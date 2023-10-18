@@ -1,3 +1,12 @@
+**Latest version: version 0.6
+
+https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/WhisperJAV_v0_6.ipynb
+
+
+
+
+
+
 **Welcome to WhisperJAV!**
 
 
