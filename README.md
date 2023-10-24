@@ -1,10 +1,10 @@
-**Latest version: version 0.6
+**Latest version: version 0.6b
 
-[https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/WhisperJAV_v0_6.ipynb](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6a.ipynb)
+[[https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/WhisperJAV_v0_6.ipynb](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6a.ipynb](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6b.ipynb))
 
 
       
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6a.ipynb)
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6b.ipynb)
       
 
 
