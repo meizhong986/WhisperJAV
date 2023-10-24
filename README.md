@@ -1,6 +1,6 @@
 **Latest version: version 0.6b
 
-[(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6b.ipynb))
+(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6b.ipynb)
 
 
       
