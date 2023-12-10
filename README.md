@@ -1,4 +1,4 @@
-**Latest version: version 0.6e (you can see all versions in folder notebook)
+**Latest version: version 0.6g (you can see all versions in folder notebook)
 
 (https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6g.ipynb)
 
@@ -7,6 +7,15 @@
   [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6g.ipynb)
   
       
+
+
+
+
+Note 1: hallucination removal is more robust in Japanese transcription than English translation task.
+
+Note 2: it works mych faster with wav audio format.
+
+
 
 
 
