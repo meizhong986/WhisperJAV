@@ -1,10 +1,10 @@
-**Latest version: version 0.6h (you can see all versions in folder notebook)
+**Latest version: version 0.6i (you can see all versions in folder notebook)
 
-(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6h.ipynb)
+(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6i.ipynb)
 
 
       
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6h.ipynb)
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6i.ipynb)
   
       
 
