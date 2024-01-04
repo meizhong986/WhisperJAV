@@ -1,10 +1,14 @@
-**Latest version: version 0.6i (you can see all versions in folder notebook)
+**Latest version: version 1.0 beta 
 
-(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6i.ipynb)
+**The beta version is a quick fix to work around the code break after the latest Google Colab upgrade.
+
+
+
+(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v1_0_beta.ipynb)
 
 
       
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_6i.ipynb)
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v1_0_beta.ipynb)
   
       
 
