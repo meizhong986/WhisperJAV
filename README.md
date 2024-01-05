@@ -1,14 +1,14 @@
-**Latest version: version 1.0 beta 
+**For fast whisper use version 0.7 
 
-**The beta version is a quick fix to work around the code break after the latest Google Colab upgrade.
+**Version 0.7 has fixed the break after the latest Google Colab upgrade. It has the same functionality as version 06i.
 
 
 
-(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v1_0_beta.ipynb)
+(https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7.ipynb)
 
 
       
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v1_0_beta.ipynb)
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7.ipynb)
   
       
 
