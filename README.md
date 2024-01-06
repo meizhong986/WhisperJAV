@@ -1,14 +1,16 @@
-**For fast whisper use version 0.7 
+**For fast whisper use version 0.7a 
 
 **Version 0.7 has fixed the break after the latest Google Colab upgrade. It has the same functionality as version 06i.
 
+**version 0.7a adds the feature: user can supply a signature text or credits that can be inserted into the beginning and the end of the srt files.
 
 
-(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7.ipynb)
+
+(https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7a.ipynb)
 
 
       
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7.ipynb)
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7a.ipynb)
   
       
 
