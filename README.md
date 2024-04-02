@@ -19,7 +19,8 @@
 
 Note 1: hallucination removal is more robust in Japanese transcription than English translation task.
 
-Note 2: it works mych faster with wav audio format.
+Note 2: it works much faster with wav audio format.
+
 
 
 
