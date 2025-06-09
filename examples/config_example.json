@@ -1,0 +1,10 @@
+{
+    "mode": "balanced",
+    "language": "ja",
+    "output_format": "srt",
+    "quality_settings": {
+        "remove_hallucinations": true,
+        "remove_repetitions": true,
+        "repetition_threshold": 2
+    }
+}

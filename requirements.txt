@@ -1,0 +1,23 @@
+# Core dependencies
+stable-ts>=2.0.0
+openai-whisper>=20230918
+faster-whisper>=0.9.0
+whisper-with-vad>=0.1.0
+
+# Audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+pydub>=0.25.0
+
+# Subtitle processing
+pysrt>=1.1.2
+regex>=2023.0.0
+
+# Utilities
+numpy>=1.24.0
+requests>=2.31.0
+tqdm>=4.66.0
+
+# Optional for advanced features
+spacy>=3.7.0
+googletrans>=4.0.0rc1
