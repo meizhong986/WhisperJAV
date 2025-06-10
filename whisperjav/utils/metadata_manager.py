@@ -34,51 +34,68 @@ class MetadataManager:
         self.output_dir = Path(output_dir)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
     def create_master_metadata(self, 
-                             input_file: str,
-                             mode: str,
-                             job_id: Optional[str] = None) -> Dict:
-        """Create initial master metadata structure."""
-        if job_id is None:
-            job_id = f"whisperjav_{int(time.time())}"
+                                 input_file: str,
+                                 mode: str,
+                                 media_info: Optional[Dict] = None,
+                                 job_id: Optional[str] = None) -> Dict[str, Any]:
+            """Create initial master metadata structure with comprehensive schema."""
+            if job_id is None:
+                job_id = f"whisperjav_{int(time.time())}"
             
-        return {
-            "metadata_master": {
-                "structure_version": "1.0.0",
-                "whisperjav_version": "1.0.0",
-                "job_id": job_id,
-                "created_at": datetime.utcnow().isoformat() + "Z",
-                "updated_at": datetime.utcnow().isoformat() + "Z"
-            },
-            "input_info": {
-                "original_input_file": input_file,
-                "processed_audio_file": None,
-                "audio_duration_seconds": None
-            },
-            "config": {
-                "mode": mode,
-                "chunking_params": {
-                    "min_dur": 0.1,
-                    "max_dur": 900.0,
-                    "max_silence": 2.0,
-                    "energy": 50
+            current_time = datetime.now().isoformat() + "Z"
+            
+            metadata = {
+                "metadata_master": {
+                    "structure_version": "1.0.0",
+                    "whisperjav_version": "1.0.0",
+                    "job_id": job_id,
+                    "created_at": current_time,
+                    "updated_at": current_time
                 },
-                "pipeline_options": {}
-            },
-            "chunks_generated": [],
-            "output_files": {},
-            "processing_stages": {},
-            "summary": {
-                "total_processing_time_seconds": 0,
-                "total_chunks_created": 0,
-                "chunks_processed_successfully": 0,
-                "final_subtitles_refined": 0,
-                "final_subtitles_raw": 0,
-                "classification_distribution": {},
-                "quality_metrics": {}
+                "input_info": {
+                    "original_input_file": input_file,
+                    "basename": Path(input_file).stem,
+                    "file_size_bytes": Path(input_file).stat().st_size if Path(input_file).exists() else 0,
+                    "processed_audio_file": None,
+                    "audio_duration_seconds": None
+                },
+                "config": {
+                    "mode": mode,
+                    "chunking_params": {
+                        "min_dur": 0.2,
+                        "max_dur": 30.0,
+                        "max_silence": 2.0,
+                        "energy": 50
+                    },
+                    "pipeline_options": {}
+                },
+                "chunks_generated": [],
+                "output_files": {},
+                "processing_stages": {},
+                "summary": {
+                    "total_processing_time_seconds": 0,
+                    "total_chunks_created": 0,
+                    "chunks_processed_successfully": 0,
+                    "final_subtitles_refined": 0,
+                    "final_subtitles_raw": 0,
+                    "classification_distribution": {},
+                    "quality_metrics": {}
+                },
+                "errors": []
             }
-        }
+            
+            # Add media info if provided
+            if media_info:
+                metadata["input_info"]["media_type"] = media_info.get("type", "unknown")
+                metadata["input_info"]["media_duration_seconds"] = media_info.get("duration", None)
+                metadata["input_info"]["media_format"] = media_info.get("format", None)
+                metadata["input_info"]["audio_codec"] = media_info.get("audio_codec", None)
+                metadata["input_info"]["video_codec"] = media_info.get("video_codec", None)
+            
+            return metadata
+            
     
     def create_chunk_metadata(self,
                             chunk_index: int,

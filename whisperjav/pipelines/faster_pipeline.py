@@ -4,15 +4,13 @@
 from pathlib import Path
 from typing import Dict
 import time
+from datetime import datetime
 
 from whisperjav.pipelines.base_pipeline import BasePipeline
-from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.stable_ts_asr import StableTSASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor
 from whisperjav.utils.logger import logger
-from whisperjav.utils.metadata_manager import MetadataManager
-
 
 
 class FasterPipeline(BasePipeline):
@@ -24,8 +22,7 @@ class FasterPipeline(BasePipeline):
                  keep_temp_files: bool = False):
         super().__init__(output_dir, temp_dir, keep_temp_files)
         
-        # Initialize modules
-        self.media_discovery = MediaDiscovery()
+        # Initialize modules (NO MediaDiscovery!)
         self.audio_extractor = AudioExtractor()
         self.asr = StableTSASR(turbo_mode=True)
         self.postprocessor = SRTPostProcessor()
@@ -33,21 +30,33 @@ class FasterPipeline(BasePipeline):
     def get_mode_name(self) -> str:
         return "faster"
         
-    def process(self, input_file: str) -> Dict:
+    def process(self, media_info: Dict) -> Dict:
         """Process media file through faster pipeline."""
         start_time = time.time()
-        media_basename = self.get_media_basename(input_file)
+        
+        # Extract info from the media_info dictionary passed from main
+        input_file = media_info['path']
+        media_basename = media_info['basename']
         
         logger.info(f"Starting FASTER pipeline for: {input_file}")
+        logger.info(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
          
-        # Create master metadata
+        # Create master metadata with the already discovered media info
         master_metadata = self.metadata_manager.create_master_metadata(
             input_file=input_file,
-            mode=self.get_mode_name()
+            mode=self.get_mode_name(),
+            media_info=media_info  # Pass the complete media info
         )
         
+        # Update config
+        master_metadata["config"]["pipeline_options"] = {
+            "model": "whisper-turbo-faster-whisper",
+            "device": self.asr.device,
+            "language": "ja"
+        }
+        
         try:
-            # Step 1: Audio extraction
+            # Step 1: Audio extraction (No more media discovery here!)
             logger.info("Step 1: Extracting audio")
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
@@ -74,9 +83,7 @@ class FasterPipeline(BasePipeline):
             
             # Step 3: Post-processing
             logger.info("Step 3: Post-processing SRT")
-            #final_srt_path = self.output_dir / f"{media_basename}.srt"
             final_srt_path = self.output_dir / f"{media_basename}.ja.whisperjav.srt"
-
             processed_srt, stats = self.postprocessor.process(raw_srt_path, final_srt_path)
             
             self.metadata_manager.update_processing_stage(
@@ -87,16 +94,24 @@ class FasterPipeline(BasePipeline):
             
             # Update final output info
             master_metadata["output_files"]["final_srt"] = str(final_srt_path)
+            master_metadata["output_files"]["raw_srt"] = str(raw_srt_path)
+            
+            # Update summary
             master_metadata["summary"]["final_subtitles_refined"] = stats['total_subtitles'] - stats['empty_removed']
+            master_metadata["summary"]["final_subtitles_raw"] = stats['total_subtitles']
             master_metadata["summary"]["quality_metrics"] = {
                 "hallucinations_removed": stats['removed_hallucinations'],
                 "repetitions_removed": stats['removed_repetitions'],
-                "duration_adjustments": stats['duration_adjustments']
+                "duration_adjustments": stats['duration_adjustments'],
+                "empty_removed": stats['empty_removed']
             }
             
             # Calculate total processing time
             total_time = time.time() - start_time
-            master_metadata["summary"]["total_processing_time_seconds"] = total_time
+            master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
+            
+            # Update the updated_at timestamp
+            master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
             
             # Save metadata
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)

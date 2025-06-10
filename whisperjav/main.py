@@ -7,9 +7,8 @@ Main entry point for the application.
 import argparse
 import sys
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 import json
-
 
 from whisperjav.utils.logger import setup_logger, logger
 from whisperjav.modules.media_discovery import MediaDiscovery
@@ -17,15 +16,20 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 def print_banner():
     """Print application banner."""
     banner = f"""
 ╔═══════════════════════════════════════════════════╗
-║          WhisperJAV v{__version__}                      ║
+║          WhisperJAV v{__version__}                ║
 ║   Japanese Adult Video Subtitle Generator         ║
 ║   Optimized for JAV content transcription         ║
+║                                                   ║
+║   Available modes:                                ║
+║   - faster: Faster-whisper backend                ║
+║   - fast: Standard whisper with chunking          ║
+║   - balanced: Coming soon                         ║
 ╚═══════════════════════════════════════════════════╝
 """
     print(banner)
@@ -37,36 +41,30 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process single file
-  whisperjav video.mp4
-  
-  # Process with specific mode
-  whisperjav video.mp4 --mode faster
-  
-  # Process multiple files with wildcards
-  whisperjav "*.mp4" --output-dir ./subtitles
-  
+  # Process a single file in fast mode
+  whisperjav "path/to/my video.mp4" --mode fast
+
+  # Process all MKV files in a directory
+  whisperjav "./videos/*.mkv" --mode faster --output-dir ./subs
+
   # Keep temporary files for debugging
   whisperjav video.mp4 --keep-temp
 """
     )
     
-    # Required arguments
     parser.add_argument(
         "input",
-        nargs="+",
-        help="Input video file(s) or directory. Supports wildcards."
+        nargs="*",
+        help="Input media file(s), directory, or wildcard pattern (e.g., \"*.mp4\")."
     )
     
-    # Mode selection
     parser.add_argument(
         "--mode",
         choices=["balanced", "fast", "faster"],
-        default="balanced",
-        help="Processing mode (default: balanced)"
+        default="fast",
+        help="Processing mode (default: fast)"
     )
     
-    # Output options
     parser.add_argument(
         "--output-dir",
         default="./output",
@@ -79,7 +77,6 @@ Examples:
         help="Temporary directory for processing (default: ./temp)"
     )
     
-    # Processing options
     parser.add_argument(
         "--language",
         default="ja",
@@ -93,34 +90,6 @@ Examples:
     )
     
     parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=16,
-        help="Batch size for turbo mode (default: 16)"
-    )
-    
-    # Post-processing options
-    parser.add_argument(
-        "--no-remove-hallucinations",
-        action="store_true",
-        help="Disable hallucination removal"
-    )
-    
-    parser.add_argument(
-        "--no-remove-repetitions",
-        action="store_true",
-        help="Disable repetition removal"
-    )
-    
-    parser.add_argument(
-        "--repetition-threshold",
-        type=int,
-        default=2,
-        help="Number of allowed repetitions (default: 2)"
-    )
-    
-    # Logging options
-    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
@@ -132,7 +101,6 @@ Examples:
         help="Log file path"
     )
     
-    # Other options
     parser.add_argument(
         "--version",
         action="version",
@@ -146,7 +114,7 @@ Examples:
     
     return parser.parse_args()
 
-def process_files(files: List[Path], args):
+def process_files(media_files: List[Dict], args):
     """Process multiple files with the selected pipeline."""
     # Select pipeline based on mode
     if args.mode == "faster":
@@ -155,39 +123,44 @@ def process_files(files: List[Path], args):
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp
         )
+    elif args.mode == "fast":
+        pipeline = FastPipeline(
+            output_dir=args.output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp
+        )
+    elif args.mode == "balanced":
+        logger.error(f"Mode 'balanced' not yet implemented. Please use 'faster' or 'fast' mode.")
+        sys.exit(1)
     else:
-        logger.error(f"Mode '{args.mode}' not yet implemented. Only 'faster' mode is available in v1.0")
+        logger.error(f"Unknown mode '{args.mode}'")
         sys.exit(1)
         
-    # Process each file
     all_stats = []
     failed_files = []
     
-    for i, file_path in enumerate(files, 1):
-        logger.info(f"\nProcessing file {i}/{len(files)}: {file_path.name}")
+    total_files = len(media_files)
+    for i, media_info in enumerate(media_files, 1):
+        file_path_str = media_info.get('path', 'Unknown File')
+        file_name = Path(file_path_str).name
+        
+        logger.info(f"\nProcessing file {i}/{total_files}: {file_name}")
         
         try:
-            metadata = pipeline.process(str(file_path))
-            all_stats.append({
-                "file": str(file_path),
-                "status": "success",
-                "metadata": metadata
-            })
+            # Pass the complete media_info dictionary, not just the path!
+            metadata = pipeline.process(media_info)
+            all_stats.append({"file": file_path_str, "status": "success", "metadata": metadata})
         except Exception as e:
-            logger.error(f"Failed to process {file_path}: {e}")
-            failed_files.append(str(file_path))
-            all_stats.append({
-                "file": str(file_path),
-                "status": "failed",
-                "error": str(e)
-            })
+            logger.error(f"Failed to process {file_path_str}: {e}", exc_info=True)
+            failed_files.append(file_path_str)
+            all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
             
     # Summary
     logger.info("\n" + "="*50)
     logger.info("PROCESSING SUMMARY")
     logger.info("="*50)
-    logger.info(f"Total files: {len(files)}")
-    logger.info(f"Successful: {len(files) - len(failed_files)}")
+    logger.info(f"Total files: {total_files}")
+    logger.info(f"Successful: {total_files - len(failed_files)}")
     logger.info(f"Failed: {len(failed_files)}")
     
     if failed_files:
@@ -195,7 +168,6 @@ def process_files(files: List[Path], args):
         for file in failed_files:
             logger.warning(f"  - {file}")
             
-    # Save statistics if requested
     if args.stats_file:
         with open(args.stats_file, 'w', encoding='utf-8') as f:
             json.dump(all_stats, f, indent=2, ensure_ascii=False)
@@ -204,32 +176,34 @@ def process_files(files: List[Path], args):
 def main():
     """Main entry point."""
     args = parse_arguments()
-    
-    # Setup logging
+
     global logger
     logger = setup_logger("whisperjav", args.log_level, args.log_file)
-    
-    # Print banner
+
     print_banner()
-    
-    # Discover media files
-    discovery = MediaDiscovery()
-    files = discovery.discover_media_files(args.input)
-    
-    if not files:
-        logger.error("No media files found!")
+
+    if not args.input:
+        logger.error("No input files specified. Use -h for help.")
         sys.exit(1)
         
-    logger.info(f"Found {len(files)} media file(s) to process")
-    
-    # Process files
+    # Step 1: Discover all media files ONCE at the beginning.
+    discovery = MediaDiscovery()
+    media_files = discovery.discover(args.input)
+
+    if not media_files:
+        logger.error(f"No valid media files found in the specified paths: {', '.join(args.input)}")
+        sys.exit(1)
+
+    logger.info(f"Found {len(media_files)} media file(s) to process")
+
+    # Step 2: Process the discovered files by passing the rich metadata.
     try:
-        process_files(files, args)
+        process_files(media_files, args)
     except KeyboardInterrupt:
         logger.warning("\nProcessing interrupted by user")
         sys.exit(1)
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":

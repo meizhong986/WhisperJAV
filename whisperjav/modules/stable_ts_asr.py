@@ -120,10 +120,7 @@ class StableTSASR:
         result = self.transcribe(audio_path, **kwargs)
         
         # Generate the proper output filename
-        output_path = Path(output_srt_path)
-        media_basename = output_path.stem.replace('_extracted', '')  # Remove _extracted suffix if present
-        lang_code = "ja" if task == "transcribe" else "en"
-        final_output_path = output_path.parent / f"{media_basename}.{lang_code}.whisperjav.srt"
+        final_output_path = Path(output_srt_path)
         
         # Save to SRT
         self._save_to_srt(result, final_output_path)
@@ -206,7 +203,6 @@ class StableTSASR:
         )
         '''
         
-
     def _save_to_srt(self, result: stable_whisper.WhisperResult, output_path: Path):
         """Save transcription result to SRT file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
