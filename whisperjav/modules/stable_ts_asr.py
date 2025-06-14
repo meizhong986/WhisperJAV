@@ -32,13 +32,17 @@ class LexicalSets:
 class StableTSASR:
     """Stable-ts ASR wrapper supporting both standard and turbo modes."""
     
+
     def __init__(self,
                  model_name: str = "turbo",
                  language: str = "ja",
                  temperature: float = 0.0,
                  turbo_mode: bool = True,
                  device: Optional[str] = "cuda"):
-        self.model_name = "turbo" if turbo_mode else model_name
+        
+        # --- FIX: Removed the logic that incorrectly overwrites the model_name ---
+        self.model_name = model_name
+        
         self.language = language
         self.temperature = temperature
         self.turbo_mode = turbo_mode
@@ -63,14 +67,14 @@ class StableTSASR:
                 'language': self.language,
                 'task': 'transcribe',
                 'temperature': (0.0, 0.4),
-                'beam_size': 5,
-                'best_of': 5,
+                'beam_size': 2,
+                'best_of': 2,
                 'patience': 1.0,
                 'vad': True,
-                'vad_threshold': 0.5,
-                'condition_on_previous_text': True,
+                'vad_threshold': 0.2,
+                'condition_on_previous_text': False,
                 'compression_ratio_threshold': 2.4,
-                'no_speech_threshold': 0.6,
+                'no_speech_threshold': 0.65,
                 'repetition_penalty': 1.0,
                 'no_repeat_ngram_size': 0,
                 'log_prob_threshold': -1.0,
@@ -81,12 +85,12 @@ class StableTSASR:
                 'language': self.language,
                 'task': 'transcribe',
                 'temperature': self.temperature,
-                'beam_size': 5,
+                'beam_size': 2,
                 'vad': True,
-                'vad_threshold': 0.5,
-                'condition_on_previous_text': True,
+                'vad_threshold': 0.2,
+                'condition_on_previous_text': False,
                 'compression_ratio_threshold': 2.4,
-                'no_speech_threshold': 0.6,
+                'no_speech_threshold': 0.65,
             }
     
     def transcribe(self, audio_path: Union[str, Path], **kwargs) -> stable_whisper.WhisperResult:
@@ -94,14 +98,21 @@ class StableTSASR:
         audio_path = Path(audio_path)
         logger.info(f"Transcribing: {audio_path.name}")
         
-        # Merge provided kwargs with defaults
-        params = {**self.default_params, **kwargs}
+        # --- REVISED: Explicitly handle the 'task' parameter ---
         
+        # Start with the class defaults
+        params = self.default_params.copy()
+        
+        # Update with any user-provided kwargs
+        params.update(kwargs)
+        
+        # The 'task' in kwargs should have already overwritten the default,
+        # but this makes the intention explicit and safe.
+        task = params.get('task', 'transcribe')
+        logger.debug(f"ASR task set to: {task}")
+
         # Transcribe
-        if self.turbo_mode:
-            result = self.model.transcribe(str(audio_path), **params)
-        else:
-            result = self.model.transcribe(str(audio_path), **params)
+        result = self.model.transcribe(str(audio_path), **params)
             
         # Apply post-processing
         self._postprocess(result)

@@ -1,0 +1,98 @@
+{
+  "//": "WhisperJAV Configuration File Template. Users can copy this to 'config.json' and modify.",
+  "components": {
+    "__description": "Reusable parameter blocks for different processing modules.",
+
+    "scene_detection_default": {
+      "__description": "Default settings for scene detection. Used by 'fast' and 'balanced' pipelines.",
+      "max_duration": 30.0,
+      "min_duration": 0.2,
+      "max_silence": 2.0,
+      "energy_threshold": 50
+    },
+
+    "asr_faster_whisper": {
+      "__description": "Settings for the 'faster' pipeline using faster-whisper.",
+      "model_load_params": {
+        "model_name": "turbo",
+        "device": "cuda",
+        "compute_type": "float16"
+      },
+      "transcribe_method_params": {
+        "language": "ja",
+        "beam_size": 2
+      }
+    },
+
+    "asr_stable_ts": {
+      "__description": "Settings for the 'fast' pipeline using stable-ts (standard whisper).",
+      "model_load_params": {
+        "model_name": "turbo",
+        "device": "cuda"
+      },
+      "transcribe_method_params": {
+        "language": "ja"
+      }
+    },
+
+    "asr_whisper_pro_vad": {
+      "__description": "Settings for the 'balanced' pipeline with Silero VAD.",
+      "model_load_params": {
+        "model_name": "turbo",
+        "device": "cuda"
+      },
+      "transcribe_method_params": {
+        "language": "ja",
+        "vad_params": {
+          "threshold": 0.2,
+          "chunk_threshold": 4.0
+        }
+      }
+    },
+
+    "post_processing_default": {
+      "__description": "Standard post-processing to remove hallucinations and repetitions.",
+      "remove_hallucinations": true,
+      "remove_repetitions": true
+    },
+    
+    "audio_enhancement_default": {
+        "__description": "Placeholder for default audio enhancement.",
+        "apply_noise_reduction": false
+    },
+
+    "audio_enhancement_vocal": {
+        "__description": "Placeholder for audio enhancement with vocal extraction.",
+        "apply_noise_reduction": true,
+        "enable_vocal_extraction": true
+    }
+  },
+
+  "pipelines": {
+    "__description": "Defines which components each pipeline mode will use by default.",
+    "faster": {
+      "transcription": "asr_faster_whisper",
+      "post_processing": "post_processing_default"
+    },
+    "fast": {
+      "scene_detection": "scene_detection_default",
+      "transcription": "asr_stable_ts",
+      "post_processing": "post_processing_default",
+      "audio_enhancement": "audio_enhancement_default"
+    },
+    "balanced": {
+      "scene_detection": "scene_detection_default",
+      "transcription": "asr_whisper_pro_vad",
+      "post_processing": "post_processing_default",
+      "audio_enhancement": "audio_enhancement_default"
+    }
+  },
+
+  "actionable_profiles": {
+    "__description": "Dynamically overrides component settings when a scene is classified with a certain type.",
+    "music": {
+      "__description": "When a scene is classified as 'music', use these components instead of the pipeline's default.",
+      "audio_enhancement": "audio_enhancement_vocal"
+    }
+  }
+}
