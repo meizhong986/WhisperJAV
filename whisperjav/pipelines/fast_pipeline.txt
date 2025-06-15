@@ -22,66 +22,55 @@ from whisperjav.modules.srt_postproduction import SRTPostProduction
 class FastPipeline(BasePipeline):
     """Fast pipeline using standard Whisper with mandatory scene detection."""
     
-    # --- FUNCTION MODIFIED ---
-    def __init__(self, 
-                 output_dir: str, 
-                 temp_dir: str, 
-                 keep_temp_files: bool, 
-                 subs_language: str,
-                 resolved_params: Dict, 
-                 **kwargs):
-        """
-        Initializes the FastPipeline using resolved configuration parameters.
-        """
+
+    def __init__(self, output_dir: str, temp_dir: str, keep_temp_files: bool, components: dict, config: dict, subs_language: str, **kwargs):
+        """Initializes the FastPipeline."""
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files, **kwargs)
         
         self.subs_language = subs_language
 
-        # Unpack the resolved parameter dictionaries
-        load_params = resolved_params.get('model_load_params', {})
-        self.transcribe_options = resolved_params.get('transcribe_options', {})
-        self.decode_options = resolved_params.get('decode_options', {})
-        stable_ts_opts = resolved_params.get('stable_ts_options', {})
-        post_proc_opts = resolved_params.get('post_processing_options', {})
-        scene_opts = resolved_params.get('scene_options', {})
-
-        # Set the ASR task based on the chosen output language
+        # Get component configurations
+        scene_conf = components.get(config.get("scene_detection", "scene_detection_default"), {})
+        transcription_conf = components.get(config.get("transcription", "asr_stable_ts"), {})
+        post_processing_conf = components.get(config.get("post_processing", "post_processing_default"), {})
+        
+        load_params = transcription_conf.get("model_load_params", {})
+        
+        self.transcribe_options = transcription_conf.get("transcribe_method_params", {})
         self.transcribe_options['task'] = 'translate' if self.subs_language == 'english-direct' else 'transcribe'
         
-        # Store scene detection params for metadata logging
-        self.scene_detection_params = scene_opts
+        self.scene_detection_params = scene_conf
 
-        # Implement the smart model-switching logic
+        # --- REVISED: Simple model switching logic as instructed ---
         effective_model_name = load_params.get("model_name", "large-v2")
+
         if self.subs_language == 'english-direct' and effective_model_name == 'turbo':
             logger.info("Direct translation requested. Switching model from 'turbo' to 'large-v2' to perform translation.")
             effective_model_name = 'large-v2'
 
-        # Instantiate modules
+        # Instantiate modules. turbo_mode is always False for the 'fast' pipeline.
         self.audio_extractor = AudioExtractor()
-        self.scene_detector = SceneDetector(**scene_opts)
+        self.scene_detector = SceneDetector(
+            max_duration=scene_conf.get("max_duration", 30.0),
+            min_duration=scene_conf.get("min_duration", 0.2),
+            max_silence=scene_conf.get("max_silence", 2.0),
+            energy_threshold=scene_conf.get("energy_threshold", 50)
+        )
         
-        final_load_params = {**load_params, 'model_name': effective_model_name}
-
         self.asr = StableTSASR(
-            model_load_params=final_load_params,
-            transcribe_options=self.transcribe_options,
-            decode_options=self.decode_options,
-            stable_ts_options=stable_ts_opts,
-            turbo_mode=False # This is specific to the fast pipeline
+            model_name=effective_model_name,
+            turbo_mode=False,
+            device=load_params.get("device", "cuda")
         )
 
         self.stitcher = SRTStitcher()
-        self.standard_postprocessor = StandardPostProcessor(**post_proc_opts)
-        
+        self.standard_postprocessor = StandardPostProcessor(**post_processing_conf)
+
         self.smart_postprocessor = SRTPostProduction()
         self.classifier = SegmentClassifier()
         self.preprocessor = AudioPreprocessor()
         
-    def get_mode_name(self) -> str:
-        return "fast"
         
-    # --- THIS FUNCTION HAS BEEN RESTORED TO ITS COMPLETE BASELINE VERSION ---
     def process(self, media_info: Dict) -> Dict:
         """Process media file through fast pipeline with mandatory scene detection."""
         start_time = time.time()
@@ -98,12 +87,26 @@ class FastPipeline(BasePipeline):
             media_info=media_info
         )
         
+        master_metadata["config"]["enhancement_options"] = {
+            "adaptive_classification": self.adaptive_classification,
+            "adaptive_audio_enhancement": self.adaptive_audio_enhancement,
+            "smart_postprocessing": self.smart_postprocessing
+        }
+        
         master_metadata["config"]["scene_detection_params"] = self.scene_detection_params
+        master_metadata["config"]["pipeline_options"] = {
+            "model": "whisper-turbo-standard",
+            "device": self.asr.device,
+            "language": "ja" # Input language is always Japanese
+        }
         
         try:
             logger.info("Step 1: Extracting audio")
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
+            
+            master_metadata["input_info"]["processed_audio_file"] = str(extracted_audio)
+            master_metadata["input_info"]["audio_duration_seconds"] = duration
             self.metadata_manager.update_processing_stage(
                 master_metadata, "audio_extraction", "completed",
                 output_path=str(audio_path),
@@ -136,10 +139,19 @@ class FastPipeline(BasePipeline):
                 scenes_dir=str(scenes_dir)
             )
             
-            if self.smart_postprocessing:
-                 logger.info("Smart Post-Processing enabled.")
+            if self.adaptive_classification:
+                logger.info("Optional Step 2a: Applying Adaptive Classification (Placeholder)")
+                self.metadata_manager.update_processing_stage(
+                    master_metadata, "scene_classification", "skipped_no_logic", enabled=True
+                )
 
-            logger.info("Step 3: Transcribing scenes with standard Whisper")
+            if self.adaptive_audio_enhancement:
+                logger.info("Optional Step 2b: Applying Adaptive Audio Enhancement (Placeholder)")
+                self.metadata_manager.update_processing_stage(
+                    master_metadata, "audio_preprocessing", "skipped_no_logic", enabled=True
+                )
+
+            logger.info("Step 3: Transcribing scenes with standard Whisper (turbo model)")
             scene_srts_dir = self.temp_dir / "scene_srts"
             scene_srts_dir.mkdir(exist_ok=True)
             
@@ -149,7 +161,7 @@ class FastPipeline(BasePipeline):
                 
                 scene_srt_path = scene_srts_dir / f"{scene_path.stem}.srt"
                 try:
-                    self.asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.transcribe_options['task'])
+                    self.asr.transcribe_to_srt(scene_path, scene_srt_path, **self.transcribe_options)
                     if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:
                         scene_srt_info.append((scene_srt_path, start_time_sec))
                         master_metadata["scenes_detected"][idx]["transcribed"] = True
@@ -166,7 +178,7 @@ class FastPipeline(BasePipeline):
             
             self.metadata_manager.update_processing_stage(
                 master_metadata, "transcription", "completed",
-                model=self.asr.model_name,
+                model="whisper-turbo-standard",
                 scenes_transcribed=len(scene_srt_info),
                 total_scenes=len(scene_paths)
             )
@@ -182,25 +194,33 @@ class FastPipeline(BasePipeline):
             )
             
             logger.info("Step 5: Post-processing final SRT")
+            # --- FIX: Use dynamic language code for output filename ---
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
 
-            _, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
-                
-            self.metadata_manager.update_processing_stage(
-                master_metadata, "postprocessing", "completed", statistics=stats, output_path=str(final_srt_path)
-            )
+            if self.smart_postprocessing:
+                logger.info("Using Smart Post-Processing (Placeholder)")
+                _, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
+                self.metadata_manager.update_processing_stage(
+                    master_metadata, "postprocessing", "completed_smart_placeholder", statistics=stats, enabled=True
+                )
+            else:
+                logger.info("Using Standard Post-Processing")
+                _, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
+                self.metadata_manager.update_processing_stage(
+                    master_metadata, "postprocessing", "completed_standard", statistics=stats
+                )
             
             master_metadata["output_files"]["final_srt"] = str(final_srt_path)
             master_metadata["output_files"]["stitched_srt"] = str(stitched_srt_path)
             
-            master_metadata["summary"]["final_subtitles_refined"] = stats.get('total_subtitles', 0) - stats.get('empty_removed', 0)
+            master_metadata["summary"]["final_subtitles_refined"] = stats['total_subtitles'] - stats['empty_removed']
             master_metadata["summary"]["final_subtitles_raw"] = num_subtitles
             master_metadata["summary"]["quality_metrics"] = {
-                "hallucinations_removed": stats.get('removed_hallucinations', 0),
-                "repetitions_removed": stats.get('removed_repetitions', 0),
-                "duration_adjustments": stats.get('duration_adjustments', 0),
-                "empty_removed": stats.get('empty_removed', 0)
+                "hallucinations_removed": stats['removed_hallucinations'],
+                "repetitions_removed": stats['removed_repetitions'],
+                "duration_adjustments": stats['duration_adjustments'],
+                "empty_removed": stats['empty_removed']
             }
             
             total_time = time.time() - start_time
@@ -224,3 +244,7 @@ class FastPipeline(BasePipeline):
             )
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
             raise
+            
+            
+    def get_mode_name(self) -> str:
+        return "fast"

@@ -50,8 +50,10 @@ class FasterPipeline(BasePipeline):
         # Instantiate modules with the final, correct parameters
         self.audio_extractor = AudioExtractor()
         
+        final_load_params = {**load_params, 'model_name': effective_model_name}
+        
         self.asr = StableTSASR(
-            model_load_params={**load_params, 'model_name': effective_model_name},
+            model_load_params=final_load_params,
             transcribe_options=self.transcribe_options,
             decode_options=self.decode_options,
             stable_ts_options=stable_ts_opts,

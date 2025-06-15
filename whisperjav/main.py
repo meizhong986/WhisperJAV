@@ -18,6 +18,8 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
+# --- NEW: Import the TranscriptionTuner ---
+from whisperjav.config.transcription_tuner import TranscriptionTuner
 
 __version__ = "1.1.0"
 
@@ -50,7 +52,6 @@ def merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, A
         else:
             result[key] = value
     return result
-
 
 
 def parse_arguments():
@@ -88,15 +89,22 @@ def parse_arguments():
     
     # Advanced Tuning Arguments
     tuning_group = parser.add_argument_group("Advanced Tuning (Overrides config file)")
-    tuning_group.add_argument("--model", default=None, help="Whisper model size for balanced mode (e.g., 'large-v2').")
+    tuning_group.add_argument("--model", default='turbo', help="Whisper model size for balanced mode (e.g., 'large-v2').")
     tuning_group.add_argument("--vad-threshold", type=float, default=None, help="VAD threshold for speech detection.")
+    # --- NEW: Added --sensitivity flag ---
+    tuning_group.add_argument(
+        "--sensitivity",
+        choices=["conservative", "balanced", "aggressive"],
+        default="balanced",
+        help="Set the transcription sensitivity to control the detail vs. noise trade-off."
+    )
     
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
     
     return parser.parse_args()
 
 
-def process_files(media_files: List[Dict], args: argparse.Namespace, components_config: Dict, pipeline_config: Dict):
+def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_params: Dict):
     """Process multiple files with the selected pipeline."""
     
     enhancement_kwargs = {
@@ -105,14 +113,12 @@ def process_files(media_files: List[Dict], args: argparse.Namespace, components_
         "smart_postprocessing": args.smart_postprocessing
     }
 
-    # FIX: Added 'subs_language' to the dictionary of arguments passed to the pipelines.
     pipeline_args = {
         "output_dir": args.output_dir,
         "temp_dir": args.temp_dir,
         "keep_temp_files": args.keep_temp,
-        "components": components_config,
-        "config": pipeline_config,
         "subs_language": args.subs_language,
+        "resolved_params": resolved_params, # Pass the single resolved params dictionary
         **enhancement_kwargs
     }
 
@@ -168,55 +174,43 @@ def main():
         logger.error("No input files specified. Use -h for help.")
         sys.exit(1)
 
-    # --- Configuration Loading and Merging Logic ---
+    # --- REVISED: Use TranscriptionTuner to handle all config logic ---
     
-    # 1. Load base configuration from the default template.
-    final_config = {}
-    template_path = Path(__file__).resolve().parent.parent / "config.template.json"
-    if template_path.exists():
-        with open(template_path, 'r', encoding='utf-8') as f:
-            final_config = json.load(f)
-    
-    # 2. Load user's configuration file if provided and merge it over the base.
-    if args.config:
-        config_path = Path(args.config)
-        if config_path.exists():
-            logger.info(f"Loading configuration from: {config_path}")
-            with open(config_path, 'r', encoding='utf-8') as f:
-                user_config = json.load(f)
-                final_config = merge_configs(final_config, user_config)
-        else:
-            logger.error(f"Configuration file not found: {config_path}")
-            sys.exit(1)
-            
-    # 3. Get the component definitions and the blueprint for the selected pipeline.
-    components = final_config.get("components", {})
-    pipeline_blueprint = final_config.get("pipelines", {}).get(args.mode, {})
+    # 1. Instantiate the tuner. It handles loading the base and user configs.
+    config_path = Path(args.config) if args.config else None
+    tuner = TranscriptionTuner(config_path=config_path)
 
-    # 4. Surgically apply CLI arguments, which have the highest priority.
-    #    This logic now uses the argparse defaults if the user provides no override.
-    trans_comp_name = pipeline_blueprint.get("transcription")
-    if trans_comp_name and trans_comp_name in components:
-        if args.mode == 'balanced':
-            # Ensure nested dictionaries exist before assignment using setdefault
-            components[trans_comp_name].setdefault('model_load_params', {})['model_name'] = args.model
-            logger.debug(f"Final model_name for component '{trans_comp_name}' is '{args.model}'")
-            
-            vad_params = components[trans_comp_name].setdefault('transcribe_method_params', {}).setdefault('vad_params', {})
-            vad_params['threshold'] = args.vad_threshold
-            logger.debug(f"Final vad_threshold for component '{trans_comp_name}' is '{args.vad_threshold}'")
+    # 2. Get the fully resolved parameters for all workers.
+    # The tuner handles the logic for mode and sensitivity.
+    resolved_params = tuner.get_resolved_params(
+        mode=args.mode,
+        sensitivity=args.sensitivity
+    )
 
-    # 5. Set up temp directory
+    if not resolved_params:
+        logger.error("Could not resolve transcription parameters. Check config file. Exiting.")
+        sys.exit(1)
+        
+    # 3. Apply final CLI overrides for parameters not related to sensitivity profiles.
+    # This logic is kept for backward compatibility and specific use cases.
+    if args.model:
+        if 'model_load_params' not in resolved_params: resolved_params['model_load_params'] = {}
+        resolved_params['model_load_params']['model_name'] = args.model
+        logger.debug(f"CLI override: model_name set to '{args.model}'")
+
+    if args.vad_threshold is not None:
+        if 'vad_options' not in resolved_params: resolved_params['vad_options'] = {}
+        resolved_params['vad_options']['threshold'] = args.vad_threshold
+        logger.debug(f"CLI override: vad_threshold set to '{args.vad_threshold}'")
+
+    # 4. Set up temp directory
     if args.temp_dir:
         temp_path = Path(args.temp_dir)
-        logger.info(f"Using user-specified temporary directory: {temp_path}")
     else:
         temp_path = Path(tempfile.gettempdir()) / "whisperjav"
-        logger.info(f"Using OS default temporary directory: {temp_path}")
     temp_path.mkdir(parents=True, exist_ok=True)
     args.temp_dir = str(temp_path)
-    
-    # --- END REVISED LOGIC ---
+    logger.info(f"Using temporary directory: {args.temp_dir}")
         
     discovery = MediaDiscovery()
     media_files = discovery.discover(args.input)
@@ -228,8 +222,8 @@ def main():
     logger.info(f"Found {len(media_files)} media file(s) to process")
 
     try:
-        # Pass the final, merged configuration to the processing function
-        process_files(media_files, args, components, pipeline_blueprint)
+        # Pass the final, resolved parameters to the processing function
+        process_files(media_files, args, resolved_params)
     except KeyboardInterrupt:
         logger.warning("\nProcessing interrupted by user")
         sys.exit(1)
@@ -239,3 +233,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
