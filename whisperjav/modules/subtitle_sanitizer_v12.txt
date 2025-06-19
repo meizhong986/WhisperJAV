@@ -1,0 +1,915 @@
+# whisperjav/modules/subtitle_sanitizer.py
+#V12 - Complete with all improvements and fixes
+
+import pysrt
+import shutil
+from pathlib import Path
+from typing import List, Dict, Tuple, Optional, Any
+from datetime import datetime, timedelta
+from dataclasses import dataclass, asdict
+
+from whisperjav.utils.logger import logger
+from whisperjav.config.sanitization_config import SanitizationConfig
+from whisperjav.modules.hallucination_remover import HallucinationRemover
+from whisperjav.modules.repetition_cleaner import RepetitionCleaner
+from whisperjav.modules.cross_subtitle_processor import CrossSubtitleProcessor
+from whisperjav.modules.timing_adjuster import TimingAdjuster
+
+@dataclass
+class SanitizationResult:
+    """Result of sanitization process"""
+    sanitized_path: Path
+    original_backup_path: Optional[Path]
+    artifacts_path: Optional[Path]
+    statistics: Dict[str, Any]
+    processing_time: float
+    
+@dataclass
+class ArtifactEntry:
+    """Represents a removed or modified subtitle entry"""
+    index: int# whisperjav/modules/subtitle_sanitizer.py
+
+    def _validate_repetition_cleaning(self, original: str, cleaned: str) -> bool:
+        """Validate that repetition cleaning didn't corrupt content"""
+        
+        # Basic sanity checks
+        if not cleaned or len(cleaned) == 0:
+            ##- return False
+            ##+ logger.warning(f"Repetition cleaning validation failed: resulted in empty subtitle from '{original[:20]}...'")
+            ##+ return False
+            
+        # Ensure no content duplication occurred
+        original_words = original.split()
+        cleaned_words = cleaned.split()
+        
+        for word in set(original_words):
+            if word in cleaned:
+                original_count = original.count(word)
+                cleaned_count = cleaned.count(word)
+                if cleaned_count > original_count:
+                    logger.warning(f"Repetition cleaning created duplication: '{word}' {original_count} → {cleaned_count}")
+                    return False
+        
+        ##- # Ensure meaningful reduction (not just random changes)
+        ##- if len(cleaned) >= len(original):
+        ##-     logger.warning(f"Repetition cleaning didn't reduce length: {len(original)} → {len(cleaned)}")
+        ##-     return False
+            
+        ##- # Ensure not over-reduced
+        ##- if len(cleaned) < len(original) * 0.1:
+        ##-     logger.warning(f"Repetition cleaning over-reduced content: {len(original)} → {len(cleaned)}")
+        ##-     return False
+        
+        ##+ # CRITICAL FIX: The "over-reduction" check has been removed.
+        ##+ # The original logic (if len(cleaned) < len(original) * 0.1) was the
+        ##+ # primary reason the provided examples were not being cleaned.
+        ##+ # Extreme repetitions REQUIRE extreme length reduction.
+            
+        return True
+    start_time: str
+    end_time: str
+    original_text: str
+    modified_text: Optional[str]  # None if completely removed
+    reason: str
+    category: str
+    confidence: float
+    pattern: Optional[str]
+    step: str
+    additional_info: Dict[str, Any]
+
+@dataclass
+class Phase1Stats:
+    """Statistics for Phase 1 processing"""
+    original_count: int = 0
+    exact_hall_pass1_removed: int = 0
+    repetition_cleaned: int = 0
+    exact_hall_pass2_removed: int = 0
+    empty_purged: int = 0
+    final_count: int = 0
+    hallucination_phrases_loaded: Dict[str, int] = None
+
+class SubtitleSanitizer:
+    """Comprehensive subtitle sanitization system with improved Phase 1 and validation"""
+    
+    def __init__(self, config: Optional[SanitizationConfig] = None,
+                 config_file: Optional[Path] = None,
+                 testing_profile: Optional[str] = None):
+        """
+        Initialize SubtitleSanitizer with full backward compatibility
+        """
+        
+        # Initialize configuration - UNCHANGED from original
+        if config:
+            self.config = config
+        elif config_file:
+            self.config = SanitizationConfig.from_file(config_file)
+        elif testing_profile:
+            from whisperjav.config.sanitization_config import get_testing_profile
+            self.config = get_testing_profile(testing_profile)
+        else:
+            self.config = SanitizationConfig()
+            
+        # Apply environment overrides - UNCHANGED from original
+        if not config:  # Only apply env overrides if not explicitly configured
+            self.config = SanitizationConfig.from_env()
+            
+        # Get effective constants - UNCHANGED from original
+        self.constants = self.config.get_effective_constants()
+        
+        # Initialize processors - IMPROVED with error handling
+        self._init_processors()
+        
+        # Track all modifications - UNCHANGED from original
+        self.artifact_entries: List[ArtifactEntry] = []
+        
+        # Phase 1 statistics - UNCHANGED from original
+        self.phase1_stats = Phase1Stats()
+        
+        logger.info(f"SubtitleSanitizer v11 initialized with sensitivity: {self.config.sensitivity_mode}")
+        
+    def _init_processors(self):
+        """Initialize all sub-processors with improved error handling"""
+        # Hallucination remover
+        if self.config.enable_exact_matching or self.config.enable_regex_matching or self.config.enable_fuzzy_matching:
+            try:
+                self.hallucination_remover = HallucinationRemover(
+                    self.constants['hallucination'],
+                    self.config.primary_language,
+                    self.config.user_blacklist_patterns
+                )
+                logger.info("✓ Hallucination remover initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize hallucination remover: {e}")
+                self.hallucination_remover = None
+        else:
+            self.hallucination_remover = None
+            
+        # IMPROVED: Repetition cleaner with enhanced patterns
+        if self.config.enable_repetition_cleaning:
+            try:
+                self.repetition_cleaner = RepetitionCleaner(self.constants['repetition'])
+                logger.info("✓ Repetition cleaner initialized with improved patterns")
+            except Exception as e:
+                logger.error(f"Failed to initialize repetition cleaner: {e}")
+                self.repetition_cleaner = None
+        else:
+            self.repetition_cleaner = None
+            
+        # Cross-subtitle processor
+        if self.config.enable_cross_subtitle:
+            try:
+                self.cross_subtitle_processor = CrossSubtitleProcessor(
+                    self.constants['cross_subtitle'],
+                    self.config.primary_language
+                )
+                logger.info("✓ Cross-subtitle processor initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize cross-subtitle processor: {e}")
+                self.cross_subtitle_processor = None
+        else:
+            self.cross_subtitle_processor = None
+            
+        # IMPROVED: Strict timing adjuster
+        try:
+            self.timing_adjuster = TimingAdjuster(
+                self.constants['timing'],
+                self.constants['cross_subtitle'],
+                self.config.primary_language
+            )
+            logger.info("✓ Timing adjuster initialized with strict conditions")
+        except Exception as e:
+            logger.error(f"Failed to initialize timing adjuster: {e}")
+            self.timing_adjuster = None
+        
+    def process(self, input_srt_path: Path) -> SanitizationResult:
+        """Process SRT file using improved pipeline with comprehensive validation"""
+        start_time = datetime.now()
+        input_srt_path = Path(input_srt_path)
+        
+        logger.info(f"Starting improved sanitization of: {input_srt_path}")
+        
+        try:
+            return self._process_with_validation(input_srt_path, start_time)
+        except Exception as e:
+            logger.error(f"Critical sanitization failure for {input_srt_path}: {e}")
+            
+            # Return minimal result on complete failure
+            processing_time = (datetime.now() - start_time).total_seconds()
+            return SanitizationResult(
+                sanitized_path=input_srt_path,  # Return original file
+                original_backup_path=None,
+                artifacts_path=None,
+                statistics={
+                    'error': str(e),
+                    'original_subtitle_count': 0,
+                    'final_subtitle_count': 0,
+                    'processing_failed': True
+                },
+                processing_time=processing_time
+            )
+
+    def _process_with_validation(self, input_srt_path: Path, start_time: datetime) -> SanitizationResult:
+        """Internal process with comprehensive validation and error handling"""
+        
+        # Validate input
+        if not input_srt_path.exists():
+            raise FileNotFoundError(f"Input SRT file not found: {input_srt_path}")
+            
+        # Setup output paths
+        paths = self._setup_output_paths(input_srt_path)
+        
+        # Save original if requested
+        if self.config.save_original:
+            try:
+                shutil.copy2(input_srt_path, paths['original_backup'])
+                logger.info(f"Saved original backup to: {paths['original_backup']}")
+            except Exception as e:
+                logger.warning(f"Failed to save original backup: {e}")
+            
+        # Load subtitles with validation
+        try:
+            original_subtitles = list(pysrt.open(str(input_srt_path), encoding='utf-8'))
+            logger.info(f"Loaded {len(original_subtitles)} subtitles")
+            
+            # Validate loaded subtitles
+            if not self._validate_loaded_subtitles(original_subtitles):
+                logger.warning("Loaded subtitles failed validation - proceeding with caution")
+                
+        except Exception as e:
+            logger.error(f"Failed to load SRT file: {e}")
+            raise
+            
+        if not original_subtitles:
+            logger.warning(f"No subtitles found in {input_srt_path}")
+            
+        # Clear previous artifacts and stats
+        self.artifact_entries.clear()
+        self.phase1_stats = Phase1Stats()
+        self.phase1_stats.original_count = len(original_subtitles)
+        
+        # Log hallucination database info
+        self._log_hallucination_database_info()
+        
+        # PHASE 1: Content Cleaning with validation
+        logger.info("=== STARTING PHASE 1: Content Cleaning with Validation ===")
+        content_cleaned_subtitles = self._process_phase1_with_validation(original_subtitles)
+        
+        # PHASE 2: Strict Timing Adjustment
+        logger.info("=== STARTING PHASE 2: Strict Timing Adjustment ===")
+        final_subtitles = self._process_phase2_with_validation(original_subtitles, content_cleaned_subtitles)
+        
+        # FINAL VALIDATION: Ensure no content corruption occurred
+        if not self._validate_final_result(original_subtitles, final_subtitles):
+            logger.error("Final validation failed - possible content corruption")
+            
+        # Log results
+        self._log_phase1_results()
+        
+        # Save outputs with error handling
+        output_path = paths['original'] if not self.config.preserve_original_file else paths['sanitized']
+        
+        try:
+            self._save_srt(final_subtitles, output_path)
+        except Exception as e:
+            logger.error(f"Failed to save sanitized SRT: {e}")
+            # Try to save to a backup location
+            backup_output = output_path.parent / f"{output_path.stem}_backup{output_path.suffix}"
+            try:
+                self._save_srt(final_subtitles, backup_output)
+                output_path = backup_output
+                logger.info(f"Saved to backup location: {backup_output}")
+            except Exception as e2:
+                logger.error(f"Failed to save to backup location: {e2}")
+                raise e
+        
+        # Save artifacts with error handling
+        if self.config.save_artifacts and self.artifact_entries:
+            try:
+                self._save_artifacts_srt(paths['artifacts'])
+            except Exception as e:
+                logger.warning(f"Failed to save artifacts: {e}")
+                
+        # Calculate statistics
+        processing_time = (datetime.now() - start_time).total_seconds()
+        statistics = self._calculate_statistics(len(original_subtitles), len(final_subtitles))
+        
+        # Create result
+        result = SanitizationResult(
+            sanitized_path=output_path,
+            original_backup_path=paths.get('original_backup') if self.config.save_original else None,
+            artifacts_path=paths.get('artifacts') if self.config.save_artifacts and self.artifact_entries else None,
+            statistics=statistics,
+            processing_time=processing_time
+        )
+        
+        logger.info(f"Improved sanitization complete in {processing_time:.2f}s. "
+                   f"Subtitles: {len(original_subtitles)} → {len(final_subtitles)}")
+        
+        return result
+
+    def _validate_loaded_subtitles(self, subtitles: List[pysrt.SubRipItem]) -> bool:
+        """Validate loaded subtitles for basic integrity"""
+        if not subtitles:
+            return False
+            
+        # Check for basic structure
+        for i, sub in enumerate(subtitles[:10]):  # Check first 10
+            if not hasattr(sub, 'text') or not hasattr(sub, 'start') or not hasattr(sub, 'end'):
+                logger.warning(f"Subtitle {i} missing required attributes")
+                return False
+                
+        return True
+
+    def _validate_final_result(self, original: List[pysrt.SubRipItem], final: List[pysrt.SubRipItem]) -> bool:
+        """Validate final result to ensure no severe content corruption"""
+        
+        # Check for reasonable reduction (not more than 90% removed)
+        if len(final) < len(original) * 0.1:
+            logger.error(f"Excessive reduction: {len(original)} → {len(final)} (>90% removed)")
+            return False
+            
+        # Check for content duplication in final result
+        final_texts = [sub.text for sub in final]
+        for text in final_texts:
+            if text.count('、') > 10:  # Suspicious amount of commas
+                logger.warning(f"Suspicious text found: '{text[:50]}...'")
+                
+        return True
+
+    def _process_phase1_with_validation(self, subtitles: List[pysrt.SubRipItem]) -> List[pysrt.SubRipItem]:
+        """Phase 1 with enhanced validation and error handling"""
+        logger.info("Phase 1: Content cleaning with comprehensive validation")
+        
+        current_subtitles = subtitles.copy()
+        
+        # Step 1: Remove empty text
+        try:
+            current_subtitles = self._phase1_remove_empty(current_subtitles)
+            logger.info(f"✓ Empty text removal: {len(current_subtitles)} remaining")
+        except Exception as e:
+            logger.warning(f"Empty text removal failed: {e}")
+        
+        # Step 2: First hallucination pass
+        try:
+            if self.hallucination_remover:
+                current_subtitles = self._phase1_exact_hallucination_pass(current_subtitles, pass_number=1)
+                logger.info(f"✓ Hallucination pass 1: {len(current_subtitles)} remaining")
+            else:
+                logger.info("⏭ Hallucination pass 1 skipped (disabled)")
+        except Exception as e:
+            logger.warning(f"Hallucination pass 1 failed: {e}")
+        
+        # Step 3: IMPROVED Repetition cleaning with validation
+        try:
+            if self.repetition_cleaner:
+                before_count = len(current_subtitles)
+                current_subtitles = self._phase1_repetition_cleaning_with_validation(current_subtitles)
+                cleaned_count = before_count - len(current_subtitles)
+                logger.info(f"✓ Repetition cleaning: {len(current_subtitles)} remaining, {cleaned_count} cleaned")
+            else:
+                logger.info("⏭ Repetition cleaning skipped (disabled)")
+        except Exception as e:
+            logger.warning(f"Repetition cleaning failed: {e}")
+        
+        # Step 4: Second hallucination pass
+        try:
+            if self.hallucination_remover:
+                current_subtitles = self._phase1_exact_hallucination_pass(current_subtitles, pass_number=2)
+                logger.info(f"✓ Hallucination pass 2: {len(current_subtitles)} remaining")
+            else:
+                logger.info("⏭ Hallucination pass 2 skipped (disabled)")
+        except Exception as e:
+            logger.warning(f"Hallucination pass 2 failed: {e}")
+        
+        # Step 5: Final cleanup
+        try:
+            current_subtitles = self._phase1_purge_empty(current_subtitles)
+            current_subtitles = self._phase1_renumber(current_subtitles)
+            logger.info(f"✓ Final cleanup: {len(current_subtitles)} final")
+        except Exception as e:
+            logger.warning(f"Final cleanup failed: {e}")
+        
+        self.phase1_stats.final_count = len(current_subtitles)
+        return current_subtitles
+
+    def _phase1_repetition_cleaning_with_validation(self, subtitles: List[pysrt.SubRipItem]) -> List[pysrt.SubRipItem]:
+        """IMPROVED: Repetition cleaning with comprehensive validation"""
+        processed = []
+        cleaned_count = 0
+        error_count = 0
+        validation_failures = 0
+        
+        for i, sub in enumerate(subtitles):
+            try:
+                # Apply repetition cleaner with protection
+                cleaned_text, mods = self.repetition_cleaner.clean_repetitions(sub.text)
+                
+                if not cleaned_text or not cleaned_text.strip():
+                    # Text became empty after cleaning
+                    self._record_removal(sub, i, "repetition_empty", "repetition")
+                elif cleaned_text != sub.text:
+                    # CRITICAL: Additional validation to prevent corruption
+                    if self._validate_repetition_cleaning(sub.text, cleaned_text):
+                        # Text was validly modified
+                        modified_sub = pysrt.SubRipItem(
+                            index=sub.index,
+                            start=sub.start,
+                            end=sub.end,
+                            text=cleaned_text
+                        )
+                        self._record_modification(sub, modified_sub, i, mods, "repetition_cleaning")
+                        processed.append(modified_sub)
+                        cleaned_count += 1
+                    else:
+                        # Validation failed - keep original
+                        logger.warning(f"Repetition cleaning validation failed for subtitle {i} - keeping original")
+                        processed.append(sub)
+                        validation_failures += 1
+                else:
+                    # Text unchanged
+                    processed.append(sub)
+                    
+            except Exception as e:
+                logger.warning(f"Repetition cleaning failed for subtitle {i}: {e}")
+                processed.append(sub)  # Keep original on error
+                error_count += 1
+                
+        self.phase1_stats.repetition_cleaned = cleaned_count
+        logger.info(f"  Cleaned {cleaned_count} subtitles, {error_count} errors, {validation_failures} validation failures")
+        return processed
+
+    def _validate_repetition_cleaning(self, original: str, cleaned: str) -> bool:
+        """Validate that repetition cleaning didn't corrupt content"""
+        
+        # Basic sanity checks
+        if not cleaned or len(cleaned) == 0:
+            return False
+            
+        # Ensure no content duplication occurred
+        original_words = original.split()
+        cleaned_words = cleaned.split()
+        
+        for word in set(original_words):
+            if word in cleaned:
+                original_count = original.count(word)
+                cleaned_count = cleaned.count(word)
+                if cleaned_count > original_count:
+                    logger.warning(f"Repetition cleaning created duplication: '{word}' {original_count} → {cleaned_count}")
+                    return False
+        
+        # Ensure meaningful reduction (not just random changes)
+        if len(cleaned) >= len(original):
+            logger.warning(f"Repetition cleaning didn't reduce length: {len(original)} → {len(cleaned)}")
+            return False
+            
+        # Ensure not over-reduced
+        if len(cleaned) < len(original) * 0.1:
+            logger.warning(f"Repetition cleaning over-reduced content: {len(original)} → {len(cleaned)}")
+            return False
+            
+        return True
+
+    def _process_phase2_with_validation(self, 
+                                      original_subtitles: List[pysrt.SubRipItem],
+                                      content_cleaned_subtitles: List[pysrt.SubRipItem]) -> List[pysrt.SubRipItem]:
+        """Phase 2 timing adjustment with strict validation"""
+        logger.info("Phase 2: Strict timing adjustment with validation")
+        
+        try:
+            if self.timing_adjuster:
+                timing_adjusted_subs, timing_mods = self.timing_adjuster.adjust_timings_content_aware(
+                    original_subtitles, content_cleaned_subtitles
+                )
+                
+                # Record timing modifications
+                for mod in timing_mods:
+                    try:
+                        self._record_timing_modification(mod)
+                    except Exception as e:
+                        logger.warning(f"Failed to record timing modification: {e}")
+                        
+                logger.info(f"✓ Strict timing adjustment complete: {len(timing_mods)} adjustments made")
+                return timing_adjusted_subs
+            else:
+                logger.info("⏭ Timing adjustment skipped (disabled)")
+                return content_cleaned_subtitles
+                
+        except Exception as e:
+            logger.warning(f"Timing adjustment failed: {e}")
+            logger.info("Returning content-cleaned subtitles without timing adjustment")
+            return content_cleaned_subtitles
+
+    # === REST OF THE METHODS UNCHANGED FROM ORIGINAL ===
+    # (Include all the existing methods exactly as they were)
+
+    def _log_hallucination_database_info(self):
+        """Log information about loaded hallucination databases"""
+        if not self.hallucination_remover:
+            logger.info("Hallucination removal disabled")
+            return
+            
+        # Get hallucination database info
+        exact_lists = getattr(self.hallucination_remover, '_exact_lists', {})
+        regex_patterns = getattr(self.hallucination_remover, '_regex_patterns', [])
+        blacklist_phrases = getattr(self.hallucination_remover, '_blacklist_phrases', [])
+        
+        # Log database sizes
+        logger.info("=== HALLUCINATION DATABASE INFO ===")
+        
+        if exact_lists:
+            total_exact = sum(len(phrases) for phrases in exact_lists.values() if isinstance(phrases, (list, set)))
+            logger.info(f"Exact match lists loaded for {len(exact_lists)} languages, total phrases: {total_exact}")
+            for lang, phrases in exact_lists.items():
+                count = len(phrases) if isinstance(phrases, (list, set)) else 0
+                logger.info(f"  - {lang}: {count} phrases")
+                
+            # Store for stats
+            self.phase1_stats.hallucination_phrases_loaded = {
+                lang: len(phrases) if isinstance(phrases, (list, set)) else 0 
+                for lang, phrases in exact_lists.items()
+            }
+        else:
+            logger.warning("No exact match hallucination lists loaded")
+            
+        if regex_patterns:
+            logger.info(f"Regex patterns loaded: {len(regex_patterns)}")
+        else:
+            logger.warning("No regex patterns loaded")
+            
+        if blacklist_phrases:
+            logger.info(f"Fuzzy match blacklist phrases: {len(blacklist_phrases)}")
+        else:
+            logger.info("No fuzzy match blacklist phrases loaded")
+            
+        logger.info("=====================================")
+
+    def _phase1_remove_empty(self, subtitles: List[pysrt.SubRipItem]) -> List[pysrt.SubRipItem]:
+        """Remove subtitles with empty or whitespace-only text"""
+        filtered = []
+        removed_count = 0
+        
+        for i, sub in enumerate(subtitles):
+            if not sub.text or not sub.text.strip():
+                self._record_removal(sub, i, "empty_text_initial", "validation")
+                removed_count += 1
+            else:
+                filtered.append(sub)
+                
+        logger.info(f"  Removed {removed_count} initially empty subtitles")
+        return filtered
+
+    def _phase1_exact_hallucination_pass(self, subtitles: List[pysrt.SubRipItem], pass_number: int) -> List[pysrt.SubRipItem]:
+        """Apply exact hallucination matching with error handling"""
+        if not self.hallucination_remover or not self.config.enable_exact_matching:
+            logger.info(f"  Exact hallucination matching pass {pass_number} skipped (disabled)")
+            return subtitles
+            
+        filtered = []
+        removed_count = 0
+        modified_count = 0
+        error_count = 0
+        
+        for i, sub in enumerate(subtitles):
+            try:
+                # Apply only exact matching
+                cleaned_text, mods = self.hallucination_remover._apply_exact_matching(
+                    sub.text, self.config.primary_language
+                )
+                
+                if not cleaned_text:
+                    # Completely removed
+                    self._record_removal(sub, i, f"exact_hallucination_pass{pass_number}", "hallucination")
+                    removed_count += 1
+                elif cleaned_text != sub.text:
+                    # Modified
+                    modified_sub = pysrt.SubRipItem(
+                        index=sub.index,
+                        start=sub.start,
+                        end=sub.end,
+                        text=cleaned_text
+                    )
+                    self._record_modification(sub, modified_sub, i, mods, f"exact_hallucination_pass{pass_number}")
+                    filtered.append(modified_sub)
+                    modified_count += 1
+                else:
+                    # Unchanged
+                    filtered.append(sub)
+                    
+            except Exception as e:
+                logger.warning(f"Hallucination processing failed for subtitle {i}: {e}")
+                filtered.append(sub)  # Keep original on error
+                error_count += 1
+                
+        # Update stats
+        if pass_number == 1:
+            self.phase1_stats.exact_hall_pass1_removed = removed_count
+        else:
+            self.phase1_stats.exact_hall_pass2_removed = removed_count
+            
+        logger.info(f"  Pass {pass_number}: Removed {removed_count}, Modified {modified_count}, Errors {error_count}")
+        return filtered
+
+    def _phase1_purge_empty(self, subtitles: List[pysrt.SubRipItem]) -> List[pysrt.SubRipItem]:
+        """Remove any subtitles that became empty during Phase 1"""
+        filtered = []
+        purged_count = 0
+        
+        for i, sub in enumerate(subtitles):
+            if not sub.text or not sub.text.strip():
+                self._record_removal(sub, i, "purged_empty_phase1", "cleanup")
+                purged_count += 1
+            else:
+                filtered.append(sub)
+                
+        self.phase1_stats.empty_purged = purged_count
+        logger.info(f"  Purged {purged_count} empty subtitles created during Phase 1")
+        return filtered
+
+    def _phase1_renumber(self, subtitles: List[pysrt.SubRipItem]) -> List[pysrt.SubRipItem]:
+        """Renumber subtitles sequentially"""
+        for i, sub in enumerate(subtitles, 1):
+            sub.index = i
+        logger.info(f"  Renumbered {len(subtitles)} subtitles")
+        return subtitles
+
+    def _log_phase1_results(self):
+        """Log comprehensive Phase 1 results"""
+        stats = self.phase1_stats
+        
+        logger.info("=== PHASE 1 RESULTS SUMMARY ===")
+        logger.info(f"Original subtitles: {stats.original_count}")
+        logger.info(f"Exact hallucination pass 1 removed: {stats.exact_hall_pass1_removed}")
+        logger.info(f"Extreme repetition cleaned: {stats.repetition_cleaned}")
+        logger.info(f"Exact hallucination pass 2 removed: {stats.exact_hall_pass2_removed}")
+        logger.info(f"Empty subtitles purged: {stats.empty_purged}")
+        logger.info(f"Final subtitles: {stats.final_count}")
+        
+        total_removed = (stats.exact_hall_pass1_removed + stats.exact_hall_pass2_removed + stats.empty_purged)
+        reduction_percent = (total_removed / stats.original_count * 100) if stats.original_count > 0 else 0
+        
+        logger.info(f"Total removed: {total_removed} ({reduction_percent:.1f}%)")
+        
+        if stats.hallucination_phrases_loaded:
+            logger.info("Hallucination database usage:")
+            for lang, count in stats.hallucination_phrases_loaded.items():
+                logger.info(f"  - {lang}: {count} phrases available")
+                
+        logger.info("===============================")
+
+    def _record_removal(self, subtitle: pysrt.SubRipItem, original_index: int, reason: str, category: str):
+        """Record a completely removed subtitle"""
+        entry = ArtifactEntry(
+            index=original_index + 1,
+            start_time=str(subtitle.start),
+            end_time=str(subtitle.end),
+            original_text=subtitle.text,
+            modified_text=None,
+            reason=reason,
+            category=category,
+            confidence=1.0,
+            pattern=None,
+            step="phase1_improved",
+            additional_info={}
+        )
+        self.artifact_entries.append(entry)
+        
+    def _record_modification(self, original: pysrt.SubRipItem, modified: pysrt.SubRipItem, 
+                           original_index: int, modifications: List[Dict], step_name: str = "phase1_improved"):
+        """Record a modified subtitle"""
+        if self.config.artifact_detail_level == "minimal":
+            return
+            
+        # Combine modification info
+        categories = set()
+        patterns = []
+        min_confidence = 1.0
+        
+        for mod in modifications:
+            categories.add(mod.get('category', mod.get('type', 'unknown')))
+            if 'pattern' in mod:
+                patterns.append(mod['pattern'])
+            if 'confidence' in mod:
+                min_confidence = min(min_confidence, mod['confidence'])
+                
+        entry = ArtifactEntry(
+            index=original_index + 1,
+            start_time=str(original.start),
+            end_time=str(original.end),
+            original_text=original.text,
+            modified_text=modified.text,
+            reason="multiple_modifications" if len(modifications) > 1 else modifications[0].get('type', 'unknown'),
+            category=','.join(categories),
+            confidence=min_confidence,
+            pattern=patterns[0] if len(patterns) == 1 else None,
+            step=step_name,
+            additional_info={'modifications': modifications} if self.config.artifact_detail_level == "full" else {}
+        )
+        self.artifact_entries.append(entry)
+
+    def _record_timing_modification(self, modification: Dict):
+        """Record timing adjustment in artifacts"""
+        if self.config.artifact_detail_level == "minimal":
+            return
+            
+        entry = ArtifactEntry(
+            index=modification.get('subtitle_index', 0),
+            start_time=str(modification.get('original_start', '')),
+            end_time=str(modification.get('end_timestamp', '')),
+            original_text=modification.get('original_text', 'N/A'),
+            modified_text=modification.get('modified_text', 'N/A'),
+            reason=modification.get('reason', 'timing_adjustment'),
+            category="strict_timing_adjustment",
+            confidence=1.0,
+            pattern=None,
+            step="strict_timing_adjustment",
+            additional_info=modification if self.config.artifact_detail_level == "full" else {}
+        )
+        self.artifact_entries.append(entry)
+
+    def _setup_output_paths(self, input_path: Path) -> Dict[str, Path]:
+        """Setup all output file paths"""
+        paths = {}
+        
+        # Always create raw_subs folder in the input file's parent directory
+        raw_subs_dir = input_path.parent / self.constants['processing'].RAW_SUBS_FOLDER
+        raw_subs_dir.mkdir(exist_ok=True)
+        
+        # Original path
+        paths['original'] = input_path
+        
+        # Backup path
+        if self.config.save_original:
+            backup_name = f"{input_path.stem}.{self.constants['processing'].ORIGINAL_BACKUP_SUFFIX}{input_path.suffix}"
+            paths['original_backup'] = raw_subs_dir / backup_name
+            
+        # Sanitized path
+        if self.config.preserve_original_file:
+            sanitized_name = f"{input_path.stem}.{self.constants['processing'].SANITIZED_SUFFIX}{input_path.suffix}"
+            paths['sanitized'] = input_path.parent / sanitized_name
+        else:
+            # When not preserving original, save sanitized to raw_subs
+            sanitized_name = f"{input_path.stem}.{self.constants['processing'].SANITIZED_SUFFIX}{input_path.suffix}"
+            paths['sanitized'] = raw_subs_dir / sanitized_name
+            
+        # Artifacts path
+        if self.config.save_artifacts:
+            artifacts_name = f"{input_path.stem}.{self.constants['processing'].ARTIFACTS_SUFFIX}{input_path.suffix}"
+            paths['artifacts'] = raw_subs_dir / artifacts_name
+            
+        return paths
+        
+    def _save_srt(self, subtitles: List[pysrt.SubRipItem], output_path: Path):
+        """Save subtitles to SRT file"""
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        srt_file = pysrt.SubRipFile(subtitles)
+        srt_file.save(str(output_path), encoding='utf-8')
+        logger.info(f"Saved sanitized SRT to: {output_path}")
+        
+    def _save_artifacts_srt(self, artifacts_path: Path):
+        """Save artifacts as SRT file with detailed information"""
+        artifacts_subs = []
+        
+        # Add summary as first subtitle
+        if self.config.artifact_detail_level in ["full", "summary"]:
+            summary = self._create_summary_subtitle()
+            artifacts_subs.append(summary)
+            
+        # Group artifacts by type
+        removals = [e for e in self.artifact_entries if e.modified_text is None]
+        modifications = [e for e in self.artifact_entries if e.modified_text is not None]
+        
+        # Add removal entries
+        for entry in removals:
+            sub = self._create_artifact_subtitle(entry, len(artifacts_subs) + 1)
+            artifacts_subs.append(sub)
+            
+        # Add modification entries
+        for entry in modifications:
+            sub = self._create_artifact_subtitle(entry, len(artifacts_subs) + 1)
+            artifacts_subs.append(sub)
+            
+        # Save artifacts file
+        if artifacts_subs:
+            artifacts_path.parent.mkdir(parents=True, exist_ok=True)
+            artifacts_file = pysrt.SubRipFile(artifacts_subs)
+            artifacts_file.save(str(artifacts_path), encoding='utf-8')
+            logger.info(f"Saved artifacts to: {artifacts_path}")
+
+    def _create_summary_subtitle(self) -> pysrt.SubRipItem:
+        """Create summary subtitle for artifacts file"""
+        stats = self.phase1_stats
+        
+        summary_text = f"""[IMPROVED SANITIZATION SUMMARY v11]
+Original subtitles: {stats.original_count}
+Exact hallucination pass 1 removed: {stats.exact_hall_pass1_removed}
+Repetition cleaned (with validation): {stats.repetition_cleaned}
+Exact hallucination pass 2 removed: {stats.exact_hall_pass2_removed}
+Empty subtitles purged: {stats.empty_purged}
+Final subtitles: {stats.final_count}
+Configuration: {self.config.sensitivity_mode} mode
+
+IMPROVEMENTS:
+- Enhanced Japanese regex patterns
+- Content duplication prevention
+- Stricter timing conditions
+- Comprehensive validation"""
+        
+        if stats.hallucination_phrases_loaded:
+            summary_text += "\nHallucination database:"
+            for lang, count in stats.hallucination_phrases_loaded.items():
+                summary_text += f"\n  {lang}: {count} phrases"
+        
+        return pysrt.SubRipItem(
+            index=1,
+            start=pysrt.SubRipTime(milliseconds=0),
+            end=pysrt.SubRipTime(milliseconds=5000),
+            text=summary_text
+        )
+
+    def _create_artifact_subtitle(self, entry: ArtifactEntry, index: int) -> pysrt.SubRipItem:
+        """Create subtitle entry for artifact"""
+        if entry.modified_text is None:
+            # Removal entry
+            text = f"""[REMOVED - {entry.reason}]
+Original: {entry.original_text}
+Category: {entry.category}
+Step: {entry.step}
+Confidence: {entry.confidence:.2f}"""
+        else:
+            # Modification entry
+            text = f"""[MODIFIED - {entry.reason}]
+Original: {entry.original_text}
+Modified: {entry.modified_text}
+Category: {entry.category}
+Step: {entry.step}"""
+            
+        # Add pattern info if available and in full mode
+        if self.config.artifact_detail_level == "full" and entry.pattern:
+            text += f"\nPattern: {entry.pattern[:50]}..."
+            
+        # Handle timing
+        try:
+            if entry.start_time == "multiple":
+                start = pysrt.SubRipTime(milliseconds=index * 5000)
+                end = pysrt.SubRipTime(milliseconds=index * 5000 + 5000)
+            else:
+                start = self._parse_time_string(entry.start_time)
+                end = self._parse_time_string(entry.end_time)
+        except:
+            start = pysrt.SubRipTime(milliseconds=index * 5000)
+            end = pysrt.SubRipTime(milliseconds=index * 5000 + 5000)
+            
+        return pysrt.SubRipItem(
+            index=index,
+            start=start,
+            end=end,
+            text=text
+        )
+
+    def _parse_time_string(self, time_str: str) -> pysrt.SubRipTime:
+        """Parse time string to SubRipTime"""
+        parts = time_str.replace(',', '.').split(':')
+        hours = int(parts[0])
+        minutes = int(parts[1])
+        seconds_parts = parts[2].split('.')
+        seconds = int(seconds_parts[0])
+        milliseconds = int(seconds_parts[1]) if len(seconds_parts) > 1 else 0
+        
+        return pysrt.SubRipTime(hours=hours, minutes=minutes, seconds=seconds, milliseconds=milliseconds)
+        
+    def _calculate_statistics(self, original_count: int, final_count: int) -> Dict[str, Any]:
+        """Calculate processing statistics"""
+        stats = {
+            'original_subtitle_count': original_count,
+            'final_subtitle_count': final_count,
+            'total_modifications': len(self.artifact_entries),
+            'removals': sum(1 for e in self.artifact_entries if e.modified_text is None),
+            'modifications': sum(1 for e in self.artifact_entries if e.modified_text is not None),
+            'reduction_percentage': ((original_count - final_count) / original_count * 100) if original_count > 0 else 0
+        }
+        
+        # Add Phase 1 specific stats
+        stats['phase1_stats'] = {
+            'exact_hallucination_pass1_removed': self.phase1_stats.exact_hall_pass1_removed,
+            'extreme_repetition_cleaned': self.phase1_stats.repetition_cleaned,
+            'exact_hallucination_pass2_removed': self.phase1_stats.exact_hall_pass2_removed,
+            'empty_purged': self.phase1_stats.empty_purged,
+            'hallucination_database_size': self.phase1_stats.hallucination_phrases_loaded
+        }
+        
+        # Count by category
+        category_counts = {}
+        for entry in self.artifact_entries:
+            for cat in entry.category.split(','):
+                category_counts[cat] = category_counts.get(cat, 0) + 1
+                
+        stats['modifications_by_category'] = category_counts
+        
+        # Count by step
+        step_counts = {}
+        for entry in self.artifact_entries:
+            step_counts[entry.step] = step_counts.get(entry.step, 0) + 1
+            
+        stats['modifications_by_step'] = step_counts
+        
+        return stats

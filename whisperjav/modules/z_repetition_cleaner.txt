@@ -1,0 +1,392 @@
+# whisperjav/modules/repetition_cleaner.py
+# V12
+
+import re
+import regex
+from collections import Counter
+from typing import Dict, List, Tuple, Set, Optional
+import numpy as np
+from whisperjav.utils.logger import logger
+from whisperjav.config.sanitization_constants import RepetitionConstants
+
+class RepetitionCleaner:
+    """Multi-level repetition detection and cleaning with content protection."""
+
+    def __init__(self, constants: RepetitionConstants):
+        """
+        Initializes the RepetitionCleaner with constants and pre-compiled regex patterns.
+        """
+        self.constants = constants
+        self.threshold = constants.DEFAULT_THRESHOLD
+
+        # --- Initialize all required regex patterns ---
+        self.protected_patterns = [
+            re.compile(r'\d'),  # Protect any numbers
+            re.compile(r'[¥$€£円]'), # Protect currency symbols
+            re.compile(r'No\.\d+') # Protect "No.123" style text
+        ]
+
+        # FIXED: Use original constants system but with EXTENDED character coverage
+        try:
+            # EXTENDED character pattern - includes 'ら' and full hiragana/katakana range
+            extended_char_pattern = r'(([あ-んア-ンぁ-ゖァ-ヺー])\2{' + str(self.threshold + 1) + r',})'
+            self.char_repeat_pattern = regex.compile(extended_char_pattern)
+            
+            # ORIGINAL patterns from constants (fixed format)
+            self.vowel_extension_pattern = regex.compile(
+                self.constants.VOWEL_EXTENSION_PATTERN.format(threshold_plus_5=self.threshold + 5)
+            ) if hasattr(self.constants, 'VOWEL_EXTENSION_PATTERN') else None
+            
+            self.standalone_extension_pattern = regex.compile(
+                self.constants.STANDALONE_EXTENSION_PATTERN.format(threshold_plus_10=self.threshold + 10)
+            ) if hasattr(self.constants, 'STANDALONE_EXTENSION_PATTERN') else None
+            
+            self.dakuten_pattern = regex.compile(
+                self.constants.DAKUTEN_PATTERN.format(threshold_plus_5=self.threshold + 5)
+            ) if hasattr(self.constants, 'DAKUTEN_PATTERN') else None
+            
+            # ORIGINAL word comma pattern (fixed)
+            self.word_comma_pattern = regex.compile(
+                r'(([あ-んア-ンぁ-ゖァ-ヺー一-龯]{2,10})、){' + str(self.threshold) + r',}'
+            )
+            
+            # NEW: Additional patterns for missed cases
+            # Pattern for Case 391: No-space word repetition like "えいよっこいえいよっこい"
+            self.no_space_word_pattern = regex.compile(
+                r'(([あ-んア-ンぁ-ゖァ-ヺー一-龯]{3,8})\2{' + str(self.threshold) + r',})'
+            )
+            
+            # Pattern for Case 660: Single char with comma like "あ、あ、あ、"
+            self.single_char_comma_pattern = regex.compile(
+                r'(([あ-んア-ンぁ-ゖァ-ヺー]、)\2{' + str(self.threshold + 1) + r',})'
+            )
+            
+            logger.info(f"RepetitionCleaner patterns compiled successfully with threshold {self.threshold}")
+            
+        except Exception as e:
+            logger.error(f"Failed to compile repetition patterns: {e}")
+            # Set None for failed patterns
+            self.char_repeat_pattern = None
+            self.vowel_extension_pattern = None
+            self.standalone_extension_pattern = None
+            self.dakuten_pattern = None
+            self.word_comma_pattern = None
+            self.no_space_word_pattern = None
+            self.single_char_comma_pattern = None
+
+    def clean_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
+        """
+        Clean all types of repetitions from text, with a safeguard for protected content.
+        KEEP ORIGINAL STRUCTURE but add validation.
+        """
+        if not text or not text.strip():
+            return text, []
+
+        if self._is_protected_content(text):
+            logger.debug(f"Skipping repetition cleaning for protected content: '{text[:50]}...'")
+            return text, []
+
+        modifications = []
+        current_text = text
+
+        # KEEP ORIGINAL STRUCTURE: Apply cleaning in the original order
+        cleaning_steps = [
+            ('pre_process_special', self._pre_process_special_patterns),
+            ('character', self._clean_character_repetitions),
+            ('no_space_word', self._clean_no_space_word_repetitions),  # NEW for Case 391
+            ('single_char_comma', self._clean_single_char_comma_repetitions),  # NEW for Case 660
+            ('word', self._clean_word_repetitions),
+            ('high_density', self._clean_high_density_repetitions_safe)
+        ]
+
+        for step_name, cleaner_func in cleaning_steps:
+            try:
+                cleaned_text, mods = cleaner_func(current_text)
+                
+                # ADDED: Validate modification before accepting it
+                if cleaned_text != current_text:
+                    if not self._validate_modification(current_text, cleaned_text):
+                        logger.warning(f"Step '{step_name}' produced invalid modification - skipping")
+                        continue
+                
+                if mods:
+                    for mod in mods:
+                        mod['step'] = step_name
+                    modifications.extend(mods)
+                    current_text = cleaned_text
+                    
+            except Exception as e:
+                logger.warning(f"Repetition cleaning step '{step_name}' failed for '{text[:30]}...': {e}")
+                continue
+
+        return current_text, modifications
+
+    def _validate_modification(self, original: str, modified: str) -> bool:
+        """ADDED: Validate that modifications make sense and don't corrupt content"""
+        
+        # Basic sanity checks
+        if not modified or not modified.strip():
+            logger.warning("VALIDATION FAILED: Modified text is empty")
+            return False
+            
+        # Prevent content duplication (the critical bug from Case 529)
+        original_words = original.split()
+        modified_words = modified.split()
+        
+        # Check for suspicious duplications
+        for word in set(original_words):
+            if word in modified:
+                original_count = original.count(word)
+                modified_count = modified.count(word)
+                if modified_count > original_count:
+                    logger.warning(f"VALIDATION FAILED: '{word}' was duplicated ({original_count} → {modified_count})")
+                    return False
+        
+        # Ensure modification is actually reducing repetitive content
+        if len(modified) >= len(original):
+            # Allow small increases due to formatting, but not large ones
+            if len(modified) > len(original) * 1.1:
+                logger.warning(f"VALIDATION FAILED: Modified text significantly longer than original")
+                return False
+        
+        # Check for nonsensical modifications
+        if len(modified) < len(original) * 0.1:
+            logger.warning(f"VALIDATION FAILED: Modified text too short (possible over-reduction)")
+            return False
+            
+        return True
+
+    def _is_protected_content(self, text: str) -> bool:
+        """
+        KEEP ORIGINAL but enhance protection.
+        """
+        if text.strip() in self.constants.LEGITIMATE_REPETITIONS:
+            return True
+        for pattern in self.protected_patterns:
+            if pattern.search(text):
+                return True
+                
+        # ADDED: Additional protections
+        text_stripped = text.strip()
+        
+        # Protect very short content (likely not repetition artifacts)
+        if len(text_stripped) <= 3:
+            return True
+            
+        # Protect content with mixed scripts (likely legitimate)
+        import regex
+        has_hiragana = bool(regex.search(r'[\p{Hiragana}]', text))
+        has_katakana = bool(regex.search(r'[\p{Katakana}]', text))
+        has_kanji = bool(regex.search(r'[\p{Han}]', text))
+        has_latin = bool(regex.search(r'[a-zA-Z]', text))
+        
+        script_count = sum([has_hiragana, has_katakana, has_kanji, has_latin])
+        if script_count >= 2:  # Mixed scripts - likely legitimate
+            return True
+            
+        return False
+
+    def _pre_process_special_patterns(self, text: str) -> Tuple[str, List[Dict]]:
+        """Handle special repetitive patterns before main processing - KEEP ORIGINAL STRUCTURE"""
+        modifications = []
+        current_text = text
+
+        # KEEP ORIGINAL: Define patterns and their corresponding replacement logic
+        patterns_to_apply = []
+        
+        if self.vowel_extension_pattern:
+            patterns_to_apply.append(('vowel_extension', self.vowel_extension_pattern, lambda m: m.group(1) + '〜' * self.threshold))
+        if self.standalone_extension_pattern:
+            patterns_to_apply.append(('standalone_extension', self.standalone_extension_pattern, '〜' * self.threshold))
+        if self.dakuten_pattern:
+            patterns_to_apply.append(('dakuten_repetition', self.dakuten_pattern, lambda m: m.group(1) * self.threshold))
+        if self.word_comma_pattern:
+            patterns_to_apply.append(('word_comma_repetition', self.word_comma_pattern, lambda m: (m.group(2) + '、') * self.threshold))
+
+        for name, pattern, replacement in patterns_to_apply:
+            try:
+                original_text = current_text
+                
+                if callable(replacement):
+                    modified_text = pattern.sub(replacement, original_text)
+                else:
+                    modified_text = pattern.sub(str(replacement), original_text)
+
+                if original_text != modified_text:
+                    modifications.append({
+                        'type': name,
+                        'pattern': pattern.pattern if hasattr(pattern, 'pattern') else str(pattern),
+                        'original': original_text,
+                        'modified': modified_text,
+                        'confidence': 0.95,
+                        'category': 'repetition_special'
+                    })
+                    current_text = modified_text
+                    
+            except Exception as e:
+                logger.warning(f"Special pattern '{name}' failed: {e}")
+                continue
+
+        return current_text, modifications
+
+    def _clean_character_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
+        """KEEP ORIGINAL METHOD but with EXTENDED character coverage"""
+        modifications = []
+        
+        if not self.char_repeat_pattern:
+            return text, []
+        
+        def replacer(match):
+            char = match.group(2)
+            return char * self.threshold
+
+        original_text = text
+        modified_text = self.char_repeat_pattern.sub(replacer, text)
+
+        if original_text != modified_text:
+            modifications.append({
+                'type': 'character_repetition_reduction',
+                'original': original_text,
+                'modified': modified_text,
+                'confidence': 0.95,
+                'category': 'character_repetition'
+            })
+
+        return modified_text, modifications
+
+    def _clean_no_space_word_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
+        """NEW: Clean no-space word repetitions like 'えいよっこいえいよっこい' (Case 391)"""
+        modifications = []
+        
+        if not self.no_space_word_pattern:
+            return text, []
+        
+        def replacer(match):
+            word = match.group(2)
+            return word * self.threshold
+
+        original_text = text
+        modified_text = self.no_space_word_pattern.sub(replacer, text)
+
+        if original_text != modified_text:
+            modifications.append({
+                'type': 'no_space_word_repetition_reduction',
+                'original': original_text,
+                'modified': modified_text,
+                'confidence': 0.90,
+                'category': 'word_repetition'
+            })
+
+        return modified_text, modifications
+
+    def _clean_single_char_comma_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
+        """NEW: Clean single char + comma repetitions like 'あ、あ、あ、' (Case 660)"""
+        modifications = []
+        
+        if not self.single_char_comma_pattern:
+            return text, []
+        
+        def replacer(match):
+            unit = match.group(2)  # e.g., "あ、"
+            return unit * self.threshold
+
+        original_text = text
+        modified_text = self.single_char_comma_pattern.sub(replacer, text)
+
+        if original_text != modified_text:
+            modifications.append({
+                'type': 'single_char_comma_repetition_reduction',
+                'original': original_text,
+                'modified': modified_text,
+                'confidence': 0.90,
+                'category': 'comma_repetition'
+            })
+
+        return modified_text, modifications
+
+    def _clean_word_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
+        """KEEP ORIGINAL: Clean word repetitions without punctuation"""
+        modifications = []
+        # Pattern to find a word repeated with spaces
+        pattern_str = r'\b([あ-んア-ンぁ-ゖァ-ヺー一-龯]{2,})\b(?:\s+\1){' + str(self.threshold) + r',}'
+        
+        try:
+            word_pattern = regex.compile(pattern_str)
+        except Exception as e:
+            logger.warning(f"Failed to compile word repetition pattern: {e}")
+            return text, []
+
+        def replacer(match):
+            word = match.group(1)
+            return ' '.join([word] * self.threshold)
+
+        original_text = text
+        modified_text = word_pattern.sub(replacer, original_text)
+
+        if original_text != modified_text:
+             modifications.append({
+                'type': 'word_repetition_reduction',
+                'original': original_text,
+                'modified': modified_text,
+                'confidence': 0.95,
+                'category': 'word_repetition'
+            })
+
+        return modified_text, modifications
+
+    def _clean_high_density_repetitions_safe(self, text: str) -> Tuple[str, List[Dict]]:
+        """
+        KEEP ORIGINAL LOGIC but with safer implementation
+        """
+        if len(text) < self.constants.HIGH_DENSITY_MIN_LENGTH:
+            return text, []
+
+        modifications = []
+        
+        try:
+            words = regex.findall(r'\p{L}+', text)
+            if not words or len(words) < self.constants.HIGH_DENSITY_MIN_OCCURRENCES:
+                return text, []
+
+            word_counts = Counter(words)
+            most_common_word, count = word_counts.most_common(1)[0]
+
+            # Check if the most common word is dense enough
+            if (count > self.constants.HIGH_DENSITY_MIN_OCCURRENCES and
+                count / len(words) > self.constants.HIGH_DENSITY_RATIO and
+                len(most_common_word) > 1):
+
+                # FIXED: Use simple string replacement instead of closure counter
+                parts = text.split()
+                kept_count = 0
+                new_parts = []
+                
+                for part in parts:
+                    # Check if this part contains the repeated word
+                    if most_common_word in part and kept_count >= self.threshold:
+                        # Skip this occurrence (remove it)
+                        continue
+                    else:
+                        new_parts.append(part)
+                        if most_common_word in part:
+                            kept_count += 1
+
+                modified_text = ' '.join(new_parts).strip()
+
+                if text != modified_text and len(modified_text) > 0:
+                    modifications.append({
+                        'type': 'high_density_repetition',
+                        'pattern': 'high_density_detection',
+                        'original': text,
+                        'modified': modified_text,
+                        'confidence': 0.90,
+                        'repeated_word': most_common_word,
+                        'repetition_count': count
+                    })
+                    return modified_text, modifications
+
+        except Exception as e:
+            logger.warning(f"High-density repetition cleaning failed: {e}")
+            return text, []
+
+        return text, modifications

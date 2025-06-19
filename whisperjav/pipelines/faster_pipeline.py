@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Faster pipeline implementation - direct transcription without chunking."""
 
+import shutil
 from pathlib import Path
 from typing import Dict
 import time
@@ -116,8 +117,23 @@ class FasterPipeline(BasePipeline):
             logger.info("Step 3: Post-processing SRT")
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
-            
+           
+            # The postprocessor returns the path to the new sanitized file in the temp directory
             processed_srt, stats = self.postprocessor.process(raw_srt_path, final_srt_path)
+            
+            # Explicitly move the sanitized file from the temp location to the final destination
+            shutil.move(processed_srt, final_srt_path)
+
+            # FIX: Move raw_subs BEFORE cleanup
+            temp_raw_subs_path = raw_srt_path.parent / "raw_subs"
+            if temp_raw_subs_path.exists():
+                final_raw_subs_path = self.output_dir / "raw_subs"
+                # Copy instead of move to avoid deletion issues
+                shutil.copytree(temp_raw_subs_path, final_raw_subs_path, dirs_exist_ok=True)
+                logger.info(f"Copied raw_subs to: {final_raw_subs_path}")
+            
+            # FIX: Now cleanup temp files
+            self.cleanup_temp_files(media_basename)
             
             self.metadata_manager.update_processing_stage(
                 master_metadata, "postprocessing", "completed",

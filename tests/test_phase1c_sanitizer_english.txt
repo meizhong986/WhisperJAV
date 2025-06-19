@@ -1,0 +1,368 @@
+#!/usr/bin/env python3
+"""
+English Subtitle Sanitizer Test Script
+Usage: python test_english_sanitizer.py input.srt [--output output.srt] [--aggressive] [--no-external]
+
+Features tested:
+- Hallucination removal (um, uh, [Music], etc.)
+- High CPS detection and removal
+- Repetition cleaning (stutters, word repetitions)
+- Consecutive duplicate merging
+- CPS-based timing adjustments
+- External hallucination list loading
+
+Example usage:
+  python test_english_sanitizer.py movie.srt
+  python test_english_sanitizer.py movie.srt --output cleaned.srt --aggressive
+  python test_english_sanitizer.py movie.srt --custom-url https://my-list.json
+"""
+
+import argparse
+import sys
+import logging
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+import json
+import pysrt
+import codecs
+from datetime import datetime
+
+# Handle UTF-8 encoding
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except (AttributeError, TypeError):
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    force=True
+)
+
+# Import the English sanitizer
+try:
+    from whisperjav.modules.subtitle_sanitizer_english import SimpleEnglishSanitizer, ENGLISH_CONSTANTS
+except ImportError:
+    print("Error: Could not import SimpleEnglishSanitizer")
+    print("Make sure simple_english_sanitizer.py is in the same directory or in your Python path")
+    sys.exit(1)
+
+class EnglishSanitizerTester:
+    """Test harness for the English subtitle sanitizer with detailed reporting"""
+    
+    def __init__(self, custom_constants: Optional[Dict[str, Any]] = None):
+        self.custom_constants = custom_constants or ENGLISH_CONSTANTS.copy()
+        self.stats = {
+            'hallucinations_removed': 0,
+            'high_cps_removed': 0,
+            'repetitions_cleaned': 0,
+            'duplicates_merged': 0,
+            'timing_adjusted': 0,
+            'empty_removed': 0
+        }
+    
+    def analyze_artifacts(self, log_path: Path) -> Dict[str, int]:
+        """Parse the artifact log to extract statistics"""
+        stats = self.stats.copy()
+        
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                
+            # Count different types of changes
+            stats['hallucinations_removed'] = content.count('[REMOVED] Sub #') - content.count('High CPS detected')
+            stats['high_cps_removed'] = content.count('High CPS detected')
+            stats['repetitions_cleaned'] = content.count('[CLEANED] Sub #')
+            stats['duplicates_merged'] = content.count('[MERGED] Subs #')
+            stats['timing_adjusted'] = content.count('[TIMING ADJUSTED] Sub #')
+            
+            # Extract merge details
+            import re
+            merge_pattern = r'\[MERGED\] Subs #(\d+) through #(\d+) \((\d+) total\)'
+            merges = re.findall(merge_pattern, content)
+            if merges:
+                total_subs_merged = sum(int(m[2]) for m in merges)
+                stats['total_subs_in_merges'] = total_subs_merged
+                
+        except Exception as e:
+            logging.warning(f"Could not analyze artifacts: {e}")
+            
+        return stats
+    
+    def create_test_report(self, input_path: Path, output_path: Path, 
+                          sanitizer: SimpleEnglishSanitizer,
+                          start_time: datetime, end_time: datetime) -> str:
+        """Create a detailed test report"""
+        
+        # Load original and sanitized files for comparison
+        try:
+            original_subs = list(pysrt.open(str(input_path), encoding='utf-8'))
+            sanitized_subs = list(pysrt.open(str(output_path), encoding='utf-8'))
+        except Exception as e:
+            return f"Error loading files for comparison: {e}"
+        
+        # Get artifact statistics
+        log_path = output_path.parent / f"{output_path.stem.replace('_sanitized', '')}_sanitizer.log"
+        stats = self.analyze_artifacts(log_path) if log_path.exists() else self.stats
+        
+        # Calculate CPS statistics
+        original_cps_stats = self._calculate_cps_stats(original_subs)
+        sanitized_cps_stats = self._calculate_cps_stats(sanitized_subs)
+        
+        # Build report
+        report = []
+        report.append("=" * 70)
+        report.append("ENGLISH SUBTITLE SANITIZER TEST REPORT")
+        report.append("=" * 70)
+        report.append(f"Input file: {input_path.name}")
+        report.append(f"Output file: {output_path.name}")
+        report.append(f"Processing time: {(end_time - start_time).total_seconds():.2f} seconds")
+        report.append(f"Hallucination phrases loaded: {len(sanitizer.hallucination_phrases)}")
+        
+        report.append("\n📊 OVERALL STATISTICS:")
+        report.append(f"   Original subtitles: {len(original_subs)}")
+        report.append(f"   Final subtitles: {len(sanitized_subs)}")
+        report.append(f"   Total removed: {len(original_subs) - len(sanitized_subs)}")
+        report.append(f"   Reduction: {((len(original_subs) - len(sanitized_subs)) / len(original_subs) * 100):.1f}%")
+        
+        report.append("\n🎯 CONTENT CLEANING BREAKDOWN:")
+        report.append(f"   Hallucinations removed: {stats['hallucinations_removed']}")
+        report.append(f"   High CPS lines removed: {stats['high_cps_removed']}")
+        report.append(f"   Lines with repetitions cleaned: {stats['repetitions_cleaned']}")
+        if 'total_subs_in_merges' in stats:
+            report.append(f"   Consecutive duplicates merged: {stats['total_subs_in_merges']} → {stats['duplicates_merged']} lines")
+        else:
+            report.append(f"   Merge operations: {stats['duplicates_merged']}")
+        report.append(f"   Timing adjustments: {stats['timing_adjusted']}")
+        
+        report.append("\n📈 CPS (Characters Per Second) ANALYSIS:")
+        report.append("   Original file:")
+        report.append(f"     Average CPS: {original_cps_stats['avg']:.1f}")
+        report.append(f"     Min CPS: {original_cps_stats['min']:.1f}")
+        report.append(f"     Max CPS: {original_cps_stats['max']:.1f}")
+        report.append(f"     Lines > {self.custom_constants['MAX_SAFE_CPS']} CPS: {original_cps_stats['high_cps_count']}")
+        report.append("   Sanitized file:")
+        report.append(f"     Average CPS: {sanitized_cps_stats['avg']:.1f}")
+        report.append(f"     Min CPS: {sanitized_cps_stats['min']:.1f}")
+        report.append(f"     Max CPS: {sanitized_cps_stats['max']:.1f}")
+        report.append(f"     Lines > {self.custom_constants['MAX_SAFE_CPS']} CPS: {sanitized_cps_stats['high_cps_count']}")
+        
+        report.append("\n⚙️ CONFIGURATION:")
+        report.append(f"   Min safe CPS: {self.custom_constants['MIN_SAFE_CPS']}")
+        report.append(f"   Max safe CPS: {self.custom_constants['MAX_SAFE_CPS']}")
+        report.append(f"   Target CPS: {self.custom_constants['TARGET_CPS']}")
+        report.append(f"   Min subtitle duration: {self.custom_constants['MIN_SUBTITLE_DURATION_S']}s")
+        report.append(f"   Max subtitle duration: {self.custom_constants['MAX_SUBTITLE_DURATION_S']}s")
+        report.append(f"   Merge threshold: {self.custom_constants['MERGE_MIN_SEQUENCE']} consecutive duplicates")
+        report.append(f"   Repetition threshold: {self.custom_constants['REPETITION_THRESHOLD']}")
+        
+        # Sample of removed content
+        if log_path.exists():
+            report.append("\n🔍 SAMPLE OF REMOVED CONTENT:")
+            removed_samples = self._extract_removed_samples(log_path, limit=5)
+            for sample in removed_samples:
+                report.append(f"   • {sample}")
+        
+        report.append("\n📁 GENERATED FILES:")
+        report.append(f"   ✅ Sanitized SRT: {output_path}")
+        if log_path.exists():
+            report.append(f"   📋 Detailed log: {log_path}")
+        
+        report.append("\n" + "=" * 70)
+        
+        return "\n".join(report)
+    
+    def _calculate_cps_stats(self, subtitles: List[pysrt.SubRipItem]) -> Dict[str, float]:
+        """Calculate CPS statistics for a subtitle file"""
+        cps_values = []
+        high_cps_count = 0
+        max_cps = self.custom_constants['MAX_SAFE_CPS']
+        
+        for sub in subtitles:
+            text_len = len(sub.text.strip())
+            duration_s = sub.duration.ordinal / 1000.0
+            if text_len > 0 and duration_s > 0:
+                cps = text_len / duration_s
+                cps_values.append(cps)
+                if cps > max_cps:
+                    high_cps_count += 1
+        
+        if not cps_values:
+            return {'avg': 0, 'min': 0, 'max': 0, 'high_cps_count': 0}
+        
+        return {
+            'avg': sum(cps_values) / len(cps_values),
+            'min': min(cps_values),
+            'max': max(cps_values),
+            'high_cps_count': high_cps_count
+        }
+    
+    def _extract_removed_samples(self, log_path: Path, limit: int = 5) -> List[str]:
+        """Extract samples of removed content from the log"""
+        samples = []
+        
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            for line in lines:
+                if '[REMOVED]' in line and "Text: '" in line:
+                    # Extract the text content
+                    start = line.find("Text: '") + 7
+                    end = line.rfind("'")
+                    if start < end:
+                        text = line[start:end]
+                        reason = "hallucination" if "hallucination" in line else "high CPS" if "CPS" in line else "other"
+                        samples.append(f"{text} ({reason})")
+                        
+                if len(samples) >= limit:
+                    break
+                    
+        except Exception as e:
+            logging.warning(f"Could not extract samples: {e}")
+            
+        return samples
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Test the English subtitle sanitizer with detailed reporting",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python test_english_sanitizer.py movie.srt
+  python test_english_sanitizer.py movie.srt --output cleaned.srt
+  python test_english_sanitizer.py movie.srt --aggressive
+  python test_english_sanitizer.py movie.srt --custom-cps 30 --custom-duration 15
+
+Key features tested:
+  - Hallucination removal (um, uh, [Music], thanks for watching, etc.)
+  - High CPS detection (removes likely artifacts)
+  - Repetition cleaning (I I I → I, goooo → goo)
+  - Consecutive duplicate merging (3+ identical lines)
+  - CPS-based timing adjustment (content changes, low CPS)
+  - External hallucination list loading
+        """
+    )
+    
+    parser.add_argument('input_srt', type=str, help='Input SRT file to sanitize')
+    parser.add_argument('--output', '-o', type=str, help='Output SRT file (default: input_sanitized.srt)')
+    parser.add_argument('--aggressive', action='store_true', help='Use aggressive settings (higher CPS threshold, etc.)')
+    parser.add_argument('--custom-url', type=str, help='Custom hallucination list URL')
+    parser.add_argument('--no-external', action='store_true', help='Skip loading external hallucination list')
+    parser.add_argument('--custom-cps', type=float, help='Custom max CPS threshold (default: 25)')
+    parser.add_argument('--custom-duration', type=float, help='Custom max duration in seconds (default: 10)')
+    parser.add_argument('--debug', action='store_true', help='Enable debug output')
+    
+    args = parser.parse_args()
+    
+    # Set logging level
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Validate input
+    input_path = Path(args.input_srt)
+    if not input_path.exists():
+        print(f"Error: Input file '{input_path}' does not exist.")
+        sys.exit(1)
+    
+    # Determine output
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        output_path = input_path.parent / f"{input_path.stem}_sanitized.srt"
+    
+    print(f"🎬 English Subtitle Sanitizer Test")
+    print(f"📁 Input: {input_path}")
+    print(f"📁 Output: {output_path}")
+    print("-" * 50)
+    
+    try:
+        # Configure constants
+        constants = ENGLISH_CONSTANTS.copy()
+        
+        if args.aggressive:
+            print("⚡ Using aggressive settings")
+            constants['MAX_SAFE_CPS'] = 35.0
+            constants['MIN_SAFE_CPS'] = 1.0
+            constants['MERGE_MIN_SEQUENCE'] = 2
+            
+        if args.custom_cps:
+            constants['MAX_SAFE_CPS'] = args.custom_cps
+            print(f"🎯 Custom max CPS: {args.custom_cps}")
+            
+        if args.custom_duration:
+            constants['MAX_SUBTITLE_DURATION_S'] = args.custom_duration
+            print(f"⏱️  Custom max duration: {args.custom_duration}s")
+        
+        # Initialize tester and sanitizer
+        tester = EnglishSanitizerTester(constants)
+        
+        # Configure hallucination URL
+        hallucination_url = None
+        if args.no_external:
+            hallucination_url = ""  # Force use of defaults
+            print("⚠️  Skipping external hallucination list")
+        elif args.custom_url:
+            hallucination_url = args.custom_url
+            print(f"🌐 Using custom hallucination URL: {args.custom_url}")
+        
+        # Create sanitizer
+        print("\n🔧 Initializing English sanitizer...")
+        sanitizer = SimpleEnglishSanitizer(
+            constants=constants #,
+            #hallucination_list_url=hallucination_url
+        )
+        
+        # Process the file
+        print(f"\n🧹 Starting sanitization process...")
+        start_time = datetime.now()
+        
+        result_path = sanitizer.sanitize(input_path)
+        
+        end_time = datetime.now()
+        
+        # Move to specified output if needed
+        if result_path != output_path:
+            import shutil
+            shutil.move(str(result_path), str(output_path))
+        
+        # Generate and print test report
+        print("\n" + "=" * 70)
+        report = tester.create_test_report(
+            input_path, output_path, sanitizer, start_time, end_time
+        )
+        print(report)
+        
+        print("\n✅ Sanitization completed successfully!")
+        print(f"Compare '{input_path}' with '{output_path}' to see changes")
+        
+        # Offer to show diff sample
+        try:
+            original_subs = list(pysrt.open(str(input_path), encoding='utf-8'))[:10]
+            sanitized_subs = list(pysrt.open(str(output_path), encoding='utf-8'))[:10]
+            
+            print("\n🔍 SAMPLE COMPARISON (first few subtitles):")
+            print("-" * 50)
+            for i, (orig, san) in enumerate(zip(original_subs, sanitized_subs)):
+                if orig.text != san.text:
+                    print(f"Sub #{i+1}:")
+                    print(f"  Original: {orig.text}")
+                    print(f"  Cleaned:  {san.text}")
+                    print()
+                    
+        except:
+            pass
+        
+        return 0
+        
+    except Exception as e:
+        print(f"\n❌ Error during sanitization: {e}")
+        logging.exception("Full error details:")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fast pipeline implementation - using standard Whisper with scene detection."""
 
+import shutil
 from pathlib import Path
 from typing import Dict, List
 import time
@@ -186,6 +187,13 @@ class FastPipeline(BasePipeline):
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
 
             _, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
+            
+            # FIX: Move raw_subs folder to output directory
+            temp_raw_subs_path = stitched_srt_path.parent / "raw_subs"
+            if temp_raw_subs_path.exists():
+                final_raw_subs_path = self.output_dir / "raw_subs"
+                shutil.copytree(temp_raw_subs_path, final_raw_subs_path, dirs_exist_ok=True)
+                logger.info(f"Copied raw_subs to: {final_raw_subs_path}")
                 
             self.metadata_manager.update_processing_stage(
                 master_metadata, "postprocessing", "completed", statistics=stats, output_path=str(final_srt_path)

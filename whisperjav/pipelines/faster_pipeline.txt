@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Faster pipeline implementation - direct transcription without chunking."""
 
+import shutil
 from pathlib import Path
 from typing import Dict
 import time
@@ -50,10 +51,8 @@ class FasterPipeline(BasePipeline):
         # Instantiate modules with the final, correct parameters
         self.audio_extractor = AudioExtractor()
         
-        final_load_params = {**load_params, 'model_name': effective_model_name}
-        
         self.asr = StableTSASR(
-            model_load_params=final_load_params,
+            model_load_params={**load_params, 'model_name': effective_model_name},
             transcribe_options=self.transcribe_options,
             decode_options=self.decode_options,
             stable_ts_options=stable_ts_opts,
@@ -118,8 +117,19 @@ class FasterPipeline(BasePipeline):
             logger.info("Step 3: Post-processing SRT")
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
-            
+           
+            # The postprocessor returns the path to the new sanitized file in the temp directory
             processed_srt, stats = self.postprocessor.process(raw_srt_path, final_srt_path)
+            
+            # Explicitly move the sanitized file from the temp location to the final destination
+            shutil.move(processed_srt, final_srt_path)
+
+            temp_raw_subs_path = raw_srt_path.parent / "raw_subs"
+            if temp_raw_subs_path.exists():
+                final_raw_subs_path = self.output_dir / "raw_subs"
+                # Use shutil.copytree and then remove the source, as move can fail across different drives
+                shutil.copytree(temp_raw_subs_path, final_raw_subs_path, dirs_exist_ok=True)
+                shutil.rmtree(temp_raw_subs_path)
             
             self.metadata_manager.update_processing_stage(
                 master_metadata, "postprocessing", "completed",

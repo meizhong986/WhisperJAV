@@ -3,73 +3,74 @@
     "__description": "The library of reusable parameter blocks for specific functions.",
 
     "SILERO_VAD_OPTIONS_CONSERVATIVE": { "threshold": 0.65, "min_speech_duration_ms": 300 },
-    "SILERO_VAD_OPTIONS_BALANCED":   { "threshold": 0.35, "min_speech_duration_ms": 150 },
-    "SILERO_VAD_OPTIONS_AGGRESSIVE": { "threshold": 0.15, "min_speech_duration_ms": 80 },
+    "SILERO_VAD_OPTIONS_BALANCED":   { "threshold": 0.35, "min_speech_duration_ms": 200 },
+    "SILERO_VAD_OPTIONS_AGGRESSIVE": { "threshold": 0.18, "min_speech_duration_ms": 100 },
 
     "WHISPER_TRANSCRIBE_OPTIONS_CONSERVATIVE": {
       "temperature": [0.0],
-      "compression_ratio_threshold": 1.5,
-      "logprob_threshold": -0.3,
-      "no_speech_threshold": 0.9,
+      "compression_ratio_threshold": 2.0,
+      "logprob_threshold": -0.9,
+      "no_speech_threshold": 0.8,
       "condition_on_previous_text": false,
       "hallucination_silence_threshold": 2.0,
       "carry_initial_prompt": false,
       "word_timestamps": true
     },
     "WHISPER_TRANSCRIBE_OPTIONS_BALANCED": {
-      "temperature": [0.0, 0.3],
-      "compression_ratio_threshold": 2.4,
-      "logprob_threshold": -1.0,
-      "no_speech_threshold": 0.6,
+      "temperature": [0.0, 0.1],
+      "compression_ratio_threshold": 2.2,
+      "logprob_threshold": -1.2,
+      "no_speech_threshold": 0.64,
       "condition_on_previous_text": false,
-      "hallucination_silence_threshold": null,
+      "hallucination_silence_threshold": 2.0,
       "carry_initial_prompt": false,
       "word_timestamps": true
     },
     "WHISPER_TRANSCRIBE_OPTIONS_AGGRESSIVE": {
       "temperature": [0.0, 0.3],
-      "compression_ratio_threshold": 3.5,
-      "logprob_threshold": -2.2,
-      "no_speech_threshold": 0.45,
+      "compression_ratio_threshold": 2.4,
+      "logprob_threshold": -1.6,
+      "no_speech_threshold": 0.52,
       "condition_on_previous_text": false,
-      "hallucination_silence_threshold": 1.0,
+      "hallucination_silence_threshold": 2.0,
       "carry_initial_prompt": false,
       "word_timestamps": true
     },
 
     "WHISPER_DECODE_OPTIONS_CONSERVATIVE": {
-      "beam_size": 5,
+      "beam_size": 6,
       "best_of": 1,
       "patience": 3.0,
       "length_penalty": 1.0,
       "suppress_tokens": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       "suppress_blank": true,
       "without_timestamps": false,
-      "max_initial_timestamp": 0.1
+      "max_initial_timestamp": 1.0
     },
     "WHISPER_DECODE_OPTIONS_BALANCED": {
       "beam_size": 2,
       "best_of": 2,
-      "patience": 1.0,
+      "patience": 3.0,
       "length_penalty": 0.75,
-      "suppress_tokens": "-1",
+      "suppress_tokens": "",
       "suppress_blank": true,
       "without_timestamps": false,
       "max_initial_timestamp": 1.0
     },
     "WHISPER_DECODE_OPTIONS_AGGRESSIVE": {
-      "beam_size": 2,
-      "best_of": 2,
+      "beam_size": 3,
+      "best_of": 3,
       "patience": 2.0,
       "length_penalty": 0.5,
-      "suppress_tokens": null,
+      "suppress_tokens": "",
       "suppress_blank": false,
       "without_timestamps": false,
-      "max_initial_timestamp": 2.0
+      "max_initial_timestamp": 1.0
     },
     
     "STABLE_TS_OPTIONS_DEFAULT": {
-        "no_repeat_ngram_size": 0
+        "no_repeat_ngram_size": 3,
+        "repetition_penalty": 2.5
     }
   },
 
