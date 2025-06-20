@@ -16,8 +16,7 @@ from whisperjav.utils.logger import logger
 
 class FasterPipeline(BasePipeline):
     """Faster pipeline using Whisper turbo mode without chunking."""
-    
-    # --- FUNCTION MODIFIED ---
+
     def __init__(self, 
                  output_dir: str, 
                  temp_dir: str, 
@@ -58,8 +57,11 @@ class FasterPipeline(BasePipeline):
             stable_ts_options=stable_ts_opts,
             turbo_mode=True # This is specific to the faster pipeline
         )
+        
 
-        self.postprocessor = SRTPostProcessor(**post_proc_opts)
+        lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
+        self.postprocessor = SRTPostProcessor(language=lang_code, **post_proc_opts)
+
 
     def get_mode_name(self) -> str:
         return "faster"

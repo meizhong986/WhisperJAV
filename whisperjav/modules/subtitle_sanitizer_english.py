@@ -209,8 +209,8 @@ class EnglishSubtitleCleaner:
         source_file: str,
         target_dir: str,
         hallucination_list_url: str = "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/9e78020b9f85cb7aa3d7004d477353adbfe60ee9/WhisperJAV_hallucination_filter_sorted_v08.json",
-        cps_slow_threshold: float = 6.0,
-        cps_fast_threshold: float = 33.0,
+        cps_slow_threshold: float = 6.22,
+        cps_fast_threshold: float = 70.0,
         max_merge_gap_sec: float = 0.4,
         min_duration: float = 0.5,
         max_duration: float = 8.0
@@ -241,6 +241,11 @@ class EnglishSubtitleCleaner:
         ]]
         self.word_rep_pattern = re.compile(r'\b(\w+)(\s+\1){2,}\b')
         self.phrase_rep_pattern = re.compile(r'((?:\b[\w\']+\b[\,\s]*){2,})(\s*\1){1,}')
+        # Pattern for comma-separated word repetitions like "no, no, no"
+        self.comma_word_rep_pattern = re.compile(r'\b(\w+)(?:,\s*\1){2,},?\b', re.IGNORECASE)
+        # Pattern for catching trailing repetitions
+        self.trailing_rep_pattern = re.compile(r'\b(\w+)(?:,\s*\1){2,},?\s*$', re.IGNORECASE)
+
 
         os.makedirs(self.target_dir, exist_ok=True)
 
@@ -351,17 +356,29 @@ class EnglishSubtitleCleaner:
                 merged.append(current)
         self.subs = merged
 
+
+
     def _remove_internal_repetitions(self):
         for sub in self.subs:
             original = sub.content
-            cleaned = self.word_rep_pattern.sub(r'\1', original)
+            
+            # First apply the word repetition pattern to create 'cleaned'
+            cleaned = self.word_rep_pattern.sub(r'\1', original)  
+            
+            # Apply additional patterns to 'cleaned'
+            cleaned = self.comma_word_rep_pattern.sub(r'\1', cleaned)  
+            cleaned = self.trailing_rep_pattern.sub(r'\1', cleaned)    
+            
+            # Continue with other patterns
             cleaned = self.phrase_rep_pattern.sub(r'\1', cleaned)
             cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            
             if cleaned != original:
                 sub.content = cleaned
                 duration = self._estimate_duration(cleaned)
                 sub.start = sub.end - timedelta(seconds=duration)
                 self._add_log(sub, f"[REMOVED REPETITIONS] {original} → {cleaned}")
+
 
     def _drop_empty_subs(self):
         self.subs = [s for s in self.subs if s.content.strip()]

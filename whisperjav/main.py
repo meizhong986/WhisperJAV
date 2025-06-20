@@ -10,8 +10,31 @@ from pathlib import Path
 import json
 import tempfile
 from typing import Dict, List, Any 
+import io
 
 from copy import deepcopy
+
+# Fix stdout before any imports that might use logging
+def fix_stdout():
+    """Ensure stdout is available, create a wrapper if needed."""
+    if sys.stdout is None or (hasattr(sys.stdout, 'closed') and sys.stdout.closed):
+        # Redirect to a new text wrapper
+        sys.stdout = io.TextIOWrapper(
+            io.BufferedWriter(io.FileIO(1, 'w')), 
+            encoding='utf-8', 
+            errors='replace',
+            line_buffering=True
+        )
+    if sys.stderr is None or (hasattr(sys.stderr, 'closed') and sys.stderr.closed):
+        sys.stderr = io.TextIOWrapper(
+            io.BufferedWriter(io.FileIO(2, 'w')), 
+            encoding='utf-8', 
+            errors='replace',
+            line_buffering=True
+        )
+
+# Fix stdout before any other imports
+fix_stdout()
 
 from whisperjav.utils.logger import setup_logger, logger
 from whisperjav.modules.media_discovery import MediaDiscovery
@@ -22,6 +45,17 @@ from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.config.transcription_tuner import TranscriptionTuner
 
 __version__ = "1.1.0"
+
+def safe_print(message: str):
+    """Safely print a message, handling closed stdout."""
+    try:
+        print(message)
+    except (ValueError, AttributeError, OSError):
+        # If printing fails, try to write directly to stderr or ignore
+        try:
+            sys.stderr.write(message + '\n')
+        except:
+            pass  # If all else fails, just continue
 
 def print_banner():
     """Print application banner."""
@@ -37,7 +71,7 @@ def print_banner():
 ║   - balanced: Scene detection + VAD-enhanced ASR  ║
 ╚═══════════════════════════════════════════════════╝
 """
-    print(banner)
+    safe_print(banner)
 
 
 def merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -233,4 +267,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

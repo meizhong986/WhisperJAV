@@ -74,7 +74,12 @@ class BalancedPipeline(BasePipeline):
         )
     
         self.stitcher = SRTStitcher()
-        self.standard_postprocessor = StandardPostProcessor(**post_proc_opts)
+        
+        
+        lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
+        self.standard_postprocessor = StandardPostProcessor(language=lang_code, **post_proc_opts)
+
+        
     
         self.smart_postprocessor = SRTPostProduction()
         self.classifier = SegmentClassifier()
