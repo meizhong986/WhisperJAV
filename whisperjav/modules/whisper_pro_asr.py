@@ -137,9 +137,13 @@ class WhisperProASR:
         # Handle suppress_tokens
         if 'suppress_tokens' in converted:
             tokens = converted['suppress_tokens']
-            if tokens is None:
+            if tokens is None or tokens == "":
+                # Empty or None - remove it to use default
                 del converted['suppress_tokens']
-            elif isinstance(tokens, str) and tokens != "-1":
+            elif tokens == "-1":
+                # Keep as is - use default suppression
+                pass
+            elif isinstance(tokens, str) and tokens:
                 # Try to parse as comma-separated integers
                 try:
                     converted['suppress_tokens'] = [int(t.strip()) for t in tokens.split(',')]
@@ -277,13 +281,24 @@ class WhisperProASR:
                 seg["end_sec"] = seg["end"] / VAD_SR
                 
         return groups
+
     
     def _prepare_transcribe_options(self, task: str) -> Tuple[Dict, Dict]:
         """Prepare and validate transcription options for Whisper."""
+        
+        # Remove incompatible parameters for newer Whisper versions
+        INCOMPATIBLE_PARAMS = ['hallucination_silence_threshold', 'carry_initial_prompt']
+        
         # Combine all parameters
         all_params = {}
         all_params.update(self.transcribe_options)
         all_params.update(self.decode_options)
+        
+        # Remove incompatible parameters
+        for param in INCOMPATIBLE_PARAMS:
+            if param in all_params:
+                logger.debug(f"Removing incompatible parameter: {param}")
+                all_params.pop(param, None)
         
         # Add runtime options
         all_params['task'] = task
@@ -337,6 +352,7 @@ class WhisperProASR:
                 **transcribe_params,
                 **decode_params
             )
+
         except TypeError as e:
             logger.error(f"Parameter error in transcribe: {e}")
             logger.debug(f"Transcribe params: {transcribe_params}")
@@ -357,6 +373,7 @@ class WhisperProASR:
             except Exception as e2:
                 logger.error(f"Even minimal transcribe failed: {e2}")
                 return []
+
                 
         except Exception as e:
             logger.error(f"Transcription error: {e}")

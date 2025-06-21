@@ -11,6 +11,7 @@ import json
 import tempfile
 from typing import Dict, List, Any 
 import io
+import shutil  # ADDED THIS IMPORT
 
 from copy import deepcopy
 
@@ -86,6 +87,46 @@ def merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, A
         else:
             result[key] = value
     return result
+
+
+def cleanup_temp_directory(temp_dir: str):
+    """Clean up the temporary directory after processing."""
+    temp_path = Path(temp_dir)
+    
+    if not temp_path.exists():
+        return
+    
+    # Check if this is the WhisperJAV subdirectory in system temp
+    if temp_path.name == "whisperjav" and temp_path.parent == Path(tempfile.gettempdir()):
+        logger.info(f"Cleaning up WhisperJAV temp directory: {temp_path}")
+        try:
+            shutil.rmtree(temp_path, ignore_errors=True)
+            logger.info("Temp directory cleaned up successfully")
+        except Exception as e:
+            logger.error(f"Error removing temp directory: {e}")
+    else:
+        # For custom temp directories, just clean the contents but keep the directory
+        logger.info(f"Cleaning up temp directory contents: {temp_path}")
+        try:
+            # List subdirectories that should be cleaned
+            subdirs_to_clean = ["scenes", "scene_srts", "raw_subs"]
+            
+            for subdir in subdirs_to_clean:
+                subdir_path = temp_path / subdir
+                if subdir_path.exists():
+                    shutil.rmtree(subdir_path, ignore_errors=True)
+                    logger.debug(f"Removed temp subdirectory: {subdir_path}")
+            
+            # Remove any remaining files in temp root
+            for file in temp_path.glob("*"):
+                if file.is_file():
+                    file.unlink()
+                    logger.debug(f"Removed temp file: {file}")
+                    
+            logger.info("Temp directory contents cleaned up successfully")
+                
+        except Exception as e:
+            logger.error(f"Error cleaning up temp directory: {e}")
 
 
 def parse_arguments():
@@ -194,6 +235,10 @@ def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_pa
         with open(args.stats_file, 'w', encoding='utf-8') as f:
             json.dump(all_stats, f, indent=2, ensure_ascii=False)
         logger.info(f"\nStatistics saved to: {args.stats_file}")
+    
+    # Clean up temp directory if not keeping temp files
+    if not args.keep_temp:
+        cleanup_temp_directory(args.temp_dir)
 
 
 def main():
@@ -260,9 +305,17 @@ def main():
         process_files(media_files, args, resolved_params)
     except KeyboardInterrupt:
         logger.warning("\nProcessing interrupted by user")
+        # Clean up temp directory even on interrupt
+        if not args.keep_temp:
+            logger.info("Cleaning up temporary files...")
+            cleanup_temp_directory(args.temp_dir)
         sys.exit(1)
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+        # Clean up temp directory even on error
+        if not args.keep_temp:
+            logger.info("Cleaning up temporary files...")
+            cleanup_temp_directory(args.temp_dir)
         sys.exit(1)
 
 if __name__ == "__main__":

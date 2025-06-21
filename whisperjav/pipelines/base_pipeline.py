@@ -52,9 +52,10 @@ class BasePipeline(ABC):
         """
         pass
         
+
+    
     def cleanup_temp_files(self, media_basename: str):
         """Clean up temporary files for a specific media file."""
-        # --- MODIFIED: Implemented cleanup logic ---
         if not self.keep_temp_files:
             logger.info(f"Cleaning up temporary files for {media_basename}")
             try:
@@ -84,6 +85,13 @@ class BasePipeline(ABC):
                     for srt_file in scene_srts_dir.glob(f"{media_basename}_scene_*.srt"):
                         srt_file.unlink()
                         logger.debug(f"Deleted temporary scene SRT: {srt_file}")
+
+                # NEW: Clean up raw_subs in temp directory (only for current media)
+                temp_raw_subs_dir = self.temp_dir / "raw_subs"
+                if temp_raw_subs_dir.exists():
+                    for raw_file in temp_raw_subs_dir.glob(f"{media_basename}*"):
+                        raw_file.unlink()
+                        logger.debug(f"Deleted temporary raw_subs file: {raw_file}")
 
             except Exception as e:
                 logger.error(f"Error during temporary file cleanup for {media_basename}: {e}")

@@ -116,6 +116,7 @@ class FasterPipeline(BasePipeline):
                 output_path=str(raw_srt_path)
             )
             
+            
             logger.info("Step 3: Post-processing SRT")
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
@@ -130,9 +131,16 @@ class FasterPipeline(BasePipeline):
             temp_raw_subs_path = raw_srt_path.parent / "raw_subs"
             if temp_raw_subs_path.exists():
                 final_raw_subs_path = self.output_dir / "raw_subs"
-                # Copy instead of move to avoid deletion issues
-                shutil.copytree(temp_raw_subs_path, final_raw_subs_path, dirs_exist_ok=True)
-                logger.info(f"Copied raw_subs to: {final_raw_subs_path}")
+                # Create raw_subs directory if it doesn't exist
+                final_raw_subs_path.mkdir(exist_ok=True)
+                
+                # CHANGED: Copy only files related to current media_basename to avoid ghost files
+                for file in temp_raw_subs_path.glob(f"{media_basename}*"):
+                    dest_file = final_raw_subs_path / file.name
+                    shutil.copy2(file, dest_file)
+                    logger.debug(f"Copied {file.name} to raw_subs")
+                    
+                logger.info(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
             
             # FIX: Now cleanup temp files
             self.cleanup_temp_files(media_basename)

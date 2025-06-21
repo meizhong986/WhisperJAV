@@ -58,6 +58,7 @@ class SRTPostProcessor:
             logger.warning(f"Unknown language '{self.language}', defaulting to Japanese")
             return self._process_japanese(srt_path, output_path)
     
+    
     def _process_japanese(self, srt_path: Path, output_path: Optional[Path]) -> Tuple[Path, Dict]:
         """Process using Japanese sanitizer"""
         # Configure to match old behavior
@@ -70,15 +71,27 @@ class SRTPostProcessor:
         
         # Return in expected format
         stats = result.statistics
-        old_stats = {
-            'total_subtitles': stats['original_subtitle_count'],
-            'removed_hallucinations': stats['modifications_by_category'].get('hallucination', 0),
-            'removed_repetitions': stats['modifications_by_category'].get('repetition', 0),
-            'duration_adjustments': stats['modifications_by_category'].get('timing', 0),
-            'empty_removed': stats['removals']
-        }
+        
+        # Handle empty statistics (when no subtitles found) - THIS IS THE ONLY CHANGE
+        if not stats:
+            old_stats = {
+                'total_subtitles': 0,
+                'removed_hallucinations': 0,
+                'removed_repetitions': 0,
+                'duration_adjustments': 0,
+                'empty_removed': 0
+            }
+        else:
+            old_stats = {
+                'total_subtitles': stats.get('original_subtitle_count', 0),
+                'removed_hallucinations': stats.get('modifications_by_category', {}).get('hallucination', 0),
+                'removed_repetitions': stats.get('modifications_by_category', {}).get('repetition', 0),
+                'duration_adjustments': stats.get('modifications_by_category', {}).get('timing', 0),
+                'empty_removed': stats.get('removals', 0)
+            }
         
         return result.sanitized_path, old_stats
+        
     
     def _process_english(self, srt_path: Path, output_path: Optional[Path]) -> Tuple[Path, Dict]:
         """Process using English sanitizer"""

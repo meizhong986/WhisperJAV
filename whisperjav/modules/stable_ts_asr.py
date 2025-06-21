@@ -8,6 +8,8 @@ from dataclasses import dataclass
 import traceback
 import logging
 
+import torch
+
 from whisperjav.utils.logger import logger
 
 # This dataclass is unchanged.
@@ -86,6 +88,27 @@ class StableTSASR:
 
         self.lexical_sets = LexicalSets()
         
+        # Pre-cache the appropriate Silero VAD version (VAD is always on)
+        if self.turbo_mode:
+            # Faster pipeline: use latest version
+            logger.info("Pre-caching latest Silero VAD for faster pipeline...")
+            vad_repo = "snakers4/silero-vad"
+        else:
+            # Fast pipeline: use v4.0
+            logger.info("Pre-caching Silero VAD v4.0 for fast pipeline...")
+            vad_repo = "snakers4/silero-vad:v4.0"
+        
+        try:
+            torch.hub.load(
+                repo_or_dir=vad_repo,
+                model="silero_vad",
+                force_reload=True,
+                onnx=False
+            )
+            logger.info(f"Successfully pre-cached VAD from {vad_repo}")
+        except Exception as e:
+            logger.warning(f"Failed to pre-cache Silero VAD: {e}")
+        
         # Load model
         logger.info(f"Loading Stable-TS model: {self.model_name}")
         if self.turbo_mode:
@@ -98,7 +121,38 @@ class StableTSASR:
             
         # Log active sensitivity parameters
         self._log_sensitivity_parameters()
+        
     
+
+    def _precache_silero_vad(self):
+        """Pre-cache the appropriate Silero VAD version for stable-ts to use."""
+        if hasattr(self, '_vad_precached') and self._vad_precached:
+            logger.debug("VAD already pre-cached for this instance")
+            return
+            
+        if self.turbo_mode:
+            # Faster pipeline: use latest version
+            logger.info("Pre-caching latest Silero VAD for faster pipeline...")
+            vad_repo = "snakers4/silero-vad"
+        else:
+            # Fast pipeline: use v4.0
+            logger.info("Pre-caching Silero VAD v4.0 for fast pipeline...")
+            vad_repo = "snakers4/silero-vad:v4.0"
+        
+        try:
+            # Force reload to ensure we get the specific version
+            torch.hub.load(
+                repo_or_dir=vad_repo,
+                model="silero_vad",
+                force_reload=True,
+                onnx=False
+            )
+            self._vad_precached = True
+            logger.info(f"Successfully pre-cached VAD from {vad_repo}")
+        except Exception as e:
+            logger.warning(f"Failed to pre-cache Silero VAD: {e}")
+                
+                
     def _log_sensitivity_parameters(self):
         """Log the sensitivity-related parameters for debugging."""
         if logger.isEnabledFor(logging.DEBUG):
@@ -113,7 +167,7 @@ class StableTSASR:
             logger.debug(f"  Compression Ratio Threshold: {self.transcribe_options.get('compression_ratio_threshold', 'default')}")
             if not self.turbo_mode:
                 logger.debug(f"  Logprob Threshold: {self.transcribe_options.get('logprob_threshold', 'default')}")
-    
+        
     def _convert_parameter_types(self, params: Dict) -> Dict:
         """Convert parameter types to match expected formats."""
         converted = params.copy()
@@ -126,18 +180,25 @@ class StableTSASR:
             elif isinstance(temp, (int, float)):
                 converted['temperature'] = (float(temp),)
         
-        # Ensure suppress_tokens is properly formatted
+        # Handle suppress_tokens properly for both backends
         if 'suppress_tokens' in converted:
             tokens = converted['suppress_tokens']
             if tokens == "-1":
                 # Keep as is - this means use default suppression
                 pass
+            elif tokens == "" or tokens is None:
+                # Empty string or None - remove it entirely
+                del converted['suppress_tokens']
             elif isinstance(tokens, list):
                 # Keep as list of integers
                 pass
-            elif tokens is None:
-                # Remove if None
-                del converted['suppress_tokens']
+            elif isinstance(tokens, str) and tokens:
+                # Try to parse as comma-separated integers
+                try:
+                    converted['suppress_tokens'] = [int(t.strip()) for t in tokens.split(',')]
+                except:
+                    logger.warning(f"Could not parse suppress_tokens: {tokens}, removing it")
+                    del converted['suppress_tokens']
         
         return converted
     
@@ -164,6 +225,7 @@ class StableTSASR:
             logger.debug(f"Removed {len(removed)} parameters not supported by {backend_name}: {removed}")
         
         return filtered
+
     
     def _prepare_transcribe_parameters(self, **kwargs) -> Dict:
         """Prepare all parameters for transcription with proper validation and conversion."""
@@ -180,6 +242,22 @@ class StableTSASR:
         # Add runtime parameters (like task)
         params.update(kwargs)
         
+        # Get the task to determine regroup setting
+        task = params.get('task', 'transcribe')
+        
+        # Enable regroup only for translation (English output)
+        # For transcription (Japanese), we use custom _postprocess instead
+        if 'regroup' not in params:  # Don't override if explicitly set
+            params['regroup'] = (task == 'translate')
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Auto-setting regroup={params['regroup']} for task='{task}'")
+        
+        # Ensure VAD is enabled for both modes (since it's always on)
+        if 'vad' not in params:
+            params['vad'] = True
+        if 'vad_threshold' not in params:
+            params['vad_threshold'] = 0.35  # Default VAD threshold
+        
         # Convert parameter types
         params = self._convert_parameter_types(params)
         
@@ -188,34 +266,134 @@ class StableTSASR:
         
         # Special handling for turbo mode
         if self.turbo_mode:
-            # Ensure VAD is enabled for turbo mode
-            if 'vad' not in params:
-                params['vad'] = True
-            if 'vad_threshold' not in params:
-                params['vad_threshold'] = 0.2
-            
             # Cap beam_size if too high
             if 'beam_size' in params and params['beam_size'] > 5:
                 logger.debug(f"Turbo mode: Capping beam_size from {params['beam_size']} to 5")
                 params['beam_size'] = 5
+                
+            return params
+        else:
+            # For original Whisper, we need to separate parameters
+            return self._separate_whisper_parameters(params)
         
-        return params
-    
+        
+
+    def _separate_whisper_parameters(self, all_params: Dict) -> Dict:
+        """Separate parameters for original Whisper backend."""
+        
+        # Ensure language is properly set
+        if 'language' not in all_params:
+            all_params['language'] = self.decode_options.get('language', 'ja')
+        
+        # Remove parameters that are incompatible with newer Whisper versions
+        INCOMPATIBLE_PARAMS = ['hallucination_silence_threshold', 'carry_initial_prompt']
+        for param in INCOMPATIBLE_PARAMS:
+            if param in all_params:
+                logger.debug(f"Removing incompatible parameter: {param}")
+                all_params.pop(param, None)
+        
+        # Define what goes where
+        DIRECT_TRANSCRIBE_PARAMS = {
+            'verbose', 'temperature', 'compression_ratio_threshold', 
+            'logprob_threshold', 'no_speech_threshold', 
+            'condition_on_previous_text', 'initial_prompt',
+            'word_timestamps', 'prepend_punctuations', 
+            'append_punctuations', 'clip_timestamps',
+            # stable-ts specific that go to transcribe
+            'regroup', 'vad', 'vad_threshold', 'suppress_silence',
+            'suppress_word_ts', 'min_word_dur', 'min_silence_dur',
+            'denoiser', 'denoiser_options'
+        }
+        
+        DECODE_OPTIONS_PARAMS = {
+            'task', 'language', 'sample_len', 'best_of', 
+            'beam_size', 'patience', 'length_penalty', 
+            'prompt', 'prefix', 'suppress_tokens', 
+            'suppress_blank', 'without_timestamps', 
+            'max_initial_timestamp', 'fp16'
+        }
+        
+        transcribe_params = {}
+        decode_options = {}
+        unknown_params = []
+        
+        for key, value in all_params.items():
+            if key in DIRECT_TRANSCRIBE_PARAMS:
+                transcribe_params[key] = value
+            elif key in DECODE_OPTIONS_PARAMS:
+                decode_options[key] = value
+            else:
+                unknown_params.append(key)
+        
+        if unknown_params and logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Unknown parameters for original Whisper: {unknown_params}")
+        
+        # Add ignore_compatibility to avoid version warning
+        transcribe_params['ignore_compatibility'] = True
+        
+        # Return as a special structure that transcribe() can understand
+        return {
+            'transcribe_params': transcribe_params,
+            'decode_options': decode_options
+        }
+
+
     def transcribe(self, audio_path: Union[str, Path], **kwargs) -> stable_whisper.WhisperResult:
         """Transcribe audio file with full parameter validation and backend compatibility."""
         audio_path = Path(audio_path)
         logger.info(f"Transcribing: {audio_path.name}")
         
+        # Add debug logging for incoming kwargs
+        logger.debug(f"Incoming kwargs: {kwargs}")
+        
         # Prepare and validate all parameters
         final_params = self._prepare_transcribe_parameters(**kwargs)
+        
+        # Extract task parameter for later use
+        task = kwargs.get('task', self.decode_options.get('task', 'transcribe'))
+
+        
+        # Enhanced debug logging
+        if not self.turbo_mode:
+            logger.debug("=== PARAMETER DEBUGGING ===")
+            logger.debug(f"All transcribe_options: {self.transcribe_options}")
+            logger.debug(f"All decode_options: {self.decode_options}")
+            logger.debug(f"All stable_ts_options: {self.stable_ts_options}")
+            
+            transcribe_params = final_params.get('transcribe_params', {})
+            decode_options = final_params.get('decode_options', {})
+            
+            # Check if hallucination_silence_threshold is in either dict
+            if 'hallucination_silence_threshold' in transcribe_params:
+                logger.debug(f"hallucination_silence_threshold found in transcribe_params: {transcribe_params['hallucination_silence_threshold']}")
+            if 'hallucination_silence_threshold' in decode_options:
+                logger.warning(f"WARNING: hallucination_silence_threshold found in decode_options! Value: {decode_options['hallucination_silence_threshold']}")
+            
+            logger.debug(f"Final transcribe_params keys: {list(transcribe_params.keys())}")
+            logger.debug(f"Final decode_options keys: {list(decode_options.keys())}")
+            logger.debug("=========================")
         
         # Log final parameters if debug enabled
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Backend: {'faster_whisper' if self.turbo_mode else 'standard_whisper'}")
-            logger.debug(f"Final transcription parameters: {final_params}")
+            logger.debug(f"Task: {task}")
+            if self.turbo_mode:
+                logger.debug(f"Final transcription parameters: {final_params}")
+            else:
+                logger.debug(f"Transcribe params: {final_params['transcribe_params']}")
+                logger.debug(f"Decode options: {final_params['decode_options']}")
         
         try:
-            result = self.model.transcribe(str(audio_path), **final_params)
+            if self.turbo_mode:
+                # Faster-whisper: all parameters together
+                result = self.model.transcribe(str(audio_path), **final_params)
+            else:
+                # Original Whisper: separated parameters
+                result = self.model.transcribe(
+                    str(audio_path), 
+                    **final_params['transcribe_params'],
+                    **final_params['decode_options']
+                )
         except TypeError as e:
             # If we still get a parameter error, log details and retry with minimal params
             logger.error(f"Parameter error: {e}")
@@ -223,39 +401,235 @@ class StableTSASR:
             
             # Fallback to minimal parameters
             minimal_params = {
-                'task': final_params.get('task', 'transcribe'),
-                'language': final_params.get('language', 'ja'),
-                'temperature': final_params.get('temperature', (0.0,)),
-                'beam_size': final_params.get('beam_size', 5)
+                'task': task,  # Use the extracted task
+                'language': self.decode_options.get('language', 'ja'),
+                'temperature': self.transcribe_options.get('temperature', (0.0,)),
+                'beam_size': self.decode_options.get('beam_size', 5)
             }
             
-            logger.warning(f"Retrying with minimal parameters: {minimal_params}")
-            result = self.model.transcribe(str(audio_path), **minimal_params)
+            # Only add ignore_compatibility for original whisper
+            if not self.turbo_mode:
+                minimal_params['ignore_compatibility'] = True
             
+            logger.warning(f"Retrying with minimal parameters: {minimal_params}")
+            
+            if self.turbo_mode:
+                result = self.model.transcribe(str(audio_path), **minimal_params)
+            else:
+                # For original whisper, split minimal params correctly
+                result = self.model.transcribe(
+                    str(audio_path),
+                    temperature=minimal_params['temperature'],
+                    ignore_compatibility=minimal_params['ignore_compatibility'],
+                    task=minimal_params['task'],
+                    language=minimal_params['language'],
+                    beam_size=minimal_params['beam_size']
+                )
+                
         except Exception as e:
             logger.error(f"Transcription failed: {e}")
             logger.debug(traceback.format_exc())
             raise
-            
-        # Apply post-processing
-        self._postprocess(result)
+        
+        # Apply post-processing only for Japanese transcription
+        if task == 'transcribe':
+            self._postprocess(result)
+        else:
+            logger.debug(f"Skipping Japanese post-processing for task='{task}' (English output)")
         
         return result
+
             
     def transcribe_to_srt(self, 
                          audio_path: Union[str, Path], 
                          output_srt_path: Union[str, Path],
                          **kwargs) -> Path:
         """Transcribe audio and save as SRT file."""
+        # Ensure task is passed through to transcribe method
+        if 'task' not in kwargs:
+            kwargs['task'] = self.decode_options.get('task', 'transcribe')
+        
         result = self.transcribe(audio_path, **kwargs)
         
         final_output_path = Path(output_srt_path)
         self._save_to_srt(result, final_output_path)
         return final_output_path
-    
-    def _postprocess(self, result: stable_whisper.WhisperResult):
-        """Apply Japanese-specific post-processing to transcription result."""
-        logger.debug("Applying Japanese post-processing")
+        
+
+    def _postprocess_japanese_dialogue(self,
+                                        result: stable_whisper.WhisperResult, 
+                                        preset: str = "default") -> stable_whisper.WhisperResult:
+        """
+        Applies a unified, multi-pass regrouping strategy to a stable-ts result
+        for optimal Japanese conversational dialogue segmentation.
+
+        Args:
+            result: The WhisperResult object from a stable-ts transcription.
+            preset: A preset strategy: "default", "high_moan", or "narrative".
+
+        Returns:
+            The modified WhisperResult object after post-processing.
+        """
+        
+        
+        logger.debug(f"Applying Japanese post-processing with '{preset}' preset.")
+        
+        if not result.segments:
+            logger.warning("No segments found in transcription result. Skipping post-processing.")
+            return
+
+
+        # --- Preset Parameters ---
+        gap_threshold = {
+            "default": 0.3,
+            "high_moan": 0.1,
+            "narrative": 0.4,
+        }.get(preset, 0.3)
+
+        segment_length = {
+            "default": 35,
+            "high_moan": 25,
+            "narrative": 45,
+        }.get(preset, 35)
+
+
+
+        # --- Linguistic Ending Clusters ---
+        BASE_ENDINGS = ['ね', 'よ', 'わ', 'の', 'ぞ', 'ぜ', 'さ', 'か', 'かな', 'な']
+        MODERN_ENDINGS = ['じゃん', 'っしょ', 'んだ', 'わけ', 'かも', 'だろう']
+        KANSAI_ENDINGS = ['わ', 'で', 'ねん', 'な', 'や']
+        FEMININE_ENDINGS = ['かしら', 'こと', 'わね', 'のよ']
+        MASCULINE_ENDINGS = ['ぜ', 'ぞ', 'だい', 'かい']
+        
+        
+        POLITE_FORMS = ['です', 'ます', 'でした', 'ましょう', 'ませんか']
+        CASUAL_CONTRACTIONS = ['ちゃ', 'じゃ', 'きゃ', 'にゃ', 'ひゃ', 'みゃ', 'りゃ']
+        QUESTION_PARTICLES = ['の', 'か']
+
+        FINAL_ENDINGS_TO_LOCK = list(set(
+            BASE_ENDINGS +
+            MODERN_ENDINGS +
+            KANSAI_ENDINGS +
+            FEMININE_ENDINGS +
+            MASCULINE_ENDINGS
+        ))
+
+
+        AIZUCHI_FILLERS = [
+            'あの', 'あのー', 'ええと', 'えっと', 'まあ', 'なんか', 'こう',
+            'うん', 'はい', 'ええ', 'そう', 'えっ', 'あっ',
+        ]
+        
+
+        EXPRESSIVE_EMOTIONS = ['ああ', 'うう', 'ええ', 'おお', 'はあ', 'ふう', 'あっ', 
+            'うっ', 'はっ', 'ふっ', 'んっ'
+        ]
+
+
+        CONVERSATIONAL_VERBAL_ENDINGS = [
+            'てる',  # from -te iru
+            'でる',  # from -de iru
+            'ちゃう', # from -te shimau
+            'じゃう', # from -de shimau
+            'とく',  # from -te oku
+            'どく',  # from -de oku
+            'んない'  # from -ranai
+        ]
+
+
+
+        try:
+
+            # --- Pass 1: Remove Fillers and Aizuchi ---
+            logger.debug("Phase 1: Sanitization (Fillers and Aizuchi Removal)")
+            result.remove_words_by_str(AIZUCHI_FILLERS, case_sensitive=False, strip=True, verbose=False)
+
+            # --- Pass 2: Structural Anchoring ---
+            logger.debug("Phase 2: Structural Anchoring")
+
+            # 2a: Split by strong punctuation marks (full-width and half-width)
+            result.regroup("sp= 。 / ？ / ！ / … / ． /. /? /!+1")
+
+            # 2b: Lock known structural boundaries
+            result.lock(startswith=['「', '『'], left=True, right=False, strip=False)
+            result.lock(endswith=['」', '』'], right=True, left=False, strip=False)
+            result.lock(endswith=FINAL_ENDINGS_TO_LOCK, right=True, left=False, strip=True)
+            result.lock(endswith=POLITE_FORMS, right=True, strip=True)
+            result.lock(endswith=QUESTION_PARTICLES, right=True, strip=True)  # Question particles
+
+            for ending in CONVERSATIONAL_VERBAL_ENDINGS:
+                            result.custom_operation('word', 'end', ending, 'lockright', word_level=True)
+
+            '''
+            for contraction in CASUAL_CONTRACTIONS:
+                result.custom_operation(
+                    key='word',
+                    operator='end',
+                    value=contraction,
+                    method='lockright',
+                    word_level=True
+                )
+            '''
+            
+            
+            
+            # 2c: Lock expressive/emotive interjections (to avoid splitting moans or sighs)
+            result.lock(
+                startswith=EXPRESSIVE_EMOTIONS,
+                endswith=EXPRESSIVE_EMOTIONS,
+                left=True,
+                right=True
+            )
+
+
+
+
+            # --- Pass 3: Merge & Heuristic Refinement ---
+            logger.debug("Phase 3: Heuristic-Based Merging & Refinement")
+            result.merge_by_punctuation(
+                punctuation=['、', '，', ','],
+                max_chars=40,
+                max_words=15 #, min_dur=0.8  # Only merge if total merged duration is under 0.8s
+            )
+
+            result.merge_by_gap(
+                min_gap=gap_threshold,
+                max_chars=40,
+                max_words=15,
+                is_sum_max=True  # Enforce limits on the final merged segment
+            )
+
+            # --- Optional: Apply split by long pause (>1.2s) ---
+            result.split_by_gap(max_gap=1.2)
+            
+            
+
+            # --- Pass 4: Final Cleanup & Formatting ---
+            logger.debug("Phase 4: Final Cleanup & Formatting")
+            result.split_by_length(
+                max_chars=segment_length,
+                max_words=15,
+                even_split=False
+            )
+
+            # Proactive safety: split long segments to avoid exceeding subtitle timing norms
+            result.split_by_duration(max_dur=8.5, even_split=False, lock=True)
+
+
+            result.reassign_ids()
+            
+            logger.debug("Japanese post-processing complete.")
+            return result
+
+        except Exception as e:
+            logger.error(f"An error occurred during Japanese post-processing: {e}")
+            logger.debug(traceback.format_exc())
+
+
+
+    def _postprocess(self, result):
+        """Apply advanced Japanese-specific post-processing using embedded logic."""
+        logger.debug("Applying refined Japanese post-processing of segment results")
         
         # Check if we have any segments to process
         if not result.segments:
@@ -263,40 +637,15 @@ class StableTSASR:
             return
             
         try:
-            # Phase 1: Structural Splitting
-            logger.debug("Phase 1: Structural Splitting")
-            result.split_by_punctuation(['。', '？', '！', '…', '．'], lock=True)
-            result.split_by_gap(0.75, lock=True)
+            self._postprocess_japanese_dialogue(result, preset="default")
+            logger.info("Post-processing segment results completed successfully")
         except Exception as e:
-            logger.error(f"Error in Phase 1 (Structural Splitting): {e}")
+            logger.error(f"Post-processing segment results failed: {e}")
             logger.debug(traceback.format_exc())
 
-        try:
-            # Phase 2: Linguistic Locking
-            logger.debug("Phase 2: Linguistic Locking")
-            result.lock(endswith=self.lexical_sets.sentence_endings, left=True, right=False)
-            result.lock(endswith=self.lexical_sets.polite_forms, left=False, right=True)
-            result.lock(endswith=self.lexical_sets.verb_continuations, left=True, right=False)
-            result.lock(endswith=self.lexical_sets.noun_phrases, right=True)
-            result.lock(startswith=['が', 'を', 'に', 'で', 'と'], left=True, right=False)
-        except Exception as e:
-            logger.error(f"Error in Phase 2 (Linguistic Locking): {e}")
-            logger.debug(traceback.format_exc())
 
-        try:
-            # Phase 3: Content-Specific Handling
-            logger.debug("Phase 3: Content-Specific Handling")
-            result.lock(endswith=self.lexical_sets.vocal_extensions, right=False)
-            result.lock(startswith=self.lexical_sets.initial_fillers, right=True)
-        except Exception as e:
-            logger.error(f"Error in Phase 3 (Content-Specific Handling): {e}")
-            logger.debug(traceback.format_exc())
 
-        # Phase 5: Cleanup
-        result.merge_by_gap(min_gap=0.15, max_words=3, max_chars=12)
-        result.merge_by_punctuation(punctuation=['、', 'けど', 'でも'],
-                                    max_words=5,
-                                    max_chars=18)
+
         
     def _save_to_srt(self, result: stable_whisper.WhisperResult, output_path: Path):
         """Save transcription result to SRT file."""

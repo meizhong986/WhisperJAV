@@ -185,19 +185,34 @@ class FastPipeline(BasePipeline):
                 output_path=str(stitched_srt_path),
                 subtitle_count=num_subtitles
             )
+
             
             logger.info("Step 5: Post-processing final SRT")
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
 
-            _, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
+            # CHANGED: Capture the returned path
+            processed_srt_path, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
+            
+            # NEW: Ensure the final SRT is in the output directory
+            if processed_srt_path != final_srt_path:
+                shutil.copy2(processed_srt_path, final_srt_path)
+                logger.info(f"Copied final SRT from {processed_srt_path} to {final_srt_path}")
             
             # FIX: Move raw_subs folder to output directory
             temp_raw_subs_path = stitched_srt_path.parent / "raw_subs"
             if temp_raw_subs_path.exists():
                 final_raw_subs_path = self.output_dir / "raw_subs"
-                shutil.copytree(temp_raw_subs_path, final_raw_subs_path, dirs_exist_ok=True)
-                logger.info(f"Copied raw_subs to: {final_raw_subs_path}")
+                # Create raw_subs directory if it doesn't exist
+                final_raw_subs_path.mkdir(exist_ok=True)
+                
+                # CHANGED: Copy only files related to current media_basename to avoid ghost files
+                for file in temp_raw_subs_path.glob(f"{media_basename}*"):
+                    dest_file = final_raw_subs_path / file.name
+                    shutil.copy2(file, dest_file)
+                    logger.debug(f"Copied {file.name} to raw_subs")
+                
+                logger.info(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
                 
             self.metadata_manager.update_processing_stage(
                 master_metadata, "postprocessing", "completed", statistics=stats, output_path=str(final_srt_path)
