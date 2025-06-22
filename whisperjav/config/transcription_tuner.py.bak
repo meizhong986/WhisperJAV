@@ -52,7 +52,7 @@ class TranscriptionTuner:
 
         user_config = {}
         if config_path and config_path.exists():
-            logger.debug(f"Loading user configuration from: {config_path}")
+            logger.info(f"Loading user configuration from: {config_path}")
             with open(config_path, 'r', encoding='utf-8') as f:
                 user_config = json.load(f)
 

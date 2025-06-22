@@ -66,20 +66,20 @@ class SceneDetector:
         if not _AUDITOK_AVAILABLE:
             raise RuntimeError("Auditok is required for scene detection but not installed")
         
-        logger.debug(f"Starting two-pass audio scene detection for: {audio_path}")
+        logger.info(f"Starting two-pass audio scene detection for: {audio_path}")
         
         audio_data, sample_rate = sf.read(str(audio_path), dtype='float32', always_2d=False)
         if audio_data.ndim > 1:
             audio_data = np.mean(audio_data, axis=1)  # Convert to mono
         
         audio_duration = len(audio_data) / sample_rate
-        logger.debug(f"Audio duration: {audio_duration:.1f}s, Sample rate: {sample_rate}Hz")
+        logger.info(f"Audio duration: {audio_duration:.1f}s, Sample rate: {sample_rate}Hz")
         
         scene_tuples = []
         scene_idx = 0
         
         # Pass 1: Coarse splitting
-        logger.debug("Pass 1: Coarse splitting")
+        logger.info("Pass 1: Coarse splitting")
         normalized_audio = self._normalize_audio(audio_data.copy())
         audio_bytes = (normalized_audio * 32767).astype(np.int16).tobytes()
         
@@ -95,7 +95,7 @@ class SceneDetector:
         }
         
         regions = list(auditok.split(audio_bytes, **pass1_params))
-        logger.debug(f"Pass 1 found {len(regions)} regions")
+        logger.info(f"Pass 1 found {len(regions)} regions")
         
         # Process each region
         for region_idx, region in enumerate(tqdm(regions, desc="Processing regions")):
@@ -119,7 +119,7 @@ class SceneDetector:
                     scene_idx += 1
             else:
                 # Pass 2: Split long regions
-                logger.debug(f"Pass 2: Splitting long region {region_idx} ({region_duration:.1f}s)")
+                logger.info(f"Pass 2: Splitting long region {region_idx} ({region_duration:.1f}s)")
                 
                 # Try auditok pass 2 first
                 normalized_region = self._normalize_audio(region_audio.copy())
@@ -164,7 +164,7 @@ class SceneDetector:
                         scene_idx += 1
                 else:
                     # Process sub-regions from pass 2
-                    logger.debug(f"Pass 2 split region into {len(sub_regions)} sub-scenes")
+                    logger.info(f"Pass 2 split region into {len(sub_regions)} sub-scenes")
                     for sub_region in sub_regions:
                         sub_start = sub_region.start
                         sub_end = sub_region.end
@@ -187,7 +187,7 @@ class SceneDetector:
                         scene_tuples.append((scene_path, abs_start, abs_end, sub_duration))
                         scene_idx += 1
         
-        logger.debug(f"Detected {len(scene_tuples)} final scenes")
+        logger.info(f"Detected {len(scene_tuples)} final scenes")
         return scene_tuples
     
     def _normalize_audio(self, audio_data: np.ndarray) -> np.ndarray:

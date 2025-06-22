@@ -19,22 +19,24 @@ from whisperjav.modules.segment_classification import SegmentClassifier
 from whisperjav.modules.audio_preprocessing import AudioPreprocessor
 from whisperjav.modules.srt_postproduction import SRTPostProduction
 
+from whisperjav.utils.progress_display import DummyProgress
+
 
 class BalancedPipeline(BasePipeline):
     """Balanced pipeline using scene detection with WhisperPro ASR (VAD-enhanced)."""
     
-    # --- FUNCTION MODIFIED ---
     def __init__(self, 
                  output_dir: str, 
                  temp_dir: str, 
                  keep_temp_files: bool, 
                  subs_language: str,
-                 resolved_params: Dict, 
+                 resolved_params: Dict,
+                 progress_display=None,  
                  **kwargs):
-        """
-        Initializes the BalancedPipeline using resolved configuration parameters.
-        """
+        """Initializes the BalancedPipeline using resolved configuration parameters."""
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files, **kwargs)
+        
+        self.progress = progress_display or DummyProgress()
         
         self.subs_language = subs_language
 
@@ -56,7 +58,7 @@ class BalancedPipeline(BasePipeline):
         # Implement the smart model-switching logic
         effective_model_name = load_params.get("model_name", "large-v2")
         if self.subs_language == 'english-direct' and effective_model_name == 'turbo':
-            logger.info("Direct translation requested. Switching model from 'turbo' to 'large-v2' to perform translation.")
+            logger.info("Direct translation requested. Switching to 'large-v2' to perform translation.")
             effective_model_name = 'large-v2'
 
         # Instantiate modules
@@ -88,7 +90,7 @@ class BalancedPipeline(BasePipeline):
     def get_mode_name(self) -> str:
         return "balanced"
 
-    # --- THIS FUNCTION HAS BEEN RESTORED TO ITS COMPLETE BASELINE VERSION ---
+
     def process(self, media_info: Dict) -> Dict:
         """Process media file through balanced pipeline with scene detection and VAD-enhanced ASR."""
         start_time = time.time()
@@ -96,8 +98,9 @@ class BalancedPipeline(BasePipeline):
         input_file = media_info['path']
         media_basename = media_info['basename']
         
-        logger.info(f"Starting BALANCED pipeline for: {input_file}")
-        logger.info(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
+        # Remove verbose logging, progress display handles it
+        # logger.info(f"Starting BALANCED pipeline for: {input_file}")
+        # logger.info(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
         
         master_metadata = self.metadata_manager.create_master_metadata(
             input_file=input_file,
@@ -109,39 +112,46 @@ class BalancedPipeline(BasePipeline):
         master_metadata["config"]["vad_params"] = self.vad_params
         
         try:
-            logger.info("Step 1: Extracting audio")
+            # Step 1: Extract audio
+            self.progress.set_current_step("Transforming audio", 1, 5)
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
             master_metadata["input_info"]["processed_audio_file"] = str(extracted_audio)
             master_metadata["input_info"]["audio_duration_seconds"] = duration
             self.metadata_manager.update_processing_stage(
-                master_metadata, "audio_extraction", "completed", output_path=str(audio_path), duration_seconds=duration)
+                master_metadata, "audio_extraction", "completed", 
+                output_path=str(audio_path), duration_seconds=duration)
 
-            logger.info("Step 2: Detecting audio scenes")
+            # Step 2: Detect scenes
+            self.progress.set_current_step("Detecting audio scenes", 2, 5)
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
             scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
-            logger.info(f"Detected {len(scene_paths)} scenes")
             
             master_metadata["scenes_detected"] = []
             for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
                 scene_info = {
                     "scene_index": idx, "filename": scene_path.name,
-                    "start_time_seconds": round(start_time_sec, 3), "end_time_seconds": round(end_time_sec, 3),
+                    "start_time_seconds": round(start_time_sec, 3), 
+                    "end_time_seconds": round(end_time_sec, 3),
                     "duration_seconds": round(duration_sec, 3), "path": str(scene_path)
                 }
                 master_metadata["scenes_detected"].append(scene_info)
             master_metadata["summary"]["total_scenes_detected"] = len(scene_paths)
             self.metadata_manager.update_processing_stage(
-                master_metadata, "scene_detection", "completed", scene_count=len(scene_paths), scenes_dir=str(scenes_dir))
+                master_metadata, "scene_detection", "completed", 
+                scene_count=len(scene_paths), scenes_dir=str(scenes_dir))
             
-            logger.info("Step 3: Transcribing scenes with WhisperPro ASR (VAD-enhanced)")
+            # Step 3: Transcribe scenes
+            self.progress.set_current_step("Transcribing scenes with VAD", 3, 5)
             scene_srts_dir = self.temp_dir / "scene_srts"
             scene_srts_dir.mkdir(exist_ok=True)
             scene_srt_info = []
+            
+            # Show sub-progress for scene transcription
+            self.progress.start_subtask("Transcribing scenes", len(scene_paths))
 
             for idx, (scene_path, start_time_sec, _, _) in enumerate(scene_paths):
-                logger.info(f"Transcribing scene {idx+1}/{len(scene_paths)}: {scene_path.name}")
                 scene_srt_path = scene_srts_dir / f"{scene_path.stem}.srt"
                 try:
                     self.asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
@@ -152,29 +162,37 @@ class BalancedPipeline(BasePipeline):
                     else:
                         master_metadata["scenes_detected"][idx]["transcribed"] = True
                         master_metadata["scenes_detected"][idx]["no_speech_detected"] = True
+                        
+                    self.progress.update_subtask(1)
+                    
                 except Exception as e:
-                    logger.error(f"Failed to transcribe scene {idx}: {e}")
+                    self.progress.show_message(f"Scene {idx+1} transcription failed: {str(e)}", "warning", 1.0)
                     master_metadata["scenes_detected"][idx]["transcribed"] = False
                     master_metadata["scenes_detected"][idx]["error"] = str(e)
+                    self.progress.update_subtask(1)
             
-            logger.info("Step 4: Combining scene transcriptions")
+            self.progress.finish_subtask()
+            
+            # Step 4: Stitch scenes
+            self.progress.set_current_step("Combining scene transcriptions", 4, 5)
             stitched_srt_path = self.temp_dir / f"{media_basename}_stitched.srt"
             num_subtitles = self.stitcher.stitch(scene_srt_info, stitched_srt_path)
             self.metadata_manager.update_processing_stage(
-                master_metadata, "stitching", "completed", subtitle_count=num_subtitles, output_path=str(stitched_srt_path))
+                master_metadata, "stitching", "completed", 
+                subtitle_count=num_subtitles, output_path=str(stitched_srt_path))
 
-            
-            logger.info("Step 5: Post-processing final SRT")
+            # Step 5: Post-process
+            self.progress.set_current_step("Post-processing subtitles", 5, 5)
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
-            
-            # CHANGED: Capture the returned path
             processed_srt_path, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
+            
+            
             
             # NEW: Ensure the final SRT is in the output directory
             if processed_srt_path != final_srt_path:
                 shutil.copy2(processed_srt_path, final_srt_path)
-                logger.info(f"Copied final SRT from {processed_srt_path} to {final_srt_path}")
+                logger.debug(f"Copied final SRT from {processed_srt_path} to {final_srt_path}")
             
             # FIX: Move raw_subs folder to output directory
             temp_raw_subs_path = stitched_srt_path.parent / "raw_subs"
@@ -189,7 +207,7 @@ class BalancedPipeline(BasePipeline):
                     shutil.copy2(file, dest_file)
                     logger.debug(f"Copied {file.name} to raw_subs")
                 
-                logger.info(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
+                logger.debug(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
 
             self.metadata_manager.update_processing_stage(
                 master_metadata, "postprocessing", "completed", statistics=stats, output_path=str(final_srt_path))
@@ -205,6 +223,8 @@ class BalancedPipeline(BasePipeline):
                 "empty_removed": stats.get('empty_removed', 0)
             }
 
+
+        
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
             master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
@@ -212,13 +232,14 @@ class BalancedPipeline(BasePipeline):
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
             self.cleanup_temp_files(media_basename)
             
-            logger.info(f"BALANCED pipeline completed in {total_time:.1f} seconds")
-            logger.info(f"Output saved to: {final_srt_path}")
-            
             return master_metadata
             
         except Exception as e:
+            self.progress.show_message(f"Pipeline error: {str(e)}", "error", 0)
             logger.error(f"Pipeline error: {e}", exc_info=True)
-            self.metadata_manager.update_processing_stage(master_metadata, "error", "failed", error_message=str(e))
+            self.metadata_manager.update_processing_stage(
+                master_metadata, "error", "failed", error_message=str(e))
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
             raise
+
+

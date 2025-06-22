@@ -37,7 +37,7 @@ class HallucinationRemover:
                 raise Exception("No patterns loaded from external sources")
         except Exception as e:
             logger.warning(f"External pattern loading failed: {e}")
-            logger.debug("Using built-in fallback patterns")
+            logger.info("Using built-in fallback patterns")
             self._load_fallback_patterns()
     
     def _load_fallback_patterns(self):
@@ -64,7 +64,7 @@ class HallucinationRemover:
         ]
         
         self._blacklist_phrases = ['www', 'ok', '笑', 'wwwww']
-        logger.debug(f"Loaded fallback patterns: {len(self._exact_lists)} exact lists, {len(self._regex_patterns)} regex patterns")
+        logger.info(f"Loaded fallback patterns: {len(self._exact_lists)} exact lists, {len(self._regex_patterns)} regex patterns")
         
     def _load_patterns(self):
         """Load all hallucination patterns with improved error handling"""
@@ -78,7 +78,7 @@ class HallucinationRemover:
                     for lang, phrases in self._exact_lists.items()
                 }
                 total_phrases = sum(len(phrases) for phrases in self._exact_lists.values() if isinstance(phrases, (list, set)))
-                logger.debug(f"Loaded exact hallucination lists for {len(self._exact_lists)} languages ({total_phrases} total phrases)")
+                logger.info(f"Loaded exact hallucination lists for {len(self._exact_lists)} languages ({total_phrases} total phrases)")
             else:
                 logger.warning("No exact hallucination lists loaded - hallucination removal may be ineffective")
                 self._exact_lists = {}
@@ -91,11 +91,11 @@ class HallucinationRemover:
             pattern_data = self._load_json_from_url(self.constants.EXACT_LIST_URL)
             if pattern_data and 'patterns' in pattern_data:
                 self._regex_patterns = pattern_data['patterns']
-                logger.debug(f"Loaded {len(self._regex_patterns)} regex patterns")
+                logger.info(f"Loaded {len(self._regex_patterns)} regex patterns")
                 
                 # Extract phrases for fuzzy matching
                 self._blacklist_phrases = self._extract_blacklist_phrases(self._regex_patterns)
-                logger.debug(f"Extracted {len(self._blacklist_phrases)} phrases for fuzzy matching")
+                logger.info(f"Extracted {len(self._blacklist_phrases)} phrases for fuzzy matching")
             else:
                 logger.warning("No regex patterns loaded from URL")
                 self._regex_patterns = []

@@ -11,9 +11,12 @@ import json
 import tempfile
 from typing import Dict, List, Any 
 import io
-import shutil  # ADDED THIS IMPORT
-
+import shutil  
 from copy import deepcopy
+
+from whisperjav.utils.progress_display import ProgressDisplay, DummyProgress
+
+
 
 # Fix stdout before any imports that might use logging
 def fix_stdout():
@@ -98,15 +101,15 @@ def cleanup_temp_directory(temp_dir: str):
     
     # Check if this is the WhisperJAV subdirectory in system temp
     if temp_path.name == "whisperjav" and temp_path.parent == Path(tempfile.gettempdir()):
-        logger.info(f"Cleaning up WhisperJAV temp directory: {temp_path}")
+        logger.debug(f"Cleaning up WhisperJAV temp directory: {temp_path}")
         try:
             shutil.rmtree(temp_path, ignore_errors=True)
-            logger.info("Temp directory cleaned up successfully")
+            logger.debug("Temp directory cleaned up successfully")
         except Exception as e:
             logger.error(f"Error removing temp directory: {e}")
     else:
         # For custom temp directories, just clean the contents but keep the directory
-        logger.info(f"Cleaning up temp directory contents: {temp_path}")
+        logger.debug(f"Cleaning up temp directory contents: {temp_path}")
         try:
             # List subdirectories that should be cleaned
             subdirs_to_clean = ["scenes", "scene_srts", "raw_subs"]
@@ -154,7 +157,10 @@ def parse_arguments():
     path_group.add_argument("--keep-temp", action="store_true", help="Keep temporary files after processing")
     path_group.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="Logging level (default: INFO)")
     path_group.add_argument("--log-file", help="Log file path")
-    path_group.add_argument("--stats-file", help="Save processing statistics to JSON file")
+    path_group.add_argument("--stats-file", help="Save processing statistics to JSON file")  
+    path_group.add_argument("--no-progress", action="store_true", 
+                           help="Disable progress bars and use traditional scrolling output")
+
     
     # Optional Enhancement Features
     enhancement_group = parser.add_argument_group("Optional Enhancement Features")
@@ -179,6 +185,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
+
 def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_params: Dict):
     """Process multiple files with the selected pipeline."""
     
@@ -188,12 +195,16 @@ def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_pa
         "smart_postprocessing": args.smart_postprocessing
     }
 
+    # Initialize progress display
+    progress = ProgressDisplay(len(media_files), enabled=not args.no_progress)
+    
     pipeline_args = {
         "output_dir": args.output_dir,
         "temp_dir": args.temp_dir,
         "keep_temp_files": args.keep_temp,
         "subs_language": args.subs_language,
-        "resolved_params": resolved_params, # Pass the single resolved params dictionary
+        "resolved_params": resolved_params,
+        "progress_display": progress,  # Pass progress display to pipeline
         **enhancement_kwargs
     }
 
@@ -209,35 +220,57 @@ def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_pa
         
     all_stats, failed_files = [], []
     total_files = len(media_files)
-    for i, media_info in enumerate(media_files, 1):
-        file_path_str = media_info.get('path', 'Unknown File')
-        file_name = Path(file_path_str).name
-        logger.info(f"\nProcessing file {i}/{total_files}: {file_name}")
-        try:
-            metadata = pipeline.process(media_info)
-            all_stats.append({"file": file_path_str, "status": "success", "metadata": metadata})
-        except Exception as e:
-            logger.error(f"Failed to process {file_path_str}: {e}", exc_info=True)
-            failed_files.append(file_path_str)
-            all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
+    
+    try:
+        for i, media_info in enumerate(media_files, 1):
+            file_path_str = media_info.get('path', 'Unknown File')
+            file_name = Path(file_path_str).name
             
-    logger.info("\n" + "="*50)
-    logger.info("PROCESSING SUMMARY")
-    logger.info("="*50)
-    logger.info(f"Total files: {total_files}")
-    logger.info(f"Successful: {total_files - len(failed_files)}")
-    logger.info(f"Failed: {len(failed_files)}")
+            progress.set_current_file(file_path_str, i)
+            
+            try:
+                metadata = pipeline.process(media_info)
+                all_stats.append({"file": file_path_str, "status": "success", "metadata": metadata})
+                
+                # Show completion
+                subtitle_count = metadata.get("summary", {}).get("final_subtitles_refined", 0)
+                output_path = metadata.get("output_files", {}).get("final_srt", "")
+                progress.show_file_complete(file_name, subtitle_count, output_path)
+                
+                progress.update_overall(1)
+                
+            except Exception as e:
+                progress.show_message(f"Failed: {file_name} - {str(e)}", "error", 3.0)
+                logger.error(f"Failed to process {file_path_str}: {e}", exc_info=True)
+                failed_files.append(file_path_str)
+                all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
+                progress.update_overall(1)
+                
+    finally:
+        progress.close()
+    
+    # Print summary (after progress bars are closed)
+    print("\n" + "="*50)
+    print("PROCESSING SUMMARY")
+    print("="*50)
+    print(f"Total files: {total_files}")
+    print(f"Successful: {total_files - len(failed_files)}")
+    print(f"Failed: {len(failed_files)}")
+    
     if failed_files:
-        logger.warning("\nFailed files:")
+        print("\nFailed files:")
         for file in failed_files:
-            logger.warning(f"  - {file}")
+            print(f"  - {file}")
+            
     if args.stats_file:
         with open(args.stats_file, 'w', encoding='utf-8') as f:
             json.dump(all_stats, f, indent=2, ensure_ascii=False)
-        logger.info(f"\nStatistics saved to: {args.stats_file}")
+        print(f"\nStatistics saved to: {args.stats_file}")
     
     # Clean up temp directory if not keeping temp files
     if not args.keep_temp:
+        if args.no_progress:
+            logger.debug("Cleaning up temporary files...")
         cleanup_temp_directory(args.temp_dir)
 
 
@@ -289,7 +322,7 @@ def main():
         temp_path = Path(tempfile.gettempdir()) / "whisperjav"
     temp_path.mkdir(parents=True, exist_ok=True)
     args.temp_dir = str(temp_path)
-    logger.info(f"Using temporary directory: {args.temp_dir}")
+    logger.debug(f"Using temporary directory: {args.temp_dir}")
         
     discovery = MediaDiscovery()
     media_files = discovery.discover(args.input)
@@ -307,14 +340,14 @@ def main():
         logger.warning("\nProcessing interrupted by user")
         # Clean up temp directory even on interrupt
         if not args.keep_temp:
-            logger.info("Cleaning up temporary files...")
+            logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
         sys.exit(1)
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         # Clean up temp directory even on error
         if not args.keep_temp:
-            logger.info("Cleaning up temporary files...")
+            logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
         sys.exit(1)
 

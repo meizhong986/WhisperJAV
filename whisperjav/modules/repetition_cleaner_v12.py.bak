@@ -58,7 +58,7 @@ class RepetitionCleaner:
             (regex.compile(r'((?:[\p{Hiragana}\p{Katakana}]{2,10}))\1{2,}'), r'\1\1'),
         ]
 
-        logger.debug(f"RepetitionCleaner initialized with {len(self.escaped_patterns)} escaped pattern rules")
+        logger.info(f"RepetitionCleaner initialized with {len(self.escaped_patterns)} escaped pattern rules")
 
     def clean_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
         """

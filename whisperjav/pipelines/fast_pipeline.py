@@ -18,24 +18,27 @@ from whisperjav.utils.logger import logger
 from whisperjav.modules.segment_classification import SegmentClassifier
 from whisperjav.modules.audio_preprocessing import AudioPreprocessor
 from whisperjav.modules.srt_postproduction import SRTPostProduction
+from whisperjav.utils.progress_display import DummyProgress
 
 
 class FastPipeline(BasePipeline):
     """Fast pipeline using standard Whisper with mandatory scene detection."""
     
-    # --- FUNCTION MODIFIED ---
+   
     def __init__(self, 
                  output_dir: str, 
                  temp_dir: str, 
                  keep_temp_files: bool, 
                  subs_language: str,
                  resolved_params: Dict, 
+                 progress_display=None, 
                  **kwargs):
         """
         Initializes the FastPipeline using resolved configuration parameters.
         """
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files, **kwargs)
         
+        self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
 
         # Unpack the resolved parameter dictionaries
@@ -106,7 +109,7 @@ class FastPipeline(BasePipeline):
         master_metadata["config"]["scene_detection_params"] = self.scene_detection_params
         
         try:
-            logger.info("Step 1: Extracting audio")
+            logger.info("Step 1: Transforming audio")
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
             self.metadata_manager.update_processing_stage(
@@ -115,11 +118,11 @@ class FastPipeline(BasePipeline):
                 duration_seconds=duration
             )
             
-            logger.info("Step 2: Detecting audio scenes")
+            logger.info("Step 2: Detecting scenes")
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
             scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
-            logger.info(f"Detected {len(scene_paths)} scenes")
+            logger.debug(f"Detected {len(scene_paths)} scenes")
             
             master_metadata["scenes_detected"] = []
             for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
@@ -142,15 +145,21 @@ class FastPipeline(BasePipeline):
             )
             
             if self.smart_postprocessing:
-                 logger.info("Smart Post-Processing enabled.")
+                 logger.debug("Smart Post-Processing enabled.")
 
-            logger.info("Step 3: Transcribing scenes with standard Whisper")
+
+
+            logger.debug("Step 3: Transcribing scenes with standard Whisper")
+            self.progress.set_current_step("Transcribing scenes", 3, 5)
             scene_srts_dir = self.temp_dir / "scene_srts"
             scene_srts_dir.mkdir(exist_ok=True)
             
+            if len(scene_paths) > 1:
+                self.progress.start_subtask("Transcribing scenes", len(scene_paths))
+            
             scene_srt_info = []
             for idx, (scene_path, start_time_sec, _, _) in enumerate(scene_paths):
-                logger.info(f"Transcribing scene {idx+1}/{len(scene_paths)}: {scene_path.name}")
+                logger.debug(f"Transcribing scene {idx+1}/{len(scene_paths)}: {scene_path.name}")
                 
                 scene_srt_path = scene_srts_dir / f"{scene_path.stem}.srt"
                 try:
@@ -176,7 +185,7 @@ class FastPipeline(BasePipeline):
                 total_scenes=len(scene_paths)
             )
             
-            logger.info("Step 4: Combining scene transcriptions")
+            logger.debug("Step 4: Combining scene transcriptions")
             stitched_srt_path = self.temp_dir / f"{media_basename}_stitched.srt"
             num_subtitles = self.stitcher.stitch(scene_srt_info, stitched_srt_path)
             
@@ -197,7 +206,7 @@ class FastPipeline(BasePipeline):
             # NEW: Ensure the final SRT is in the output directory
             if processed_srt_path != final_srt_path:
                 shutil.copy2(processed_srt_path, final_srt_path)
-                logger.info(f"Copied final SRT from {processed_srt_path} to {final_srt_path}")
+                logger.debug(f"Copied final SRT from {processed_srt_path} to {final_srt_path}")
             
             # FIX: Move raw_subs folder to output directory
             temp_raw_subs_path = stitched_srt_path.parent / "raw_subs"
@@ -212,7 +221,7 @@ class FastPipeline(BasePipeline):
                     shutil.copy2(file, dest_file)
                     logger.debug(f"Copied {file.name} to raw_subs")
                 
-                logger.info(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
+                logger.debug(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
                 
             self.metadata_manager.update_processing_stage(
                 master_metadata, "postprocessing", "completed", statistics=stats, output_path=str(final_srt_path)
@@ -238,7 +247,7 @@ class FastPipeline(BasePipeline):
             
             self.cleanup_temp_files(media_basename)
             
-            logger.info(f"FAST pipeline completed in {total_time:.1f} seconds")
+            logger.debug(f"Completed in {total_time:.1f} seconds")
             logger.info(f"Output saved to: {final_srt_path}")
             
             return master_metadata

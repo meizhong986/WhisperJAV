@@ -10,127 +10,72 @@ import numpy as np
 from whisperjav.utils.logger import logger
 from whisperjav.config.sanitization_constants import RepetitionConstants
 
-class RepetitionCleaner:
-    """Multi-level repetition detection and cleaning with content protection."""
 
-# In whisperjav/modules/repetition_cleaner.py
+class RepetitionCleaner:
+    """
+    FINAL, HARDENED VERSION.
+    This cleaner uses a single, curated list of safe patterns to aggressively clean
+    extreme repetitions while avoiding the data corruption bugs.
+    """
 
     def __init__(self, constants: RepetitionConstants):
-        """
-        CORRECTED: Initializes the RepetitionCleaner with constants and pre-compiled regex patterns.
-        Removed references to old, deleted patterns from RepetitionConstants.
-        """
         self.constants = constants
-        self.threshold = constants.DEFAULT_THRESHOLD # The target count for repetitions, typically 2.
+        self.threshold = constants.DEFAULT_THRESHOLD
 
-        # --- Minimal protections remain ---
-        self.protected_patterns = [
-            re.compile(r'\d'),  # Protect any numbers
-            re.compile(r'[¥$€£円]'), # Protect currency symbols
-            re.compile(r'No\.\d+') # Protect "No.123" style text
+        # This is the final, curated list of patterns.
+        # They are ordered from most specific/extreme to most general.
+        self.cleaning_patterns = [
+            # 1. Targets extreme phrase repetition with separators (e.g., "あ!!あ!!あ!!")
+            # Uses a backreference `\1` to ensure phrases are identical.
+            ('phrase_with_separator', regex.compile(r'((?:[\p{L}\p{N}]{1,8}[、,!\s!!??。。・]+))\1{3,}'), r'\1'),
+
+            # 2. Targets extreme multi-character word repetition (e.g., "ハッハッハッハッ")
+            ('multi_char_word', regex.compile(r'(([ぁ-んァ-ン]{2,4}))\1{3,}'), r'\1\1'),
+            
+            # 3. Targets phrase repetition with a comma (e.g., "ゆーちゃん、ゆーちゃん、ゆーちゃん")
+            ('phrase_with_comma', regex.compile(r'((?:[\p{L}\p{N}]{1,10}[、,]\s*))\1{2,}'), r'\1'),
+
+            # 4. Targets single character with prefix (e.g., "あらららら...")
+            ('prefix_plus_char', regex.compile(r'([ぁ-んァ-ン]{1,2})([ぁ-んァ-ン])\2{3,}'), r'\1\2\2'),
+
+            # 5. Targets simple single-character floods (e.g., "ううううう")
+            ('single_char_flood', regex.compile(r'([ぁ-んァ-ン])\1{3,}'), r'\1\1'),
+            
+            # 6. Targets vowel extensions (e.g., "あ〜〜〜〜")
+            ('vowel_extension', regex.compile(r'([ぁ-んァ-ン])([〜ー])\2{3,}'), r'\1\2\2'),
         ]
 
-        # --- Compile patterns that are still in use ---
-        self.char_repeat_pattern = regex.compile(
-            self.constants.CHAR_REPETITION_PATTERN.format(threshold=self.threshold)
-        )
-
-
-        self.escaped_patterns = [
-            # Pattern 1: CORRECTED to be more specific and safer.
-            # Instead of a generic wildcard (.), it now specifically looks for letters/numbers,
-            # preventing it from incorrectly matching across punctuation and corrupting lines.
-            (regex.compile(r'((?:[\p{L}\p{N}]{1,10})(?:[、,!\s!!??。。・]))\1{3,}'), r'\1'),
-
-            # Pattern 2: Handles multi-character repetitions like "ハッハッハッ" or "ごいごいごい"
-            (regex.compile(r'(([ぁ-んァ-ン]{2,4}))\1{3,}'), r'\1\1'),
-
-            # Pattern 3: Handles single-character repetitions with a prefix, like "あらららら..." or "よっこっこ..."
-            (regex.compile(r'([ぁ-んァ-ン]{1,2})([ぁ-んァ-ン])\2{8,}'), r'\1\2\2'),
-            
-            # Pattern 4: Handles single character + comma repetitions like "あ、あ、あ、" or "ん、ん、ん、"
-            (regex.compile(r'(([ぁ-んァ-ン])[、,]\s*)\1{3,}'), r'\1\1'),
-
-            # Pattern 5: Handles extreme single-character floods like "あぁぁぁぁ..." or "はぁぁぁぁ..."
-            (regex.compile(r'([ぁ-んァ-ン])\1{8,}'), r'\1\1'),
-            
-            # Pattern 6: A general fallback for any short repeated phrase (e.g. from ASR errors)
-            (regex.compile(r'((?:[\p{Hiragana}\p{Katakana}]{2,10}))\1{2,}'), r'\1\1'),
-        ]
-
-        logger.debug(f"RepetitionCleaner initialized with {len(self.escaped_patterns)} escaped pattern rules")
+        logger.info(f"RepetitionCleaner initialized with {len(self.cleaning_patterns)} final cleaning patterns.")
 
     def clean_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
         """
-        Clean all types of repetitions from text, with content protection and validation.
+        Applies the final, curated list of cleaning patterns.
         """
         if not text or not text.strip():
-            return text, []
-
-        # The protection function is now minimal and will not block most lines.
-        if self._is_protected_content_enhanced(text):
-            logger.debug(f"Skipping repetition cleaning for protected content: '{text[:50]}...'")
             return text, []
 
         modifications = []
         current_text = text
 
-        # Apply escaped patterns with more aggressive approach
-        for i, (pattern, replacement) in enumerate(self.escaped_patterns):
+        for name, pattern, replacement in self.cleaning_patterns:
             try:
                 original_text = current_text
-                # Apply repeatedly until no more matches
-                while True:
-                    new_text = pattern.sub(replacement, current_text)
-                    if new_text == current_text:
-                        break
+                new_text = pattern.sub(replacement, original_text)
+
+                if new_text != original_text:
+                    modifications.append({
+                        'type': name,
+                        'pattern': pattern.pattern,
+                        'original': original_text,
+                        'modified': new_text,
+                        'confidence': 0.99,
+                        'category': 'repetition_cleaning'
+                    })
                     current_text = new_text
-
-                if current_text != original_text:
-                    if self._validate_modification(original_text, current_text):
-                        modifications.append({
-                            'type': f'escaped_pattern_{i}',
-                            'pattern': pattern.pattern,
-                            'original': original_text,
-                            'modified': current_text,
-                            'confidence': 0.98,
-                            'category': 'escaped_repetition'
-                        })
-                        logger.debug(f"Escaped pattern {i} applied: '{original_text[:30]}...' → '{current_text[:30]}...'")
-                    else:
-                        logger.warning(f"Escaped pattern {i} validation failed - reverting")
-                        current_text = original_text  # Revert if validation fails
             except Exception as e:
-                logger.warning(f"Escaped pattern {i} failed: {e}")
+                logger.warning(f"Pattern '{name}' failed on text '{text[:30]}...': {e}")
                 continue
-
-        # THEN: Apply the remaining, more specialized cleaning steps.
-        cleaning_steps = [
-            ('pre_process_special', self._pre_process_special_patterns),
-            ('character', self._clean_character_repetitions),
-            ('word', self._clean_word_repetitions),
-            ('high_density', self._clean_high_density_repetitions_safe)
-        ]
-
-        for step_name, cleaner_func in cleaning_steps:
-            try:
-                cleaned_text, mods = cleaner_func(current_text)
-
-                if cleaned_text != current_text:
-                    if not self._validate_modification(current_text, cleaned_text):
-                        logger.warning(f"Step '{step_name}' produced invalid modification - skipping")
-                        continue
-                
-                if mods:
-                    for mod in mods:
-                        mod['step'] = step_name
-                    modifications.extend(mods)
-                    current_text = cleaned_text
-                    
-            except Exception as e:
-                logger.warning(f"Repetition cleaning step '{step_name}' failed for '{text[:30]}...': {e}")
-                continue
-
+        
         return current_text.strip(), modifications
 
 
@@ -299,18 +244,63 @@ class RepetitionCleaner:
 
 
 
+    def _clean_character_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
+        """Clean character repetitions based on a defined constant."""
+        modifications = []
+        
+        def replacer(match):
+            char = match.group(1)
+            return char * self.threshold
+
+        original_text = text
+        
+        # This now uses the new, descriptive constant from the constants file.
+        # The quantifier for N or more items is {N-1,}.
+        quantifier = self.constants.MIN_CHAR_REPETITION_THRESHOLD - 1
+        pattern_str = self.constants.CHAR_REPETITION_PATTERN + f'\\1{{{quantifier},}}'
+        char_repeat_pattern = regex.compile(pattern_str)
+
+        try:
+            modified_text = char_repeat_pattern.sub(replacer, text)
+
+            if original_text != modified_text:
+                if self._validate_modification(original_text, modified_text):
+                    modifications.append({
+                        'type': 'character_repetition_reduction',
+                        'original': original_text,
+                        'modified': modified_text,
+                        'confidence': 0.95,
+                        'category': 'character_repetition'
+                    })
+                else:
+                    # Revert if validation fails
+                    modified_text = original_text
+            
+            return modified_text, modifications
+        except Exception as e:
+            logger.warning(f"Character repetition cleaning failed with error: {e}")
+            return text, []
+
     def _pre_process_special_patterns(self, text: str) -> Tuple[str, List[Dict]]:
-        """Handle special repetitive patterns before main processing, using the new robust constants."""
+        """Handle special repetitive patterns using defined constants."""
         modifications = []
         current_text = text
 
-        # Add the new vowel extension pattern to the list of patterns to apply
+        # The quantifiers are now based on the new, descriptive constants
+        vowel_quantifier = self.threshold + 2
+        phrase_quantifier = self.constants.MIN_PHRASE_REPETITION_THRESHOLD - 1
+
         patterns_to_apply = [
-            ('vowel_extension', regex.compile(self.constants.VOWEL_EXTENSION_PATTERN + f'{{{self.threshold + 2},}}'), lambda m: m.group(1) + m.group(2) * self.threshold),
-            ('comma_phrase', regex.compile(self.constants.COMMA_PHRASE_PATTERN + f'{{{self.threshold},}}'), lambda m: m.group(1).strip() * self.threshold),
+            ('vowel_extension', regex.compile(self.constants.VOWEL_EXTENSION_PATTERN + f'{{{vowel_quantifier},}}'), lambda m: m.group(1) + m.group(2) * self.threshold),
+            
+            # --- THIS IS THE LINE TO CHANGE FOR CONSERVATIVE CLEANING ---
+            ('comma_phrase', regex.compile(self.constants.COMMA_PHRASE_PATTERN + r'\1' + f'{{{phrase_quantifier},}}'), lambda m: m.group(1) * self.threshold),
+            # -----------------------------------------------------------
+
             ('prefix_char_flood', regex.compile(self.constants.PREFIX_PLUS_CHAR_FLOOD_PATTERN), lambda m: m.group(1) + m.group(2) * self.threshold),
             ('small_vowel_flood', regex.compile(self.constants.SMALL_VOWEL_FLOOD_PATTERN), lambda m: m.group(1) + m.group(2) * self.threshold),
         ]
+
 
         for name, pattern, replacement in patterns_to_apply:
             try:
@@ -335,7 +325,6 @@ class RepetitionCleaner:
                         })
                         current_text = new_text
                     else:
-                        # Validation failed, revert the change for this pattern
                         current_text = original_text
                         logger.warning(f"Validation failed for special pattern '{name}', reverting.")
                     
@@ -345,42 +334,6 @@ class RepetitionCleaner:
 
         return current_text, modifications
 
-
-
-    def _clean_character_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
-        """Clean character repetitions: ええええ → ええ"""
-        modifications = []
-        
-        # This function remains the same.
-        def replacer(match):
-            char = match.group(1) # The single repeating character
-            return char * self.threshold
-
-        original_text = text
-        
-        # CORRECTED: Build the regex pattern correctly and simply.
-        # This looks for a single kana character, followed by itself `threshold - 1` or more times.
-        # e.g., if threshold is 2, it looks for a char, then that same char 1 or more times (total 2+).
-        pattern_str = f'([ぁ-んァ-ン])\\1{{{self.threshold - 1},}}'
-        char_repeat_pattern = regex.compile(pattern_str)
-
-        try:
-            modified_text = char_repeat_pattern.sub(replacer, text)
-
-            if original_text != modified_text:
-                modifications.append({
-                    'type': 'character_repetition_reduction',
-                    'original': original_text,
-                    'modified': modified_text,
-                    'confidence': 0.95,
-                    'category': 'character_repetition'
-                })
-
-            return modified_text, modifications
-        except Exception as e:
-            # This should no longer be hit, but is good practice to keep.
-            logger.warning(f"Character repetition cleaning failed with error: {e}")
-            return text, []
             
 
     def _clean_word_repetitions(self, text: str) -> Tuple[str, List[Dict]]:

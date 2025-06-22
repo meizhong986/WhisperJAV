@@ -32,10 +32,10 @@ class SRTPostProcessor:
                 max_subtitle_duration=kwargs.get('max_subtitle_duration', 7.0)
             )
             self.japanese_sanitizer = SubtitleSanitizer(config)
-            logger.debug("Initialized Japanese subtitle sanitizer")
+            logger.info("Initialized Japanese subtitle sanitizer")
         else:
             # For English, we'll create cleaner per file
-            logger.debug("Configured for English subtitle cleaning")
+            logger.info("Configured for English subtitle cleaning")
             
     def process(self, srt_path: Union[str, Path], output_path: Optional[Union[str, Path]] = None) -> Tuple[Path, Dict]:
         """
@@ -151,8 +151,8 @@ class SRTPostProcessor:
                 'empty_removed': 0
             }
             
-            logger.debug(f"English subtitle cleaning complete: {final_clean_path}")
-            logger.debug(f"Log saved to: {final_log_path}")
+            logger.info(f"English subtitle cleaning complete: {final_clean_path}")
+            logger.info(f"Log saved to: {final_log_path}")
             
             return final_clean_path, stats
             

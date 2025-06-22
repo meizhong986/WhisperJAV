@@ -129,12 +129,12 @@ class TimingAdjuster:
         for i, sub in enumerate(result_subtitles, 1):
             sub.index = i
 
-        logger.debug(f"STRICT timing adjustment complete:")
-        logger.debug(f"  Condition (a) - Substantial content changed: {condition_a_count} subtitles")
-        logger.debug(f"  Condition (b) - Duration > {self.HALLUCINATION_THRESHOLD}s: {condition_b_count} subtitles")
-        logger.debug(f"  Condition (c) - Merged lines detected: {condition_c_count} subtitles")
-        logger.debug(f"  Condition (d) - Abnormally Slow CPS (< {min_cps} CPS): {condition_d_count} subtitles")
-        logger.debug(f"  Untouched (as required): {untouched_count} subtitles")
+        logger.info(f"STRICT timing adjustment complete:")
+        logger.info(f"  Condition (a) - Substantial content changed: {condition_a_count} subtitles")
+        logger.info(f"  Condition (b) - Duration > {self.HALLUCINATION_THRESHOLD}s: {condition_b_count} subtitles")
+        logger.info(f"  Condition (c) - Merged lines detected: {condition_c_count} subtitles")
+        logger.info(f"  Condition (d) - Abnormally Slow CPS (< {min_cps} CPS): {condition_d_count} subtitles")
+        logger.info(f"  Untouched (as required): {untouched_count} subtitles")
 
         return result_subtitles, modifications
         

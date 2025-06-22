@@ -12,7 +12,7 @@ from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.stable_ts_asr import StableTSASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor
 from whisperjav.utils.logger import logger
-
+from whisperjav.utils.progress_display import DummyProgress
 
 class FasterPipeline(BasePipeline):
     """Faster pipeline using Whisper turbo mode without chunking."""
@@ -23,12 +23,14 @@ class FasterPipeline(BasePipeline):
                  keep_temp_files: bool, 
                  subs_language: str,
                  resolved_params: Dict, 
+                 progress_display=None, 
                  **kwargs):
         """
         Initializes the FasterPipeline using resolved configuration parameters.
         """
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files, **kwargs)
         
+        self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
 
         # Unpack the resolved parameter dictionaries from the TranscriptionTuner
@@ -44,7 +46,7 @@ class FasterPipeline(BasePipeline):
         # Implement the smart model-switching logic
         effective_model_name = load_params.get("model_name", "turbo")
         if self.subs_language == 'english-direct' and effective_model_name == 'turbo':
-            logger.info("Direct translation requested. Switching model from 'turbo' to 'large-v2' to perform translation.")
+            logger.info("Direct translation requested. Switching to 'large-v2' to perform translation.")
             effective_model_name = 'large-v2'
         
         # Instantiate modules with the final, correct parameters
@@ -75,7 +77,7 @@ class FasterPipeline(BasePipeline):
         media_basename = media_info['basename']
         
         logger.info(f"Starting FASTER pipeline for: {input_file}")
-        logger.info(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
+        logger.debug(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
          
         master_metadata = self.metadata_manager.create_master_metadata(
             input_file=input_file,
@@ -90,10 +92,13 @@ class FasterPipeline(BasePipeline):
         }
         
         if self.smart_postprocessing:
-            logger.info("Smart Post-Processing enabled.")
+            logger.debug("Smart Post-Processing enabled.")
             
         try:
-            logger.info("Step 1: Extracting audio")
+            self.progress.set_current_step("Transforming audio", 1, 3)
+            
+            
+            #logger.info("Step 1: Transforming audio")
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
             
@@ -105,7 +110,9 @@ class FasterPipeline(BasePipeline):
                 duration_seconds=duration
             )
             
-            logger.info("Step 2: Transcribing with Whisper Turbo")
+            
+            #logger.info("Step 2: Transcribing")
+            self.progress.set_current_step("Transcribing", 2, 3)
             raw_srt_path = self.temp_dir / f"{media_basename}_raw.srt"
             
             self.asr.transcribe_to_srt(audio_path, raw_srt_path, task=self.transcribe_options['task'])
@@ -117,7 +124,9 @@ class FasterPipeline(BasePipeline):
             )
             
             
-            logger.info("Step 3: Post-processing SRT")
+            #logger.info("Step 3: Post-processing SRT")
+            self.progress.set_current_step("Post-processing subtitles", 3, 3)
+
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
             final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
            
@@ -140,7 +149,7 @@ class FasterPipeline(BasePipeline):
                     shutil.copy2(file, dest_file)
                     logger.debug(f"Copied {file.name} to raw_subs")
                     
-                logger.info(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
+                logger.debug(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
             
             # FIX: Now cleanup temp files
             self.cleanup_temp_files(media_basename)
@@ -172,7 +181,7 @@ class FasterPipeline(BasePipeline):
             
             self.cleanup_temp_files(media_basename)
             
-            logger.info(f"FASTER pipeline completed in {total_time:.1f} seconds")
+            logger.debug(f"FASTER pipeline completed in {total_time:.1f} seconds")
             logger.info(f"Output saved to: {final_srt_path}")
             
             return master_metadata
