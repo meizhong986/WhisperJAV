@@ -633,12 +633,13 @@ class WhisperJAVGUI(tk.Tk):
         
         # Build command
         command = [
-            sys.executable, "main.py",
+            sys.executable, "-m", "whisperjav.main",
             "--output-dir", output_dir,
             "--mode", self.mode.get(),
             "--sensitivity", self.sensitivity.get(),
             "--subs-language", self.subs_language.get()
         ]
+
         
         # Add config file if created
         if config_path:
