@@ -4,9 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -23,14 +20,15 @@ wheels/
 .installed.cfg
 *.egg
 
-# Project specific
-output/
-temp/
-*.srt
-*.wav
-*.mp4
-*.avi
-*.mkv
+# Virtual environments
+venv/
+ENV/
+env/
+
+# Test outputs
+tests/test_outputs/
+tests/temp/
+*.log
 
 # IDE
 .vscode/
@@ -42,10 +40,14 @@ temp/
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
-
-# Config
-config.json
-settings.json
+# Project specific
+temp/
+output/
+*.wav
+*.mp4
+*.avi
+*.mkv
+*.srt
+!examples/*.srt
+.tmp/
+raw_subs/

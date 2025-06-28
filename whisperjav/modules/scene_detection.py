@@ -41,7 +41,7 @@ class SceneDetector:
         self.energy_threshold = energy_threshold
         
         # Two-pass parameters
-        self.pass1_max_duration = 599.0  # ~10 minutes
+        self.pass1_max_duration = 1599.0  # ~25 minutes
         self.pass1_min_duration = 0.1
         self.pass1_max_silence = max_silence
         self.pass1_energy_threshold = energy_threshold
@@ -53,7 +53,7 @@ class SceneDetector:
         
     def detect_scenes(self, audio_path: Path, output_dir: Path, media_basename: str) -> List[Tuple[Path, float, float, float]]:
         """
-        Split audio into scenes using a two-pass approach.
+        Split audio into scenes using a two-pass Auditok approach.
         
         Args:
             audio_path: Path to input audio file
@@ -97,8 +97,8 @@ class SceneDetector:
         regions = list(auditok.split(audio_bytes, **pass1_params))
         logger.debug(f"Pass 1 found {len(regions)} regions")
         
-        # Process each region
-        for region_idx, region in enumerate(tqdm(regions, desc="Processing regions")):
+        # Process each region - DISABLE tqdm here
+        for region_idx, region in enumerate(regions):
             region_start = region.start
             region_end = region.end
             region_duration = region_end - region_start
@@ -187,11 +187,12 @@ class SceneDetector:
                         scene_tuples.append((scene_path, abs_start, abs_end, sub_duration))
                         scene_idx += 1
         
-        logger.debug(f"Detected {len(scene_tuples)} final scenes")
+        logger.info(f"Detected {len(scene_tuples)} final scenes")
         return scene_tuples
     
     def _normalize_audio(self, audio_data: np.ndarray) -> np.ndarray:
         """Normalize audio to have peak of 1.0."""
+        logger.debug("Normalizing audio ....")
         peak = np.max(np.abs(audio_data))
         safe_peak = max(peak, 0.1)
         if safe_peak == 0:

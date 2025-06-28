@@ -110,12 +110,14 @@ class FasterPipeline(BasePipeline):
                 duration_seconds=duration
             )
             
-            
             #logger.info("Step 2: Transcribing")
-            self.progress.set_current_step("Transcribing", 2, 3)
+            self.progress.set_current_step("Transcribing (this may take a while...)", 2, 3)
+            logger.info("Starting transcription of entire audio ...")
             raw_srt_path = self.temp_dir / f"{media_basename}_raw.srt"
-            
+
             self.asr.transcribe_to_srt(audio_path, raw_srt_path, task=self.transcribe_options['task'])
+            
+           
             
             self.metadata_manager.update_processing_stage(
                 master_metadata, "transcription", "completed",

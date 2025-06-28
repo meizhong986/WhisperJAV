@@ -147,8 +147,6 @@ class FastPipeline(BasePipeline):
             if self.smart_postprocessing:
                  logger.debug("Smart Post-Processing enabled.")
 
-
-
             logger.debug("Step 3: Transcribing scenes with standard Whisper")
             self.progress.set_current_step("Transcribing scenes", 3, 5)
             scene_srts_dir = self.temp_dir / "scene_srts"
@@ -170,11 +168,23 @@ class FastPipeline(BasePipeline):
                         master_metadata["scenes_detected"][idx]["srt_path"] = str(scene_srt_path)
                     else:
                         master_metadata["scenes_detected"][idx]["transcribed"] = False
+                    
+                    # Update progress after each scene
+                    if len(scene_paths) > 1:
+                        self.progress.update_subtask(1)
+                        
                 except Exception as e:
                     logger.error(f"Failed to transcribe scene {idx}: {e}")
                     master_metadata["scenes_detected"][idx]["transcribed"] = False
                     master_metadata["scenes_detected"][idx]["error"] = str(e)
+                    # Still update progress even on error
+                    if len(scene_paths) > 1:
+                        self.progress.update_subtask(1)
                     continue
+            
+            # Finish the subtask progress
+            if len(scene_paths) > 1:
+                self.progress.finish_subtask()
             
             master_metadata["summary"]["scenes_processed_successfully"] = len(scene_srt_info)
             
@@ -194,7 +204,6 @@ class FastPipeline(BasePipeline):
                 output_path=str(stitched_srt_path),
                 subtitle_count=num_subtitles
             )
-
             
             logger.info("Step 5: Post-processing final SRT")
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'

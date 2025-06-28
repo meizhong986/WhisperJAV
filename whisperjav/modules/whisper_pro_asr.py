@@ -659,172 +659,92 @@ class WhisperProASR:
     
 
     def _transcribe_vad_group(self, audio_data: np.ndarray, sample_rate: int, 
-
                              vad_group: List[Dict], task: str) -> List[Dict]:
-
         """
-
         Transcribe a group of VAD segments with validated parameters.
-
         """
-
         if not vad_group:
-
             return []
-
             
-
         start_sec = vad_group[0]["start_sec"]
-
         end_sec = vad_group[-1]["end_sec"]
-
         start_sample = int(start_sec * sample_rate)
-
         end_sample = int(end_sec * sample_rate)
-
         group_audio = audio_data[start_sample:end_sample]
-
         
-
         # Get properly separated and validated parameters
-
         transcribe_params, decode_params = self._prepare_transcribe_options(task)
-
         
-
+        # Force verbose=None to suppress progress bars
+        transcribe_params['verbose'] = None
+        
         try:
-
             # Call transcribe with properly separated parameters
-
             result = self.whisper_model.transcribe(
-
                 group_audio,
-
                 **transcribe_params,
-
                 **decode_params
-
             )
 
-
-
         except TypeError as e:
-
             logger.error(f"Parameter error in transcribe: {e}")
-
             logger.debug(f"Transcribe params: {transcribe_params}")
-
             logger.debug(f"Decode params: {decode_params}")
-
             
-
             # Fallback to minimal parameters
-
             minimal_params = {
-
                 'task': task,
-
                 'language': self.language,
-
                 'temperature': transcribe_params.get('temperature', 0.0),
-
                 'beam_size': decode_params.get('beam_size', 5),
-
-                'fp16': torch.cuda.is_available()
-
+                'fp16': torch.cuda.is_available(),
+                'verbose': None  # Suppress progress in fallback too
             }
-
             logger.warning(f"Retrying with minimal parameters: {minimal_params}")
-
             
-
             try:
-
                 result = self.whisper_model.transcribe(group_audio, **minimal_params)
-
             except Exception as e2:
-
                 logger.error(f"Even minimal transcribe failed: {e2}")
-
                 return []
 
-
-
                 
-
         except Exception as e:
-
             logger.error(f"Transcription error: {e}")
-
             logger.debug(traceback.format_exc())
-
             return []
-
                     
-
         if not result or not result["segments"]:
-
             return []
-
             
-
         # Adjust timestamps and apply text-based suppression
-
         segments = []
-
         for seg in result["segments"]:
-
             text = seg["text"]
-
             avg_logprob = seg.get("avg_logprob", 0)
-
             
-
             # Apply text-based suppression penalties
-
             for suppress_word in self.suppress_low:
-
                 if suppress_word in text: 
-
                     avg_logprob -= 0.15
-
                     
-
             for suppress_word in self.suppress_high:
-
                 if suppress_word in text: 
-
                     avg_logprob -= 0.35
-
                     
-
             # Check against logprob threshold
-
             logprob_filter = self.transcribe_options.get("logprob_threshold", -1.0)
-
             if avg_logprob < logprob_filter:
-
                 logger.debug(f"Filtered segment with logprob {avg_logprob}: {text[:50]}...")
-
                 continue
-
                 
-
             adjusted_seg = {
-
                 "start": seg["start"] + start_sec,
-
                 "end": seg["end"] + start_sec,
-
                 "text": text.strip(),
-
                 "avg_logprob": avg_logprob
-
             }
-
             segments.append(adjusted_seg)
-
             
-
         return segments
 

@@ -1,10 +1,28 @@
 {
   "parameter_sets": {
-    "__description": "The library of reusable parameter blocks for specific functions.",
+    "__description": "The library of default parameter blocks for specific options.",
 
-    "SILERO_VAD_OPTIONS_CONSERVATIVE": { "threshold": 0.65, "min_speech_duration_ms": 300 },
-    "SILERO_VAD_OPTIONS_BALANCED":   { "threshold": 0.35, "min_speech_duration_ms": 200 },
-    "SILERO_VAD_OPTIONS_AGGRESSIVE": { "threshold": 0.18, "min_speech_duration_ms": 100 },
+    "MODEL_LOAD_PARAMS_DEFAULT": {
+      "model_name": "turbo",
+      "device": "cuda",
+      "compute_type": "float16"
+    },
+
+    "SILERO_VAD_OPTIONS_CONSERVATIVE": { 
+      "threshold": 0.5, 
+      "min_speech_duration_ms": 300,
+      "chunk_threshold": 5.0
+    },
+    "SILERO_VAD_OPTIONS_BALANCED": { 
+      "threshold": 0.35, 
+      "min_speech_duration_ms": 200,
+      "chunk_threshold": 4.0
+    },
+    "SILERO_VAD_OPTIONS_AGGRESSIVE": { 
+      "threshold": 0.20, 
+      "min_speech_duration_ms": 100,
+      "chunk_threshold": 4.0
+    },
 
     "WHISPER_TRANSCRIBE_OPTIONS_CONSERVATIVE": {
       "temperature": [0.0],
@@ -38,7 +56,8 @@
     },
 
     "WHISPER_DECODE_OPTIONS_CONSERVATIVE": {
-      "beam_size": 6,
+      "language": "ja",
+      "beam_size": 1,
       "best_of": 1,
       "patience": 3.0,
       "length_penalty": 1.0,
@@ -48,6 +67,7 @@
       "max_initial_timestamp": 1.0
     },
     "WHISPER_DECODE_OPTIONS_BALANCED": {
+      "language": "ja",
       "beam_size": 2,
       "best_of": 2,
       "patience": 3.0,
@@ -58,6 +78,7 @@
       "max_initial_timestamp": 1.0
     },
     "WHISPER_DECODE_OPTIONS_AGGRESSIVE": {
+      "language": "ja",
       "beam_size": 3,
       "best_of": 3,
       "patience": 2.0,
@@ -69,8 +90,29 @@
     },
     
     "STABLE_TS_OPTIONS_DEFAULT": {
-        "no_repeat_ngram_size": 3,
-        "repetition_penalty": 2.5
+      "regroup": true,
+      "vad": true,
+      "vad_threshold": 0.2,
+      "no_repeat_ngram_size": 3,
+      "repetition_penalty": 2.5
+    },
+
+    "SCENE_DETECTION_DEFAULT": {
+      "max_duration": 30.0,
+      "min_duration": 0.2,
+      "max_silence": 2.0,
+      "energy_threshold": 50
+    },
+
+    "POST_PROCESSING_DEFAULT": {
+      "remove_hallucinations": true,
+      "remove_repetitions": true,
+      "repetition_threshold": 2,
+      "min_subtitle_duration": 0.5,
+      "max_subtitle_duration": 7.0,
+      "cps_slow_threshold": 6.0,
+      "cps_fast_threshold": 60.22,
+      "max_merge_gap_sec": 0.4
     }
   },
 
@@ -78,18 +120,21 @@
     "__description": "Recipes that assemble parameter sets into full component profiles.",
 
     "ASR_COMPONENT_CONSERVATIVE": {
+      "model_load_params_ref": "MODEL_LOAD_PARAMS_DEFAULT",
       "transcribe_options_ref": "WHISPER_TRANSCRIBE_OPTIONS_CONSERVATIVE",
       "decode_options_ref": "WHISPER_DECODE_OPTIONS_CONSERVATIVE",
       "vad_options_ref": "SILERO_VAD_OPTIONS_CONSERVATIVE",
       "stable_ts_options_ref": "STABLE_TS_OPTIONS_DEFAULT"
     },
     "ASR_COMPONENT_BALANCED": {
+      "model_load_params_ref": "MODEL_LOAD_PARAMS_DEFAULT",
       "transcribe_options_ref": "WHISPER_TRANSCRIBE_OPTIONS_BALANCED",
       "decode_options_ref": "WHISPER_DECODE_OPTIONS_BALANCED",
       "vad_options_ref": "SILERO_VAD_OPTIONS_BALANCED",
       "stable_ts_options_ref": "STABLE_TS_OPTIONS_DEFAULT"
     },
     "ASR_COMPONENT_AGGRESSIVE": {
+      "model_load_params_ref": "MODEL_LOAD_PARAMS_DEFAULT",
       "transcribe_options_ref": "WHISPER_TRANSCRIBE_OPTIONS_AGGRESSIVE",
       "decode_options_ref": "WHISPER_DECODE_OPTIONS_AGGRESSIVE",
       "vad_options_ref": "SILERO_VAD_OPTIONS_AGGRESSIVE",
@@ -100,18 +145,18 @@
   "pipelines": {
     "__description": "Assigns a default component to each pipeline. This is the entry point.",
     "faster": { 
-        "transcription_component": "ASR_COMPONENT_BALANCED",
-        "post_processing_component": "POST_PROCESSING_DEFAULT"
+      "transcription_component": "ASR_COMPONENT_BALANCED",
+      "post_processing_component": "POST_PROCESSING_DEFAULT"
     },
     "fast": { 
-        "transcription_component": "ASR_COMPONENT_BALANCED",
-        "post_processing_component": "POST_PROCESSING_DEFAULT",
-        "scene_detection_component": "SCENE_DETECTION_DEFAULT"
+      "transcription_component": "ASR_COMPONENT_BALANCED",
+      "post_processing_component": "POST_PROCESSING_DEFAULT",
+      "scene_detection_component": "SCENE_DETECTION_DEFAULT"
     },
     "balanced": { 
-        "transcription_component": "ASR_COMPONENT_BALANCED",
-        "post_processing_component": "POST_PROCESSING_DEFAULT",
-        "scene_detection_component": "SCENE_DETECTION_DEFAULT"
+      "transcription_component": "ASR_COMPONENT_BALANCED",
+      "post_processing_component": "POST_PROCESSING_DEFAULT",
+      "scene_detection_component": "SCENE_DETECTION_DEFAULT"
     }
   }
 }
