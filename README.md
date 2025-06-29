@@ -38,9 +38,12 @@ WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JA
 
 ### Prerequisites
 
+Please see the details at the end of this readme for more details. 
+
 -   Python 3.8 or higher
--   CUDA-capable GPU (recommended) or CPU
+-   CUDA-capable GPU, drivers, CUDA Toolkit, cuDNN 
 -   FFmpeg installed and in your system's PATH
+-   PIP and git installation packages
 
 ### Install from Source
 
@@ -371,3 +374,104 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## ⚠️ Disclaimer
 
 This tool is designed for creating accessibility subtitles and for use as a language-learning material. Users are solely responsible for compliance with all applicable local and international laws and regulations regarding the content they choose to process.
+
+
+Prerequisites:
+# ✅ Tools You MUST Install First (Prerequisites)
+
+Install these in the order listed. If you already have them, ensure they are up-to-date.
+
+---
+
+## 🎮 NVIDIA CUDA Platform (Drivers, CUDA Toolkit, cuDNN)
+
+**What you need**:  
+Your **NVIDIA Graphics Card Drivers**, the **CUDA Toolkit**, and the **cuDNN** library.  
+All three are essential for WhisperJAV to use your GPU.
+
+### 🔧 How to install:
+
+#### 1. NVIDIA Graphics Driver
+- Ensure you have the latest drivers for your NVIDIA GPU.
+- 📥 Download from: [https://www.nvidia.com/drivers](https://www.nvidia.com/drivers)
+
+#### 2. CUDA Toolkit
+- Open **Command Prompt (CMD)** and type:
+  ```bash
+  nvidia-smi
+  ```
+- Note the `CUDA Version:` (e.g., **12.3**).
+- 📥 Go to: [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads)
+- Select **Windows**, then choose a CUDA Toolkit version **equal to or lower than** what `nvidia-smi` showed.
+- Download and install it.
+
+#### 3. cuDNN (CUDA Deep Neural Network library)
+- 📥 Go to: [https://developer.nvidia.com/cudnn](https://developer.nvidia.com/cudnn)
+- ⚠️ You need a **free NVIDIA Developer Program** account.
+- Download the cuDNN version that **matches your installed CUDA Toolkit** (e.g., “cuDNN v9.x.x for CUDA 12.x”).
+- Choose the “**Windows (x86_64) Zip**”.
+
+**Extract and Copy (Crucial!)**
+- Extract the cuDNN `.zip` file.
+- You’ll find folders: `bin`, `include`, `lib`
+- Copy **all contents** from cuDNN’s `bin` folder into your CUDA Toolkit’s `bin` folder:
+  ```
+  C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\vX.Y\bin
+  ```
+- Do the same for the `include` and `lib` folders.
+
+📌 **Restart your PC** after copying cuDNN files.
+
+---
+
+## 🐍 Python 3.8 or Higher
+
+### Download:
+- 📥 [https://www.python.org/downloads/windows](https://www.python.org/downloads/windows)
+
+### Install:
+- During installation, **CHECK THE BOX**:  
+  ✅ “Add Python.exe to PATH” (on the first screen).
+
+---
+
+## 🧬 Git for Windows
+
+### Download:
+- 📥 [https://git-scm.com/download/win](https://git-scm.com/download/win)
+
+### Install:
+- The default options are usually fine.
+
+---
+
+## 🎞 FFmpeg (For Video & Audio Processing)
+
+### Download:
+- 📥 [https://www.gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds)
+- Download `ffmpeg-git-full.7z` or `.zip`.
+
+### Extract & Move:
+- Extract the archive.
+- Rename the inner folder to `ffmpeg`.
+- Move it to:
+  ```
+  C:\ffmpeg
+  ```
+
+### Add to PATH (Crucial!):
+
+1. Open **Command Prompt as Administrator**
+2. Paste and run:
+   ```bash
+   setx /M PATH "C:\ffmpeg\bin;%PATH%"
+   ```
+
+3. Close and reopen all Command Prompt / PowerShell windows.
+
+### Verify:
+- Open a new **regular** Command Prompt and type:
+  ```bash
+  ffmpeg -version
+  ```
+- You should see version info if installed correctly.
