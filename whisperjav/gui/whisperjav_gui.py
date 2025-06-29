@@ -588,6 +588,51 @@ class WhisperJAVGUI(tk.Tk):
                 pass
         self.progress_line_ids = new_ids
     
+    def _run_main_direct(self):
+        """Run main directly when in exe mode"""
+        try:
+            from whisperjav.main import main as whisperjav_main
+            
+            self.write_to_console(f"Running in exe mode with args: {' '.join(sys.argv[1:])}")
+            
+            # Capture output by redirecting stdout/stderr to queue
+            import io
+            import contextlib
+            
+            class QueueWriter:
+                def __init__(self, queue):
+                    self.queue = queue
+                
+                def write(self, msg):
+                    if msg and msg.strip():
+                        self.queue.put(msg.strip())
+                
+                def flush(self):
+                    pass
+            
+            # Redirect output to our queue
+            queue_writer = QueueWriter(self.output_queue)
+            
+            with contextlib.redirect_stdout(queue_writer), contextlib.redirect_stderr(queue_writer):
+                try:
+                    # Run main
+                    whisperjav_main()
+                    return_code = 0
+                except SystemExit as e:
+                    return_code = e.code if e.code is not None else 0
+            
+            self.output_queue.put(f"\nProcess completed with exit code: {return_code}")
+            
+        except Exception as e:
+            self.output_queue.put(f"Error during processing: {str(e)}")
+            import traceback
+            self.output_queue.put(traceback.format_exc())
+        finally:
+            # Restore original argv
+            sys.argv = self.original_argv
+            self.output_queue.put(None)  # Signal processing complete
+            self.after(100, self.processing_complete)    
+    
     def start_processing(self):
         if not self.input_files:
             messagebox.showerror("Input Error", "Please select at least one media file.")
@@ -631,33 +676,68 @@ class WhisperJAVGUI(tk.Tk):
             except Exception as e:
                 self.write_to_console(f"Error saving config: {str(e)}")
         
-        # Build command
-        command = [
-            sys.executable, "-m", "whisperjav.main",
-            "--output-dir", output_dir,
-            "--mode", self.mode.get(),
-            "--sensitivity", self.sensitivity.get(),
-            "--subs-language", self.subs_language.get()
-        ]
-
-        
-        # Add config file if created
-        if config_path:
-            command.extend(["--config", str(config_path)])
-        
-        # Add enhancement options
-        if self.adaptive_classification.get():
-            command.append("--adaptive-classification")
-        if self.adaptive_audio_enhancement.get():
-            command.append("--adaptive-audio-enhancement")
-        if self.smart_postprocessing.get():
-            command.append("--smart-postprocessing")
-        
-        # Add input files
-        command.extend(self.input_files)
-        
-        # Start processing in a separate thread
-        threading.Thread(target=self.run_processing, args=(command,), daemon=True).start()
+        # Check if running from PyInstaller bundle
+        if getattr(sys, 'frozen', False):
+            # Running from exe - need to call main.py differently
+            from whisperjav.main import main as whisperjav_main
+            
+            # Build args list
+            args = [
+                "--output-dir", output_dir,
+                "--mode", self.mode.get(),
+                "--sensitivity", self.sensitivity.get(),
+                "--subs-language", self.subs_language.get()
+            ]
+            
+            # Add config file if created
+            if config_path:
+                args.extend(["--config", str(config_path)])
+            
+            # Add enhancement options
+            if self.adaptive_classification.get():
+                args.append("--adaptive-classification")
+            if self.adaptive_audio_enhancement.get():
+                args.append("--adaptive-audio-enhancement")
+            if self.smart_postprocessing.get():
+                args.append("--smart-postprocessing")
+            
+            # Add input files
+            args.extend(self.input_files)
+            
+            # Store original argv
+            self.original_argv = sys.argv
+            # Modify sys.argv temporarily
+            sys.argv = ["whisperjav"] + args
+            
+            # Start processing in a separate thread
+            threading.Thread(target=self._run_main_direct, daemon=True).start()
+        else:
+            # Running from Python - use subprocess as before
+            command = [
+                sys.executable, "-m", "whisperjav.main",
+                "--output-dir", output_dir,
+                "--mode", self.mode.get(),
+                "--sensitivity", self.sensitivity.get(),
+                "--subs-language", self.subs_language.get()
+            ]
+            
+            # Add config file if created
+            if config_path:
+                command.extend(["--config", str(config_path)])
+            
+            # Add enhancement options
+            if self.adaptive_classification.get():
+                command.append("--adaptive-classification")
+            if self.adaptive_audio_enhancement.get():
+                command.append("--adaptive-audio-enhancement")
+            if self.smart_postprocessing.get():
+                command.append("--smart-postprocessing")
+            
+            # Add input files
+            command.extend(self.input_files)
+            
+            # Start processing in a separate thread
+            threading.Thread(target=self.run_processing, args=(command,), daemon=True).start()
     
     def run_processing(self, command):
         try:
