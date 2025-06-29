@@ -1,136 +1,372 @@
-# WhisperJAV
+# WhisperJAV - Japanese Adult Video Subtitle Generator
 
-<<<<<<< HEAD
-Japanese Adult Video Subtitle Generator - Optimized for JAV content transcription
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/python-3.8+-green.svg" alt="Python">
+  <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
+</p>
 
-## Features
+WhisperJAV is a specialized subtitle generation tool optimized for Japanese Adult Videos (JAV). It leverages OpenAI's Whisper ASR technology with custom enhancements specifically tailored for the unique audio characteristics, speech patterns, and content types found in JAV media.
 
-- 🚀 **Three Processing Modes**:
-  - **Faster**: Direct transcription with Whisper Turbo
-  - **Fast**: Chunked processing with standard Whisper
-  - **Balanced**: Full preprocessing with WhisperWithVAD
+## 🌟 Key Features
 
-- 🎯 **JAV-Optimized**:
-  - Specialized for Japanese adult content
-  - Handles background music and vocal sounds
-  - Removes common hallucinations
+-   **Three Processing Modes**: Optimized pipelines for different content types and quality requirements.
+-   **Advanced Japanese Language Processing**: Custom post-processing for natural dialogue segmentation.
+-   **Intelligent Scene Detection**: Automatic scene splitting for better transcription accuracy.
+-   **VAD Integration**: Voice Activity Detection for improved speech recognition.
+-   **Hallucination Removal**: Specialized filters for common JAV transcription errors.
+-   **GUI and CLI**: User-friendly interface and command-line options.
+-   **Batch Processing**: Process multiple files with progress tracking.
 
-- 🔧 **Advanced Processing**:
-  - Automatic audio extraction
-  - Intelligent chunking
-  - Segment classification
-  - Post-processing and cleanup
+## 📋 Table of Contents
 
-## Installation
+-   [Installation](#-installation)
+-   [Quick Start](#-quick-start)
+-   [Processing Modes Guide](#-processing-modes-guide)
+-   [Sensitivity Settings](#️-sensitivity-settings)
+-   [Advanced Japanese Language Features](#-advanced-japanese-language-features)
+-   [Usage Examples](#-usage-examples)
+-   [Configuration](#️-configuration)
+-   [GUI Interface](#️-gui-interface)
+-   [Troubleshooting](#-troubleshooting)
+-   [Contributing](#-contributing)
+-   [License](#-license)
+-   [Acknowledgments](#-acknowledgments)
+-   [Disclaimer](#️-disclaimer)
+
+## 🔧 Installation
+
+### Prerequisites
+
+-   Python 3.8 or higher
+-   CUDA-capable GPU (recommended) or CPU
+-   FFmpeg installed and in your system's PATH
+
+### Install from Source
 
 ```bash
-pip install -r requirements.txt
-python setup.py install
+git clone [https://github.com/yourusername/whisperjav.git](https://github.com/yourusername/whisperjav.git)
+cd whisperjav
+pip install -e .
 ```
 
-## Quick Start
+### Dependencies
+
+The main dependencies will be automatically installed:
+
+-   `openai-whisper` or `faster-whisper`
+-   `stable-ts`
+-   `torch` (with CUDA support if available)
+-   `pysrt`
+-   `tqdm`
+-   `numpy`
+-   `soundfile`
+
+## 🚀 Quick Start
+
+### Command Line
 
 ```bash
-# Process single file
-whisperjav video.mp4
+# Basic usage with default settings
+python main.py video.mp4
 
-# Process with faster mode
-whisperjav video.mp4 --mode faster
+# Specify mode and output directory
+python main.py video.mp4 --mode faster --output-dir ./subtitles
 
-# Process directory
-whisperjav /path/to/videos/*.mp4 --output-dir ./subtitles
+# Process multiple files with specific sensitivity
+python main.py *.mp4 --mode balanced --sensitivity aggressive
+
+# Generate English subtitles
+python main.py video.mp4 --subs-language english-direct
 ```
 
-## Requirements
+### GUI
 
-- Python 3.8+
-- FFmpeg
-- CUDA-capable GPU (recommended)
+```bash
+python whisperjav_gui.py
+```
 
-## License
+## 📊 Processing Modes Guide
 
-MIT License
-=======
-**A faster, easier way to create subtitles for your favorite JAV videos.**
+Choose the appropriate mode based on your content type and requirements:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7b.ipynb)  
-**Latest version:** `0.7b`
+| Mode     | Best For                                                                                             | Characteristics                                                                                     | Processing Speed | Accuracy      |
+| :------- | :--------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :--------------- | :------------ |
+| **Faster** | • Standard dialogue scenes<br>• Clear audio quality<br>• Modern HD content<br>• Single performer scenes | • Uses Faster-Whisper backend<br>• Direct transcription without chunking<br>• Lower memory usage         | ⚡⚡⚡ Fast        | ★★★☆☆ Good      |
+| **Fast** | • Mixed content quality<br>• Vintage/older content<br>• Amateur recordings<br>• Compilation videos      | • Standard Whisper with scene detection<br>• Mandatory scene splitting<br>• Better handling of quality | ⚡⚡ Medium       | ★★★★☆ Very Good |
+| **Balanced** | • Complex multi-performer scenes<br>• Heavy background noise<br>• Mixed audio<br>• Moaning/non-speech    | • Scene detection + VAD enhancement<br>• Best noise handling<br>• Most accurate timestamps          | ⚡ Slower        | ★★★★★ Excellent |
 
----
+### Content-Specific Recommendations
 
-## Support This Project
+| Content Type                | Recommended Mode | Recommended Sensitivity |
+| :-------------------------- | :--------------- | :---------------------- |
+| Interview/Dialogue Heavy    | Faster           | Balanced                |
+| Group Scenes                | Balanced         | Aggressive              |
+| Amateur/Homemade            | Fast             | Conservative            |
+| Vintage (pre-2000)          | Fast/Balanced    | Conservative            |
+| ASMR/Whisper Content        | Balanced         | Aggressive              |
+| Compilation/Multiple Scenes | Fast             | Balanced                |
+| Heavy Background Music      | Balanced         | Conservative            |
+| Outdoor/Public Scenes       | Balanced         | Conservative            |
 
-If you’ve found WhisperJAV helpful, please consider supporting further development:
+## 🎚️ Sensitivity Settings
 
-[![Buy Me a Coffee](https://www.buymeacoffee.com/assets/img/custom_images/yellow_img.png)](https://buymeacoffee.com/meizhong)
+The `sensitivity` parameter controls the trade-off between capturing detail and avoiding noise/hallucinations:
 
-Your support helps me dedicate more time to improvements and acquire the GPU and colab resources that I need to keep WhisperJAV development.
+**Conservative**
+-   **Fewer false positives**: Reduces hallucinated text and repetitions.
+-   **Higher confidence threshold**: Only includes clearly spoken words.
+-   **Best for**:
+    -   Poor audio quality recordings
+    -   Heavy background noise or music
+    -   Vintage/degraded content
+    -   Content with lots of non-speech sounds
+-   **Trade-off**: May miss some quiet or unclear speech.
 
----
+**Balanced (Default)**
+-   **Optimal balance**: Good detection with reasonable filtering.
+-   **Moderate thresholds**: Captures most speech while filtering obvious errors.
+-   **Best for**:
+    -   Standard quality recordings
+    -   Mixed content types
+    -   General-purpose transcription
+    -   First-time users
+-   **Trade-off**: A balanced approach to all aspects.
 
-## Key Notes
+**Aggressive**
+-   **Maximum detail capture**: Attempts to transcribe everything.
+-   **Lower confidence threshold**: Includes uncertain segments.
+-   **Best for**:
+    -   High-quality audio
+    -   ASMR or whisper content
+    -   Content where every utterance matters
+    -   Professional recordings with clear audio
+-   **Trade-off**: May include more false positives and hallucinations.
 
-WhisperJAV uses [faster-whisper](https://github.com/guillaumekln/faster-whisper) to achieve roughly 2x the speed of the original Whisper, along with additional post-processing to remove hallucinations and repetition.
+### Sensitivity Selection Matrix
 
+| Audio Quality | Background Noise | Speech Clarity | Recommended Sensitivity |
+| :------------ | :--------------- | :------------- | :---------------------- |
+| Poor          | High             | Unclear        | **Conservative** |
+| Average       | Moderate         | Mixed          | **Balanced** |
+| Excellent     | Low              | Clear          | **Aggressive** |
+| Variable      | Variable         | Variable       | **Balanced** |
 
-- **Faster with WAV:** The script runs *much* faster using WAV audio format.  
-- **Hallucination Removal:** Currently more robust for Japanese transcription than for English translation tasks.  
-- **Goal:** Make it *fast* and *easy* for non-technical users.
+## 🗾 Advanced Japanese Language Features
 
----
+WhisperJAV includes sophisticated Japanese language processing specifically optimized for adult content dialogue.
 
-## Getting Started
+### Dialogue-Optimized Segmentation
 
-### 1. Extract MP3 (or WAV) Audio from Videos
-You’ll need an MP3 (or WAV) file of your video. Popular tools:
+The system uses advanced `stable-ts` regrouping algorithms customized for Japanese conversational patterns.
+```python
+# Automatic application of Japanese-specific rules:
+# - Sentence-ending particles (ね, よ, わ, の, ぞ, ぜ, さ, か)
+# - Polite forms (です, ます, でした, ましょう)
+# - Question particles detection
+# - Emotional expressions and interjections
+# - Casual contractions (ちゃ, じゃ, きゃ)
+```
 
-- [Clever FFmpeg GUI](https://www.videohelp.com/software/clever-FFmpeg-GUI)  
-- [VLC Media Player](https://youtu.be/sMy-T8RJAo0?si=AKg-WgDAAhtaBFkr)  
-- [Audacity](https://www.audacityteam.org/)  
-- Direct `ffmpeg` command-line
+### Specialized Pattern Recognition
 
-> **Tip:** VLC and Audacity are user-friendly options if you prefer a graphical interface.
+-   **Aizuchi and Fillers**: Automatically identifies and handles:
+    -   `あの`, `ええと`, `まあ`, `なんか` (filler words)
+    -   `うん`, `はい`, `ええ`, `そう` (acknowledgments)
+-   **Emotional Expressions**: Preserves important non-lexical vocalizations:
+    -   `ああ`, `うう`, `はあ`, `ふう` (sighs, moans)
+    -   Maintains timing for emotional context
+-   **Dialect Support**: Recognizes common dialect patterns:
+    -   Kansai-ben endings (`わ`, `で`, `ねん`, `や`)
+    -   Feminine speech patterns (`かしら`, `わね`, `のよ`)
+    -   Masculine speech patterns (`ぜ`, `ぞ`, `だい`)
 
-### 2. Create a “WhisperJAV” Folder in Google Drive
-1. Go to [Google Drive](https://drive.google.com/).  
-2. Click **+ New** \> **Folder**, name it `WhisperJAV`.  
-3. Drag and drop or upload your MP3/WAV files into this folder.
+### Custom Regrouping Strategies
 
-See these quick tutorials for more info:  
-- [Organize your files in Google Drive](https://support.google.com/drive/answer/2375091?hl=en&co=GENIE.Platform%3DDesktop)  
-- [Managing files on Google Drive (Video)](https://youtu.be/EKjnjySLTvM?si=SF8ww3z572FnO_cq)
+The system automatically selects appropriate regrouping based on content:
 
-### 3. Run WhisperJAV
-Open our latest Colab notebook:
+```bash
+# These are applied automatically based on mode and sensitivity:
+--mode balanced      # Applies comprehensive regrouping
+--sensitivity aggressive # Includes more nuanced patterns
+```
 
-[**WhisperJAV v0.7b**](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_v0_7b.ipynb)
+### Timing Optimization for Natural Speech
 
-1. Once the notebook is open, go to **Runtime** \> **Run all**.  
-2. When prompted, allow Google Colab to connect to your Google Drive (this gives it permission to read/write your WhisperJAV folder).  
-3. If you change any options or get odd errors, select **Runtime** \> **Restart and run all** for a clean start.  
-4. Watch out for Captcha-style checks—Google may ask if you’re still there.
+-   **Gap-based merging**: Combines segments with natural speech pauses.
+-   **Punctuation-aware splitting**: Respects Japanese punctuation (`。`, `、`, `！`, `？`).
+-   **Maximum subtitle duration**: Ensures readability (default 7-8 seconds).
+-   **Minimum duration filtering**: Removes micro-segments.
 
-### 4. Download Subtitles
-- Final subtitles are saved to your `WhisperJAV` folder in Drive.  
-- Colab will also automatically zip and download them when processing completes (depending on your settings).  
-- Alternatively, you can manually download from Drive.
+## 📖 Usage Examples
 
----
+### Basic Transcription
 
-## Credits and Citation
-WhisperJAV would not be possible without prior works and contributions from:  
-- @Anon_entity  
-- @phineas-pta  
-- JAV communities on [ScanLover](https://www.scanlover.com/) and [Akiba-Online](https://www.akiba-online.com/)
+```bash
+# Generate Japanese subtitles (default)
+python main.py video.mp4
 
+# Generate English translation
+python main.py video.mp4 --subs-language english-direct
+```
 
----
+### Batch Processing
 
-## Contact and Sponsorship
-If you’re interested in sponsoring new features or need technical support, feel free to reach out:  
-[**meizhong.986@gmail.com**](mailto:meizhong.986@gmail.com)
+```bash
+# Process an entire directory
+python main.py /path/to/videos/*.mp4 --output-dir ./output
 
----
+# Process with specific settings
+python main.py *.mp4 --mode balanced --sensitivity aggressive --output-dir ./subs
+```
 
-Thanks for using WhisperJAV, and happy subtitling!
->>>>>>> 22ce1c99bf8b3cca06ab92647426fa4c679e8658
+### Advanced Options
+
+```bash
+# Keep temporary files for debugging
+python main.py video.mp4 --keep-temp
+
+# Enable all enhancement features
+python main.py video.mp4 --adaptive-classification --adaptive-audio-enhancement --smart-postprocessing
+
+# Use a custom configuration file
+python main.py video.mp4 --config my_config.json
+
+# Specify a different Whisper model
+python main.py video.mp4 --model large-v2
+```
+
+### Output Options
+
+```bash
+# Save processing statistics to a file
+python main.py video.mp4 --stats-file stats.json
+
+# Disable progress bars
+python main.py video.mp4 --no-progress
+
+# Use a custom temporary directory (e.g., on a fast SSD)
+python main.py video.mp4 --temp-dir /fast/ssd/temp
+```
+
+## ⚙️ Configuration
+
+### Configuration File Format
+
+Create a custom `config.json` to override default settings:
+
+```json
+{
+  "modes": {
+    "balanced": {
+      "scene_detection": {
+        "max_duration": 30.0,
+        "min_duration": 0.2,
+        "max_silence": 2.0
+      },
+      "vad_options": {
+        "threshold": 0.4,
+        "min_speech_duration_ms": 150
+      }
+    }
+  },
+  "sensitivity_profiles": {
+    "aggressive": {
+      "hallucination_threshold": 0.8,
+      "repetition_threshold": 3,
+      "min_confidence": 0.5
+    }
+  }
+}
+```
+
+### Environment Variables
+
+```bash
+export WHISPERJAV_CACHE_DIR=/path/to/cache
+export WHISPERJAV_MODEL_DIR=/path/to/models
+export WHISPERJAV_LOG_LEVEL=DEBUG
+```
+
+## 🖥️ GUI Interface
+
+The GUI provides an intuitive interface for users who prefer not to use the command line.
+
+### Features
+
+-   Drag-and-drop file selection
+-   Real-time progress monitoring
+-   Visual mode and sensitivity selection
+-   Advanced settings dialog
+-   Console output display
+
+### GUI Quick Start
+
+1.  Launch the GUI: `python whisperjav_gui.py`
+2.  Select files using the "Select File(s)" button.
+3.  Choose your **Processing Mode** (Faster/Fast/Balanced).
+4.  Select the **Sensitivity** (Conservative/Balanced/Aggressive).
+5.  Choose the **Output Language** (Japanese/English).
+6.  Click "START PROCESSING".
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+-   **Issue**: `CUDA out of memory`
+    -   **Solution**: Use the CPU, which is slower but requires less VRAM.
+        ```bash
+        python main.py video.mp4 --device cpu
+        ```
+-   **Issue**: `FFmpeg not found`
+    -   **Solution**: Install FFmpeg and ensure it's in your system's PATH.
+        ```bash
+        # Ubuntu/Debian
+        sudo apt install ffmpeg
+        # Windows (using Chocolatey)
+        choco install ffmpeg
+        # macOS (using Homebrew)
+        brew install ffmpeg
+        ```
+-   **Issue**: Slow processing on CPU
+    -   **Solution**: Use a faster mode or a smaller model.
+        ```bash
+        python main.py video.mp4 --mode faster --model medium
+        ```
+
+### Performance Tips
+
+-   **GPU Acceleration**: Ensure CUDA is properly installed for a 3-5x speed improvement.
+-   **SSD Storage**: Use an SSD for temporary files via the `--temp-dir` argument for faster I/O.
+-   **Batch Processing**: Process multiple files in one run to avoid reloading the model for each file.
+-   **Memory Usage**: Close other memory-intensive applications when processing large files.
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our `CONTRIBUTING.md` for details on how to get started.
+
+### Development Setup
+
+```bash
+git clone [https://github.com/yourusername/whisperjav.git](https://github.com/yourusername/whisperjav.git)
+cd whisperjav
+# Install in editable mode with development dependencies
+pip install -e .[dev]
+# Run tests
+python -m pytest tests/
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+-   The [OpenAI Whisper](https://github.com/openai/whisper) team for the base ASR technology.
+-   The [stable-ts](https://github.com/jianfch/stable-ts) project for enhanced timestamp features.
+-   The [faster-whisper](https://github.com/guillaumekln/faster-whisper) project for optimized inference.
+-   The JAV transcription community for their invaluable feedback and testing.
+
+## ⚠️ Disclaimer
+
+This tool is designed for creating accessibility subtitles and for use as a language-learning material. Users are solely responsible for compliance with all applicable local and international laws and regulations regarding the content they choose to process.
