@@ -85,15 +85,17 @@ whisperjav video.mp4 --subs-language english-direct
 whisperjav-gui
 ```
 
+
 ## 📊 Processing Modes Guide
 
 Choose the appropriate mode based on your content type and requirements:
 
 | Mode     | Best For                                                                                             | Characteristics                                                                                     | Processing Speed | Accuracy      |
 | :------- | :--------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :--------------- | :------------ |
-| **Faster** | • Standard dialogue scenes<br>• Clear audio quality<br>• Modern HD content<br>• Single performer scenes | • Uses Faster-Whisper backend<br>• Direct transcription without chunking<br>• Lower memory usage         | ⚡⚡⚡ Fast        | ★★★☆☆ Good      |
-| **Fast** | • Mixed content quality<br>• Vintage/older content<br>• Amateur recordings<br>• Compilation videos      | • Standard Whisper with scene detection<br>• Mandatory scene splitting<br>• Better handling of quality | ⚡⚡ Medium       | ★★★★☆ Very Good |
-| **Balanced** | • Complex multi-performer scenes<br>• Heavy background noise<br>• Mixed audio<br>• Moaning/non-speech    | • Scene detection + VAD enhancement<br>• Best noise handling<br>• Most accurate timestamps          | ⚡ Slower        | ★★★★★ Excellent |
+| **Faster** | • Complex multi-performer scenes<br>• Heavy background noise<br>• Mixed audio<br>• Moaning/non-speech | • Uses Faster-Whisper backend<br>• Direct transcription without chunking<br>• Lower memory usage         | ⚡⚡⚡ Fast        | Adequate      |
+| **Fast** | • Mixed content quality<br>• Vintage/older content<br>• Amateur recordings<br>• Compilation videos      | • Standard Whisper with scene detection<br>• Mandatory scene splitting<br>• Better handling of quality | ⚡⚡ Medium       | Satisfactory  |
+| **Balanced** | • Standard dialogue scenes<br>• Clear audio quality<br>• Modern HD content<br>• Single performer scenes | • Scene detection + VAD enhancement<br>• Best noise handling<br>• Most accurate timestamps          | ⚡ Slower        | Good          |
+
 
 ### Content-Specific Recommendations
 
