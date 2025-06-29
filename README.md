@@ -82,7 +82,7 @@ whisperjav video.mp4 --subs-language english-direct
 ### GUI
 
 ```bash
-python whisperjav_gui.py
+whisperjav-gui
 ```
 
 ## 📊 Processing Modes Guide
