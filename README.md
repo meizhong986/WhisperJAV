@@ -6,13 +6,13 @@
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
 
-WhisperJAV is a specialized subtitle generation tool optimized for Japanese Adult Videos (JAV). It leverages OpenAI's Whisper ASR technology with custom enhancements specifically tailored for the unique audio characteristics, speech patterns, and content types found in JAV media.
+WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JAV). It uses custom enhancements specifically tailored for the audio characteristics, and sound patterns in JAV media.
 
 ## 🌟 Key Features
 
 -   **Three Processing Modes**: Optimized pipelines for different content types and quality requirements.
--   **Advanced Japanese Language Processing**: Custom post-processing for natural dialogue segmentation.
--   **Intelligent Scene Detection**: Automatic scene splitting for better transcription accuracy.
+-   **Japanese Language Processing**: Custom post-processing for natural dialogue segmentation.
+-   **Scene Detection**: Automatic scene splitting for better transcription accuracy.
 -   **VAD Integration**: Voice Activity Detection for improved speech recognition.
 -   **Hallucination Removal**: Specialized filters for common JAV transcription errors.
 -   **GUI and CLI**: User-friendly interface and command-line options.
@@ -45,9 +45,8 @@ WhisperJAV is a specialized subtitle generation tool optimized for Japanese Adul
 ### Install from Source
 
 ```bash
-git clone [https://github.com/yourusername/whisperjav.git](https://github.com/yourusername/whisperjav.git)
-cd whisperjav
-pip install -e .
+pip install -U git+[https://github.com/meizhong986/whisperjav.git](https://github.com/meizhong986/whisperjav.git)
+
 ```
 
 ### Dependencies
@@ -68,16 +67,16 @@ The main dependencies will be automatically installed:
 
 ```bash
 # Basic usage with default settings
-python main.py video.mp4
+whisperjav video.mp4
 
 # Specify mode and output directory
-python main.py video.mp4 --mode faster --output-dir ./subtitles
+whisperjav audio.wav --mode faster --output-dir ./subtitles
 
 # Process multiple files with specific sensitivity
-python main.py *.mp4 --mode balanced --sensitivity aggressive
+whisperjav *.mp3 --mode balanced --sensitivity aggressive
 
 # Generate English subtitles
-python main.py video.mp4 --subs-language english-direct
+whisperjav video.mp4 --subs-language english-direct
 ```
 
 ### GUI
@@ -204,49 +203,49 @@ The system automatically selects appropriate regrouping based on content:
 
 ```bash
 # Generate Japanese subtitles (default)
-python main.py video.mp4
+whisperjav video.mp4
 
 # Generate English translation
-python main.py video.mp4 --subs-language english-direct
+whisperjav video.mp4 --subs-language english-direct
 ```
 
 ### Batch Processing
 
 ```bash
 # Process an entire directory
-python main.py /path/to/videos/*.mp4 --output-dir ./output
+whisperjav /path/to/videos/*.mp4 --output-dir ./output
 
 # Process with specific settings
-python main.py *.mp4 --mode balanced --sensitivity aggressive --output-dir ./subs
+whisperjav *.mp4 --mode balanced --sensitivity aggressive --output-dir ./subs
 ```
 
 ### Advanced Options
 
 ```bash
 # Keep temporary files for debugging
-python main.py video.mp4 --keep-temp
+whisperjav video.mp4 --keep-temp
 
 # Enable all enhancement features
-python main.py video.mp4 --adaptive-classification --adaptive-audio-enhancement --smart-postprocessing
+whisperjav video.mp4 --adaptive-classification --adaptive-audio-enhancement --smart-postprocessing
 
 # Use a custom configuration file
-python main.py video.mp4 --config my_config.json
+whisperjav video.mp4 --config my_config.json
 
 # Specify a different Whisper model
-python main.py video.mp4 --model large-v2
+whisperjav video.mp4 --model large-v2
 ```
 
 ### Output Options
 
 ```bash
 # Save processing statistics to a file
-python main.py video.mp4 --stats-file stats.json
+whisperjav video.mp4 --stats-file stats.json
 
 # Disable progress bars
-python main.py video.mp4 --no-progress
+whisperjav video.mp4 --no-progress
 
 # Use a custom temporary directory (e.g., on a fast SSD)
-python main.py video.mp4 --temp-dir /fast/ssd/temp
+whisperjav video.mp4 --temp-dir /fast/ssd/temp
 ```
 
 ## ⚙️ Configuration
@@ -316,7 +315,7 @@ The GUI provides an intuitive interface for users who prefer not to use the comm
 -   **Issue**: `CUDA out of memory`
     -   **Solution**: Use the CPU, which is slower but requires less VRAM.
         ```bash
-        python main.py video.mp4 --device cpu
+        whisperjav video.mp4 --device cpu
         ```
 -   **Issue**: `FFmpeg not found`
     -   **Solution**: Install FFmpeg and ensure it's in your system's PATH.
@@ -331,7 +330,7 @@ The GUI provides an intuitive interface for users who prefer not to use the comm
 -   **Issue**: Slow processing on CPU
     -   **Solution**: Use a faster mode or a smaller model.
         ```bash
-        python main.py video.mp4 --mode faster --model medium
+        whisperjav video.mp4 --mode faster --model medium
         ```
 
 ### Performance Tips
