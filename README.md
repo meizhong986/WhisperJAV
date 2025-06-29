@@ -45,7 +45,7 @@ WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JA
 ### Install from Source
 
 ```bash
-pip install -U git+[https://github.com/meizhong986/whisperjav.git](https://github.com/meizhong986/whisperjav.git)
+pip install -U git+https://github.com/meizhong986/whisperjav.git
 
 ```
 
