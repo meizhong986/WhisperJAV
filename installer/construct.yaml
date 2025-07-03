@@ -1,0 +1,27 @@
+name: WhisperJAV
+version: 1.1.2
+
+channels:
+  - conda-forge
+  - defaults
+
+specs:
+  # Conda's job is to set up the basic environment and non-python tools
+  - python=3.10.18
+  - pip
+  - git
+  - ffmpeg
+
+post_install: post_install.bat
+
+
+
+extra_files:
+  - post_install.bat
+  - post_install.py
+  - WhisperJAV.bat
+  - create_desktop_shortcut.bat
+  - README_INSTALLER.txt
+  - LICENSE.txt
+  - whisperjav_icon.ico
+

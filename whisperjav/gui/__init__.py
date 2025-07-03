@@ -1,6 +1,5 @@
 # whisperjav/gui/__init__.py
 """WhisperJAV GUI Package"""
 
-from .whisperjav_gui import WhisperJAVGUI, main
-
-__all__ = ['WhisperJAVGUI', 'main']
+# This file is kept intentionally simple to avoid the import conflicts
+# that were causing a RuntimeWarning and slow performance.
