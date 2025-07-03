@@ -41,7 +41,7 @@ setup(
     python_requires=">=3.8,<3.13",
     install_requires=[
         "openai-whisper @ git+https://github.com/openai/whisper@v20250625",
-        "stable-ts>=2.11.0", 
+        "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
         "faster-whisper>=1.1.0",
         "torch>=2.0.0",
         "torchaudio",
