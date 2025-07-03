@@ -45,10 +45,11 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-# --- NEW: Import the TranscriptionTuner ---
 from whisperjav.config.transcription_tuner import TranscriptionTuner
+# Import version from __version__.py
+from whisperjav.__version__ import __version__
 
-__version__ = "1.1.0"
+
 
 def safe_print(message: str):
     """Safely print a message, handling closed stdout."""

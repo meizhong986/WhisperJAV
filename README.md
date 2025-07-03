@@ -1,7 +1,7 @@
 # WhisperJAV - Japanese Adult Video Subtitle Generator
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.1.1-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.8+-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
@@ -40,8 +40,8 @@ WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JA
 
 Please see the details at the end of this readme for more details. 
 
--   Python 3.8 or higher
--   CUDA-capable GPU, drivers, CUDA Toolkit, cuDNN 
+-   Python 3.8 - 3.12 (Python 3.13+ is not compatible with openai-whisper)
+-   CUDA-capable GPU, drivers, CUDA Toolkit, cuDNN (CUDA > 11.7) 
 -   FFmpeg installed and in your system's PATH
 -   PIP and git installation packages
 
