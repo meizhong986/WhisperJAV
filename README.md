@@ -48,7 +48,17 @@ Please see the details at the end of this readme for more details.
 ### Install from Source
 
 ```bash
+
+# Standard installation (RECOMMENDED - use -U to ensure correct dependencies)
 pip install -U git+https://github.com/meizhong986/whisperjav.git
+
+
+# For users with existing installations, force reinstall
+pip install --force-reinstall git+https://github.com/meizhong986/whisperjav.git
+
+
+### ⚠️ Important Note
+The `-U` flag ensures you get specific versions of stable-ts and openai-whisper, which are required for WhisperJAV to function properly.
 
 ```
 
