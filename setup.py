@@ -1,13 +1,6 @@
 from setuptools import setup, find_packages
 import sys
 
-# Block installation on Python 3.13+
-if sys.version_info >= (3, 13):
-    raise RuntimeError(
-        "whisperjav doesn't support Python 3.13 yet. "
-        "Please use Python 3.8-3.12."
-    )
-
 # Read version from __version__.py without importing the package
 version_file = {}
 with open("whisperjav/__version__.py") as fp:
@@ -17,44 +10,50 @@ __version__ = version_file['__version__']
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+# Relaxed Python version requirement (allow 3.8 to 3.12)
+python_requires = ">=3.8,<3.13"
 
+# Relaxed dependency versions to allow flexibility
+install_requires = [
+    "openai-whisper @ git+https://github.com/openai/whisper@main",  # Use 'main' branch for latest releases
+    "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
+    "faster-whisper>=1.1.0",
+    "torch",  # No version constraint to allow Colab's pre-installed version
+    "torchaudio",
+    "ffmpeg-python",
+    "soundfile",
+    "auditok",
+    "numpy",  # Removed <2.0 constraint
+    "scipy",  # Removed <2.0 constraint
+    "tqdm",   # Removed <5.0 constraint
+    "pysrt",
+    "srt",
+]
+
+# Classifiers for supported Python versions
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
 
 setup(
     name="whisperjav",
-    version=__version__,  # using simple version
+    version=__version__,
     author="MeiZhong",
     description="Japanese Adult Video Subtitle Generator",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/meizhong986/WhisperJAV",
-    license="MIT",  # Modern SPDX
+    license="MIT",
     packages=find_packages(),
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Operating System :: OS Independent",
-    ],
-    python_requires=">=3.8,<3.13",
-    install_requires=[
-        "openai-whisper @ git+https://github.com/openai/whisper@v20250625",
-        "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
-        "faster-whisper>=1.1.0",
-        "torch>=2.0.0",
-        "torchaudio",
-        "ffmpeg-python",
-        "soundfile",
-        "auditok",
-        "numpy<2.0",
-        "scipy<2.0",
-        "tqdm<5.0",
-        "pysrt",
-        "srt",
-    ],
-    # Removed setup_requires for setuptools_scm
+    classifiers=classifiers,
+    python_requires=python_requires,
+    install_requires=install_requires,
     entry_points={
         "console_scripts": [
             "whisperjav=whisperjav.main:main",
