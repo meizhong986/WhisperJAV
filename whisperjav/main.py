@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""WhisperJAV - Japanese Adult Video Subtitle Generator
+"""WhisperJAV Main Entry Point - V3 Enhanced with all improvements."""
 
-Main entry point for the application.
-"""
-
+import os
 import argparse
 import sys
 from pathlib import Path
@@ -11,18 +9,12 @@ import json
 import tempfile
 from typing import Dict, List, Any 
 import io
-import shutil  
-from copy import deepcopy
-
-from whisperjav.utils.progress_display import ProgressDisplay, DummyProgress
-
-
+import shutil
 
 # Fix stdout before any imports that might use logging
 def fix_stdout():
     """Ensure stdout is available, create a wrapper if needed."""
     if sys.stdout is None or (hasattr(sys.stdout, 'closed') and sys.stdout.closed):
-        # Redirect to a new text wrapper
         sys.stdout = io.TextIOWrapper(
             io.BufferedWriter(io.FileIO(1, 'w')), 
             encoding='utf-8', 
@@ -45,10 +37,14 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-from whisperjav.config.transcription_tuner import TranscriptionTuner
-# Import version from __version__.py
+from whisperjav.config.transcription_tuner_v3 import TranscriptionTunerV3
 from whisperjav.__version__ import __version__
 
+# Import new components
+from whisperjav.utils.preflight_check import enforce_cuda_requirement, run_preflight_checks
+from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
+from whisperjav.utils.async_processor import AsyncPipelineManager
+from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
 
 def safe_print(message: str):
@@ -56,11 +52,11 @@ def safe_print(message: str):
     try:
         print(message)
     except (ValueError, AttributeError, OSError):
-        # If printing fails, try to write directly to stderr or ignore
         try:
             sys.stderr.write(message + '\n')
         except:
-            pass  # If all else fails, just continue
+            pass
+
 
 def print_banner():
     """Print application banner."""
@@ -68,29 +64,79 @@ def print_banner():
 ╔═══════════════════════════════════════════════════╗
 ║          WhisperJAV v{__version__}                        ║
 ║   Japanese Adult Video Subtitle Generator         ║
-║   Optimized for JAV content transcription         ║
+║   CUDA GPU Required - Optimized for Performance   ║
 ║                                                   ║
 ║   Available modes:                                ║
-║   - faster: Faster-whisper backend                ║
-║   - fast: Standard whisper with scene detection   ║
-║   - balanced: Scene detection + VAD-enhanced ASR  ║
+║   - faster: Direct transcription (fastest)        ║
+║   - fast: Scene detection + standard Whisper      ║
+║   - balanced: Scene + VAD-enhanced processing     ║
+║                                                   ║
+║   Run with --check for environment diagnostics    ║
 ╚═══════════════════════════════════════════════════╝
 """
     safe_print(banner)
 
 
-def merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Recursively merge two dictionaries.
-    The `override` dictionary's values take precedence.
-    """
-    result = deepcopy(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and key in result and isinstance(result[key], dict):
-            result[key] = merge_configs(result[key], value)
-        else:
-            result[key] = value
-    return result
+def parse_arguments():
+    """Parse command line arguments with all enhancements."""
+    parser = argparse.ArgumentParser(
+        description="WhisperJAV - Generate accurate subtitles for Japanese adult videos",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    # Core arguments
+    parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
+    parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced", 
+                       help="Processing mode (default: balanced)")
+    parser.add_argument("--config", default=None, help="Path to a JSON configuration file")
+    parser.add_argument("--subs-language", choices=["japanese", "english-direct"], 
+                       default="japanese", help="Output subtitle language")
+    
+    # Environment check
+    parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
+    parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
+    
+    # Path and logging
+    path_group = parser.add_argument_group("Path and Logging Options")
+    path_group.add_argument("--output-dir", default="./output", help="Output directory")
+    path_group.add_argument("--temp-dir", default=None, help="Temporary directory")
+    path_group.add_argument("--keep-temp", action="store_true", help="Keep temporary files")
+    path_group.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
+                           default="INFO", help="Logging level")
+    path_group.add_argument("--log-file", help="Log file path")
+    path_group.add_argument("--stats-file", help="Save processing statistics to JSON")
+    
+    # Progress control
+    progress_group = parser.add_argument_group("Progress Display Options")
+    progress_group.add_argument("--no-progress", action="store_true", 
+                               help="Disable progress bars")
+    progress_group.add_argument("--verbosity", 
+                               choices=["quiet", "summary", "normal", "verbose"],
+                               default=None,
+                               help="Console output verbosity (overrides config)")
+    
+    # Enhancement features
+    enhancement_group = parser.add_argument_group("Optional Enhancement Features")
+    enhancement_group.add_argument("--adaptive-classification", action="store_true")
+    enhancement_group.add_argument("--adaptive-audio-enhancement", action="store_true")
+    enhancement_group.add_argument("--smart-postprocessing", action="store_true")
+    
+    # Transcription tuning
+    tuning_group = parser.add_argument_group("Transcription Tuning")
+    tuning_group.add_argument("--sensitivity", 
+                             choices=["conservative", "balanced", "aggressive"],
+                             default="balanced", help="Transcription sensitivity")
+    
+    # Async processing
+    async_group = parser.add_argument_group("Processing Options")
+    async_group.add_argument("--async-processing", action="store_true",
+                            help="Use async processing (better for GUIs)")
+    async_group.add_argument("--max-workers", type=int, default=1,
+                            help="Max concurrent workers (default: 1)")
+    
+    parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
+    
+    return parser.parse_args()
 
 
 def cleanup_temp_directory(temp_dir: str):
@@ -100,7 +146,6 @@ def cleanup_temp_directory(temp_dir: str):
     if not temp_path.exists():
         return
     
-    # Check if this is the WhisperJAV subdirectory in system temp
     if temp_path.name == "whisperjav" and temp_path.parent == Path(tempfile.gettempdir()):
         logger.debug(f"Cleaning up WhisperJAV temp directory: {temp_path}")
         try:
@@ -109,118 +154,72 @@ def cleanup_temp_directory(temp_dir: str):
         except Exception as e:
             logger.error(f"Error removing temp directory: {e}")
     else:
-        # For custom temp directories, just clean the contents but keep the directory
         logger.debug(f"Cleaning up temp directory contents: {temp_path}")
         try:
-            # List subdirectories that should be cleaned
             subdirs_to_clean = ["scenes", "scene_srts", "raw_subs"]
-            
             for subdir in subdirs_to_clean:
                 subdir_path = temp_path / subdir
                 if subdir_path.exists():
                     shutil.rmtree(subdir_path, ignore_errors=True)
                     logger.debug(f"Removed temp subdirectory: {subdir_path}")
             
-            # Remove any remaining files in temp root
             for file in temp_path.glob("*"):
                 if file.is_file():
                     file.unlink()
                     logger.debug(f"Removed temp file: {file}")
                     
             logger.info("Temp directory contents cleaned up successfully")
-                
         except Exception as e:
             logger.error(f"Error cleaning up temp directory: {e}")
 
 
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="WhisperJAV - Generate accurate subtitles for Japanese adult videos",
-        formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
+    """Process files synchronously with enhanced progress reporting."""
     
-    # Core Execution Arguments
-    parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced", help="Processing mode (default: balanced)")
-    parser.add_argument("--config", default=None, help="Path to a JSON configuration file. Overrides defaults.")
-    parser.add_argument(
-        "--subs-language", 
-        choices=["japanese", "english-direct"], 
-        default="japanese",
-        help="Specify the output language for the subtitle file. 'english-direct' will translate from audio."
-    )
-    
-    # Path and Logging Options
-    path_group = parser.add_argument_group("Path and Logging Options")
-    path_group.add_argument("--output-dir", default="./output", help="Output directory for subtitles (default: ./output)")
-    path_group.add_argument("--temp-dir", default=None, help="Temporary directory for processing (default: OS-specific temp folder)")
-    path_group.add_argument("--keep-temp", action="store_true", help="Keep temporary files after processing")
-    path_group.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="Logging level (default: INFO)")
-    path_group.add_argument("--log-file", help="Log file path")
-    path_group.add_argument("--stats-file", help="Save processing statistics to JSON file")  
-    path_group.add_argument("--no-progress", action="store_true", 
-                           help="Disable progress bars and use traditional scrolling output")
-
-    
-    # Optional Enhancement Features
-    enhancement_group = parser.add_argument_group("Optional Enhancement Features")
-    enhancement_group.add_argument("--adaptive-classification", action="store_true", help="Enable adaptive classification.")
-    enhancement_group.add_argument("--adaptive-audio-enhancement", action="store_true", help="Enable adaptive audio enhancement.")
-    enhancement_group.add_argument("--smart-postprocessing", action="store_true", help="Enable advanced subtitle refinement.")
-    
-    # Advanced Tuning Arguments
-    tuning_group = parser.add_argument_group("Advanced Tuning (Overrides config file)")
-    tuning_group.add_argument("--model", default='turbo', help="Whisper model size for balanced mode (e.g., 'large-v2').")
-    tuning_group.add_argument("--vad-threshold", type=float, default=None, help="VAD threshold for speech detection.")
-    # --- NEW: Added --sensitivity flag ---
-    tuning_group.add_argument(
-        "--sensitivity",
-        choices=["conservative", "balanced", "aggressive"],
-        default="balanced",
-        help="Set the transcription sensitivity to control the detail vs. noise trade-off."
-    )
-    
-    parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
-    
-    return parser.parse_args()
-
-
-
-def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_params: Dict):
-    """Process multiple files with the selected pipeline."""
+    # Determine verbosity
+    if args.verbosity:
+        verbosity = VerbosityLevel(args.verbosity)
+    else:
+        # Get from config manager
+        config_manager = ConfigManager(args.config)
+        ui_prefs = config_manager.get_ui_preferences()
+        verbosity = VerbosityLevel(ui_prefs.get('console_verbosity', 'summary'))
     
     enhancement_kwargs = {
         "adaptive_classification": args.adaptive_classification,
         "adaptive_audio_enhancement": args.adaptive_audio_enhancement,
         "smart_postprocessing": args.smart_postprocessing
     }
-
-    # Initialize progress display
-    progress = ProgressDisplay(len(media_files), enabled=not args.no_progress)
+    
+    # Initialize appropriate progress handler
+    if args.no_progress:
+        from whisperjav.utils.progress_display import DummyProgress
+        progress = DummyProgress()
+    else:
+        # This would need to be integrated with the existing ProgressDisplay
+        # For now, use the existing system
+        from whisperjav.utils.progress_display import ProgressDisplay
+        progress = ProgressDisplay(len(media_files), enabled=True)
     
     pipeline_args = {
         "output_dir": args.output_dir,
         "temp_dir": args.temp_dir,
         "keep_temp_files": args.keep_temp,
         "subs_language": args.subs_language,
-        "resolved_params": resolved_params,
-        "progress_display": progress,  # Pass progress display to pipeline
+        "resolved_config": resolved_config,
+        "progress_display": progress,
         **enhancement_kwargs
     }
-
+    
+    # Select pipeline
     if args.mode == "faster":
         pipeline = FasterPipeline(**pipeline_args)
     elif args.mode == "fast":
         pipeline = FastPipeline(**pipeline_args)
-    elif args.mode == "balanced":
+    else:  # balanced
         pipeline = BalancedPipeline(**pipeline_args)
-    else:
-        logger.error(f"Unknown mode '{args.mode}'")
-        sys.exit(1)
-        
+    
     all_stats, failed_files = [], []
-    total_files = len(media_files)
     
     try:
         for i, media_info in enumerate(media_files, 1):
@@ -233,7 +232,6 @@ def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_pa
                 metadata = pipeline.process(media_info)
                 all_stats.append({"file": file_path_str, "status": "success", "metadata": metadata})
                 
-                # Show completion
                 subtitle_count = metadata.get("summary", {}).get("final_subtitles_refined", 0)
                 output_path = metadata.get("output_files", {}).get("final_srt", "")
                 progress.show_file_complete(file_name, subtitle_count, output_path)
@@ -250,73 +248,149 @@ def process_files(media_files: List[Dict], args: argparse.Namespace, resolved_pa
     finally:
         progress.close()
     
-    # Print summary (after progress bars are closed)
+    # Print summary
     print("\n" + "="*50)
     print("PROCESSING SUMMARY")
     print("="*50)
-    print(f"Total files: {total_files}")
-    print(f"Successful: {total_files - len(failed_files)}")
+    print(f"Total files: {len(media_files)}")
+    print(f"Successful: {len(media_files) - len(failed_files)}")
     print(f"Failed: {len(failed_files)}")
     
     if failed_files:
         print("\nFailed files:")
         for file in failed_files:
             print(f"  - {file}")
-            
+    
     if args.stats_file:
         with open(args.stats_file, 'w', encoding='utf-8') as f:
             json.dump(all_stats, f, indent=2, ensure_ascii=False)
         print(f"\nStatistics saved to: {args.stats_file}")
     
-    # Clean up temp directory if not keeping temp files
     if not args.keep_temp:
-        if args.no_progress:
-            logger.debug("Cleaning up temporary files...")
         cleanup_temp_directory(args.temp_dir)
 
 
-def main():
-    """Main entry point."""
-    args = parse_arguments()
+def process_files_async(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
+    """Process files asynchronously using the new async processor."""
+    
+    # Determine verbosity
+    if args.verbosity:
+        verbosity = VerbosityLevel(args.verbosity)
+    else:
+        config_manager = ConfigManager(args.config)
+        ui_prefs = config_manager.get_ui_preferences()
+        verbosity = VerbosityLevel(ui_prefs.get('console_verbosity', 'summary'))
+    
+    # Update resolved config with runtime options
+    resolved_config['output_dir'] = args.output_dir
+    resolved_config['temp_dir'] = args.temp_dir
+    resolved_config['keep_temp_files'] = args.keep_temp
+    resolved_config['subs_language'] = args.subs_language
+    
+    # Enhancement options
+    for opt in ['adaptive_classification', 'adaptive_audio_enhancement', 'smart_postprocessing']:
+        resolved_config[opt] = getattr(args, opt)
+    
+    # Create async manager
+    def progress_callback(message: Dict):
+        """Handle progress messages."""
+        msg_type = message.get('type')
+        if msg_type == 'file_start':
+            print(f"\nProcessing: {message['filename']}")
+        elif msg_type == 'task_complete':
+            if message['success']:
+                print(f"✓ Completed: {message['task_id']}")
+            else:
+                print(f"✗ Failed: {message['task_id']} - {message.get('error', 'Unknown error')}")
+    
+    manager = AsyncPipelineManager(
+        ui_update_callback=progress_callback,
+        verbosity=verbosity
+    )
+    
+    try:
+        # Process files
+        print(f"\nProcessing {len(media_files)} files asynchronously...")
+        tasks = manager.process_files(media_files, args.mode, resolved_config)
+        
+        # Summarize results
+        successful = sum(1 for t in tasks if t.status.value == 'completed')
+        failed = sum(1 for t in tasks if t.status.value == 'failed')
+        
+        print("\n" + "="*50)
+        print("ASYNC PROCESSING SUMMARY")
+        print("="*50)
+        print(f"Total files: {len(media_files)}")
+        print(f"Successful: {successful}")
+        print(f"Failed: {failed}")
+        
+        # Save stats if requested
+        if args.stats_file:
+            stats = []
+            for task in tasks:
+                stats.append({
+                    'file': task.media_info['path'],
+                    'status': task.status.value,
+                    'duration': task.end_time - task.start_time if task.end_time else None,
+                    'error': str(task.error) if task.error else None
+                })
+            
+            with open(args.stats_file, 'w', encoding='utf-8') as f:
+                json.dump(stats, f, indent=2, ensure_ascii=False)
+            print(f"\nStatistics saved to: {args.stats_file}")
+    
+    finally:
+        manager.shutdown()
+        
+        if not args.keep_temp:
+            cleanup_temp_directory(args.temp_dir)
 
+
+def main():
+    """Enhanced main entry point with all V3 improvements."""
+    args = parse_arguments()
+    
+    # Run environment checks if requested
+    if args.check or args.check_verbose:
+        run_preflight_checks(verbose=args.check_verbose)
+        sys.exit(0)
+    
+    # Enforce CUDA requirement
+    enforce_cuda_requirement()
+    
+    # Setup logging
     global logger
     logger = setup_logger("whisperjav", args.log_level, args.log_file)
     print_banner()
-
+    
     if not args.input:
         logger.error("No input files specified. Use -h for help.")
         sys.exit(1)
-
-    # --- REVISED: Use TranscriptionTuner to handle all config logic ---
     
-    # 1. Instantiate the tuner. It handles loading the base and user configs.
+    # Configuration management
     config_path = Path(args.config) if args.config else None
-    tuner = TranscriptionTuner(config_path=config_path)
-
-    # 2. Get the fully resolved parameters for all workers.
-    # The tuner handles the logic for mode and sensitivity.
-    resolved_params = tuner.get_resolved_params(
-        mode=args.mode,
-        sensitivity=args.sensitivity
-    )
-
-    if not resolved_params:
-        logger.error("Could not resolve transcription parameters. Check config file. Exiting.")
+    
+    # Update UI preferences if verbosity override provided
+    if args.verbosity:
+        quick_update_ui_preference('console_verbosity', args.verbosity, config_path)
+    
+    # V3 Configuration resolution
+    tuner = TranscriptionTunerV3(config_path=config_path)
+    task = 'translate' if args.subs_language == 'english-direct' else 'transcribe'
+    
+    try:
+        resolved_config = tuner.resolve_params(
+            pipeline_name=args.mode,
+            sensitivity=args.sensitivity,
+            task=task
+        )
+    except Exception as e:
+        logger.error(f"Failed to resolve configuration: {e}")
         sys.exit(1)
-        
-    # 3. Apply final CLI overrides for parameters not related to sensitivity profiles.
-    # This logic is kept for backward compatibility and specific use cases.
-    if args.model:
-        if 'model_load_params' not in resolved_params: resolved_params['model_load_params'] = {}
-        resolved_params['model_load_params']['model_name'] = args.model
-        logger.debug(f"CLI override: model_name set to '{args.model}'")
-
-    if args.vad_threshold is not None:
-        if 'vad_options' not in resolved_params: resolved_params['vad_options'] = {}
-        resolved_params['vad_options']['threshold'] = args.vad_threshold
-        logger.debug(f"CLI override: vad_threshold set to '{args.vad_threshold}'")
-
-    # 4. Set up temp directory
+    
+    logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
+    
+    # Setup temp directory
     if args.temp_dir:
         temp_path = Path(args.temp_dir)
     else:
@@ -324,33 +398,37 @@ def main():
     temp_path.mkdir(parents=True, exist_ok=True)
     args.temp_dir = str(temp_path)
     logger.debug(f"Using temporary directory: {args.temp_dir}")
-        
+    
+    # Discover media files
     discovery = MediaDiscovery()
     media_files = discovery.discover(args.input)
-
+    
     if not media_files:
         logger.error(f"No valid media files found in the specified paths: {', '.join(args.input)}")
         sys.exit(1)
-
+    
     logger.info(f"Found {len(media_files)} media file(s) to process")
-
+    
     try:
-        # Pass the final, resolved parameters to the processing function
-        process_files(media_files, args, resolved_params)
+        # Choose sync or async processing
+        if args.async_processing:
+            process_files_async(media_files, args, resolved_config)
+        else:
+            process_files_sync(media_files, args, resolved_config)
+            
     except KeyboardInterrupt:
         logger.warning("\nProcessing interrupted by user")
-        # Clean up temp directory even on interrupt
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
         sys.exit(1)
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-        # Clean up temp directory even on error
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

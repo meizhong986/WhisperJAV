@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Base pipeline class for WhisperJAV."""
+"""V3 Arch and new UI Base pipeline class for WhisperJAV."""
 
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict
 from whisperjav.utils.metadata_manager import MetadataManager
 from whisperjav.utils.logger import logger
-import os      # --- NEW: Imported for file operations ---
-import shutil  # --- NEW: Imported for directory operations (if needed in future) ---
+import os
+import shutil
 
 
 class BasePipeline(ABC):
@@ -19,7 +19,8 @@ class BasePipeline(ABC):
                  keep_temp_files: bool = False,
                  adaptive_classification: bool = False,
                  adaptive_audio_enhancement: bool = False,
-                 smart_postprocessing: bool = False
+                 smart_postprocessing: bool = False,
+                 **kwargs  # --- FIX: Accept and ignore extra keyword arguments ---
                 ):
         self.output_dir = Path(output_dir)
         self.temp_dir = Path(temp_dir)
@@ -32,6 +33,10 @@ class BasePipeline(ABC):
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Log any unused kwargs to help with debugging, but don't crash
+        if kwargs:
+            logger.debug(f"BasePipeline received unused arguments: {list(kwargs.keys())}")
         
     @abstractmethod
     def get_mode_name(self) -> str:
@@ -52,8 +57,6 @@ class BasePipeline(ABC):
         """
         pass
         
-
-    
     def cleanup_temp_files(self, media_basename: str):
         """Clean up temporary files for a specific media file."""
         if not self.keep_temp_files:
@@ -86,7 +89,7 @@ class BasePipeline(ABC):
                         srt_file.unlink()
                         logger.debug(f"Deleted temporary scene SRT: {srt_file}")
 
-                # NEW: Clean up raw_subs in temp directory (only for current media)
+                # Clean up raw_subs in temp directory (only for current media)
                 temp_raw_subs_dir = self.temp_dir / "raw_subs"
                 if temp_raw_subs_dir.exists():
                     for raw_file in temp_raw_subs_dir.glob(f"{media_basename}*"):

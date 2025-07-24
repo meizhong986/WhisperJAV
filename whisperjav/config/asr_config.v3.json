@@ -1,0 +1,178 @@
+{
+  "version": "3.0",
+  "//": "Part 5: Global Defaults",
+  "models": {
+    "whisper-turbo": {
+      "provider": "openai_whisper",
+      "model_name": "turbo",
+      "device": "cuda",
+      "compute_type": "float16",
+      "supported_tasks": [
+        "transcribe"
+      ]
+    },
+    "whisper-large-v2": {
+      "provider": "openai_whisper",
+      "model_name": "large-v2",
+      "device": "cuda",
+      "compute_type": "float16",
+      "supported_tasks": [
+        "transcribe",
+        "translate"
+      ]
+    }
+  },
+  "vad_engines": {
+    "silero-v4": {
+      "provider": "silero",
+      "repo": "snakers4/silero-vad:v4.0"
+    }
+  },
+  "parameter_sets": {
+    "decoder_params": {
+      "conservative": {
+        "beam_size": 1,
+        "best_of": 1,
+        "temperature": [
+          0.0
+        ],
+        "length_penalty": 0.62,
+        "patience": 2.0
+      },
+      "balanced": {
+        "beam_size": 2,
+        "best_of": 2,
+        "temperature": [
+          0.0,
+          0.2
+        ],
+        "length_penalty": 0.25,
+        "patience": 1.5
+      },
+      "aggressive": {
+        "beam_size": 5,
+        "best_of": 5,
+        "temperature": [
+          0.0,
+          0.3
+        ],
+        "length_penalty": 0.1,
+        "patience": 1.0
+      }
+    },
+    "vad_params": {
+      "conservative": {
+        "threshold": 0.5,
+        "min_speech_duration_ms": 300
+      },
+      "balanced": {
+        "threshold": 0.35,
+        "min_speech_duration_ms": 200
+      },
+      "aggressive": {
+        "threshold": 0.2,
+        "min_speech_duration_ms": 100
+      }
+    },
+    "provider_specific_params": {
+      "openai_whisper": {
+        "conservative": {
+          "no_speech_threshold": 0.8,
+          "logprob_threshold": -0.8,
+          "suppress_blank": true
+        },
+        "balanced": {
+          "no_speech_threshold": 0.6,
+          "logprob_threshold": -1.0,
+          "suppress_blank": true
+        },
+        "aggressive": {
+          "no_speech_threshold": 0.4,
+          "logprob_threshold": -1.5,
+          "suppress_blank": false
+        }
+      }
+    }
+  },
+  "sensitivity_profiles": {
+    "conservative": {
+      "decoder": "conservative",
+      "vad": "conservative",
+      "provider_settings": "conservative"
+    },
+    "balanced": {
+      "decoder": "balanced",
+      "vad": "balanced",
+      "provider_settings": "balanced"
+    },
+    "aggressive": {
+      "decoder": "aggressive",
+      "vad": "aggressive",
+      "provider_settings": "aggressive"
+    }
+  },
+  "feature_configs": {
+    "scene_detection": {
+      "default": {
+        "max_duration": 30.0,
+        "min_duration": 0.2
+      }
+    },
+    "post_processing": {
+      "standard": {
+        "remove_hallucinations": true,
+        "max_merge_gap_sec": 0.4
+      }
+    }
+  },
+  "pipelines": {
+    "faster": {
+      "workflow": {
+        "model": "whisper-turbo",
+        "vad": "none",
+        "backend": "stable-ts",
+        "features": {
+          "post_processing": "standard"
+        }
+      },
+      "model_overrides": {
+        "translate": "whisper-large-v2"
+      }
+    },
+    "fast": {
+      "workflow": {
+        "model": "whisper-turbo",
+        "vad": "none",
+        "backend": "stable-ts",
+        "features": {
+          "scene_detection": "default",
+          "post_processing": "standard"
+        }
+      }
+    },
+    "balanced": {
+      "workflow": {
+        "model": "whisper-turbo",
+        "vad": "silero-v4",
+        "backend": "whisper",
+        "features": {
+          "scene_detection": "default",
+          "post_processing": "standard"
+        }
+      }
+    }
+  },
+  "defaults": {
+    "language": "ja",
+    "output_format": "srt"
+  },
+  "ui_preferences": {
+    "console_verbosity": "quiet",
+    "progress_batch_size": 10,
+    "show_scene_details": false,
+    "max_console_lines": 1000,
+    "auto_scroll": true,
+    "show_timestamps": false,
+    "theme": "default"
+  }
+}
