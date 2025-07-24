@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Faster pipeline implementation - direct transcription without chunking."""
+"""V3 architect. Faster pipeline implementation - direct transcription without chunking."""
 
 import shutil
 from pathlib import Path
@@ -13,6 +13,7 @@ from whisperjav.modules.stable_ts_asr import StableTSASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor
 from whisperjav.utils.logger import logger
 from whisperjav.utils.progress_display import DummyProgress
+from whisperjav.utils.progress_aggregator import AsyncProgressReporter
 
 class FasterPipeline(BasePipeline):
     """Faster pipeline using Whisper turbo mode without chunking."""
@@ -22,59 +23,86 @@ class FasterPipeline(BasePipeline):
                  temp_dir: str, 
                  keep_temp_files: bool, 
                  subs_language: str,
-                 resolved_params: Dict, 
+                 resolved_config: Dict, 
                  progress_display=None, 
                  **kwargs):
         """
-        Initializes the FasterPipeline using resolved configuration parameters.
+        Initializes the FasterPipeline using V3 structured configuration.
+        
+        Args:
+            output_dir: Output directory for subtitles
+            temp_dir: Temporary directory for processing
+            keep_temp_files: Whether to keep temporary files
+            subs_language: Language for subtitles ('japanese' or 'english-direct')
+            resolved_config: V3 structured configuration from TranscriptionTunerV3
+            progress_display: Progress display object
+            **kwargs: Additional parameters for base class
         """
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files, **kwargs)
         
         self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
+        
+        # ADD THIS LINE - Extract progress reporter from kwargs
+        self.progress_reporter = kwargs.get('progress_reporter', None)
 
-        # Unpack the resolved parameter dictionaries from the TranscriptionTuner
-        load_params = resolved_params.get('model_load_params', {})
-        self.transcribe_options = resolved_params.get('transcribe_options', {})
-        self.decode_options = resolved_params.get('decode_options', {})
-        stable_ts_opts = resolved_params.get('stable_ts_options', {})
-        post_proc_opts = resolved_params.get('post_processing_options', {})
+        # --- V3 STRUCTURED CONFIG UNPACKING ---
+        model_cfg = resolved_config["model"]
+        params = resolved_config["params"]
+        features = resolved_config["features"]
+        task = resolved_config["task"]
         
         # Set the ASR task based on the user's choice
-        self.transcribe_options['task'] = 'translate' if self.subs_language == 'english-direct' else 'transcribe'
-
-        # Implement the smart model-switching logic
-        effective_model_name = load_params.get("model_name", "turbo")
-        if self.subs_language == 'english-direct' and effective_model_name == 'turbo':
-            logger.info("Direct translation requested. Switching to 'large-v2' to perform translation.")
-            effective_model_name = 'large-v2'
+        self.asr_task = task  # Use the task from resolved config directly
         
-        # Instantiate modules with the final, correct parameters
+        # Extract feature configurations (only post-processing for faster pipeline)
+        post_proc_opts = features.get("post_processing", {})
+        
+        # Implement the smart model-switching logic
+        effective_model_cfg = model_cfg.copy()
+        if self.subs_language == 'english-direct' and model_cfg.get("model_name") == 'turbo':
+            logger.info("Direct translation requested. Switching to 'large-v2' to perform translation.")
+            effective_model_cfg["model_name"] = 'large-v2'
+        # --- END V3 CONFIG UNPACKING ---
+        
+        # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor()
         
+        # Pass structured config to StableTSASR
+        # NOTE: 'faster' pipeline uses turbo mode (faster-whisper backend)
         self.asr = StableTSASR(
-            model_load_params={**load_params, 'model_name': effective_model_name},
-            transcribe_options=self.transcribe_options,
-            decode_options=self.decode_options,
-            stable_ts_options=stable_ts_opts,
-            turbo_mode=True # This is specific to the faster pipeline
+            model_config=effective_model_cfg,
+            params=params,
+            task=task,
+            turbo_mode=True
         )
         
-
+        # Language code for post-processor
         lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
         self.postprocessor = SRTPostProcessor(language=lang_code, **post_proc_opts)
 
+        # Log if smart post-processing is enabled
+        if kwargs.get('smart_postprocessing', False):
+            logger.debug("Smart Post-Processing enabled.")
 
     def get_mode_name(self) -> str:
         return "faster"
         
-    # --- THIS FUNCTION HAS BEEN RESTORED TO ITS COMPLETE BASELINE VERSION ---
+
     def process(self, media_info: Dict) -> Dict:
         """Process media file through faster pipeline."""
         start_time = time.time()
         
         input_file = media_info['path']
         media_basename = media_info['basename']
+        
+        # Report file start if async reporter available
+        if self.progress_reporter:
+            self.progress_reporter.report_file_start(
+                filename=media_basename,
+                file_number=media_info.get('file_number', 1),
+                total_files=media_info.get('total_files', 1)
+            )
         
         logger.info(f"Starting FASTER pipeline for: {input_file}")
         logger.debug(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
@@ -88,17 +116,18 @@ class FasterPipeline(BasePipeline):
         master_metadata["config"]["pipeline_options"] = {
             "model": f"whisper-({self.asr.model_name})",
             "device": self.asr.device,
-            "language": "ja"
+            "language": self.asr.language
         }
         
-        if self.smart_postprocessing:
+        if hasattr(self, 'smart_postprocessor'):
             logger.debug("Smart Post-Processing enabled.")
             
         try:
+            # Step 1: Extract audio
+            if self.progress_reporter:
+                self.progress_reporter.report_step("Transforming audio", 1, 3)
             self.progress.set_current_step("Transforming audio", 1, 3)
             
-            
-            #logger.info("Step 1: Transforming audio")
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
             
@@ -110,14 +139,27 @@ class FasterPipeline(BasePipeline):
                 duration_seconds=duration
             )
             
-            #logger.info("Step 2: Transcribing")
-            self.progress.set_current_step("Transcribing (this may take a while...)", 2, 3)
+            # Step 2: Transcribe entire audio
+            if self.progress_reporter:
+                self.progress_reporter.report_step("Transcribing (progress bar for the faster mode is shown in your terminal...)", 2, 3)
+                # Report transcription start with method info
+                self.progress_reporter.report('transcription_start', 
+                                            filename=media_basename,
+                                            method='direct',
+                                            model=self.asr.model_name,
+                                            duration=duration)
+            self.progress.set_current_step("Transcribing (progress bar for the faster mode is shown in your terminal...)", 2, 3)
+            
             logger.info("Starting transcription of entire audio ...")
             raw_srt_path = self.temp_dir / f"{media_basename}_raw.srt"
 
-            self.asr.transcribe_to_srt(audio_path, raw_srt_path, task=self.transcribe_options['task'])
+            self.asr.transcribe_to_srt(audio_path, raw_srt_path, task=self.asr_task)
             
-           
+            # Report transcription complete
+            if self.progress_reporter:
+                self.progress_reporter.report('transcription_complete',
+                                            filename=media_basename,
+                                            duration=time.time() - start_time)
             
             self.metadata_manager.update_processing_stage(
                 master_metadata, "transcription", "completed",
@@ -125,8 +167,9 @@ class FasterPipeline(BasePipeline):
                 output_path=str(raw_srt_path)
             )
             
-            
-            #logger.info("Step 3: Post-processing SRT")
+            # Step 3: Post-process
+            if self.progress_reporter:
+                self.progress_reporter.report_step("Post-processing subtitles", 3, 3)
             self.progress.set_current_step("Post-processing subtitles", 3, 3)
 
             lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
@@ -138,14 +181,14 @@ class FasterPipeline(BasePipeline):
             # Explicitly move the sanitized file from the temp location to the final destination
             shutil.move(processed_srt, final_srt_path)
 
-            # FIX: Move raw_subs BEFORE cleanup
+            # Move raw_subs BEFORE cleanup
             temp_raw_subs_path = raw_srt_path.parent / "raw_subs"
             if temp_raw_subs_path.exists():
                 final_raw_subs_path = self.output_dir / "raw_subs"
                 # Create raw_subs directory if it doesn't exist
                 final_raw_subs_path.mkdir(exist_ok=True)
                 
-                # CHANGED: Copy only files related to current media_basename to avoid ghost files
+                # Copy only files related to current media_basename to avoid ghost files
                 for file in temp_raw_subs_path.glob(f"{media_basename}*"):
                     dest_file = final_raw_subs_path / file.name
                     shutil.copy2(file, dest_file)
@@ -153,7 +196,7 @@ class FasterPipeline(BasePipeline):
                     
                 logger.debug(f"Copied relevant raw_subs files to: {final_raw_subs_path}")
             
-            # FIX: Now cleanup temp files
+            # Now cleanup temp files
             self.cleanup_temp_files(media_basename)
             
             self.metadata_manager.update_processing_stage(
@@ -186,6 +229,17 @@ class FasterPipeline(BasePipeline):
             logger.debug(f"FASTER pipeline completed in {total_time:.1f} seconds")
             logger.info(f"Output saved to: {final_srt_path}")
             
+            # Report completion
+            if self.progress_reporter:
+                self.progress_reporter.report_completion(
+                    success=True,
+                    stats={
+                        'subtitles': master_metadata["summary"]["final_subtitles_refined"],
+                        'duration': total_time,
+                        'scenes': 1  # Direct transcription has no scenes
+                    }
+                )
+            
             return master_metadata
             
         except Exception as e:
@@ -195,4 +249,12 @@ class FasterPipeline(BasePipeline):
                 error_message=str(e)
             )
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
+            
+            # Report failure
+            if self.progress_reporter:
+                self.progress_reporter.report_completion(
+                    success=False,
+                    stats={'error': str(e)}
+                )
+            
             raise

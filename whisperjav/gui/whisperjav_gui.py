@@ -9,6 +9,13 @@ import json
 from pathlib import Path
 import tempfile
 import re
+import time
+
+from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
+from whisperjav.utils.progress_aggregator import VerbosityLevel
+from whisperjav.config.manager import ConfigManager
+
+
 
 class AdvancedSettingsDialog(Toplevel):
     def __init__(self, parent, config=None):
@@ -17,6 +24,10 @@ class AdvancedSettingsDialog(Toplevel):
         self.geometry("500x400")
         self.transient(parent)
         self.grab_set()
+        
+        self.async_manager = None
+        self.current_tasks = []
+        self.console_buffer = []
         
         # Match parent window styling
         self.configure(bg='#f0f0f0')
@@ -231,7 +242,7 @@ class WhisperJAVGUI(tk.Tk):
         self.resizable(True, True)
         self.configure(bg='#f0f0f0')
         
-        # Variables
+        # --- State Variables ---
         self.input_files = []
         self.output_dir = tk.StringVar()
         self.mode = tk.StringVar(value="balanced")
@@ -242,18 +253,27 @@ class WhisperJAVGUI(tk.Tk):
         self.smart_postprocessing = tk.BooleanVar()
         self.show_console = tk.BooleanVar(value=True)
         self.processing = False
-        self.output_queue = queue.Queue()
         self.advanced_config = {}
         
-        self.current_file_index = 0
-        self.total_files = 0
-        self.progress_line_ids = {}
-        self.last_progress_text = ""
+        # --- Async and Progress Tracking ---
+        self.async_manager = None
+        self.processing_thread = None
+        self.submitted_tasks_count = 0
+        self.completed_tasks_count = 0
+        self.current_tasks = []
+        self.console_buffer = []
         
+        self.progress_line_index = None
+        self.last_progress_update_time = 0
         
+        # --- FIX (c): Add a periodic timer for smoother UI updates ---
+        self.gui_update_timer = None
         
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    
+
         
     def create_widgets(self):
         # Main container
@@ -382,6 +402,24 @@ class WhisperJAVGUI(tk.Tk):
                                      activebackground='#3a6aac', cursor='hand2')
         self.start_button.pack(pady=(0, 15))
         
+        """
+        self.cancel_button = tk.Button(
+            main_container,  # Or wherever your start button is
+            text="CANCEL PROCESSING",
+            command=self.cancel_processing,
+            bg='#dc3545',
+            fg='white',
+            font=('Arial', 12, 'bold'),
+            padx=40,
+            pady=12,
+            bd=0,
+            relief=tk.FLAT,
+            activebackground='#cc2e3f',
+            cursor='hand2'
+        )
+        # Don't pack it initially - only show during processing
+        """        
+        
         # Progress bar frame (hidden initially)
         self.progress_frame = tk.Frame(main_container, bg='#f0f0f0')
         self.progress_frame.pack(fill=tk.X, pady=(0, 10))
@@ -508,71 +546,63 @@ class WhisperJAVGUI(tk.Tk):
             return "overall"
         return None
 
+    def update_sensitivity_options(self):
+        """Update sensitivity radio buttons based on selected pipeline."""
+        if not hasattr(self, 'tuner') or not isinstance(self.tuner, TranscriptionTunerV2):
+            return
+            
+        selected_pipeline = self.mode_var.get()
+        available = self.tuner.get_available_sensitivities(selected_pipeline)
+        
+        # Update radio button states
+        for radio in [self.conservative_radio, self.balanced_radio, self.aggressive_radio]:
+            sensitivity = radio.cget("value")
+            if sensitivity in available:
+                radio.configure(state="normal")
+            else:
+                radio.configure(state="disabled")
+        
+        # If current selection not available, switch to first available
+        if self.sensitivity_var.get() not in available:
+            self.sensitivity_var.set(available[0])
+
 
 
     def write_to_console(self, message):
         """Write cleaned message to console with appropriate formatting."""
         self.console.config(state=tk.NORMAL)
         
-        # Identify progress bar type
-        progress_type = self.get_progress_type(message)
+        # Skip progress bar artifacts and overwhelming outputs
+        skip_patterns = ["Progress:", "Processing regions:", "||", "Transcribing scene", "VAD detected"]
+        if any(pattern in message for pattern in skip_patterns):
+            self.console.config(state=tk.DISABLED)
+            return
         
-        if progress_type:
-            # Handle progress update in-place
-            if progress_type in self.progress_line_ids:
-                # Get the line index for this progress type
-                line_index = self.progress_line_ids[progress_type]
-                # Delete the old line
-                self.console.delete(f"{line_index}.0", f"{line_index}.end+1c")
-                # Insert the updated line at the same position
-                self.console.insert(f"{line_index}.0", message + "\n", "progress")
-            else:
-                # First time seeing this progress type, add it
-                # Get current line number
-                current_line = int(self.console.index('end-1c').split('.')[0])
-                self.progress_line_ids[progress_type] = current_line
-                self.console.insert(tk.END, message + "\n", "progress")
-            
-            self.last_progress_text = message
+        # Apply formatting based on content
+        if "╔" in message or "║" in message or "╚" in message:
+            self.console.insert(tk.END, message + "\n", "banner")
+        elif "[✓" in message or "✓" in message or "successful" in message.lower():
+            self.console.insert(tk.END, message + "\n", "success")
+        elif "error" in message.lower() or "failed" in message.lower() or "[✗" in message or "✗" in message:
+            self.console.insert(tk.END, message + "\n", "error")
+        elif "Step" in message and "/" in message:
+            self.console.insert(tk.END, message + "\n", "step")
+        elif "Processing:" in message or "Starting:" in message:
+            self.console.insert(tk.END, message + "\n", "current_file")
+        elif "PROCESSING SUMMARY" in message or "PROCESSING COMPLETE" in message or "=" * 10 in message:
+            self.console.insert(tk.END, message + "\n", "summary")
         else:
-            # Skip duplicate consecutive messages
-            try:
-                last_line = self.console.get("end-2l", "end-1l").strip()
-                if last_line == message.strip():
-                    self.console.config(state=tk.DISABLED)
-                    return
-            except:
-                pass
-            
-            # Apply formatting based on content
-            if "╔" in message or "║" in message or "╚" in message:
-                self.console.insert(tk.END, message + "\n", "banner")
-            elif "[✓ OK]" in message or "successful" in message.lower():
-                self.console.insert(tk.END, message + "\n", "success")
-            elif "error" in message.lower() or "failed" in message.lower():
-                self.console.insert(tk.END, message + "\n", "error")
-            elif "Step" in message and "/" in message:
-                self.console.insert(tk.END, message + "\n", "step")
-            elif "Processing:" in message:
-                self.console.insert(tk.END, message + "\n", "current_file")
-            elif "PROCESSING SUMMARY" in message or "=" * 10 in message:
-                self.console.insert(tk.END, message + "\n", "summary")
-            else:
-                self.console.insert(tk.END, message + "\n")
-            
-            # When adding a regular line, reset progress tracking
-            self.progress_line_ids = {}
+            self.console.insert(tk.END, message + "\n")
         
         # Limit console to 500 lines to prevent performance issues
         line_count = int(self.console.index('end-1c').split('.')[0])
         if line_count > 500:
             # Remove oldest 100 lines
             self.console.delete('1.0', '100.0')
-            # Update progress line positions
-            self.update_progress_line_ids()
         
         self.console.see(tk.END)
         self.console.config(state=tk.DISABLED)
+        
     
     def update_progress_line_ids(self):
         """Update progress line positions after console truncation"""
@@ -632,8 +662,9 @@ class WhisperJAVGUI(tk.Tk):
             sys.argv = self.original_argv
             self.output_queue.put(None)  # Signal processing complete
             self.after(100, self.processing_complete)    
-    
+
     def start_processing(self):
+        """Start processing with async pipeline manager instead of subprocess."""
         if not self.input_files:
             messagebox.showerror("Input Error", "Please select at least one media file.")
             return
@@ -642,103 +673,294 @@ class WhisperJAVGUI(tk.Tk):
         if not output_dir:
             messagebox.showerror("Output Error", "Please select an output directory.")
             return
-            
+        
+        # Create output directory if needed
         if not os.path.exists(output_dir):
             try:
                 os.makedirs(output_dir)
             except OSError:
                 messagebox.showerror("Output Error", "Could not create output directory.")
                 return
-
-        # Reset progress tracking
+        
+        # Reset state
         self.current_file_index = 0
         self.total_files = len(self.input_files)
-        self.progress_line_ids = {}  # Track multiple progress bars
+        self.progress_line_ids = {}
         self.last_progress_text = ""
+        self.console_buffer = []
+
+        self.submitted_tasks_count = len(self.input_files)
+        self.completed_tasks_count = 0
+        self.current_tasks = [] # Populated by the progress handler        
         
+        
+        # Disable start button
         self.processing = True
         self.start_button.config(state=tk.DISABLED, bg='#cccccc')
-        self.write_to_console("Starting processing...")
+        self.write_to_console("Initializing processing...")
         
         # Show progress bar
-        self.progress_label.config(text="Processing files...")
+        self.progress_label.config(text="Preparing files...")
+
         self.progress_bar.pack(pady=5)
         self.progress_bar.start(10)
+        self.write_to_console("Initializing processing...")
         
-        # Create temporary config file if advanced settings were modified
-        config_path = None
-        if self.advanced_config:
-            try:
-                config_path = Path(tempfile.gettempdir()) / "whisperjav_gui_config.json"
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    json.dump(self.advanced_config, f, indent=2)
-                self.write_to_console(f"Using custom config: {config_path}")
-            except Exception as e:
-                self.write_to_console(f"Error saving config: {str(e)}")
+        # --- FIX: Reset state for inline progress updates ---
+        self.progress_line_index = None
+        self.last_progress_update_time = 0
         
-        # Check if running from PyInstaller bundle
-        if getattr(sys, 'frozen', False):
-            # Running from exe - need to call main.py differently
-            from whisperjav.main import main as whisperjav_main
+        self.submitted_tasks_count = len(self.input_files)
+
+             
+        # Determine verbosity
+        verbosity = VerbosityLevel.SUMMARY  # Default
+        if self.show_console.get():
+            verbosity = VerbosityLevel.NORMAL
+        
+        # Create async manager with progress callback
+        self.async_manager = AsyncPipelineManager(
+            ui_update_callback=self.handle_async_progress,
+            verbosity=verbosity
+        )
+        
+        # Prepare configuration
+        try:
+            # Use the V3 tuner to get resolved config
+            from whisperjav.config.transcription_tuner_v3 import TranscriptionTunerV3
             
-            # Build args list
-            args = [
-                "--output-dir", output_dir,
-                "--mode", self.mode.get(),
-                "--sensitivity", self.sensitivity.get(),
-                "--subs-language", self.subs_language.get()
-            ]
+            config_path = Path(self.advanced_config.get('config_path')) if 'config_path' in self.advanced_config else None
+            tuner = TranscriptionTunerV3(config_path=config_path)
             
-            # Add config file if created
-            if config_path:
-                args.extend(["--config", str(config_path)])
+            task = 'translate' if self.subs_language.get() == 'english-direct' else 'transcribe'
+            resolved_config = tuner.resolve_params(
+                pipeline_name=self.mode.get(),
+                sensitivity=self.sensitivity.get(),
+                task=task
+            )
+            
+            # Add UI-specific settings
+            resolved_config['output_dir'] = output_dir
+            resolved_config['temp_dir'] = str(Path(tempfile.gettempdir()) / "whisperjav")
+            resolved_config['keep_temp_files'] = False
+            resolved_config['subs_language'] = self.subs_language.get()
             
             # Add enhancement options
-            if self.adaptive_classification.get():
-                args.append("--adaptive-classification")
-            if self.adaptive_audio_enhancement.get():
-                args.append("--adaptive-audio-enhancement")
-            if self.smart_postprocessing.get():
-                args.append("--smart-postprocessing")
+            resolved_config['adaptive_classification'] = self.adaptive_classification.get()
+            resolved_config['adaptive_audio_enhancement'] = self.adaptive_audio_enhancement.get()
+            resolved_config['smart_postprocessing'] = self.smart_postprocessing.get()
             
-            # Add input files
-            args.extend(self.input_files)
-            
-            # Store original argv
-            self.original_argv = sys.argv
-            # Modify sys.argv temporarily
-            sys.argv = ["whisperjav"] + args
-            
-            # Start processing in a separate thread
-            threading.Thread(target=self._run_main_direct, daemon=True).start()
-        else:
-            # Running from Python - use subprocess as before
-            command = [
-                sys.executable, "-m", "whisperjav.main",
-                "--output-dir", output_dir,
-                "--mode", self.mode.get(),
-                "--sensitivity", self.sensitivity.get(),
-                "--subs-language", self.subs_language.get()
-            ]
-            
-            # Add config file if created
-            if config_path:
-                command.extend(["--config", str(config_path)])
-            
-            # Add enhancement options
-            if self.adaptive_classification.get():
-                command.append("--adaptive-classification")
-            if self.adaptive_audio_enhancement.get():
-                command.append("--adaptive-audio-enhancement")
-            if self.smart_postprocessing.get():
-                command.append("--smart-postprocessing")
-            
-            # Add input files
-            command.extend(self.input_files)
-            
-            # Start processing in a separate thread
-            threading.Thread(target=self.run_processing, args=(command,), daemon=True).start()
+        except Exception as e:
+            self.write_to_console(f"Configuration error: {str(e)}")
+            self.processing_complete()
+            return
+        
+        # Discover media files
+        from whisperjav.modules.media_discovery import MediaDiscovery
+        discovery = MediaDiscovery()
+        media_files = discovery.discover(self.input_files)
+        
+        if not media_files:
+            self.write_to_console("No valid media files found!")
+            self.processing_complete()
+            return
+        
+        # Start async processing in a separate thread
+        self.processing_thread = threading.Thread(
+            target=self._process_files_async,
+            args=(media_files, resolved_config),
+            daemon=True
+        )
+        self.processing_thread.start()
+        
+        # Start progress update timer
+        self.start_progress_updates()
     
+
+
+
+
+    def _process_files_async(self, media_files, resolved_config):
+        """Run async processing in background thread."""
+        try:
+            # This call is now NON-BLOCKING and returns a list of task IDs.
+            # We store these if we need them for cancellation.
+            task_ids = self.async_manager.process_files(
+                media_files,
+                self.mode.get(),
+                resolved_config
+            )
+            self.submitted_task_ids = task_ids # Store the IDs
+            self.submitted_tasks_count = len(task_ids)
+            self.completed_tasks_count = 0
+
+            # The thread's job is now done. It has successfully submitted the tasks.
+            # It no longer waits here. The UI will be notified of completion via events.
+            
+        except Exception as e:
+            # Use the buffer to safely communicate with the UI thread
+            self.console_buffer.append(f"Error submitting tasks: {str(e)}")
+            # Schedule the final UI update from the main thread
+            self.after(100, self.processing_complete)
+
+
+    def handle_async_progress(self, message: dict):
+        """
+        Handle progress updates from the async processor.
+
+        This method runs on the main UI thread and is the bridge between the
+        background processing and the GUI. It buffers messages and updates the
+        console in batches to maintain UI responsiveness.
+        """
+        msg_type = message.get('type')
+        timestamp = time.strftime('%H:%M:%S')
+
+        # --- Handle different message types ---
+
+        if msg_type == 'file_start':
+            filename = message.get('filename', 'Unknown')
+            file_num = message.get('file_number', self.current_file_index + 1)
+            total = message.get('total_files', self.total_files)
+            
+            self.current_file_index = file_num - 1
+            self.console_buffer.append(f"\n[{timestamp}] [{file_num}/{total}] Starting: {filename}")
+            
+            # Schedule the label update to run on the UI thread
+            self.after(0, lambda: self.progress_label.config(text=f"Processing: {filename}"))
+            
+        elif msg_type == 'step_update': 
+            self.progress_line_index = None
+            step_name = message.get('step_name', '')
+            self.console_buffer.append(f"  > {step_name}...")
+            
+        elif msg_type == 'scene_progress':
+            # --- FIX (a): Logic for more frequent, time-based updates ---
+            now = time.time()
+            scene_idx = message.get('scene_index', 0)
+            total_scenes = message.get('total_scenes', 0)
+            
+            # Update if it's the first scene, the last scene, every 5 scenes, OR if 10s have passed
+            if (total_scenes > 0 and (
+                scene_idx == 0 or 
+                (scene_idx + 1) == total_scenes or 
+                scene_idx % 5 == 0 or 
+                (now - self.last_progress_update_time > 10))
+            ):
+                progress_pct = ((scene_idx + 1) / total_scenes) * 100
+                progress_text = f"    - Scene transcription: {progress_pct:.0f}% ({scene_idx + 1}/{total_scenes})"
+                self.console_buffer.append(progress_text)
+                self.last_progress_update_time = now # Reset timer
+
+            status = message.get('status', '')
+            
+            # Batch scene updates to avoid console spam.
+            # Show an update every 20 scenes, on the first/last scene, or on failure.
+            if scene_idx % 20 == 0 or status == 'failed' or scene_idx + 1 == total_scenes:
+                if total_scenes > 0:
+                    progress_pct = ((scene_idx + 1) / total_scenes) * 100
+                    self.console_buffer.append(f"    - Scene transcription: {progress_pct:.0f}% ({scene_idx + 1}/{total_scenes})")
+                
+        elif msg_type == 'completion':
+            # This message is from the pipeline when a single file finishes.
+            # We can use it to show intermediate success/failure.
+            success = message.get('success', False)
+            stats = message.get('stats', {})
+            
+            if success:
+                subtitles = stats.get('subtitles', 0)
+                duration = stats.get('duration', 0)
+                self.console_buffer.append(f"  ✓ Intermediate result: {subtitles} subtitles found in {duration:.1f}s")
+            else:
+                error = stats.get('error', 'Unknown error')
+                self.console_buffer.append(f"  ✗ Intermediate error: {error}")
+                
+        elif msg_type == 'task_complete':
+            # This is the final confirmation that a task is done.
+            # We use this to track overall completion.
+            self.completed_tasks_count += 1
+            
+            task_id = message.get('task_id')
+            success = message.get('success', False)
+            
+            # Retrieve the final task object to get all details for the summary
+            final_task_state = self.async_manager.processor.get_task_status(task_id)
+            if final_task_state:
+                self.current_tasks.append(final_task_state)
+
+            if success:
+                result = message.get('result', {})
+                output_file = Path(result.get('output_files', {}).get('final_srt', ''))
+                self.console_buffer.append(f"[{timestamp}] ✓ Task Complete. Output: {output_file.name}")
+            else:
+                error = message.get('error', 'Unknown error')
+                self.console_buffer.append(f"[{timestamp}] ✗ Task Failed: {error}")
+            
+            # --- CRITICAL: Check if all submitted tasks are finished ---
+            if self.completed_tasks_count >= self.submitted_tasks_count:
+                # All jobs are done. Schedule the final cleanup and summary.
+                # self.after() ensures this runs safely on the main UI thread.
+                self.after(100, self.processing_complete)
+
+        # --- Trigger a batched update to the console ---
+        self.update_console_batch()
+
+    def update_console_batch(self):
+            """Update console in batches and handle inline progress."""
+            if not self.console_buffer:
+                return
+
+            # Filter out any empty messages that could reset the progress line index
+            processed_messages = [msg for msg in self.console_buffer if msg and msg.strip()]
+            self.console_buffer.clear()
+            
+            if not processed_messages:
+                return
+
+            self.console.config(state=tk.NORMAL)
+            
+            for message in processed_messages:
+                # --- FIX (b): Logic for inline progress updates ---
+                if "Scene transcription:" in message:
+                    if self.progress_line_index:
+                        # Delete the old progress line content
+                        self.console.delete(self.progress_line_index, f"{self.progress_line_index} lineend")
+                        # Insert the new progress message at the same position
+                        self.console.insert(self.progress_line_index, message, "progress")
+                    else:
+                        # This is the first progress line for this step.
+                        # Ensure it starts on a new line, then store its index.
+                        self.console.insert(tk.END, "\n" + message, "progress")
+                        self.progress_line_index = self.console.index("end-1l linestart")
+                else:
+                    # This is a normal message. If a progress line was active,
+                    # move to the next line before printing. Then, reset the index.
+                    if self.progress_line_index:
+                        self.console.insert(f"{self.progress_line_index} lineend", "\n")
+                        self.progress_line_index = None
+                    
+                    self.console.insert(tk.END, message + "\n")
+
+            self.console.see(tk.END)
+            self.console.config(state=tk.DISABLED)
+
+    def start_progress_updates(self):
+        """Start periodic progress updates."""
+        def update():
+            if self.processing:
+                # Force console update
+                self.update_console_batch()
+                
+                # Update progress bar position if we know the progress
+                if self.total_files > 0 and self.current_file_index > 0:
+                    progress = (self.current_file_index / self.total_files) * 100
+                    # Could update a determinate progress bar here if you switch from indeterminate
+                    
+                # Schedule next update
+                self.progress_update_timer = self.after(100, update)
+        
+        update()
+
+
     def run_processing(self, command):
         try:
             self.write_to_console(f"Running command: {' '.join(command)}")
@@ -802,23 +1024,104 @@ class WhisperJAVGUI(tk.Tk):
             self.after(100, self.update_console)  # Maintain update frequency
     
     def processing_complete(self):
+        """Handle processing completion."""
         self.processing = False
         self.start_button.config(state=tk.NORMAL, bg='#4a7abc')
+        
+        # Stop progress updates
+        if self.progress_update_timer:
+            self.after_cancel(self.progress_update_timer)
+            self.progress_update_timer = None
+        
+        # Final console flush
+        self.update_console_batch()
         
         # Hide progress bar
         self.progress_bar.stop()
         self.progress_bar.pack_forget()
         self.progress_label.config(text="")
         
-        self.write_to_console("Processing complete.")
-    
+        # Shutdown async manager
+        if self.async_manager:
+            try:
+                self.async_manager.shutdown()
+            except:
+                pass
+            self.async_manager = None
+        
+        # Show summary
+        if self.current_tasks:
+            successful = sum(1 for t in self.current_tasks if t.status == ProcessingStatus.COMPLETED)
+            failed = sum(1 for t in self.current_tasks if t.status == ProcessingStatus.FAILED)
+            
+            summary = f"\n{'='*50}\nPROCESSING COMPLETE\n{'='*50}\n"
+            summary += f"Total files: {len(self.current_tasks)}\n"
+            summary += f"Successful: {successful}\n"
+            if failed > 0:
+                summary += f"Failed: {failed}\n"
+                
+                # List failed files
+                for task in self.current_tasks:
+                    if task.status == ProcessingStatus.FAILED:
+                        summary += f"  - {task.media_info.get('basename', 'Unknown')}: {task.error}\n"
+            
+            summary += "="*50 + "\n"
+            
+            self.write_to_console(summary)
+        
+        self.write_to_console("Ready for next batch.")
+
+
+    def periodic_gui_update(self):
+        """
+        FIX (c): New method.
+        Periodically flushes the console buffer to ensure responsiveness.
+        """
+        if not self.processing:
+            return
+        self.update_console_batch()
+        self.gui_update_timer = self.after(500, self.periodic_gui_update) # Reschedule for 500ms later
+
+
+    def cancel_processing(self):
+        """Cancel ongoing processing."""
+        if not self.processing or not self.async_manager:
+            return
+        
+        response = messagebox.askyesno(
+            "Cancel Processing",
+            "Are you sure you want to cancel the current processing?"
+        )
+        
+        if response:
+            self.write_to_console("\nCancelling processing...")
+            
+            # Cancel all running tasks
+            if self.current_tasks:
+                for task in self.current_tasks:
+                    if task.status == ProcessingStatus.RUNNING:
+                        try:
+                            self.async_manager.processor.cancel_task(task.task_id)
+                        except:
+                            pass
+            
+            # This will trigger completion
+            self.processing_complete()
+            
+        
     def on_close(self):
         if self.processing:
             if messagebox.askokcancel("Quit", "Processing is still running. Quit anyway?"):
+                # Cleanup async manager
+                if self.async_manager:
+                    try:
+                        self.async_manager.shutdown(wait=False)
+                    except:
+                        pass
                 self.destroy()
         else:
             self.destroy()
-            
+                
             
 def main():
     """Main entry point for GUI."""
