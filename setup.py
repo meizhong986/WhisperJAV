@@ -23,11 +23,12 @@ install_requires = [
     "ffmpeg-python",
     "soundfile",
     "auditok",
-    "numpy",  # Removed <2.0 constraint
-    "scipy",  # Removed <2.0 constraint
-    "tqdm",   # Removed <5.0 constraint
+    "numpy",
+    "scipy",
+    "tqdm",
     "pysrt",
     "srt",
+    "aiofiles",
 ]
 
 # Classifiers for supported Python versions
