@@ -245,6 +245,12 @@ class StableTSASR:
             if 'beam_size' in params and params['beam_size'] > 5:
                 logger.debug(f"Turbo mode: Capping beam_size from {params['beam_size']} to 5")
                 params['beam_size'] = 5
+
+            # Force batch_size=16 for BatchedInferencePipeline
+            logger.debug("Turbo mode: Forcing batch_size=16 for batched inference")
+            params['batch_size'] = 16                
+                
+                
             return params
         else:
             # For original Whisper, we need to handle it differently
