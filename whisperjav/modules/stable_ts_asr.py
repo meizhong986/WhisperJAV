@@ -246,9 +246,9 @@ class StableTSASR:
                 logger.debug(f"Turbo mode: Capping beam_size from {params['beam_size']} to 5")
                 params['beam_size'] = 5
 
-            # Force batch_size=16 for BatchedInferencePipeline
-            logger.debug("Turbo mode: Forcing batch_size=16 for batched inference")
-            params['batch_size'] = 16                
+            # Force batch_size=8 for BatchedInferencePipeline
+            logger.debug("Turbo mode: Forcing batch_size=8 for batched inference")
+            params['batch_size'] = 8                
                 
                 
             return params
