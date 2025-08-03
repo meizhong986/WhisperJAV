@@ -19,7 +19,7 @@ if exist _build rmdir /s /q _build
 if exist *.exe del *.exe
 
 REM Build installer
-constructor . --clean
+constructor .  -v 
 
 if errorlevel 1 (
     echo.
@@ -30,6 +30,6 @@ if errorlevel 1 (
 
 echo.
 echo Build complete!
-echo Installer created: WhisperJAV-1.1.2-Windows-x86_64-Setup.exe
+echo Installer created: WhisperJAV-1.3.1-Windows-x86_64-Setup.exe
 echo.
 pause

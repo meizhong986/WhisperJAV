@@ -114,8 +114,8 @@
   "feature_configs": {
     "scene_detection": {
       "default": {
-        "max_duration": 30.0,
-        "min_duration": 0.2
+        "max_duration": 29.0,
+        "min_duration": 0.3
       }
     },
     "post_processing": {

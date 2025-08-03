@@ -52,4 +52,13 @@ output/
 .tmp/
 raw_subs/
 
+# Installer binaries
+installer/*.exe
+
+# Internal source output folders
+whisperjav/output/
+
+# Microsoft Office temporary files
+~$*.docx
+
 
