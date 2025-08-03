@@ -19,7 +19,6 @@ extra_files:
   - post_install.bat
   - post_install.py
   - ../requirements.txt         
-  - ../whisperjav               
   - WhisperJAV.bat
   - create_desktop_shortcut.bat
   - README_INSTALLER.txt

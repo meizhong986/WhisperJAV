@@ -61,6 +61,50 @@ def check_cuda_driver():
         log(f"An unexpected error occurred during the NVIDIA driver check: {e}")
         return False
 
+
+def check_existing_pytorch():
+    """Checks if a compatible version of PyTorch is already installed."""
+    log("Checking for existing PyTorch installation...")
+    min_cuda_version = 11.8
+    required_packages = ["torch", "torchvision", "torchaudio"]
+    
+    try:
+        # Check if all required packages are installed
+        import importlib
+        for pkg in required_packages:
+            importlib.import_module(pkg)
+        log("Found existing torch, torchvision, and torchaudio.")
+
+        # Now check CUDA availability and version
+        import torch
+        if not torch.cuda.is_available():
+            log("WARNING: PyTorch is installed but CUDA is not available. This may be due to:")
+            log("1. Missing NVIDIA drivers")
+            log("2. PyTorch installed without CUDA support")
+            log("Will proceed with reinstall.")
+            return False
+
+        # Check CUDA toolkit version compatibility
+        torch_cuda_version = torch.version.cuda
+        if torch_cuda_version:
+            log(f"PyTorch was built with CUDA version: {torch_cuda_version}")
+            if float(torch_cuda_version) >= min_cuda_version:
+                log("Existing PyTorch installation is compatible.")
+                return True
+            else:
+                log(f"PyTorch CUDA version is older than required {min_cuda_version}.")
+        else:
+            log("PyTorch was built without CUDA support.")
+
+        return False
+
+    except ImportError as e:
+        log(f"Missing PyTorch package: {e}. Will install.")
+        return False
+    except Exception as e:
+        log(f"Error checking PyTorch: {e}. Will reinstall.")
+        return False
+
 def run_command(cmd, description):
     # ... (this function remains unchanged from the previous version) ...
     log(f"Starting: {description}")
@@ -101,7 +145,7 @@ def main():
 
     # --- Step 1: Verify system prerequisites (NVIDIA Driver) ---
     if not check_cuda_driver():
-        log("FATAL: System does not meet the minimum requirements. Halting installation.")
+        log("FATAL: CUDA missing. WhisperJAV requires GPU with CUDA and CUDNN. Halting installation.")
         # Writing a user-facing error file can be helpful
         with open(os.path.join(sys.prefix, "INSTALLATION_FAILED.txt"), "w") as f:
             f.write("Installation failed because a compatible NVIDIA driver was not found.\n")
@@ -109,23 +153,34 @@ def main():
             f.write("Check the install_log.txt file for more details.\n")
         return 1
 
-    # --- Step 2: Install PyTorch with specific CUDA version ---
-    #torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
-    if not run_command([
-        "install", "torch==2.6.0", "torchvision==0.21.0", "torchaudio==2.6.0",
-        "--index-url", "https://download.pytorch.org/whl/cu124"
-    ], "PyTorch for CUDA 12.4"):
-        return 1
+
+    # --- Step 2: Check for and install PyTorch ---
+    if check_existing_pytorch():
+        log("Pytorch exist. Skipping PyTorch installation.")
+    else:
+        log("Didn't find cuda enabled pytorch. Proceeding with new PyTorch installation.")
+        if not run_command([
+            "install", "torch", "torchvision", "torchaudio",
+            "--index-url", "https://download.pytorch.org/whl/cu124"
+        ], "PyTorch for CUDA 12.4"):
+            return 1
+            
+
 
     # --- Step 3: Install all other dependencies from requirements.txt ---
     req_path = os.path.join(sys.prefix, "requirements.txt")
     if not run_command(["install", "-r", req_path], "dependencies from requirements.txt"):
         return 1
 
-    # --- Step 4: Install the WhisperJAV application itself from local source ---
-    whisperjav_path = os.path.join(sys.prefix, "whisperjav")
-    if not run_command(["install", "--no-deps", "-e", whisperjav_path], "WhisperJAV application"):
+
+    # --- Step 4: Install WhisperJAV from the GitHub repository ---
+    # Make sure to replace YOUR_USERNAME/YOUR_REPONAME with your actual details
+    repo_url = "git+https://github.com/meizhong986/WhisperJAV.git"
+    log(f"Installing WhisperJAV from GitHub: {repo_url}...")
+    if not run_command(["install", "--no-deps", repo_url], "WhisperJAV application from GitHub"):
         return 1
+        
+
 
     log("\n" + "="*60)
     log("Post-install script completed successfully.")
