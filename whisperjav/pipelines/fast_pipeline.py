@@ -11,7 +11,11 @@ from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.stable_ts_asr import StableTSASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
+
 from whisperjav.modules.scene_detection import SceneDetector
+from whisperjav.modules.scene_detection import AdaptiveSceneDetector
+from whisperjav.modules.scene_detection import DynamicSceneDetector
+
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 
@@ -67,7 +71,12 @@ class FastPipeline(BasePipeline):
         
         # Store params for metadata logging
         self.scene_detection_params = scene_opts
-        
+        '''
+        self.scene_detection_params = {
+            "detector_type": "AdaptiveSceneDetector",
+            "using_defaults": True
+        }        
+        '''
         # Implement the smart model-switching logic (preserved from V2)
         effective_model_cfg = model_cfg.copy()
         if self.subs_language == 'english-direct' and model_cfg.get("model_name") == 'turbo':
@@ -77,7 +86,10 @@ class FastPipeline(BasePipeline):
 
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor()
-        self.scene_detector = SceneDetector(**scene_opts)
+        #self.scene_detector = SceneDetector(**scene_opts)
+        #self.scene_detector = AdaptiveSceneDetector()  # Use all defaults
+        self.scene_detector = DynamicSceneDetector(**scene_opts)
+        
         
         # Pass structured config to StableTSASR
         # NOTE: 'fast' pipeline uses standard whisper backend (turbo_mode=False)

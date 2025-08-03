@@ -11,7 +11,11 @@ from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.whisper_pro_asr import WhisperProASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
+
 from whisperjav.modules.scene_detection import SceneDetector
+from whisperjav.modules.scene_detection import AdaptiveSceneDetector
+from whisperjav.modules.scene_detection import DynamicSceneDetector
+
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 
@@ -68,6 +72,12 @@ class BalancedPipeline(BasePipeline):
         
         # Store params for metadata logging
         self.scene_detection_params = scene_opts
+        '''
+        self.scene_detection_params = {
+            "detector_type": "AdaptiveSceneDetector",
+            "using_defaults": True
+        }        
+        '''
         self.vad_params = params.get("vad", {})
         
         # Implement the smart model-switching logic (preserved from V2)
@@ -79,7 +89,10 @@ class BalancedPipeline(BasePipeline):
 
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor()
-        self.scene_detector = SceneDetector(**scene_opts)
+        #self.scene_detector = SceneDetector(**scene_opts)
+        #self.scene_detector = AdaptiveSceneDetector()  # Use all defaults
+        self.scene_detector = DynamicSceneDetector(**scene_opts)
+        
         
         # Pass structured config to WhisperProASR
         self.asr = WhisperProASR(
