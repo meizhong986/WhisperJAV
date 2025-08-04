@@ -40,11 +40,21 @@ from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.config.transcription_tuner_v3 import TranscriptionTunerV3
 from whisperjav.__version__ import __version__
 
-# Import new components
+
 from whisperjav.utils.preflight_check import enforce_cuda_requirement, run_preflight_checks
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
+
+
+
+# --- UNCONDITIONAL CUDA CHECK ---
+# This code runs the moment the module is loaded,
+# ensuring the check is never bypassed.
+args = sys.argv[1:]
+if '--check' not in args:
+    enforce_cuda_requirement()
+# --- END OF CHECK ---
 
 
 def safe_print(message: str):
