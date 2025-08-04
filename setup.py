@@ -29,7 +29,20 @@ install_requires = [
     "pysrt",
     "srt",
     "aiofiles",
+    "jsonschema",
+    "Pillow",
+    "colorama",
+    "librosa",
+    "matplotlib",
+    "pyloudnorm",
+    "requests",  
 ]
+
+# Optional dependencies 
+extras_require = {
+    'speedup': ['numba'],
+}
+
 
 # Classifiers for supported Python versions
 classifiers = [
@@ -55,6 +68,7 @@ setup(
     classifiers=classifiers,
     python_requires=python_requires,
     install_requires=install_requires,
+    extras_require=extras_require,
     entry_points={
         "console_scripts": [
             "whisperjav=whisperjav.main:main",
