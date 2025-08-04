@@ -5,6 +5,7 @@ This module ensures the runtime environment meets all requirements,
 with special focus on CUDA availability and compatibility.
 """
 
+import time 
 import sys
 import os
 import shutil
@@ -407,9 +408,9 @@ def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bo
     
     return success
 
-
 def enforce_cuda_requirement():
     """Simple CUDA enforcement for main.py integration."""
+    print("\nInitial check for CUDA enabled torch. WhisperJAV requires an NVIDIA GPU with CUDA support.")
     try:
         import torch
         if not torch.cuda.is_available():
@@ -419,12 +420,16 @@ def enforce_cuda_requirement():
             print("\nWhisperJAV requires an NVIDIA GPU with CUDA support.")
             print("Run 'whisperjav --check' for detailed diagnostics.")
             print(f"{Fore.RED}{'='*60}{Style.RESET_ALL}\n")
+
+            # Wait for user input before exiting
+            input("Press Enter to exit...")
             sys.exit(1)
     except ImportError:
         print(f"\n{Fore.RED}PyTorch not installed. Please complete installation first.{Style.RESET_ALL}\n")
+        input("Press Enter to exit...")
         sys.exit(1)
-
-
+        
+        
 if __name__ == "__main__":
     # Run checks when module is executed directly
     import argparse

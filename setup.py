@@ -18,8 +18,6 @@ install_requires = [
     "openai-whisper @ git+https://github.com/openai/whisper@main",  # Use 'main' branch for latest releases
     "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
     "faster-whisper>=1.1.0",
-    "torch",  # No version constraint to allow Colab's pre-installed version
-    "torchaudio",
     "ffmpeg-python",
     "soundfile",
     "auditok",

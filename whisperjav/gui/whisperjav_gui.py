@@ -16,6 +16,11 @@ from whisperjav.utils.progress_aggregator import VerbosityLevel
 from whisperjav.config.manager import ConfigManager
 
 
+from whisperjav.utils.preflight_check import enforce_cuda_requirement
+# Enforce CUDA requirement before initializing any GUI components
+enforce_cuda_requirement()
+
+
 
 class AdvancedSettingsDialog(Toplevel):
     def __init__(self, parent, config=None):
