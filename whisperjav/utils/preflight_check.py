@@ -412,10 +412,9 @@ def enforce_cuda_requirement():
             print(f"\n{Fore.RED}{'='*60}{Style.RESET_ALL}")
             print(f"{Fore.RED}❌ CUDA Required - CPU Mode Not Supported{Style.RESET_ALL}")
             print(f"{Fore.RED}{'='*60}{Style.RESET_ALL}")
-            print("\nWhisperJAV requires GPU with CUDA support.")
-            print("\nCUDA environment was not detected.")
+            print("\nWhisperJAV requires GPU with CUDA support, and CUDA enabled torch.")
             print("If you already have CUDA, please check that torch is cuda enabled.")
-            print("You need to install cuda enabled torch and torch audio\n.")
+            print("Uninstall cpu torch and reinstall torch and torch audio with CUDA support\n.")
             print("Run 'whisperjav --check' for detailed diagnostics.")
             print(f"{Fore.RED}{'='*60}{Style.RESET_ALL}\n")
 
