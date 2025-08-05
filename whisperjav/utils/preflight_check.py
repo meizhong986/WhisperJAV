@@ -117,18 +117,13 @@ class PreflightChecker:
                     status=CheckStatus.FAIL,
                     message="No CUDA-capable GPU detected",
                     details=[
-                        "WhisperJAV requires an NVIDIA GPU with CUDA support.",
+                        "WhisperJAV requires an NVIDIA GPU with CUDA support and cuda enabled torch.",
                         "",
                         "Possible solutions:",
-                        "1. Ensure you have an NVIDIA GPU installed",
-                        "2. Install NVIDIA CUDA drivers from: https://developer.nvidia.com/cuda-downloads",
-                        "3. Verify GPU is not disabled in BIOS/Device Manager",
+                        "1. Ensure you have an CUDA version above 11.8 and CUDNN. ",
+                        "2. Ensure you have CUDA enabled torch and torchaudio installed. "",
+                        "3. Verify your torch is not CPU version. ",
                         "",
-                        "Cloud alternatives with GPU support:",
-                        "- Google Colab (free tier available)",
-                        "- Paperspace Gradient",
-                        "- AWS EC2 GPU instances",
-                        "- Lambda Labs Cloud"
                     ],
                     fatal=True
                 ))
@@ -136,7 +131,7 @@ class PreflightChecker:
             self.results.append(CheckResult(
                 name="CUDA Availability",
                 status=CheckStatus.FAIL,
-                message="PyTorch not installed",
+                message="CUDA enabled PyTorch not installed",
                 details=["Please complete installation first"],
                 fatal=True
             ))
@@ -417,7 +412,10 @@ def enforce_cuda_requirement():
             print(f"\n{Fore.RED}{'='*60}{Style.RESET_ALL}")
             print(f"{Fore.RED}❌ CUDA Required - CPU Mode Not Supported{Style.RESET_ALL}")
             print(f"{Fore.RED}{'='*60}{Style.RESET_ALL}")
-            print("\nWhisperJAV requires an NVIDIA GPU with CUDA support.")
+            print("\nWhisperJAV requires GPU with CUDA support.")
+            print("\nCUDA environment was not detected.")
+            print("If you already have CUDA, please check that torch is cuda enabled.")
+            print("You need to install cuda enabled torch and torch audio\n.")
             print("Run 'whisperjav --check' for detailed diagnostics.")
             print(f"{Fore.RED}{'='*60}{Style.RESET_ALL}\n")
 
