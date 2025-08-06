@@ -121,7 +121,7 @@ class PreflightChecker:
                         "",
                         "Possible solutions:",
                         "1. Ensure you have an CUDA version above 11.8 and CUDNN. ",
-                        "2. Ensure you have CUDA enabled torch and torchaudio installed. "",
+                        "2. Ensure you have CUDA enabled torch and torchaudio installed. ",
                         "3. Verify your torch is not CPU version. ",
                         "",
                     ],
