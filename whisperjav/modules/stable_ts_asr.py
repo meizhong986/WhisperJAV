@@ -205,60 +205,86 @@ class StableTSASR:
         return filtered
     
     def _prepare_transcribe_parameters(self, **kwargs) -> Dict:
-        """Prepare all parameters for transcription - simplified for V3."""
-        # Start with decoder and provider params (trusting they're pre-structured)
-        params = {}
-        params.update(self.decoder_params)
-        params.update(self.provider_params)
-        
-        # Add stable-ts specific options
-        if self.stable_ts_options:
-            params.update(self.stable_ts_options)
-        
-        # Add runtime parameters
-        params.update(kwargs)
-        
-        # Ensure task and language are set
-        params['task'] = kwargs.get('task', self.task)
-        params['language'] = self.language
-        
-        # Temperature type conversion if needed
-        if 'temperature' in params:
-            temp = params['temperature']
-            if isinstance(temp, list):
-                params['temperature'] = tuple(temp)
-            elif isinstance(temp, (int, float)):
-                params['temperature'] = (float(temp),)
-        
-        # Ensure VAD is enabled (since it's always on for stable-ts)
-        if 'vad' not in params:
-            params['vad'] = True
-        if 'vad_threshold' not in params:
-            params['vad_threshold'] = 0.35  # Default VAD threshold
-        
-        # Filter based on backend - this is essential!
-        params = self._filter_parameters_for_backend(params)
-        
-        # Special handling for turbo mode
-        if self.turbo_mode:
-            # Cap beam_size if too high
-            if 'beam_size' in params and params['beam_size'] > 5:
-                logger.debug(f"Turbo mode: Capping beam_size from {params['beam_size']} to 5")
-                params['beam_size'] = 5
+            """Prepare all parameters for transcription - simplified for V3."""
+            # Start with decoder and provider params (trusting they're pre-structured)
+            params = {}
+            params.update(self.decoder_params)
+            params.update(self.provider_params)
+            
+            # Add stable-ts specific options
+            if self.stable_ts_options:
+                params.update(self.stable_ts_options)
+            
+            # Add runtime parameters
+            params.update(kwargs)
+            
+            # Ensure task and language are set
+            params['task'] = kwargs.get('task', self.task)
+            params['language'] = self.language
+            
+            # Temperature type conversion if needed
+            if 'temperature' in params:
+                temp = params['temperature']
+                if isinstance(temp, list):
+                    params['temperature'] = tuple(temp)
+                elif isinstance(temp, (int, float)):
+                    params['temperature'] = (float(temp),)
+            
+            # Ensure VAD is enabled (since it's always on for stable-ts)
+            if 'vad' not in params:
+                params['vad'] = True
+            if 'vad_threshold' not in params:
+                params['vad_threshold'] = 0.35  # Default VAD threshold
+            
+            # Filter based on backend - this is essential!
+            params = self._filter_parameters_for_backend(params)
+            
+            # FIX: ctranslate2 compatibility - convert tuples to lists where needed
+            if self.turbo_mode:
+                params = self._ensure_ctranslate2_compatibility(params)
+            
+            # Special handling for turbo mode
+            if self.turbo_mode:
+                # Cap beam_size if too high
+                if 'beam_size' in params and params['beam_size'] > 5:
+                    logger.debug(f"Turbo mode: Capping beam_size from {params['beam_size']} to 5")
+                    params['beam_size'] = 5
 
-            # Force batch_size=8 for BatchedInferencePipeline
-            logger.debug("Turbo mode: Forcing batch_size=8 for batched inference")
-            params['batch_size'] = 8                
-                
-                
-            return params
-        else:
-            # For original Whisper, we need to handle it differently
-            # But now we trust that params are already properly structured
-            # Just ensure we have the ignore_compatibility flag
-            params['ignore_compatibility'] = True
+                # Force batch_size=8 for BatchedInferencePipeline
+                logger.debug("Turbo mode: Forcing batch_size=8 for batched inference")
+                params['batch_size'] = 8                
+                    
+                return params
+            else:
+                # For original Whisper, we need to handle it differently
+                # But now we trust that params are already properly structured
+                # Just ensure we have the ignore_compatibility flag
+                params['ignore_compatibility'] = True
             params['verbose'] = None  # Suppress progress
             return params
+
+    def _ensure_ctranslate2_compatibility(self, params: Dict) -> Dict:
+        """
+        Ensure parameter types are compatible with ctranslate2 backend used by faster-whisper.
+        
+        ctranslate2 is very strict about parameter types and will reject incompatible arguments.
+        """
+        # Convert tuples to lists where ctranslate2 expects lists
+        if 'suppress_tokens' in params and isinstance(params['suppress_tokens'], tuple):
+            params['suppress_tokens'] = list(params['suppress_tokens'])
+            logger.debug(f"Converted suppress_tokens from tuple to list for ctranslate2 compatibility")
+        
+        # Ensure no_repeat_ngram_size is int (ctranslate2 requirement)
+        if 'no_repeat_ngram_size' in params:
+            try:
+                params['no_repeat_ngram_size'] = int(params['no_repeat_ngram_size'])
+                logger.debug(f"Ensured no_repeat_ngram_size is int for ctranslate2")
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid no_repeat_ngram_size value, removing: {params['no_repeat_ngram_size']}")
+                del params['no_repeat_ngram_size']
+        
+        return params
+
 
     def transcribe(self, audio_path: Union[str, Path], **kwargs) -> stable_whisper.WhisperResult:
         """Transcribe audio file with full parameter validation and backend compatibility."""

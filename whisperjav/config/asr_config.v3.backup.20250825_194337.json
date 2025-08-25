@@ -167,7 +167,7 @@
     "output_format": "srt"
   },
   "ui_preferences": {
-    "console_verbosity": "verbose",
+    "console_verbosity": "quiet",
     "progress_batch_size": 10,
     "show_scene_details": false,
     "max_console_lines": 1000,
