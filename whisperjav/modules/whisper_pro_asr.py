@@ -38,16 +38,23 @@ class WhisperProASR:
         vad_params = params["vad"]
         provider_params = params["provider"]
 
-        # VAD parameters
+        # VAD parameters (kept separate as they're used by our VAD logic, not Whisper)
         self.vad_threshold = vad_params.get("threshold", 0.4)
         self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 150)
         self.vad_chunk_threshold = vad_params.get("chunk_threshold", 4.0)
 
-        # CORRECT: Direct assignment - trusting pre-structured parameters
-        self.transcribe_options = provider_params
-        self.decode_options = decoder_params
-        self.decode_options['task'] = task
-        self.decode_options['language'] = 'ja'
+        # FIX: Combine all Whisper parameters into a single dictionary
+        # The Whisper library expects all parameters in one transcribe() call
+        self.whisper_params = {}
+        self.whisper_params.update(decoder_params)  # task, language, beam_size, etc.
+        self.whisper_params.update(provider_params)  # temperature, fp16, etc.
+        
+        # Ensure task is set correctly
+        self.whisper_params['task'] = task
+        self.whisper_params['language'] = 'ja'
+        
+        # Store task for metadata
+        self.task = task
         # --- END V3 PARAMETER UNPACKING ---
 
         # Suppression lists for Japanese content (business logic preserved)
@@ -83,23 +90,28 @@ class WhisperProASR:
             logger.debug("--- WhisperProASR Initialized with V3 Parameters ---")
             logger.debug(f"  VAD Threshold: {self.vad_threshold}")
             logger.debug(f"  Min Speech Duration: {self.min_speech_duration_ms}ms")
-            logger.debug(f"  Decoder Params: {self.decode_options}")
-            logger.debug(f"  Provider (Whisper) Params: {self.transcribe_options}")
+            logger.debug(f"  Task: {self.task}")
+            logger.debug(f"  Combined Whisper Params: {self.whisper_params}")
             logger.debug("----------------------------------------------------")
 
-    def _prepare_transcribe_options(self) -> Tuple[Dict, Dict]:
-        """Prepares and validates transcription options for Whisper."""
-        # CORRECT: Simple copy - trusting pre-structured inputs
-        transcribe_params = self.transcribe_options.copy()
-        decode_params = self.decode_options.copy()
+    def _prepare_whisper_params(self) -> Dict:
+        """
+        Prepare final parameters for Whisper transcribe call.
+        All tuner-provided parameters are already cleaned and properly structured.
+        """
+        # Start with tuner-provided parameters (already cleaned of None values)
+        final_params = self.whisper_params.copy()
         
-        # Only minimal type conversion
-        if 'temperature' in transcribe_params and isinstance(transcribe_params.get('temperature'), list):
-            transcribe_params['temperature'] = tuple(transcribe_params['temperature'])
-            
-        decode_params['fp16'] = self.device == 'cuda'
+        # Handle temperature type conversion if needed
+        if 'temperature' in final_params and isinstance(final_params['temperature'], list):
+            final_params['temperature'] = tuple(final_params['temperature'])
         
-        return transcribe_params, decode_params
+        # Only override verbose if not already set by tuner
+        if 'verbose' not in final_params:
+            final_params['verbose'] = None  # Suppress progress bars
+        
+        logger.debug(f"Final Whisper parameters: {final_params}")
+        return final_params
 
     def transcribe(self, audio_path: Union[str, Path], **kwargs) -> Dict:
         """Transcribe audio file with internal VAD processing."""
@@ -118,7 +130,7 @@ class WhisperProASR:
         
         if not vad_segments:
             logger.debug(f"No speech detected in {audio_path.name}")
-            return {"segments": [], "text": "", "language": self.decode_options.get('language', 'ja')}
+            return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
         
         all_segments = []
         for vad_group in vad_segments:
@@ -128,7 +140,7 @@ class WhisperProASR:
         return {
             "segments": all_segments,
             "text": " ".join(seg["text"] for seg in all_segments),
-            "language": self.decode_options.get('language', 'ja')
+            "language": self.whisper_params.get('language', 'ja')
         }
 
     def _run_vad_on_audio(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
@@ -186,8 +198,7 @@ class WhisperProASR:
     def _transcribe_vad_group(self, audio_data: np.ndarray, sample_rate: int, 
                              vad_group: List[Dict]) -> List[Dict]:
         """
-        Transcribe a group of VAD segments.
-        Preserves all original business logic including suppression and fallback.
+        Transcribe a group of VAD segments using properly structured tuner parameters.
         """
         if not vad_group:
             return []
@@ -198,30 +209,34 @@ class WhisperProASR:
         end_sample = int(end_sec * sample_rate)
         group_audio = audio_data[start_sample:end_sample]
         
-        # Get transcription parameters
-        transcribe_params, decode_params = self._prepare_transcribe_options()
+        # Get cleaned parameters from tuner
+        whisper_params = self._prepare_whisper_params()
         
+        # Use logger to output the final parameters at debug level
+        logging.debug("Final Parameters for Debugging: %s", whisper_params)
+                
+
         try:
+            #Pass all parameters together - no artificial separation
             result = self.whisper_model.transcribe(
                 group_audio,
-                verbose=None,
-                **transcribe_params,
-                **decode_params
+                **whisper_params  # All tuner parameters in one go
             )
+            
         except Exception as e:
             logger.error(f"Transcription of a VAD group failed: {e}", exc_info=True)
             
-            # Fallback to minimal parameters (preserved from original)
+            # Fallback to minimal parameters
             try:
                 minimal_params = {
-                    'task': self.decode_options.get('task', 'transcribe'),
-                    'language': self.decode_options.get('language', 'ja'),
+                    'task': self.whisper_params.get('task', 'transcribe'),
+                    'language': self.whisper_params.get('language', 'ja'),
                     'temperature': 0.0,
                     'beam_size': 5,
                     'fp16': torch.cuda.is_available(),
                     'verbose': None
                 }
-                logger.warning(f"Retrying with minimal parameters")
+                logger.warning(f"Retrying with minimal parameters: {minimal_params}")
                 result = self.whisper_model.transcribe(group_audio, **minimal_params)
             except Exception as e2:
                 logger.error(f"Even minimal transcribe failed: {e2}")
@@ -250,8 +265,8 @@ class WhisperProASR:
                 if suppress_word in text: 
                     avg_logprob -= 0.15
             
-            # Check against logprob threshold
-            logprob_filter = self.transcribe_options.get("logprob_threshold", -1.0)
+            # Check against logprob threshold (get from our parameters)
+            logprob_filter = self.whisper_params.get("logprob_threshold", -1.0)
             if avg_logprob < logprob_filter:
                 logger.debug(f"Filtered segment with logprob {avg_logprob}: {text[:50]}...")
                 continue

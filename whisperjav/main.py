@@ -37,7 +37,7 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-from whisperjav.config.transcription_tuner_v3 import TranscriptionTunerV3
+from whisperjav.config.transcription_tuner import TranscriptionTuner
 from whisperjav.__version__ import __version__
 
 
@@ -385,7 +385,7 @@ def main():
         quick_update_ui_preference('console_verbosity', args.verbosity, config_path)
     
     # V3 Configuration resolution
-    tuner = TranscriptionTunerV3(config_path=config_path)
+    tuner = TranscriptionTuner(config_path=config_path)
     task = 'translate' if args.subs_language == 'english-direct' else 'transcribe'
     
     try:

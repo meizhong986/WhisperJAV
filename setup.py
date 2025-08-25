@@ -10,8 +10,8 @@ __version__ = version_file['__version__']
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-# Relaxed Python version requirement (allow 3.8 to 3.12)
-python_requires = ">=3.8,<3.13"
+# Relaxed Python version requirement (allow 3.9 to 3.12)
+python_requires = ">=3.9,<3.13"
 
 # Relaxed dependency versions to allow flexibility
 install_requires = [
@@ -45,7 +45,6 @@ extras_require = {
 # Classifiers for supported Python versions
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
