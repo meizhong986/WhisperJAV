@@ -308,15 +308,15 @@
   "stable_ts_vad_options": {
     "balanced": {
       "vad": true,
-      "vad_threshold": 3
+      "vad_threshold": 0.3
     },
     "conservative": {
       "vad": true,
-      "vad_threshold": 5
+      "vad_threshold": 0.5
     },
     "aggressive": {
       "vad": true,
-      "vad_threshold": 1.8
+      "vad_threshold": 0.18
     }
   },
   "stable_ts_engine_options": {
