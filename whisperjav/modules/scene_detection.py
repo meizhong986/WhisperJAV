@@ -31,6 +31,42 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
+
+def load_audio_unified(audio_path: Path, target_sr: Optional[int] = None, force_mono: bool = True) -> Tuple[np.ndarray, int]:
+    """
+    Unified audio loading function used by all scene detectors.
+    Provides consistent audio format and sample rate handling.
+    
+    Args:
+        audio_path: Path to audio file
+        target_sr: Target sample rate (None = preserve original)
+        force_mono: Convert to mono if stereo
+        
+    Returns:
+        Tuple of (audio_data, sample_rate)
+    """
+    try:
+        # Use soundfile for consistent loading with optional resampling
+        audio_data, sample_rate = sf.read(str(audio_path), dtype='float32', always_2d=False)
+        
+        # Convert stereo to mono efficiently if needed
+        if force_mono and audio_data.ndim > 1:
+            logger.debug("Converting stereo to mono")
+            audio_data = np.mean(audio_data, axis=1)
+        
+        # Resample if target sample rate specified
+        if target_sr is not None and sample_rate != target_sr:
+            logger.debug(f"Resampling from {sample_rate}Hz to {target_sr}Hz")
+            audio_data = librosa.resample(audio_data, orig_sr=sample_rate, target_sr=target_sr)
+            sample_rate = target_sr
+            
+        logger.debug(f"Audio loaded: {len(audio_data)/sample_rate:.1f}s @ {sample_rate}Hz, {'mono' if audio_data.ndim == 1 else 'stereo'}")
+        return audio_data, sample_rate
+        
+    except Exception as e:
+        logger.error(f"Failed to load audio {audio_path}: {e}")
+        raise
+
 # Try to import auditok for the coarse-splitting pass
 AUDITOK_AVAILABLE = False
 try:
@@ -46,6 +82,9 @@ except ImportError:
 
 class SceneDetector:
     """Handles audio scene detection using a two-pass Auditok approach."""
+    
+    # Class-level LUFS meter cache to avoid recreation
+    _lufs_meter_cache = {}
     
     def __init__(self,
                  max_duration: float = 29.0,
@@ -94,9 +133,8 @@ class SceneDetector:
         
         logger.debug(f"Starting two-pass audio scene detection for: {audio_path}")
         
-        audio_data, sample_rate = sf.read(str(audio_path), dtype='float32', always_2d=False)
-        if audio_data.ndim > 1:
-            audio_data = np.mean(audio_data, axis=1)  # Convert to mono
+        # Use unified audio loading for consistency
+        audio_data, sample_rate = load_audio_unified(audio_path, target_sr=None, force_mono=True)
         
         audio_duration = len(audio_data) / sample_rate
         logger.info(f"Audio duration: {audio_duration:.1f}s, Sample rate: {sample_rate}Hz")
@@ -107,7 +145,7 @@ class SceneDetector:
         # Pass 1: Coarse splitting
         logger.debug("Pass 1: Phase 1 splitting")
         
-        normalized_audio = self._lufs_normalize(audio_data.copy())
+        normalized_audio = self._lufs_normalize(audio_data.copy(), sample_rate)
         #normalized_audio = self._normalize_audio(audio_data.copy())
         audio_bytes = (normalized_audio * 32767).astype(np.int16).tobytes()
         
@@ -150,7 +188,7 @@ class SceneDetector:
                 logger.debug(f"Pass 2: Splitting long region {region_idx} ({region_duration:.1f}s)")
                 
                 # Try auditok pass 2 first
-                normalized_region = self._lufs_normalize(region_audio.copy())
+                normalized_region = self._lufs_normalize(region_audio.copy(), sample_rate)
                 region_bytes = (normalized_region * 32767).astype(np.int16).tobytes()
                 
                 pass2_params = {
@@ -227,20 +265,29 @@ class SceneDetector:
             return audio_data
         return audio_data / safe_peak
         
-    def _lufs_normalize(self, audio: np.ndarray) -> np.ndarray:
+    def _lufs_normalize(self, audio: np.ndarray, sample_rate: int = 16000) -> np.ndarray:
         """Normalize audio to target LUFS loudness"""
-        # Create loudness meter (ITU-R BS.1770-4)
-        sample_rate = 16000
+        # Use cached loudness meter (ITU-R BS.1770-4) to avoid expensive recreation
         target_lufs = -14.0
-        meter = pyln.Meter(sample_rate)
+        if sample_rate not in self._lufs_meter_cache:
+            self._lufs_meter_cache[sample_rate] = pyln.Meter(sample_rate)
+        meter = self._lufs_meter_cache[sample_rate]
         
-        # Measure current loudness
-        loudness = meter.integrated_loudness(audio)
-        logger.debug(f"Original loudness: {loudness:.1f} LUFS")
+        # Measure current loudness (this is the expensive operation)
+        try:
+            loudness = meter.integrated_loudness(audio)
+            logger.debug(f"Original loudness: {loudness:.1f} LUFS")
+        except Exception as e:
+            logger.warning(f"LUFS measurement failed: {e}, using original audio")
+            return audio
         
         # Apply normalization if measurable
         if loudness > -70:  # Avoid silent segments
-            normalized = pyln.normalize.loudness(audio, loudness, target_lufs)
+            try:
+                normalized = pyln.normalize.loudness(audio, loudness, target_lufs)
+            except Exception as e:
+                logger.warning(f"LUFS normalization failed: {e}, using original audio")
+                return audio
             
             # Prevent clipping
             peak = np.max(np.abs(normalized))
@@ -402,6 +449,8 @@ class AdaptiveSceneDetector:
     
     def _adaptive_threshold(self, feature_series: np.ndarray, filter_size_frames: int, factor: float) -> np.ndarray:
         """Calculates an adaptive threshold using a moving median filter."""
+        # Ensure minimum window size and odd number for proper median calculation
+        filter_size_frames = max(1, filter_size_frames)
         if filter_size_frames % 2 == 0:
             filter_size_frames += 1
         
@@ -518,6 +567,7 @@ class AdaptiveSceneDetector:
         onset = features['onset']
         
         # Compute adaptive thresholds
+        # Note: adaptive_filter_frames calculation ensures minimum window size in _adaptive_threshold
         adaptive_filter_frames = int(self.adaptive_filter_size_s * sample_rate / self.hop_length)
         rms_threshold = self._adaptive_threshold(rms, adaptive_filter_frames, self.rms_threshold_factor)
         zcr_threshold = self._adaptive_threshold(zcr, adaptive_filter_frames, self.zcr_threshold_factor)
@@ -538,8 +588,8 @@ class AdaptiveSceneDetector:
         # Now all arrays should have exactly the same length
         is_speech = ((rms > rms_threshold) & (zcr < zcr_threshold)) | (onset > onset_threshold)
         
-        merge_window_frames = int(self.merge_short_speech_window_s * sample_rate / self.hop_length)
-        remove_window_frames = int(self.remove_spurious_speech_window_s * sample_rate / self.hop_length)
+        merge_window_frames = max(1, int(self.merge_short_speech_window_s * sample_rate / self.hop_length))
+        remove_window_frames = max(1, int(self.remove_spurious_speech_window_s * sample_rate / self.hop_length))
         is_speech = binary_closing(is_speech, structure=np.ones(merge_window_frames))
         is_speech = binary_opening(is_speech, structure=np.ones(remove_window_frames))
         
@@ -558,10 +608,8 @@ class AdaptiveSceneDetector:
         Detects audio scenes using a two-pass, memory-efficient adaptive algorithm.
         """
         logger.info(f"Loading full audio file: {audio_path}")
-        original_audio, sample_rate = sf.read(str(audio_path), dtype='float32', always_2d=False)
-        if original_audio.ndim > 1:
-            logger.info("Audio is stereo, converting to mono.")
-            original_audio = np.mean(original_audio, axis=1)
+        # Use unified audio loading for consistency
+        original_audio, sample_rate = load_audio_unified(audio_path, target_sr=None, force_mono=True)
         story_line_regions = self._find_story_lines(original_audio, sample_rate)
         all_final_scenes = []
         for chunk_start_s, chunk_end_s in tqdm(story_line_regions, desc="Processing Story Chunks"):
@@ -692,8 +740,8 @@ class DynamicSceneDetector:
 
     def _apply_assistive_processing(self, audio_chunk: np.ndarray, sample_rate: int) -> np.ndarray:
         """
-        Applies a bandpass filter and DRC to a temporary audio copy to enhance
-        speech detection for Pass 2. Includes a safety check for pre-amplified audio.
+        Applies a bandpass filter and DRC to enhance speech detection for Pass 2.
+        Optimized to minimize memory usage by working on input array when possible.
 
         Args:
             audio_chunk (np.ndarray): The audio data to process.
@@ -714,7 +762,8 @@ class DynamicSceneDetector:
         low = 200 / nyquist
         high = 4000 / nyquist
         b, a = butter(5, [low, high], btype='band')
-        filtered_audio = filtfilt(b, a, audio_chunk)
+        # Create a copy for processing to avoid modifying the original
+        filtered_audio = filtfilt(b, a, audio_chunk.copy())
 
         # 3. Dynamic Range Compression (DRC): Boost quiet parts, tame loud parts
         # Convert to pydub AudioSegment for DRC
@@ -788,9 +837,9 @@ class DynamicSceneDetector:
         """
         logger.info(f"Starting dynamic scene detection for: {audio_path}")
 
-        # 1. Load audio using librosa for robustness (auto-resamples to 16k, converts to mono)
+        # 1. Load audio using unified loading (consistent with other detectors)
         try:
-            original_audio, sample_rate = librosa.load(str(audio_path), sr=16000, mono=True)
+            original_audio, sample_rate = load_audio_unified(audio_path, target_sr=16000, force_mono=True)
             audio_duration = len(original_audio) / sample_rate
             logger.info(f"Audio loaded successfully. Duration: {audio_duration:.1f}s, Sample Rate: {sample_rate}Hz")
         except Exception as e:
@@ -846,11 +895,15 @@ class DynamicSceneDetector:
             # --- Pass 2: Fine-grained splitting for long regions ---
             logger.debug(f"Pass 2: Processing long region {region_idx} ({region_duration:.1f}s)")
             
-            audio_for_detection = region_audio_original.copy()
+            # Memory-optimized approach: avoid unnecessary copies
             if self.assist_processing:
                 logger.debug("Applying assistive processing to enhance detection.")
-                audio_for_detection = self._apply_assistive_processing(audio_for_detection, sample_rate)
+                audio_for_detection = self._apply_assistive_processing(region_audio_original, sample_rate)
+            else:
+                # Use original audio directly - no copy needed
+                audio_for_detection = region_audio_original
 
+            # Convert to bytes for auditok (note: this creates a copy, but it's unavoidable)
             region_bytes_for_detection = (audio_for_detection * 32767).astype(np.int16).tobytes()
 
             pass2_params = {
