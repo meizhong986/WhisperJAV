@@ -61,4 +61,9 @@ whisperjav/output/
 # Microsoft Office temporary files
 ~$*.docx
 
+#claude in any subdirectory of are ignored
+**.claude/
+**/CLAUDE.md
+**/claude.md
+
 
