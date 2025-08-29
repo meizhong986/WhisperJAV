@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Configuration Manager for WhisperJAV V3.
-
+"""Configuration Manager for WhisperJAV v4.3.
 This module provides a high-level API for safely reading and modifying
-the asr_config.v3.json file, serving as the backend for future UI development.
+the asr_config.json file (v4.3 structure).
 """
-
 import json
 import shutil
 from pathlib import Path
@@ -14,9 +12,7 @@ import threading
 from copy import deepcopy
 import jsonschema
 from dataclasses import dataclass
-
 from whisperjav.utils.logger import logger
-
 
 @dataclass
 class ConfigValidationError(Exception):
@@ -25,35 +21,28 @@ class ConfigValidationError(Exception):
     message: str
     value: Any = None
 
-
 class ConfigManager:
     """
-    Manages WhisperJAV configuration with validation and safe updates.
+    Manages WhisperJAV v4.3 configuration with validation and safe updates.
     
     This class provides a stable API for configuration manipulation,
-    abstracting away the JSON structure and ensuring data integrity.
+    working with the current v4.3 config structure.
     """
     
-    # Configuration schema for validation
+    # Configuration schema for v4.3 validation
     CONFIG_SCHEMA = {
         "type": "object",
-        "required": ["version", "models", "parameter_sets", "sensitivity_profiles", "pipelines"],
+        "required": ["version", "pipeline_parameter_map", "models", "pipelines", "common_transcriber_options", "common_decoder_options"],
         "properties": {
-            "version": {"type": "string", "pattern": "^\\d+\\.\\d+$"},
+            "version": {"type": "string", "pattern": "^4\\.\\d+$"},
+            "pipeline_parameter_map": {"type": "object"},
             "models": {"type": "object"},
-            "parameter_sets": {
-                "type": "object",
-                "properties": {
-                    "decoder_params": {"type": "object"},
-                    "vad_params": {"type": "object"},
-                    "provider_specific_params": {"type": "object"}
-                }
-            },
-            "sensitivity_profiles": {"type": "object"},
             "pipelines": {"type": "object"},
+            "common_transcriber_options": {"type": "object"},
+            "common_decoder_options": {"type": "object"},
             "feature_configs": {"type": "object"},
             "defaults": {"type": "object"},
-            "ui_preferences": {"type": "object"}  # Added for UI settings
+            "ui_preferences": {"type": "object"}
         }
     }
     
@@ -67,8 +56,8 @@ class ConfigManager:
         if config_path:
             self.config_path = Path(config_path)
         else:
-            # Default to package configuration
-            self.config_path = Path(__file__).parent / "asr_config.v3.json"
+            # FIX: Updated to use current v4.3 config file
+            self.config_path = Path(__file__).parent / "asr_config.json"
         
         # Thread safety
         self._lock = threading.RLock()
@@ -93,7 +82,7 @@ class ConfigManager:
         Raises:
             FileNotFoundError: If config file doesn't exist
             json.JSONDecodeError: If config file is invalid JSON
-            ConfigValidationError: If config doesn't match schema
+            ConfigValidationError: If config doesn't match expected structure
         """
         with self._lock:
             if not self.config_path.exists():
@@ -118,7 +107,7 @@ class ConfigManager:
                 if 'ui_preferences' not in self._config:
                     self._config['ui_preferences'] = self._get_default_ui_preferences()
                 
-                logger.debug(f"Loaded configuration from {self.config_path}")
+                logger.debug(f"Loaded v4.3 configuration from {self.config_path}")
                 return deepcopy(self._config)
                 
             except json.JSONDecodeError as e:
@@ -171,23 +160,35 @@ class ConfigManager:
                 logger.error(f"Failed to save configuration: {e}")
                 raise IOError(f"Failed to save configuration: {e}")
     
-    def get_sensitivity_profiles(self) -> Dict[str, Dict[str, str]]:
+    def get_sensitivity_profiles(self) -> Dict[str, Dict[str, Any]]:
         """
-        Get all defined sensitivity profiles.
+        Get all defined sensitivity profiles from v4.3 structure.
         
         Returns:
-            Dictionary mapping profile names to their settings
+            Dictionary mapping profile names to their aggregated settings
         """
         with self._lock:
-            return deepcopy(self._config.get('sensitivity_profiles', {}))
+            profiles = {}
+            # In v4.3, sensitivity profiles are keys in parameter sections
+            profile_names = list(self._config.get('common_decoder_options', {}).keys())
+            
+            for profile_name in profile_names:
+                profiles[profile_name] = {
+                    'decoder': profile_name,
+                    'transcriber': profile_name,
+                    'vad': profile_name,
+                    'engine_options': profile_name
+                }
+            
+            return profiles
     
     def get_parameter_set(self, param_type: str, name: str) -> Dict[str, Any]:
         """
-        Get a specific parameter set.
+        Get a specific parameter set from v4.3 config structure.
         
         Args:
-            param_type: Type of parameters ('decoder_params', 'vad_params', etc.)
-            name: Name of the parameter set ('conservative', 'balanced', etc.)
+            param_type: Type of parameters (maps to v4.3 sections)
+            name: Name of the parameter set ('conservative', 'balanced', 'aggressive')
             
         Returns:
             The requested parameter set
@@ -196,10 +197,22 @@ class ConfigManager:
             KeyError: If param_type or name not found
         """
         with self._lock:
-            if param_type not in self._config.get('parameter_sets', {}):
-                raise KeyError(f"Unknown parameter type: {param_type}")
+            # Map v3 param types to v4.3 sections
+            param_type_mapping = {
+                'decoder_params': 'common_decoder_options',
+                'transcriber_params': 'common_transcriber_options', 
+                'vad_params': 'silero_vad_options',
+                'engine_params': 'openai_whisper_engine_options',
+                'faster_whisper_params': 'faster_whisper_engine_options',
+                'stable_ts_params': 'stable_ts_engine_options'
+            }
             
-            param_sets = self._config['parameter_sets'][param_type]
+            v43_section = param_type_mapping.get(param_type, param_type)
+            
+            if v43_section not in self._config:
+                raise KeyError(f"Unknown parameter type: {param_type} (maps to {v43_section})")
+            
+            param_sets = self._config[v43_section]
             if name not in param_sets:
                 raise KeyError(f"Unknown {param_type} set: {name}")
             
@@ -207,7 +220,7 @@ class ConfigManager:
     
     def update_parameter_set(self, param_type: str, name: str, new_settings: Dict[str, Any]) -> None:
         """
-        Update or create a parameter set.
+        Update or create a parameter set in v4.3 structure.
         
         Args:
             param_type: Type of parameters
@@ -218,52 +231,68 @@ class ConfigManager:
             ConfigValidationError: If settings are invalid
         """
         with self._lock:
-            # Ensure parameter_sets structure exists
-            if 'parameter_sets' not in self._config:
-                self._config['parameter_sets'] = {}
-            if param_type not in self._config['parameter_sets']:
-                self._config['parameter_sets'][param_type] = {}
+            # Map to v4.3 section
+            param_type_mapping = {
+                'decoder_params': 'common_decoder_options',
+                'transcriber_params': 'common_transcriber_options',
+                'vad_params': 'silero_vad_options',
+                'engine_params': 'openai_whisper_engine_options',
+                'faster_whisper_params': 'faster_whisper_engine_options',
+                'stable_ts_params': 'stable_ts_engine_options'
+            }
+            
+            v43_section = param_type_mapping.get(param_type, param_type)
+            
+            # Ensure section exists
+            if v43_section not in self._config:
+                self._config[v43_section] = {}
             
             # Validate parameter values
             self._validate_parameters(param_type, new_settings)
             
             # Update settings
-            self._config['parameter_sets'][param_type][name] = deepcopy(new_settings)
+            self._config[v43_section][name] = deepcopy(new_settings)
             self._modified = True
             
-            logger.debug(f"Updated {param_type}.{name}")
+            logger.debug(f"Updated {v43_section}.{name}")
     
     def add_sensitivity_profile(self, name: str, settings: Dict[str, str]) -> None:
         """
-        Add a new sensitivity profile.
+        Add a new sensitivity profile by creating parameter sets across sections.
         
         Args:
             name: Profile name
-            settings: Profile settings mapping parameter groups to set names
-                     e.g., {'decoder': 'aggressive', 'vad': 'balanced', ...}
+            settings: Profile settings mapping parameter groups to configurations
             
         Raises:
             ConfigValidationError: If profile already exists or settings invalid
         """
         with self._lock:
-            if name in self._config.get('sensitivity_profiles', {}):
+            existing_profiles = list(self._config.get('common_decoder_options', {}).keys())
+            if name in existing_profiles:
                 raise ConfigValidationError('profile', f"Profile '{name}' already exists")
             
-            # Validate settings reference existing parameter sets
-            self._validate_profile_settings(settings)
+            # Create parameter sets in relevant v4.3 sections
+            sections_to_update = [
+                'common_decoder_options',
+                'common_transcriber_options', 
+                'silero_vad_options',
+                'openai_whisper_engine_options',
+                'faster_whisper_engine_options',
+                'stable_ts_engine_options'
+            ]
             
-            # Add profile
-            if 'sensitivity_profiles' not in self._config:
-                self._config['sensitivity_profiles'] = {}
+            # Use 'balanced' as template for new profile
+            for section in sections_to_update:
+                if section in self._config and 'balanced' in self._config[section]:
+                    self._config[section][name] = deepcopy(self._config[section]['balanced'])
             
-            self._config['sensitivity_profiles'][name] = deepcopy(settings)
             self._modified = True
-            
             logger.info(f"Added sensitivity profile: {name}")
     
     def remove_sensitivity_profile(self, name: str) -> None:
         """
-        Remove a sensitivity profile.
+        Remove a sensitivity profile from all v4.3 sections.
         
         Args:
             name: Profile name to remove
@@ -278,12 +307,25 @@ class ConfigManager:
             if name in built_in_profiles:
                 raise ValueError(f"Cannot remove built-in profile: {name}")
             
-            if name not in self._config.get('sensitivity_profiles', {}):
+            existing_profiles = list(self._config.get('common_decoder_options', {}).keys())
+            if name not in existing_profiles:
                 raise KeyError(f"Profile not found: {name}")
             
-            del self._config['sensitivity_profiles'][name]
-            self._modified = True
+            # Remove from all sections
+            sections_with_profiles = [
+                'common_decoder_options',
+                'common_transcriber_options',
+                'silero_vad_options', 
+                'openai_whisper_engine_options',
+                'faster_whisper_engine_options',
+                'stable_ts_engine_options'
+            ]
             
+            for section in sections_with_profiles:
+                if section in self._config and name in self._config[section]:
+                    del self._config[section][name]
+            
+            self._modified = True
             logger.info(f"Removed sensitivity profile: {name}")
     
     def get_ui_preferences(self) -> Dict[str, Any]:
@@ -295,6 +337,22 @@ class ConfigManager:
         """
         with self._lock:
             return deepcopy(self._config.get('ui_preferences', self._get_default_ui_preferences()))
+    
+    def update_ui_preferences(self, preferences: Dict[str, Any]) -> None:
+        """
+        Update UI preferences.
+        
+        Args:
+            preferences: New preferences dictionary
+        """
+        with self._lock:
+            if 'ui_preferences' not in self._config:
+                self._config['ui_preferences'] = self._get_default_ui_preferences()
+            
+            self._config['ui_preferences'].update(preferences)
+            self._modified = True
+            
+            logger.debug(f"Updated UI preferences")
     
     def update_ui_preference(self, key: str, value: Any) -> None:
         """
@@ -332,32 +390,31 @@ class ConfigManager:
             output_path: Path to save exported profile
         """
         with self._lock:
-            if profile_name not in self._config.get('sensitivity_profiles', {}):
+            existing_profiles = list(self._config.get('common_decoder_options', {}).keys())
+            if profile_name not in existing_profiles:
                 raise KeyError(f"Profile not found: {profile_name}")
             
             profile_data = {
-                'version': '1.0',
+                'version': '4.3',
                 'profile_name': profile_name,
-                'settings': self._config['sensitivity_profiles'][profile_name],
                 'parameter_sets': {}
             }
             
-            # Include referenced parameter sets
-            for param_type, set_name in profile_data['settings'].items():
-                if param_type in ['decoder', 'vad', 'provider_settings']:
-                    mapped_type = {
-                        'decoder': 'decoder_params',
-                        'vad': 'vad_params',
-                        'provider_settings': 'provider_specific_params'
-                    }.get(param_type, param_type)
-                    
-                    try:
-                        params = self.get_parameter_set(mapped_type, set_name)
-                        if mapped_type not in profile_data['parameter_sets']:
-                            profile_data['parameter_sets'][mapped_type] = {}
-                        profile_data['parameter_sets'][mapped_type][set_name] = params
-                    except KeyError:
-                        logger.warning(f"Parameter set not found: {mapped_type}.{set_name}")
+            # Export parameter sets from all relevant v4.3 sections
+            sections_to_export = [
+                'common_decoder_options',
+                'common_transcriber_options',
+                'silero_vad_options',
+                'openai_whisper_engine_options', 
+                'faster_whisper_engine_options',
+                'stable_ts_engine_options'
+            ]
+            
+            for section in sections_to_export:
+                if section in self._config and profile_name in self._config[section]:
+                    profile_data['parameter_sets'][section] = {
+                        profile_name: self._config[section][profile_name]
+                    }
             
             # Write export file
             with open(output_path, 'w', encoding='utf-8') as f:
@@ -381,8 +438,8 @@ class ConfigManager:
                 profile_data = json.load(f)
             
             # Validate format
-            if 'settings' not in profile_data:
-                raise ValueError("Invalid profile format: missing 'settings'")
+            if 'parameter_sets' not in profile_data:
+                raise ValueError("Invalid profile format: missing 'parameter_sets'")
             
             # Use provided name or original
             name = profile_name or profile_data.get('profile_name', import_path.stem)
@@ -390,22 +447,18 @@ class ConfigManager:
             # Ensure unique name
             base_name = name
             counter = 1
-            while name in self._config.get('sensitivity_profiles', {}):
+            existing_profiles = list(self._config.get('common_decoder_options', {}).keys())
+            while name in existing_profiles:
                 name = f"{base_name}_{counter}"
                 counter += 1
             
-            # Import parameter sets if included
-            if 'parameter_sets' in profile_data:
-                for param_type, sets in profile_data['parameter_sets'].items():
-                    for set_name, params in sets.items():
-                        try:
-                            self.update_parameter_set(param_type, set_name, params)
-                        except Exception as e:
-                            logger.warning(f"Failed to import {param_type}.{set_name}: {e}")
+            # Import parameter sets
+            for section, params in profile_data['parameter_sets'].items():
+                if section in self._config:
+                    for param_name, param_values in params.items():
+                        self._config[section][name] = deepcopy(param_values)
             
-            # Add profile
-            self.add_sensitivity_profile(name, profile_data['settings'])
-            
+            self._modified = True
             logger.info(f"Imported profile as '{name}' from {import_path}")
             return name
     
@@ -422,30 +475,39 @@ class ConfigManager:
             return self._modified
     
     def _validate_config(self, config: Dict[str, Any]) -> None:
-        """Validate configuration against schema."""
+        """Validate v4.3 configuration against schema."""
         try:
             jsonschema.validate(config, self.CONFIG_SCHEMA)
         except jsonschema.ValidationError as e:
             raise ConfigValidationError('config', f"Schema validation failed: {e.message}")
         
-        # Additional semantic validation
-        if config.get('version') != '3.0':
-            raise ConfigValidationError('version', f"Unsupported version: {config.get('version')}")
+        # Additional semantic validation for v4.3
+        version = config.get('version', '')
+        if not version.startswith('4.'):
+            raise ConfigValidationError('version', f"Expected v4.x, got: {version}")
     
     def _validate_parameters(self, param_type: str, params: Dict[str, Any]) -> None:
-        """Validate parameter values based on type."""
+        """Validate parameter values based on type for v4.3 structure."""
         # Parameter-specific validation rules
         validation_rules = {
             'decoder_params': {
                 'beam_size': (1, 10, int),
                 'temperature': (0.0, 2.0, (float, list)),
-                'length_penalty': (0.0, 2.0, float),
-                'patience': (0.1, 10.0, float)
+                'length_penalty': (0.0, 2.0, float), 
+                'patience': (0.1, 10.0, float),
+                'best_of': (1, 20, int)
+            },
+            'transcriber_params': {
+                'temperature': (0.0, 2.0, (float, list)),
+                'compression_ratio_threshold': (1.0, 10.0, float),
+                'logprob_threshold': (-10.0, 0.0, float),
+                'no_speech_threshold': (0.0, 1.0, float)
             },
             'vad_params': {
                 'threshold': (0.0, 1.0, float),
                 'min_speech_duration_ms': (0, 5000, int),
-                'chunk_threshold': (0.1, 10.0, float)
+                'max_speech_duration_s': (1, 30, int),
+                'min_silence_duration_ms': (0, 1000, int)
             }
         }
         
@@ -472,35 +534,6 @@ class ConfigManager:
                                 value
                             )
     
-    def _validate_profile_settings(self, settings: Dict[str, str]) -> None:
-        """Validate that profile settings reference existing parameter sets."""
-        required_keys = {'decoder', 'vad', 'provider_settings'}
-        
-        # Check required keys
-        missing = required_keys - set(settings.keys())
-        if missing:
-            raise ConfigValidationError(
-                'settings',
-                f"Missing required keys: {missing}"
-            )
-        
-        # Check referenced sets exist
-        mappings = {
-            'decoder': 'decoder_params',
-            'vad': 'vad_params',
-            'provider_settings': 'provider_specific_params'
-        }
-        
-        for key, set_name in settings.items():
-            if key in mappings:
-                param_type = mappings[key]
-                available = self._config.get('parameter_sets', {}).get(param_type, {}).keys()
-                if set_name not in available:
-                    raise ConfigValidationError(
-                        key,
-                        f"Unknown {param_type} set: {set_name}. Available: {list(available)}"
-                    )
-    
     def _get_default_ui_preferences(self) -> Dict[str, Any]:
         """Get default UI preferences."""
         return {
@@ -513,12 +546,10 @@ class ConfigManager:
             'theme': 'default'
         }
 
-
 # Convenience functions for common operations
 def get_config_manager(config_path: Optional[Path] = None) -> ConfigManager:
     """Get a configuration manager instance."""
     return ConfigManager(config_path)
-
 
 def quick_update_ui_preference(key: str, value: Any, config_path: Optional[Path] = None) -> None:
     """Quickly update a UI preference."""

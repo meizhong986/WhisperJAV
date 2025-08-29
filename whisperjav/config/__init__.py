@@ -1,42 +1,38 @@
 """
-V3 Architecture WhisperJAV configuration module.
+WhisperJAV Configuration Module
+Provides configuration management for the WhisperJAV transcription system.
 
-This module provides configuration management for the WhisperJAV transcription system.
-As of V3, the primary configuration system uses TranscriptionTunerV3, which implements
-a clean, modular architecture with single source of truth configuration management.
+The current production system uses TranscriptionTuner with v4.3 config structure,
+featuring None value cleaning, backend-specific type validation, and parameter optimization.
 """
 
-# V3 Architecture - Primary tuner
-from .transcription_tuner_v3 import TranscriptionTunerV3
-
-# Legacy tuners for backward compatibility (deprecated)
-# These are maintained for existing code but should not be used for new development
+# Current production tuner (supports v4.3 config structure)
 from .transcription_tuner import TranscriptionTuner
 
-# Optional V2 tuner (may not exist in all installations)
-try:
-    from .transcription_tuner_v2 import TranscriptionTunerV2
-except ImportError:
-    TranscriptionTunerV2 = None
+# Configuration manager for general settings
+from .manager import ConfigManager
 
-# Export all available tuners
-__all__ = ['TranscriptionTunerV3', 'TranscriptionTuner', 'TranscriptionTunerV2']
+# Export primary classes
+__all__ = ['TranscriptionTuner', 'ConfigManager']
 
-# For convenience and future compatibility, alias V3 as the default
-# This allows future code to use 'from whisperjav.config import Tuner'
-Tuner = TranscriptionTunerV3
+# For convenience, alias as default tuner
+Tuner = TranscriptionTuner
 
-# Version information for the configuration system
-CONFIG_VERSION = "3.0"
+# Version information for the configuration system  
+CONFIG_VERSION = "4.3"
 
-# Deprecation notice function for legacy usage
-def _deprecation_notice():
-    """Print deprecation notice for legacy tuner usage."""
-    import warnings
-    warnings.warn(
-        "TranscriptionTuner and TranscriptionTunerV2 are deprecated. "
-        "Please use TranscriptionTunerV3 for all new development. "
-        "Legacy tuners will be removed in a future version.",
-        DeprecationWarning,
-        stacklevel=2
-    )
+# Helper function for quick config updates
+def quick_update_ui_preference(key: str, value, config_path=None):
+    """
+    Quick utility to update UI preferences without full config loading.
+    
+    Args:
+        key: UI preference key to update
+        value: New value to set
+        config_path: Optional path to config file
+    """
+    from .manager import ConfigManager
+    config_manager = ConfigManager(config_path)
+    ui_prefs = config_manager.get_ui_preferences()
+    ui_prefs[key] = value
+    config_manager.update_ui_preferences(ui_prefs)

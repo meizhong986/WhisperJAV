@@ -4,11 +4,15 @@ REM Build WhisperJAV Installer
 echo Building WhisperJAV Installer...
 echo.
 
-REM Check if constructor is installed
-where constructor >nul 2>nul
+REM Check if constructor is installed by trying to run it with --help
+constructor --help >nul 2>nul
 if errorlevel 1 (
-    echo ERROR: Constructor not found!
+    echo ERROR: Constructor not found or not working!
     echo Please install with: conda install constructor -c conda-forge
+    echo.
+    echo If constructor is installed but not found, try:
+    echo 1. Activate your conda environment: conda activate base
+    echo 2. Ensure conda is in your PATH
     pause
     exit /b 1
 )
@@ -19,7 +23,7 @@ if exist _build rmdir /s /q _build
 if exist *.exe del *.exe
 
 REM Build installer
-constructor .  -v 
+constructor . -v 
 
 if errorlevel 1 (
     echo.
