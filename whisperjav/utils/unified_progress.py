@@ -143,62 +143,13 @@ class ConsoleProgressHandler:
     
     def _render_standard_mode(self, contexts: Dict[str, ProgressContext]):
         """Standard progress display matching industry best practices."""
-        file_context = self._find_active_file_context(contexts)
-        if not file_context:
-            return
-            
-        # Create progress bar
-        progress_pct = file_context.progress_percent
-        bar = self._create_progress_bar(progress_pct, width=30)
-        
-        # Get current step info
-        step_context = self._find_active_step_context(contexts, file_context)
-        current_step = step_context.name if step_context else "Processing"
-        
-        # Get task info if available
-        task_info = ""
-        task_context = self._find_active_task_context(contexts, step_context)
-        if task_context and task_context.total and task_context.total > 1:
-            task_progress = task_context.progress_percent
-            task_info = f" ({task_context.current}/{task_context.total} - {task_progress:.0f}%)"
-        
-        # Single line output with all key information
-        file_name = file_context.name[:40] + "..." if len(file_context.name) > 43 else file_context.name
-        print(f"\r{file_name} [{bar}] {progress_pct:3.0f}% - {current_step}{task_info}", end='', flush=True)
+        # Disable progress bar output - keep it clean and simple
+        return
     
     def _render_detailed_mode(self, contexts: Dict[str, ProgressContext]):
         """Detailed progress with step and batch information."""
-        file_context = self._find_active_file_context(contexts)
-        if not file_context:
-            return
-            
-        lines = []
-        
-        # File progress line
-        progress_pct = file_context.progress_percent
-        bar = self._create_progress_bar(progress_pct, width=40)
-        lines.append(f"File: {file_context.name}")
-        lines.append(f"Progress: [{bar}] {progress_pct:3.0f}%")
-        
-        # Step information
-        step_context = self._find_active_step_context(contexts, file_context)
-        if step_context:
-            step_progress = step_context.progress_percent
-            step_bar = self._create_progress_bar(step_progress, width=30)
-            lines.append(f"Step: {step_context.name} [{step_bar}] {step_progress:3.0f}%")
-            
-            # Task information 
-            task_context = self._find_active_task_context(contexts, step_context)
-            if task_context and task_context.total:
-                elapsed = task_context.elapsed_time
-                avg_time = elapsed / max(1, task_context.current) if task_context.current > 0 else 0
-                remaining = (task_context.total - task_context.current) * avg_time
-                eta = f"ETA: {remaining/60:.1f}m" if remaining > 60 else f"ETA: {remaining:.0f}s"
-                lines.append(f"  {task_context.name}: {task_context.current}/{task_context.total} ({eta})")
-        
-        # Print all lines with proper clearing
-        output = "\n".join(lines)
-        print(f"\r{output}", end='', flush=True)
+        # Disable progress bar output - keep it clean and simple
+        return
     
     def _render_debug_mode(self, contexts: Dict[str, ProgressContext]):
         """Full debug information with all context details."""

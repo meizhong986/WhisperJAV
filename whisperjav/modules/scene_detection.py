@@ -976,18 +976,54 @@ class DynamicSceneDetector:
                     scene_idx += 1
 
         if self.verbose_summary:
-            summary_lines = [
-                "", "="*50,
-                "Dynamic Scene Detection Summary",
-                "="*50,
-                f"Total Story Lines Found: {len(story_lines)}",
-                f" - Segments saved directly: {storyline_direct_saves}",
-                f" - Segments from granular split (Pass 2): {granular_segments_count}",
-                f" - Segments from brute-force split: {brute_force_segments_count}",
-                "-" * 50,
-                f"Total Final Scenes Saved: {len(final_scene_tuples)}",
-                "="*50, ""
-            ]
+            # Calculate duration statistics
+            durations = [duration for _, _, _, duration in final_scene_tuples]
+            if durations:
+                min_duration = min(durations)
+                max_duration = max(durations)
+                mean_duration = sum(durations) / len(durations)
+                
+                # Calculate median duration
+                sorted_durations = sorted(durations)
+                n = len(sorted_durations)
+                if n % 2 == 0:
+                    median_duration = (sorted_durations[n//2 - 1] + sorted_durations[n//2]) / 2
+                else:
+                    median_duration = sorted_durations[n//2]
+                
+                total_scene_duration = sum(durations)
+                
+                summary_lines = [
+                    "", "="*50,
+                    "Dynamic Scene Detection Summary",
+                    "="*50,
+                    f"Total Story Lines Found: {len(story_lines)}",
+                    f" - Segments saved directly: {storyline_direct_saves}",
+                    f" - Segments from granular split (Pass 2): {granular_segments_count}",
+                    f" - Segments from brute-force split: {brute_force_segments_count}",
+                    "-" * 50,
+                    f"Total Final Scenes Saved: {len(final_scene_tuples)}",
+                    f"Scene Duration Statistics:",
+                    f" - Shortest: {min_duration:.2f}s",
+                    f" - Longest: {max_duration:.2f}s", 
+                    f" - Mean: {mean_duration:.2f}s",
+                    f" - Median: {median_duration:.2f}s",
+                    f" - Total: {total_scene_duration:.1f}s ({total_scene_duration/60:.1f}m)",
+                    "="*50, ""
+                ]
+            else:
+                summary_lines = [
+                    "", "="*50,
+                    "Dynamic Scene Detection Summary",
+                    "="*50,
+                    f"Total Story Lines Found: {len(story_lines)}",
+                    f" - Segments saved directly: {storyline_direct_saves}",
+                    f" - Segments from granular split (Pass 2): {granular_segments_count}",
+                    f" - Segments from brute-force split: {brute_force_segments_count}",
+                    "-" * 50,
+                    f"Total Final Scenes Saved: {len(final_scene_tuples)}",
+                    "="*50, ""
+                ]
             logger.info('\n'.join(summary_lines))
 
         logger.info(f"Detected and saved {len(final_scene_tuples)} final scenes.")

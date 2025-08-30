@@ -2,19 +2,35 @@
   "version": "4.3",
   "pipeline_parameter_map": {
     "faster": {
-      "common": ["common_transcriber_options", "common_decoder_options"],
-      "engine": ["faster_whisper_engine_options", "stable_ts_engine_options"],
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options"
+      ],
+      "engine": [
+        "faster_whisper_engine_options",
+        "stable_ts_engine_options"
+      ],
       "vad": "stable_ts_vad_options",
       "vad_handling": "packed"
     },
     "fast": {
-      "common": ["common_transcriber_options", "common_decoder_options"],
-      "engine": ["openai_whisper_engine_options", "stable_ts_engine_options"],
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options"
+      ],
+      "engine": [
+        "openai_whisper_engine_options",
+        "stable_ts_engine_options"
+      ],
       "vad": "stable_ts_vad_options",
       "vad_handling": "packed"
     },
     "balanced": {
-      "common": ["common_transcriber_options", "common_decoder_options", "exclusive_whisper_plus_faster_whisper"],
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options",
+        "exclusive_whisper_plus_faster_whisper"
+      ],
       "engine": "openai_whisper_engine_options",
       "vad": "silero_vad_options",
       "vad_handling": "separate"
@@ -59,25 +75,20 @@
     "scene_detection": {
       "default": {
         "max_duration_s": 29.0,
-        "min_duration_s": 0.20,
-
+        "min_duration_s": 0.2,
         "target_sr": 16000,
         "force_mono": true,
         "preserve_original_sr": true,
-
         "assist_processing": false,
         "verbose_summary": true,
-
         "pass1_min_duration_s": 2.0,
         "pass1_max_duration_s": 2700.0,
-        "pass1_max_silence_s": 1.80,
+        "pass1_max_silence_s": 1.8,
         "pass1_energy_threshold": 35,
-
-        "pass2_min_duration_s": 0.100,
-        "pass2_max_duration_s": 960.0, 
-        "pass2_max_silence_s": 1.20,
+        "pass2_min_duration_s": 0.1,
+        "pass2_max_duration_s": 960.0,
+        "pass2_max_silence_s": 1.2,
         "pass2_energy_threshold": 42,
-
         "bandpass_low_hz": 200,
         "bandpass_high_hz": 4000,
         "drc_threshold_db": -24.0,
@@ -85,7 +96,6 @@
         "drc_attack_ms": 5.0,
         "drc_release_ms": 100.0,
         "skip_assist_on_loud_dbfs": -5.0,
-
         "brute_force_fallback": true,
         "brute_force_chunk_s": 29.0,
         "pad_edges_s": 0.0,
@@ -141,13 +151,20 @@
     "output_format": "srt"
   },
   "ui_preferences": {
-    "console_verbosity": "quiet",
+    "console_verbosity": "summary",
     "progress_batch_size": 10,
     "show_scene_details": false,
     "max_console_lines": 1000,
     "auto_scroll": true,
     "show_timestamps": false,
-    "theme": "default"
+    "theme": "default",
+    "last_mode": "balanced",
+    "last_sensitivity": "conservative",
+    "last_language": "japanese",
+    "show_console": true,
+    "adaptive_classification": true,
+    "adaptive_audio_enhancement": true,
+    "smart_postprocessing": true
   },
   "common_transcriber_options": {
     "balanced": {
@@ -460,7 +477,7 @@
     "aggressive": {
       "hallucination_silence_threshold": 2.5
     }
-  },    
+  },
   "HF_transformers_engine_options": {
     "balanced": {
       "placeholder for future": "placeholder for future"

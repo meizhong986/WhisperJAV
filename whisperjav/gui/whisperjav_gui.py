@@ -12,8 +12,11 @@ import re
 import time
 
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
-from whisperjav.utils.progress_aggregator import VerbosityLevel
-from whisperjav.config.manager import ConfigManager
+from whisperjav.config.transcription_tuner import TranscriptionTuner
+from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
+from whisperjav.utils.unified_progress import UnifiedProgressManager, VerbosityLevel as UnifiedVerbosityLevel
+from whisperjav.utils.progress_adapter import ProgressDisplayAdapter
+from whisperjav.utils.logger import logger
 
 
 from whisperjav.utils.preflight_check import enforce_cuda_requirement
@@ -23,130 +26,307 @@ enforce_cuda_requirement()
 
 
 class AdvancedSettingsDialog(Toplevel):
-    def __init__(self, parent, config=None):
+    def __init__(self, parent, config_manager: ConfigManager, current_sensitivity: str):
         super().__init__(parent)
         self.title("Advanced Settings")
-        self.geometry("500x400")
+        self.geometry("600x500")
         self.transient(parent)
         self.grab_set()
         
-        self.async_manager = None
-        self.current_tasks = []
-        self.console_buffer = []
-        
-        # Match parent window styling
-        self.configure(bg='#f0f0f0')
-        
-        self.config = config or {}
+        self.parent = parent
+        self.config_manager = config_manager
+        self.current_sensitivity = current_sensitivity
         self.result = None
         
-        # Create notebook for different setting categories
+        # Configure styling to match parent
+        self.configure(bg='#f0f0f0')
+        
+        # Load current parameter sets from configuration
+        self.load_current_settings()
+        
+        # Create UI
+        self.create_widgets()
+        
+        # Center dialog on parent
+        self.center_on_parent()
+    
+    def load_current_settings(self):
+        """Load current parameter sets from the configuration system."""
+        try:
+            # Get parameter sets for current sensitivity
+            self.decoder_params = self.config_manager.get_parameter_set(
+                'common_decoder_options', self.current_sensitivity
+            )
+            self.transcriber_params = self.config_manager.get_parameter_set(
+                'common_transcriber_options', self.current_sensitivity
+            )
+            # Try to get VAD params, fallback to defaults if not available
+            try:
+                self.vad_params = self.config_manager.get_parameter_set(
+                    'silero_vad_options', self.current_sensitivity
+                )
+            except:
+                # Fallback to default VAD parameters
+                self.vad_params = {
+                    'threshold': 0.5,
+                    'min_speech_duration_ms': 250,
+                    'max_speech_duration_s': 30
+                }
+            
+            logger.debug(f"Loaded settings for sensitivity: {self.current_sensitivity}")
+            
+        except Exception as e:
+            logger.error(f"Failed to load current settings: {e}")
+            # Fallback to defaults
+            self.decoder_params = {}
+            self.transcriber_params = {}
+            self.vad_params = {}
+    
+    def create_widgets(self):
+        """Create the advanced settings UI with real configuration values."""
+        # Create notebook for settings categories
         style = ttk.Style()
         style.configure('Settings.TNotebook', background='#f0f0f0')
         style.configure('Settings.TFrame', background='#f0f0f0')
         
         notebook = ttk.Notebook(self, style='Settings.TNotebook')
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        # VAD Settings
+        # Decoder Settings Tab
+        decoder_frame = ttk.Frame(notebook, style='Settings.TFrame', padding=20)
+        notebook.add(decoder_frame, text="Decoder Options")
+        self.create_decoder_settings(decoder_frame)
+        
+        # Transcriber Settings Tab
+        transcriber_frame = ttk.Frame(notebook, style='Settings.TFrame', padding=20)
+        notebook.add(transcriber_frame, text="Transcriber Options")
+        self.create_transcriber_settings(transcriber_frame)
+        
+        # VAD Settings Tab  
         vad_frame = ttk.Frame(notebook, style='Settings.TFrame', padding=20)
-        notebook.add(vad_frame, text="VAD Settings")
+        notebook.add(vad_frame, text="VAD Options")
         self.create_vad_settings(vad_frame)
         
-        # Transcription Settings
-        trans_frame = ttk.Frame(notebook, style='Settings.TFrame', padding=20)
-        notebook.add(trans_frame, text="Transcription")
-        self.create_transcription_settings(trans_frame)
-        
-        # Decoder Settings
-        dec_frame = ttk.Frame(notebook, style='Settings.TFrame', padding=20)
-        notebook.add(dec_frame, text="Decoder")
-        self.create_decoder_settings(dec_frame)
-        
         # Buttons
-        btn_frame = tk.Frame(self, bg='#f0f0f0')
-        btn_frame.pack(pady=10)
-        
-        save_btn = tk.Button(btn_frame, text="Save", command=self.save,
-                            bg='#4a7abc', fg='white', font=('Arial', 10),
-                            padx=20, pady=5, bd=0, relief=tk.FLAT,
-                            activebackground='#3a6aac')
-        save_btn.pack(side=tk.LEFT, padx=5)
-        
-        cancel_btn = tk.Button(btn_frame, text="Cancel", command=self.destroy,
-                              bg='#e0e0e0', fg='#333333', font=('Arial', 10),
-                              padx=20, pady=5, bd=0, relief=tk.FLAT,
-                              activebackground='#d0d0d0')
-        cancel_btn.pack(side=tk.LEFT, padx=5)
-    
-    def create_vad_settings(self, parent):
-        ttk.Label(parent, text="VAD Threshold:", background='#f0f0f0').grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.vad_threshold = tk.DoubleVar(value=self.config.get("vad_threshold", 0.5))
-        ttk.Scale(parent, from_=0.1, to=0.9, variable=self.vad_threshold, 
-                 orient=tk.HORIZONTAL, length=300).grid(row=0, column=1, padx=5)
-        self.vad_label = ttk.Label(parent, text=f"{self.vad_threshold.get():.2f}", background='#f0f0f0')
-        self.vad_label.grid(row=0, column=2)
-        
-        def update_vad_label(val):
-            self.vad_label.config(text=f"{float(val):.2f}")
-        self.vad_threshold.trace('w', lambda *args: update_vad_label(self.vad_threshold.get()))
-        
-        ttk.Label(parent, text="Min Speech Duration (ms):", background='#f0f0f0').grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.min_speech_duration = tk.IntVar(value=self.config.get("min_speech_duration", 250))
-        ttk.Entry(parent, textvariable=self.min_speech_duration, width=10).grid(row=1, column=1, sticky=tk.W)
-        
-        ttk.Label(parent, text="Max Speech Duration (s):", background='#f0f0f0').grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.max_speech_duration = tk.IntVar(value=self.config.get("max_speech_duration", 30))
-        ttk.Entry(parent, textvariable=self.max_speech_duration, width=10).grid(row=2, column=1, sticky=tk.W)
-    
-    def create_transcription_settings(self, parent):
-        ttk.Label(parent, text="Beam Size:", background='#f0f0f0').grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.beam_size = tk.IntVar(value=self.config.get("beam_size", 5))
-        ttk.Entry(parent, textvariable=self.beam_size, width=10).grid(row=0, column=1, sticky=tk.W)
-        
-        ttk.Label(parent, text="Patience:", background='#f0f0f0').grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.patience = tk.DoubleVar(value=self.config.get("patience", 1.0))
-        ttk.Entry(parent, textvariable=self.patience, width=10).grid(row=1, column=1, sticky=tk.W)
-        
-        ttk.Label(parent, text="Temperature:", background='#f0f0f0').grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.temperature = tk.DoubleVar(value=self.config.get("temperature", 0.0))
-        ttk.Entry(parent, textvariable=self.temperature, width=10).grid(row=2, column=1, sticky=tk.W)
+        self.create_button_frame()
     
     def create_decoder_settings(self, parent):
-        ttk.Label(parent, text="Word Threshold:", background='#f0f0f0').grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.word_threshold = tk.DoubleVar(value=self.config.get("word_threshold", 0.01))
-        ttk.Scale(parent, from_=0.0, to=1.0, variable=self.word_threshold, 
-                 orient=tk.HORIZONTAL, length=300).grid(row=0, column=1, padx=5)
-        self.word_label = ttk.Label(parent, text=f"{self.word_threshold.get():.2f}", background='#f0f0f0')
-        self.word_label.grid(row=0, column=2)
+        """Create decoder settings widgets using actual config values."""
+        row = 0
         
-        def update_word_label(val):
-            self.word_label.config(text=f"{float(val):.2f}")
-        self.word_threshold.trace('w', lambda *args: update_word_label(self.word_threshold.get()))
+        # Beam Size
+        if 'beam_size' in self.decoder_params:
+            ttk.Label(parent, text="Beam Size:", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.beam_size = tk.IntVar(value=self.decoder_params.get('beam_size', 5))
+            ttk.Entry(parent, textvariable=self.beam_size, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(1-10)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
         
-        ttk.Label(parent, text="Logprob Threshold:", background='#f0f0f0').grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.logprob_threshold = tk.DoubleVar(value=self.config.get("logprob_threshold", -1.0))
-        ttk.Scale(parent, from_=-5.0, to=0.0, variable=self.logprob_threshold, 
-                 orient=tk.HORIZONTAL, length=300).grid(row=1, column=1, padx=5)
-        self.logprob_label = ttk.Label(parent, text=f"{self.logprob_threshold.get():.2f}", background='#f0f0f0')
-        self.logprob_label.grid(row=1, column=2)
+        # Temperature
+        if 'temperature' in self.decoder_params:
+            ttk.Label(parent, text="Temperature:", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            temp_val = self.decoder_params.get('temperature', 0.0)
+            if isinstance(temp_val, list):
+                temp_val = temp_val[0] if temp_val else 0.0
+            self.temperature = tk.DoubleVar(value=float(temp_val))
+            ttk.Entry(parent, textvariable=self.temperature, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(0.0-2.0)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
         
-        def update_logprob_label(val):
-            self.logprob_label.config(text=f"{float(val):.2f}")
-        self.logprob_threshold.trace('w', lambda *args: update_logprob_label(self.logprob_threshold.get()))
+        # Patience
+        if 'patience' in self.decoder_params:
+            ttk.Label(parent, text="Patience:", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.patience = tk.DoubleVar(value=self.decoder_params.get('patience', 1.0))
+            ttk.Entry(parent, textvariable=self.patience, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(0.1-10.0)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
     
-    def save(self):
-        self.result = {
-            "vad_threshold": self.vad_threshold.get(),
-            "min_speech_duration": self.min_speech_duration.get(),
-            "max_speech_duration": self.max_speech_duration.get(),
-            "beam_size": self.beam_size.get(),
-            "patience": self.patience.get(),
-            "temperature": self.temperature.get(),
-            "word_threshold": self.word_threshold.get(),
-            "logprob_threshold": self.logprob_threshold.get()
-        }
+    def create_transcriber_settings(self, parent):
+        """Create transcriber settings widgets using actual config values."""
+        row = 0
+        
+        # Compression Ratio Threshold
+        if 'compression_ratio_threshold' in self.transcriber_params:
+            ttk.Label(parent, text="Compression Ratio Threshold:", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.compression_ratio_threshold = tk.DoubleVar(value=self.transcriber_params.get('compression_ratio_threshold', 2.4))
+            ttk.Entry(parent, textvariable=self.compression_ratio_threshold, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(1.0-10.0)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
+        
+        # Logprob Threshold
+        if 'logprob_threshold' in self.transcriber_params:
+            ttk.Label(parent, text="Logprob Threshold:", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.logprob_threshold = tk.DoubleVar(value=self.transcriber_params.get('logprob_threshold', -1.0))
+            ttk.Entry(parent, textvariable=self.logprob_threshold, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(-10.0 to 0.0)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
+        
+        # No Speech Threshold
+        if 'no_speech_threshold' in self.transcriber_params:
+            ttk.Label(parent, text="No Speech Threshold:", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.no_speech_threshold = tk.DoubleVar(value=self.transcriber_params.get('no_speech_threshold', 0.6))
+            ttk.Entry(parent, textvariable=self.no_speech_threshold, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(0.0-1.0)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
+    
+    def create_vad_settings(self, parent):
+        """Create VAD settings widgets using actual config values."""
+        row = 0
+        
+        # VAD Threshold
+        if 'threshold' in self.vad_params:
+            ttk.Label(parent, text="VAD Threshold:", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.vad_threshold = tk.DoubleVar(value=self.vad_params.get('threshold', 0.5))
+            ttk.Scale(parent, from_=0.0, to=1.0, variable=self.vad_threshold, 
+                     orient=tk.HORIZONTAL, length=300).grid(row=row, column=1, padx=10)
+            self.vad_threshold_label = ttk.Label(parent, text=f"{self.vad_threshold.get():.2f}", background='#f0f0f0')
+            self.vad_threshold_label.grid(row=row, column=2)
+            
+            def update_vad_label(val):
+                self.vad_threshold_label.config(text=f"{float(val):.2f}")
+            self.vad_threshold.trace('w', lambda *args: update_vad_label(self.vad_threshold.get()))
+            row += 1
+        
+        # Min Speech Duration
+        if 'min_speech_duration_ms' in self.vad_params:
+            ttk.Label(parent, text="Min Speech Duration (ms):", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.min_speech_duration_ms = tk.IntVar(value=self.vad_params.get('min_speech_duration_ms', 250))
+            ttk.Entry(parent, textvariable=self.min_speech_duration_ms, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(0-5000)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
+        
+        # Max Speech Duration
+        if 'max_speech_duration_s' in self.vad_params:
+            ttk.Label(parent, text="Max Speech Duration (s):", background='#f0f0f0').grid(row=row, column=0, sticky=tk.W, pady=5)
+            self.max_speech_duration_s = tk.IntVar(value=self.vad_params.get('max_speech_duration_s', 30))
+            ttk.Entry(parent, textvariable=self.max_speech_duration_s, width=10).grid(row=row, column=1, sticky=tk.W, padx=10)
+            ttk.Label(parent, text="(1-300)", background='#f0f0f0', foreground='gray').grid(row=row, column=2, sticky=tk.W)
+            row += 1
+    
+    def create_button_frame(self):
+        """Create save/cancel buttons."""
+        btn_frame = tk.Frame(self, bg='#f0f0f0')
+        btn_frame.pack(pady=20)
+        
+        save_btn = tk.Button(btn_frame, text="Save Changes", command=self.save_settings,
+                            bg='#4a7abc', fg='white', font=('Arial', 11),
+                            padx=30, pady=8, bd=0, relief=tk.FLAT,
+                            activebackground='#3a6aac')
+        save_btn.pack(side=tk.LEFT, padx=10)
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=self.cancel,
+                              bg='#e0e0e0', fg='#333333', font=('Arial', 11),
+                              padx=30, pady=8, bd=0, relief=tk.FLAT,
+                              activebackground='#d0d0d0')
+        cancel_btn.pack(side=tk.LEFT, padx=10)
+        
+        reset_btn = tk.Button(btn_frame, text="Reset to Defaults", command=self.reset_to_defaults,
+                             bg='#ffc107', fg='#333333', font=('Arial', 11),
+                             padx=30, pady=8, bd=0, relief=tk.FLAT,
+                             activebackground='#ffcd39')
+        reset_btn.pack(side=tk.LEFT, padx=10)
+    
+    def save_settings(self):
+        """Save current settings back to the configuration system."""
+        try:
+            # Collect updated decoder parameters
+            updated_decoder = self.decoder_params.copy()
+            if hasattr(self, 'beam_size'):
+                updated_decoder['beam_size'] = self.beam_size.get()
+            if hasattr(self, 'temperature'):
+                updated_decoder['temperature'] = self.temperature.get()
+            if hasattr(self, 'patience'):
+                updated_decoder['patience'] = self.patience.get()
+            
+            # Collect updated transcriber parameters  
+            updated_transcriber = self.transcriber_params.copy()
+            if hasattr(self, 'compression_ratio_threshold'):
+                updated_transcriber['compression_ratio_threshold'] = self.compression_ratio_threshold.get()
+            if hasattr(self, 'logprob_threshold'):
+                updated_transcriber['logprob_threshold'] = self.logprob_threshold.get()
+            if hasattr(self, 'no_speech_threshold'):
+                updated_transcriber['no_speech_threshold'] = self.no_speech_threshold.get()
+            
+            # Collect updated VAD parameters
+            updated_vad = self.vad_params.copy()
+            if hasattr(self, 'vad_threshold'):
+                updated_vad['threshold'] = self.vad_threshold.get()
+            if hasattr(self, 'min_speech_duration_ms'):
+                updated_vad['min_speech_duration_ms'] = self.min_speech_duration_ms.get()
+            if hasattr(self, 'max_speech_duration_s'):
+                updated_vad['max_speech_duration_s'] = self.max_speech_duration_s.get()
+            
+            # Update configuration through ConfigManager
+            self.config_manager.update_parameter_set('common_decoder_options', self.current_sensitivity, updated_decoder)
+            self.config_manager.update_parameter_set('common_transcriber_options', self.current_sensitivity, updated_transcriber)
+            if updated_vad:  # Only update if we have VAD params
+                self.config_manager.update_parameter_set('silero_vad_options', self.current_sensitivity, updated_vad)
+            
+            # Save configuration to file
+            self.config_manager.save_config()
+            
+            logger.info(f"Saved advanced settings for sensitivity: {self.current_sensitivity}")
+            self.result = True
+            self.destroy()
+            
+        except Exception as e:
+            logger.error(f"Failed to save advanced settings: {e}", exc_info=True)
+            messagebox.showerror("Save Error", f"Failed to save settings:\n\n{str(e)}")
+    
+    def reset_to_defaults(self):
+        """Reset current sensitivity profile to default values."""
+        try:
+            # Confirm reset action
+            if messagebox.askyesno("Reset to Defaults", 
+                                 f"Reset all settings for '{self.current_sensitivity}' sensitivity to defaults?\n\nThis cannot be undone."):
+                
+                # Get default parameter sets (use 'balanced' as baseline)
+                default_decoder = self.config_manager.get_parameter_set('common_decoder_options', 'balanced')
+                default_transcriber = self.config_manager.get_parameter_set('common_transcriber_options', 'balanced')
+                try:
+                    default_vad = self.config_manager.get_parameter_set('silero_vad_options', 'balanced')
+                except:
+                    default_vad = {'threshold': 0.5, 'min_speech_duration_ms': 250, 'max_speech_duration_s': 30}
+                
+                # Update configuration
+                self.config_manager.update_parameter_set('common_decoder_options', self.current_sensitivity, default_decoder)
+                self.config_manager.update_parameter_set('common_transcriber_options', self.current_sensitivity, default_transcriber)
+                if default_vad:
+                    self.config_manager.update_parameter_set('silero_vad_options', self.current_sensitivity, default_vad)
+                self.config_manager.save_config()
+                
+                # Reload the dialog
+                self.load_current_settings()
+                self.destroy()
+                
+                # Reopen dialog with updated settings
+                new_dialog = AdvancedSettingsDialog(self.parent, self.config_manager, self.current_sensitivity)
+                self.parent.wait_window(new_dialog)
+                
+        except Exception as e:
+            logger.error(f"Failed to reset settings: {e}", exc_info=True)
+            messagebox.showerror("Reset Error", f"Failed to reset settings:\n\n{str(e)}")
+    
+    def cancel(self):
+        """Cancel without saving."""
+        self.result = False
         self.destroy()
+    
+    def center_on_parent(self):
+        """Center dialog on parent window."""
+        self.update_idletasks()
+        parent_x = self.parent.winfo_x()
+        parent_y = self.parent.winfo_y()
+        parent_width = self.parent.winfo_width()
+        parent_height = self.parent.winfo_height()
+        
+        dialog_width = self.winfo_width()
+        dialog_height = self.winfo_height()
+        
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
+        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
 
 
 class RadioButtonGroup(tk.Frame):
@@ -247,16 +427,26 @@ class WhisperJAVGUI(tk.Tk):
         self.resizable(True, True)
         self.configure(bg='#f0f0f0')
         
-        # --- State Variables ---
+        # --- Initialize v4.3 Configuration System ---
+        self.config_manager = ConfigManager()
+        self.transcription_tuner = TranscriptionTuner()
+        self.config_path = None
+        
+        # Load UI preferences from configuration
+        self.ui_preferences = self.config_manager.get_ui_preferences()
+        
+        # --- State Variables (update with config defaults) ---
         self.input_files = []
         self.output_dir = tk.StringVar()
-        self.mode = tk.StringVar(value="balanced")
-        self.sensitivity = tk.StringVar(value="balanced")
-        self.subs_language = tk.StringVar(value="japanese")
-        self.adaptive_classification = tk.BooleanVar()
-        self.adaptive_audio_enhancement = tk.BooleanVar()
-        self.smart_postprocessing = tk.BooleanVar()
-        self.show_console = tk.BooleanVar(value=True)
+        self.mode = tk.StringVar(value=self.ui_preferences.get('last_mode', 'balanced'))
+        self.sensitivity = tk.StringVar(value=self.ui_preferences.get('last_sensitivity', 'balanced'))
+        self.subs_language = tk.StringVar(value=self.ui_preferences.get('last_language', 'japanese'))
+        
+        # Enhancement options (load from UI preferences)
+        self.adaptive_classification = tk.BooleanVar(value=self.ui_preferences.get('adaptive_classification', False))
+        self.adaptive_audio_enhancement = tk.BooleanVar(value=self.ui_preferences.get('adaptive_audio_enhancement', False))
+        self.smart_postprocessing = tk.BooleanVar(value=self.ui_preferences.get('smart_postprocessing', False))
+        self.show_console = tk.BooleanVar(value=self.ui_preferences.get('show_console', True))
         self.processing = False
         self.advanced_config = {}
         
@@ -271,8 +461,10 @@ class WhisperJAVGUI(tk.Tk):
         self.progress_line_index = None
         self.last_progress_update_time = 0
         
-        # --- FIX (c): Add a periodic timer for smoother UI updates ---
-        self.gui_update_timer = None
+        # Modern progress system components
+        self.progress_manager = None
+        self.progress_display = None
+        self.progress_update_timer = None
         
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -536,12 +728,12 @@ class WhisperJAVGUI(tk.Tk):
             self.output_button.config(text=f"📁 {folder_name}")
     
     def open_advanced_settings(self):
-        dialog = AdvancedSettingsDialog(self, self.advanced_config)
+        dialog = AdvancedSettingsDialog(self, self.config_manager, self.sensitivity.get())
         self.wait_window(dialog)
         
         if dialog.result:
-            self.advanced_config = dialog.result
-            self.write_to_console("Advanced settings updated")
+            # Settings are automatically saved by ConfigManager in dialog
+            self.write_to_console("Advanced settings updated and saved to configuration")
     
     def get_progress_type(self, line):
         """Identify the type of progress line"""
@@ -551,25 +743,6 @@ class WhisperJAVGUI(tk.Tk):
             return "overall"
         return None
 
-    def update_sensitivity_options(self):
-        """Update sensitivity radio buttons based on selected pipeline."""
-        if not hasattr(self, 'tuner') or not isinstance(self.tuner, TranscriptionTunerV2):
-            return
-            
-        selected_pipeline = self.mode_var.get()
-        available = self.tuner.get_available_sensitivities(selected_pipeline)
-        
-        # Update radio button states
-        for radio in [self.conservative_radio, self.balanced_radio, self.aggressive_radio]:
-            sensitivity = radio.cget("value")
-            if sensitivity in available:
-                radio.configure(state="normal")
-            else:
-                radio.configure(state="disabled")
-        
-        # If current selection not available, switch to first available
-        if self.sensitivity_var.get() not in available:
-            self.sensitivity_var.set(available[0])
 
 
 
@@ -718,12 +891,22 @@ class WhisperJAVGUI(tk.Tk):
         self.submitted_tasks_count = len(self.input_files)
 
              
-        # Determine verbosity
-        verbosity = VerbosityLevel.SUMMARY  # Default
-        if self.show_console.get():
-            verbosity = VerbosityLevel.NORMAL
+        # Initialize modern progress system
+        verbosity_mapping = {
+            'quiet': UnifiedVerbosityLevel.QUIET,
+            'summary': UnifiedVerbosityLevel.STANDARD,
+            'normal': UnifiedVerbosityLevel.STANDARD,
+            'verbose': UnifiedVerbosityLevel.DEBUG
+        }
         
-        # Create async manager with progress callback
+        console_verbosity = self.ui_preferences.get('console_verbosity', 'summary')
+        verbosity = verbosity_mapping.get(console_verbosity, UnifiedVerbosityLevel.STANDARD)
+        
+        # Create unified progress system
+        self.progress_manager = UnifiedProgressManager(verbosity=verbosity)
+        self.progress_display = ProgressDisplayAdapter(self.progress_manager)
+        
+        # Create async manager with unified progress
         self.async_manager = AsyncPipelineManager(
             ui_update_callback=self.handle_async_progress,
             verbosity=verbosity
@@ -731,11 +914,9 @@ class WhisperJAVGUI(tk.Tk):
         
         # Prepare configuration
         try:
-            # Use the V3 tuner to get resolved config
-            from whisperjav.config.transcription_tuner_v3 import TranscriptionTunerV3
-            
+            # Use correct TranscriptionTuner from v4.3 system
             config_path = Path(self.advanced_config.get('config_path')) if 'config_path' in self.advanced_config else None
-            tuner = TranscriptionTunerV3(config_path=config_path)
+            tuner = TranscriptionTuner(config_path=config_path)
             
             task = 'translate' if self.subs_language.get() == 'english-direct' else 'transcribe'
             resolved_config = tuner.resolve_params(
@@ -755,8 +936,22 @@ class WhisperJAVGUI(tk.Tk):
             resolved_config['adaptive_audio_enhancement'] = self.adaptive_audio_enhancement.get()
             resolved_config['smart_postprocessing'] = self.smart_postprocessing.get()
             
+        except FileNotFoundError as e:
+            self.write_to_console(f"Configuration file not found: {e}")
+            messagebox.showerror("Configuration Error", 
+                               f"Could not load configuration file.\n\n{str(e)}\n\nPlease check your WhisperJAV installation.")
+            self.processing_complete()
+            return
+        except ValueError as e:
+            self.write_to_console(f"Configuration validation error: {e}")
+            messagebox.showerror("Configuration Error", 
+                               f"Invalid configuration settings.\n\n{str(e)}\n\nTry resetting to defaults in Advanced Settings.")
+            self.processing_complete()
+            return
         except Exception as e:
-            self.write_to_console(f"Configuration error: {str(e)}")
+            logger.error(f"Unexpected configuration error: {e}", exc_info=True)
+            self.write_to_console(f"Unexpected configuration error: {e}")
+            messagebox.showerror("Error", f"An unexpected error occurred during configuration:\n\n{str(e)}")
             self.processing_complete()
             return
         
@@ -1050,9 +1245,17 @@ class WhisperJAVGUI(tk.Tk):
         if self.async_manager:
             try:
                 self.async_manager.shutdown()
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Error during async manager shutdown: {e}")
             self.async_manager = None
+        
+        # Cleanup progress manager
+        if self.progress_manager:
+            try:
+                self.progress_manager.cleanup()
+            except Exception as e:
+                logger.error(f"Error during progress manager cleanup: {e}")
+            self.progress_manager = None
         
         # Show summary
         if self.current_tasks:
@@ -1115,17 +1318,43 @@ class WhisperJAVGUI(tk.Tk):
             
         
     def on_close(self):
+        # Save current UI state to configuration before closing
+        try:
+            ui_settings = {
+                'last_mode': self.mode.get(),
+                'last_sensitivity': self.sensitivity.get(),
+                'last_language': self.subs_language.get(),
+                'show_console': self.show_console.get(),
+                'adaptive_classification': self.adaptive_classification.get(),
+                'adaptive_audio_enhancement': self.adaptive_audio_enhancement.get(),
+                'smart_postprocessing': self.smart_postprocessing.get()
+            }
+            self.config_manager.update_ui_preferences(ui_settings)
+            self.config_manager.save_config()
+        except Exception as e:
+            logger.error(f"Failed to save UI preferences: {e}")
+        
         if self.processing:
             if messagebox.askokcancel("Quit", "Processing is still running. Quit anyway?"):
-                # Cleanup async manager
-                if self.async_manager:
-                    try:
-                        self.async_manager.shutdown(wait=False)
-                    except:
-                        pass
-                self.destroy()
+                self.cleanup_and_exit()
         else:
             self.destroy()
+
+    def cleanup_and_exit(self):
+        """Clean up resources and exit."""
+        if self.async_manager:
+            try:
+                self.async_manager.shutdown(wait=False)
+            except Exception as e:
+                logger.error(f"Error during async manager shutdown: {e}")
+        
+        if self.progress_manager:
+            try:
+                self.progress_manager.cleanup()
+            except Exception as e:
+                logger.error(f"Error during progress manager cleanup: {e}")
+        
+        self.destroy()
                 
             
 def main():
