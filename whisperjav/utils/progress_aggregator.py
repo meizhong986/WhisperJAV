@@ -18,6 +18,57 @@ from contextlib import contextmanager
 from whisperjav.utils.logger import logger
 
 
+class InPlaceProgressHandler:
+    """Handles in-place progress updates using carriage return."""
+    
+    def __init__(self, use_in_place: bool = True):
+        """
+        Initialize the progress handler.
+        
+        Args:
+            use_in_place: If True, use \r for in-place updates. If False, use newlines.
+        """
+        self.use_in_place = use_in_place and sys.stdout.isatty()
+        self.last_progress_length = 0
+        self.has_active_progress = False
+        
+    def print_progress(self, message: str):
+        """Print a progress message that can be updated in-place."""
+        if not self.use_in_place:
+            print(message)
+            return
+            
+        # Clear the previous progress line if it was longer
+        if self.has_active_progress and self.last_progress_length > len(message):
+            # Clear with spaces then return to beginning
+            clear_line = '\r' + ' ' * self.last_progress_length + '\r'
+            sys.stdout.write(clear_line)
+            
+        # Print the new progress message
+        sys.stdout.write(f'\r{message}')
+        sys.stdout.flush()
+        
+        self.last_progress_length = len(message)
+        self.has_active_progress = True
+        
+    def print_permanent(self, message: str):
+        """Print a permanent message that stays on screen."""
+        if self.has_active_progress:
+            # Move to new line to preserve the progress, then print message
+            print()
+            self.has_active_progress = False
+            self.last_progress_length = 0
+        
+        print(message)
+        
+    def finish_progress(self):
+        """Finish the current progress and move to next line."""
+        if self.has_active_progress:
+            print()  # Move to next line
+            self.has_active_progress = False
+            self.last_progress_length = 0
+
+
 class VerbosityLevel(Enum):
     """Console output verbosity levels."""
     QUIET = "quiet"          # Only major milestones
@@ -74,12 +125,20 @@ class ProgressAggregator:
             total_scenes: Total number of scenes to process
             verbosity: Output verbosity level
             batch_size: Number of scenes to batch before reporting
-            output_fn: Custom output function (defaults to print)
+            output_fn: Custom output function (defaults to InPlaceProgressHandler)
         """
         self.total_scenes = total_scenes
         self.verbosity = verbosity
         self.batch_size = batch_size
-        self.output_fn = output_fn or print
+        
+        # Use InPlaceProgressHandler for clean progress updates
+        if output_fn is None:
+            self.progress_handler = InPlaceProgressHandler()
+            self.output_fn = self.progress_handler.print_progress
+        else:
+            # Custom output function provided - use as-is for backward compatibility
+            self.output_fn = output_fn
+            self.progress_handler = None
         
         # Progress tracking
         self.completed_scenes = 0
@@ -103,18 +162,29 @@ class ProgressAggregator:
         with self._lock:
             self.current_file = filename
             if self.verbosity != VerbosityLevel.QUIET:
-                self.output_fn(f"\n[{file_number}/{total_files}] Processing: {filename}")
+                # Use permanent message for file start (important milestone)
+                if self.progress_handler:
+                    self.progress_handler.print_permanent(f"[{file_number}/{total_files}] Processing: {filename}")
+                else:
+                    self.output_fn(f"\n[{file_number}/{total_files}] Processing: {filename}")
     
     def set_step_info(self, step_name: str, step_number: int, total_steps: int):
         """Set current processing step."""
         with self._lock:
             self.current_step = step_name
             if self.verbosity == VerbosityLevel.VERBOSE:
-                self.output_fn(f"  Step {step_number}/{total_steps}: {step_name}")
+                # Use permanent message for step information in verbose mode
+                if self.progress_handler:
+                    self.progress_handler.print_permanent(f"  Step {step_number}/{total_steps}: {step_name}")
+                else:
+                    self.output_fn(f"  Step {step_number}/{total_steps}: {step_name}")
             elif self.verbosity == VerbosityLevel.NORMAL:
-                # Show only major steps
+                # Show only major steps as permanent messages
                 if step_number in [1, 3, 5]:  # Audio extraction, transcription, post-processing
-                    self.output_fn(f"  {step_name}...")
+                    if self.progress_handler:
+                        self.progress_handler.print_permanent(f"  {step_name}...")
+                    else:
+                        self.output_fn(f"  {step_name}...")
     
     def start_scene(self, scene_index: int) -> SceneProgress:
         """Start tracking a scene."""
@@ -157,13 +227,19 @@ class ProgressAggregator:
             else:
                 self.failed_scenes += 1
             
-            # Verbose mode: immediate feedback
+            # Verbose mode: immediate feedback as permanent messages
             if self.verbosity == VerbosityLevel.VERBOSE:
                 duration = scene_progress.end_time - scene_progress.start_time
                 if success:
-                    self.output_fn(f"    Scene {scene_progress.scene_index + 1}: ✓ Complete ({duration:.1f}s)")
+                    if self.progress_handler:
+                        self.progress_handler.print_permanent(f"    Scene {scene_progress.scene_index + 1}: OK Complete ({duration:.1f}s)")
+                    else:
+                        self.output_fn(f"    Scene {scene_progress.scene_index + 1}: OK Complete ({duration:.1f}s)")
                 else:
-                    self.output_fn(f"    Scene {scene_progress.scene_index + 1}: ✗ Failed - {error}")
+                    if self.progress_handler:
+                        self.progress_handler.print_permanent(f"    Scene {scene_progress.scene_index + 1}: ERR Failed - {error}")
+                    else:
+                        self.output_fn(f"    Scene {scene_progress.scene_index + 1}: ERR Failed - {error}")
             
             # Check for batch completion
             if len(self.current_batch) >= self.batch_size:
@@ -215,26 +291,35 @@ class ProgressAggregator:
         progress_pct = (self.completed_scenes / self.total_scenes) * 100
         bar_width = 30
         filled = int(bar_width * self.completed_scenes / self.total_scenes)
-        bar = "█" * filled + "░" * (bar_width - filled)
+        bar = "#" * filled + "-" * (bar_width - filled)
         
         if self.verbosity == VerbosityLevel.SUMMARY:
-            # Compact summary
+            # Compact summary as in-place progress update
             self.output_fn(
                 f"  [{bar}] {progress_pct:3.0f}% | "
                 f"Scenes {scene_start}-{scene_end}: "
-                f"✓{successful} ✗{failed} | "
+                f"OK:{successful} ERR:{failed} | "
                 f"Avg: {avg_time:.1f}s | "
                 f"ETA: {eta}"
             )
         else:  # NORMAL
-            # More detailed summary
-            self.output_fn(f"\n  Scene Batch {scene_start}-{scene_end} Summary:")
-            self.output_fn(f"    Successful: {successful}/{len(batch.scenes)}")
-            if failed > 0:
-                self.output_fn(f"    Failed: {failed}")
-            self.output_fn(f"    Batch time: {batch.duration:.1f}s (avg {avg_time:.1f}s/scene)")
-            self.output_fn(f"    Overall progress: [{bar}] {progress_pct:.1f}%")
-            self.output_fn(f"    ETA: {eta}")
+            # More detailed summary as permanent messages
+            if self.progress_handler:
+                self.progress_handler.print_permanent(f"\n  Scene Batch {scene_start}-{scene_end} Summary:")
+                self.progress_handler.print_permanent(f"    Successful: {successful}/{len(batch.scenes)}")
+                if failed > 0:
+                    self.progress_handler.print_permanent(f"    Failed: {failed}")
+                self.progress_handler.print_permanent(f"    Batch time: {batch.duration:.1f}s (avg {avg_time:.1f}s/scene)")
+                self.progress_handler.print_permanent(f"    Overall progress: [{bar}] {progress_pct:.1f}%")
+                self.progress_handler.print_permanent(f"    ETA: {eta}")
+            else:
+                self.output_fn(f"\n  Scene Batch {scene_start}-{scene_end} Summary:")
+                self.output_fn(f"    Successful: {successful}/{len(batch.scenes)}")
+                if failed > 0:
+                    self.output_fn(f"    Failed: {failed}")
+                self.output_fn(f"    Batch time: {batch.duration:.1f}s (avg {avg_time:.1f}s/scene)")
+                self.output_fn(f"    Overall progress: [{bar}] {progress_pct:.1f}%")
+                self.output_fn(f"    ETA: {eta}")
     
     def finalize(self):
         """Finalize processing and show final summary."""
@@ -243,21 +328,38 @@ class ProgressAggregator:
             if self.current_batch:
                 self._flush_batch()
             
-            # Final summary
+            # Finish any active progress before showing final summary
+            if self.progress_handler:
+                self.progress_handler.finish_progress()
+            
+            # Final summary as permanent messages
             total_time = time.time() - self.start_time
             
             if self.verbosity != VerbosityLevel.QUIET:
-                self.output_fn("\n" + "="*50)
-                self.output_fn(f"Transcription Complete")
-                self.output_fn(f"  Total scenes: {self.total_scenes}")
-                self.output_fn(f"  Successful: {self.completed_scenes}")
-                if self.failed_scenes > 0:
-                    self.output_fn(f"  Failed: {self.failed_scenes}")
-                self.output_fn(f"  Total time: {timedelta(seconds=int(total_time))}")
-                if self.scene_times:
-                    avg_scene_time = sum(self.scene_times) / len(self.scene_times)
-                    self.output_fn(f"  Average per scene: {avg_scene_time:.1f}s")
-                self.output_fn("="*50)
+                if self.progress_handler:
+                    self.progress_handler.print_permanent("\n" + "="*50)
+                    self.progress_handler.print_permanent(f"Transcription Complete")
+                    self.progress_handler.print_permanent(f"  Total scenes: {self.total_scenes}")
+                    self.progress_handler.print_permanent(f"  Successful: {self.completed_scenes}")
+                    if self.failed_scenes > 0:
+                        self.progress_handler.print_permanent(f"  Failed: {self.failed_scenes}")
+                    self.progress_handler.print_permanent(f"  Total time: {timedelta(seconds=int(total_time))}")
+                    if self.scene_times:
+                        avg_scene_time = sum(self.scene_times) / len(self.scene_times)
+                        self.progress_handler.print_permanent(f"  Average per scene: {avg_scene_time:.1f}s")
+                    self.progress_handler.print_permanent("="*50)
+                else:
+                    self.output_fn("\n" + "="*50)
+                    self.output_fn(f"Transcription Complete")
+                    self.output_fn(f"  Total scenes: {self.total_scenes}")
+                    self.output_fn(f"  Successful: {self.completed_scenes}")
+                    if self.failed_scenes > 0:
+                        self.output_fn(f"  Failed: {self.failed_scenes}")
+                    self.output_fn(f"  Total time: {timedelta(seconds=int(total_time))}")
+                    if self.scene_times:
+                        avg_scene_time = sum(self.scene_times) / len(self.scene_times)
+                        self.output_fn(f"  Average per scene: {avg_scene_time:.1f}s")
+                    self.output_fn("="*50)
     
     @contextmanager
     def scene_context(self, scene_index: int):
