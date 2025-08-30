@@ -202,9 +202,56 @@ class FastPipeline(BasePipeline):
             if len(scene_paths) > 1:
                 self.progress.start_subtask("Transcribing scenes", len(scene_paths))
             
+            # Add scene-level progress tracking
+            total_scenes = len(scene_paths)
+            print(f"\nTranscribing {total_scenes} scenes:")
+            last_update_time = time.time()
+            transcription_start_time = time.time()
+            
             scene_srt_info = []
             for idx, (scene_path, start_time_sec, _, _) in enumerate(scene_paths):
-                logger.debug(f"Transcribing scene {idx+1}/{len(scene_paths)}: {scene_path.name}")
+                scene_num = idx + 1
+                logger.debug(f"Transcribing scene {scene_num}/{total_scenes}: {scene_path.name}")
+                
+                # Show progress for first scene, every 5 scenes, every 30 seconds, or last scene
+                current_time = time.time()
+                should_show_progress = (
+                    scene_num == 1 or 
+                    scene_num == total_scenes or
+                    scene_num % 5 == 0 or
+                    (current_time - last_update_time) > 30
+                )
+                
+                if should_show_progress:
+                    # Calculate progress percentage
+                    progress_pct = (scene_num / total_scenes) * 100
+                    
+                    # Create ASCII progress bar (30 characters wide)
+                    filled = int(progress_pct / 3.33)  # 30 chars total
+                    progress_bar = '=' * filled + '-' * (30 - filled)
+                    
+                    # Calculate ETA if we have processed at least one scene
+                    eta_text = ""
+                    if scene_num > 1:
+                        elapsed = current_time - transcription_start_time
+                        avg_time_per_scene = elapsed / (scene_num - 1)
+                        remaining_scenes = total_scenes - scene_num
+                        eta_seconds = remaining_scenes * avg_time_per_scene
+                        
+                        if eta_seconds > 60:
+                            eta_text = f" | ETA: {eta_seconds/60:.1f}m"
+                        else:
+                            eta_text = f" | ETA: {eta_seconds:.0f}s"
+                    
+                    # Truncate scene filename if too long
+                    scene_filename = scene_path.name
+                    if len(scene_filename) > 25:
+                        scene_filename = scene_filename[:22] + "..."
+                    
+                    # Print progress line
+                    progress_line = f"\rTranscribing: [{progress_bar}] {scene_num}/{total_scenes} [{progress_pct:.1f}%] | {scene_filename}{eta_text}"
+                    print(progress_line, end='', flush=True)
+                    last_update_time = current_time
                 
                 # Report scene start to async system
                 if self.progress_reporter:
@@ -265,6 +312,10 @@ class FastPipeline(BasePipeline):
                     if len(scene_paths) > 1:
                         self.progress.update_subtask(1)
                     continue
+            
+            # Show completion message for scene transcription
+            if total_scenes > 0:
+                print(f"\n[DONE] Completed transcription of {total_scenes} scenes")
             
             # Finish the subtask progress
             if len(scene_paths) > 1:

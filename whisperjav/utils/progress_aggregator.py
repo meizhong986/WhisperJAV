@@ -322,15 +322,15 @@ def create_progress_handler(verbosity: VerbosityLevel,
                           total_scenes: int,
                           output_fn: Optional[Callable] = None) -> ProgressAggregator:
     """Factory function to create appropriate progress handler."""
-    # Determine batch size based on total scenes and verbosity
+    # Determine batch size based on total scenes and verbosity - INCREASED FOR CLUTTER REDUCTION
     if verbosity == VerbosityLevel.QUIET:
-        batch_size = max(50, total_scenes // 4)  # 4 updates max
+        batch_size = max(75, total_scenes // 3)  # 3 updates max
     elif verbosity == VerbosityLevel.SUMMARY:
-        batch_size = max(10, total_scenes // 20)  # ~20 updates
+        batch_size = max(25, total_scenes // 12)  # ~12 updates (reduced from 20)
     elif verbosity == VerbosityLevel.NORMAL:
-        batch_size = max(5, total_scenes // 40)   # ~40 updates
+        batch_size = max(15, total_scenes // 25)   # ~25 updates (reduced from 40)
     else:  # VERBOSE
-        batch_size = 1  # Every scene
+        batch_size = max(5, total_scenes // 50)  # Batch even in verbose mode
     
     return ProgressAggregator(
         total_scenes=total_scenes,

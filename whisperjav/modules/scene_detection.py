@@ -22,14 +22,8 @@ from scipy.ndimage import binary_closing, binary_opening
 from scipy.signal import medfilt, butter, filtfilt
 from tqdm import tqdm
 
-# Configure logger if no handlers are present
-logger = logging.getLogger(__name__)
-if not logger.handlers:
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+# Use the global WhisperJAV logger
+from whisperjav.utils.logger import logger
 
 
 def load_audio_unified(audio_path: Path, target_sr: Optional[int] = None, force_mono: bool = True) -> Tuple[np.ndarray, int]:
@@ -612,7 +606,11 @@ class AdaptiveSceneDetector:
         original_audio, sample_rate = load_audio_unified(audio_path, target_sr=None, force_mono=True)
         story_line_regions = self._find_story_lines(original_audio, sample_rate)
         all_final_scenes = []
-        for chunk_start_s, chunk_end_s in tqdm(story_line_regions, desc="Processing Story Chunks"):
+        # Process story chunks with reduced progress spam
+        for chunk_idx, (chunk_start_s, chunk_end_s) in enumerate(story_line_regions):
+            # Only show progress for every 10th chunk or first/last chunk to reduce spam
+            if chunk_idx % 10 == 0 or chunk_idx == len(story_line_regions) - 1:
+                logger.debug(f"Processing story chunk {chunk_idx + 1}/{len(story_line_regions)}")
             start_sample = int(chunk_start_s * sample_rate)
             end_sample = int(chunk_end_s * sample_rate)
             
@@ -628,7 +626,11 @@ class AdaptiveSceneDetector:
         # FIX: Use a dedicated counter for saved scenes to ensure sequential numbering
         saved_scene_idx = 0
         logger.info(f"Validating and saving {len(all_final_scenes)} candidate scenes...")
-        for start_sec, end_sec in tqdm(all_final_scenes, desc="Saving Scenes"):
+        # Save scenes with reduced progress spam  
+        for scene_idx_iter, (start_sec, end_sec) in enumerate(all_final_scenes):
+            # Only show progress every 25 scenes or for first/last scene to reduce spam
+            if scene_idx_iter % 25 == 0 or scene_idx_iter == len(all_final_scenes) - 1:
+                logger.debug(f"Saving scene {scene_idx_iter + 1}/{len(all_final_scenes)}")
             scene_path, energy_db = self._save_scene(original_audio, sample_rate, saved_scene_idx, output_dir, media_basename, start_sec, end_sec)
             if scene_path:
                 duration = end_sec - start_sec
@@ -690,284 +692,289 @@ class DynamicSceneDetector:
     """
 
     def __init__(self,
+                 # Core final segment bounds
                  max_duration: float = 29.0,
                  min_duration: float = 0.3,
+                 # Legacy pass-1 defaults (kept for BC if *_s not provided)
                  max_silence: float = 1.8,
                  energy_threshold: int = 38,
-                 # New optional flags for backward-compatible enhancements
+                 # Assistive detection flags
                  assist_processing: bool = True,
-                 verbose_summary: bool = True):
+                 verbose_summary: bool = True,
+                 # New: detection audio handling
+                 target_sr: int = 16000,
+                 force_mono: bool = True,
+                 preserve_original_sr: bool = True,
+                 # New: pass-1 controls
+                 pass1_min_duration_s: Optional[float] = None,
+                 pass1_max_duration_s: Optional[float] = None,
+                 pass1_max_silence_s: Optional[float] = None,
+                 pass1_energy_threshold: Optional[int] = None,
+                 # New: pass-2 controls
+                 pass2_min_duration_s: float = 0.3,
+                 pass2_max_duration_s: Optional[float] = None,
+                 pass2_max_silence_s: float = 0.94,
+                 pass2_energy_threshold: int = 50,
+                 # New: assist processing shaping
+                 bandpass_low_hz: int = 200,
+                 bandpass_high_hz: int = 4000,
+                 drc_threshold_db: float = -24.0,
+                 drc_ratio: float = 4.0,
+                 drc_attack_ms: float = 5.0,
+                 drc_release_ms: float = 100.0,
+                 skip_assist_on_loud_dbfs: float = -5.0,
+                 # New: fallback and shaping
+                 brute_force_fallback: bool = True,
+                 brute_force_chunk_s: Optional[float] = None,
+                 pad_edges_s: float = 0.0,
+                 fade_ms: int = 0,
+                 # Accept *_s aliases via kwargs for config flexibility
+                 **kwargs):
         """
         Initialize the dynamic audio scene detector.
-
-        Args:
-            max_duration (float): The final maximum scene duration in seconds.
-            min_duration (float): The final minimum scene duration in seconds.
-            max_silence (float): Max silence for Pass 1 splitting. Kept for contract compatibility.
-            energy_threshold (int): Energy threshold for Pass 1. Kept for contract compatibility.
-            assist_processing (bool): If True, enables a bandpass filter and Dynamic Range
-                                      Compression to assist in detecting quiet speech in Pass 2.
-                                      Defaults to False to maintain original behavior.
-            verbose_summary (bool): If True, prints a detailed summary of the segmentation process.
-                                    Defaults to False.
         """
         if not AUDITOK_AVAILABLE:
             raise ImportError("The 'auditok' library is required for DynamicSceneDetector.")
 
-        # Core parameters defining the final output segments
+        # Allow *_s aliases from config (e.g., max_duration_s)
+        max_duration = float(kwargs.get("max_duration_s", max_duration))
+        min_duration = float(kwargs.get("min_duration_s", min_duration))
+
+        # Core parameters
         self.max_duration = max_duration
         self.min_duration = min_duration
 
+        # Detection and saving audio handling
+        self.target_sr = int(kwargs.get("target_sr", target_sr))
+        self.force_mono = bool(kwargs.get("force_mono", force_mono))
+        self.preserve_original_sr = bool(kwargs.get("preserve_original_sr", preserve_original_sr))
+
         # --- Pass 1 Parameters (Coarse Splitting) ---
-        # These define the initial "story line" segmentation.
-        self.pass1_max_duration = 2700.0  # ~45 minutes, for finding large chunks
-        self.pass1_min_duration = 0.3
-        self.pass1_max_silence = max_silence
-        self.pass1_energy_threshold = energy_threshold
+        # Defaults map to legacy args if explicit *_s not provided
+        self.pass1_min_duration = float(kwargs.get("pass1_min_duration_s", pass1_min_duration_s if pass1_min_duration_s is not None else 0.3))
+        self.pass1_max_duration = float(kwargs.get("pass1_max_duration_s", pass1_max_duration_s if pass1_max_duration_s is not None else 2700.0))
+        self.pass1_max_silence = float(kwargs.get("pass1_max_silence_s", pass1_max_silence_s if pass1_max_silence_s is not None else max_silence))
+        self.pass1_energy_threshold = int(kwargs.get("pass1_energy_threshold", pass1_energy_threshold if pass1_energy_threshold is not None else energy_threshold))
 
-        # --- Pass 2 Parameters (Fine-grained Splitting) ---
-        # These are applied to the long chunks found in Pass 1.
-        self.pass2_max_duration = self.max_duration - 1.0 # Use main param with a buffer
-        self.pass2_min_duration = 0.3
-        self.pass2_max_silence = 0.94
-        self.pass2_energy_threshold = 50 # Higher threshold for more sensitive splitting
+        # --- Pass 2 Parameters (Fine Splitting) ---
+        # If pass2_max_duration_s not provided, derive from max_duration - 1.0
+        derived_pass2_max = max(self.max_duration - 1.0, self.min_duration)
+        self.pass2_min_duration = float(kwargs.get("pass2_min_duration_s", pass2_min_duration_s))
+        self.pass2_max_duration = float(kwargs.get("pass2_max_duration_s", pass2_max_duration_s if pass2_max_duration_s is not None else derived_pass2_max))
+        self.pass2_max_silence = float(kwargs.get("pass2_max_silence_s", pass2_max_silence_s))
+        self.pass2_energy_threshold = int(kwargs.get("pass2_energy_threshold", pass2_energy_threshold))
 
-        # --- Enhancement Flags ---
-        self.assist_processing = assist_processing
-        self.verbose_summary = verbose_summary
-        logger.info(f"DynamicSceneDetector initialized. Assistive Processing: {self.assist_processing}")
+        # --- Enhancement Flags and Shaping ---
+        self.assist_processing = bool(kwargs.get("assist_processing", assist_processing))
+        self.verbose_summary = bool(kwargs.get("verbose_summary", verbose_summary))
 
+        self.bandpass_low_hz = int(kwargs.get("bandpass_low_hz", bandpass_low_hz))
+        self.bandpass_high_hz = int(kwargs.get("bandpass_high_hz", bandpass_high_hz))
+        self.drc_threshold_db = float(kwargs.get("drc_threshold_db", drc_threshold_db))
+        self.drc_ratio = float(kwargs.get("drc_ratio", drc_ratio))
+        self.drc_attack_ms = float(kwargs.get("drc_attack_ms", drc_attack_ms))
+        self.drc_release_ms = float(kwargs.get("drc_release_ms", drc_release_ms))
+        self.skip_assist_on_loud_dbfs = float(kwargs.get("skip_assist_on_loud_dbfs", skip_assist_on_loud_dbfs))
+
+        self.brute_force_fallback = bool(kwargs.get("brute_force_fallback", brute_force_fallback))
+        # default fallback chunk equals max_duration
+        self.brute_force_chunk_s = float(kwargs.get("brute_force_chunk_s", brute_force_chunk_s if brute_force_chunk_s is not None else self.max_duration))
+        self.pad_edges_s = float(kwargs.get("pad_edges_s", pad_edges_s))
+        self.fade_ms = int(kwargs.get("fade_ms", fade_ms))
+
+        logger.debug(
+            "DynamicSceneDetector cfg: "
+            f"target_sr={self.target_sr}, preserve_original_sr={self.preserve_original_sr}, "
+            f"max_dur={self.max_duration}s, min_dur={self.min_duration}s, "
+            f"pass1(max_dur={self.pass1_max_duration}, max_sil={self.pass1_max_silence}, thr={self.pass1_energy_threshold}), "
+            f"pass2(max_dur={self.pass2_max_duration}, max_sil={self.pass2_max_silence}, thr={self.pass2_energy_threshold}), "
+            f"assist={self.assist_processing}"
+        )
 
     def _apply_assistive_processing(self, audio_chunk: np.ndarray, sample_rate: int) -> np.ndarray:
         """
         Applies a bandpass filter and DRC to enhance speech detection for Pass 2.
-        Optimized to minimize memory usage by working on input array when possible.
-
-        Args:
-            audio_chunk (np.ndarray): The audio data to process.
-            sample_rate (int): The audio sample rate.
-
-        Returns:
-            np.ndarray: The processed audio data.
         """
-        # 1. Safety Check: Avoid processing already loud audio
+        # Skip on loud chunks
         peak_dbfs = 20 * np.log10(np.max(np.abs(audio_chunk)) + 1e-9)
-        if peak_dbfs > -5.0:
-            logger.warning(f"Audio chunk peak is {peak_dbfs:.2f} dBFS. "
-                           "Skipping assistive processing to avoid distortion.")
+        if peak_dbfs > self.skip_assist_on_loud_dbfs:
+            logger.debug(f"Peak {peak_dbfs:.2f} dBFS >= {self.skip_assist_on_loud_dbfs:.2f} dBFS; skipping assist.")
             return audio_chunk
 
-        # 2. Bandpass Filter: Isolate typical speech frequencies (e.g., 200Hz - 4000Hz)
+        # Bandpass
         nyquist = 0.5 * sample_rate
-        low = 200 / nyquist
-        high = 4000 / nyquist
+        low = max(10.0, float(self.bandpass_low_hz)) / nyquist
+        high = min(nyquist - 1.0, float(self.bandpass_high_hz)) / nyquist
+        # Guard band limits
+        high = min(max(high, low + 1e-4), 0.999)
         b, a = butter(5, [low, high], btype='band')
-        # Create a copy for processing to avoid modifying the original
         filtered_audio = filtfilt(b, a, audio_chunk.copy())
 
-        # 3. Dynamic Range Compression (DRC): Boost quiet parts, tame loud parts
-        # Convert to pydub AudioSegment for DRC
+        # DRC via pydub
         audio_segment = AudioSegment(
             (filtered_audio * 32767).astype(np.int16).tobytes(),
             frame_rate=sample_rate,
             sample_width=2,
             channels=1
         )
-        # Apply gentle compression
         compressed_segment = compress_dynamic_range(
             audio_segment,
-            threshold=-24.0,
-            ratio=4.0,
-            attack=5.0,
-            release=100.0
+            threshold=self.drc_threshold_db,
+            ratio=self.drc_ratio,
+            attack=self.drc_attack_ms,
+            release=self.drc_release_ms
         )
-        # Convert back to numpy float array
-        processed_samples = np.array(compressed_segment.get_array_of_samples()).astype(np.float32)
-        processed_samples /= 32768.0
+        processed_samples = np.array(compressed_segment.get_array_of_samples()).astype(np.float32) / 32768.0
 
-        # 4. Safety Clip: Ensure processed audio does not exceed float limits
+        # Safety clip
         post_peak = np.max(np.abs(processed_samples))
         if post_peak > 1.0:
-            logger.debug(f"Clipping processed audio from peak {post_peak:.2f} to 1.0")
             processed_samples = np.clip(processed_samples, -1.0, 1.0)
 
         return processed_samples
-
 
     def _save_scene(self, audio_data: np.ndarray, sample_rate: int,
                     scene_idx: int, output_dir: Path,
                     media_basename: str) -> Path:
         """
-        Saves a scene to a WAV file. This function always works with and saves
-        the ORIGINAL, unprocessed audio data.
-
-        Args:
-            audio_data (np.ndarray): The audio data for the scene (a slice of the original).
-            sample_rate (int): The audio sample rate.
-            scene_idx (int): The sequential index of the scene.
-            output_dir (Path): The directory to save the file.
-            media_basename (str): The base name for the output file.
-
-        Returns:
-            Path: The path to the saved scene file.
+        Save scene as PCM16 WAV.
         """
         scene_filename = f"{media_basename}_scene_{scene_idx:04d}.wav"
         scene_path = output_dir / scene_filename
-        # Ensure output directory exists
         output_dir.mkdir(parents=True, exist_ok=True)
-        # Save the audio chunk as a 16-bit PCM WAV file
         sf.write(str(scene_path), audio_data, sample_rate, subtype='PCM_16')
         return scene_path
-
 
     def detect_scenes(self, audio_path: Path, output_dir: Path, media_basename: str) -> List[Tuple[Path, float, float, float]]:
         """
         Splits audio into scenes using a robust two-pass approach.
-
-        This is the main public method, maintaining the original contract.
-
-        Args:
-            audio_path (Path): Path to the input audio file.
-            output_dir (Path): Directory to save scene files.
-            media_basename (str): The base name for naming scenes.
-
-        Returns:
-            List[Tuple[Path, float, float, float]]: A list of tuples, where each
-            tuple contains (scene_path, start_time, end_time, duration).
         """
         logger.info(f"Starting dynamic scene detection for: {audio_path}")
 
-        # 1. Load audio using unified loading (consistent with other detectors)
+        # Load detection stream and original stream
         try:
-            original_audio, sample_rate = load_audio_unified(audio_path, target_sr=16000, force_mono=True)
-            audio_duration = len(original_audio) / sample_rate
-            logger.info(f"Audio loaded successfully. Duration: {audio_duration:.1f}s, Sample Rate: {sample_rate}Hz")
+            detection_audio, det_sr = load_audio_unified(audio_path, target_sr=self.target_sr, force_mono=self.force_mono)
+            original_audio, orig_sr = load_audio_unified(audio_path, target_sr=None, force_mono=self.force_mono)
+            det_duration = len(detection_audio) / det_sr
+            logger.info(f"Detection stream: {det_duration:.1f}s @ {det_sr}Hz; Original stream: {len(original_audio)/orig_sr:.1f}s @ {orig_sr}Hz")
         except Exception as e:
             logger.error(f"Failed to load audio file {audio_path}: {e}")
             return []
 
-        # --- Pass 1: Coarse splitting on RAW audio to find "story lines" ---
-        logger.info("Pass 1: Finding coarse story lines on original audio...")
-        raw_audio_bytes = (original_audio * 32767).astype(np.int16).tobytes()
+        # Choose saving stream
+        save_audio = original_audio if self.preserve_original_sr else detection_audio
+        save_sr = orig_sr if self.preserve_original_sr else det_sr
+        total_duration_s = len(save_audio) / save_sr  # seconds baseline
 
+        # Pass 1 on detection audio
+        logger.info("Pass 1: Finding coarse story lines on detection audio...")
+        det_bytes = (detection_audio * 32767).astype(np.int16).tobytes()
         pass1_params = {
-            "sampling_rate": sample_rate,
+            "sampling_rate": det_sr,
             "channels": 1,
             "sample_width": 2,
             "min_dur": self.pass1_min_duration,
             "max_dur": self.pass1_max_duration,
-            "max_silence": min(audio_duration * 0.95, self.pass1_max_silence),
+            "max_silence": min(det_duration * 0.95, self.pass1_max_silence),
             "energy_threshold": self.pass1_energy_threshold,
             "drop_trailing_silence": True
         }
-        story_lines = list(auditok.split(raw_audio_bytes, **pass1_params))
+        story_lines = list(auditok.split(det_bytes, **pass1_params))
         logger.info(f"Pass 1: Found {len(story_lines)} story line region(s).")
 
-        # --- Process each story line ---
-        final_scene_tuples = []
+        final_scene_tuples: List[Tuple[Path, float, float, float]] = []
         scene_idx = 0
-        
-        # Counters for verbose summary
+
+        # Counters
         storyline_direct_saves = 0
         granular_segments_count = 0
         brute_force_segments_count = 0
 
-        for region_idx, region in enumerate(tqdm(story_lines, desc="Processing Story Lines")):
+        # Helper to clamp with optional edge padding
+        def clamp_with_pad(s: float, e: float) -> Tuple[float, float]:
+            s_pad = max(0.0, s - self.pad_edges_s)
+            e_pad = min(total_duration_s, e + self.pad_edges_s)
+            if e_pad < s_pad:
+                e_pad = s_pad
+            return s_pad, e_pad
+
+        for region_idx, region in enumerate(story_lines):
+            if region_idx % 15 == 0 or region_idx == len(story_lines) - 1:
+                logger.debug(f"Processing story line {region_idx + 1}/{len(story_lines)}")
+
             region_start_sec = region.start
             region_end_sec = region.end
             region_duration = region_end_sec - region_start_sec
 
-            start_sample = int(region_start_sec * sample_rate)
-            end_sample = int(region_end_sec * sample_rate)
-            region_audio_original = original_audio[start_sample:end_sample]
-
-            # If region is short enough, save it directly
-            if region_duration <= self.max_duration:
-                if region_duration >= self.min_duration:
-                    scene_path = self._save_scene(
-                        region_audio_original, sample_rate, scene_idx, output_dir, media_basename
-                    )
-                    final_scene_tuples.append((scene_path, region_start_sec, region_end_sec, region_duration))
-                    scene_idx += 1
-                    storyline_direct_saves += 1
+            # Direct save if short enough
+            if region_duration <= self.max_duration and region_duration >= self.min_duration:
+                s_sec, e_sec = clamp_with_pad(region_start_sec, region_end_sec)
+                start_sample = int(s_sec * save_sr)
+                end_sample = int(e_sec * save_sr)
+                scene_path = self._save_scene(save_audio[start_sample:end_sample], save_sr, scene_idx, output_dir, media_basename)
+                final_scene_tuples.append((scene_path, s_sec, e_sec, e_sec - s_sec))
+                scene_idx += 1
+                storyline_direct_saves += 1
                 continue
 
-            # --- Pass 2: Fine-grained splitting for long regions ---
-            logger.debug(f"Pass 2: Processing long region {region_idx} ({region_duration:.1f}s)")
-            
-            # Memory-optimized approach: avoid unnecessary copies
+            # Pass 2 on detection audio chunk
+            det_start = int(region_start_sec * det_sr)
+            det_end = int(region_end_sec * det_sr)
+            region_audio_det = detection_audio[det_start:det_end]
+
+            audio_for_detection = region_audio_det
             if self.assist_processing:
-                logger.debug("Applying assistive processing to enhance detection.")
-                audio_for_detection = self._apply_assistive_processing(region_audio_original, sample_rate)
-            else:
-                # Use original audio directly - no copy needed
-                audio_for_detection = region_audio_original
+                audio_for_detection = self._apply_assistive_processing(region_audio_det, det_sr)
 
-            # Convert to bytes for auditok (note: this creates a copy, but it's unavoidable)
             region_bytes_for_detection = (audio_for_detection * 32767).astype(np.int16).tobytes()
-
             pass2_params = {
-                "sampling_rate": sample_rate, "channels": 1, "sample_width": 2,
-                "min_dur": self.pass2_min_duration, "max_dur": self.pass2_max_duration,
+                "sampling_rate": det_sr,
+                "channels": 1,
+                "sample_width": 2,
+                "min_dur": self.pass2_min_duration,
+                "max_dur": self.pass2_max_duration,
                 "max_silence": min(region_duration * 0.95, self.pass2_max_silence),
                 "energy_threshold": self.pass2_energy_threshold,
                 "drop_trailing_silence": True
             }
             sub_regions = list(auditok.split(region_bytes_for_detection, **pass2_params))
 
-            # Process the sub-regions found
             if sub_regions:
                 granular_segments_count += len(sub_regions)
-                logger.debug(f"Pass 2 successfully split region into {len(sub_regions)} sub-scenes.")
-                for sub_region in sub_regions:
-                    sub_start_sec = sub_region.start
-                    sub_end_sec = sub_region.end
-                    sub_duration = sub_end_sec - sub_start_sec
-
-                    if sub_duration < self.min_duration:
+                logger.debug(f"Pass 2 split region into {len(sub_regions)} sub-scenes.")
+                for sub in sub_regions:
+                    sub_start = region_start_sec + sub.start
+                    sub_end = region_start_sec + sub.end
+                    sub_dur = sub_end - sub_start
+                    if sub_dur < self.min_duration:
                         continue
-                    
-                    # IMPORTANT: Slice from the ORIGINAL region audio, not the processed one
-                    sub_start_sample = int(sub_start_sec * sample_rate)
-                    sub_end_sample = int(sub_end_sec * sample_rate)
-                    sub_audio_original = region_audio_original[sub_start_sample:sub_end_sample]
-
-                    abs_start = region_start_sec + sub_start_sec
-                    abs_end = region_start_sec + sub_end_sec
-
-                    scene_path = self._save_scene(
-                        sub_audio_original, sample_rate, scene_idx, output_dir, media_basename
-                    )
-                    final_scene_tuples.append((scene_path, abs_start, abs_end, sub_duration))
+                    s_sec, e_sec = clamp_with_pad(sub_start, sub_end)
+                    start_sample = int(s_sec * save_sr)
+                    end_sample = int(e_sec * save_sr)
+                    scene_path = self._save_scene(save_audio[start_sample:end_sample], save_sr, scene_idx, output_dir, media_basename)
+                    final_scene_tuples.append((scene_path, s_sec, e_sec, e_sec - s_sec))
                     scene_idx += 1
             else:
-                # Fallback: Brute-force splitting if Pass 2 fails
+                if not self.brute_force_fallback:
+                    logger.warning(f"Pass 2 found no sub-regions in region {region_idx}; skipping fallback.")
+                    continue
                 logger.warning(f"Pass 2 found no sub-regions in region {region_idx}, using brute-force splitting.")
-                num_chunks = int(np.ceil(region_duration / self.max_duration))
+                chunk_len = self.brute_force_chunk_s
+                num_chunks = int(np.ceil(region_duration / max(chunk_len, self.min_duration)))
                 brute_force_segments_count += num_chunks
-                
                 for i in range(num_chunks):
-                    sub_start_sec = i * self.max_duration
-                    sub_end_sec = min((i + 1) * self.max_duration, region_duration)
-                    sub_duration = sub_end_sec - sub_start_sec
-
-                    if sub_duration < self.min_duration:
+                    sub_start = region_start_sec + i * chunk_len
+                    sub_end = min(region_start_sec + (i + 1) * chunk_len, region_end_sec)
+                    sub_dur = sub_end - sub_start
+                    if sub_dur < self.min_duration:
                         continue
-
-                    sub_start_sample = int(sub_start_sec * sample_rate)
-                    sub_end_sample = int(sub_end_sec * sample_rate)
-                    sub_audio_original = region_audio_original[sub_start_sample:sub_end_sample]
-
-                    abs_start = region_start_sec + sub_start_sec
-                    abs_end = region_start_sec + sub_end_sec
-
-                    scene_path = self._save_scene(
-                        sub_audio_original, sample_rate, scene_idx, output_dir, media_basename
-                    )
-                    final_scene_tuples.append((scene_path, abs_start, abs_end, sub_duration))
+                    s_sec, e_sec = clamp_with_pad(sub_start, sub_end)
+                    start_sample = int(s_sec * save_sr)
+                    end_sample = int(e_sec * save_sr)
+                    scene_path = self._save_scene(save_audio[start_sample:end_sample], save_sr, scene_idx, output_dir, media_basename)
+                    final_scene_tuples.append((scene_path, s_sec, e_sec, e_sec - s_sec))
                     scene_idx += 1
 
-        # --- Final Summary ---
         if self.verbose_summary:
             summary_lines = [
                 "", "="*50,
