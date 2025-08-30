@@ -186,14 +186,29 @@ def cleanup_temp_directory(temp_dir: str):
 def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
     """Process files synchronously with enhanced progress reporting."""
     
-    # Determine verbosity
+    # Import unified progress components at function start
+    from whisperjav.utils.unified_progress import UnifiedProgressManager, VerbosityLevel as UnifiedVerbosityLevel
+    from whisperjav.utils.progress_adapter import ProgressDisplayAdapter
+    
+    # Determine verbosity level from args or config
+    verbosity_mapping = {
+        'quiet': UnifiedVerbosityLevel.QUIET,
+        'summary': UnifiedVerbosityLevel.STANDARD,  # Map summary to standard
+        'standard': UnifiedVerbosityLevel.STANDARD,
+        'normal': UnifiedVerbosityLevel.STANDARD,   # Map normal to standard
+        'detailed': UnifiedVerbosityLevel.DETAILED,
+        'verbose': UnifiedVerbosityLevel.DEBUG,     # Map verbose to debug
+        'debug': UnifiedVerbosityLevel.DEBUG
+    }
+    
     if args.verbosity:
-        verbosity = VerbosityLevel(args.verbosity)
+        verbosity = verbosity_mapping.get(args.verbosity, UnifiedVerbosityLevel.STANDARD)
     else:
         # Get from config manager
         config_manager = ConfigManager(args.config)
         ui_prefs = config_manager.get_ui_preferences()
-        verbosity = VerbosityLevel(ui_prefs.get('console_verbosity', 'summary'))
+        verbosity_str = ui_prefs.get('console_verbosity', 'summary')
+        verbosity = verbosity_mapping.get(verbosity_str, UnifiedVerbosityLevel.STANDARD)
     
     enhancement_kwargs = {
         "adaptive_classification": args.adaptive_classification,
@@ -201,15 +216,15 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "smart_postprocessing": args.smart_postprocessing
     }
     
-    # Initialize appropriate progress handler
+    # Initialize unified progress system for better UX and reduced spam
     if args.no_progress:
-        from whisperjav.utils.progress_display import DummyProgress
-        progress = DummyProgress()
+        from whisperjav.utils.progress_adapter import DummyProgressAdapter
+        progress = DummyProgressAdapter()
     else:
-        # This would need to be integrated with the existing ProgressDisplay
-        # For now, use the existing system
-        from whisperjav.utils.progress_display import ProgressDisplay
-        progress = ProgressDisplay(len(media_files), enabled=True)
+        # Create unified manager and adapter
+        unified_manager = UnifiedProgressManager(verbosity=verbosity)
+        unified_manager.total_files = len(media_files)  # Store for reference
+        progress = ProgressDisplayAdapter(unified_manager)
     
     pipeline_args = {
         "output_dir": args.output_dir,

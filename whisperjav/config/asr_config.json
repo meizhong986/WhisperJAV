@@ -58,8 +58,38 @@
   "feature_configs": {
     "scene_detection": {
       "default": {
-        "max_duration": 29.0,
-        "min_duration": 0.3
+        "max_duration_s": 29.0,
+        "min_duration_s": 0.30,
+
+        "target_sr": 16000,
+        "force_mono": true,
+        "preserve_original_sr": true,
+
+        "assist_processing": false,
+        "verbose_summary": true,
+
+        "pass1_min_duration_s": 0.30,
+        "pass1_max_duration_s": 2700.0,
+        "pass1_max_silence_s": 1.80,
+        "pass1_energy_threshold": 38,
+
+        "pass2_min_duration_s": 0.30,
+        "pass2_max_duration_s": 28.0, 
+        "pass2_max_silence_s": 0.94,
+        "pass2_energy_threshold": 50,
+
+        "bandpass_low_hz": 200,
+        "bandpass_high_hz": 4000,
+        "drc_threshold_db": -24.0,
+        "drc_ratio": 4.0,
+        "drc_attack_ms": 5.0,
+        "drc_release_ms": 100.0,
+        "skip_assist_on_loud_dbfs": -5.0,
+
+        "brute_force_fallback": true,
+        "brute_force_chunk_s": 29.0,
+        "pad_edges_s": 0.0,
+        "fade_ms": 0
       }
     },
     "post_processing": {
@@ -208,18 +238,18 @@
   },
   "openai_whisper_engine_options": {
     "balanced": {
-      "carry_initial_prompt": false,
+      "carry_initial_prompt": null,
       "prompt": null,
       "fp16": true
     },
     "conservative": {
-      "carry_initial_prompt": false,
+      "carry_initial_prompt": null,
       "prompt": null,
       "fp16": true
     },
     "aggressive": {
       "verbose": false,
-      "carry_initial_prompt": false,
+      "carry_initial_prompt": null,
       "prompt": null,
       "fp16": true
     }
