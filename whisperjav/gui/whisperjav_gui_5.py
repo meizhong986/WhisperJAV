@@ -25,7 +25,15 @@ class WhisperJAVGUI(tk.Tk):
 
         # Layout grid weights for responsive design
         frm.columnconfigure(0, weight=1)
-        frm.rowconfigure(4, weight=1)  # Log expands
+        # Make the Log section (row 5) expand so run buttons stay visible
+        frm.rowconfigure(5, weight=1)
+
+        # Styles
+        style = ttk.Style(self)
+        try:
+            style.configure('Info.TLabel', foreground='#666666')
+        except Exception:
+            pass
 
         # 1) Source (inputs list)
         src = ttk.LabelFrame(frm, text="Source")
@@ -64,21 +72,25 @@ class WhisperJAVGUI(tk.Tk):
         for val in ("balanced", "fast", "faster"):
             ttk.Radiobutton(rb_frame, text=val, value=val, variable=self.mode_var).pack(side=tk.LEFT, padx=(0, 8))
 
-        ttk.Label(prof, text="Subs language:").grid(row=0, column=2, sticky="e", padx=6)
-        self.lang_var = tk.StringVar(value="japanese")
-        ttk.Combobox(prof, textvariable=self.lang_var, values=["japanese", "english-direct"], width=16, state="readonly").grid(row=0, column=3, sticky="w")
-
-        ttk.Label(prof, text="Sensitivity:").grid(row=0, column=4, sticky="e", padx=6)
+        ttk.Label(prof, text="Sensitivity:").grid(row=0, column=2, sticky="e", padx=6)
         self.sens_var = tk.StringVar(value="balanced")
-        ttk.Combobox(prof, textvariable=self.sens_var, values=["conservative", "balanced", "aggressive"], width=14, state="readonly").grid(row=0, column=5, sticky="w")
+        ttk.Combobox(prof, textvariable=self.sens_var, values=["conservative", "balanced", "aggressive"], width=14, state="readonly").grid(row=0, column=3, sticky="w")
 
-        # Quick presets
-        presets = ttk.Frame(prof)
-        presets.grid(row=1, column=0, columnspan=6, sticky="w", padx=6, pady=(0, 6))
-        ttk.Label(presets, text="Presets:").pack(side=tk.LEFT)
-        ttk.Button(presets, text="Default", command=lambda: self.apply_preset("default")).pack(side=tk.LEFT, padx=(6, 0))
-        ttk.Button(presets, text="Speed", command=lambda: self.apply_preset("speed")).pack(side=tk.LEFT, padx=6)
-        ttk.Button(presets, text="Quality", command=lambda: self.apply_preset("quality")).pack(side=tk.LEFT)
+        ttk.Label(prof, text="Output language:").grid(row=0, column=4, sticky="e", padx=6)
+        self.lang_var = tk.StringVar(value="japanese")
+        ttk.Combobox(prof, textvariable=self.lang_var, values=["japanese", "english-direct"], width=16, state="readonly").grid(row=0, column=5, sticky="w")
+
+        # Info rows
+        ttk.Label(
+            prof,
+            text="Speed vs. Accuracy: 'fast' and 'faster' prioritize throughput; 'balanced' favors accuracy.",
+            style='Info.TLabel', wraplength=420, justify='left'
+        ).grid(row=1, column=1, columnspan=2, sticky="w", padx=6, pady=(0, 6))
+        ttk.Label(
+            prof,
+            text="Details vs. Noise: 'conservative' reduces false positives; 'aggressive' may include noise while capturing more detail.",
+            style='Info.TLabel', wraplength=420, justify='left'
+        ).grid(row=1, column=3, columnspan=3, sticky="w", padx=6, pady=(0, 6))
 
         # 4) Advanced (collapsible)
         adv_header = ttk.Frame(frm)
@@ -133,12 +145,10 @@ class WhisperJAVGUI(tk.Tk):
 
         btns_run = ttk.Frame(run)
         btns_run.grid(row=1, column=0, columnspan=5, sticky="w", padx=0, pady=6)
-        self.btn_check = ttk.Button(btns_run, text="Check Environment", command=self.check_env)
         self.btn_start = ttk.Button(btns_run, text="Start", command=self.start)
         self.btn_cancel = ttk.Button(btns_run, text="Cancel", command=self.cancel, state=tk.DISABLED)
-        self.btn_check.pack(side=tk.LEFT)
-        self.btn_start.pack(side=tk.LEFT, padx=8)
-        self.btn_cancel.pack(side=tk.LEFT)
+        self.btn_start.pack(side=tk.LEFT)
+        self.btn_cancel.pack(side=tk.LEFT, padx=8)
 
         # 6) Log
         log_frame = ttk.LabelFrame(frm, text="Log")
@@ -319,7 +329,6 @@ class WhisperJAVGUI(tk.Tk):
             except Exception:
                 pass
             self.btn_start.configure(state=tk.DISABLED)
-            self.btn_check.configure(state=tk.DISABLED)
             self.btn_cancel.configure(state=tk.NORMAL)
         else:
             try:
@@ -327,7 +336,6 @@ class WhisperJAVGUI(tk.Tk):
             except Exception:
                 pass
             self.btn_start.configure(state=tk.NORMAL)
-            self.btn_check.configure(state=tk.NORMAL)
             self.btn_cancel.configure(state=tk.DISABLED)
 
     def toggle_advanced(self):
@@ -342,43 +350,7 @@ class WhisperJAVGUI(tk.Tk):
             self.adv_open.set(True)
             self._adv_btn.configure(text="Hide advanced ▾")
 
-    def apply_preset(self, name: str):
-        name = (name or "").lower()
-        if name == "speed":
-            self.mode_var.set("faster")
-            self.sens_var.set("balanced")
-            self.opt_adapt_cls.set(False)
-            self.opt_adapt_enh.set(False)
-            self.opt_smart_post.set(False)
-            self.async_var.set(True)
-            # Pick a reasonable default for workers
-            try:
-                cpu = os.cpu_count() or 4
-            except Exception:
-                cpu = 4
-            self.workers_var.set(max(2, min(8, cpu - 1)))
-            self.verbosity_var.set("summary")
-            self.no_progress_var.set(False)
-        elif name == "quality":
-            self.mode_var.set("balanced")
-            self.sens_var.set("conservative")
-            self.opt_adapt_cls.set(True)
-            self.opt_adapt_enh.set(True)
-            self.opt_smart_post.set(True)
-            self.async_var.set(False)
-            self.workers_var.set(1)
-            self.verbosity_var.set("normal")
-            self.no_progress_var.set(False)
-        else:  # default
-            self.mode_var.set("balanced")
-            self.sens_var.set("balanced")
-            self.opt_adapt_cls.set(False)
-            self.opt_adapt_enh.set(False)
-            self.opt_smart_post.set(False)
-            self.async_var.set(False)
-            self.workers_var.set(1)
-            self.verbosity_var.set("summary")
-            self.no_progress_var.set(False)
+    # (Presets removed by user request)
 
 if __name__ == "__main__":
     app = WhisperJAVGUI()
