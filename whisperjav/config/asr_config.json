@@ -59,7 +59,7 @@
     "scene_detection": {
       "default": {
         "max_duration_s": 29.0,
-        "min_duration_s": 0.30,
+        "min_duration_s": 0.20,
 
         "target_sr": 16000,
         "force_mono": true,
@@ -68,15 +68,15 @@
         "assist_processing": false,
         "verbose_summary": true,
 
-        "pass1_min_duration_s": 0.30,
+        "pass1_min_duration_s": 2.0,
         "pass1_max_duration_s": 2700.0,
         "pass1_max_silence_s": 1.80,
-        "pass1_energy_threshold": 38,
+        "pass1_energy_threshold": 35,
 
-        "pass2_min_duration_s": 0.30,
-        "pass2_max_duration_s": 28.0, 
-        "pass2_max_silence_s": 0.94,
-        "pass2_energy_threshold": 50,
+        "pass2_min_duration_s": 0.100,
+        "pass2_max_duration_s": 960.0, 
+        "pass2_max_silence_s": 1.20,
+        "pass2_energy_threshold": 42,
 
         "bandpass_low_hz": 200,
         "bandpass_high_hz": 4000,
