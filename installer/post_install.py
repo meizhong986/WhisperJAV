@@ -179,7 +179,59 @@ def main():
     log(f"Installing WhisperJAV from GitHub: {repo_url}...")
     if not run_command(["install", "--no-deps", repo_url], "WhisperJAV application from GitHub"):
         return 1
-        
+    
+    # --- Step 5: Build GUI executable (WhisperJAV.exe) ---
+    try:
+        log("Installing PyInstaller...")
+        if not run_command(["install", "pyinstaller"], "PyInstaller"):
+            log("ERROR: Failed to install PyInstaller. Skipping EXE creation.")
+        else:
+            log("Building GUI executable with PyInstaller...")
+            launcher_path = os.path.join(sys.prefix, "WhisperJAV_Launcher.py")
+            icon_path = os.path.join(sys.prefix, "whisperjav_icon.ico")
+            # Use onefile + noconsole, drop the exe into installation root for easy shortcut
+            work_dir = os.path.join(sys.prefix, 'build_pyinstaller', 'work')
+            spec_dir = os.path.join(sys.prefix, 'build_pyinstaller', 'spec')
+
+            pyinstaller_cmd = [
+                os.path.join(sys.prefix, 'python.exe'),
+                '-m', 'PyInstaller',
+                '--noconsole',
+                '--onefile',
+                '--name', 'WhisperJAV',
+                '--distpath', sys.prefix,
+                '--workpath', work_dir,
+                '--specpath', spec_dir,
+                '--clean',
+                '--icon', icon_path,
+                launcher_path
+            ]
+            log("Running: " + ' '.join(f'"{c}"' if ' ' in str(c) else str(c) for c in pyinstaller_cmd))
+            result = subprocess.run(pyinstaller_cmd, capture_output=True, text=True, cwd=sys.prefix)
+            if result.returncode != 0:
+                log("ERROR: PyInstaller failed to build the executable.")
+                if result.stdout:
+                    log("STDOUT:\n" + result.stdout)
+                if result.stderr:
+                    log("STDERR:\n" + result.stderr)
+            else:
+                log("Successfully created WhisperJAV.exe")
+
+                # Create desktop shortcut to the new EXE
+                shortcut_bat = os.path.join(sys.prefix, 'create_desktop_shortcut.bat')
+                if os.path.exists(shortcut_bat):
+                    log("Creating desktop shortcut...")
+                    # shell=True is required to run .bat files on Windows
+                    sc = subprocess.run(shortcut_bat, shell=True)
+                    if sc.returncode == 0:
+                        log("Desktop shortcut created.")
+                    else:
+                        log(f"WARNING: Desktop shortcut script returned code {sc.returncode}.")
+                else:
+                    log("WARNING: create_desktop_shortcut.bat not found; skipping shortcut creation.")
+    except Exception as e:
+        log(f"WARNING: Exception during EXE creation: {e}")
+        log(traceback.format_exc())
 
 
     log("\n" + "="*60)

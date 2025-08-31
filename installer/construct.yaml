@@ -1,5 +1,5 @@
 name: WhisperJAV
-version: 1.4.0  
+version: 1.4.2  
 
 channels:
   - conda-forge
@@ -19,6 +19,7 @@ extra_files:
   - post_install.bat
   - post_install.py
   - ../requirements.txt         
+  - WhisperJAV_Launcher.py
   - WhisperJAV.bat
   - create_desktop_shortcut.bat
   - README_INSTALLER.txt

@@ -5,13 +5,14 @@
 import os
 import sys
 import json
+import subprocess
 import tkinter as tk
 from tkinter import messagebox
 from pathlib import Path
 
-def check_first_run():
+def check_first_run(install_root: Path):
     """Check if this is first run and download models if needed"""
-    config_path = Path(sys.prefix) / "whisperjav_config.json"
+    config_path = install_root / "whisperjav_config.json"
     
     if config_path.exists():
         with open(config_path, 'r') as f:
@@ -44,28 +45,29 @@ def check_first_run():
                 print("You can download models later from the GUI.")
 
 def main():
-    """Launch WhisperJAV GUI"""
+    """Launch WhisperJAV GUI using the installed Python (pythonw.exe)."""
     try:
+        # Determine install root: when frozen, use folder of the EXE; else use sys.prefix
+        exe_dir = Path(getattr(sys, 'frozen', False) and os.path.dirname(sys.executable) or sys.prefix)
+
         # Add Scripts to PATH for this session
-        scripts_dir = os.path.join(sys.prefix, "Scripts")
+        scripts_dir = str(exe_dir / "Scripts")
         os.environ["PATH"] = scripts_dir + os.pathsep + os.environ.get("PATH", "")
-        
-        # Check first run
-        check_first_run()
-        
-        # Import and launch GUI
-        print("Starting WhisperJAV GUI...")
-        from whisperjav.gui.whisperjav_gui import main as gui_main
-        gui_main()
-        
-    except ImportError as e:
-        messagebox.showerror(
-            "Import Error",
-            f"Failed to import WhisperJAV:\n{e}\n\n"
-            "The installation may be incomplete.\n"
-            "Please reinstall WhisperJAV."
-        )
-        sys.exit(1)
+
+        # Check first run prompt
+        check_first_run(exe_dir)
+
+        # Build command to run GUI entrypoint with pythonw (no console window)
+        pythonw = os.path.join(str(exe_dir), "pythonw.exe")
+        if not os.path.exists(pythonw):
+            # Fallback to python.exe if pythonw.exe is not present
+            pythonw = os.path.join(str(exe_dir), "python.exe")
+
+        cmd = [pythonw, "-m", "whisperjav.gui.whisperjav_gui"]
+        # Launch detached so the GUI isn't tied to the launcher process
+        creationflags = 0x00000008  # DETACHED_PROCESS
+        subprocess.Popen(cmd, cwd=str(exe_dir), creationflags=creationflags)
+
     except Exception as e:
         messagebox.showerror(
             "Error",
