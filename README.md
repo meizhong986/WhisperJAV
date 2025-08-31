@@ -117,16 +117,16 @@ Choose the appropriate mode based on your content type and requirements:
 
 ### Content-Specific Recommendations
 
-| Content Type                | Recommended Mode | Recommended Sensitivity |
+| Genre                       | Recommended Mode | Recommended Sensitivity |
 | :-------------------------- | :--------------- | :---------------------- |
-| Interview/Dialogue Heavy    | Faster           | Balanced                |
-| Group Scenes                | Balanced         | Aggressive              |
-| Amateur/Homemade            | Fast             | Conservative            |
-| Vintage (pre-2000)          | Fast/Balanced    | Conservative            |
-| ASMR/Whisper Content        | Balanced         | Aggressive              |
-| Compilation/Multiple Scenes | Fast             | Balanced                |
-| Heavy Background Music      | Balanced         | Conservative            |
-| Outdoor/Public Scenes       | Balanced         | Conservative            |
+| Drama/Dialogue Heavy        | balanced         | aggressive              |
+| Group/3p/4p Scenes          | faster           | conservative            |
+| Amateur/Homemade            | fast             | conservative            |
+| Vintage (pre-2000)          | fast             | balanced                |
+| ASMR/VR Content             | balanced         | aggressive              |
+| Compilation/Omnibus         | faster           | conservative            |
+| Heavy Background Music      | balanced         | conservative            |
+| Outdoor/Public Scenes       | fast             | balanced                |
 
 ## 🎚️ Sensitivity Settings
 
