@@ -34,6 +34,6 @@ if errorlevel 1 (
 
 echo.
 echo Build complete!
-echo Installer created: WhisperJAV-1.4.2-Windows-x86_64.exe
+echo Installer created: WhisperJAV-1.4.3-Windows-x86_64.exe
 echo.
 pause
