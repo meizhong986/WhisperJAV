@@ -7,9 +7,70 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 
-# Use repo root so -m whisperjav.main resolves correctly
+# Use site root so -m whisperjav.main resolves correctly
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT = REPO_ROOT / "output"
+
+def _get_documents_dir() -> Path:
+    """Best-effort resolve of the user's Documents folder across platforms.
+
+    - On Windows, prefer SHGetKnownFolderPath(FOLDERID_Documents) and
+      fall back to %USERPROFILE%/Documents or %OneDrive%/Documents.
+    - On macOS/Linux, default to ~/Documents if it exists, else ~.
+    """
+    home = Path.home()
+    # Windows-specific: try Known Folder API
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            # FOLDERID_Documents GUID {FDD39AD0-238F-46AF-ADB4-6C85480369C7}
+            _FOLDERID_Documents = ctypes.c_char_p(b"{FDD39AD0-238F-46AF-ADB4-6C85480369C7}")
+            SHGetKnownFolderPath = ctypes.windll.shell32.SHGetKnownFolderPath
+            SHGetKnownFolderPath.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_wchar_p)]
+            SHGetKnownFolderPath.restype = ctypes.c_long
+
+            # Convert GUID string to a GUID structure
+            class GUID(ctypes.Structure):
+                _fields_ = [
+                    ("Data1", ctypes.c_uint32),
+                    ("Data2", ctypes.c_uint16),
+                    ("Data3", ctypes.c_uint16),
+                    ("Data4", ctypes.c_ubyte * 8),
+                ]
+
+            def _guid_from_str(s: str) -> GUID:
+                import uuid
+                u = uuid.UUID(s)
+                data4 = (ctypes.c_ubyte * 8)(*u.bytes[8:])
+                return GUID(u.time_low, u.time_mid, u.time_hi_version, data4)
+
+            guid = _guid_from_str("{FDD39AD0-238F-46AF-ADB4-6C85480369C7}")
+            path_ptr = ctypes.c_wchar_p()
+            # Flags=0, hToken=None
+            hr = SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(path_ptr))
+            if hr == 0 and path_ptr.value:
+                return Path(path_ptr.value)
+        except Exception:
+            # Fall through to environment heuristics
+            pass
+
+        # Heuristics: OneDrive/Documents preferred if present
+        onedrive = os.environ.get("OneDrive")
+        if onedrive:
+            p = Path(onedrive) / "Documents"
+            if p.exists():
+                return p
+        # Default to %USERPROFILE%/Documents
+        p = home / "Documents"
+        return p if p.exists() else home
+
+    # Non-Windows
+    docs = home / "Documents"
+    return docs if docs.exists() else home
+
+
+DEFAULT_OUTPUT = _get_documents_dir() / "WhisperJAV" / "output"
 
 class WhisperJAVGUI(tk.Tk):
     def __init__(self):

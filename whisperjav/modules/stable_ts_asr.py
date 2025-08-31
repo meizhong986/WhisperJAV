@@ -3,6 +3,7 @@
 
 import sys
 import os
+import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Tuple
 import stable_whisper
@@ -11,6 +12,8 @@ import traceback
 import logging
 import torch
 import warnings
+import soundfile as sf
+import librosa
 
 from whisperjav.utils.logger import logger
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
@@ -285,6 +288,38 @@ class StableTSASR:
         
         return params
 
+    def _load_audio_as_numpy(self, audio_path: Path) -> np.ndarray:
+        """Load audio file as numpy array to avoid FFmpeg subprocess calls.
+        
+        This method loads audio directly into memory, preventing stable-whisper
+        from spawning FFmpeg subprocesses that create visible console windows.
+        """
+        try:
+            if audio_path.suffix.lower() == '.wav':
+                # Use soundfile for WAV files (faster, no FFmpeg)
+                data, sr = sf.read(str(audio_path), dtype='float32', always_2d=False)
+                
+                # Convert to mono if stereo
+                if data.ndim > 1:
+                    data = data.mean(axis=1)
+                
+                # Resample to 16kHz if needed (Whisper requirement)
+                if sr != 16000:
+                    data = librosa.resample(data, orig_sr=sr, target_sr=16000)
+                
+                logger.debug(f"Loaded {audio_path.name} as numpy array (WAV path, sr={sr}->16000)")
+                return data
+            else:
+                # Use librosa for other formats (MP3, MP4, etc.)
+                # This might still use FFmpeg internally, but only once per file
+                data, sr = librosa.load(str(audio_path), sr=16000, mono=True)
+                logger.debug(f"Loaded {audio_path.name} as numpy array (librosa path)")
+                return data
+                
+        except Exception as e:
+            logger.warning(f"Failed to load audio as numpy array: {e}")
+            # Return None to signal fallback to file path method
+            return None
 
     def transcribe(self, audio_path: Union[str, Path], **kwargs) -> stable_whisper.WhisperResult:
         """Transcribe audio file with full parameter validation and backend compatibility."""
@@ -304,11 +339,21 @@ class StableTSASR:
             logger.debug(f"Final transcription parameters: {final_params}")
         
         try:
+            # Load audio as numpy array to avoid FFmpeg subprocess windows
+            audio_input = self._load_audio_as_numpy(audio_path)
+            
+            if audio_input is None:
+                # Fallback to file path if numpy loading failed
+                logger.debug("Using file path for transcription (fallback)")
+                audio_input = str(audio_path)
+            else:
+                logger.debug("Using numpy array for transcription (no FFmpeg windows)")
+            
             # Suppress warnings during transcription
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=UserWarning)
                 
-                result = self.model.transcribe(str(audio_path), **final_params)
+                result = self.model.transcribe(audio_input, **final_params)
                 
         except TypeError as e:
             # If we still get a parameter error, log details and retry with minimal params
@@ -330,10 +375,15 @@ class StableTSASR:
             
             logger.warning(f"Retrying with minimal parameters: {minimal_params}")
             
+            # Try with minimal params, still using numpy if possible
+            audio_input = self._load_audio_as_numpy(audio_path)
+            if audio_input is None:
+                audio_input = str(audio_path)
+            
             # Suppress warnings during fallback too
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=UserWarning)
-                result = self.model.transcribe(str(audio_path), **minimal_params)
+                result = self.model.transcribe(audio_input, **minimal_params)
                 
         except Exception as e:
             logger.error(f"Transcription failed: {e}")
