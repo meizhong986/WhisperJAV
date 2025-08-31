@@ -50,9 +50,10 @@ def main():
         # Determine install root: when frozen, use folder of the EXE; else use sys.prefix
         exe_dir = Path(getattr(sys, 'frozen', False) and os.path.dirname(sys.executable) or sys.prefix)
 
-        # Add Scripts to PATH for this session
+        # Add Scripts and Library\bin to PATH for this session (ffmpeg, DLLs)
         scripts_dir = str(exe_dir / "Scripts")
-        os.environ["PATH"] = scripts_dir + os.pathsep + os.environ.get("PATH", "")
+        lib_bin_dir = str(exe_dir / "Library" / "bin")
+        os.environ["PATH"] = os.pathsep.join([scripts_dir, lib_bin_dir, os.environ.get("PATH", "")])
 
         # Check first run prompt
         check_first_run(exe_dir)
