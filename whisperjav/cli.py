@@ -4,6 +4,7 @@
 
 import sys
 import os
+import shutil
 
 def main():
     """Console script entry point."""
@@ -12,8 +13,8 @@ def main():
         print("Error: WhisperJAV requires Python 3.8 or higher")
         sys.exit(1)
     
-    # Check for FFmpeg
-    if os.system("ffmpeg -version > /dev/null 2>&1") != 0:
+    # Check for FFmpeg in PATH (cross-platform)
+    if shutil.which("ffmpeg") is None:
         print("Error: FFmpeg is not installed or not in PATH")
         sys.exit(1)
     
