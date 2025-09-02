@@ -174,7 +174,7 @@
       ],
       "compression_ratio_threshold": 2.4,
       "logprob_threshold": -1.0,
-      "no_speech_threshold": 0.6,
+      "no_speech_threshold": 0.5,
       "condition_on_previous_text": false,
       "initial_prompt": null,
       "word_timestamps": true,
@@ -202,8 +202,8 @@
         0.3
       ],
       "compression_ratio_threshold": 2.4,
-      "logprob_threshold": -1.0,
-      "no_speech_threshold": 0.46,
+      "logprob_threshold": -1.26,
+      "no_speech_threshold": 0.314,
       "condition_on_previous_text": false,
       "initial_prompt": null,
       "word_timestamps": true,
@@ -244,7 +244,7 @@
       "language": "ja",
       "best_of": 5,
       "beam_size": 5,
-      "patience": 2.5,
+      "patience": 2.9,
       "length_penalty": null,
       "prefix": null,
       "suppress_tokens": null,
@@ -328,11 +328,11 @@
       "speech_pad_ms": 60
     },
     "aggressive": {
-      "threshold": 0.18,
-      "min_speech_duration_ms": 250,
+      "threshold": 0.149,
+      "min_speech_duration_ms": 220,
       "max_speech_duration_s": 9,
-      "min_silence_duration_ms": 100,
-      "speech_pad_ms": 60
+      "min_silence_duration_ms": 125,
+      "speech_pad_ms": 110
     }
   },
   "faster_whisper_vad_options": {
