@@ -41,7 +41,8 @@ WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JA
 Please see the details at the end of this readme for more details. 
 
 -   Python 3.9 - 3.12 (Python 3.13+ is not compatible with openai-whisper)
--   CUDA-capable GPU, drivers, CUDA Toolkit, cuDNN (CUDA > 11.7) 
+-   CUDA-capable GPU, drivers, CUDA Toolkit, cuDNN (CUDA > 11.7)
+-   **CUDA-version** of pytorch, torchaudio and torchvision
 -   FFmpeg installed and in your system's PATH
 -   PIP and git installation packages
 
@@ -49,16 +50,20 @@ Please see the details at the end of this readme for more details.
 
 ```bash
 
-# Standard installation (RECOMMENDED - use -U to ensure correct dependencies)
-pip install -U git+https://github.com/meizhong986/whisperjav.git
+# Standard installation (RECOMMENDED - use the latest commit from main)
+pip install git+https://github.com/meizhong986/whisperjav.git@main
 
 
-# For users with existing installations, force reinstall
-pip install --force-reinstall git+https://github.com/meizhong986/whisperjav.git
+
+# For users with existing installations, Update:
+pip install -U --no-deps git+https://github.com/meizhong986/whisperjav.git@main
+
 
 
 ### ⚠️ Important Note
-The `-U` flag ensures you get specific versions of stable-ts and openai-whisper, which are required for WhisperJAV to function properly.
+Please make sure that you have installed cuda enabled pytorch, and pyaudio before installing whisperjav. Otherwise, openai-whisper will automatically installs a CPU torch version which is 8 times slower. You don't want that!!! 
+Example for CUDA 12.4 torch 2.5.1 (the version WhisperJAv has been tested for): 
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
 
 ```
 
@@ -68,7 +73,7 @@ The main dependencies will be automatically installed:
 
 -   `openai-whisper` or `faster-whisper`
 -   `stable-ts`
--   `torch` (with CUDA support if available)
+-   `torch` (with CUDA support)
 -   `pysrt`
 -   `tqdm`
 -   `numpy`
@@ -112,16 +117,16 @@ Choose the appropriate mode based on your content type and requirements:
 
 ### Content-Specific Recommendations
 
-| Content Type                | Recommended Mode | Recommended Sensitivity |
+| Genre                       | Recommended Mode | Recommended Sensitivity |
 | :-------------------------- | :--------------- | :---------------------- |
-| Interview/Dialogue Heavy    | Faster           | Balanced                |
-| Group Scenes                | Balanced         | Aggressive              |
-| Amateur/Homemade            | Fast             | Conservative            |
-| Vintage (pre-2000)          | Fast/Balanced    | Conservative            |
-| ASMR/Whisper Content        | Balanced         | Aggressive              |
-| Compilation/Multiple Scenes | Fast             | Balanced                |
-| Heavy Background Music      | Balanced         | Conservative            |
-| Outdoor/Public Scenes       | Balanced         | Conservative            |
+| Drama/Dialogue Heavy        | balanced         | aggressive              |
+| Group/3p/4p Scenes          | faster           | conservative            |
+| Amateur/Homemade            | fast             | conservative            |
+| Vintage (pre-2000)          | fast             | balanced                |
+| ASMR/VR Content             | balanced         | aggressive              |
+| Compilation/Omnibus         | faster           | conservative            |
+| Heavy Background Music      | balanced         | conservative            |
+| Outdoor/Public Scenes       | fast             | balanced                |
 
 ## 🎚️ Sensitivity Settings
 
