@@ -1,0 +1,14 @@
+{
+  "VAD_MIN": 0.5,
+  "SNR_CLEAN": 7.5,
+  "C50_CLEAN": 0.5,
+  "MIN_COVERAGE": 0.4,
+  "SCORE": { "w_snr": 0.7, "w_c50": 0.3, "thresh": 6.0 },
+  "CHAINS": {
+    "noisy": ["denoise", "norm"],
+    "reverberant": ["dereverb", "denoise", "norm"],
+    "music": ["separate", "denoise", "norm"],
+    "low_energy": ["agc", "norm"],
+    "unknown": ["denoise", "norm"]
+  }
+}

@@ -37,6 +37,7 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
+from whisperjav.pipelines.brouhaha_pipeline import BrouhahaPipeline
 from whisperjav.config.transcription_tuner import TranscriptionTuner
 from whisperjav.__version__ import __version__
 
@@ -96,7 +97,7 @@ def parse_arguments():
     
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced", 
+    parser.add_argument("--mode", choices=["balanced", "fast", "faster", "brouhaha"], default="balanced", 
                        help="Processing mode (default: balanced)")
     parser.add_argument("--config", default=None, help="Path to a JSON configuration file")
     parser.add_argument("--subs-language", choices=["japanese", "english-direct"], 
@@ -241,6 +242,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         pipeline = FasterPipeline(**pipeline_args)
     elif args.mode == "fast":
         pipeline = FastPipeline(**pipeline_args)
+    elif args.mode == "brouhaha":
+        pipeline = BrouhahaPipeline(**pipeline_args)
     else:  # balanced
         pipeline = BalancedPipeline(**pipeline_args)
     
