@@ -251,7 +251,7 @@ whisperjav video.mp4 --adaptive-classification --adaptive-audio-enhancement --sm
 # Use a custom configuration file
 whisperjav video.mp4 --config my_config.json
 
-# Specify a different Whisper model
+# Specify a different Whisper model (WiP)
 whisperjav video.mp4 --model large-v2
 ```
 
@@ -270,7 +270,7 @@ whisperjav video.mp4 --temp-dir /fast/ssd/temp
 
 ## ⚙️ Configuration
 
-### Configuration File Format
+### Configuration File Format (Work in Progress --subject to change)
 
 Create a custom `config.json` to override default settings:
 
@@ -299,15 +299,9 @@ Create a custom `config.json` to override default settings:
 }
 ```
 
-### Environment Variables
 
-```bash
-export WHISPERJAV_CACHE_DIR=/path/to/cache
-export WHISPERJAV_MODEL_DIR=/path/to/models
-export WHISPERJAV_LOG_LEVEL=DEBUG
-```
 
-## 🖥️ GUI Interface
+## 🖥️ GUI Interface (Work in Progress)
 
 The GUI provides an intuitive interface for users who prefer not to use the command line.
 
@@ -331,11 +325,6 @@ The GUI provides an intuitive interface for users who prefer not to use the comm
 ## 🔍 Troubleshooting
 
 ### Common Issues
-
--   **Issue**: `CUDA out of memory`
-    -   **Solution**: Use the CPU, which is slower but requires less VRAM.
-        ```bash
-        whisperjav video.mp4 --device cpu
         ```
 -   **Issue**: `FFmpeg not found`
     -   **Solution**: Install FFmpeg and ensure it's in your system's PATH.
@@ -347,10 +336,10 @@ The GUI provides an intuitive interface for users who prefer not to use the comm
         # macOS (using Homebrew)
         brew install ffmpeg
         ```
--   **Issue**: Slow processing on CPU
-    -   **Solution**: Use a faster mode or a smaller model.
-        ```bash
-        whisperjav video.mp4 --mode faster --model medium
+-   **Issue**: Slow processing or GUI looks hanged
+    -   **Solution**: Often it is caused by wrong pytorch version
+        ```
+        Remove CPU version of pytorch if exist
         ```
 
 ### Performance Tips
@@ -439,7 +428,7 @@ All three are essential for WhisperJAV to use your GPU.
 
 ---
 
-## 🐍 Python 3.8 or Higher
+## 🐍 Python 3.9 or Higher
 
 ### Download:
 - 📥 [https://www.python.org/downloads/windows](https://www.python.org/downloads/windows)
