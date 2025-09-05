@@ -43,7 +43,7 @@ from whisperjav.__version__ import __version__
 
 from whisperjav.utils.preflight_check import enforce_cuda_requirement, run_preflight_checks
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
-from whisperjav.utils.async_processor import AsyncPipelineManager
+from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
 
@@ -336,11 +336,19 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     try:
         # Process files
         print(f"\nProcessing {len(media_files)} files asynchronously...")
-        tasks = manager.process_files(media_files, args.mode, resolved_config)
+        task_ids = manager.process_files(media_files, args.mode, resolved_config)
+        
+        # Get actual task objects from the processor
+        tasks = []
+        for task_id in task_ids:
+            task = manager.processor.get_task_status(task_id)
+            if task:
+                tasks.append(task)
         
         # Summarize results
-        successful = sum(1 for t in tasks if t.status.value == 'completed')
-        failed = sum(1 for t in tasks if t.status.value == 'failed')
+        successful = sum(1 for t in tasks if t.status == ProcessingStatus.COMPLETED)
+        failed = sum(1 for t in tasks if t.status == ProcessingStatus.FAILED)
+        cancelled = sum(1 for t in tasks if t.status == ProcessingStatus.CANCELLED)
         
         print("\n" + "="*50)
         print("ASYNC PROCESSING SUMMARY")
@@ -348,6 +356,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         print(f"Total files: {len(media_files)}")
         print(f"Successful: {successful}")
         print(f"Failed: {failed}")
+        if cancelled > 0:
+            print(f"Cancelled: {cancelled}")
         
         # Save stats if requested
         if args.stats_file:
