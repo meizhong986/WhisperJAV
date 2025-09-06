@@ -163,37 +163,65 @@ class WhisperJAVGUI(tk.Tk):
 
         self.adv = ttk.LabelFrame(frm, text="Advanced options")
         # Do not grid initially; toggle_advanced will handle
-        for c in range(6):
-            self.adv.columnconfigure(c, weight=1 if c % 2 == 1 else 0)
+        # Configure grid with 4 columns for 3x4 layout
+        for c in range(4):
+            self.adv.columnconfigure(c, weight=1)
 
-        # Enhancements
+        # Row 1 (4 elements): Adaptive Classification, Adaptive Audio Enhancements, Smart Postprocessing, Verbosity
         self.opt_adapt_cls = tk.BooleanVar(value=False)
         self.opt_adapt_enh = tk.BooleanVar(value=False)
         self.opt_smart_post = tk.BooleanVar(value=False)
         ttk.Checkbutton(self.adv, text="Adaptive classification", variable=self.opt_adapt_cls).grid(row=0, column=0, sticky="w", padx=6, pady=6)
-        ttk.Checkbutton(self.adv, text="Adaptive audio enhancement", variable=self.opt_adapt_enh).grid(row=0, column=1, sticky="w", padx=6, pady=6)
+        ttk.Checkbutton(self.adv, text="Adaptive audio enhancements", variable=self.opt_adapt_enh).grid(row=0, column=1, sticky="w", padx=6, pady=6)
         ttk.Checkbutton(self.adv, text="Smart postprocessing", variable=self.opt_smart_post).grid(row=0, column=2, sticky="w", padx=6, pady=6)
-
-        # Concurrency
-        self.async_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self.adv, text="Async processing", variable=self.async_var).grid(row=1, column=0, sticky="w", padx=6)
-        ttk.Label(self.adv, text="Max workers:").grid(row=1, column=1, sticky="e", padx=6)
-        self.workers_var = tk.IntVar(value=1)
-        ttk.Spinbox(self.adv, from_=1, to=16, textvariable=self.workers_var, width=6).grid(row=1, column=2, sticky="w")
-
-        # Logging & progress
-        ttk.Label(self.adv, text="Verbosity:").grid(row=2, column=0, sticky="w", padx=6, pady=6)
+        
+        verbosity_frame = ttk.Frame(self.adv)
+        verbosity_frame.grid(row=0, column=3, sticky="w", padx=6, pady=6)
+        ttk.Label(verbosity_frame, text="Verbosity:").pack(side=tk.LEFT)
         self.verbosity_var = tk.StringVar(value="summary")
-        ttk.Combobox(self.adv, textvariable=self.verbosity_var, values=["quiet", "summary", "normal", "verbose"], width=12, state="readonly").grid(row=2, column=1, sticky="w", padx=0, pady=6)
-        self.no_progress_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self.adv, text="No progress bars", variable=self.no_progress_var).grid(row=2, column=2, sticky="w", padx=6)
+        ttk.Combobox(verbosity_frame, textvariable=self.verbosity_var, values=["quiet", "summary", "normal", "verbose"], width=10, state="readonly").pack(side=tk.LEFT, padx=(4, 0))
 
-        # Temp options
+        # Row 2 (4 elements): Model Override checkbox, Model Selection dropdown, Async Processing, Max Workers
+        # Model override with checkbox + dropdown
+        self.model_override_enabled = tk.BooleanVar(value=False)
+        ttk.Checkbutton(self.adv, text="Model override", variable=self.model_override_enabled, command=self._toggle_model_override).grid(row=1, column=0, sticky="w", padx=6, pady=6)
+        
+        self.model_selection_var = tk.StringVar(value="large-v3")
+        self.model_selection_combo = ttk.Combobox(self.adv, textvariable=self.model_selection_var, values=["large-v3", "large-v2", "turbo"], width=12, state="disabled")
+        self.model_selection_combo.grid(row=1, column=1, sticky="w", padx=6, pady=6)
+        
+        self.async_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(self.adv, text="Async processing", variable=self.async_var).grid(row=1, column=2, sticky="w", padx=6, pady=6)
+        
+        workers_frame = ttk.Frame(self.adv)
+        workers_frame.grid(row=1, column=3, sticky="w", padx=6, pady=6)
+        ttk.Label(workers_frame, text="Max workers:").pack(side=tk.LEFT)
+        self.workers_var = tk.IntVar(value=1)
+        ttk.Spinbox(workers_frame, from_=1, to=16, textvariable=self.workers_var, width=6).pack(side=tk.LEFT, padx=(4, 0))
+
+        # Row 3 (3 elements): Opening Credit (spans 2 columns), Keep Temp Files, Temp Dir + Browse
+        # Opening credit (single line entry with caption)
+        credit_frame = ttk.Frame(self.adv)
+        credit_frame.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=6)
+        credit_frame.columnconfigure(0, weight=1)
+        ttk.Label(credit_frame, text="Opening credit (Example: Produced by XXX):").grid(row=0, column=0, sticky="w")
+        self.credit_var = tk.StringVar(value="")
+        self.credit_entry = ttk.Entry(credit_frame, textvariable=self.credit_var)
+        self.credit_entry.grid(row=1, column=0, sticky="ew", pady=(2, 0))
+        
         self.keep_temp_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self.adv, text="Keep temp files", variable=self.keep_temp_var).grid(row=3, column=0, sticky="w", padx=6)
-        ttk.Label(self.adv, text="Temp dir:").grid(row=3, column=1, sticky="e", padx=6)
+        ttk.Checkbutton(self.adv, text="Keep temp files", variable=self.keep_temp_var).grid(row=2, column=2, sticky="w", padx=6, pady=6)
+        
+        temp_frame = ttk.Frame(self.adv)
+        temp_frame.grid(row=2, column=3, sticky="ew", padx=6, pady=6)
+        temp_frame.columnconfigure(0, weight=1)
+        ttk.Label(temp_frame, text="Temp dir:").grid(row=0, column=0, sticky="w")
+        temp_entry_frame = ttk.Frame(temp_frame)
+        temp_entry_frame.grid(row=1, column=0, sticky="ew", pady=(2, 0))
+        temp_entry_frame.columnconfigure(0, weight=1)
         self.temp_var = tk.StringVar(value="")
-        ttk.Entry(self.adv, textvariable=self.temp_var, width=28).grid(row=3, column=2, sticky="w", padx=0, pady=6)
+        ttk.Entry(temp_entry_frame, textvariable=self.temp_var).grid(row=0, column=0, sticky="ew")
+        ttk.Button(temp_entry_frame, text="Browse", command=self._browse_temp_dir, width=8).grid(row=0, column=1, padx=(2, 0))
 
         # 5) Run controls
         run = ttk.Frame(frm)
@@ -211,12 +239,12 @@ class WhisperJAVGUI(tk.Tk):
         self.btn_start.pack(side=tk.LEFT)
         self.btn_cancel.pack(side=tk.LEFT, padx=8)
 
-        # 6) Log
-        log_frame = ttk.LabelFrame(frm, text="Log")
+        # 6) Console/Log (expanded height)
+        log_frame = ttk.LabelFrame(frm, text="Console")
         log_frame.grid(row=5, column=0, sticky="nsew", pady=(8, 0))
         log_frame.rowconfigure(0, weight=1)
         log_frame.columnconfigure(0, weight=1)
-        self.log = tk.Text(log_frame, wrap="word", height=16, state="disabled")
+        self.log = tk.Text(log_frame, wrap="word", height=21, state="disabled")
         self.log.grid(row=0, column=0, sticky="nsew")
         self._append_log("Ready.\n")
 
@@ -287,8 +315,7 @@ class WhisperJAVGUI(tk.Tk):
             args += ["--temp-dir", self.temp_var.get().strip()]
         if self.keep_temp_var.get():
             args += ["--keep-temp"]
-        if self.no_progress_var.get():
-            args += ["--no-progress"]
+        # Note: no_progress_var removed - this option is no longer available
         if self.verbosity_var.get():
             args += ["--verbosity", self.verbosity_var.get()]
 
@@ -301,6 +328,16 @@ class WhisperJAVGUI(tk.Tk):
 
         if self.async_var.get():
             args += ["--async-processing", "--max-workers", str(self.workers_var.get())]
+
+        # Model override - only use if enabled
+        if self.model_override_enabled.get():
+            args += ["--model", self.model_selection_var.get()]
+
+        # Opening credit text
+        credit_text = self.credit_var.get().strip()
+        if credit_text:
+            args += ["--credit", credit_text]
+
         return args
 
     def _append_log(self, text):
@@ -410,6 +447,19 @@ class WhisperJAVGUI(tk.Tk):
             self.adv.grid(row=3, column=0, sticky="ew")
             self.adv_open.set(True)
             self._adv_btn.configure(text="Hide advanced ▾")
+    
+    def _toggle_model_override(self):
+        """Enable/disable the model selection dropdown based on override checkbox"""
+        if self.model_override_enabled.get():
+            self.model_selection_combo.configure(state="readonly")
+        else:
+            self.model_selection_combo.configure(state="disabled")
+    
+    def _browse_temp_dir(self):
+        """Browse for temp directory"""
+        path = filedialog.askdirectory(title="Select temporary directory")
+        if path:
+            self.temp_var.set(path)
 
     # (Presets removed by user request)
 
