@@ -144,9 +144,91 @@ def parse_arguments():
     async_group.add_argument("--max-workers", type=int, default=1,
                             help="Max concurrent workers (default: 1)")
     
+    # Subtitle signature options
+    signature_group = parser.add_argument_group("Subtitle Attribution")
+    signature_group.add_argument("--credit", type=str, 
+                                help="Producer credit text to add at beginning of subtitles")
+    signature_group.add_argument("--no-signature", action="store_true",
+                                help="Disable WhisperJAV technical signature at end")
+    
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
     
     return parser.parse_args()
+
+
+def add_signatures_to_srt(srt_path: str, producer_credit: str = None, 
+                          add_technical_sig: bool = True, 
+                          mode: str = "balanced", 
+                          sensitivity: str = "balanced",
+                          version: str = __version__):
+    """Add producer credit and/or technical signature to SRT file.
+    
+    Args:
+        srt_path: Path to the SRT file to modify
+        producer_credit: Optional producer credit text to add at beginning
+        add_technical_sig: Whether to add technical signature at end
+        mode: Processing mode used (faster/fast/balanced)
+        sensitivity: Sensitivity level used
+        version: WhisperJAV version
+    """
+    import pysrt
+    
+    try:
+        srt_path = Path(srt_path)
+        if not srt_path.exists():
+            logger.warning(f"SRT file not found for signature addition: {srt_path}")
+            return
+            
+        subs = pysrt.open(str(srt_path), encoding='utf-8')
+        if not subs or len(subs) == 0:
+            logger.debug(f"Empty or invalid SRT file, skipping signatures: {srt_path}")
+            return
+        
+        # Add producer credit at beginning if provided
+        if producer_credit and producer_credit.strip():
+            credit_sub = pysrt.SubRipItem(
+                index=0,
+                start=pysrt.SubRipTime(milliseconds=0),
+                end=pysrt.SubRipTime(milliseconds=100),
+                text=producer_credit.strip()
+            )
+            
+            # Reindex existing subtitles
+            for sub in subs:
+                sub.index += 1
+            
+            # Insert credit at beginning
+            subs.insert(0, credit_sub)
+            logger.debug(f"Added producer credit: {producer_credit}")
+        
+        # Add technical signature at end if enabled
+        if add_technical_sig:
+            last_sub = subs[-1]
+            
+            # Format signature text (compact format)
+            sig_text = f"WhisperJAV {version} | {mode.capitalize()}/{sensitivity.capitalize()}"
+            
+            # Calculate timing (500ms after last subtitle ends)
+            start_ms = last_sub.end.ordinal + 500
+            end_ms = start_ms + 2000
+            
+            tech_sig = pysrt.SubRipItem(
+                index=last_sub.index + 1,
+                start=pysrt.SubRipTime(milliseconds=start_ms),
+                end=pysrt.SubRipTime(milliseconds=end_ms),
+                text=sig_text
+            )
+            
+            subs.append(tech_sig)
+            logger.debug(f"Added technical signature: {sig_text}")
+        
+        # Save back to file
+        subs.save(str(srt_path), encoding='utf-8')
+        logger.debug(f"Signatures added successfully to {srt_path}")
+        
+    except Exception as e:
+        logger.warning(f"Could not add signatures to {srt_path}: {e}")
+        # Don't fail the whole process if signatures can't be added
 
 
 def cleanup_temp_directory(temp_dir: str):
@@ -259,6 +341,18 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 
                 subtitle_count = metadata.get("summary", {}).get("final_subtitles_refined", 0)
                 output_path = metadata.get("output_files", {}).get("final_srt", "")
+                
+                # Add signatures to the generated subtitle file
+                if output_path and Path(output_path).exists():
+                    add_signatures_to_srt(
+                        srt_path=output_path,
+                        producer_credit=args.credit if hasattr(args, 'credit') else None,
+                        add_technical_sig=not args.no_signature if hasattr(args, 'no_signature') else True,
+                        mode=args.mode,
+                        sensitivity=args.sensitivity,
+                        version=__version__
+                    )
+                
                 progress.show_file_complete(file_name, subtitle_count, output_path)
                 
                 progress.update_overall(1)
@@ -344,6 +438,22 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
             task = manager.processor.get_task_status(task_id)
             if task:
                 tasks.append(task)
+        
+        # Add signatures to successfully processed files
+        for task in tasks:
+            if task.status == ProcessingStatus.COMPLETED and hasattr(task, 'result'):
+                # Try to get the output path from the task result
+                if isinstance(task.result, dict):
+                    output_path = task.result.get("output_files", {}).get("final_srt", "")
+                    if output_path and Path(output_path).exists():
+                        add_signatures_to_srt(
+                            srt_path=output_path,
+                            producer_credit=args.credit if hasattr(args, 'credit') else None,
+                            add_technical_sig=not args.no_signature if hasattr(args, 'no_signature') else True,
+                            mode=args.mode,
+                            sensitivity=args.sensitivity,
+                            version=__version__
+                        )
         
         # Summarize results
         successful = sum(1 for t in tasks if t.status == ProcessingStatus.COMPLETED)
