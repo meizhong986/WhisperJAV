@@ -98,6 +98,8 @@ def parse_arguments():
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
     parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced", 
                        help="Processing mode (default: balanced)")
+    parser.add_argument("--model", default=None, 
+                       help="Whisper model to use (e.g., large-v2, turbo, large). Overrides config default.")
     parser.add_argument("--config", default=None, help="Path to a JSON configuration file")
     parser.add_argument("--subs-language", choices=["japanese", "english-direct"], 
                        default="japanese", help="Output subtitle language")
@@ -534,6 +536,20 @@ def main():
         sys.exit(1)
     
     logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
+    
+    # Apply model override if specified via CLI
+    if args.model:
+        logger.info(f"Overriding model with CLI argument: {args.model}")
+        # Create a model configuration for the CLI-specified model
+        override_model_config = {
+            "provider": "openai_whisper",  # Default provider
+            "model_name": args.model,
+            "device": "cuda",
+            "compute_type": "float16",
+            "supported_tasks": ["transcribe", "translate"]
+        }
+        resolved_config["model"] = override_model_config
+        logger.debug(f"Model override applied: {args.model}")
     
     # Setup temp directory
     if args.temp_dir:
