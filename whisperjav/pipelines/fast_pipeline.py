@@ -97,7 +97,7 @@ class FastPipeline(BasePipeline):
             model_config=effective_model_cfg,
             params=params,
             task=task,
-            turbo_mode=False
+            turbo_mode=True
         )
 
         self.stitcher = SRTStitcher()
@@ -192,8 +192,8 @@ class FastPipeline(BasePipeline):
 
             # Step 3: Transcribe scenes
             if self.progress_reporter:
-                self.progress_reporter.report_step("Transcribing scenes with standard Whisper", 3, 5)
-            logger.debug("Step 3: Transcribing scenes with standard Whisper")
+                self.progress_reporter.report_step("Transcribing scenes with Faster-Whisper", 3, 5)
+            logger.debug("Step 3: Transcribing scenes with Faster-Whisper")
             self.progress.set_current_step("Transcribing scenes", 3, 5)
             
             scene_srts_dir = self.temp_dir / "scene_srts"

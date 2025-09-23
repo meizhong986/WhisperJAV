@@ -171,9 +171,9 @@ class WhisperJAVGUI(tk.Tk):
         self.opt_adapt_cls = tk.BooleanVar(value=False)
         self.opt_adapt_enh = tk.BooleanVar(value=False)
         self.opt_smart_post = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self.adv, text="Adaptive classification", variable=self.opt_adapt_cls).grid(row=0, column=0, sticky="w", padx=6, pady=6)
-        ttk.Checkbutton(self.adv, text="Adaptive audio enhancements", variable=self.opt_adapt_enh).grid(row=0, column=1, sticky="w", padx=6, pady=6)
-        ttk.Checkbutton(self.adv, text="Smart postprocessing", variable=self.opt_smart_post).grid(row=0, column=2, sticky="w", padx=6, pady=6)
+        ttk.Checkbutton(self.adv, text="Adaptive classification (WIP)", variable=self.opt_adapt_cls, state="disabled").grid(row=0, column=0, sticky="w", padx=6, pady=6)
+        ttk.Checkbutton(self.adv, text="Adaptive audio enhancements (WIP)", variable=self.opt_adapt_enh, state="disabled").grid(row=0, column=1, sticky="w", padx=6, pady=6)
+        ttk.Checkbutton(self.adv, text="Smart postprocessing (WIP)", variable=self.opt_smart_post, state="disabled").grid(row=0, column=2, sticky="w", padx=6, pady=6)
         
         verbosity_frame = ttk.Frame(self.adv)
         verbosity_frame.grid(row=0, column=3, sticky="w", padx=6, pady=6)
