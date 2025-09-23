@@ -82,7 +82,9 @@ class StableTSASR:
         # Stable-ts specific
         'regroup',
         # Faster-whisper specific
-        'repetition_penalty', 'no_repeat_ngram_size'
+        'repetition_penalty', 'no_repeat_ngram_size',
+        # Inference control
+        'batch_size', 'chunk_length'
     }
     
     def __init__(self,

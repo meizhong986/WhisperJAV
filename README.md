@@ -110,9 +110,10 @@ Choose the appropriate mode based on your content type and requirements:
 
 | Mode     | Best For                                                                                             | Characteristics                                                                                     | Processing Speed | Accuracy      |
 | :------- | :--------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :--------------- | :------------ |
-| **Faster** | • Complex multi-performer scenes<br>• Heavy background noise<br>• Mixed audio<br>• Moaning/non-speech | • Uses Faster-Whisper backend<br>• Direct transcription without chunking<br>• Lower memory usage         | ⚡⚡⚡ Fast        | Adequate      |
-| **Fast** | • Mixed content quality<br>• Vintage/older content<br>• Amateur recordings<br>• Compilation videos      | • Standard Whisper with scene detection<br>• Mandatory scene splitting<br>• Better handling of quality | ⚡⚡ Medium       | Satisfactory  |
-| **Balanced** | • Standard dialogue scenes<br>• Clear audio quality<br>• Modern HD content<br>• Single performer scenes | • Scene detection + VAD enhancement<br>• Best noise handling<br>• Most accurate timestamps          | ⚡ Slower        | Good          |
+| **Faster** | • Whole-file runs where speed matters                                                               | • Faster‑Whisper backend<br>• No scene splitting<br>• Internal VAD (Stable‑TS packed)<br>• Batched inference (higher throughput) | ⚡⚡⚡ Fast        | Adequate      |
+| **Fast** | • Mixed content quality with variable audio                                                          | • Faster‑Whisper backend<br>• Scene detection enabled (mandatory splitting)<br>• Internal VAD (Stable‑TS packed)<br>• Non‑batched inference (batch_size=1) | ⚡⚡ Medium       | Satisfactory  |
+| **Balanced** | • Max accuracy for dialogue timing and noisy audio                                                  | • Scene detection + separate VAD + WhisperPro (OpenAI Whisper)
+| • Most accurate timestamps | ⚡ Slower        | Good          |
 
 
 ### Content-Specific Recommendations
@@ -312,6 +313,16 @@ The GUI provides an intuitive interface for users who prefer not to use the comm
 -   Visual mode and sensitivity selection
 -   Advanced settings dialog
 -   Console output display
+
+### Status of Adaptive Features (WIP)
+
+The following optional features are present in the UI/CLI switches but are currently work in progress and not yet fully functional end-to-end:
+
+- Adaptive scene classification (`--adaptive-classification`)
+- Adaptive audio enhancement (`--adaptive-audio-enhancement`)
+- Smart post‑processing (`--smart-postprocessing`)
+
+You can toggle them, but expect incomplete behavior or no effect in some pipelines. We’ll remove this note once they’re production‑ready.
 
 ### GUI Quick Start
 
