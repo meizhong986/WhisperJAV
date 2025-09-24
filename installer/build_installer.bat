@@ -30,6 +30,8 @@ if errorlevel 1 (
 
 echo.
 echo Build complete!
-echo Installer created: WhisperJAV-1.4.4-Windows-x86_64.exe
+for /f "tokens=2 delims=: " %%A in ('findstr /b /c:"version:" construct.yaml') do set INSTVER=%%A
+set INSTVER=%INSTVER: =%
+echo Installer created: WhisperJAV-%INSTVER%-Windows-x86_64.exe
 echo.
 pause
