@@ -1,0 +1,18 @@
+# Include configuration and instruction files
+include whisperjav/config/*.json
+include whisperjav/translate/defaults/*.txt
+include whisperjav/instructions/*.txt
+
+# Include documentation
+include README.md
+include LICENSE
+
+# Include version file
+include whisperjav/__version__.py
+
+# Exclude development files
+exclude .gitignore
+exclude .git*
+prune tests
+prune docs
+prune installer
