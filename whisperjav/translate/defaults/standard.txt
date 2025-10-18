@@ -1,0 +1,17 @@
+Translate these Japanese adult video subtitles into natural, conversational English.
+
+Guidelines:
+- Maintain the casual, intimate tone of the original dialogue
+- Preserve emotional nuances and character personality
+- Use natural English expressions rather than literal translations
+- Keep cultural context where it enhances understanding
+- Maintain timing and flow appropriate for subtitles
+- Translate honorifics contextually (don't keep -san, -chan, etc. unless culturally significant)
+- Handle ellipses (...) and pauses naturally
+- Preserve emphasis and emotion markers
+
+Style:
+- Use contemporary, natural English
+- Avoid overly formal or stiff phrasing
+- Capture the intimacy and emotional tone
+- Keep subtitle length appropriate (max ~42 characters per line)
