@@ -33,7 +33,8 @@ install_requires = [
     "librosa",
     "matplotlib",
     "pyloudnorm",
-    "requests",  
+    "requests",
+    "PySubtrans>=0.7.0",
 ]
 
 # Optional dependencies 
@@ -70,11 +71,12 @@ setup(
         "console_scripts": [
             "whisperjav=whisperjav.main:main",
             "whisperjav-gui=whisperjav.gui.whisperjav_gui:main",
+            "whisperjav-translate=whisperjav.translate.cli:main",
         ],
     },
     include_package_data=True,
     package_data={
-        "whisperjav": ["config/*.json"],
+        "whisperjav": ["config/*.json", "instructions/*.txt", "translate/defaults/*.txt"],
     },
     zip_safe=False,
     ext_modules=[],
