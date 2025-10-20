@@ -15,6 +15,7 @@ WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JA
 -   **Scene Detection**: Automatic scene splitting for better transcription accuracy.
 -   **VAD Integration**: Voice Activity Detection for improved speech recognition.
 -   **Hallucination Removal**: Specialized filters for common JAV transcription errors.
+-   **AI Translation**: Built-in subtitle translation powered by DeepSeek, Gemini, Claude, and more.
 -   **GUI and CLI**: User-friendly interface and command-line options.
 -   **Batch Processing**: Process multiple files with progress tracking.
 
@@ -22,6 +23,7 @@ WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JA
 
 -   [Installation](#-installation)
 -   [Quick Start](#-quick-start)
+-   [AI Translation](#-ai-translation)
 -   [Processing Modes Guide](#-processing-modes-guide)
 -   [Sensitivity Settings](#️-sensitivity-settings)
 -   [Advanced Japanese Language Features](#-advanced-japanese-language-features)
@@ -102,6 +104,119 @@ whisperjav video.mp4 --subs-language english-direct
 ```bash
 whisperjav-gui
 ```
+
+
+## 🌐 AI Translation
+
+WhisperJAV includes built-in AI-powered subtitle translation via `whisperjav-translate`.
+
+### Quick Translation Setup
+
+1. Get an API key from [DeepSeek](https://platform.deepseek.com/) (recommended, ~$0.10 per 100k tokens)
+2. Set your API key:
+   ```bash
+   # Windows (PowerShell)
+   $env:DEEPSEEK_API_KEY="sk-..."
+
+   # Linux/Mac
+   export DEEPSEEK_API_KEY="sk-..."
+   ```
+
+3. Translate subtitles:
+   ```bash
+   # Standalone translation
+   whisperjav-translate -i movie.srt
+
+   # Generate and translate in one command
+   whisperjav video.mp4 --translate
+   ```
+
+### Translation Features
+
+- **Multiple AI Providers**: DeepSeek (default), Gemini, Claude, GPT-4, OpenRouter
+- **Smart Caching**: Instructions fetched from Gist with local caching
+- **Settings File**: Save your preferences for repeated use
+- **Tone Styles**: Standard or Pornify (explicit content) translation styles
+- **Multiple Languages**: Translate to English, Spanish, Chinese, Indonesian
+- **Metadata-aware prompts**: Optional movie title, plot, and actress name to improve translation
+- **Sampling controls**: Temperature and top_p supported; pornify tone applies sensible defaults
+
+### Translation Examples
+
+```bash
+# Translate to Spanish with pornify style
+whisperjav-translate -i movie.srt -t spanish --tone pornify
+
+# Use Gemini provider
+whisperjav-translate -i movie.srt --provider gemini
+
+# Configure translation preferences interactively
+whisperjav-translate --configure
+
+# View API key setup instructions
+whisperjav-translate --print-env
+
+# Advanced: Pass provider-specific options
+whisperjav-translate -i movie.srt --provider-option temperature=0.7 --provider-option max_tokens=2000
+
+# Generate subtitles and translate together
+whisperjav video.mp4 --translate --translate-provider deepseek
+
+# Use local custom instructions instead of defaults
+whisperjav-translate -i movie.srt --instructions-file C:\path\to\my_instructions.txt
+
+# Add helpful metadata context (optional)
+whisperjav-translate -i movie.srt \
+  --movie-title "JAV-123: After-work Massage" \
+  --actress "Yua Mikami" \
+  --movie-plot "Office worker gets an after-hours massage that turns intimate"
+
+# Explicitly set sampling params (override tone defaults)
+whisperjav-translate -i movie.srt --temperature 0.5 --top-p 0.85
+```
+
+### Configuration
+
+WhisperJAV-Translate supports persistent settings to avoid repeating common flags:
+
+```bash
+# Interactive configuration wizard (RECOMMENDED)
+whisperjav-translate --configure
+
+# View API key setup instructions
+whisperjav-translate --print-env
+
+# Show current settings
+whisperjav-translate --show-settings
+```
+
+Settings are stored in:
+- **Windows**: `%AppData%\WhisperJAV\translate\settings.json`
+- **Linux**: `~/.config/WhisperJAV/translate/settings.json`
+- **Mac**: `~/Library/Application Support/WhisperJAV/translate/settings.json`
+
+**Configuration Precedence** (highest to lowest):
+1. CLI flags (e.g., `--provider gemini`)
+2. Environment variables (e.g., `DEEPSEEK_API_KEY`)
+3. Settings file
+4. Built-in defaults
+
+Instructions source precedence:
+- Local file via `--instructions-file`
+- Settings file mapping for source/tone
+- Default remote Gist (with ETag cache) → local cache → bundled fallback
+
+### Supported Providers
+
+| Provider   | Cost | Setup | API Key Env Var |
+|------------|------|-------|-----------------|
+| **DeepSeek** (default) | ~$0.10/100k tokens | [platform.deepseek.com](https://platform.deepseek.com/) | `DEEPSEEK_API_KEY` |
+| **Gemini** | Free tier available | [makersuite.google.com](https://makersuite.google.com/) | `GEMINI_API_KEY` |
+| **Claude** | Pay-as-you-go | [console.anthropic.com](https://console.anthropic.com/) | `ANTHROPIC_API_KEY` |
+| **GPT-4** | Pay-as-you-go | [platform.openai.com](https://platform.openai.com/) | `OPENAI_API_KEY` |
+| **OpenRouter** | Varies | [openrouter.ai](https://openrouter.ai/) | `OPENROUTER_API_KEY` |
+
+For detailed translation options, run: `whisperjav-translate --help`
 
 
 ## 📊 Processing Modes Guide

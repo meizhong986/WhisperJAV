@@ -37,27 +37,60 @@ def generate_output_path(input_path: str, target_lang: str) -> str:
     return str(input_path.parent / output_name)
 
 
-def build_provider_options(args, base_opts: dict) -> dict:
-    """Build provider-specific options from CLI args."""
-    provider_opts = {}
+def build_provider_options(args, settings_model_params: dict, effective_tone: str) -> dict:
+    """Build provider options with correct precedence and tone-aware defaults.
 
-    # Model parameters
+    Precedence: CLI > settings > defaults (tone-aware).
+    Defaults:
+      - standard: temperature=0.5, top_p=0.9
+      - pornify:  temperature=1.2, top_p=0.9
+    """
+    def _to_float(val):
+        try:
+            return float(val)
+        except Exception:
+            return None
+
+    # 1) Start from tone-aware defaults
+    if effective_tone == 'pornify':
+        temperature = 1.2
+        top_p = 0.9
+    else:
+        temperature = 0.5
+        top_p = 0.9
+
+    # 2) Apply settings overrides (if provided and not None)
+    if settings_model_params:
+        s_temp = settings_model_params.get('temperature', None)
+        s_top_p = settings_model_params.get('top_p', None)
+        if s_temp is not None:
+            f = _to_float(s_temp)
+            if f is not None:
+                temperature = f
+        if s_top_p is not None:
+            f = _to_float(s_top_p)
+            if f is not None:
+                top_p = f
+
+    # 3) Apply CLI overrides last (highest precedence)
     if hasattr(args, 'temperature') and args.temperature is not None:
-        temp = args.temperature
-        if not (0.0 <= temp <= 2.0):
-            print(f"Warning: temperature {temp} outside recommended range [0.0, 2.0]", file=sys.stderr)
-        provider_opts['temperature'] = max(0.0, min(2.0, temp))
-
+        temperature = args.temperature
     if hasattr(args, 'top_p') and args.top_p is not None:
         top_p = args.top_p
-        if not (0.0 <= top_p <= 1.0):
-            print(f"Warning: top_p {top_p} outside valid range [0.0, 1.0]", file=sys.stderr)
-        provider_opts['top_p'] = max(0.0, min(1.0, top_p))
 
-    # Merge with base options
-    if base_opts:
-        provider_opts.update(base_opts)
+    # 4) Clamp ranges and warn when out-of-range
+    if temperature is not None and not (0.0 <= temperature <= 2.0):
+        print(f"Warning: temperature {temperature} outside recommended range [0.0, 2.0]", file=sys.stderr)
+    if top_p is not None and not (0.0 <= top_p <= 1.0):
+        print(f"Warning: top_p {top_p} outside valid range [0.0, 1.0]", file=sys.stderr)
+    temperature = max(0.0, min(2.0, float(temperature))) if temperature is not None else None
+    top_p = max(0.0, min(1.0, float(top_p))) if top_p is not None else None
 
+    provider_opts = {}
+    if temperature is not None:
+        provider_opts['temperature'] = temperature
+    if top_p is not None:
+        provider_opts['top_p'] = top_p
     return provider_opts
 
 
@@ -291,8 +324,9 @@ def main():
     # Resolve instruction file
     instruction_file = resolve_instruction_file_or_content(args, merged)
 
-    # Build provider options
-    provider_options = build_provider_options(args, merged.get('model_params', {}))
+    # Build provider options (tone-aware defaults, settings, then CLI)
+    effective_tone = merged.get('tone') or 'standard'
+    provider_options = build_provider_options(args, merged.get('model_params', {}), effective_tone)
 
     # Build extra context
     extra_context = build_extra_context(args)

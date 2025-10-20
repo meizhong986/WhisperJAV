@@ -25,12 +25,7 @@ DEFAULT_SETTINGS = {
     'preprocess_subtitles': True,
     'postprocess_translation': True,
     'save_preprocessed_subtitles': False,
-    'instruction_urls': {
-        'japanese': {
-            'standard': 'https://gist.githubusercontent.com/meizhong986/fd38f54ccbf6c1df3f04019a4875f6db/raw/e39b96a58e5e4ea4c751508b7c0d0f6f28157330/translationJAV-standard.txt',
-            'pornify': 'https://gist.githubusercontent.com/meizhong986/bd34016a3d84f16f1086e8caf18e0d0f/raw/60be27cc654300d3299e8dfc4791c840238ca2b2/translationJAV-pornify.txt'
-        }
-    },
+    # instruction_urls removed; Gist-based defaults are handled in instructions.py
     'autosave': True,
     'movie_title': None,
     'movie_plot': None,
@@ -163,10 +158,21 @@ def resolve_config(cli_args, settings: Optional[dict] = None) -> dict:
             elif key == 'model':
                 if value:  # Only set if model explicitly provided
                     config['model'] = value
+            elif key == 'tone':
+                config['tone'] = value
+            elif key == 'temperature':
+                config.setdefault('model_params', {}).update({'temperature': value})
+            elif key == 'top_p':
+                config.setdefault('model_params', {}).update({'top_p': value})
             elif key == 'movie_title':
                 if value:
-                    config.setdefault('movie_title', value)
-                    config.update({key: value})
+                    config['movie_title'] = value
+            elif key == 'movie_plot':
+                if value:
+                    config['movie_plot'] = value
+            elif key == 'actress':
+                if value:
+                    config['actress'] = value
 
     return config
 
