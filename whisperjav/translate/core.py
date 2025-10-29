@@ -73,8 +73,8 @@ def translate_subtitle(
             print(f"ERROR: Provider validation failed: {msg}", file=sys.stderr)
             return None
 
-        # Initialize project
-        project = init_project(options, file=str(input_path))
+        # Initialize project (PySubtrans 1.5.x expects subtitle path in 'filepath' kwarg)
+        project = init_project(options, filepath=str(input_path))
 
         # Set instructions if provided
         if instruction_file is not None and hasattr(project, 'SetInstructions'):
