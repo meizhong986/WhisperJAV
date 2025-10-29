@@ -351,7 +351,8 @@ def main():
             stream=args.stream if hasattr(args, 'stream') else False,
             debug=args.debug,
             provider_options=provider_options,
-            extra_context=extra_context if extra_context else None
+            extra_context=extra_context if extra_context else None,
+            emit_raw_output=not getattr(args, 'no_progress', False)
         )
 
         if result_path:
