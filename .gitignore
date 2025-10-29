@@ -66,4 +66,11 @@ whisperjav/output/
 **/CLAUDE.md
 **/claude.md
 
+# Ignore the nul file
+nul
+
+# Ignore all backup JSON files in whisperjav/config/
+whisperjav/config/*.backup*.json
+
+
 
