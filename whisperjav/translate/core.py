@@ -20,7 +20,8 @@ def translate_subtitle(
     stream: bool = False,
     debug: bool = False,
     provider_options: dict = None,
-    extra_context: str = None
+    extra_context: str = None,
+    emit_raw_output: bool = True
 ):
     """
     Translate subtitle file using PySubtrans.
@@ -92,6 +93,29 @@ def translate_subtitle(
 
         # Initialize translator and translate
         translator = init_translator(options, translation_provider=provider)
+
+        if emit_raw_output:
+            def _emit_raw(message):
+                if message is None:
+                    return
+                try:
+                    print(message, file=sys.stderr, flush=True)
+                except Exception:
+                    pass
+
+            def _make_wrapper():
+                def _wrapper(sender, message=None, **kwargs):
+                    msg = message
+                    if msg is None and kwargs:
+                        msg = kwargs.get('message')
+                        if msg is None and kwargs:
+                            msg = " ".join(str(v) for v in kwargs.values())
+                    _emit_raw(msg)
+                return _wrapper
+
+            translator.events._default_error_wrapper = _make_wrapper()
+            translator.events._default_warning_wrapper = _make_wrapper()
+            translator.events._default_info_wrapper = _make_wrapper()
 
         # Translate subtitles
         project.TranslateSubtitles(translator)
