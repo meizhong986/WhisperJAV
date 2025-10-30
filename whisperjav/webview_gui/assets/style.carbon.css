@@ -1,0 +1,48 @@
+/*
+ * WhisperJAV Web GUI - IBM Carbon-inspired Theme (Light)
+ * ------------------------------------------------------
+ * Imports the base stylesheet for layout/components and overrides
+ * only CSS variables to match IBM Carbon Design palette.
+ *
+ * Usage:
+ * - Select "IBM Carbon" from the theme menu, or set ThemeManager to 'carbon'.
+ */
+
+@import url("style.css");
+
+/* ============================================================
+   CSS Variables (IBM Carbon palette overrides)
+   ============================================================ */
+:root {
+    /* Tabs and surfaces */
+    --tab-bar-bg: #FFFFFF;
+    --content-area-bg: #F4F4F4;
+    --active-tab-bg: #F4F4F4;
+    --inactive-tab-bg: #FFFFFF;
+    --hover-tab-bg: #E8E8E8;
+    --active-tab-text: #0F62FE;    /* Carbon blue */
+    --inactive-tab-text: #525252;
+    --border-color: #C6C6C6;
+
+    /* Brand / semantic colors */
+    --primary-color: #0F62FE;      /* Carbon Blue 60 */
+    --primary-hover: #0353E9;      /* Darker hover */
+    --secondary-color: #525252;    /* Gray 70 text */
+    --secondary-hover: #4A4A4A;
+    --danger-color: #DA1E28;       /* Red 60 */
+    --success-color: #24A148;      /* Green 50 */
+    --warning-color: #F1C21B;      /* Yellow 30 */
+    --info-color: #0F62FE;         /* Use primary */
+
+    /* Backgrounds */
+    --body-bg: #FFFFFF;
+    --section-bg: #FFFFFF;
+    --input-bg: #FFFFFF;
+    --disabled-bg: #E0E0E0;        /* Gray 20 */
+
+    /* Text colors */
+    --text-primary: #161616;       /* Gray 100 */
+    --text-secondary: #525252;     /* Gray 70 */
+    --text-muted: #8D8D8D;         /* Gray 50 */
+    --text-disabled: #A8A8A8;      /* Gray 40 */
+}

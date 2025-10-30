@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhisperJAV - Simple Runner</title>
-    <link rel="stylesheet" href="style.css">
+    <!-- Theme stylesheet (swappable at runtime) -->
+    <link id="themeStylesheet" rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- Main Application Container -->
@@ -13,7 +14,19 @@
         <!-- Header -->
         <header class="app-header">
             <h1>WhisperJAV</h1>
-            <p class="subtitle">Simple Runner</p>
+            <div class="header-actions">
+                <!-- Minimal theme switch button -->
+                <button id="themeBtn" class="theme-button" aria-label="Theme" title="Theme">
+                    🎨
+                </button>
+                <!-- Tiny popover menu -->
+                <div id="themeMenu" class="theme-menu" role="menu" aria-label="Select theme">
+                    <button class="theme-option" data-theme="default" role="menuitem">Default</button>
+                    <button class="theme-option" data-theme="google" role="menuitem">Google</button>
+                    <button class="theme-option" data-theme="carbon" role="menuitem">IBM Carbon</button>
+                    <button class="theme-option" data-theme="primer" role="menuitem">GitHub Primer</button>
+                </div>
+            </div>
         </header>
 
         <!-- Main Content Area -->
@@ -161,12 +174,12 @@
                             <div class="form-row info-row">
                                 <div class="info-group">
                                     <p class="info-text">
-                                        Speed vs. Accuracy: 'fast' and 'faster' prioritize throughput; 'balanced' favors accuracy.
+                                        Speed vs. Accuracy: 'fast' and 'faster' prioritize throughput; <br>'balanced' favors accuracy.
                                     </p>
                                 </div>
                                 <div class="info-group">
                                     <p class="info-text">
-                                        Details vs. Noise: 'conservative' reduces false positives; 'aggressive' may include noise while capturing more detail.
+                                        Details vs. Noise: 'conservative' reduces false positives; <br>'aggressive' may include noise while capturing more detail.
                                     </p>
                                 </div>
                             </div>

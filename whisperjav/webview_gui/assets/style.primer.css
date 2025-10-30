@@ -1,0 +1,48 @@
+/*
+ * WhisperJAV Web GUI - GitHub Primer-inspired Theme (Light)
+ * ---------------------------------------------------------
+ * Imports the base stylesheet for layout/components and overrides
+ * only CSS variables to match GitHub Primer (light) palette vibes.
+ *
+ * Usage:
+ * - Select "GitHub Primer" from the theme menu, or set ThemeManager to 'primer'.
+ */
+
+@import url("style.css");
+
+/* ============================================================
+   CSS Variables (GitHub Primer palette overrides)
+   ============================================================ */
+:root {
+    /* Tabs and surfaces */
+    --tab-bar-bg: #FFFFFF;
+    --content-area-bg: #F6F8FA;   /* canvas-subtle */
+    --active-tab-bg: #F6F8FA;
+    --inactive-tab-bg: #FFFFFF;
+    --hover-tab-bg: #EDF2FA;      /* gentle blue hover */
+    --active-tab-text: #0969DA;   /* Primer blue */
+    --inactive-tab-text: #57606A; /* Primer text-secondary */
+    --border-color: #D0D7DE;      /* Primer border */
+
+    /* Brand / semantic colors */
+    --primary-color: #0969DA;
+    --primary-hover: #0753B1;
+    --secondary-color: #57606A;
+    --secondary-hover: #434A54;
+    --danger-color: #D1242F;      /* close to Primer danger */
+    --success-color: #1A7F37;     /* close to Primer success */
+    --warning-color: #BF8700;     /* close to Primer attention */
+    --info-color: #0969DA;        /* reuse primary */
+
+    /* Backgrounds */
+    --body-bg: #FFFFFF;
+    --section-bg: #FFFFFF;
+    --input-bg: #FFFFFF;
+    --disabled-bg: #F6F8FA;
+
+    /* Text colors */
+    --text-primary: #24292F;
+    --text-secondary: #57606A;
+    --text-muted: #8B949E;
+    --text-disabled: #9DA7B0;
+}

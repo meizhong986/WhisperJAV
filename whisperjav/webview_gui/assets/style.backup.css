@@ -15,10 +15,8 @@
 :root {
     /* Tab colors - matching Tkinter design */
     --tab-bar-bg: #FFFFFF;
-    --content-area-bg: #E8EAED;
-    --active-tab-bg: #E8EAED;
-#    --content-area-bg: #F0F2F5;
-#    --active-tab-bg: #F0F2F5;
+    --content-area-bg: #F0F2F5;
+    --active-tab-bg: #F0F2F5;
     --inactive-tab-bg: #F7F8FA;
     --hover-tab-bg: #F2F4FA;
     --active-tab-text: #024873;
@@ -54,14 +52,14 @@
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
 
-    /* Typography - Aggressively optimized for compact UI */
+    /* Typography */
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
                    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
-    --font-size-base: 13px;   /* Body text - keep at 13px */
-    --font-size-sm: 10px;     /* Reduced from 11px */
-    --font-size-lg: 12px;     /* Reduced from 15px */
-    --line-height: 1.4;       /* Slightly reduced from 1.5 */
+    --font-size-base: 14px;
+    --font-size-sm: 12px;
+    --font-size-lg: 16px;
+    --line-height: 1.5;
 }
 
 /* ============================================================
@@ -101,99 +99,39 @@ body {
 
 .app-header {
     flex-shrink: 0;
-    padding: 4px 12px;  /* AGGRESSIVE: Reduced from 12px 16px 8px */
+    padding: 16px 20px 12px;
     background: var(--primary-color);
     color: white;
     border-bottom: 2px solid var(--primary-hover);
-    min-height: 25px;
-    position: relative; /* For popover anchoring */
-    display: flex;
-    align-items: center;
 }
 
 .app-header h1 {
-    font-size: 12px;  /* AGGRESSIVE: Reduced from 18px (-6px, 3 steps) */
+    font-size: 20px;
     font-weight: 600;
     margin: 0;
-    padding: 2px 0;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.3px;
 }
 
 .app-header .subtitle {
-    display: none;  /* REMOVED: Per aggressive requirements */
-}
-
-/* Header actions (right side) */
-.header-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.theme-button {
-    background: transparent;
-    color: #FFFFFF;
-    border: none;
-    width: 24px;
-    height: 24px;
-    line-height: 24px;
-    text-align: center;
-    cursor: pointer;
-    border-radius: var(--border-radius);
-}
-
-.theme-button:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.theme-menu {
-    position: absolute;
-    top: 30px;
-    right: 12px;
-    background: var(--section-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
-    display: none;
-    min-width: 160px;
-    z-index: 100;
-}
-
-.theme-menu.active {
-    display: block;
-}
-
-.theme-menu .theme-option {
-    display: block;
-    background: transparent;
-    border: none;
-    width: 100%;
-    text-align: left;
-    cursor: pointer;
-    color: var(--text-primary);
-    padding: 8px 12px;
-    font-size: var(--font-size-base);
-}
-
-.theme-menu .theme-option:hover {
-    background: var(--hover-tab-bg);
+    font-size: var(--font-size-sm);
+    opacity: 0.9;
+    margin: 2px 0 0;
 }
 
 .app-main {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 12px;  /* AGGRESSIVE: Reduced from 10px 14px */
+    padding: 12px 16px;
     background: var(--content-area-bg);
 }
 
 .app-footer {
     flex-shrink: 0;
-    padding: 4px 12px;  /* AGGRESSIVE: Reduced from 6px 16px */
+    padding: 8px 20px;
     background: var(--section-bg);
     border-top: 1px solid var(--border-color);
     text-align: center;
-    font-size: var(--font-size-sm);  /* Now 10px */
+    font-size: var(--font-size-sm);
     color: var(--text-muted);
 }
 
@@ -203,7 +141,7 @@ body {
 .section {
     background: var(--section-bg);
     border-radius: var(--border-radius-lg);
-    margin-bottom: 8px;  /* AGGRESSIVE: Reduced from 10px */
+    margin-bottom: 12px;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
 }
@@ -212,40 +150,37 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 4px 12px;  /* AGGRESSIVE: Reduced from 8px 12px (halved vertical) */
+    padding: 10px 16px;
     border-bottom: 1px solid var(--border-color);
     background: var(--inactive-tab-bg);
-    min-height: 22px;
 }
 
 .section-header h2 {
-    font-size: 10px;  /* AGGRESSIVE: Reduced from 15px (-5px, ~3 steps) */
+    font-size: var(--font-size-lg);
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .section-content {
-    padding: 10px;  /* AGGRESSIVE: Reduced from 12px */
+    padding: 16px;
 }
 
 /* ============================================================
    Source Section - File List
    ============================================================ */
 .file-list-container {
-    margin-bottom: 8px;  /* AGGRESSIVE: Reduced from 10px */
+    margin-bottom: 12px;
 }
 
 .file-list {
-    min-height: 70px;  /* AGGRESSIVE: Reduced from 80px */
-    max-height: 70px;  /* AGGRESSIVE: Reduced from 80px */
+    min-height: 120px;
+    max-height: 120px;
     overflow-y: auto;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    padding: 6px;  /* AGGRESSIVE: Reduced from 8px */
+    padding: 8px;
     position: relative;
     outline: none;
 }
@@ -284,8 +219,8 @@ body {
 
 /* File list items */
 .file-item {
-    padding: 4px 8px;  /* AGGRESSIVE: Reduced from 6px 10px */
-    margin-bottom: 2px;  /* AGGRESSIVE: Reduced from 3px */
+    padding: 8px 12px;
+    margin-bottom: 4px;
     background: var(--inactive-tab-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
@@ -294,7 +229,7 @@ body {
     user-select: none;
     display: flex;
     align-items: center;
-    gap: 6px;  /* AGGRESSIVE: Reduced from 8px */
+    gap: 8px;
 }
 
 .file-item:hover {
@@ -328,25 +263,24 @@ body {
 .output-control {
     display: flex;
     align-items: center;
-    gap: 6px;  /* AGGRESSIVE: Reduced from 8px */
+    gap: 12px;
 }
 
 .control-label {
     font-weight: 500;
     color: var(--text-primary);
     white-space: nowrap;
-    font-size: 11px;  /* AGGRESSIVE: Reduced from 13px */
 }
 
 .output-path {
     flex: 1;
-    padding: 5px 8px;  /* AGGRESSIVE: Reduced from 6px 10px */
+    padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background: var(--disabled-bg);
     color: var(--text-primary);
     font-family: var(--font-mono);
-    font-size: 11px;  /* AGGRESSIVE: Reduced from 12px */
+    font-size: var(--font-size-sm);
     cursor: not-allowed;
 }
 
@@ -367,14 +301,14 @@ body {
     display: flex;
     gap: 0;
     background: var(--tab-bar-bg);
-    padding: 0 12px;  /* AGGRESSIVE: Reduced from 16px */
+    padding: 0 20px;
     border-bottom: 2px solid var(--border-color);
     position: relative;
 }
 
 /* Tab buttons - file folder metaphor */
 .tab-button {
-    padding: 6px 24px 4px;  /* AGGRESSIVE: Reduced from 8px 30px 6px */
+    padding: 10px 40px 8px;
     background: var(--inactive-tab-bg);
     color: var(--inactive-tab-text);
     border: none;
@@ -384,13 +318,13 @@ body {
     border-top-left-radius: var(--border-radius-lg);
     border-top-right-radius: var(--border-radius-lg);
     font-family: var(--font-family);
-    font-size: 11px;  /* AGGRESSIVE: Reduced from 13px */
+    font-size: var(--font-size-base);
     font-weight: 400;
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
     bottom: -2px;
-    margin-right: 4px;  /* AGGRESSIVE: Reduced from 6px */
+    margin-right: 8px;
 }
 
 .tab-button:hover:not(.active) {
@@ -402,8 +336,8 @@ body {
     background: var(--active-tab-bg);
     color: var(--active-tab-text);
     font-weight: 600;
-    font-size: 12px;  /* AGGRESSIVE: Reduced from 14px */
-    padding: 8px 24px 6px;  /* AGGRESSIVE: Reduced from 10px 30px 8px */
+    font-size: 15px;
+    padding: 12px 40px 10px;
     border-bottom: 2px solid var(--active-tab-bg);
     z-index: 10;
 }
@@ -411,8 +345,8 @@ body {
 /* Tab content area - seamless connection with active tab */
 .tab-content-container {
     background: var(--active-tab-bg);
-    padding: 10px;  /* AGGRESSIVE: Reduced from 14px */
-    min-height: 140px;  /* AGGRESSIVE: Reduced from 160px */
+    padding: 20px;
+    min-height: 200px;
 }
 
 .tab-panel {
@@ -428,9 +362,9 @@ body {
    ============================================================ */
 .form-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 10px;  /* AGGRESSIVE: Reduced from 12px */
-    margin-bottom: 8px;  /* AGGRESSIVE: Reduced from 12px (-4px) */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
 }
 
 .form-row:last-child {
@@ -440,7 +374,7 @@ body {
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 3px;  /* AGGRESSIVE: Reduced from 4px */
+    gap: 6px;
 }
 
 .form-group.full-width {
@@ -452,20 +386,20 @@ body {
 }
 
 .form-label {
-    font-size: 10px;  /* AGGRESSIVE: Reduced from 12px */
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-primary);
 }
 
 .form-input,
 .form-select {
-    padding: 5px 8px;  /* AGGRESSIVE: Reduced from 6px 10px */
+    padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background: var(--input-bg);
     color: var(--text-primary);
     font-family: var(--font-family);
-    font-size: 12px;  /* AGGRESSIVE: Reduced from 13px */
+    font-size: var(--font-size-base);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -490,39 +424,39 @@ body {
 /* Radio buttons */
 .radio-group {
     display: flex;
-    gap: 10px;  /* AGGRESSIVE: Reduced from 12px */
+    gap: 12px;
 }
 
 .radio-label {
     display: flex;
     align-items: center;
-    gap: 5px;  /* AGGRESSIVE: Reduced from 6px */
+    gap: 6px;
     cursor: pointer;
-    font-size: 11px;  /* AGGRESSIVE: Reduced from 13px */
+    font-size: var(--font-size-base);
     color: var(--text-primary);
 }
 
 .radio-label input[type="radio"] {
     cursor: pointer;
-    width: 15px;  /* AGGRESSIVE: Slightly reduced from 16px */
-    height: 15px;
+    width: 16px;
+    height: 16px;
 }
 
 /* Checkboxes */
 .checkbox-label {
     display: flex;
     align-items: center;
-    gap: 6px;  /* AGGRESSIVE: Reduced from 8px */
+    gap: 8px;
     cursor: pointer;
-    font-size: 11px;  /* AGGRESSIVE: Reduced from 13px */
+    font-size: var(--font-size-base);
     color: var(--text-primary);
     user-select: none;
 }
 
 .checkbox-label input[type="checkbox"] {
     cursor: pointer;
-    width: 15px;  /* AGGRESSIVE: Slightly reduced from 16px */
-    height: 15px;
+    width: 16px;
+    height: 16px;
 }
 
 .checkbox-label input[type="checkbox"]:disabled {
@@ -547,22 +481,20 @@ body {
 /* Info text */
 .info-row {
     grid-template-columns: 1fr 1fr;
-    margin-top: 4px;  /* AGGRESSIVE: Reduced from 6px */
+    margin-top: 8px;
 }
 
 .info-group {
-    max-width: 360px;
-    justify-self: start; 
-    padding: 5px;  /* AGGRESSIVE: Reduced from 6px */
+    padding: 8px;
     background: rgba(2, 72, 115, 0.05);
     border-left: 3px solid var(--primary-color);
     border-radius: var(--border-radius);
 }
 
 .info-text {
-    font-size: 10px;  /* AGGRESSIVE: Reduced from 11px (now matches var(--font-size-sm)) */
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    line-height: 1.3;
+    line-height: 1.4;
     margin: 0;
 }
 
@@ -570,11 +502,11 @@ body {
    Buttons
    ============================================================ */
 .btn {
-    padding: 5px 10px;  /* AGGRESSIVE: Reduced from 6px 12px */
+    padding: 8px 16px;
     border: none;
     border-radius: var(--border-radius);
     font-family: var(--font-family);
-    font-size: 12px;  /* AGGRESSIVE: Reduced from 13px (-1px, 1 step) */
+    font-size: var(--font-size-base);
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -582,9 +514,8 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;  /* AGGRESSIVE: Reduced from 6px */
+    gap: 6px;
     white-space: nowrap;
-    min-height: 26px;  /* Maintain clickability */
 }
 
 .btn:focus {
@@ -629,21 +560,19 @@ body {
 
 /* Button sizes */
 .btn-sm {
-    padding: 4px 8px;  /* AGGRESSIVE: Reduced from 5px 10px */
-    font-size: var(--font-size-sm);  /* Now 10px */
-    min-height: 22px;
+    padding: 6px 12px;
+    font-size: var(--font-size-sm);
 }
 
 .btn-lg {
-    padding: 8px 16px;  /* AGGRESSIVE: Reduced from 10px 20px */
-    font-size: var(--font-size-lg);  /* Now 12px */
-    min-height: 30px;
+    padding: 12px 24px;
+    font-size: var(--font-size-lg);
 }
 
 /* Button group */
 .button-group {
     display: flex;
-    gap: 5px;  /* AGGRESSIVE: Reduced from 6px */
+    gap: 8px;
     flex-wrap: wrap;
 }
 
@@ -651,21 +580,21 @@ body {
    Run Section - Progress & Controls
    ============================================================ */
 .run-section .section-content {
-    padding: 10px;  /* AGGRESSIVE: Reduced from 12px */
+    padding: 16px;
 }
 
 .progress-container {
     display: flex;
     align-items: center;
-    gap: 8px;  /* AGGRESSIVE: Reduced from 10px */
-    margin-bottom: 8px;  /* AGGRESSIVE: Reduced from 10px */
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 .progress-bar {
     flex: 1;
-    height: 5px;  /* AGGRESSIVE: Reduced from 6px */
+    height: 8px;
     background: var(--disabled-bg);
-    border-radius: 2.5px;  /* Proportional to height */
+    border-radius: 4px;
     overflow: hidden;
     position: relative;
 }
@@ -698,11 +627,11 @@ body {
 }
 
 .status-label {
-    font-size: 11px;  /* AGGRESSIVE: Reduced from 13px */
+    font-size: var(--font-size-base);
     font-weight: 500;
     color: var(--text-primary);
     white-space: nowrap;
-    min-width: 60px;  /* AGGRESSIVE: Reduced from 70px */
+    min-width: 80px;
     text-align: right;
 }
 
@@ -727,14 +656,14 @@ body {
     background: #1E1E1E;
     color: #D4D4D4;
     font-family: var(--font-mono);
-    font-size: 11px;  /* AGGRESSIVE: Reduced from 12px (keep monospace readable) */
-    padding: 8px;  /* AGGRESSIVE: Reduced from 10px */
+    font-size: var(--font-size-sm);
+    padding: 12px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-wrap: break-word;
-    line-height: 1.45;  /* AGGRESSIVE: Slightly reduced from 1.5 */
-    min-height: 280px;  /* AGGRESSIVE: INCREASED from 250px (more console space!) */
-    max-height: none;  /* REMOVED 300px cap - allows flex-grow */
+    line-height: 1.6;
+    min-height: 180px;
+    max-height: 300px;
 }
 
 .console-line {
@@ -811,13 +740,11 @@ body {
     }
 
     .tab-button {
-        padding: 5px 14px 3px;  /* AGGRESSIVE: Further reduced for mobile */
-        font-size: 10px;
+        padding: 8px 20px 6px;
     }
 
     .tab-button.active {
-        padding: 6px 14px 4px;  /* AGGRESSIVE: Further reduced for mobile */
-        font-size: 11px;
+        padding: 10px 20px 8px;
     }
 }
 

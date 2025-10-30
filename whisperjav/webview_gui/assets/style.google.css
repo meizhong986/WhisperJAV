@@ -1,0 +1,60 @@
+/*
+ * WhisperJAV Web GUI - Google/Material-inspired Theme
+ * ----------------------------------------------------
+ * This theme imports the base styles (layout, components, spacing)
+ * from style.css and overrides only the CSS variables to apply
+ * a Material/Google-like color system.
+ *
+ * How to use:
+ * - In assets/index.html, replace
+ *     <link rel="stylesheet" href="style.css">
+ *   with
+ *     <link rel="stylesheet" href="style.google.css">
+ * - The @import below will load the base stylesheet first, and the
+ *   variables defined here will override it.
+ */
+
+@import url("style.css");
+
+/* ============================================================
+   CSS Variables (Google/Material palette overrides)
+   ============================================================ */
+:root {
+    /* Tabs and surfaces */
+    --tab-bar-bg: #FFFFFF;         /* Pure white app bar */
+    --content-area-bg: #F1F3F4;    /* Google surface (Docs/Drive-like) */
+    --active-tab-bg: #F1F3F4;      /* Match content for lifted tab effect */
+    --inactive-tab-bg: #F8F9FA;    /* Slightly lighter for inactive tabs */
+    --hover-tab-bg: #EEF3FE;       /* Subtle blue-tinted hover */
+    --active-tab-text: #1A73E8;    /* Google blue */
+    --inactive-tab-text: #5F6368;  /* Google gray text */
+    --border-color: #E0E0E0;       /* Light gray divider */
+
+    /* Brand / semantic colors */
+    --primary-color: #1A73E8;      /* Google blue */
+    --primary-hover: #1765CC;      /* Slightly darker on hover */
+    --secondary-color: #5F6368;    /* Neutral gray */
+    --secondary-hover: #4A4F54;
+    --danger-color: #D93025;       /* Material Red 600-ish */
+    --success-color: #1E8E3E;      /* Material Green 600-ish */
+    --warning-color: #F9AB00;      /* Material Amber 600-ish */
+    --info-color: #1A73E8;         /* Reuse primary for info */
+
+    /* Backgrounds */
+    --body-bg: #FFFFFF;
+    --section-bg: #FFFFFF;         /* Cards/sections remain white */
+    --input-bg: #FFFFFF;
+    --disabled-bg: #F1F3F4;        /* Disabled fields/surfaces */
+
+    /* Text colors */
+    --text-primary: #202124;       /* Google text (near-black) */
+    --text-secondary: #5F6368;     /* Secondary gray */
+    --text-muted: #9AA0A6;         /* Muted gray */
+    --text-disabled: #BDC1C6;      /* Disabled text */
+
+    /* Radii and shadows (keep base for consistency) */
+    /* You can optionally tweak these for a more Material look */
+    /* --border-radius: 8px; */
+    /* --border-radius-lg: 10px; */
+    /* --shadow-sm, --shadow-md, --shadow-lg left as-is */
+}
