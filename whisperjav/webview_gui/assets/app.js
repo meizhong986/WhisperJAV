@@ -925,7 +925,112 @@ const KeyboardShortcuts = {
                     }
                 }
             }
+
+            // Ctrl+Shift+T: Toggle theme
+            if (e.ctrlKey && e.shiftKey && (e.key === 'T' || e.key === 't')) {
+                e.preventDefault();
+                ThemeManager.toggleTheme();
+            }
         });
+    }
+};
+
+// ============================================================
+// Theme Manager (runtime stylesheet switching with persistence)
+// ============================================================
+const ThemeManager = {
+    storageKey: 'wj_theme',
+    themes: {
+        'default': 'style.css',
+        'google': 'style.google.css',
+        'carbon': 'style.carbon.css',
+        'primer': 'style.primer.css'
+    },
+
+    init() {
+        // Ensure link element exists
+        this.linkEl = document.getElementById('themeStylesheet');
+        if (!this.linkEl) {
+            console.warn('ThemeManager: #themeStylesheet not found; falling back to style.css');
+            return;
+        }
+
+        // Apply persisted theme
+        const saved = this.getSavedTheme();
+        this.applyTheme(saved);
+
+        // Wire UI
+        const btn = document.getElementById('themeBtn');
+        const menu = document.getElementById('themeMenu');
+        if (btn && menu) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.classList.toggle('active');
+                if (menu.classList.contains('active')) {
+                    // Focus first option for accessibility
+                    const first = menu.querySelector('.theme-option');
+                    if (first) first.focus();
+                }
+            });
+
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                if (menu.classList.contains('active')) {
+                    menu.classList.remove('active');
+                }
+            });
+
+            // Close on Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    menu.classList.remove('active');
+                }
+            });
+
+            // Menu item clicks
+            menu.querySelectorAll('.theme-option').forEach(opt => {
+                opt.addEventListener('click', (e) => {
+                    const theme = opt.dataset.theme;
+                    this.applyTheme(theme);
+                    menu.classList.remove('active');
+                });
+            });
+        }
+    },
+
+    getSavedTheme() {
+        try {
+            const key = localStorage.getItem(this.storageKey) || 'default';
+            return this.themes[key] ? key : 'default';
+        } catch (e) {
+            return 'default';
+        }
+    },
+
+    saveTheme(key) {
+        try {
+            localStorage.setItem(this.storageKey, key);
+        } catch (e) {
+            // ignore
+        }
+    },
+
+    applyTheme(key) {
+        if (!this.linkEl) return;
+        const href = this.themes[key] || this.themes['default'];
+        // Apply href and persist
+        this.linkEl.setAttribute('href', href);
+        this.saveTheme(key in this.themes ? key : 'default');
+        ConsoleManager.log(`Theme: ${key}`, 'info');
+    },
+
+    toggleTheme() {
+        const keys = Object.keys(this.themes);
+        const currentHref = this.linkEl ? this.linkEl.getAttribute('href') : 'style.css';
+        const currentKey = keys.find(k => this.themes[k] === currentHref) || 'default';
+        const idx = keys.indexOf(currentKey);
+        const next = keys[(idx + 1) % keys.length];
+        this.applyTheme(next);
     }
 };
 
@@ -947,6 +1052,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     DirectoryControls.init();
     RunControls.init();
     KeyboardShortcuts.init();
+    ThemeManager.init();
 
     // Initial validation
     FormManager.validateForm();

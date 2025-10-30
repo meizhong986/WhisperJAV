@@ -143,13 +143,16 @@ def create_window():
         if icon_file.exists():
             icon_path = icon_file
 
+
+    width_s, height_s = int(1920 * 0.63), int(1080 * 0.85)
+
     # Create window with icon if available
     window_kwargs = {
         'title': "WhisperJAV GUI",
         'url': str(html_path),
         'js_api': api,
-        'width': 1000,
-        'height': 700,
+        'width': width_s,
+        'height': height_s,
         'resizable': True,
         'frameless': False,
         'easy_drag': True,
