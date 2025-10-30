@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhisperJAV - Simple Runner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Main Application Container -->
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="app-header">
+            <h1>WhisperJAV</h1>
+            <p class="subtitle">Simple Runner</p>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="app-main">
+
+            <!-- Source Section -->
+            <section class="section source-section">
+                <div class="section-header">
+                    <h2>Source</h2>
+                </div>
+                <div class="section-content">
+                    <!-- File List Display -->
+                    <div class="file-list-container" id="fileListContainer">
+                        <div class="file-list" id="fileList" tabindex="0">
+                            <div class="empty-state" id="emptyState">
+                                <span class="empty-icon">📂</span>
+                                <p>No files selected</p>
+                                <p class="empty-hint">Click "Add File(s)" or "Add Folder" to get started</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Management Buttons -->
+                    <div class="button-group">
+                        <button type="button" class="btn btn-primary" id="addFilesBtn">
+                            Add File(s)
+                        </button>
+                        <button type="button" class="btn btn-primary" id="addFolderBtn">
+                            Add Folder
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="removeSelectedBtn" disabled>
+                            Remove Selected
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="clearBtn" disabled>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Destination Section -->
+            <section class="section destination-section">
+                <div class="section-header">
+                    <h2>Destination</h2>
+                </div>
+                <div class="section-content">
+                    <div class="output-control">
+                        <label for="outputDir" class="control-label">Output:</label>
+                        <input
+                            type="text"
+                            id="outputDir"
+                            class="output-path"
+                            readonly
+                            placeholder="Output directory..."
+                        >
+                        <button type="button" class="btn btn-secondary" id="browseOutputBtn">
+                            Browse
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="openOutputBtn">
+                            Open
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tabbed Options Section -->
+            <section class="section tabs-section">
+                <div class="tabs-container">
+                    <!-- Tab Navigation -->
+                    <div class="tab-bar" role="tablist">
+                        <button
+                            class="tab-button active"
+                            role="tab"
+                            aria-selected="true"
+                            aria-controls="tab1-panel"
+                            id="tab1-button"
+                            data-tab="tab1"
+                        >
+                            Transcription Mode
+                        </button>
+                        <button
+                            class="tab-button"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="tab2-panel"
+                            id="tab2-button"
+                            data-tab="tab2"
+                        >
+                            Transcription Adv. Options
+                        </button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content-container">
+
+                        <!-- Tab 1: Transcription Mode -->
+                        <div
+                            class="tab-panel active"
+                            id="tab1-panel"
+                            role="tabpanel"
+                            aria-labelledby="tab1-button"
+                        >
+                            <!-- Row 1: Mode, Sensitivity, Output Language -->
+                            <div class="form-row">
+                                <!-- Mode Selection -->
+                                <div class="form-group">
+                                    <label class="form-label">Mode:</label>
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" name="mode" value="balanced" checked>
+                                            <span>balanced</span>
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" name="mode" value="fast">
+                                            <span>fast</span>
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" name="mode" value="faster">
+                                            <span>faster</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Sensitivity -->
+                                <div class="form-group">
+                                    <label for="sensitivity" class="form-label">Sensitivity:</label>
+                                    <select id="sensitivity" class="form-select">
+                                        <option value="conservative">conservative</option>
+                                        <option value="balanced" selected>balanced</option>
+                                        <option value="aggressive">aggressive</option>
+                                    </select>
+                                </div>
+
+                                <!-- Output Language -->
+                                <div class="form-group">
+                                    <label for="language" class="form-label">Output language:</label>
+                                    <select id="language" class="form-select">
+                                        <option value="japanese" selected>japanese</option>
+                                        <option value="english-direct">english-direct</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Info Labels -->
+                            <div class="form-row info-row">
+                                <div class="info-group">
+                                    <p class="info-text">
+                                        Speed vs. Accuracy: 'fast' and 'faster' prioritize throughput; 'balanced' favors accuracy.
+                                    </p>
+                                </div>
+                                <div class="info-group">
+                                    <p class="info-text">
+                                        Details vs. Noise: 'conservative' reduces false positives; 'aggressive' may include noise while capturing more detail.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 2: Advanced Options -->
+                        <div
+                            class="tab-panel"
+                            id="tab2-panel"
+                            role="tabpanel"
+                            aria-labelledby="tab2-button"
+                        >
+                            <!-- Row 1: Adaptive features + Verbosity -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Work in Progress - Not yet implemented">
+                                        <input type="checkbox" id="adaptiveClassification" disabled>
+                                        <span>Adaptive classification (WIP)</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Work in Progress - Not yet implemented">
+                                        <input type="checkbox" id="adaptiveEnhancement" disabled>
+                                        <span>Adaptive audio enhancements (WIP)</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Work in Progress - Not yet implemented">
+                                        <input type="checkbox" id="smartPostprocessing" disabled>
+                                        <span>Smart postprocessing (WIP)</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="verbosity" class="form-label">Verbosity:</label>
+                                    <select id="verbosity" class="form-select">
+                                        <option value="quiet">quiet</option>
+                                        <option value="summary" selected>summary</option>
+                                        <option value="normal">normal</option>
+                                        <option value="verbose">verbose</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Model override + Async processing -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="modelOverrideEnabled">
+                                        <span>Model override</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <select id="modelSelection" class="form-select" disabled>
+                                        <option value="large-v3" selected>large-v3</option>
+                                        <option value="large-v2">large-v2</option>
+                                        <option value="turbo">turbo</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="asyncProcessing">
+                                        <span>Async processing</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="maxWorkers" class="form-label">Max workers:</label>
+                                    <input
+                                        type="number"
+                                        id="maxWorkers"
+                                        class="form-input"
+                                        value="1"
+                                        min="1"
+                                        max="16"
+                                        style="width: 80px;"
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Row 3: Opening credit + Keep temp + Temp dir -->
+                            <div class="form-row">
+                                <div class="form-group full-width">
+                                    <label for="openingCredit" class="form-label">
+                                        Opening credit (Example: Produced by XXX):
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="openingCredit"
+                                        class="form-input"
+                                        placeholder="Optional opening credit text..."
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Row 4: Keep temp files + Temp directory -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="keepTemp">
+                                        <span>Keep temp files</span>
+                                    </label>
+                                </div>
+                                <div class="form-group temp-dir-group">
+                                    <label for="tempDir" class="form-label">Temp dir:</label>
+                                    <div class="input-with-button">
+                                        <input
+                                            type="text"
+                                            id="tempDir"
+                                            class="form-input"
+                                            placeholder="Default system temp directory"
+                                        >
+                                        <button type="button" class="btn btn-secondary btn-sm" id="browseTempBtn">
+                                            Browse
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Run Controls Section -->
+            <section class="section run-section">
+                <div class="section-content">
+                    <!-- Progress Bar -->
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progressBar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="status-label" id="statusLabel">Idle</span>
+                    </div>
+
+                    <!-- Control Buttons -->
+                    <div class="button-group">
+                        <button type="button" class="btn btn-primary btn-lg" id="startBtn">
+                            Start
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-lg" id="cancelBtn" disabled>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Console Section -->
+            <section class="section console-section">
+                <div class="section-header">
+                    <h2>Console</h2>
+                    <button type="button" class="btn btn-text btn-sm" id="clearConsoleBtn">
+                        Clear
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="console-output" id="consoleOutput">
+                        <div class="console-line">Ready.</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>WhisperJAV - Subtitle generation for Japanese Adult Videos |
+               <a href="#" onclick="showAbout(); return false;" style="color: var(--primary-color); text-decoration: none;">About</a>
+            </p>
+        </footer>
+
+    </div>
+
+    <!-- About Dialog Modal -->
+    <div class="modal-overlay" id="aboutModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2>About WhisperJAV</h2>
+                <button class="modal-close" onclick="closeAbout()" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="about-logo">🎬</div>
+                <div class="about-title">WhisperJAV GUI</div>
+                <div class="about-version" id="aboutVersion">Version 1.4.5</div>
+
+                <div class="about-section">
+                    <h3>Description</h3>
+                    <p>Japanese Adult Video Subtitle Generator powered by OpenAI Whisper with specialized enhancements for Japanese language processing, scene detection, and voice activity detection.</p>
+                </div>
+
+                <div class="about-section">
+                    <h3>Key Features</h3>
+                    <ul>
+                        <li>Multi-mode processing (Balanced, Fast, Faster)</li>
+                        <li>Scene detection and voice activity detection</li>
+                        <li>Japanese language optimization</li>
+                        <li>Batch processing support</li>
+                        <li>Real-time progress monitoring</li>
+                    </ul>
+                </div>
+
+                <div class="about-section">
+                    <h3>Technology</h3>
+                    <p>Built with PyWebView and Python. This modern web-based interface provides a clean and intuitive experience for generating high-quality Japanese subtitles.</p>
+                </div>
+
+                <div class="about-section">
+                    <h3>Keyboard Shortcuts</h3>
+                    <ul>
+                        <li>Ctrl+O - Add files</li>
+                        <li>Ctrl+R - Start processing</li>
+                        <li>Escape - Cancel process</li>
+                        <li>F1 - Show this dialog</li>
+                    </ul>
+                </div>
+
+                <div class="about-section">
+                    <p style="text-align: center; margin-top: 20px;">
+                        <a href="https://github.com/meizhong986/WhisperJAV" class="about-link" target="_blank">Visit GitHub Repository</a>
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeAbout()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>
