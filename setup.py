@@ -37,9 +37,10 @@ install_requires = [
     "PySubtrans>=0.7.0",
 ]
 
-# Optional dependencies 
+# Optional dependencies
 extras_require = {
     'speedup': ['numba'],
+    'gui': ['pywebview>=5.0.0'],  # PyWebView GUI dependencies
 }
 
 
@@ -71,12 +72,20 @@ setup(
         "console_scripts": [
             "whisperjav=whisperjav.main:main",
             "whisperjav-gui=whisperjav.gui.whisperjav_gui:main",
+            "whisperjav-gui-web=whisperjav.webview_gui.main:main",
             "whisperjav-translate=whisperjav.translate.cli:main",
         ],
     },
     include_package_data=True,
     package_data={
-        "whisperjav": ["config/*.json", "instructions/*.txt", "translate/defaults/*.txt"],
+        "whisperjav": [
+            "config/*.json",
+            "instructions/*.txt",
+            "translate/defaults/*.txt",
+            "webview_gui/assets/*.html",
+            "webview_gui/assets/*.css",
+            "webview_gui/assets/*.js",
+        ],
     },
     zip_safe=False,
     ext_modules=[],
