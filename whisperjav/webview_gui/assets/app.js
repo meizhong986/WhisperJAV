@@ -208,6 +208,8 @@ const FileListManager = {
             // Remove all file items
             fileList.querySelectorAll('.file-item').forEach(item => item.remove());
             this.updateButtons();
+            // Ensure Start button reflects current file presence
+            FormManager.validateForm();
             return;
         }
 
@@ -233,6 +235,8 @@ const FileListManager = {
         });
 
         this.updateButtons();
+        // After any change to the file list, re-validate to enable/disable Start
+        FormManager.validateForm();
     },
 
     createFileItem(path, index) {

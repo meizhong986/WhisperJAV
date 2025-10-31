@@ -433,6 +433,13 @@ body {
     margin-bottom: 8px;  /* AGGRESSIVE: Reduced from 12px (-4px) */
 }
 
+/* Make "Sensitivity" sit closer to "Mode" on the first row of Tab 1 */
+#tab1-panel .form-row:first-of-type {
+    /* Tighter spacing between first two columns; keep third wide and right-aligned area */
+    grid-template-columns: minmax(220px, 0.85fr) minmax(200px, 0.75fr) 1.4fr;
+    column-gap: 4px; /* minimal distance between Mode and Sensitivity */
+}
+
 .form-row:last-child {
     margin-bottom: 0;
 }
@@ -546,9 +553,20 @@ body {
 
 /* Info text */
 .info-row {
-    grid-template-columns: 1fr 1fr;
+    /* Align info boxes under the first two fields (Mode, Sensitivity) */
+    grid-template-columns: repeat(3, 1fr);
     margin-top: 4px;  /* AGGRESSIVE: Reduced from 6px */
 }
+
+/* Ensure the info row grid matches first row columns for perfect vertical alignment */
+#tab1-panel .info-row {
+    grid-template-columns: minmax(220px, 0.85fr) minmax(200px, 0.75fr) 1.4fr;
+    column-gap: 4px;
+}
+
+/* Place the two info boxes explicitly under column 1 and 2 */
+.info-row .info-group:nth-child(1) { grid-column: 1; }
+.info-row .info-group:nth-child(2) { grid-column: 2; }
 
 .info-group {
     max-width: 360px;
@@ -559,11 +577,113 @@ body {
     border-radius: var(--border-radius);
 }
 
+/* First row: fine-tune alignment and reasonable select widths */
+#tab1-panel .form-row:first-of-type .form-group:nth-child(2) { /* Sensitivity group */
+    align-items: flex-start;
+}
+
+#tab1-panel .form-row:first-of-type .form-group:nth-child(3) { /* Output language group */
+    justify-self: end;
+    align-items: flex-end; /* right-align label and control within the column */
+}
+
+/* Reasonable control widths to avoid overly long dropdowns */
+#sensitivity {
+    width: 170px;
+}
+
+#language {
+    width: 200px;
+}
+
 .info-text {
     font-size: 10px;  /* AGGRESSIVE: Reduced from 11px (now matches var(--font-size-sm)) */
     color: var(--text-secondary);
     line-height: 1.3;
     margin: 0;
+}
+
+/* =====================
+   Tab 2 Advanced Options
+   ===================== */
+/* Row 1: 4 columns (Model override, model select tight, Async, Verbosity) */
+#tab2-panel #adv-row-1 {
+    /* Make the first two columns a bit tighter so the select sits closer */
+    grid-template-columns: minmax(160px, 0.75fr) minmax(140px, 0.7fr) minmax(160px, 0.8fr) minmax(180px, 1fr);
+    column-gap: 3px; /* bring model select closer to the checkbox */
+}
+
+/* Make model select visually paired with its checkbox (tighter) */
+#tab2-panel #adv-row-1 .tight-pair .form-select {
+    width: 155px; /* slightly narrower to visually tuck in */
+}
+
+/* Make the model select’s container shrink and hug the left edge */
+#tab2-panel #adv-row-1 .form-group:nth-child(2) {
+    justify-self: start;      /* align this grid item to the left */
+    width: max-content;       /* let the item shrink to its content width */
+}
+
+/* Make the "Model override" container shrink and hug the left edge */
+#tab2-panel #adv-row-1 .form-group:nth-child(1) {
+    justify-self: start;      /* align this grid item to the left */
+    width: max-content;       /* let the item shrink to its content width */
+}
+
+/* Keep the model override label from wrapping and avoid extra right padding */
+#tab2-panel #adv-row-1 .checkbox-label {
+    white-space: nowrap;
+}
+
+/* Keep Verbosity select a reasonable width */
+#verbosity {
+    width: 160px;
+}
+
+/* Generic inline field helper: label + control in a single row */
+.inline-field {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+.inline-field .form-label {
+    margin: 0;
+}
+.inline-field .form-select,
+.inline-field .form-input {
+    margin: 0; /* neutralize column layout margins */
+}
+.inline-field .input-with-button {
+    flex: 1; /* allow path field to stretch next to label */
+}
+.inline-field .input-with-button .form-input {
+    width: 100%;
+}
+
+/* Row 2: Opening credit inline (label + input on same line) */
+.input-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.input-inline .form-input {
+    flex: 1;
+}
+
+/* Row 3: 4 columns (3 WIP checkboxes + Max workers) */
+#tab2-panel #adv-row-3 {
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
+    column-gap: 8px;
+}
+
+/* Keep max workers input compact */
+#maxWorkers {
+    width: 80px;
+}
+
+/* Row 4: Keep temp + Temp dir group (existing layout, small tweak) */
+#tab2-panel #adv-row-4 .temp-dir-group .form-input {
+    min-width: 260px;
 }
 
 /* ============================================================
@@ -804,6 +924,27 @@ body {
 @media (max-width: 900px) {
     .form-row {
         grid-template-columns: 1fr;
+    }
+
+    /* Reset first-row tweak for mobile to keep stacking clean */
+    #tab1-panel .form-row:first-of-type {
+        grid-template-columns: 1fr;
+        column-gap: 10px;
+    }
+
+    /* On narrow screens, stack info boxes naturally */
+    .info-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* Stack advanced rows neatly */
+    #tab2-panel #adv-row-1,
+    #tab2-panel #adv-row-3 {
+        grid-template-columns: 1fr;
+    }
+    .input-inline {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .output-control {
