@@ -1,4 +1,4 @@
-WhisperJAV v1.4.5
+WhisperJAV v1.5.1
 =================
 
 Thank you for installing WhisperJAV!
@@ -31,8 +31,9 @@ System Requirements:
 - 8GB+ RAM (16GB recommended for large models)
 - ~7GB free disk space (app + initial models/cache)
 
-Release Notes (1.4.5):
+Release Notes (1.5.1):
 ----------------------
-- Fast mode now uses Faster-Whisper backend (scene-splitting retained, improved speed).
-- Faster mode unchanged (single-pass Faster-Whisper).
-- Added internal parameter refinements and updated documentation.
+- Complete PyWebView GUI takeover - modern, responsive web-based interface
+- Removed legacy Tkinter GUI components
+- Enhanced GUI with improved file management and progress tracking
+- Internal refinements and stability improvements
