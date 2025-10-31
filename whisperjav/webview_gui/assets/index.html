@@ -21,10 +21,10 @@
                 </button>
                 <!-- Tiny popover menu -->
                 <div id="themeMenu" class="theme-menu" role="menu" aria-label="Select theme">
-                    <button class="theme-option" data-theme="default" role="menuitem">Default</button>
-                    <button class="theme-option" data-theme="google" role="menuitem">Google</button>
-                    <button class="theme-option" data-theme="carbon" role="menuitem">IBM Carbon</button>
-                    <button class="theme-option" data-theme="primer" role="menuitem">GitHub Primer</button>
+                    <button class="theme-option" data-theme="default" role="menuitem">Default Theme</button>
+                    <button class="theme-option" data-theme="google" role="menuitem">Google Theme</button>
+                    <button class="theme-option" data-theme="carbon" role="menuitem">IBM Carbon Theme</button>
+                    <button class="theme-option" data-theme="primer" role="menuitem">GitHub Primer Theme</button>
                 </div>
             </div>
         </header>
@@ -192,8 +192,55 @@
                             role="tabpanel"
                             aria-labelledby="tab2-button"
                         >
-                            <!-- Row 1: Adaptive features + Verbosity -->
-                            <div class="form-row">
+                            <!-- Row 1 (new): Model override + model select + Async + Verbosity -->
+                            <div class="form-row" id="adv-row-1">
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="modelOverrideEnabled">
+                                        <span>Model override</span>
+                                    </label>
+                                </div>
+                                <div class="form-group tight-pair">
+                                    <select id="modelSelection" class="form-select" disabled>
+                                        <option value="large-v3" selected>large-v3</option>
+                                        <option value="large-v2">large-v2</option>
+                                        <option value="turbo">turbo</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="asyncProcessing">
+                                        <span>Async processing</span>
+                                    </label>
+                                </div>
+                                <div class="form-group inline-field">
+                                    <label for="verbosity" class="form-label" style="white-space: nowrap;">Verbosity:</label>
+                                    <select id="verbosity" class="form-select">
+                                        <option value="quiet">quiet</option>
+                                        <option value="summary" selected>summary</option>
+                                        <option value="normal">normal</option>
+                                        <option value="verbose">verbose</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Row 2 (new): Opening credit inline -->
+                            <div class="form-row" id="adv-row-2">
+                                <div class="form-group full-width">
+                                    <div class="input-inline">
+                                        <label for="openingCredit" class="form-label" style="white-space: nowrap;">Opening credit (Example: Produced by XXX):</label>
+                                        <input
+                                            type="text"
+                                            id="openingCredit"
+                                            class="form-input"
+                                            placeholder="Optional opening credit text..."
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Row 3 (new): Adaptive features + Max workers -->
+                            <div class="form-row" id="adv-row-3">
                                 <div class="form-group">
                                     <label class="checkbox-label" title="Work in Progress - Not yet implemented">
                                         <input type="checkbox" id="adaptiveClassification" disabled>
@@ -212,40 +259,8 @@
                                         <span>Smart postprocessing (WIP)</span>
                                     </label>
                                 </div>
-                                <div class="form-group">
-                                    <label for="verbosity" class="form-label">Verbosity:</label>
-                                    <select id="verbosity" class="form-select">
-                                        <option value="quiet">quiet</option>
-                                        <option value="summary" selected>summary</option>
-                                        <option value="normal">normal</option>
-                                        <option value="verbose">verbose</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Row 2: Model override + Async processing -->
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="modelOverrideEnabled">
-                                        <span>Model override</span>
-                                    </label>
-                                </div>
-                                <div class="form-group">
-                                    <select id="modelSelection" class="form-select" disabled>
-                                        <option value="large-v3" selected>large-v3</option>
-                                        <option value="large-v2">large-v2</option>
-                                        <option value="turbo">turbo</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="asyncProcessing">
-                                        <span>Async processing</span>
-                                    </label>
-                                </div>
-                                <div class="form-group">
-                                    <label for="maxWorkers" class="form-label">Max workers:</label>
+                                <div class="form-group inline-field">
+                                    <label for="maxWorkers" class="form-label" style="white-space: nowrap;">Max workers:</label>
                                     <input
                                         type="number"
                                         id="maxWorkers"
@@ -258,31 +273,16 @@
                                 </div>
                             </div>
 
-                            <!-- Row 3: Opening credit + Keep temp + Temp dir -->
-                            <div class="form-row">
-                                <div class="form-group full-width">
-                                    <label for="openingCredit" class="form-label">
-                                        Opening credit (Example: Produced by XXX):
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="openingCredit"
-                                        class="form-input"
-                                        placeholder="Optional opening credit text..."
-                                    >
-                                </div>
-                            </div>
-
-                            <!-- Row 4: Keep temp files + Temp directory -->
-                            <div class="form-row">
+                            <!-- Row 4 (new): Keep temp files + Temp directory -->
+                            <div class="form-row" id="adv-row-4">
                                 <div class="form-group">
                                     <label class="checkbox-label">
                                         <input type="checkbox" id="keepTemp">
                                         <span>Keep temp files</span>
                                     </label>
                                 </div>
-                                <div class="form-group temp-dir-group">
-                                    <label for="tempDir" class="form-label">Temp dir:</label>
+                                <div class="form-group temp-dir-group inline-field">
+                                    <label for="tempDir" class="form-label" style="white-space: nowrap;">Temp dir:</label>
                                     <div class="input-with-button">
                                         <input
                                             type="text"

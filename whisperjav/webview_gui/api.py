@@ -25,66 +25,34 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def _get_documents_dir() -> Path:
     """
-    Best-effort resolve of the user's Documents folder across platforms.
+    Simple, platform-neutral Documents resolution.
 
-    - On Windows, prefer SHGetKnownFolderPath(FOLDERID_Documents) and
-      fall back to %USERPROFILE%/Documents or %OneDrive%/Documents.
-    - On macOS/Linux, default to ~/Documents if it exists, else ~.
+    - Windows: %USERPROFILE%/Documents (via Path.home()/"Documents")
+    - macOS/Linux: ~/Documents
+    Fallback: user's home if Documents doesn't exist.
     """
     home = Path.home()
-    # Windows-specific: try Known Folder API
-    if sys.platform.startswith("win"):
-        try:
-            import ctypes
-            from ctypes import wintypes
-
-            # FOLDERID_Documents GUID {FDD39AD0-238F-46AF-ADB4-6C85480369C7}
-            _FOLDERID_Documents = ctypes.c_char_p(b"{FDD39AD0-238F-46AF-ADB4-6C85480369C7}")
-            SHGetKnownFolderPath = ctypes.windll.shell32.SHGetKnownFolderPath
-            SHGetKnownFolderPath.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_wchar_p)]
-            SHGetKnownFolderPath.restype = ctypes.c_long
-
-            # Convert GUID string to a GUID structure
-            class GUID(ctypes.Structure):
-                _fields_ = [
-                    ("Data1", ctypes.c_uint32),
-                    ("Data2", ctypes.c_uint16),
-                    ("Data3", ctypes.c_uint16),
-                    ("Data4", ctypes.c_ubyte * 8),
-                ]
-
-            def _guid_from_str(s: str) -> GUID:
-                import uuid
-                u = uuid.UUID(s)
-                data4 = (ctypes.c_ubyte * 8)(*u.bytes[8:])
-                return GUID(u.time_low, u.time_mid, u.time_hi_version, data4)
-
-            guid = _guid_from_str("{FDD39AD0-238F-46AF-ADB4-6C85480369C7}")
-            path_ptr = ctypes.c_wchar_p()
-            # Flags=0, hToken=None
-            hr = SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(path_ptr))
-            if hr == 0 and path_ptr.value:
-                return Path(path_ptr.value)
-        except Exception:
-            # Fall through to environment heuristics
-            pass
-
-        # Heuristics: OneDrive/Documents preferred if present
-        onedrive = os.environ.get("OneDrive")
-        if onedrive:
-            p = Path(onedrive) / "Documents"
-            if p.exists():
-                return p
-        # Default to %USERPROFILE%/Documents
-        p = home / "Documents"
-        return p if p.exists() else home
-
-    # Non-Windows
     docs = home / "Documents"
     return docs if docs.exists() else home
 
 
-DEFAULT_OUTPUT = _get_documents_dir() / "WhisperJAV" / "output"
+def _compute_default_output_dir() -> Path:
+    """
+    Compute default output per simple conventions:
+    - Windows/macOS/Linux: Documents/WhisperJAV/output if Documents exists
+    - Fallback: ~/WhisperJAV/output
+
+    Always ensures the directory exists.
+    """
+    base = _get_documents_dir()
+    if base.name.lower() != "documents" or not base.exists():
+        base = Path.home()
+    p = base / "WhisperJAV" / "output"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+DEFAULT_OUTPUT = _compute_default_output_dir()
 
 
 class WhisperJAVAPI:
@@ -109,8 +77,8 @@ class WhisperJAVAPI:
         self.log_queue: queue.Queue = queue.Queue()
         self._stream_thread: Optional[threading.Thread] = None
 
-        # Default output directory
-        self.default_output = str(DEFAULT_OUTPUT)
+        # Default output directory (ensure it exists and is normalized)
+        self.default_output = str(_compute_default_output_dir())
 
     # ========================================================================
     # Process Management
@@ -422,10 +390,13 @@ class WhisperJAVAPI:
 
         window = windows[0]
 
-        file_types = (
-            'Media Files (*.mp4; *.mkv; *.avi; *.flv; *.wmv; *.webm; *.mpg; *.mpeg; *.ts; *.mp3; *.wav; *.aac; *.m4a; *.flac; *.ogg; *.opus)'
+        # File filters must be a list/tuple of filter strings. A single string will be
+        # iterated character-by-character by pywebview and cause parse errors (e.g., 'M').
+        # Use semicolon-separated patterns without spaces for compatibility.
+        file_types = [
+            'Media Files (*.mp4;*.mkv;*.avi;*.flv;*.wmv;*.webm;*.mpg;*.mpeg;*.ts;*.mp3;*.wav;*.aac;*.m4a;*.flac;*.ogg;*.opus)',
             'All Files (*.*)'
-        )
+        ]
 
         result = window.create_file_dialog(
             FileDialog.OPEN,
@@ -536,6 +507,8 @@ class WhisperJAVAPI:
         Returns:
             Default output directory path
         """
+        # Recompute to honor any environment changes during runtime
+        self.default_output = str(_compute_default_output_dir())
         return self.default_output
 
     # ========================================================================
