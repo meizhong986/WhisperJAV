@@ -64,7 +64,7 @@ def main():
             # Fallback to python.exe if pythonw.exe is not present
             pythonw = os.path.join(str(exe_dir), "python.exe")
 
-        cmd = [pythonw, "-m", "whisperjav.gui.whisperjav_gui"]
+        cmd = [pythonw, "-m", "whisperjav.webview_gui.main"]
         # Launch detached so the GUI isn't tied to the launcher process
         creationflags = 0x00000008  # DETACHED_PROCESS
         subprocess.Popen(cmd, cwd=str(exe_dir), creationflags=creationflags)

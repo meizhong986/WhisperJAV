@@ -71,8 +71,7 @@ setup(
     entry_points={
         "console_scripts": [
             "whisperjav=whisperjav.main:main",
-            "whisperjav-gui=whisperjav.gui.whisperjav_gui:main",
-            "whisperjav-gui-web=whisperjav.webview_gui.main:main",
+            "whisperjav-gui=whisperjav.webview_gui.main:main",
             "whisperjav-translate=whisperjav.translate.cli:main",
         ],
     },

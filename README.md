@@ -417,17 +417,27 @@ Create a custom `config.json` to override default settings:
 
 
 
-## 🖥️ GUI Interface (Work in Progress)
+## 🖥️ GUI Interface
 
-The GUI provides an intuitive interface for users who prefer not to use the command line.
+The PyWebView-based GUI provides a modern, responsive interface for users who prefer not to use the command line.
 
 ### Features
 
--   Drag-and-drop file selection
--   Real-time progress monitoring
--   Visual mode and sensitivity selection
--   Advanced settings dialog
--   Console output display
+-   Modern HTML/CSS/JS interface with professional look and feel
+-   Drag-and-drop file and folder selection
+-   Real-time progress monitoring and log streaming
+-   Visual mode and sensitivity selection with descriptions
+-   Advanced settings in tabbed interface
+-   Keyboard shortcuts (Ctrl+O, Ctrl+R, F1, Esc, F5)
+-   Console output display with real-time updates
+
+### System Requirements
+
+-   **Windows**: Requires WebView2 runtime (automatically installed with Microsoft Edge browser)
+-   **macOS**: Uses native WebKit (built-in)
+-   **Linux**: Uses GTK WebKit2
+
+For detailed GUI usage instructions, see [GUI_USER_GUIDE.md](GUI_USER_GUIDE.md).
 
 ### Status of Adaptive Features (WIP)
 
@@ -441,12 +451,12 @@ You can toggle them, but expect incomplete behavior or no effect in some pipelin
 
 ### GUI Quick Start
 
-1.  Launch the GUI: `python whisperjav_gui.py`
-2.  Select files using the "Select File(s)" button.
+1.  Launch the GUI: `whisperjav-gui`
+2.  Select files using the "Add Files" button or drag and drop.
 3.  Choose your **Processing Mode** (Faster/Fast/Balanced).
 4.  Select the **Sensitivity** (Conservative/Balanced/Aggressive).
 5.  Choose the **Output Language** (Japanese/English).
-6.  Click "START PROCESSING".
+6.  Click "Start" to begin processing.
 
 ## 🔍 Troubleshooting
 
