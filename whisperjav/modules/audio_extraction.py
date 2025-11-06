@@ -61,7 +61,7 @@ class AudioExtractor:
             result = subprocess.run(cmd, 
                                   capture_output=True, 
                                   text=True, 
-                                  check=True)
+                                  encoding='utf-8', check=True)
             
             # Get duration
             duration = self._get_audio_duration(output_path)
@@ -83,7 +83,7 @@ class AudioExtractor:
             "-"
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
         
         # Parse duration from FFmpeg output
         for line in result.stderr.split('\n'):
