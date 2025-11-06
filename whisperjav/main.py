@@ -430,6 +430,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                                 cmd,
                                 capture_output=True,
                                 text=True,
+                                encoding='utf-8',
                                 timeout=600
                             )
                         else:
@@ -439,6 +440,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                                 stdout=subprocess.PIPE,
                                 stderr=None,
                                 text=True,
+                                encoding='utf-8',
                                 timeout=600
                             )
 
@@ -595,6 +597,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                         cmd,
                                         capture_output=True,
                                         text=True,
+                                        encoding='utf-8',
                                         timeout=600
                                     )
                                 else:
@@ -604,6 +607,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                         stdout=subprocess.PIPE,
                                         stderr=None,
                                         text=True,
+                                        encoding='utf-8',
                                         timeout=600
                                     )
 

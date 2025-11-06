@@ -143,7 +143,7 @@ class MediaDiscovery:
                 file_path
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', check=True)
             data = json.loads(result.stdout)
             
             info = {}
