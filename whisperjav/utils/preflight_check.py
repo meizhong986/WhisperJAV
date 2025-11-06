@@ -149,7 +149,18 @@ class PreflightChecker:
                 compiled_cuda = torch._C._cuda_getCompiledVersion()
                 runtime_cuda = torch.version.cuda
                 
-                if compiled_cuda == runtime_cuda:
+                # Convert compiled_cuda integer to version string for comparison
+                # compiled_cuda is an integer like 12090 representing CUDA 12.9.0
+                # We extract major.minor (12.9) to match runtime_cuda format (string "12.9")
+                # Note: Patch version is intentionally truncated as runtime_cuda doesn't include it
+                if isinstance(compiled_cuda, int):
+                    major = compiled_cuda // 1000
+                    minor = (compiled_cuda % 1000) // 10
+                    compiled_cuda_str = f"{major}.{minor}"
+                else:
+                    compiled_cuda_str = str(compiled_cuda)
+                
+                if compiled_cuda_str == runtime_cuda:
                     self.results.append(CheckResult(
                         name="PyTorch CUDA Build",
                         status=CheckStatus.PASS,
@@ -161,7 +172,7 @@ class PreflightChecker:
                         status=CheckStatus.WARN,
                         message="CUDA version mismatch",
                         details=[
-                            f"PyTorch compiled for: CUDA {compiled_cuda}",
+                            f"PyTorch compiled for: CUDA {compiled_cuda_str}",
                             f"Runtime CUDA version: {runtime_cuda}",
                             "This may cause compatibility issues"
                         ]
