@@ -74,6 +74,9 @@ a = Analysis(
         'webview.platforms.winforms',  # Windows backend
         'webview.platforms.cocoa',     # macOS backend
         'webview.platforms.gtk',       # Linux backend
+        # Web server used by pywebview
+        'bottle',
+        'werkzeug',
         'whisperjav.webview_gui',
         'whisperjav.webview_gui.api',
         'whisperjav.webview_gui.main',

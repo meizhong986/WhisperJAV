@@ -1,0 +1,22 @@
+WhisperJAV v1.5.1 Installer Build Log 
+Build started: Sat 11/01/2025 13:14:35.99 
+ 
+[Phase 1/5] Checking prerequisites... 
+  - Constructor: constructor 3.11.3 
+  - Python: Python 3.11.11 
+  - Config file: construct_v1.5.1.yaml 
+[Phase 2/5] Validating configuration... 
+  - Validation: PASSED 
+[Phase 3/5] Cleaning previous builds... 
+  - Cleaned: WhisperJAV-1.5.1-Windows-x86_64.exe 
+[Phase 4/5] Building installer... 
+[Phase 5/5] Verifying output... 
+ 
+=============================================================================== 
+BUILD SUCCESSFUL 
+=============================================================================== 
+ 
+Output file: WhisperJAV-1.5.1-Windows-x86_64.exe 
+File size: 253 MB 
+Build completed: Sat 11/01/2025 13:15:47.68 
+ 
