@@ -247,6 +247,7 @@ class PreflightChecker:
                     ['ffmpeg', '-version'],
                     capture_output=True,
                     text=True,
+                    encoding='utf-8',
                     timeout=5
                 )
                 version_line = result.stdout.split('\n')[0]
