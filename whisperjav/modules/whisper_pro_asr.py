@@ -16,6 +16,7 @@ import traceback
 import logging
 
 from whisperjav.utils.logger import logger
+from whisperjav.utils.device_detector import get_best_device
 
 
 def _is_silero_vad_cached(repo_or_dir: str) -> bool:
@@ -69,7 +70,8 @@ class WhisperProASR:
         """
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
-        self.device = model_config.get("device", "cuda") if torch.cuda.is_available() else "cpu"
+        # Use smart device detection: CUDA → MPS → CPU
+        self.device = model_config.get("device", get_best_device())
         
         decoder_params = params["decoder"]
         vad_params = params["vad"]

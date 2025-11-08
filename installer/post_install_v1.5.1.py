@@ -259,7 +259,13 @@ def install_pytorch(cuda_version: float) -> bool:
     log_section("PyTorch Installation")
 
     # Select HIGHEST compatible PyTorch CUDA build for the detected driver
-    if cuda_version >= 12.4:
+    if cuda_version >= 12.8:
+        log("Installing PyTorch with CUDA 12.4+ support (Blackwell compatible)...")
+        log("Detected CUDA 12.8+ driver - supports NVIDIA Blackwell GPUs (RTX 50-series)")
+        log("This will download ~2GB of packages. Please wait...")
+        pytorch_index = "https://download.pytorch.org/whl/cu124"
+        build_type = "CUDA 12.4+ (Blackwell)"
+    elif cuda_version >= 12.4:
         log("Installing PyTorch with CUDA 12.4 support...")
         log("This will download ~2GB of packages. Please wait...")
         pytorch_index = "https://download.pytorch.org/whl/cu124"

@@ -9,6 +9,8 @@ import requests
 import torch
 from torch import nn
 
+from whisperjav.utils.device_detector import get_best_device
+
 
 # モデルの定義
 class AudioClassifier(nn.Module):
@@ -200,7 +202,8 @@ def main():
         parser.add_argument("--cache_dir", type=str, default="hf_cache", help="Hugging Face cache directory")
         args = parser.parse_args()
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Use smart device detection: CUDA → MPS → CPU
+        device = get_best_device()
         print(f"Device: {device}")
 
         model = get_model_and_config(args.cache_dir, device)

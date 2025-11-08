@@ -16,6 +16,7 @@ import soundfile as sf
 import librosa
 
 from whisperjav.utils.logger import logger
+from whisperjav.utils.device_detector import get_best_device
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
 # Suppress specific warnings from stable_whisper
@@ -140,7 +141,8 @@ class StableTSASR:
         """
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
-        self.device = model_config.get("device", "cuda") if torch.cuda.is_available() else "cpu"
+        # Use smart device detection: CUDA → MPS → CPU
+        self.device = model_config.get("device", get_best_device())
         self.compute_type = model_config.get("compute_type", "float16")
         self.turbo_mode = turbo_mode
         

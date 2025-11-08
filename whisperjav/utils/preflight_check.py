@@ -16,6 +16,9 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
 
+# Import after UTF-8 fix to avoid encoding issues
+from whisperjav.utils.device_detector import get_best_device, is_gpu_available
+
 # Fix stdout/stderr encoding for Windows before any print statements
 # This is critical for unicode characters (⚠️, ✓, •, etc.) in console output
 def _ensure_utf8_output():
@@ -482,16 +485,16 @@ def _wait_for_keypress_with_timeout(timeout_seconds=30):
             return False
 
 
-def enforce_cuda_requirement(accept_cpu_mode=False, timeout_seconds=30):
+def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
     """
-    Check for CUDA availability with friendly warning and optional bypass.
+    Check for GPU (CUDA or MPS) availability with friendly warning and optional bypass.
 
     Args:
         accept_cpu_mode: If True, skip the warning entirely (from --accept-cpu flag)
         timeout_seconds: How long to wait for user acknowledgment (default: 30)
 
     Returns:
-        bool: True if CUDA is available or user accepted CPU mode, False otherwise
+        bool: True if GPU is available or user accepted CPU mode, False otherwise
     """
     # Skip check entirely if user explicitly accepted CPU mode
     if accept_cpu_mode:
@@ -501,34 +504,51 @@ def enforce_cuda_requirement(accept_cpu_mode=False, timeout_seconds=30):
     try:
         import torch
 
-        # CUDA is available - all good!
-        if torch.cuda.is_available():
+        # Check for any GPU (CUDA or MPS)
+        best_device = get_best_device()
+        if best_device in ('cuda', 'mps'):
             return True
 
-        # No CUDA detected - show friendly warning
+        # No GPU detected - show friendly warning
         print(f"\n{Fore.YELLOW}{'='*70}{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}⚠  GPU Performance Warning{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}{'='*70}{Style.RESET_ALL}\n")
 
-        print("WhisperJAV works best with an NVIDIA GPU with CUDA support.")
-        print("We detected that CUDA is not currently available on your system.\n")
+        print("WhisperJAV works best with GPU acceleration.")
+        print("We detected that no compatible GPU is currently available.\n")
 
         print(f"{Fore.CYAN}What this means:{Style.RESET_ALL}")
         print("  • CPU-only processing will be significantly slower (10-50x)")
         print("  • Large video files may take hours instead of minutes")
         print("  • You may encounter memory issues with longer videos\n")
 
-        print(f"{Fore.CYAN}Possible reasons for this warning:{Style.RESET_ALL}")
-        print("  • No NVIDIA GPU installed")
-        print("  • NVIDIA drivers not installed or outdated")
-        print("  • PyTorch installed without CUDA support")
-        print("  • CUDA toolkit version mismatch\n")
+        print(f"{Fore.CYAN}Supported GPU platforms:{Style.RESET_ALL}")
+        print("  • NVIDIA GPUs (CUDA) - RTX 20/30/40/50 series, Blackwell, etc.")
+        print("  • Apple Silicon (MPS) - M1/M2/M3/M4/M5 chips")
+        print("  • AMD GPUs (ROCm) - Limited support, see documentation\n")
 
-        print(f"{Fore.CYAN}To fix this for better performance:{Style.RESET_ALL}")
-        print("  1. Ensure you have an NVIDIA GPU installed")
-        print("  2. Install latest NVIDIA drivers")
-        print("  3. Reinstall PyTorch with CUDA: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
-        print("  4. Run 'whisperjav --check' for detailed diagnostics\n")
+        print(f"{Fore.CYAN}To enable GPU acceleration:{Style.RESET_ALL}")
+
+        current_platform = platform.system()
+        if current_platform == "Darwin":
+            print("  macOS detected:")
+            print("  1. If you have Apple Silicon (M1/M2/M3/M4/M5):")
+            print("     pip install --upgrade torch torchvision torchaudio")
+            print("  2. If you have Intel Mac with AMD GPU, GPU acceleration not supported")
+        elif current_platform == "Windows":
+            print("  Windows detected:")
+            print("  1. Ensure you have an NVIDIA GPU")
+            print("  2. Install latest NVIDIA drivers from nvidia.com")
+            print("  3. Reinstall PyTorch with CUDA:")
+            print("     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
+        else:
+            print("  Linux detected:")
+            print("  1. For NVIDIA GPUs:")
+            print("     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
+            print("  2. For AMD GPUs (experimental):")
+            print("     See https://pytorch.org/get-started/locally/ for ROCm installation")
+
+        print("\n  Run 'whisperjav --check' for detailed diagnostics\n")
 
         print(f"{Fore.YELLOW}You can continue with CPU-only mode, but expect slower performance.{Style.RESET_ALL}\n")
 

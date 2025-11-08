@@ -181,20 +181,95 @@ const FileListManager = {
             fileList.classList.remove('drag-over');
         });
 
-        fileList.addEventListener('drop', (e) => {
+        fileList.addEventListener('drop', async (e) => {
             e.preventDefault();
             fileList.classList.remove('drag-over');
 
             const files = Array.from(e.dataTransfer.files);
-            files.forEach(file => {
-                const path = file.path || file.name;
+
+            // Try to extract full paths from dropped files
+            const paths = [];
+            let hasIncompletePaths = false;
+
+            for (const file of files) {
+                // Try multiple methods to get the full path
+                let path = null;
+
+                // Debug: Log available properties (only in first file for brevity)
+                if (files.indexOf(file) === 0) {
+                    console.log('[Debug] File object properties:', {
+                        name: file.name,
+                        path: file.path,
+                        webkitRelativePath: file.webkitRelativePath,
+                        type: file.type,
+                        size: file.size
+                    });
+                }
+
+                // Method 1: file.path (works on Windows WebView2, Electron)
+                if (file.path && file.path.length > 0) {
+                    path = file.path;
+                }
+
+                // Method 2: Check if File API provides full path via webkitRelativePath
+                if (!path && file.webkitRelativePath && file.webkitRelativePath.length > 0) {
+                    path = file.webkitRelativePath;
+                }
+
+                // Method 3: Try to get from dataTransfer items (for some browsers)
+                if (!path && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+                    const item = e.dataTransfer.items[files.indexOf(file)];
+                    if (item && item.webkitGetAsEntry) {
+                        const entry = item.webkitGetAsEntry();
+                        if (entry && entry.fullPath) {
+                            path = entry.fullPath;
+                        }
+                    }
+                }
+
+                // Fallback: Use filename only (will cause validation error)
+                if (!path) {
+                    path = file.name;
+                    hasIncompletePaths = true;
+                }
+
+                // Validate we got a full path (contains directory separators)
+                const isFullPath = path.includes('/') || path.includes('\\');
+                if (!isFullPath && path === file.name) {
+                    hasIncompletePaths = true;
+                }
+
+                paths.push(path);
+            }
+
+            // If we couldn't get full paths, automatically fall back to file dialog
+            if (hasIncompletePaths) {
+                ConsoleManager.log(
+                    'ℹ Drag-and-drop could not get full file paths. Opening file selection dialog...',
+                    'info'
+                );
+
+                // Automatically trigger file selection dialog as fallback
+                // This provides seamless UX without errors
+                setTimeout(() => this.addFiles(), 100);
+                return;
+            }
+
+            // Add valid full paths to the list
+            let addedCount = 0;
+            paths.forEach(path => {
                 if (!AppState.selectedFiles.includes(path)) {
                     AppState.selectedFiles.push(path);
+                    addedCount++;
                 }
             });
 
-            this.render();
-            ConsoleManager.log(`Added ${files.length} file(s) via drag-and-drop`, 'info');
+            if (addedCount > 0) {
+                this.render();
+                ConsoleManager.log(`Added ${addedCount} file(s) via drag-and-drop`, 'info');
+            } else {
+                ConsoleManager.log('No new files added (duplicates skipped)', 'info');
+            }
         });
     },
 
@@ -515,8 +590,10 @@ const ConsoleManager = {
         line.textContent = message;
         output.appendChild(line);
 
-        // Auto-scroll to bottom
-        output.scrollTop = output.scrollHeight;
+        // Auto-scroll to bottom (use requestAnimationFrame to ensure DOM updated)
+        requestAnimationFrame(() => {
+            output.scrollTop = output.scrollHeight;
+        });
     },
 
     clear() {
@@ -540,8 +617,10 @@ const ConsoleManager = {
             output.appendChild(lineEl);
         });
 
-        // Auto-scroll to bottom
-        output.scrollTop = output.scrollHeight;
+        // Auto-scroll to bottom (use requestAnimationFrame to ensure DOM updated)
+        requestAnimationFrame(() => {
+            output.scrollTop = output.scrollHeight;
+        });
     }
 };
 

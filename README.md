@@ -40,11 +40,14 @@ WhisperJAV is a subtitle generation tool optimized for Japanese Adult Videos (JA
 
 ### Prerequisites
 
-Please see the details at the end of this readme for more details. 
+Please see the details at the end of this readme for more details.
 
 -   Python 3.9 - 3.12 (Python 3.13+ is not compatible with openai-whisper)
--   CUDA-capable GPU, drivers, CUDA Toolkit, cuDNN (CUDA > 11.7)
--   **CUDA-version** of pytorch, torchaudio and torchvision
+-   **GPU (Recommended for best performance)**:
+    -   NVIDIA GPU (CUDA > 11.7) - RTX 20/30/40/50 series, Blackwell, etc.
+    -   Apple Silicon (M1/M2/M3/M4/M5) - Native MPS acceleration
+    -   AMD GPU (ROCm) - Limited support, see platform-specific notes
+-   **PyTorch with GPU support** (see Platform-Specific Installation below)
 -   FFmpeg installed and in your system's PATH
 -   PIP and git installation packages
 
@@ -62,10 +65,84 @@ pip install -U --no-deps git+https://github.com/meizhong986/whisperjav.git@main
 
 
 
-### ⚠️ Important Note
-Please make sure that you have installed cuda enabled pytorch, and pyaudio before installing whisperjav. Otherwise, openai-whisper will automatically installs a CPU torch version which is 8 times slower. You don't want that!!! 
-Example for CUDA 12.4 torch 2.5.1 (the version WhisperJAv has been tested for): 
+### Platform-Specific Installation
+
+WhisperJAV now supports multiple GPU platforms for optimal performance. Choose the installation method for your hardware:
+
+#### Windows (NVIDIA GPU)
+
+```bash
+# For NVIDIA RTX 20/30/40/50 series and Blackwell GPUs
+# Install PyTorch with CUDA 12.4 support (recommended for latest GPUs)
 pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+
+# For older GPUs or CUDA 12.1 drivers
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+
+# Then install WhisperJAV
+pip install git+https://github.com/meizhong986/whisperjav.git@main
+```
+
+#### macOS (Apple Silicon)
+
+```bash
+# For M1/M2/M3/M4/M5 Macs - uses native Metal Performance Shaders (MPS)
+pip install torch torchvision torchaudio
+
+# Then install WhisperJAV
+pip install git+https://github.com/meizhong986/whisperjav.git@main
+```
+
+**Note**: MPS acceleration is automatic on Apple Silicon. No additional configuration needed.
+
+#### Linux (NVIDIA GPU)
+
+```bash
+# For NVIDIA GPUs on Linux
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+
+# Then install WhisperJAV
+pip install git+https://github.com/meizhong986/whisperjav.git@main
+```
+
+#### Linux (AMD GPU - Experimental)
+
+```bash
+# AMD GPU support via ROCm is experimental
+# Note: The faster-whisper backend has limited ROCm support
+# Balanced mode works better with AMD GPUs
+
+# Install PyTorch with ROCm (example for ROCm 6.0)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0
+
+# Then install WhisperJAV
+pip install git+https://github.com/meizhong986/whisperjav.git@main
+
+# Use balanced mode for best compatibility
+whisperjav video.mp4 --mode balanced
+```
+
+#### CPU-Only Mode
+
+```bash
+# For systems without GPU (significantly slower)
+pip install torch torchvision torchaudio
+
+# Then install WhisperJAV
+pip install git+https://github.com/meizhong986/whisperjav.git@main
+
+# Use --accept-cpu-mode to skip GPU warning
+whisperjav video.mp4 --accept-cpu-mode
+```
+
+### ⚠️ Performance Notes
+
+- **NVIDIA GPU (CUDA)**: Best performance, ~5-10 minutes per hour of video
+- **Apple Silicon (MPS)**: Good performance, ~8-15 minutes per hour of video
+- **AMD GPU (ROCm)**: Limited support, use balanced mode, ~10-20 minutes per hour
+- **CPU-Only**: Very slow, ~30-60 minutes per hour of video (6-10x slower than GPU)
+
+**Important**: Always install GPU-enabled PyTorch BEFORE installing WhisperJAV. Otherwise, openai-whisper will automatically install a CPU-only version.
 
 ```
 
@@ -461,7 +538,7 @@ You can toggle them, but expect incomplete behavior or no effect in some pipelin
 ## 🔍 Troubleshooting
 
 ### Common Issues
-        ```
+
 -   **Issue**: `FFmpeg not found`
     -   **Solution**: Install FFmpeg and ensure it's in your system's PATH.
         ```bash
@@ -472,18 +549,55 @@ You can toggle them, but expect incomplete behavior or no effect in some pipelin
         # macOS (using Homebrew)
         brew install ffmpeg
         ```
--   **Issue**: Slow processing or GUI looks hanged
-    -   **Solution**: Often it is caused by wrong pytorch version
+
+-   **Issue**: Slow processing or "GPU Performance Warning"
+    -   **Solution**: Check your GPU setup with diagnostics:
+        ```bash
+        whisperjav --check
         ```
-        Remove CPU version of pytorch if exist
+    -   Common causes:
+        - CPU-only PyTorch installed instead of GPU version
+        - Missing or outdated GPU drivers
+        - CUDA toolkit version mismatch
+    -   **Fix for NVIDIA GPUs**:
+        ```bash
+        # Reinstall PyTorch with CUDA support
+        pip uninstall torch torchvision torchaudio
+        pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
         ```
+    -   **Fix for Apple Silicon**:
+        ```bash
+        # Update to latest PyTorch for MPS support
+        pip install --upgrade torch torchvision torchaudio
+        ```
+
+-   **Issue**: GPU not detected on Apple Silicon Mac
+    -   **Solution**: Ensure you're running Python natively (not via Rosetta):
+        ```bash
+        # Check Python architecture
+        python -c "import platform; print(platform.machine())"
+        # Should show 'arm64', not 'x86_64'
+        ```
+    -   If using x86_64, reinstall Python for Apple Silicon
+
+-   **Issue**: AMD GPU not working
+    -   **Solution**: AMD GPU support is experimental. Use balanced mode:
+        ```bash
+        whisperjav video.mp4 --mode balanced
+        ```
+    -   Note: faster mode may not work with ROCm due to CTranslate2 limitations
 
 ### Performance Tips
 
--   **GPU Acceleration**: Ensure CUDA is properly installed for a 3-5x speed improvement.
+-   **GPU Acceleration**:
+    - **NVIDIA (CUDA)**: Best performance, 5-10 minutes per hour of video
+    - **Apple Silicon (MPS)**: Good performance, 8-15 minutes per hour
+    - **AMD (ROCm)**: Limited support, use balanced mode
+    - Use `whisperjav --check` to verify GPU is detected correctly
 -   **SSD Storage**: Use an SSD for temporary files via the `--temp-dir` argument for faster I/O.
 -   **Batch Processing**: Process multiple files in one run to avoid reloading the model for each file.
 -   **Memory Usage**: Close other memory-intensive applications when processing large files.
+-   **CPU Mode**: If needed, use `--accept-cpu-mode` to skip GPU warning (processing will be 6-10x slower).
 
 ## 🤝 Contributing
 

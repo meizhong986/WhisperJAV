@@ -34,6 +34,7 @@ def fix_stdout():
 fix_stdout()
 
 from whisperjav.utils.logger import setup_logger, logger
+from whisperjav.utils.device_detector import get_best_device
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -42,7 +43,7 @@ from whisperjav.config.transcription_tuner import TranscriptionTuner
 from whisperjav.__version__ import __version__
 
 
-from whisperjav.utils.preflight_check import enforce_cuda_requirement, run_preflight_checks
+from whisperjav.utils.preflight_check import enforce_gpu_requirement, run_preflight_checks
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
@@ -65,7 +66,7 @@ args = sys.argv[1:]
 bypass_flags = ['--check', '--help', '-h', '--version', '-v']
 accept_cpu = '--accept-cpu-mode' in args
 if not any(flag in args for flag in bypass_flags):
-    enforce_cuda_requirement(accept_cpu_mode=accept_cpu)
+    enforce_gpu_requirement(accept_cpu_mode=accept_cpu)
 # --- END OF CHECK ---
 
 
@@ -689,8 +690,8 @@ def main():
         run_preflight_checks(verbose=args.check_verbose)
         sys.exit(0)
 
-    # Enforce CUDA requirement (with optional bypass)
-    enforce_cuda_requirement(accept_cpu_mode=args.accept_cpu_mode)
+    # Enforce GPU requirement (CUDA/MPS) with optional bypass
+    enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode)
 
     # Setup logging
     global logger
@@ -735,7 +736,7 @@ def main():
         override_model_config = {
             "provider": "openai_whisper",  # Default provider
             "model_name": args.model,
-            "device": "cuda",
+            "device": get_best_device(),  # Auto-detect: CUDA → MPS → CPU
             "compute_type": "float16",
             "supported_tasks": ["transcribe", "translate"]
         }

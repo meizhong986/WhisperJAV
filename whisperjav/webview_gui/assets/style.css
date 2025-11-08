@@ -855,6 +855,7 @@ body {
     line-height: 1.45;  /* AGGRESSIVE: Slightly reduced from 1.5 */
     min-height: 280px;  /* AGGRESSIVE: INCREASED from 250px (more console space!) */
     max-height: none;  /* REMOVED 300px cap - allows flex-grow */
+    scroll-behavior: smooth;  /* Smooth auto-scroll animation */
 }
 
 .console-line {
