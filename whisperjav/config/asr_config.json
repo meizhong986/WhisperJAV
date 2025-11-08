@@ -55,21 +55,21 @@
     "whisper-turbo": {
       "provider": "openai_whisper",
       "model_name": "turbo",
-      "device": "cuda",
       "compute_type": "float16",
       "supported_tasks": [
         "transcribe"
-      ]
+      ],
+      "_comment": "device auto-detected: CUDA → MPS → CPU"
     },
     "whisper-large-v2": {
       "provider": "openai_whisper",
       "model_name": "large-v2",
-      "device": "cuda",
       "compute_type": "float16",
       "supported_tasks": [
         "transcribe",
         "translate"
-      ]
+      ],
+      "_comment": "device auto-detected: CUDA → MPS → CPU"
     }
   },
   "vad_engines": {
