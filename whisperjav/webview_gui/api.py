@@ -129,8 +129,13 @@ class WhisperJAVAPI:
         mode = options.get('mode', 'balanced')
         args += ["--mode", mode]
 
-        language = options.get('language', 'japanese')
-        args += ["--subs-language", language]
+        # Source audio language (for transcription)
+        source_language = options.get('source_language', 'japanese')
+        args += ["--language", source_language]
+
+        # Subtitle output format (native or direct-to-english)
+        subs_language = options.get('subs_language', 'native')
+        args += ["--subs-language", subs_language]
 
         sensitivity = options.get('sensitivity', 'balanced')
         args += ["--sensitivity", sensitivity]
@@ -173,6 +178,10 @@ class WhisperJAVAPI:
         credit = options.get('credit', '').strip()
         if credit:
             args += ["--credit", credit]
+
+        # Accept CPU mode (skip GPU warning)
+        if options.get('accept_cpu_mode', False):
+            args += ["--accept-cpu-mode"]
 
         return args
 

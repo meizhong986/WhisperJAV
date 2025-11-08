@@ -23,6 +23,43 @@ warnings.filterwarnings("ignore", message="Cannot clamp due to missing/no word-t
 warnings.filterwarnings("ignore", message="Failed to transcribe audio. Result contains no text")
 warnings.filterwarnings("ignore", message="Failed to translate audio. Result contains no text")
 
+def _is_silero_vad_cached(repo_or_dir: str) -> bool:
+    """
+    Check if a specific silero-vad version is already cached by torch.hub.
+
+    Args:
+        repo_or_dir: Repository string (e.g., "snakers4/silero-vad:v3.1")
+
+    Returns:
+        True if the exact version is cached, False otherwise
+    """
+    try:
+        # Get torch hub cache directory
+        hub_dir = torch.hub.get_dir()
+
+        # Parse repo and version
+        if ':' in repo_or_dir:
+            repo_name, version = repo_or_dir.rsplit(':', 1)
+        else:
+            repo_name = repo_or_dir
+            version = 'master'  # Default branch
+
+        # Construct expected cache path
+        # torch.hub caches repos as: hub_dir/owner_repo_branch
+        repo_safe = repo_name.replace('/', '_')
+        cached_repo_path = Path(hub_dir) / f"{repo_safe}_{version}"
+
+        if cached_repo_path.exists():
+            logger.debug(f"Silero VAD {version} found in cache: {cached_repo_path}")
+            return True
+        else:
+            logger.debug(f"Silero VAD {version} NOT in cache, will download")
+            return False
+    except Exception as e:
+        logger.warning(f"Error checking silero-vad cache: {e}")
+        return False  # If we can't check, assume not cached
+
+
 @contextmanager
 def suppress_output():
     """Suppress both stdout and stderr."""
@@ -144,7 +181,7 @@ class StableTSASR:
         if hasattr(self, '_vad_precached') and self._vad_precached:
             logger.debug("VAD already pre-cached for this instance")
             return
-            
+
         if self.turbo_mode:
             # Faster pipeline: use latest version
             logger.debug("Pre-caching latest Silero VAD for faster pipeline...")
@@ -153,17 +190,21 @@ class StableTSASR:
             # Fast pipeline: use v4.0
             logger.debug("Pre-caching Silero VAD v4.0 for fast pipeline...")
             vad_repo = "snakers4/silero-vad:v4.0"
-        
+
         try:
-            # Force reload to ensure we get the specific version
+            # Check if already cached to avoid unnecessary download
+            is_cached = _is_silero_vad_cached(vad_repo)
+
+            # Only force reload if not cached (downloads specific version if needed)
             torch.hub.load(
                 repo_or_dir=vad_repo,
                 model="silero_vad",
-                force_reload=True,
+                force_reload=not is_cached,  # Use cache if available
                 onnx=False
             )
             self._vad_precached = True
-            logger.debug(f"Successfully pre-cached VAD from {vad_repo}")
+            status = "from cache" if is_cached else "downloaded"
+            logger.debug(f"Successfully loaded VAD from {vad_repo} ({status})")
         except Exception as e:
             logger.warning(f"Failed to pre-cache Silero VAD: {e}")
     

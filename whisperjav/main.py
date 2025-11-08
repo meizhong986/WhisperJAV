@@ -48,15 +48,24 @@ from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingSta
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
 
+# Language code mapping for Whisper
+LANGUAGE_CODE_MAP = {
+    'japanese': 'ja',
+    'korean': 'ko',
+    'chinese': 'zh',
+    'english': 'en'
+}
+
 
 # --- UNCONDITIONAL CUDA CHECK ---
 # This code runs the moment the module is loaded,
 # ensuring the check is never bypassed.
-# Bypass for help/version/check
+# Bypass for help/version/check and accept-cpu-mode
 args = sys.argv[1:]
 bypass_flags = ['--check', '--help', '-h', '--version', '-v']
+accept_cpu = '--accept-cpu-mode' in args
 if not any(flag in args for flag in bypass_flags):
-    enforce_cuda_requirement()
+    enforce_cuda_requirement(accept_cpu_mode=accept_cpu)
 # --- END OF CHECK ---
 
 
@@ -101,16 +110,21 @@ def parse_arguments():
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
     parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced", 
                        help="Processing mode (default: balanced)")
-    parser.add_argument("--model", default=None, 
+    parser.add_argument("--model", default=None,
                        help="Whisper model to use (e.g., large-v2, turbo, large). Overrides config default.")
+    parser.add_argument("--language", choices=["japanese", "korean", "chinese", "english"],
+                       default="japanese",
+                       help="Source audio language for transcription (default: japanese)")
     parser.add_argument("--config", default=None, help="Path to a JSON configuration file")
-    parser.add_argument("--subs-language", choices=["japanese", "english-direct"], 
-                       default="japanese", help="Output subtitle language")
+    parser.add_argument("--subs-language", choices=["native", "direct-to-english"],
+                       default="native", help="Subtitle output format: 'native' (transcribe in source language) or 'direct-to-english' (translate to English via Whisper)")
     
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
     parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
-    
+    parser.add_argument("--accept-cpu-mode", action="store_true",
+                       help="Accept CPU-only mode without GPU warning (skip GPU performance check)")
+
     # Path and logging
     path_group = parser.add_argument_group("Path and Logging Options")
     path_group.add_argument("--output-dir", default="./output", help="Output directory")
@@ -514,6 +528,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     resolved_config['temp_dir'] = args.temp_dir
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
+    resolved_config['language'] = language_code  # Whisper language code
     
     # Enhancement options
     for opt in ['adaptive_classification', 'adaptive_audio_enhancement', 'smart_postprocessing']:
@@ -673,10 +688,10 @@ def main():
     if args.check or args.check_verbose:
         run_preflight_checks(verbose=args.check_verbose)
         sys.exit(0)
-    
-    # Enforce CUDA requirement
-    enforce_cuda_requirement()
-    
+
+    # Enforce CUDA requirement (with optional bypass)
+    enforce_cuda_requirement(accept_cpu_mode=args.accept_cpu_mode)
+
     # Setup logging
     global logger
     logger = setup_logger("whisperjav", args.log_level, args.log_file)
@@ -695,8 +710,12 @@ def main():
     
     # V3 Configuration resolution
     tuner = TranscriptionTuner(config_path=config_path)
-    task = 'translate' if args.subs_language == 'english-direct' else 'transcribe'
-    
+    task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
+
+    # Map language name to Whisper language code
+    language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
+    logger.info(f"Transcription language: {args.language} ({language_code})")
+
     try:
         resolved_config = tuner.resolve_params(
             pipeline_name=args.mode,
@@ -706,7 +725,7 @@ def main():
     except Exception as e:
         logger.error(f"Failed to resolve configuration: {e}")
         sys.exit(1)
-    
+
     logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
     
     # Apply model override if specified via CLI
@@ -722,7 +741,12 @@ def main():
         }
         resolved_config["model"] = override_model_config
         logger.debug(f"Model override applied: {args.model}")
-    
+
+    # Apply language override to decoder params
+    if "params" in resolved_config and "decoder" in resolved_config["params"]:
+        resolved_config["params"]["decoder"]["language"] = language_code
+        logger.debug(f"Language override applied to decoder params: {language_code}")
+
     # Setup temp directory
     if args.temp_dir:
         temp_path = Path(args.temp_dir)

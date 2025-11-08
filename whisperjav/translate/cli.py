@@ -9,8 +9,38 @@ import argparse
 import logging
 import os
 import sys
+import io
 from pathlib import Path
 from typing import Optional
+
+# Fix stdout/stderr encoding for Windows to handle unicode in file paths
+# Critical for Japanese, Korean, Chinese file names
+def _ensure_utf8_console():
+    """Ensure stdout and stderr use UTF-8 encoding."""
+    if sys.stdout is not None and (not hasattr(sys.stdout, 'encoding') or sys.stdout.encoding.lower() != 'utf-8'):
+        try:
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer if hasattr(sys.stdout, 'buffer') else io.BufferedWriter(io.FileIO(1, 'w')),
+                encoding='utf-8',
+                errors='replace',
+                line_buffering=True
+            )
+        except (AttributeError, OSError):
+            pass
+
+    if sys.stderr is not None and (not hasattr(sys.stderr, 'encoding') or sys.stderr.encoding.lower() != 'utf-8'):
+        try:
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer if hasattr(sys.stderr, 'buffer') else io.BufferedWriter(io.FileIO(2, 'w')),
+                encoding='utf-8',
+                errors='replace',
+                line_buffering=True
+            )
+        except (AttributeError, OSError):
+            pass
+
+# Apply fix at module level
+_ensure_utf8_console()
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_SOURCES, SUPPORTED_TARGETS
 from .core import translate_subtitle
