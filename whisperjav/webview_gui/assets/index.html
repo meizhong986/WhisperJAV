@@ -160,12 +160,23 @@
                                     </select>
                                 </div>
 
-                                <!-- Output Language -->
+                                <!-- Source Audio Language -->
                                 <div class="form-group">
-                                    <label for="language" class="form-label">Output language:</label>
+                                    <label for="source-language" class="form-label">Source audio language:</label>
+                                    <select id="source-language" class="form-select">
+                                        <option value="japanese" selected>Japanese (日本語)</option>
+                                        <option value="korean">Korean (한국어)</option>
+                                        <option value="chinese">Chinese (中文)</option>
+                                        <option value="english">English</option>
+                                    </select>
+                                </div>
+
+                                <!-- Subtitle Output Format -->
+                                <div class="form-group">
+                                    <label for="language" class="form-label">Subtitle output:</label>
                                     <select id="language" class="form-select">
-                                        <option value="japanese" selected>japanese</option>
-                                        <option value="english-direct">english-direct</option>
+                                        <option value="native" selected>Native (transcribe in source language)</option>
+                                        <option value="direct-to-english">Direct to English (translate via Whisper)</option>
                                     </select>
                                 </div>
                             </div>
@@ -294,6 +305,16 @@
                                             Browse
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Row 5: Accept CPU mode -->
+                            <div class="form-row" id="adv-row-5">
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Skip GPU performance warning and accept CPU-only mode">
+                                        <input type="checkbox" id="acceptCpuMode">
+                                        <span>Accept CPU-only mode (skip GPU warning)</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>

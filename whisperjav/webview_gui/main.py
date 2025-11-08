@@ -7,9 +7,38 @@ Handles asset path resolution for both development and bundled modes.
 
 import os
 import sys
+import io
 import platform
 from pathlib import Path
 import time
+
+# Fix stdout/stderr encoding for Windows console
+def _ensure_utf8_output():
+    """Ensure stdout and stderr use UTF-8 encoding."""
+    if sys.stdout is not None and (not hasattr(sys.stdout, 'encoding') or sys.stdout.encoding.lower() != 'utf-8'):
+        try:
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer if hasattr(sys.stdout, 'buffer') else io.BufferedWriter(io.FileIO(1, 'w')),
+                encoding='utf-8',
+                errors='replace',
+                line_buffering=True
+            )
+        except (AttributeError, OSError):
+            pass
+
+    if sys.stderr is not None and (not hasattr(sys.stderr, 'encoding') or sys.stderr.encoding.lower() != 'utf-8'):
+        try:
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer if hasattr(sys.stderr, 'buffer') else io.BufferedWriter(io.FileIO(2, 'w')),
+                encoding='utf-8',
+                errors='replace',
+                line_buffering=True
+            )
+        except (AttributeError, OSError):
+            pass
+
+# Apply fix at module level
+_ensure_utf8_output()
 
 
 def get_asset_path(relative_path: str) -> Path:

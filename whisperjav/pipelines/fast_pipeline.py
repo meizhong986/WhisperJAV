@@ -43,7 +43,7 @@ class FastPipeline(BasePipeline):
             output_dir: Output directory for subtitles
             temp_dir: Temporary directory for processing
             keep_temp_files: Whether to keep temporary files
-            subs_language: Language for subtitles ('japanese' or 'english-direct')
+            subs_language: Language for subtitles ('native' or 'direct-to-english')
             resolved_config: V3 structured configuration from TranscriptionTunerV3
             progress_display: Progress display object
             **kwargs: Additional parameters for base class
@@ -79,7 +79,7 @@ class FastPipeline(BasePipeline):
         '''
         # Implement the smart model-switching logic (preserved from V2)
         effective_model_cfg = model_cfg.copy()
-        if self.subs_language == 'english-direct' and model_cfg.get("model_name") == 'turbo':
+        if self.subs_language == 'direct-to-english' and model_cfg.get("model_name") == 'turbo':
             logger.info("Direct translation requested. Switching to 'large-v2' to perform translation.")
             effective_model_cfg["model_name"] = 'large-v2'
         # --- END V3 CONFIG UNPACKING ---
@@ -89,8 +89,8 @@ class FastPipeline(BasePipeline):
         #self.scene_detector = SceneDetector(**scene_opts)
         #self.scene_detector = AdaptiveSceneDetector()  # Use all defaults
         self.scene_detector = DynamicSceneDetector(**scene_opts)
-        
-        
+
+
         # Pass structured config to StableTSASR
         # NOTE: 'fast' pipeline uses standard whisper backend (turbo_mode=False)
         self.asr = StableTSASR(
@@ -101,10 +101,15 @@ class FastPipeline(BasePipeline):
         )
 
         self.stitcher = SRTStitcher()
-        
-        # Language code for post-processor
-        lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
-        self.standard_postprocessor = StandardPostProcessor(language=lang_code, **post_proc_opts)
+
+        # Language code for post-processor and output filenames
+        # Use 'en' for direct-to-english translation, otherwise use the selected source language
+        if self.subs_language == 'direct-to-english':
+            self.lang_code = 'en'
+        else:
+            # Get language from decoder params (set by CLI --language)
+            self.lang_code = params["decoder"].get("language", "ja")
+        self.standard_postprocessor = StandardPostProcessor(language=self.lang_code, **post_proc_opts)
 
         # Optional modules (if enhancement features are enabled)
         if kwargs.get('smart_postprocessing', False):
@@ -348,9 +353,8 @@ class FastPipeline(BasePipeline):
             if self.progress_reporter:
                 self.progress_reporter.report_step("Post-processing final SRT", 5, 5)
             logger.info("Step 5: Post-processing final SRT")
-            
-            lang_code = 'en' if self.subs_language == 'english-direct' else 'ja'
-            final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
+
+            final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
 
             # Capture the returned path
             processed_srt_path, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)

@@ -469,7 +469,8 @@ const FormManager = {
             output_dir: document.getElementById('outputDir').value,
             mode: document.querySelector('input[name="mode"]:checked').value,
             sensitivity: document.getElementById('sensitivity').value,
-            language: document.getElementById('language').value,
+            source_language: document.getElementById('source-language').value,
+            subs_language: document.getElementById('language').value,
 
             // Optional verbosity
             verbosity: document.getElementById('verbosity').value,
@@ -489,6 +490,7 @@ const FormManager = {
             credit: document.getElementById('openingCredit').value.trim(),
             keep_temp: document.getElementById('keepTemp').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
+            accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
 
             // WIP features (currently disabled, but include for future)
             adaptive_classification: document.getElementById('adaptiveClassification').checked,

@@ -18,6 +18,43 @@ import logging
 from whisperjav.utils.logger import logger
 
 
+def _is_silero_vad_cached(repo_or_dir: str) -> bool:
+    """
+    Check if a specific silero-vad version is already cached by torch.hub.
+
+    Args:
+        repo_or_dir: Repository string (e.g., "snakers4/silero-vad:v3.1")
+
+    Returns:
+        True if the exact version is cached, False otherwise
+    """
+    try:
+        # Get torch hub cache directory
+        hub_dir = torch.hub.get_dir()
+
+        # Parse repo and version
+        if ':' in repo_or_dir:
+            repo_name, version = repo_or_dir.rsplit(':', 1)
+        else:
+            repo_name = repo_or_dir
+            version = 'master'  # Default branch
+
+        # Construct expected cache path
+        # torch.hub caches repos as: hub_dir/owner_repo_branch
+        repo_safe = repo_name.replace('/', '_')
+        cached_repo_path = Path(hub_dir) / f"{repo_safe}_{version}"
+
+        if cached_repo_path.exists():
+            logger.debug(f"Silero VAD {version} found in cache: {cached_repo_path}")
+            return True
+        else:
+            logger.debug(f"Silero VAD {version} NOT in cache, will download")
+            return False
+    except Exception as e:
+        logger.warning(f"Error checking silero-vad cache: {e}")
+        return False  # If we can't check, assume not cached
+
+
 class WhisperProASR:
     """Whisper ASR with internal VAD, using structured v3 parameters."""
     
@@ -48,10 +85,10 @@ class WhisperProASR:
         self.whisper_params = {}
         self.whisper_params.update(decoder_params)  # task, language, beam_size, etc.
         self.whisper_params.update(provider_params)  # temperature, fp16, etc.
-        
+
         # Ensure task is set correctly
         self.whisper_params['task'] = task
-        self.whisper_params['language'] = 'ja'
+        # Language is now passed from decoder_params (set via CLI --language argument)
         
         # Store task for metadata
         self.task = task
@@ -69,14 +106,22 @@ class WhisperProASR:
         """Initialize VAD and Whisper models."""
         logger.debug("Loading Silero VAD model...")
         try:
-            # Preserved exactly from original file to ensure correct VAD version
+            # Use v3.1 for balanced pipeline (stable and well-tested)
+            vad_repo = "snakers4/silero-vad:v3.1"
+
+            # Check if already cached to avoid unnecessary download
+            is_cached = _is_silero_vad_cached(vad_repo)
+
             self.vad_model, self.vad_utils = torch.hub.load(
-                repo_or_dir="snakers4/silero-vad:v3.1",
+                repo_or_dir=vad_repo,
                 model="silero_vad",
-                force_reload=True,
+                force_reload=not is_cached,  # Use cache if available
                 onnx=False
             )
             (self.get_speech_timestamps, _, _, _, _) = self.vad_utils
+
+            status = "from cache" if is_cached else "downloaded"
+            logger.debug(f"Silero VAD v3.1 loaded ({status})")
         except Exception as e:
             logger.error(f"Failed to load Silero VAD model: {e}", exc_info=True)
             raise

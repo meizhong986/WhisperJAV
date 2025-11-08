@@ -5,15 +5,45 @@ This module ensures the runtime environment meets all requirements,
 with special focus on CUDA availability and compatibility.
 """
 
-import time 
+import time
 import sys
 import os
+import io
 import shutil
 import platform
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
+
+# Fix stdout/stderr encoding for Windows before any print statements
+# This is critical for unicode characters (⚠️, ✓, •, etc.) in console output
+def _ensure_utf8_output():
+    """Ensure stdout and stderr use UTF-8 encoding to handle unicode characters."""
+    if sys.stdout is not None and (not hasattr(sys.stdout, 'encoding') or sys.stdout.encoding.lower() != 'utf-8'):
+        try:
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer if hasattr(sys.stdout, 'buffer') else io.BufferedWriter(io.FileIO(1, 'w')),
+                encoding='utf-8',
+                errors='replace',
+                line_buffering=True
+            )
+        except (AttributeError, OSError):
+            pass  # Silently fail if wrapping not possible
+
+    if sys.stderr is not None and (not hasattr(sys.stderr, 'encoding') or sys.stderr.encoding.lower() != 'utf-8'):
+        try:
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer if hasattr(sys.stderr, 'buffer') else io.BufferedWriter(io.FileIO(2, 'w')),
+                encoding='utf-8',
+                errors='replace',
+                line_buffering=True
+            )
+        except (AttributeError, OSError):
+            pass  # Silently fail if wrapping not possible
+
+# Apply UTF-8 fix immediately
+_ensure_utf8_output()
 
 # Use colorama for cross-platform colored output if available
 try:
@@ -415,26 +445,118 @@ def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bo
     
     return success
 
-def enforce_cuda_requirement():
-    """Simple CUDA enforcement for main.py integration."""
-    print("\nInitial check for CUDA enabled torch. WhisperJAV requires an NVIDIA GPU with CUDA support.")
+def _wait_for_keypress_with_timeout(timeout_seconds=30):
+    """
+    Cross-platform implementation to wait for any keypress with timeout.
+    Returns True if key was pressed, False if timeout occurred.
+    """
+    if sys.platform == 'win32':
+        # Windows implementation using msvcrt
+        try:
+            import msvcrt
+            start_time = time.time()
+            while (time.time() - start_time) < timeout_seconds:
+                if msvcrt.kbhit():
+                    msvcrt.getch()  # Consume the keypress
+                    return True
+                time.sleep(0.1)
+            return False
+        except ImportError:
+            # Fallback if msvcrt not available
+            time.sleep(timeout_seconds)
+            return False
+    else:
+        # Unix-like systems (Linux, macOS) using select
+        try:
+            import select
+            print("Press any key to continue immediately, or wait for auto-continue...")
+            # Use select to wait for stdin with timeout
+            rlist, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
+            if rlist:
+                sys.stdin.readline()  # Consume the input
+                return True
+            return False
+        except (ImportError, OSError):
+            # Fallback if select not available or stdin not supported
+            time.sleep(timeout_seconds)
+            return False
+
+
+def enforce_cuda_requirement(accept_cpu_mode=False, timeout_seconds=30):
+    """
+    Check for CUDA availability with friendly warning and optional bypass.
+
+    Args:
+        accept_cpu_mode: If True, skip the warning entirely (from --accept-cpu flag)
+        timeout_seconds: How long to wait for user acknowledgment (default: 30)
+
+    Returns:
+        bool: True if CUDA is available or user accepted CPU mode, False otherwise
+    """
+    # Skip check entirely if user explicitly accepted CPU mode
+    if accept_cpu_mode:
+        print(f"{Fore.YELLOW}ℹ GPU check bypassed via --accept-cpu-mode flag.{Style.RESET_ALL}")
+        return True
+
     try:
         import torch
-        if not torch.cuda.is_available():
-            print(f"\n{Fore.RED}{'='*60}{Style.RESET_ALL}")
-            print(f"{Fore.RED}❌ CUDA Required - CPU Mode Not Supported{Style.RESET_ALL}")
-            print(f"{Fore.RED}{'='*60}{Style.RESET_ALL}")
-            print("\nWhisperJAV requires GPU with CUDA support, and CUDA enabled torch.")
-            print("If you already have CUDA, please check that torch is cuda enabled.")
-            print("Uninstall cpu torch and reinstall torch and torch audio with CUDA support\n.")
-            print("Run 'whisperjav --check' for detailed diagnostics.")
-            print(f"{Fore.RED}{'='*60}{Style.RESET_ALL}\n")
 
-            # Wait for user input before exiting
-            input("Press Enter to exit...")
-            sys.exit(1)
+        # CUDA is available - all good!
+        if torch.cuda.is_available():
+            return True
+
+        # No CUDA detected - show friendly warning
+        print(f"\n{Fore.YELLOW}{'='*70}{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}⚠  GPU Performance Warning{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}{'='*70}{Style.RESET_ALL}\n")
+
+        print("WhisperJAV works best with an NVIDIA GPU with CUDA support.")
+        print("We detected that CUDA is not currently available on your system.\n")
+
+        print(f"{Fore.CYAN}What this means:{Style.RESET_ALL}")
+        print("  • CPU-only processing will be significantly slower (10-50x)")
+        print("  • Large video files may take hours instead of minutes")
+        print("  • You may encounter memory issues with longer videos\n")
+
+        print(f"{Fore.CYAN}Possible reasons for this warning:{Style.RESET_ALL}")
+        print("  • No NVIDIA GPU installed")
+        print("  • NVIDIA drivers not installed or outdated")
+        print("  • PyTorch installed without CUDA support")
+        print("  • CUDA toolkit version mismatch\n")
+
+        print(f"{Fore.CYAN}To fix this for better performance:{Style.RESET_ALL}")
+        print("  1. Ensure you have an NVIDIA GPU installed")
+        print("  2. Install latest NVIDIA drivers")
+        print("  3. Reinstall PyTorch with CUDA: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
+        print("  4. Run 'whisperjav --check' for detailed diagnostics\n")
+
+        print(f"{Fore.YELLOW}You can continue with CPU-only mode, but expect slower performance.{Style.RESET_ALL}\n")
+
+        print(f"{Fore.GREEN}Press any key to continue with CPU mode...{Style.RESET_ALL}")
+        print(f"(Auto-continuing in {timeout_seconds} seconds, or use --accept-cpu-mode to skip this warning)")
+        print(f"{Fore.YELLOW}{'='*70}{Style.RESET_ALL}\n")
+
+        # Wait for keypress or timeout
+        key_pressed = _wait_for_keypress_with_timeout(timeout_seconds)
+
+        if key_pressed:
+            print(f"\n{Fore.GREEN}✓ Continuing with CPU mode (user confirmed)...{Style.RESET_ALL}\n")
+        else:
+            print(f"\n{Fore.GREEN}✓ Auto-continuing with CPU mode after timeout...{Style.RESET_ALL}\n")
+
+        return True
+
     except ImportError:
-        print(f"\n{Fore.RED}PyTorch not installed. Please complete installation first.{Style.RESET_ALL}\n")
+        # PyTorch not installed - this is a critical error
+        print(f"\n{Fore.RED}{'='*70}{Style.RESET_ALL}")
+        print(f"{Fore.RED}❌ Critical Error: PyTorch Not Installed{Style.RESET_ALL}")
+        print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
+        print("WhisperJAV requires PyTorch to function.")
+        print("Please install it using:\n")
+        print("  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
+        print("\nOr for CPU-only (slower):")
+        print("  pip install torch torchvision torchaudio")
+        print(f"\n{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
         input("Press Enter to exit...")
         sys.exit(1)
         
