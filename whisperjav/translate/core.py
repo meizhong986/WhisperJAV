@@ -75,7 +75,7 @@ def translate_subtitle(
             return None
 
         # Initialize project (PySubtrans 1.5.x expects subtitle path in 'filepath' kwarg)
-        project = init_project(options, filepath=str(input_path))
+        project = init_project(options, filepath=str(input_path), persistent=True)
 
         # Set instructions if provided
         if instruction_file is not None and hasattr(project, 'SetInstructions'):
@@ -84,12 +84,17 @@ def translate_subtitle(
             except Exception:
                 pass
 
-        # Save project if possible
-        if hasattr(project, 'SaveProject'):
-            try:
-                project.SaveProject()
-            except Exception:
-                pass
+        # Register auto-save handler to save project after each batch
+        if hasattr(project, 'events') and hasattr(project.events, 'batch_translated'):
+            def _auto_save_handler(sender, **kwargs):
+                """Auto-save project state after each translated batch."""
+                try:
+                    if hasattr(project, 'SaveProject'):
+                        project.SaveProject()
+                except Exception:
+                    pass  # Don't fail translation due to save errors
+
+            project.events.batch_translated.connect(_auto_save_handler)
 
         # Initialize translator and translate
         translator = init_translator(options, translation_provider=provider)
@@ -120,6 +125,13 @@ def translate_subtitle(
         # Translate subtitles
         project.TranslateSubtitles(translator)
 
+        # Save final project state after successful translation
+        if hasattr(project, 'SaveProject'):
+            try:
+                project.SaveProject()
+            except Exception:
+                pass  # Don't fail on final save
+
         # Save translation
         saved_path = None
         try:
@@ -136,6 +148,15 @@ def translate_subtitle(
         return output_path
 
     except Exception as e:
+        # Save project state before propagating error
+        if 'project' in locals() and hasattr(project, 'SaveProject'):
+            try:
+                project.SaveProject()
+                print("WARNING: Translation failed, project state saved to .subtrans file", file=sys.stderr)
+            except Exception as save_err:
+                if debug:
+                    print(f"Warning: Failed to save project on error: {save_err}", file=sys.stderr)
+
         if debug:
             import traceback
             traceback.print_exc()

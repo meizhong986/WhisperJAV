@@ -664,7 +664,7 @@ body {
     word-wrap: break-word;
     line-height: 1.5;  /* Reduced from 1.6 */
     min-height: 250px;  /* INCREASED from 180px */
-    max-height: none;  /* REMOVED 300px cap - allows flex-grow */
+    max-height: 400px;  /* Fixed height for dedicated scrollbar and auto-scroll */
 }
 
 .console-line {
