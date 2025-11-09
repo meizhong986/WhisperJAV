@@ -106,10 +106,10 @@ def parse_arguments():
         description="WhisperJAV - Generate accurate subtitles for Japanese adult videos",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    
+
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced", 
+    parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced",
                        help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
                        help="Whisper model to use (e.g., large-v2, turbo, large). Overrides config default.")

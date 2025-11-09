@@ -11,6 +11,10 @@ import io
 import platform
 from pathlib import Path
 import time
+import json
+
+import webview
+from webview.dom import DOMEventHandler
 
 # Fix stdout/stderr encoding for Windows console
 def _ensure_utf8_output():
@@ -39,6 +43,75 @@ def _ensure_utf8_output():
 
 # Apply fix at module level
 _ensure_utf8_output()
+
+
+def on_drop_event(e):
+    """
+    Handle file/folder drops from OS into WebView.
+
+    Uses PyWebView's pywebviewFullPath to get absolute file paths,
+    bypassing browser security restrictions.
+
+    Args:
+        e: DOM drop event with dataTransfer.files
+    """
+    files = e.get('dataTransfer', {}).get('files', [])
+    if len(files) == 0:
+        return
+
+    paths = []
+    unsupported = []
+
+    for file in files:
+        # Get full path using PyWebView's native property
+        full_path = file.get('pywebviewFullPath')
+        if full_path:
+            paths.append(full_path)
+        else:
+            # Fallback: filename only (shouldn't happen, but defensive)
+            unsupported.append(file.get('name', 'unknown'))
+
+    # Send paths to JavaScript
+    try:
+        window = webview.windows[0]
+        if paths:
+            # Escape backslashes for JavaScript string
+            paths_json = json.dumps(paths)
+            window.evaluate_js(f"FileListManager.addDroppedFiles({paths_json})")
+
+        if unsupported:
+            names_str = ', '.join(unsupported)
+            window.evaluate_js(
+                f"ErrorHandler.showWarning('Incomplete Paths', "
+                f"'Some files could not be added: {names_str}. Please use Add Files button.')"
+            )
+    except Exception as ex:
+        print(f"Error handling drop event: {ex}")
+
+
+def bind_dom_events(window):
+    """
+    Bind drag-drop events to window DOM after creation.
+
+    Registers handlers for dragenter, dragover, and drop events
+    to enable native file path access via pywebviewFullPath.
+
+    Args:
+        window: PyWebView window instance
+    """
+    try:
+        # Prevent default for drag events (required for drop to work)
+        # preventDefault=True, stopPropagation=True
+        window.dom.document.events.dragenter += DOMEventHandler(lambda e: None, True, True)
+        window.dom.document.events.dragover += DOMEventHandler(lambda e: None, True, True)
+
+        # Handle actual file drops
+        window.dom.document.events.drop += DOMEventHandler(on_drop_event, True, True)
+
+        print("DOM drag-drop events bound successfully")
+    except Exception as ex:
+        print(f"Warning: Could not bind DOM events: {ex}")
+        print("Drag-drop may not work correctly. Please use Add Files button.")
 
 
 def get_asset_path(relative_path: str) -> Path:
@@ -325,9 +398,10 @@ def main():
         if platform.system() == 'Windows' and icon_path and not icon_used:
             def _after_start():
                 _set_windows_icon('WhisperJAV GUI', icon_path)
+                bind_dom_events(window)
             webview.start(debug=debug_mode, func=_after_start)
         else:
-            webview.start(debug=debug_mode)
+            webview.start(debug=debug_mode, func=lambda: bind_dom_events(window))
 
     except FileNotFoundError as e:
         print("\nERROR: Asset file not found!")
