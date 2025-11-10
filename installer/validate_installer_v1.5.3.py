@@ -54,6 +54,7 @@ REQUIRED_FILES = [
     "README_INSTALLER_v1.5.3.txt",
     "LICENSE.txt",
     "whisperjav_icon.ico",
+    "whisperjav_local.whl",
 ]
 
 # Expected module path (no old Tkinter GUI references)
