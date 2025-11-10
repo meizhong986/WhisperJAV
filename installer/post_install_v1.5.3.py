@@ -548,12 +548,20 @@ def main() -> int:
     # === Phase 5: WhisperJAV Application ===
     log_section("Phase 5: WhisperJAV Application Installation")
 
-    repo_url = "git+https://github.com/meizhong986/WhisperJAV.git"
-    log(f"Installing WhisperJAV from: {repo_url}")
+    # Install from local wheel bundled with installer
+    local_wheel = os.path.join(sys.prefix, "whisperjav_local.whl")
+
+    if not os.path.exists(local_wheel):
+        log(f"ERROR: Local wheel not found: {local_wheel}")
+        log("ERROR: The installer package may be corrupted or incomplete")
+        create_failure_file(f"Missing local wheel: {local_wheel}")
+        return 1
+
+    log(f"Installing WhisperJAV from local wheel: {local_wheel}")
     log("Using --no-deps to avoid reinstalling dependencies...")
 
     if not run_pip(
-        ["install", "--no-deps", repo_url, "--progress-bar", "on"],
+        ["install", "--no-deps", local_wheel, "--progress-bar", "on"],
         "Install WhisperJAV application"
     ):
         create_failure_file("WhisperJAV application installation failed")

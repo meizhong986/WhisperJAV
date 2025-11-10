@@ -96,9 +96,27 @@ echo   - Config file: %CONFIG_FILE% (found)
 echo   - Config file: %CONFIG_FILE% >> "%BUILD_LOG%"
 echo.
 
-REM ===== Phase 2: Validate Configuration =====
-echo [Phase 2/5] Validating installer configuration...
-echo [Phase 2/5] Validating configuration... >> "%BUILD_LOG%"
+REM ===== Phase 2: Build WhisperJAV Wheel from Local Source =====
+echo [Phase 2/6] Building WhisperJAV wheel from local source...
+echo [Phase 2/6] Building local wheel... >> "%BUILD_LOG%"
+
+call build_whisperjav_wheel.bat
+if errorlevel 1 (
+    echo.
+    echo ERROR: Failed to build WhisperJAV wheel!
+    echo ERROR: Wheel build failed >> "%BUILD_LOG%"
+    echo.
+    pause
+    exit /b 1
+)
+
+echo   - WhisperJAV wheel built successfully
+echo   - Wheel: whisperjav_local.whl >> "%BUILD_LOG%"
+echo.
+
+REM ===== Phase 3: Validate Configuration =====
+echo [Phase 3/6] Validating installer configuration...
+echo [Phase 3/6] Validating configuration... >> "%BUILD_LOG%"
 
 if exist "%VALIDATOR%" (
     python "%VALIDATOR%"
@@ -118,9 +136,9 @@ if exist "%VALIDATOR%" (
 )
 echo.
 
-REM ===== Phase 3: Clean Previous Builds =====
-echo [Phase 3/5] Cleaning previous v1.5.3 builds...
-echo [Phase 3/5] Cleaning previous builds... >> "%BUILD_LOG%"
+REM ===== Phase 4: Clean Previous Builds =====
+echo [Phase 4/6] Cleaning previous v1.5.3 builds...
+echo [Phase 4/6] Cleaning previous builds... >> "%BUILD_LOG%"
 
 REM Only clean v1.5.3 builds, preserve other versions
 if exist build (
@@ -144,9 +162,9 @@ if exist WhisperJAV-%VERSION%-Windows-x86_64.exe (
 echo   - Cleanup complete
 echo.
 
-REM ===== Phase 4: Build Installer =====
-echo [Phase 4/5] Building installer with constructor...
-echo [Phase 4/5] Building installer... >> "%BUILD_LOG%"
+REM ===== Phase 5: Build Installer =====
+echo [Phase 5/6] Building installer with constructor...
+echo [Phase 5/6] Building installer... >> "%BUILD_LOG%"
 echo.
 echo This will take 2-5 minutes. Please wait...
 echo.
@@ -180,9 +198,9 @@ if errorlevel 1 (
 
 echo.
 
-REM ===== Phase 5: Verify Output and Generate Report =====
-echo [Phase 5/5] Verifying build output...
-echo [Phase 5/5] Verifying output... >> "%BUILD_LOG%"
+REM ===== Phase 6: Verify Output and Generate Report =====
+echo [Phase 6/6] Verifying build output...
+echo [Phase 6/6] Verifying output... >> "%BUILD_LOG%"
 
 set INSTALLER_NAME=WhisperJAV-%VERSION%-Windows-x86_64.exe
 
