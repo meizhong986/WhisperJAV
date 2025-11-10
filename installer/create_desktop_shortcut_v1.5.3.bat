@@ -53,21 +53,69 @@ if not exist "%ICON%" (
     set ICON=
 )
 
-REM Create shortcut using PowerShell
+REM Create shortcut using PowerShell or VBScript fallback
 echo Icon: %ICON%
 echo Working Directory: %SCRIPT_DIR%
 echo.
 
-if "%USE_LAUNCHER_EXE%"=="1" (
-    REM Preferred: Point to WhisperJAV-GUI.exe
-    echo Shortcut target: %TARGET_EXE%
-    echo.
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%TARGET_EXE%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.5.3 - Japanese AV Subtitle Generator'; $Shortcut.Save()"
+REM Try PowerShell first (modern Windows systems)
+where powershell >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    echo Using PowerShell to create shortcut...
+    if "%USE_LAUNCHER_EXE%"=="1" (
+        REM Preferred: Point to WhisperJAV-GUI.exe
+        echo Shortcut target: %TARGET_EXE%
+        echo.
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%TARGET_EXE%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.5.3 - Japanese AV Subtitle Generator'; $Shortcut.Save()"
+    ) else (
+        REM Fallback: Point to pythonw.exe with module arguments
+        echo Shortcut target: %PYTHONW% %TARGET_ARGS%
+        echo.
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%PYTHONW%'; $Shortcut.Arguments = '%TARGET_ARGS%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.5.3 - Japanese AV Subtitle Generator'; $Shortcut.Save()"
+    )
 ) else (
-    REM Fallback: Point to pythonw.exe with module arguments
-    echo Shortcut target: %PYTHONW% %TARGET_ARGS%
-    echo.
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%PYTHONW%'; $Shortcut.Arguments = '%TARGET_ARGS%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.5.3 - Japanese AV Subtitle Generator'; $Shortcut.Save()"
+    REM PowerShell not available - use VBScript fallback (works on all Windows)
+    echo PowerShell not found, using VBScript fallback...
+
+    REM Create temporary VBScript
+    set VBS_SCRIPT=%TEMP%\create_whisperjav_shortcut.vbs
+
+    if "%USE_LAUNCHER_EXE%"=="1" (
+        REM Preferred: Point to WhisperJAV-GUI.exe
+        echo Shortcut target: %TARGET_EXE%
+        echo.
+        (
+            echo Set WshShell = CreateObject^("WScript.Shell"^)
+            echo DesktopPath = WshShell.SpecialFolders^("Desktop"^)
+            echo Set Shortcut = WshShell.CreateShortcut^(DesktopPath ^& "\%SHORTCUT_NAME%"^)
+            echo Shortcut.TargetPath = "%TARGET_EXE%"
+            echo Shortcut.WorkingDirectory = "%SCRIPT_DIR%"
+            echo Shortcut.Description = "WhisperJAV v1.5.3 - Japanese AV Subtitle Generator"
+            if not "%ICON%"=="" echo Shortcut.IconLocation = "%ICON%"
+            echo Shortcut.Save
+        ) > "%VBS_SCRIPT%"
+    ) else (
+        REM Fallback: Point to pythonw.exe with module arguments
+        echo Shortcut target: %PYTHONW% %TARGET_ARGS%
+        echo.
+        (
+            echo Set WshShell = CreateObject^("WScript.Shell"^)
+            echo DesktopPath = WshShell.SpecialFolders^("Desktop"^)
+            echo Set Shortcut = WshShell.CreateShortcut^(DesktopPath ^& "\%SHORTCUT_NAME%"^)
+            echo Shortcut.TargetPath = "%PYTHONW%"
+            echo Shortcut.Arguments = "%TARGET_ARGS%"
+            echo Shortcut.WorkingDirectory = "%SCRIPT_DIR%"
+            echo Shortcut.Description = "WhisperJAV v1.5.3 - Japanese AV Subtitle Generator"
+            if not "%ICON%"=="" echo Shortcut.IconLocation = "%ICON%"
+            echo Shortcut.Save
+        ) > "%VBS_SCRIPT%"
+    )
+
+    REM Execute VBScript
+    cscript //NoLogo "%VBS_SCRIPT%"
+
+    REM Cleanup
+    del "%VBS_SCRIPT%" >nul 2>&1
 )
 
 REM Verify shortcut was created

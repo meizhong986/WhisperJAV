@@ -232,16 +232,24 @@ def create_window():
     # Create API instance
     api = WhisperJAVAPI()
 
-    # Check for icon file
+    # Check for icon file with multiple fallback locations
     icon_path = None
-    if getattr(sys, 'frozen', False):
-        # Running as executable
+
+    # Priority 1: Check install root directory (where installer places whisperjav_icon.ico)
+    # This is needed for conda-constructor installations
+    install_root_icon = Path(sys.prefix) / "whisperjav_icon.ico"
+    if install_root_icon.exists():
+        icon_path = install_root_icon
+
+    # Priority 2: Check bundled executable assets (PyInstaller)
+    elif getattr(sys, 'frozen', False):
         try:
             icon_path = get_asset_path('icon.ico')
         except FileNotFoundError:
             pass  # No icon available
+
+    # Priority 3: Running as script - check assets directory
     else:
-        # Running as script
         icon_file = Path(__file__).parent / "assets" / "icon.ico"
         if icon_file.exists():
             icon_path = icon_file

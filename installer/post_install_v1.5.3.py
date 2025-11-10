@@ -465,7 +465,9 @@ def copy_launcher_to_root() -> str:
     root_exe = os.path.join(sys.prefix, "WhisperJAV-GUI.exe")
 
     if not os.path.exists(scripts_exe):
-        log(f"WARNING: Scripts launcher not found: {scripts_exe}")
+        log(f"INFO: Scripts launcher not found: {scripts_exe}")
+        log(f"      This is normal - the shortcut will use pythonw.exe instead")
+        log(f"      (Both methods work equally well)")
         return None
 
     try:
@@ -477,11 +479,12 @@ def copy_launcher_to_root() -> str:
             log(f"  Users can double-click this file to launch the GUI")
             return root_exe
         else:
-            log(f"WARNING: Failed to create launcher in root")
+            log(f"INFO: Could not create launcher in root (will use pythonw.exe fallback)")
             return None
 
     except Exception as e:
-        log(f"WARNING: Could not copy launcher: {e}")
+        log(f"INFO: Could not copy launcher: {e}")
+        log(f"      The shortcut will use pythonw.exe fallback instead")
         return None
 
 
