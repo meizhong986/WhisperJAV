@@ -1,7 +1,7 @@
 # WhisperJAV - Japanese Adult Video Subtitle Generator
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.4.4-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.3-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.9+-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
