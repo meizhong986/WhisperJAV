@@ -84,6 +84,7 @@ setup(
             "webview_gui/assets/*.html",
             "webview_gui/assets/*.css",
             "webview_gui/assets/*.js",
+            "Menu/*.json",  # menuinst shortcut definition
         ],
     },
     zip_safe=False,

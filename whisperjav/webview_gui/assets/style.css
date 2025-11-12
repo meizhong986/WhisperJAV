@@ -433,11 +433,19 @@ body {
     margin-bottom: 8px;  /* AGGRESSIVE: Reduced from 12px (-4px) */
 }
 
-/* Make "Sensitivity" sit closer to "Mode" on the first row of Tab 1 */
-#tab1-panel .form-row:first-of-type {
-    /* Tighter spacing between first two columns; keep third wide and right-aligned area */
-    grid-template-columns: minmax(220px, 0.85fr) minmax(200px, 0.75fr) 1.4fr;
-    column-gap: 4px; /* minimal distance between Mode and Sensitivity */
+/* Two-column grouped layout for Tab 1 */
+.form-row-two-column {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    align-items: start;
+}
+
+/* Form column: horizontal grouping within each column */
+.form-column {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
 }
 
 .form-row:last-child {
@@ -553,20 +561,11 @@ body {
 
 /* Info text */
 .info-row {
-    /* Align info boxes under the first two fields (Mode, Sensitivity) */
-    grid-template-columns: repeat(3, 1fr);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
     margin-top: 4px;  /* AGGRESSIVE: Reduced from 6px */
 }
-
-/* Ensure the info row grid matches first row columns for perfect vertical alignment */
-#tab1-panel .info-row {
-    grid-template-columns: minmax(220px, 0.85fr) minmax(200px, 0.75fr) 1.4fr;
-    column-gap: 4px;
-}
-
-/* Place the two info boxes explicitly under column 1 and 2 */
-.info-row .info-group:nth-child(1) { grid-column: 1; }
-.info-row .info-group:nth-child(2) { grid-column: 2; }
 
 .info-group {
     max-width: 360px;
@@ -577,23 +576,32 @@ body {
     border-radius: var(--border-radius);
 }
 
-/* First row: fine-tune alignment and reasonable select widths */
-#tab1-panel .form-row:first-of-type .form-group:nth-child(2) { /* Sensitivity group */
-    align-items: flex-start;
-}
-
-#tab1-panel .form-row:first-of-type .form-group:nth-child(3) { /* Output language group */
-    justify-self: end;
-    align-items: flex-end; /* right-align label and control within the column */
+/* Right column alignment for Tab 1 */
+.form-column:last-child {
+    justify-content: flex-end;
 }
 
 /* Reasonable control widths to avoid overly long dropdowns */
-#sensitivity {
-    width: 170px;
+#mode {
+    min-width: 250px;
+    max-width: 300px;
 }
 
+#sensitivity {
+    min-width: 250px;
+    max-width: 300px;
+}
+
+#source-language,
 #language {
-    width: 200px;
+    max-width: 280px;
+}
+
+/* Disabled select options styling */
+.form-select option:disabled {
+    color: var(--text-disabled);
+    font-style: italic;
+    opacity: 0.6;
 }
 
 .info-text {
@@ -927,10 +935,16 @@ body {
         grid-template-columns: 1fr;
     }
 
-    /* Reset first-row tweak for mobile to keep stacking clean */
-    #tab1-panel .form-row:first-of-type {
+    /* Stack two-column layout vertically on mobile */
+    .form-row-two-column {
         grid-template-columns: 1fr;
-        column-gap: 10px;
+        gap: 10px;
+    }
+
+    /* Stack form columns vertically on mobile */
+    .form-column {
+        flex-direction: column;
+        gap: 8px;
     }
 
     /* On narrow screens, stack info boxes naturally */

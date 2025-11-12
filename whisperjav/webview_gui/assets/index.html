@@ -129,55 +129,54 @@
                             role="tabpanel"
                             aria-labelledby="tab1-button"
                         >
-                            <!-- Row 1: Mode, Sensitivity, Output Language -->
-                            <div class="form-row">
-                                <!-- Mode Selection -->
-                                <div class="form-group">
-                                    <label class="form-label">Mode:</label>
-                                    <div class="radio-group">
-                                        <label class="radio-label">
-                                            <input type="radio" name="mode" value="balanced" checked>
-                                            <span>balanced</span>
-                                        </label>
-                                        <label class="radio-label">
-                                            <input type="radio" name="mode" value="fast">
-                                            <span>fast</span>
-                                        </label>
-                                        <label class="radio-label">
-                                            <input type="radio" name="mode" value="faster">
-                                            <span>faster</span>
-                                        </label>
+                            <!-- Row 1: Mode + Sensitivity (left), Source language + Subtitle output (right) -->
+                            <div class="form-row form-row-two-column">
+                                <!-- Left Column: Mode + Sensitivity -->
+                                <div class="form-column">
+                                    <!-- Mode Selection -->
+                                    <div class="form-group">
+                                        <label for="mode" class="form-label">Mode (ASR Engine options):</label>
+                                        <select id="mode" class="form-select">
+                                            <option value="balanced" selected>balanced (standard whisper)</option>
+                                            <option value="fast">fast (stable-ts)</option>
+                                            <option value="faster">faster (faster-whisper)</option>
+                                            <option value="kotoba" disabled>kotoba (future placeholder)</option>
+                                            <option value="anime" disabled>anime (future placeholder)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Sensitivity -->
+                                    <div class="form-group">
+                                        <label for="sensitivity" class="form-label">Sensitivity (accuracy vs false-positives):</label>
+                                        <select id="sensitivity" class="form-select">
+                                            <option value="aggressive">aggressive (hi-details, noise)</option>
+                                            <option value="balanced" selected>balanced (details, lo-noise)</option>
+                                            <option value="conservative">conservative (lo-details, accurate)</option>
+                                        </select>
                                     </div>
                                 </div>
 
-                                <!-- Sensitivity -->
-                                <div class="form-group">
-                                    <label for="sensitivity" class="form-label">Sensitivity:</label>
-                                    <select id="sensitivity" class="form-select">
-                                        <option value="conservative">conservative</option>
-                                        <option value="balanced" selected>balanced</option>
-                                        <option value="aggressive">aggressive</option>
-                                    </select>
-                                </div>
+                                <!-- Right Column: Source Audio Language + Subtitle Output -->
+                                <div class="form-column">
+                                    <!-- Source Audio Language -->
+                                    <div class="form-group">
+                                        <label for="source-language" class="form-label">Source audio language:</label>
+                                        <select id="source-language" class="form-select">
+                                            <option value="japanese" selected>Japanese (日本語)</option>
+                                            <option value="korean">Korean (한국어)</option>
+                                            <option value="chinese">Chinese (中文)</option>
+                                            <option value="english">English</option>
+                                        </select>
+                                    </div>
 
-                                <!-- Source Audio Language -->
-                                <div class="form-group">
-                                    <label for="source-language" class="form-label">Source audio language:</label>
-                                    <select id="source-language" class="form-select">
-                                        <option value="japanese" selected>Japanese (日本語)</option>
-                                        <option value="korean">Korean (한국어)</option>
-                                        <option value="chinese">Chinese (中文)</option>
-                                        <option value="english">English</option>
-                                    </select>
-                                </div>
-
-                                <!-- Subtitle Output Format -->
-                                <div class="form-group">
-                                    <label for="language" class="form-label">Subtitle output:</label>
-                                    <select id="language" class="form-select">
-                                        <option value="native" selected>Native (transcribe in source language)</option>
-                                        <option value="direct-to-english">Direct to English (translate via Whisper)</option>
-                                    </select>
+                                    <!-- Subtitle Output Format -->
+                                    <div class="form-group">
+                                        <label for="language" class="form-label">Subtitle output:</label>
+                                        <select id="language" class="form-select">
+                                            <option value="native" selected>Native (transcribe in source language)</option>
+                                            <option value="direct-to-english">Direct to English (translate via Whisper)</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 

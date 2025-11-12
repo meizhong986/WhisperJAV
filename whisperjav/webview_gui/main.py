@@ -391,6 +391,20 @@ def main():
         show_webview2_error()
         sys.exit(1)
 
+    # Set Windows AppUserModelID for taskbar icon support
+    # Must be called BEFORE creating GUI windows
+    # This tells Windows this is a unique application, not just pythonw.exe
+    if platform.system() == 'Windows':
+        try:
+            import ctypes
+            # Unique identifier for WhisperJAV (company.product.subproduct.version format)
+            appid = 'WhisperJAV.GUI.PyWebView.v1.5.3'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appid)
+            print(f"Windows AppUserModelID set: {appid}")
+        except Exception as e:
+            print(f"Warning: Could not set Windows AppUserModelID: {e}")
+            # Non-fatal - continue anyway
+
     try:
         # Create window (stored in webview's global window registry)
         window, icon_path, icon_used = create_window()

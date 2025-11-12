@@ -499,7 +499,7 @@ const FormManager = {
             // Required fields
             inputs: AppState.selectedFiles,
             output_dir: document.getElementById('outputDir').value,
-            mode: document.querySelector('input[name="mode"]:checked').value,
+            mode: document.getElementById('mode').value,
             sensitivity: document.getElementById('sensitivity').value,
             source_language: document.getElementById('source-language').value,
             subs_language: document.getElementById('language').value,
