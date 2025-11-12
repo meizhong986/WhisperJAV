@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schemas.conda.org/menuinst/menuinst-1-1-0.schema.json",
+  "menu_name": "WhisperJAV",
+  "menu_items": [
+    {
+      "name": "WhisperJAV v1.5.3",
+      "description": "Japanese AV Subtitle Generator with AI-powered transcription",
+      "icon": "{{ PREFIX }}\\whisperjav_icon.ico",
+      "command": ["{{ PYTHONW }}", "-m", "whisperjav.webview_gui.main"],
+      "working_dir": "{{ PREFIX }}",
+      "desktop": true,
+      "quicklaunch": false,
+      "terminal": false,
+      "platforms": {
+        "win": true,
+        "linux": false,
+        "osx": false
+      }
+    }
+  ]
+}
