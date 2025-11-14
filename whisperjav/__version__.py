@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Version information for WhisperJAV."""
 
-__version__ = "1.5.3"  # uses v4.3 config architecture
+__version__ = "1.5.4"  # uses v4.3 config architecture
 
 # Optional: Add version metadata
 __version_info__ = {
     "major": 1,
     "minor": 5,
-    "patch": 3,
+    "patch": 4,
     "release": "stable",
     "architecture": "v4.3"
 }
