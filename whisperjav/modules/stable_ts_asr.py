@@ -145,13 +145,20 @@ class StableTSASR:
         self.device = model_config.get("device", get_best_device())
         self.compute_type = model_config.get("compute_type", "float16")
         self.turbo_mode = turbo_mode
-        
+
         # Store structured parameters directly - trust the tuner
         self.decoder_params = params.get("decoder", {})
         self.provider_params = params.get("provider", {})
         self.task = task
         self.language = self.decoder_params.get("language", "ja")
-        
+
+        # Extract VAD repo from provider params (packed handling in tuner)
+        # Fallback to old hardcoded logic if not provided (backward compatibility)
+        self.vad_repo = self.provider_params.get("vad_repo", None)
+        if not self.vad_repo:
+            self.vad_repo = "snakers4/silero-vad" if turbo_mode else "snakers4/silero-vad:v4.0"
+            logger.warning(f"VAD repo not found in config, using fallback: {self.vad_repo}")
+
         # Extract stable-ts specific options if provided
         self.stable_ts_options = params.get("stable_ts", {})
         
@@ -184,22 +191,16 @@ class StableTSASR:
             logger.debug("VAD already pre-cached for this instance")
             return
 
-        if self.turbo_mode:
-            # Faster pipeline: use latest version
-            logger.debug("Pre-caching latest Silero VAD for faster pipeline...")
-            vad_repo = "snakers4/silero-vad"
-        else:
-            # Fast pipeline: use v4.0
-            logger.debug("Pre-caching Silero VAD v4.0 for fast pipeline...")
-            vad_repo = "snakers4/silero-vad:v4.0"
+        # Use repo from config (resolved by TranscriptionTuner, or fallback from __init__)
+        logger.debug(f"Pre-caching Silero VAD: {self.vad_repo}")
 
         try:
             # Check if already cached to avoid unnecessary download
-            is_cached = _is_silero_vad_cached(vad_repo)
+            is_cached = _is_silero_vad_cached(self.vad_repo)
 
             # Only force reload if not cached (downloads specific version if needed)
             torch.hub.load(
-                repo_or_dir=vad_repo,
+                repo_or_dir=self.vad_repo,  # Config-driven, not hardcoded
                 model="silero_vad",
                 force_reload=not is_cached,  # Use cache if available
                 onnx=False

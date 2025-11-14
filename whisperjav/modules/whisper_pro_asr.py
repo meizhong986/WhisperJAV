@@ -82,6 +82,9 @@ class WhisperProASR:
         self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 150)
         self.vad_chunk_threshold = vad_params.get("chunk_threshold", 4.0)
 
+        # VAD engine repo (resolved from config, with fallback for backward compatibility)
+        self.vad_repo = vad_params.get("vad_repo", "snakers4/silero-vad:v3.1")
+
         # FIX: Combine all Whisper parameters into a single dictionary
         # The Whisper library expects all parameters in one transcribe() call
         self.whisper_params = {}
@@ -106,16 +109,14 @@ class WhisperProASR:
         
     def _initialize_models(self):
         """Initialize VAD and Whisper models."""
-        logger.debug("Loading Silero VAD model...")
+        logger.debug(f"Loading Silero VAD model from: {self.vad_repo}")
         try:
-            # Use v3.1 for balanced pipeline (stable and well-tested)
-            vad_repo = "snakers4/silero-vad:v3.1"
-
+            # Use repo from config (resolved by TranscriptionTuner)
             # Check if already cached to avoid unnecessary download
-            is_cached = _is_silero_vad_cached(vad_repo)
+            is_cached = _is_silero_vad_cached(self.vad_repo)
 
             self.vad_model, self.vad_utils = torch.hub.load(
-                repo_or_dir=vad_repo,
+                repo_or_dir=self.vad_repo,  # Config-driven, not hardcoded
                 model="silero_vad",
                 force_reload=not is_cached,  # Use cache if available
                 onnx=False
@@ -123,7 +124,7 @@ class WhisperProASR:
             (self.get_speech_timestamps, _, _, _, _) = self.vad_utils
 
             status = "from cache" if is_cached else "downloaded"
-            logger.debug(f"Silero VAD v3.1 loaded ({status})")
+            logger.debug(f"Silero VAD loaded ({status}) from {self.vad_repo}")
         except Exception as e:
             logger.error(f"Failed to load Silero VAD model: {e}", exc_info=True)
             raise

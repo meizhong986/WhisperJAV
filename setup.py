@@ -35,6 +35,7 @@ install_requires = [
     "pyloudnorm",
     "requests",
     "PySubtrans>=0.7.0",
+    "silero-vad>=6.0",  # Latest Silero VAD for scene detection (separate from torch.hub ASR version)
 ]
 
 # Optional dependencies

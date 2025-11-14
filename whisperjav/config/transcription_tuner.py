@@ -315,7 +315,7 @@ class TranscriptionTuner:
         
         return cleaned
     
-    def resolve_params(self, pipeline_name: str, sensitivity: str, task: str) -> Dict[str, Any]:
+    def resolve_params(self, pipeline_name: str, sensitivity: str, task: str, **kwargs) -> Dict[str, Any]:
         """
         Resolves all necessary configurations for a given run.
         
@@ -394,10 +394,21 @@ class TranscriptionTuner:
         if pipeline_map.get('vad'):
             vad_section = pipeline_map['vad']
             vad_handling = pipeline_map.get('vad_handling', 'packed')
-            
+
             if vad_section in self.config and sensitivity in self.config[vad_section]:
                 vad_data = deepcopy(self.config[vad_section][sensitivity])
-                
+
+                # NEW: Resolve VAD engine repo URL from workflow
+                vad_engine_id = workflow.get('vad')  # e.g., "silero-v3.1"
+                if vad_engine_id and vad_engine_id != 'none':
+                    if 'vad_engines' in self.config and vad_engine_id in self.config['vad_engines']:
+                        vad_engine_config = self.config['vad_engines'][vad_engine_id]
+                        vad_data['vad_repo'] = vad_engine_config['repo']
+                        vad_data['vad_provider'] = vad_engine_config['provider']
+                        logger.debug(f"Resolved VAD engine '{vad_engine_id}' to repo: {vad_engine_config['repo']}")
+                    else:
+                        logger.warning(f"VAD engine '{vad_engine_id}' not found in vad_engines config")
+
                 if vad_handling == 'packed':
                     # Pack VAD params into provider (for StableTSASR)
                     provider_params.update(vad_data)
@@ -427,11 +438,33 @@ class TranscriptionTuner:
                 if feature_config and feature_config != 'none':
                     # Look up feature configuration
                     if feature_name in self.config.get('feature_configs', {}):
-                        config_key = feature_config if isinstance(feature_config, str) else 'default'
-                        if config_key in self.config['feature_configs'][feature_name]:
-                            features[feature_name] = deepcopy(
-                                self.config['feature_configs'][feature_name][config_key]
-                            )
+                        # Special handling for scene_detection method selection
+                        if feature_name == 'scene_detection':
+                            # Check if method is specified in kwargs
+                            method = kwargs.get('scene_detection_method', None)
+                            if method is None:
+                                method = self.config['feature_configs']['scene_detection'].get('default_method', 'auditok')
+
+                            # Load method-specific config
+                            if method in self.config['feature_configs']['scene_detection']:
+                                features[feature_name] = deepcopy(
+                                    self.config['feature_configs']['scene_detection'][method]
+                                )
+                                features[feature_name]['method'] = method  # Pass method to detector
+                                logger.debug(f"Loaded scene_detection config for method: {method}")
+                            else:
+                                logger.warning(f"Unknown scene detection method: {method}, falling back to auditok")
+                                features[feature_name] = deepcopy(
+                                    self.config['feature_configs']['scene_detection']['auditok']
+                                )
+                                features[feature_name]['method'] = 'auditok'
+                        else:
+                            # Normal feature loading
+                            config_key = feature_config if isinstance(feature_config, str) else 'default'
+                            if config_key in self.config['feature_configs'][feature_name]:
+                                features[feature_name] = deepcopy(
+                                    self.config['feature_configs'][feature_name][config_key]
+                                )
         
         # 7. CLEAN ALL PARAMETER DICTIONARIES - Remove None values before returning
         # This prevents None values from being passed to libraries that don't handle them properly

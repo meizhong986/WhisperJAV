@@ -153,10 +153,20 @@ def parse_arguments():
     
     # Transcription tuning
     tuning_group = parser.add_argument_group("Transcription Tuning")
-    tuning_group.add_argument("--sensitivity", 
+    tuning_group.add_argument("--sensitivity",
                              choices=["conservative", "balanced", "aggressive"],
                              default="balanced", help="Transcription sensitivity")
-    
+    tuning_group.add_argument("--scene-detection-method",
+                             type=str,
+                             choices=["auditok", "silero"],
+                             default=None,  # None = use config default
+                             metavar="METHOD",
+                             help=(
+                                 "Scene detection method: "
+                                 "auditok (energy-based, default) or "
+                                 "silero (VAD-based, experimental)"
+                             ))
+
     # Async processing
     async_group = parser.add_argument_group("Processing Options")
     async_group.add_argument("--async-processing", action="store_true",
@@ -718,10 +728,17 @@ def main():
     logger.info(f"Transcription language: {args.language} ({language_code})")
 
     try:
+        # Pass scene_detection_method if specified
+        kwargs = {}
+        if args.scene_detection_method:
+            kwargs['scene_detection_method'] = args.scene_detection_method
+            logger.info(f"Using scene detection method: {args.scene_detection_method}")
+
         resolved_config = tuner.resolve_params(
             pipeline_name=args.mode,
             sensitivity=args.sensitivity,
-            task=task
+            task=task,
+            **kwargs
         )
     except Exception as e:
         logger.error(f"Failed to resolve configuration: {e}")
