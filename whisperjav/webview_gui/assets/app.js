@@ -507,6 +507,9 @@ const FormManager = {
             // Optional verbosity
             verbosity: document.getElementById('verbosity').value,
 
+            // Scene detection method (optional)
+            scene_detection_method: document.getElementById('sceneDetectionMethod').value,
+
             // Model override (conditional)
             model_override: modelOverrideEnabled
                 ? document.getElementById('modelSelection').value

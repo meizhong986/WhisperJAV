@@ -88,7 +88,8 @@
   },
   "feature_configs": {
     "scene_detection": {
-      "default": {
+      "default_method": "auditok",
+      "auditok": {
         "max_duration_s": 29.0,
         "min_duration_s": 0.2,
         "target_sr": 16000,
@@ -104,6 +105,40 @@
         "pass2_max_duration_s": 960.0,
         "pass2_max_silence_s": 1.8,
         "pass2_energy_threshold": 38,
+        "bandpass_low_hz": 200,
+        "bandpass_high_hz": 4000,
+        "drc_threshold_db": -24.0,
+        "drc_ratio": 4.0,
+        "drc_attack_ms": 5.0,
+        "drc_release_ms": 100.0,
+        "skip_assist_on_loud_dbfs": -5.0,
+        "brute_force_fallback": true,
+        "brute_force_chunk_s": 29.0,
+        "pad_edges_s": 0.0,
+        "fade_ms": 0
+      },
+      "silero": {
+        "method": "silero",
+        "max_duration_s": 29.0,
+        "min_duration_s": 0.2,
+        "target_sr": 16000,
+        "force_mono": true,
+        "preserve_original_sr": true,
+        "assist_processing": false,
+        "verbose_summary": true,
+        "pass1_min_duration_s": 2.0,
+        "pass1_max_duration_s": 2700.0,
+        "pass1_max_silence_s": 2.5,
+        "pass1_energy_threshold": 32,
+        "pass2_min_duration_s": 0.1,
+        "pass2_max_duration_s": 960.0,
+        "silero_threshold": 0.11,
+        "silero_neg_threshold": 0.15,
+        "silero_min_silence_ms": 7800,
+        "silero_min_speech_ms": 100,
+        "silero_max_speech_s": 960,
+        "silero_min_silence_at_max": 500,
+        "silero_speech_pad_ms": 200,
         "bandpass_low_hz": 200,
         "bandpass_high_hz": 4000,
         "drc_threshold_db": -24.0,
@@ -152,7 +187,7 @@
     "balanced": {
       "workflow": {
         "model": "whisper-turbo",
-        "vad": "silero-v3.1",
+        "vad": "silero-v5.1",
         "backend": "whisper",
         "features": {
           "scene_detection": "default",
@@ -344,10 +379,10 @@
     },
     "aggressive": {
       "threshold": 0.149,
-      "min_speech_duration_ms": 220,
+      "min_speech_duration_ms": 100,
       "max_speech_duration_s": 9,
       "min_silence_duration_ms": 125,
-      "speech_pad_ms": 110
+      "speech_pad_ms": 200
     }
   },
   "faster_whisper_vad_options": {

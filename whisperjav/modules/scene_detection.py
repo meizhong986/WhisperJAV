@@ -692,6 +692,8 @@ class DynamicSceneDetector:
     """
 
     def __init__(self,
+                 # Method selection (NEW)
+                 method: str = "auditok",
                  # Core final segment bounds
                  max_duration: float = 29.0,
                  min_duration: float = 0.3,
@@ -735,6 +737,9 @@ class DynamicSceneDetector:
         """
         if not AUDITOK_AVAILABLE:
             raise ImportError("The 'auditok' library is required for DynamicSceneDetector.")
+
+        # Store method selection
+        self.method = str(kwargs.get("method", method))
 
         # Allow *_s aliases from config (e.g., max_duration_s)
         max_duration = float(kwargs.get("max_duration_s", max_duration))
@@ -782,14 +787,110 @@ class DynamicSceneDetector:
         self.pad_edges_s = float(kwargs.get("pad_edges_s", pad_edges_s))
         self.fade_ms = int(kwargs.get("fade_ms", fade_ms))
 
+        # Initialize Silero VAD if needed
+        if self.method == "silero":
+            self._init_silero_vad(kwargs)
+
         logger.debug(
             "DynamicSceneDetector cfg: "
+            f"method={self.method}, "
             f"target_sr={self.target_sr}, preserve_original_sr={self.preserve_original_sr}, "
             f"max_dur={self.max_duration}s, min_dur={self.min_duration}s, "
             f"pass1(max_dur={self.pass1_max_duration}, max_sil={self.pass1_max_silence}, thr={self.pass1_energy_threshold}), "
             f"pass2(max_dur={self.pass2_max_duration}, max_sil={self.pass2_max_silence}, thr={self.pass2_energy_threshold}), "
             f"assist={self.assist_processing}"
         )
+
+    def _init_silero_vad(self, config: dict):
+        """
+        Initialize Silero VAD model and parameters for Pass 2.
+
+        Uses pip-installed silero-vad package (v6.x) for scene detection.
+        This is separate from the torch.hub v3.1 used by ASR in whisper_pro_asr.py.
+        """
+        # Read Silero-specific parameters from flat config structure
+        # Default values are conservative for scene detection (not ultra-sensitive)
+        self.silero_threshold = float(config.get('silero_threshold', 0.35))
+        self.silero_neg_threshold = float(config.get('silero_neg_threshold', 0.15))
+        self.silero_min_silence_ms = int(config.get('silero_min_silence_ms', 1500))
+        self.silero_min_speech_ms = int(config.get('silero_min_speech_ms', 100))
+        self.silero_max_speech_s = float(config.get('silero_max_speech_s', 600))
+        self.silero_min_silence_at_max = int(config.get('silero_min_silence_at_max', 500))
+        self.silero_speech_pad_ms = int(config.get('silero_speech_pad_ms', 200))
+
+        # Load Silero VAD model (pip-installed version, latest v6.x)
+        logger.info("Loading Silero VAD (pip package) for scene detection...")
+
+        try:
+            # Import pip-installed silero-vad package
+            from silero_vad import load_silero_vad, get_speech_timestamps
+
+            # Load the model (automatically uses latest version from pip)
+            self.vad_model = load_silero_vad()
+
+            # Store the get_speech_timestamps function
+            self.get_speech_timestamps = get_speech_timestamps
+
+            logger.info("Silero VAD (pip package v6.x) loaded successfully for scene detection")
+
+        except Exception as e:
+            logger.error(f"Failed to load Silero VAD: {e}")
+            raise RuntimeError(
+                "Silero VAD method selected but model failed to load. "
+                "Fall back to --scene-detection-method auditok"
+            ) from e
+
+    def _detect_pass2_silero(self, region_audio: np.ndarray, sr: int, region_start_sec: float) -> List:
+        """
+        Use Silero VAD for Pass 2 fine scene splitting.
+
+        Returns: List of timestamp tuples compatible with Auditok format
+        """
+        import torch
+        import librosa
+
+        # Resample to 16kHz for Silero VAD (if needed)
+        if sr != 16000:
+            audio_16k = librosa.resample(region_audio, orig_sr=sr, target_sr=16000)
+        else:
+            audio_16k = region_audio
+
+        # Convert to torch tensor
+        audio_tensor = torch.FloatTensor(audio_16k)
+
+        # Get speech timestamps from Silero VAD
+        speech_timestamps = self.get_speech_timestamps(
+            audio_tensor,
+            self.vad_model,
+            sampling_rate=16000,
+            threshold=self.silero_threshold,
+            neg_threshold=self.silero_neg_threshold,
+            min_silence_duration_ms=self.silero_min_silence_ms,
+            min_speech_duration_ms=self.silero_min_speech_ms,
+            max_speech_duration_s=self.silero_max_speech_s,
+            min_silence_at_max_speech=self.silero_min_silence_at_max,
+            speech_pad_ms=self.silero_speech_pad_ms,
+            return_seconds=True
+        )
+
+        # Convert Silero format to Auditok-compatible format
+        # Silero returns: [{'start': 0.5, 'end': 3.2}, {'start': 5.0, 'end': 8.5}, ...]
+        # Need to return objects with .start and .end attributes (in seconds relative to region)
+
+        class SileroRegion:
+            """Wrapper to make Silero timestamps compatible with Auditok interface"""
+            def __init__(self, start_sec, end_sec):
+                self.start = start_sec  # In seconds
+                self.end = end_sec      # In seconds
+
+        sub_regions = [
+            SileroRegion(seg['start'], seg['end'])
+            for seg in speech_timestamps
+        ]
+
+        logger.debug(f"Silero VAD detected {len(sub_regions)} segments in Pass 2")
+
+        return sub_regions
 
     def _apply_assistive_processing(self, audio_chunk: np.ndarray, sample_rate: int) -> np.ndarray:
         """
@@ -922,22 +1023,32 @@ class DynamicSceneDetector:
             det_end = int(region_end_sec * det_sr)
             region_audio_det = detection_audio[det_start:det_end]
 
-            audio_for_detection = region_audio_det
-            if self.assist_processing:
-                audio_for_detection = self._apply_assistive_processing(region_audio_det, det_sr)
+            # Pass 2: Method-dependent detection
+            if self.method == "silero":
+                # Use Silero VAD for Pass 2
+                sub_regions = self._detect_pass2_silero(
+                    region_audio_det,
+                    det_sr,
+                    region_start_sec
+                )
+            else:
+                # Existing Auditok Pass 2 (keep as-is)
+                audio_for_detection = region_audio_det
+                if self.assist_processing:
+                    audio_for_detection = self._apply_assistive_processing(region_audio_det, det_sr)
 
-            region_bytes_for_detection = (audio_for_detection * 32767).astype(np.int16).tobytes()
-            pass2_params = {
-                "sampling_rate": det_sr,
-                "channels": 1,
-                "sample_width": 2,
-                "min_dur": self.pass2_min_duration,
-                "max_dur": self.pass2_max_duration,
-                "max_silence": min(region_duration * 0.95, self.pass2_max_silence),
-                "energy_threshold": self.pass2_energy_threshold,
-                "drop_trailing_silence": True
-            }
-            sub_regions = list(auditok.split(region_bytes_for_detection, **pass2_params))
+                region_bytes_for_detection = (audio_for_detection * 32767).astype(np.int16).tobytes()
+                pass2_params = {
+                    "sampling_rate": det_sr,
+                    "channels": 1,
+                    "sample_width": 2,
+                    "min_dur": self.pass2_min_duration,
+                    "max_dur": self.pass2_max_duration,
+                    "max_silence": min(region_duration * 0.95, self.pass2_max_silence),
+                    "energy_threshold": self.pass2_energy_threshold,
+                    "drop_trailing_silence": True
+                }
+                sub_regions = list(auditok.split(region_bytes_for_detection, **pass2_params))
 
             if sub_regions:
                 granular_segments_count += len(sub_regions)

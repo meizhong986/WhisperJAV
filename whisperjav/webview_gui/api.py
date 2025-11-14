@@ -140,6 +140,11 @@ class WhisperJAVAPI:
         sensitivity = options.get('sensitivity', 'balanced')
         args += ["--sensitivity", sensitivity]
 
+        # Scene detection method (optional)
+        scene_method = options.get('scene_detection_method', '').strip()
+        if scene_method:
+            args += ["--scene-detection-method", scene_method]
+
         output_dir = options.get('output_dir', self.default_output)
         args += ["--output-dir", output_dir]
 
