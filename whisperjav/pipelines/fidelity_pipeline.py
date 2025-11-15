@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""V3 Architectur. Balanced pipeline implementation - scene detection with WhisperPro ASR."""
+"""V3 Architectur. Fidelity pipeline implementation - scene detection with WhisperPro ASR."""
 
 import shutil 
 from pathlib import Path
@@ -26,8 +26,8 @@ from whisperjav.modules.srt_postproduction import SRTPostProduction
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
 
-class BalancedPipeline(BasePipeline):
-    """Balanced pipeline using scene detection with WhisperPro ASR (VAD-enhanced)."""
+class FidelityPipeline(BasePipeline):
+    """Fidelity pipeline using scene detection with WhisperPro ASR (VAD-enhanced)."""
     
     def __init__(self, 
                  output_dir: str, 
@@ -38,7 +38,7 @@ class BalancedPipeline(BasePipeline):
                  progress_display=None,  
                  **kwargs):
         """
-        Initializes the BalancedPipeline using V3 structured configuration.
+        Initializes the FidelityPipeline using V3 structured configuration.
         
         Args:
             output_dir: Output directory for subtitles
@@ -123,7 +123,7 @@ class BalancedPipeline(BasePipeline):
 
 
     def process(self, media_info: Dict) -> Dict:
-        """Process media file through balanced pipeline with scene detection and VAD-enhanced ASR."""
+        """Process media file through fidelity pipeline with scene detection and VAD-enhanced ASR."""
         start_time = time.time()
         
         input_file = media_info['path']
@@ -372,5 +372,5 @@ class BalancedPipeline(BasePipeline):
             raise
 
     def get_mode_name(self) -> str:
-        return "balanced"
+        return "fidelity"
 

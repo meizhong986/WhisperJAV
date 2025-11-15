@@ -26,7 +26,7 @@
       "vad": "stable_ts_vad_options",
       "vad_handling": "packed"
     },
-    "balanced": {
+    "fidelity": {
       "common": [
         "common_transcriber_options",
         "common_decoder_options",
@@ -184,7 +184,7 @@
         }
       }
     },
-    "balanced": {
+    "fidelity": {
       "workflow": {
         "model": "whisper-turbo",
         "vad": "silero-v5.1",
@@ -208,7 +208,7 @@
     "auto_scroll": true,
     "show_timestamps": false,
     "theme": "default",
-    "last_mode": "balanced",
+    "last_mode": "fidelity",
     "last_sensitivity": "conservative",
     "last_language": "japanese",
     "show_console": true,
