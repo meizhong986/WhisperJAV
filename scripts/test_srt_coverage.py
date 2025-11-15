@@ -219,6 +219,7 @@ def main():
         # Step 3: Trace through metadata (if provided)
         trace_results = []
         root_cause_stats = {}
+        pipeline_metadata = None
 
         if args.metadata:
             print("🔍 Tracing missing/partial segments through metadata...")
@@ -284,9 +285,9 @@ def main():
             coverage_results=coverage_results,
             test_segments=test_segments,
             output_dir=str(output_dir),
+            metadata=pipeline_metadata,
             generate_static=True,
-            generate_interactive=not args.skip_interactive,
-            max_segments_static=50
+            generate_interactive=not args.skip_interactive
         )
 
         if timeline_files['static_chart']:
