@@ -187,7 +187,7 @@
     "balanced": {
       "workflow": {
         "model": "whisper-turbo",
-        "vad": "silero-v3.1",
+        "vad": "silero-v5.1",
         "backend": "whisper",
         "features": {
           "scene_detection": "default",
@@ -251,9 +251,9 @@
         0.0,
         0.3
       ],
-      "no_speech_threshold": 0.346,
-      "logprob_threshold": -2.0,
-      "compression_ratio_threshold": 3.0,
+      "compression_ratio_threshold": 2.4,
+      "logprob_threshold": -1.26,
+      "no_speech_threshold": 0.314,
       "condition_on_previous_text": false,
       "initial_prompt": null,
       "word_timestamps": true,
@@ -292,13 +292,13 @@
     "aggressive": {
       "task": "transcribe",
       "language": "ja",
-      "best_of": 2,
-      "beam_size": 2,
+      "best_of": 5,
+      "beam_size": 5,
       "patience": 2.9,
       "length_penalty": null,
       "prefix": null,
-      "suppress_blank": false,
-      "suppress_tokens": [],
+      "suppress_tokens": null,
+      "suppress_blank": true,
       "without_timestamps": false,
       "max_initial_timestamp": null
     }

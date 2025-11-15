@@ -8,7 +8,7 @@ This tool helps identify missing or partially captured dialogue segments in Whis
 1. **Comparing temporal coverage** between reference and test SRT files
 2. **Tracing missing segments** through pipeline metadata to determine root causes
 3. **Extracting media chunks** for manual review of missing/partial segments
-4. **Generating visual reports** with Gantt charts and detailed analysis
+4. **Generating visual reports** with horizontal timeline charts and detailed analysis
 
 ## Features
 
@@ -16,7 +16,7 @@ This tool helps identify missing or partially captured dialogue segments in Whis
 ✅ **Interval Coverage Analysis** - Pure temporal overlap calculation (≥60% coverage = pass)
 ✅ **Root Cause Tracing** - Identify why segments were missed (not in scene, VAD filtered, sanitization, etc.)
 ✅ **Media Chunk Extraction** - Auto-extract missing/partial segments with ±1s padding for review
-✅ **Visual Gantt Charts** - Both static PNG and interactive HTML timelines
+✅ **Horizontal Timeline Charts** - Both static PNG and interactive HTML visualizations with scene boundaries
 ✅ **Comprehensive Reports** - HTML (for humans) + JSON (for machines)
 
 ## Installation
@@ -96,7 +96,7 @@ python scripts/test_srt_coverage.py \
 results/
 ├── report.html                    # Comprehensive HTML report (open in browser)
 ├── report.json                    # Machine-readable JSON data
-├── timeline.png                   # Static Gantt chart
+├── timeline.png                   # Static horizontal timeline chart
 ├── timeline_interactive.html      # Interactive timeline (if Plotly available)
 └── chunks/                        # Extracted media segments
     ├── seg_0001_00-01-23_missing.mp4
@@ -135,6 +135,33 @@ When metadata is provided, the tool traces missing/partial segments to determine
 | `SCENE_NOT_TRANSCRIBED` | Scene detected but ASR failed | Check ASR logs |
 | `FILTERED_OR_FAILED` | Transcribed but filtered (VAD/sanitization) | Review VAD/sanitization thresholds |
 
+### Timeline Visualization Layout
+
+The timeline chart provides a horizontal visualization for easy visual inspection of coverage:
+
+```
+Scene Boundaries:  S0        S1           S2        S3
+                   |         |            |         |
+Reference SRT:  ████████ ████████████ ████████ ████████  (colored by status)
+Test SRT:       ████████  ██████████  ██  ███  ████████  (all blue)
+                ←─────────────── Time (seconds) ─────────────→
+```
+
+**Layout:**
+- **Top Row**: Reference segments colored by coverage status
+  - 🟢 Green: COVERED (≥60% overlap)
+  - 🟡 Yellow: PARTIAL (>0% <60% overlap)
+  - 🔴 Red: MISSING (0% overlap)
+- **Bottom Row**: Test segments (all blue)
+- **Vertical Lines**: Scene boundaries with scene numbers
+- **Time Axis**: Displayed at both top and bottom
+
+**How to Read:**
+- Gaps in the blue test row = segments not captured
+- Red bars in reference row = completely missing dialogue
+- Yellow bars in reference row = partially captured dialogue
+- Scene boundaries help identify which scenes have issues
+
 ## Report Interpretation
 
 ### HTML Report Sections
@@ -142,7 +169,7 @@ When metadata is provided, the tool traces missing/partial segments to determine
 1. **SRT File Statistics** - Basic stats for reference and test SRT files (line counts, total durations, timeline spans)
 2. **Coverage Analysis Summary** - Overall coverage metrics
 3. **Root Cause Analysis** - Distribution of failure reasons
-4. **Timeline Visualization** - Visual Gantt chart showing coverage gaps
+4. **Timeline Visualization** - Horizontal timeline showing reference and test segments with scene boundaries
 5. **Segments Needing Review** - Table of missing/partial segments with details
 6. **Media Extraction Statistics** - Chunk extraction results
 
@@ -300,7 +327,7 @@ python -m srt_coverage_analysis.metadata_tracer metadata.json
 # Test media extractor
 python -m srt_coverage_analysis.media_extractor video.mp4 reference.srt chunks/
 
-# Test Gantt visualizer
+# Test timeline visualizer
 python -m srt_coverage_analysis.gantt_visualizer reference.srt test.srt charts/
 ```
 
