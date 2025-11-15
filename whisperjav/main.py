@@ -38,7 +38,7 @@ from whisperjav.utils.device_detector import get_best_device
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
-from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
+from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.config.transcription_tuner import TranscriptionTuner
 from whisperjav.__version__ import __version__
 
@@ -92,7 +92,7 @@ def print_banner():
 ║   Available modes:                                ║
 ║   - faster: Direct transcription (fastest)        ║
 ║   - fast: Scene detection + standard Whisper      ║
-║   - balanced: Scene + VAD-enhanced processing     ║
+║   - fidelity: Scene + VAD-enhanced processing     ║
 ║                                                   ║
 ║   Run with --check for environment diagnostics    ║
 ╚═══════════════════════════════════════════════════╝
@@ -109,8 +109,8 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["balanced", "fast", "faster"], default="balanced",
-                       help="Processing mode (default: balanced)")
+    parser.add_argument("--mode", choices=["fidelity", "fast", "faster"], default="fidelity",
+                       help="Processing mode (default: fidelity)")
     parser.add_argument("--model", default=None,
                        help="Whisper model to use (e.g., large-v2, turbo, large). Overrides config default.")
     parser.add_argument("--language", choices=["japanese", "korean", "chinese", "english"],
@@ -225,18 +225,18 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def add_signatures_to_srt(srt_path: str, producer_credit: str = None, 
-                          add_technical_sig: bool = True, 
-                          mode: str = "balanced", 
+def add_signatures_to_srt(srt_path: str, producer_credit: str = None,
+                          add_technical_sig: bool = True,
+                          mode: str = "fidelity",
                           sensitivity: str = "balanced",
                           version: str = __version__):
     """Add producer credit and/or technical signature to SRT file.
-    
+
     Args:
         srt_path: Path to the SRT file to modify
         producer_credit: Optional producer credit text to add at beginning
         add_technical_sig: Whether to add technical signature at end
-        mode: Processing mode used (faster/fast/balanced)
+        mode: Processing mode used (faster/fast/fidelity)
         sensitivity: Sensitivity level used
         version: WhisperJAV version
     """
@@ -392,8 +392,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         pipeline = FasterPipeline(**pipeline_args)
     elif args.mode == "fast":
         pipeline = FastPipeline(**pipeline_args)
-    else:  # balanced
-        pipeline = BalancedPipeline(**pipeline_args)
+    else:  # fidelity
+        pipeline = FidelityPipeline(**pipeline_args)
     
     all_stats, failed_files = [], []
     

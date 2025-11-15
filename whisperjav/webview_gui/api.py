@@ -91,7 +91,7 @@ class WhisperJAVAPI:
         Args:
             options: Dictionary of options from JavaScript:
                 - inputs: List[str] - Input files/folders
-                - mode: str - Processing mode (balanced/fast/faster)
+                - mode: str - Processing mode (fidelity/fast/faster)
                 - sensitivity: str - Sensitivity level (conservative/balanced/aggressive)
                 - language: str - Output language (japanese/english-direct)
                 - output_dir: str - Output directory path
@@ -126,7 +126,7 @@ class WhisperJAVAPI:
         args.extend(inputs)
 
         # Core options
-        mode = options.get('mode', 'balanced')
+        mode = options.get('mode', 'fidelity')
         args += ["--mode", mode]
 
         # Source audio language (for transcription)

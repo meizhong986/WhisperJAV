@@ -10,7 +10,7 @@ from whisperjav.__version__ import __version__, __version_info__
 # Public API exports
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
-from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
+from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.utils.logger import setup_logger
 
@@ -19,7 +19,7 @@ from whisperjav.utils.logger import setup_logger
 __all__ = [
     "FasterPipeline",
     "FastPipeline",
-    "BalancedPipeline",
+    "FidelityPipeline",
     "MediaDiscovery",
     "setup_logger",
 ]

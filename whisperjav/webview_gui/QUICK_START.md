@@ -75,7 +75,7 @@ whisperjav-gui-web
 ### 2. Configure Settings
 
 **Transcription Mode Tab:**
-- **Mode:** balanced (accuracy) / fast / faster (speed)
+- **Mode:** fidelity (accuracy) / fast / faster (speed)
 - **Sensitivity:** conservative / balanced / aggressive
 - **Output language:** japanese / english-direct
 
@@ -131,7 +131,7 @@ whisperjav-gui-web
 ### For Best Quality
 
 ```
-Mode: balanced
+Mode: fidelity
 Sensitivity: balanced
 Language: japanese
 Model override: large-v3 (if GPU available)
@@ -152,7 +152,7 @@ Verbosity: summary
 ### For Noisy Audio
 
 ```
-Mode: balanced
+Mode: fidelity
 Sensitivity: aggressive
 Language: japanese
 Verbosity: verbose
@@ -278,7 +278,7 @@ python -m whisperjav.webview_gui.main
 
 ### For Better Accuracy
 
-1. **Use balanced mode:** Full preprocessing pipeline
+1. **Use fidelity mode:** Full preprocessing pipeline
 2. **Use aggressive sensitivity:** Captures more detail
 3. **Use larger model:** Override with "large-v3" model
 4. **Use verbose output:** See detailed processing logs
