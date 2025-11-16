@@ -39,6 +39,7 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
+from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.config.transcription_tuner import TranscriptionTuner
 from whisperjav.__version__ import __version__
 
@@ -92,7 +93,8 @@ def print_banner():
 ║   Available modes:                                ║
 ║   - faster: Direct transcription (fastest)        ║
 ║   - fast: Scene detection + standard Whisper      ║
-║   - fidelity: Scene + VAD-enhanced processing     ║
+║   - balanced: Scene + faster-whisper VAD          ║
+║   - fidelity: Scene + standard Whisper VAD        ║
 ║                                                   ║
 ║   Run with --check for environment diagnostics    ║
 ╚═══════════════════════════════════════════════════╝
@@ -109,7 +111,7 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["fidelity", "fast", "faster"], default="fidelity",
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster"], default="fidelity",
                        help="Processing mode (default: fidelity)")
     parser.add_argument("--model", default=None,
                        help="Whisper model to use (e.g., large-v2, turbo, large). Overrides config default.")
@@ -392,6 +394,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         pipeline = FasterPipeline(**pipeline_args)
     elif args.mode == "fast":
         pipeline = FastPipeline(**pipeline_args)
+    elif args.mode == "balanced":
+        pipeline = BalancedPipeline(**pipeline_args)
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
     

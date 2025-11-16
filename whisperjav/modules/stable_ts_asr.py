@@ -15,6 +15,11 @@ import warnings
 import soundfile as sf
 import librosa
 
+try:
+    from huggingface_hub import snapshot_download
+except Exception:  # pragma: no cover - optional dependency guard
+    snapshot_download = None
+
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
@@ -145,6 +150,9 @@ class StableTSASR:
         self.device = model_config.get("device", get_best_device())
         self.compute_type = model_config.get("compute_type", "float16")
         self.turbo_mode = turbo_mode
+        self.model_repo = model_config.get("hf_repo")
+        if not self.model_repo:
+            self.model_repo = self._derive_model_repo(self.model_name)
 
         # Store structured parameters directly - trust the tuner
         self.decoder_params = params.get("decoder", {})
@@ -172,12 +180,9 @@ class StableTSASR:
         # Load model
         logger.debug(f"Loading Stable-TS model: {self.model_name}")
         if self.turbo_mode:
-            # Use faster_whisper backend
-            self.model = stable_whisper.load_faster_whisper(
-                self.model_name, 
-                device=self.device, 
-                compute_type=self.compute_type
-            )
+            # Use faster_whisper backend with guardrails for corrupted caches
+            self._prefetch_faster_whisper_weights()
+            self.model = self._load_faster_whisper_with_retry()
         else:
             # Use standard whisper backend
             self.model = stable_whisper.load_model(self.model_name, device=self.device)
@@ -210,6 +215,85 @@ class StableTSASR:
             logger.debug(f"Successfully loaded VAD from {vad_repo} ({status})")
         except Exception as e:
             logger.warning(f"Failed to pre-cache Silero VAD: {e}")
+
+    def _derive_model_repo(self, model_name: Optional[str]) -> Optional[str]:
+        """Best-effort mapping from faster-whisper size to Hugging Face repo."""
+        if not model_name:
+            return None
+
+        try:
+            potential_path = Path(model_name).expanduser()
+            if potential_path.exists():
+                # Explicit local path
+                return None
+        except Exception:
+            pass
+
+        if "/" in model_name:
+            return model_name
+
+        normalized = model_name
+        if not normalized.startswith("faster-whisper-"):
+            normalized = f"faster-whisper-{normalized}"
+        return f"Systran/{normalized}"
+
+    def _prefetch_faster_whisper_weights(self, force: bool = False) -> None:
+        """Ensure faster-whisper weights exist locally before loading."""
+        if not self.turbo_mode or not self.model_repo or snapshot_download is None:
+            return
+
+        try:
+            snapshot_dir = snapshot_download(
+                repo_id=self.model_repo,
+                resume_download=not force,
+                force_download=force,
+                local_files_only=False,
+                allow_patterns=[
+                    "*.bin",
+                    "*.json",
+                    "*.txt",
+                    "*.model",
+                    "*.vocab*"
+                ],
+            )
+            model_bin = Path(snapshot_dir) / "model.bin"
+            if not model_bin.exists():
+                if force:
+                    logger.warning(
+                        "model.bin still missing after forced download of %s", self.model_repo
+                    )
+                else:
+                    logger.warning(
+                        "model.bin missing in %s; forcing clean download", snapshot_dir
+                    )
+                    self._prefetch_faster_whisper_weights(force=True)
+        except Exception as e:
+            logger.warning(f"Failed to prefetch faster-whisper weights ({self.model_repo}): {e}")
+
+    def _load_faster_whisper_with_retry(self):
+        """Load faster-whisper with a cache refresh fallback."""
+        last_exc: Optional[Exception] = None
+        for attempt in range(2):
+            try:
+                return stable_whisper.load_faster_whisper(
+                    self.model_name,
+                    device=self.device,
+                    compute_type=self.compute_type
+                )
+            except (RuntimeError, OSError) as exc:
+                last_exc = exc
+                message = str(exc).lower()
+                if attempt == 0 and "model.bin" in message:
+                    logger.warning(
+                        "Detected corrupted faster-whisper cache (%s). Re-downloading weights and retrying once.",
+                        exc
+                    )
+                    self._prefetch_faster_whisper_weights(force=True)
+                    continue
+                raise
+
+        if last_exc:
+            raise last_exc
     
     def _log_sensitivity_parameters(self):
         """Log the sensitivity-related parameters for debugging."""
