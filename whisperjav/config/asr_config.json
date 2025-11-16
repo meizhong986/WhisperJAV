@@ -35,6 +35,16 @@
       "engine": "openai_whisper_engine_options",
       "vad": "silero_vad_options",
       "vad_handling": "separate"
+    },
+    "balanced": {
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options",
+        "exclusive_whisper_plus_faster_whisper"
+      ],
+      "engine": "faster_whisper_engine_options",
+      "vad": "silero_vad_options",
+      "vad_handling": "separate"
     }
   },
   "fast_pipeline_overrides": {
@@ -193,6 +203,20 @@
           "scene_detection": "default",
           "post_processing": "standard"
         }
+      }
+    },
+    "balanced": {
+      "workflow": {
+        "model": "whisper-turbo",
+        "vad": "silero-v3.1",
+        "backend": "faster-whisper",
+        "features": {
+          "scene_detection": "default",
+          "post_processing": "standard"
+        }
+      },
+      "model_overrides": {
+        "translate": "whisper-large-v2"
       }
     }
   },

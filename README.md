@@ -293,6 +293,8 @@ Instructions source precedence:
 | **GPT-4** | Pay-as-you-go | [platform.openai.com](https://platform.openai.com/) | `OPENAI_API_KEY` |
 | **OpenRouter** | Varies | [openrouter.ai](https://openrouter.ai/) | `OPENROUTER_API_KEY` |
 
+> **Provider SDKs:** PySubtrans only registers GPT and Gemini providers if their SDKs are installed. Run `pip install openai google-genai` (already covered by `requirements.txt`) or you will see errors like `Unknown translation provider: OpenAI`/`Gemini` even though the CLI recognizes the provider.
+
 For detailed translation options, run: `whisperjav-translate --help`
 
 
@@ -586,6 +588,17 @@ You can toggle them, but expect incomplete behavior or no effect in some pipelin
         whisperjav video.mp4 --mode balanced
         ```
     -   Note: faster mode may not work with ROCm due to CTranslate2 limitations
+
+-   **Issue**: `pkg_resources is deprecated` warning followed by `Unable to open file 'model.bin'` (faster/faster-balanced modes)
+  -   **What it means**: the warning is emitted by `ctranslate2` and is harmless, but the crash indicates the Hugging Face cache stored a partial `model.bin` (often on Windows when Developer Mode/symlinks are disabled).
+  -   **Fix**:
+    1. Enable Windows *Developer Mode* (Settings → Privacy & Security → For Developers) **or** run the terminal as Administrator so Hugging Face can create symlinks.
+    2. Remove the corrupted snapshot folder and let WhisperJAV re-download it (the app now retries automatically, but you can force it manually):
+      ```powershell
+      Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\huggingface\hub\models--Systran--faster-whisper-large-v2"
+      ```
+       (Change `large-v2` to the model you selected.)
+    3. Re-run `whisperjav ... --mode faster` – the new build verifies the cache and re-downloads if the binary is missing.
 
 ### Performance Tips
 

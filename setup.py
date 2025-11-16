@@ -35,6 +35,9 @@ install_requires = [
     "pyloudnorm",
     "requests",
     "PySubtrans>=0.7.0",
+    "openai>=1.35.0",
+    "google-genai>=1.39.0",
+    "huggingface-hub>=0.25.0",
     "silero-vad>=6.0",  # Latest Silero VAD for scene detection (separate from torch.hub ASR version)
 ]
 

@@ -137,9 +137,10 @@
                                     <div class="form-group">
                                         <label for="mode" class="form-label">Mode (ASR Engine options):</label>
                                         <select id="mode" class="form-select">
-                                            <option value="fidelity" selected>fidelity (standard whisper)</option>
-                                            <option value="fast">fast (stable-ts)</option>
-                                            <option value="faster">faster (faster-whisper)</option>
+                                            <option value="fidelity" selected>fidelity (standard whisper + VAD)</option>
+                                            <option value="balanced">balanced (faster-whisper + VAD)</option>
+                                            <option value="fast">fast (faster-whisper, scenes)</option>
+                                            <option value="faster">faster (faster-whisper, direct)</option>
                                             <option value="kotoba" disabled>kotoba (future placeholder)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>

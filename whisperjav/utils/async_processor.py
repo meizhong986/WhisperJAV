@@ -445,9 +445,12 @@ class AsyncPipelineManager:
         elif pipeline_mode == "fast":
             from whisperjav.pipelines.fast_pipeline import FastPipeline
             pipeline_class = FastPipeline
-        else:  # balanced
+        elif pipeline_mode == "balanced":
             from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
             pipeline_class = BalancedPipeline
+        else:  # fidelity
+            from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
+            pipeline_class = FidelityPipeline
         
         # Prepare a CLEAN set of pipeline args, containing only what the pipeline expects.
         pipeline_args = {
