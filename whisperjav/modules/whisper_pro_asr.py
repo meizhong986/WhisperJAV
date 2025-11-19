@@ -17,6 +17,7 @@ import logging
 
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
+from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 
 
 def _is_silero_vad_cached(repo_or_dir: str) -> bool:
@@ -91,12 +92,28 @@ class WhisperProASR:
         self.whisper_params.update(decoder_params)  # task, language, beam_size, etc.
         self.whisper_params.update(provider_params)  # temperature, fp16, etc.
 
+        raw_threshold = self.whisper_params.get("logprob_threshold", -1.0)
+        self.logprob_threshold = float(raw_threshold) if raw_threshold is not None else None
+        raw_margin = self.whisper_params.get("logprob_margin", 0.0)
+        self.logprob_margin = float(raw_margin or 0.0)
+        self.drop_nonverbal_vocals = bool(self.whisper_params.get("drop_nonverbal_vocals", False))
+        filter_config = SegmentFilterConfig(
+            logprob_threshold=self.logprob_threshold,
+            logprob_margin=self.logprob_margin,
+            drop_nonverbal_vocals=self.drop_nonverbal_vocals,
+        )
+        self._segment_filter = SegmentFilterHelper(filter_config)
+
+        self.whisper_params.pop("logprob_margin", None)
+        self.whisper_params.pop("drop_nonverbal_vocals", None)
+
         # Ensure task is set correctly
         self.whisper_params['task'] = task
         # Language is now passed from decoder_params (set via CLI --language argument)
         
         # Store task for metadata
         self.task = task
+        self._reset_runtime_statistics()
         # --- END V3 PARAMETER UNPACKING ---
 
         # Suppression lists for Japanese content (business logic preserved)
@@ -106,6 +123,21 @@ class WhisperProASR:
         
         self._initialize_models()
         self._log_sensitivity_parameters()
+
+    def _reset_runtime_statistics(self) -> None:
+        """Reset counters that feed into final stats summaries."""
+        self._filter_statistics = {
+            'logprob_filtered': 0,
+            'nonverbal_filtered': 0
+        }
+
+    def reset_statistics(self) -> None:
+        """Public hook for pipelines to clear accumulated statistics."""
+        self._reset_runtime_statistics()
+
+    def get_filter_statistics(self) -> Dict[str, int]:
+        """Expose collected statistics for downstream reporting."""
+        return dict(self._filter_statistics)
         
     def _initialize_models(self):
         """Initialize VAD and Whisper models."""
@@ -139,6 +171,13 @@ class WhisperProASR:
             logger.debug(f"  VAD Threshold: {self.vad_threshold}")
             logger.debug(f"  Min Speech Duration: {self.min_speech_duration_ms}ms")
             logger.debug(f"  Task: {self.task}")
+            logger.debug(f"  Logprob Threshold: {self.logprob_threshold}")
+            logger.debug(
+                "  Logprob Margin (<= %.1fs): %s",
+                self._segment_filter.short_window,
+                self.logprob_margin,
+            )
+            logger.debug(f"  Drop Nonverbal Vocals: {self.drop_nonverbal_vocals}")
             logger.debug(f"  Combined Whisper Params: {self.whisper_params}")
             logger.debug("----------------------------------------------------")
 
@@ -313,10 +352,25 @@ class WhisperProASR:
                 if suppress_word in text: 
                     avg_logprob -= 0.15
             
-            # Check against logprob threshold (get from our parameters)
-            logprob_filter = self.whisper_params.get("logprob_threshold", -1.0)
-            if avg_logprob < logprob_filter:
-                logger.debug(f"Filtered segment with logprob {avg_logprob}: {text[:50]}...")
+            segment_duration = max(0.0, float(seg["end"] - seg["start"]))
+            should_filter, reason, effective_threshold = self._segment_filter.should_filter(
+                avg_logprob=avg_logprob,
+                duration=segment_duration,
+                text=text,
+            )
+
+            if should_filter:
+                if reason == "logprob":
+                    logger.debug(
+                        "Filtered segment with logprob %.3f (threshold %.3f): %s",
+                        avg_logprob,
+                        effective_threshold if effective_threshold is not None else -1.0,
+                        f"{text[:50]}...",
+                    )
+                    self._filter_statistics['logprob_filtered'] += 1
+                else:
+                    logger.debug(f"Filtered nonverbal segment: {text[:50]}...")
+                    self._filter_statistics['nonverbal_filtered'] += 1
                 continue
 
             adjusted_seg = {

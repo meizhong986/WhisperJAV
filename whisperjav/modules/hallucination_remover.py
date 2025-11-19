@@ -14,6 +14,19 @@ from whisperjav.config.sanitization_constants import HallucinationConstants
 class HallucinationRemover:
     """Handles exact, regex, and fuzzy hallucination detection with improved debugging"""
     
+    BRACKET_PAIRS: Tuple[Tuple[str, str], ...] = (
+        ("(", ")"),
+        ("[", "]"),
+        ("{", "}"),
+        ("（", "）"),
+        ("［", "］"),
+        ("｛", "｝"),
+        ("【", "】"),
+        ("『", "』"),
+        ("「", "」"),
+        ("《", "》"),
+    )
+
     def __init__(self, constants: HallucinationConstants, 
                  primary_language: Optional[str] = None,
                  user_blacklist: Optional[List[str]] = None):
@@ -190,6 +203,19 @@ class HallucinationRemover:
         # Normalize text for comparison: lowercase and remove leading/trailing whitespace
         normalized_text = text.strip().lower()
 
+        bracket_info = self._is_bracketed_context(text)
+        if bracket_info:
+            modifications = [{
+                'type': 'bracketed_context',
+                'pattern': bracket_info['wrapper_sequence'],
+                'category': 'context_caption',
+                'confidence': 1.0,
+                'original': text,
+                'modified': '',
+                'language': effective_language,
+            }]
+            return '', modifications
+
         # Strict, full-line, exact matching
         if normalized_text in lang_list:
             modifications = [{
@@ -204,6 +230,33 @@ class HallucinationRemover:
             return '', modifications
         
         return text, []
+
+    def _is_bracketed_context(self, text: str) -> Optional[Dict[str, Any]]:
+        stripped = text.strip()
+        if len(stripped) < 3:
+            return None
+
+        inner = stripped
+        wrappers: List[str] = []
+
+        while True:
+            matched = False
+            for left, right in self.BRACKET_PAIRS:
+                if inner.startswith(left) and inner.endswith(right) and len(inner) > len(left) + len(right):
+                    inner = inner[len(left):-len(right)].strip()
+                    wrappers.append(f"{left}{right}")
+                    matched = True
+                    break
+            if not matched:
+                break
+
+        if wrappers and inner:
+            return {
+                'wrapper_sequence': wrappers,
+                'inner_text': inner,
+            }
+
+        return None
 
     def _looks_like_valid_japanese_expression(self, text: str) -> bool:
         """NEW: Check if text looks like valid Japanese expression to prevent false positives"""

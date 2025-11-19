@@ -501,6 +501,8 @@ class ConfigManager:
                 'temperature': (0.0, 2.0, (float, list)),
                 'compression_ratio_threshold': (1.0, 10.0, float),
                 'logprob_threshold': (-10.0, 0.0, float),
+                'logprob_margin': (0.0, 5.0, float),
+                'drop_nonverbal_vocals': (0, 1, bool),
                 'no_speech_threshold': (0.0, 1.0, float)
             },
             'vad_params': {
@@ -526,7 +528,7 @@ class ConfigManager:
                         )
                     
                     # Range check for numbers
-                    if isinstance(value, (int, float)):
+                    if isinstance(value, (int, float)) and not isinstance(value, bool):
                         if value < min_val or value > max_val:
                             raise ConfigValidationError(
                                 param_name,

@@ -117,6 +117,9 @@ class FasterPipeline(BasePipeline):
             mode=self.get_mode_name(),
             media_info=media_info
         )
+
+        if hasattr(self.asr, "reset_statistics"):
+            self.asr.reset_statistics()
         
         master_metadata["config"]["pipeline_options"] = {
             "model": f"whisper-({self.asr.model_name})",
@@ -220,6 +223,20 @@ class FasterPipeline(BasePipeline):
                 "duration_adjustments": stats.get('duration_adjustments', 0),
                 "empty_removed": stats.get('empty_removed', 0)
             }
+
+            logprob_filtered = 0
+            nonverbal_filtered = 0
+            if hasattr(self.asr, "get_filter_statistics"):
+                filter_stats = self.asr.get_filter_statistics() or {}
+                logprob_filtered = filter_stats.get('logprob_filtered', 0)
+                nonverbal_filtered = filter_stats.get('nonverbal_filtered', 0)
+
+            master_metadata["summary"]["final_subtitles_raw"] += logprob_filtered + nonverbal_filtered
+            master_metadata["summary"]["quality_metrics"].update({
+                "logprob_filtered": logprob_filtered,
+                "nonverbal_filtered": nonverbal_filtered,
+                "cps_filtered": stats.get('cps_filtered', 0)
+            })
             
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)

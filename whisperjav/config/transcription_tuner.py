@@ -107,7 +107,9 @@ class TranscriptionTuner:
                 'repetition_penalty': float,
                 'compression_ratio_threshold': float,
                 'logprob_threshold': float,
+                'logprob_margin': float,
                 'no_speech_threshold': float,
+                'drop_nonverbal_vocals': bool,
                 'vad_threshold': float,
                 'max_instant_words': float,
                 'avg_prob_threshold': float,
@@ -151,6 +153,8 @@ class TranscriptionTuner:
                 'beam_size': int,
                 'best_of': int,
                 'patience': float,
+                'logprob_margin': float,
+                'drop_nonverbal_vocals': bool,
             }
         
         # Special handling for suppress_tokens (common issue across backends)

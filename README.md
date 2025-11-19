@@ -494,6 +494,15 @@ Create a custom `config.json` to override default settings:
 }
 ```
 
+### Logprob Filter Controls
+
+`common_transcriber_options` now accepts two extra keys per sensitivity profile:
+
+- `logprob_margin` – gives short segments (≤1.6s) additional headroom by lowering the threshold when set (e.g., `0.2`).
+- `drop_nonverbal_vocals` – when `true`, removes obvious nonverbal fillers such as `[music]`, `(moans)`, or pure `♪` notes before stitching.
+
+Combine these with the existing `logprob_threshold` to dial in how aggressive scene-level filtering should be across modes.
+
 
 
 ## 🖥️ GUI Interface
