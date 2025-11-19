@@ -153,7 +153,7 @@
         "pass2_min_duration_s": 0.1,
         "pass2_max_duration_s": 960.0,
         "silero_threshold": 0.02,
-        "silero_neg_threshold": 0.10,
+        "silero_neg_threshold": 0.1,
         "silero_min_silence_ms": 7800,
         "silero_min_speech_ms": 100,
         "silero_max_speech_s": 960,
@@ -235,7 +235,7 @@
     "output_format": "srt"
   },
   "ui_preferences": {
-    "console_verbosity": "verbose",
+    "console_verbosity": "summary",
     "progress_batch_size": 10,
     "show_scene_details": false,
     "max_console_lines": 1000,
@@ -413,7 +413,7 @@
       "min_speech_duration_ms": 150,
       "max_speech_duration_s": 9,
       "min_silence_duration_ms": 300,
-      "neg_threshold": 0.30,
+      "neg_threshold": 0.3,
       "speech_pad_ms": 400
     },
     "aggressive": {
@@ -421,7 +421,7 @@
       "min_speech_duration_ms": 30,
       "max_speech_duration_s": 14,
       "min_silence_duration_ms": 300,
-      "neg_threshold": 0.10,
+      "neg_threshold": 0.1,
       "speech_pad_ms": 600
     }
   },
@@ -453,7 +453,7 @@
     },
     "aggressive": {
       "vad": true,
-      "vad_threshold": 0.10
+      "vad_threshold": 0.1
     }
   },
   "stable_ts_engine_options": {

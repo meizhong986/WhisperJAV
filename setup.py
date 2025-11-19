@@ -44,7 +44,11 @@ install_requires = [
 # Optional dependencies
 extras_require = {
     'speedup': ['numba'],
-    'gui': ['pywebview>=5.0.0'],  # PyWebView GUI dependencies
+    'gui': [
+        'pywebview>=5.0.0',  # PyWebView GUI framework
+        'pythonnet>=3.0; sys_platform=="win32"',  # WebView2 backend for Windows
+        'pywin32>=305; sys_platform=="win32"',  # Windows COM support for shortcuts
+    ],
 }
 
 
