@@ -136,11 +136,11 @@
                                     <!-- Mode Selection -->
                                     <div class="form-group">
                                         <label for="mode" class="form-label">Mode (ASR Engine options):</label>
-                                        <select id="mode" class="form-select">
-                                            <option value="fidelity">fidelity (standard whisper + VAD)</option>
-                                            <option value="balanced" selected>balanced (faster-whisper + VAD)</option>
-                                            <option value="fast">fast (faster-whisper, scenes)</option>
-                                            <option value="faster">faster (faster-whisper, direct)</option>
+                                        <select id="mode" class="form-select mode-select">
+                                            <option value="fidelity">fidelity&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(large-v2-fp16&nbsp;&nbsp;&nbsp;10GB VRAM)</option>
+                                            <option value="balanced" selected>balanced&nbsp;&nbsp;&nbsp;&nbsp;(large-v2-int8&nbsp;&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
+                                            <option value="fast">fast&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4GB VRAM)</option>
+                                            <option value="faster">faster&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8-batch8&nbsp;&nbsp;6GB VRAM)</option>
                                             <option value="kotoba" disabled>kotoba (future placeholder)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>
@@ -389,7 +389,7 @@
             <div class="modal-body">
                 <div class="about-logo">🎬</div>
                 <div class="about-title">WhisperJAV GUI</div>
-                <div class="about-version" id="aboutVersion">Version 1.5.1</div>
+                <div class="about-version" id="aboutVersion">Version 1.6.0</div>
 
                 <div class="about-section">
                     <h3>Description</h3>

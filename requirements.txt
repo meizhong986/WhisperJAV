@@ -33,6 +33,11 @@ requests
 # Optional: speed-up
 numba
 
+# GUI Framework (PyWebView)
+pywebview>=5.0.0
+pythonnet>=3.0; platform_system=="Windows"
+pywin32>=305; platform_system=="Windows"
+
 # Translation dependencies
 PySubtrans>=0.7.0
 openai>=1.35.0

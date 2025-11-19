@@ -64,6 +64,14 @@
     --line-height: 1.4;       /* Slightly reduced from 1.5 */
 }
 
+.mode-select {
+    font-family: var(--mono-font, "Fira Mono", "Consolas", "Courier New", monospace);
+    white-space: pre;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+}
+
 /* ============================================================
    Reset & Base Styles
    ============================================================ */
