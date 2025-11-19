@@ -88,15 +88,8 @@ def print_banner():
 ╔═══════════════════════════════════════════════════╗
 ║          WhisperJAV v{__version__}                        ║
 ║   Japanese Adult Video Subtitle Generator         ║
-║   CUDA GPU Required - Optimized for Performance   ║
 ║                                                   ║
-║   Available modes:                                ║
-║   - faster: Direct transcription (fastest)        ║
-║   - fast: Scene detection + standard Whisper      ║
-║   - balanced: Scene + faster-whisper VAD          ║
-║   - fidelity: Scene + standard Whisper VAD        ║
 ║                                                   ║
-║   Run with --check for environment diagnostics    ║
 ╚═══════════════════════════════════════════════════╝
 """
     safe_print(banner)
@@ -111,10 +104,10 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster"], default="fidelity",
-                       help="Processing mode (default: fidelity)")
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster"], default="balanced",
+                       help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
-                       help="Whisper model to use (e.g., large-v2, turbo, large). Overrides config default.")
+                       help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
     parser.add_argument("--language", choices=["japanese", "korean", "chinese", "english"],
                        default="japanese",
                        help="Source audio language for transcription (default: japanese)")
@@ -157,7 +150,7 @@ def parse_arguments():
     tuning_group = parser.add_argument_group("Transcription Tuning")
     tuning_group.add_argument("--sensitivity",
                              choices=["conservative", "balanced", "aggressive"],
-                             default="balanced", help="Transcription sensitivity")
+                             default="aggressive", help="Transcription sensitivity")
     tuning_group.add_argument("--scene-detection-method",
                              type=str,
                              choices=["auditok", "silero"],
@@ -336,6 +329,81 @@ def cleanup_temp_directory(temp_dir: str):
             logger.error(f"Error cleaning up temp directory: {e}")
 
 
+def aggregate_subtitle_metrics(metadata_entries: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Aggregate subtitle/filter metrics across successful files."""
+    totals = {
+        "files_processed": 0,
+        "raw_subtitles": 0,
+        "final_subtitles": 0,
+        "hallucinations_removed": 0,
+        "repetitions_removed": 0,
+        "logprob_filtered": 0,
+        "cps_filtered": 0,
+        "nonverbal_filtered": 0,
+        "empty_removed": 0,
+        "other_removed": 0,
+        "processing_time_seconds": 0.0
+    }
+
+    for metadata in metadata_entries:
+        if not metadata:
+            continue
+
+        summary = metadata.get("summary", {})
+        quality_metrics = summary.get("quality_metrics", {})
+
+        totals["files_processed"] += 1
+        totals["raw_subtitles"] += int(summary.get("final_subtitles_raw", 0) or 0)
+        totals["final_subtitles"] += int(summary.get("final_subtitles_refined", 0) or 0)
+        totals["hallucinations_removed"] += int(quality_metrics.get("hallucinations_removed", 0) or 0)
+        totals["repetitions_removed"] += int(quality_metrics.get("repetitions_removed", 0) or 0)
+        totals["logprob_filtered"] += int(quality_metrics.get("logprob_filtered", 0) or 0)
+        totals["cps_filtered"] += int(quality_metrics.get("cps_filtered", 0) or 0)
+        totals["nonverbal_filtered"] += int(quality_metrics.get("nonverbal_filtered", 0) or 0)
+
+        totals["processing_time_seconds"] += float(
+            summary.get("total_processing_time_seconds", 0.0) or 0.0
+        )
+
+        empty_removed = int(quality_metrics.get("empty_removed", 0) or 0)
+        totals["empty_removed"] += empty_removed
+
+        other_removed = empty_removed - (
+            int(quality_metrics.get("hallucinations_removed", 0) or 0)
+            + int(quality_metrics.get("repetitions_removed", 0) or 0)
+        )
+        if other_removed < 0:
+            other_removed = 0
+        totals["other_removed"] += other_removed
+
+    return totals
+
+
+def print_subtitle_metrics(totals: Dict[str, int]):
+    """Pretty-print aggregated subtitle/filter metrics."""
+    if not totals or totals.get("files_processed", 0) == 0:
+        return
+
+    print("\nSubtitle Filter Totals")
+    print("-" * 50)
+    print(f"Files with metrics : {totals['files_processed']}")
+    print(f"Raw subtitles     : {totals['raw_subtitles']}")
+    print(f"Final subtitles   : {totals['final_subtitles']}")
+    print("Filter removals:")
+    print(f"  Logprob threshold : {totals['logprob_filtered']}")
+    print(f"  Non-verbal filter : {totals['nonverbal_filtered']}")
+    print(f"  CPS limiter       : {totals['cps_filtered']}")
+    print(f"  Hallucination cut : {totals['hallucinations_removed']}")
+    print(f"  Repetition cull   : {totals['repetitions_removed']}")
+    print(f"  Other removals    : {totals['other_removed']}")
+    discrepancy = (totals['raw_subtitles'] - totals['final_subtitles']) - (
+        totals['logprob_filtered'] + totals['nonverbal_filtered'] + totals['cps_filtered'] +
+        totals['hallucinations_removed'] + totals['repetitions_removed'] + totals['other_removed']
+    )
+    if discrepancy:
+        print(f"  Untracked delta    : {discrepancy}")
+
+
 def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
     """Process files synchronously with enhanced progress reporting."""
     
@@ -505,6 +573,13 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     finally:
         progress.close()
     
+    successful_metadata = [
+        entry.get("metadata")
+        for entry in all_stats
+        if entry.get("status") == "success" and isinstance(entry.get("metadata"), dict)
+    ]
+    subtitle_totals = aggregate_subtitle_metrics(successful_metadata)
+
     # Print summary
     print("\n" + "="*50)
     print("PROCESSING SUMMARY")
@@ -512,11 +587,19 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     print(f"Total files: {len(media_files)}")
     print(f"Successful: {len(media_files) - len(failed_files)}")
     print(f"Failed: {len(failed_files)}")
+    if subtitle_totals.get("processing_time_seconds"):
+        total_time = subtitle_totals["processing_time_seconds"]
+        print(f"Processing time (s): {total_time:.2f}")
+        if subtitle_totals.get("files_processed"):
+            avg_time = total_time / subtitle_totals["files_processed"]
+            print(f"Average per file (s): {avg_time:.2f}")
     
     if failed_files:
         print("\nFailed files:")
         for file in failed_files:
             print(f"  - {file}")
+
+    print_subtitle_metrics(subtitle_totals)
     
     if args.stats_file:
         with open(args.stats_file, 'w', encoding='utf-8') as f:
@@ -663,6 +746,10 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         successful = sum(1 for t in tasks if t.status == ProcessingStatus.COMPLETED)
         failed = sum(1 for t in tasks if t.status == ProcessingStatus.FAILED)
         cancelled = sum(1 for t in tasks if t.status == ProcessingStatus.CANCELLED)
+        subtitle_totals = aggregate_subtitle_metrics([
+            t.result for t in tasks
+            if t.status == ProcessingStatus.COMPLETED and isinstance(t.result, dict)
+        ])
         
         print("\n" + "="*50)
         print("ASYNC PROCESSING SUMMARY")
@@ -672,6 +759,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         print(f"Failed: {failed}")
         if cancelled > 0:
             print(f"Cancelled: {cancelled}")
+
+        print_subtitle_metrics(subtitle_totals)
         
         # Save stats if requested
         if args.stats_file:

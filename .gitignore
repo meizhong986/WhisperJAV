@@ -68,7 +68,7 @@ whisperjav/output/
 **/claude.md
 
 #old docs in any subdirectory of are ignored
-**.doc_archive/
+**.docs_archive/
 
 
 # Ignore the nul file

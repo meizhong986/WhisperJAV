@@ -198,6 +198,8 @@ class ASRConfigurator(QMainWindow):
         provider_layout.addRow("Provider:", QComboBox())
         provider_layout.addRow("No speech threshold:", QDoubleSpinBox())
         provider_layout.addRow("Logprob threshold:", QDoubleSpinBox())
+        provider_layout.addRow("Logprob margin:", QDoubleSpinBox())
+        provider_layout.addRow("Drop nonverbal vocals:", QCheckBox())
         provider_layout.addRow("Suppress blank:", QCheckBox())
         
         param_sets_layout.addWidget(feature_group)

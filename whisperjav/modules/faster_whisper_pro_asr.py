@@ -5,7 +5,7 @@ This module uses faster-whisper direct API and is intended for the 'balanced' pi
 """
 
 from pathlib import Path
-from typing import Dict, List, Tuple, Union, Optional
+from typing import Dict, List, Tuple, Union, Optional, Any
 import torch
 from faster_whisper import WhisperModel
 import soundfile as sf
@@ -17,6 +17,7 @@ import logging
 
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
+from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 
 
 def _is_silero_vad_cached(repo_or_dir: str) -> bool:
@@ -92,12 +93,31 @@ class FasterWhisperProASR:
         self.whisper_params.update(decoder_params)  # task, language, beam_size, etc.
         self.whisper_params.update(provider_params)  # temperature, fp16, etc.
 
+        raw_threshold = self.whisper_params.get("logprob_threshold", -1.0)
+        self.logprob_threshold = float(raw_threshold) if raw_threshold is not None else None
+        raw_margin = self.whisper_params.get("logprob_margin", 0.0)
+        self.logprob_margin = float(raw_margin or 0.0)
+        self.drop_nonverbal_vocals = bool(self.whisper_params.get("drop_nonverbal_vocals", False))
+        filter_config = SegmentFilterConfig(
+            logprob_threshold=self.logprob_threshold,
+            logprob_margin=self.logprob_margin,
+            drop_nonverbal_vocals=self.drop_nonverbal_vocals,
+        )
+        self._segment_filter = SegmentFilterHelper(filter_config)
+
+        # Helper-only parameters should not be forwarded to the backend
+        self.whisper_params.pop("logprob_margin", None)
+        self.whisper_params.pop("drop_nonverbal_vocals", None)
+
         # Ensure task is set correctly
         self.whisper_params['task'] = task
         # Language is now passed from decoder_params (set via CLI --language argument)
 
         # Store task for metadata
         self.task = task
+        self._logged_param_snapshot = False
+        self._vad_parameters = self._build_vad_parameters(vad_params)
+        self._reset_runtime_statistics()
         # --- END V3 PARAMETER UNPACKING ---
 
         # Suppression lists for Japanese content (business logic preserved)
@@ -107,6 +127,21 @@ class FasterWhisperProASR:
 
         self._initialize_models()
         self._log_sensitivity_parameters()
+
+    def _reset_runtime_statistics(self) -> None:
+        """Reset per-run counters used for final summaries."""
+        self._filter_statistics = {
+            'logprob_filtered': 0,
+            'nonverbal_filtered': 0
+        }
+
+    def reset_statistics(self) -> None:
+        """Public hook for pipelines to clear accumulated statistics."""
+        self._reset_runtime_statistics()
+
+    def get_filter_statistics(self) -> Dict[str, int]:
+        """Return a copy of accumulated filter statistics."""
+        return dict(self._filter_statistics)
 
     def _initialize_models(self):
         """Initialize VAD and Faster-Whisper models (direct API)."""
@@ -159,9 +194,37 @@ class FasterWhisperProASR:
             logger.debug(f"  VAD Threshold: {self.vad_threshold}")
             logger.debug(f"  Min Speech Duration: {self.min_speech_duration_ms}ms")
             logger.debug(f"  Task: {self.task}")
+            logger.debug(f"  Logprob Threshold: {self.logprob_threshold}")
+            logger.debug(
+                "  Logprob Margin (<= %.1fs): %s",
+                self._segment_filter.short_window,
+                self.logprob_margin,
+            )
+            logger.debug(f"  Drop Nonverbal Vocals: {self.drop_nonverbal_vocals}")
             logger.debug(f"  Backend: faster-whisper (via stable-ts)")
             logger.debug(f"  Combined Whisper Params: {self.whisper_params}")
             logger.debug("----------------------------------------------------")
+
+    def _build_vad_parameters(self, vad_params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Convert config VAD settings into faster-whisper VadOptions format."""
+        if not vad_params:
+            return None
+
+        mapping = {
+            'threshold': 'threshold',  # faster-whisper VadOptions expects the raw threshold name
+            'neg_threshold': 'neg_threshold',  # optional, only present if config defines it
+            'min_speech_duration_ms': 'min_speech_duration_ms',
+            'max_speech_duration_s': 'max_speech_duration_s',
+            'min_silence_duration_ms': 'min_silence_duration_ms',
+            'speech_pad_ms': 'speech_pad_ms'
+        }
+
+        vad_options: Dict[str, Any] = {}
+        for source_key, target_key in mapping.items():
+            if source_key in vad_params and vad_params[source_key] is not None:
+                vad_options[target_key] = vad_params[source_key]
+
+        return vad_options or None
 
     def _prepare_whisper_params(self) -> Dict:
         """
@@ -231,7 +294,23 @@ class FasterWhisperProASR:
         if 'log_progress' not in final_params:
             final_params['log_progress'] = False  # Suppress progress bars
 
+        final_params['vad_filter'] = final_params.get('vad_filter', False)
+
+        if self._vad_parameters and 'vad_parameters' not in final_params:
+            final_params['vad_parameters'] = self._vad_parameters
+
         logger.debug(f"Final faster-whisper parameters ({len(final_params)} params): {final_params}")
+
+        if not self._logged_param_snapshot and logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Faster-Whisper transcribe kwargs (model=%s, device=%s, compute_type=%s): %s",
+                self.model_name,
+                self.device,
+                self.compute_type,
+                final_params
+            )
+            self._logged_param_snapshot = True
+
         return final_params
 
     def transcribe(self, audio_path: Union[str, Path], **kwargs) -> Dict:
@@ -414,10 +493,25 @@ class FasterWhisperProASR:
                 if suppress_word in text:
                     avg_logprob -= 0.15
 
-            # Use default threshold for filtering
-            logprob_filter = -1.0  # Default threshold
-            if avg_logprob < logprob_filter:
-                logger.debug(f"Filtered segment with logprob {avg_logprob}: {text[:50]}...")
+            segment_duration = max(0.0, float(seg["end"] - seg["start"]))
+            should_filter, reason, effective_threshold = self._segment_filter.should_filter(
+                avg_logprob=avg_logprob,
+                duration=segment_duration,
+                text=text,
+            )
+
+            if should_filter:
+                if reason == "logprob":
+                    logger.debug(
+                        "Filtered segment with logprob %.3f (threshold %.3f): %s",
+                        avg_logprob,
+                        effective_threshold if effective_threshold is not None else -1.0,
+                        f"{text[:50]}...",
+                    )
+                    self._filter_statistics['logprob_filtered'] += 1
+                else:
+                    logger.debug(f"Filtered nonverbal segment: {text[:50]}...")
+                    self._filter_statistics['nonverbal_filtered'] += 1
                 continue
 
             adjusted_seg = {
