@@ -212,7 +212,7 @@ class StableTSASR:
             )
             self._vad_precached = True
             status = "from cache" if is_cached else "downloaded"
-            logger.debug(f"Successfully loaded VAD from {vad_repo} ({status})")
+            logger.debug(f"Successfully loaded VAD from {self.vad_repo} ({status})")
         except Exception as e:
             logger.warning(f"Failed to pre-cache Silero VAD: {e}")
 
