@@ -1,0 +1,34 @@
+# WhisperJAV Version Configuration
+# ==================================
+# Single source of truth for version information.
+# Edit this file, then run: python build_release.py
+
+[version]
+major = 1
+minor = 6
+patch = 1
+prerelease =
+label = stable
+architecture = v4.3
+
+[metadata]
+app_name = WhisperJAV
+description = Japanese AV Subtitle Generator with AI-powered transcription
+author = MeiZhong
+license = MIT
+url = https://github.com/meizhong986/whisperjav
+
+[installer]
+python_version = 3.10.18
+shortcut_name_template = WhisperJAV v{version}
+shortcut_description = WhisperJAV v{version} - Japanese AV Subtitle Generator
+desktop_icon = whisperjav_icon.ico
+install_prefix = %%LOCALAPPDATA%%\WhisperJAV
+
+[build]
+wheel_tag = py3-none-any
+clean_before_build = true
+
+[changelog]
+include_git_log = true
+commits_since_tag = true

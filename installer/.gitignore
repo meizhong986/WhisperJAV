@@ -1,0 +1,18 @@
+# Ignore built installers
+*.exe
+*.sh
+*.pkg
+
+# Ignore constructor work directory
+build/
+_build/
+work/
+
+# Ignore downloaded packages cache
+pkgs/
+
+# But keep the icon file
+!whisperjav_icon.ico
+
+# Auto-generated release files (from build_release.py)
+generated/
