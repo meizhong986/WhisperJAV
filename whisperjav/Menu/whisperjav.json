@@ -3,7 +3,7 @@
   "menu_name": "WhisperJAV",
   "menu_items": [
     {
-      "name": "WhisperJAV v1.6.0",
+      "name": "WhisperJAV v1.6.1",
       "description": "Japanese AV Subtitle Generator with AI-powered transcription",
       "icon": "{{ PREFIX }}\\whisperjav_icon.ico",
       "command": ["{{ PYTHONW }}", "-m", "whisperjav.webview_gui.main"],
