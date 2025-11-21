@@ -40,7 +40,7 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-from whisperjav.config import resolve_config
+from whisperjav.config.legacy import resolve_legacy_pipeline
 from whisperjav.__version__ import __version__
 
 
@@ -812,7 +812,7 @@ def main():
     if args.verbosity:
         quick_update_ui_preference('console_verbosity', args.verbosity, config_path)
     
-    # V2.0 Configuration resolution (Pydantic-based)
+    # V3.0 Configuration resolution (Component-based)
     task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
 
     # Map language name to Whisper language code
@@ -820,19 +820,15 @@ def main():
     logger.info(f"Transcription language: {args.language} ({language_code})")
 
     try:
-        # Pass scene_detection_method if specified
-        kwargs = {}
-        if args.scene_detection_method:
-            kwargs['scene_detection_method'] = args.scene_detection_method
-            logger.info(f"Using scene detection method: {args.scene_detection_method}")
-
-        resolved_config = resolve_config(
+        resolved_config = resolve_legacy_pipeline(
             pipeline_name=args.mode,
             sensitivity=args.sensitivity,
             task=task,
-            config_path=config_path,
-            **kwargs
         )
+
+        if args.scene_detection_method:
+            logger.info(f"Using scene detection method: {args.scene_detection_method}")
+
     except Exception as e:
         logger.error(f"Failed to resolve configuration: {e}")
         sys.exit(1)
