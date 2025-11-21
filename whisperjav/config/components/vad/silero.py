@@ -2,6 +2,8 @@
 Silero VAD Component.
 
 High-quality Voice Activity Detection from Silero team.
+
+Parameter values match v1 asr_config.json exactly for backward compatibility.
 """
 
 from pydantic import BaseModel, Field
@@ -10,31 +12,39 @@ from whisperjav.config.components.base import VADComponent, register_vad
 
 
 class SileroVADOptions(BaseModel):
-    """Silero VAD configuration options."""
+    """
+    Silero VAD configuration options matching v1 silero_vad_options.
+    """
 
     threshold: float = Field(
-        0.5, ge=0.0, le=1.0,
-        description="Speech probability threshold. Higher = less sensitive to speech."
+        0.18,
+        ge=0.0, le=1.0,
+        description="Speech probability threshold. Lower = more sensitive."
     )
     min_speech_duration_ms: int = Field(
-        250, ge=0, le=5000,
+        100,
+        ge=0, le=5000,
         description="Minimum speech segment duration in milliseconds."
     )
     max_speech_duration_s: float = Field(
-        float('inf'), ge=0.0,
+        11.0,
+        ge=0.0, le=300.0,
         description="Maximum speech segment duration in seconds."
     )
     min_silence_duration_ms: int = Field(
-        100, ge=0, le=5000,
+        300,
+        ge=0, le=5000,
         description="Minimum silence duration to split segments."
     )
-    speech_pad_ms: int = Field(
-        400, ge=0, le=2000,
-        description="Padding added around detected speech in milliseconds."
+    neg_threshold: float = Field(
+        0.15,
+        ge=0.0, le=1.0,
+        description="Negative speech threshold for deactivation."
     )
-    window_size_samples: int = Field(
-        1536, ge=512, le=4096,
-        description="Window size for VAD processing."
+    speech_pad_ms: int = Field(
+        400,
+        ge=0, le=2000,
+        description="Padding added around detected speech in milliseconds."
     )
 
 
@@ -55,24 +65,30 @@ class SileroVAD(VADComponent):
     # === Schema ===
     Options = SileroVADOptions
 
-    # === Presets ===
+    # === Presets - Exact v1 values ===
     presets = {
         "conservative": SileroVADOptions(
-            threshold=0.6,
-            min_speech_duration_ms=300,
-            min_silence_duration_ms=150,
-            speech_pad_ms=500,
+            threshold=0.35,
+            min_speech_duration_ms=150,
+            max_speech_duration_s=9.0,
+            min_silence_duration_ms=300,
+            neg_threshold=0.3,
+            speech_pad_ms=400,
         ),
         "balanced": SileroVADOptions(
-            threshold=0.5,
-            min_speech_duration_ms=250,
-            min_silence_duration_ms=100,
+            threshold=0.18,
+            min_speech_duration_ms=100,
+            max_speech_duration_s=11.0,
+            min_silence_duration_ms=300,
+            neg_threshold=0.15,
             speech_pad_ms=400,
         ),
         "aggressive": SileroVADOptions(
-            threshold=0.35,
-            min_speech_duration_ms=100,
-            min_silence_duration_ms=50,
-            speech_pad_ms=200,
+            threshold=0.05,
+            min_speech_duration_ms=30,
+            max_speech_duration_s=14.0,
+            min_silence_duration_ms=300,
+            neg_threshold=0.1,
+            speech_pad_ms=600,
         ),
     }
