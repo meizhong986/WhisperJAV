@@ -40,7 +40,7 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-from whisperjav.config.legacy import resolve_legacy_pipeline
+from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
 from whisperjav.__version__ import __version__
 
 
@@ -114,7 +114,20 @@ def parse_arguments():
     parser.add_argument("--config", default=None, help="Path to a JSON configuration file")
     parser.add_argument("--subs-language", choices=["native", "direct-to-english"],
                        default="native", help="Subtitle output format: 'native' (transcribe in source language) or 'direct-to-english' (translate to English via Whisper)")
-    
+
+    # Ensemble mode arguments (for direct component specification)
+    ensemble_group = parser.add_argument_group("Ensemble Mode Options")
+    ensemble_group.add_argument("--asr", default=None,
+                               help="ASR component name (e.g., faster_whisper, stable_ts, openai_whisper)")
+    ensemble_group.add_argument("--vad", default=None,
+                               help="VAD component name (e.g., silero, none)")
+    ensemble_group.add_argument("--features", default=None,
+                               help="Comma-separated feature names (e.g., auditok_scene_detection)")
+    ensemble_group.add_argument("--task", choices=["transcribe", "translate"], default="transcribe",
+                               help="Task type (default: transcribe)")
+    ensemble_group.add_argument("--overrides", default=None,
+                               help="JSON string of parameter overrides")
+
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
     parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
@@ -813,18 +826,53 @@ def main():
         quick_update_ui_preference('console_verbosity', args.verbosity, config_path)
     
     # V3.0 Configuration resolution (Component-based)
-    task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
+    # Use --task if provided, otherwise determine from subs-language
+    if hasattr(args, 'task') and args.task:
+        task = args.task
+    else:
+        task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
 
     # Map language name to Whisper language code
     language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
     logger.info(f"Transcription language: {args.language} ({language_code})")
 
     try:
-        resolved_config = resolve_legacy_pipeline(
-            pipeline_name=args.mode,
-            sensitivity=args.sensitivity,
-            task=task,
-        )
+        # Check if ensemble mode (--asr provided)
+        if args.asr:
+            # Ensemble mode: use ensemble resolver
+            logger.info(f"Ensemble mode: ASR={args.asr}, VAD={args.vad or 'none'}")
+
+            # Parse features
+            features = []
+            if args.features:
+                features = [f.strip() for f in args.features.split(',') if f.strip()]
+
+            # Parse overrides
+            overrides = None
+            if args.overrides:
+                import json
+                try:
+                    overrides = json.loads(args.overrides)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --overrides: {e}")
+                    sys.exit(1)
+
+            # Resolve using ensemble resolver (returns legacy-compatible structure)
+            resolved_config = resolve_ensemble_config(
+                asr=args.asr,
+                vad=args.vad or 'none',
+                task=task,
+                features=features,
+                overrides=overrides,
+            )
+
+        else:
+            # Legacy mode: use pipeline resolver
+            resolved_config = resolve_legacy_pipeline(
+                pipeline_name=args.mode,
+                sensitivity=args.sensitivity,
+                task=task,
+            )
 
         if args.scene_detection_method:
             logger.info(f"Using scene detection method: {args.scene_detection_method}")

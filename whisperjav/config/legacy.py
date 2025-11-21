@@ -284,6 +284,79 @@ def _get_backend_name(asr_name: str) -> str:
     return backend_map.get(asr_name, asr_name)
 
 
+def resolve_ensemble_config(
+    asr: str,
+    vad: str = "none",
+    task: str = "transcribe",
+    features: Optional[List[str]] = None,
+    overrides: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Resolve configuration for ensemble mode (direct component specification).
+
+    This is the entry point for the Ensemble Tab GUI, allowing users to
+    specify components and parameters directly without using preset pipelines.
+
+    Args:
+        asr: ASR component name (e.g., 'faster_whisper', 'stable_ts', 'openai_whisper')
+        vad: VAD component name or 'none'
+        task: Task type ('transcribe' or 'translate')
+        features: List of feature names (e.g., ['auditok_scene_detection'])
+        overrides: Parameter overrides in flat dot notation
+                   (e.g., {'asr.beam_size': 10, 'vad.threshold': 0.25})
+
+    Returns:
+        Resolved configuration in legacy structure for pipeline compatibility.
+    """
+    # Convert flat overrides to nested structure
+    nested_overrides = None
+    if overrides:
+        nested_overrides = {}
+        for key, value in overrides.items():
+            parts = key.split('.')
+            if len(parts) >= 2:
+                comp_type = parts[0]
+                param_path = '.'.join(parts[1:])
+
+                if comp_type not in nested_overrides:
+                    nested_overrides[comp_type] = {}
+
+                # Handle nested params like features.scene_detection.max_duration_s
+                if comp_type == 'features' and len(parts) >= 3:
+                    feature_name = parts[1]
+                    param_name = '.'.join(parts[2:])
+                    if feature_name not in nested_overrides[comp_type]:
+                        nested_overrides[comp_type][feature_name] = {}
+                    nested_overrides[comp_type][feature_name][param_name] = value
+                else:
+                    nested_overrides[comp_type][param_path] = value
+
+    # Resolve using v3 system
+    config = resolve_config_v3(
+        asr=asr,
+        vad=vad,
+        sensitivity='balanced',  # Ensemble doesn't use sensitivity presets
+        task=task,
+        features=features or [],
+        overrides=nested_overrides,
+    )
+
+    # Add ensemble-specific metadata
+    config['pipeline_name'] = 'ensemble'
+    config['sensitivity_name'] = 'custom'
+
+    # Build pipeline definition for mapping
+    pipeline_def = {
+        "asr": asr,
+        "vad": vad,
+        "features": features or [],
+        "description": "Custom ensemble configuration",
+    }
+
+    # Map to legacy structure for pipeline compatibility
+    return _map_to_legacy_structure(config, pipeline_def)
+
+
 def list_legacy_pipelines() -> List[str]:
     """List available legacy pipeline names."""
     return list(LEGACY_PIPELINES.keys())
