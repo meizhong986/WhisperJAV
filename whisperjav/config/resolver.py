@@ -6,11 +6,14 @@ TranscriptionTuner.resolve_params() for backward compatibility.
 """
 
 import json
+import logging
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
 
 from .errors import ConfigValidationError, UnknownComponentError
+
+logger = logging.getLogger("whisperjav")
 from .schemas import (
     DECODER_PRESETS,
     FASTER_WHISPER_ENGINE_PRESETS,
@@ -127,7 +130,10 @@ def _load_config(config_path: Path = None) -> Dict[str, Any]:
         raise FileNotFoundError(f"ASR configuration file not found: {config_path}")
 
     with open(config_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        config = json.load(f)
+
+    logger.debug(f"v2.0 resolver: Loaded config from {config_path}")
+    return config
 
 
 def _validate_inputs(

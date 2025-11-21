@@ -526,6 +526,74 @@ class WhisperJAVAPI:
         return self.default_output
 
     # ========================================================================
+    # Component Introspection (v3.0 - Dynamic GUI support)
+    # ========================================================================
+
+    def get_available_components(self) -> Dict[str, Any]:
+        """
+        Get all available components for dynamic GUI population.
+
+        Returns:
+            dict with 'asr', 'vad', 'features' lists
+        """
+        try:
+            from whisperjav.config.components import get_all_components
+            return {
+                "success": True,
+                "components": get_all_components()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_component_schema(self, component_type: str, name: str) -> Dict[str, Any]:
+        """
+        Get parameter schema for a specific component.
+
+        Args:
+            component_type: 'asr', 'vad', or 'features'
+            name: Component name
+
+        Returns:
+            dict with parameter schema
+        """
+        try:
+            from whisperjav.config.components import get_component
+            component = get_component(component_type, name)
+            return {
+                "success": True,
+                "schema": component.get_schema(),
+                "metadata": component.to_dict()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_legacy_pipelines(self) -> Dict[str, Any]:
+        """
+        Get available legacy pipeline names and info.
+
+        Returns:
+            dict with pipeline information
+        """
+        try:
+            from whisperjav.config.legacy import LEGACY_PIPELINES, list_legacy_pipelines
+            return {
+                "success": True,
+                "pipelines": list_legacy_pipelines(),
+                "info": LEGACY_PIPELINES
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    # ========================================================================
     # Test Methods (Phase 1 - Keep for backward compatibility)
     # ========================================================================
 
