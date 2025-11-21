@@ -205,7 +205,7 @@
     },
     "fast": {
       "workflow": {
-        "model": "faster-whisper-large-v3",
+        "model": "faster-whisper-large-v2-int8",
         "vad": "none",
         "backend": "stable-ts",
         "features": {
