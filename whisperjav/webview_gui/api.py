@@ -593,6 +593,340 @@ class WhisperJAVAPI:
                 "error": str(e)
             }
 
+    def get_component_defaults(self, component_type: str, name: str) -> Dict[str, Any]:
+        """
+        Get default parameter values for a component.
+
+        Args:
+            component_type: 'asr', 'vad', or 'features'
+            name: Component name
+
+        Returns:
+            dict with default parameter values
+        """
+        try:
+            from whisperjav.config.components import get_component
+            component = get_component(component_type, name)
+
+            # Get defaults from the balanced preset or Options defaults
+            if hasattr(component, 'presets') and 'balanced' in component.presets:
+                defaults = component.presets['balanced'].model_dump()
+            else:
+                # Fall back to Options class defaults
+                defaults = component.Options().model_dump()
+
+            return {
+                "success": True,
+                "defaults": defaults
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def validate_ensemble_config(self, options: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate ensemble configuration before processing.
+
+        Args:
+            options: Ensemble configuration options
+
+        Returns:
+            dict with validation result and any errors
+        """
+        errors = []
+        warnings = []
+
+        try:
+            from whisperjav.config.components import get_component, get_all_components
+
+            # Check required fields
+            if not options.get('inputs'):
+                errors.append({
+                    "field": "inputs",
+                    "message": "At least one input file is required"
+                })
+
+            # Validate ASR selection
+            asr_name = options.get('asr', '')
+            if not asr_name:
+                errors.append({
+                    "field": "asr",
+                    "message": "Please select an ASR engine"
+                })
+            else:
+                try:
+                    get_component('asr', asr_name)
+                except Exception:
+                    errors.append({
+                        "field": "asr",
+                        "message": f"Unknown ASR component: {asr_name}"
+                    })
+
+            # Validate VAD selection (can be 'none')
+            vad_name = options.get('vad', 'none')
+            if vad_name and vad_name != 'none':
+                try:
+                    get_component('vad', vad_name)
+                except Exception:
+                    errors.append({
+                        "field": "vad",
+                        "message": f"Unknown VAD component: {vad_name}"
+                    })
+
+            # Validate features
+            features = options.get('features', [])
+            for feature_name in features:
+                try:
+                    get_component('features', feature_name)
+                except Exception:
+                    errors.append({
+                        "field": f"features.{feature_name}",
+                        "message": f"Unknown feature: {feature_name}"
+                    })
+
+            # Validate overrides against component schemas
+            overrides = options.get('overrides', {})
+            for key, value in overrides.items():
+                # Parse key like "asr.beam_size" or "vad.threshold"
+                parts = key.split('.', 1)
+                if len(parts) != 2:
+                    errors.append({
+                        "field": f"overrides.{key}",
+                        "message": f"Invalid override key format: {key}"
+                    })
+                    continue
+
+                comp_type, param_name = parts
+
+                # Map component type
+                if comp_type == 'asr':
+                    comp_name = asr_name
+                elif comp_type == 'vad':
+                    comp_name = vad_name
+                elif comp_type == 'features':
+                    # For features, extract feature name from param
+                    # e.g., "features.scene_detection.max_duration_s"
+                    feature_parts = param_name.split('.', 1)
+                    if len(feature_parts) == 2:
+                        comp_name = feature_parts[0]
+                        param_name = feature_parts[1]
+                        comp_type = 'features'
+                    else:
+                        continue
+                else:
+                    continue
+
+                # Validate parameter value against schema
+                if comp_name and comp_name != 'none':
+                    try:
+                        component = get_component(comp_type, comp_name)
+                        schema = component.get_schema()
+
+                        # Find parameter in schema
+                        param_schema = None
+                        for p in schema:
+                            if p['name'] == param_name:
+                                param_schema = p
+                                break
+
+                        if param_schema and 'constraints' in param_schema:
+                            constraints = param_schema['constraints']
+                            if 'ge' in constraints and value < constraints['ge']:
+                                errors.append({
+                                    "field": f"overrides.{key}",
+                                    "message": f"Value {value} is below minimum {constraints['ge']}"
+                                })
+                            if 'le' in constraints and value > constraints['le']:
+                                errors.append({
+                                    "field": f"overrides.{key}",
+                                    "message": f"Value {value} exceeds maximum {constraints['le']}"
+                                })
+                    except Exception:
+                        pass  # Skip validation if component not found
+
+            if errors:
+                return {
+                    "valid": False,
+                    "errors": errors,
+                    "warnings": warnings
+                }
+
+            return {
+                "valid": True,
+                "errors": [],
+                "warnings": warnings
+            }
+
+        except Exception as e:
+            return {
+                "valid": False,
+                "errors": [{"field": "general", "message": str(e)}],
+                "warnings": []
+            }
+
+    def start_ensemble_process(self, options: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Start WhisperJAV subprocess with ensemble configuration.
+
+        Args:
+            options: Ensemble configuration options:
+                - inputs: List[str] - Input files/folders
+                - asr: str - ASR component name
+                - vad: str - VAD component name (or 'none')
+                - features: List[str] - Feature names
+                - overrides: Dict[str, Any] - Parameter overrides
+                - output_dir: str - Output directory
+                - task: str - Task type (transcribe/translate)
+                - language: str - Source language
+                - temp_dir: str - Temp directory (optional)
+                - keep_temp: bool - Keep temp files
+                - verbosity: str - Verbosity level
+
+        Returns:
+            dict: Response with success status and message
+        """
+        # Check if already running
+        if self.process is not None:
+            return {
+                "success": False,
+                "message": "Process already running"
+            }
+
+        # Validate configuration first
+        validation = self.validate_ensemble_config(options)
+        if not validation.get('valid', False):
+            error_msgs = [e['message'] for e in validation.get('errors', [])]
+            return {
+                "success": False,
+                "message": "Invalid configuration: " + "; ".join(error_msgs)
+            }
+
+        try:
+            # Build ensemble-specific arguments
+            args = self._build_ensemble_args(options)
+
+            # Construct command
+            cmd = [sys.executable, "-X", "utf8", "-m", "whisperjav.main", *args]
+
+            # Force UTF-8 stdio
+            env = os.environ.copy()
+            env["PYTHONUTF8"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8:replace"
+
+            # Log command
+            def quote_arg(a: str) -> str:
+                return f'"{a}"' if (" " in a or "\t" in a) else a
+
+            cmd_display = "whisperjav.main " + " ".join(quote_arg(a) for a in args)
+            self.log_queue.put(f"\n> {cmd_display}\n")
+
+            # Start subprocess
+            self.process = subprocess.Popen(
+                cmd,
+                cwd=str(REPO_ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+                universal_newlines=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+
+            # Update status
+            self.status = "running"
+            self.exit_code = None
+
+            # Start log streaming thread
+            self._stream_thread = threading.Thread(
+                target=self._stream_output,
+                daemon=True
+            )
+            self._stream_thread.start()
+
+            return {
+                "success": True,
+                "message": "Ensemble process started successfully",
+                "command": cmd_display
+            }
+
+        except ValueError as e:
+            return {
+                "success": False,
+                "message": str(e)
+            }
+        except Exception as e:
+            self.status = "error"
+            return {
+                "success": False,
+                "message": f"Failed to start ensemble process: {e}"
+            }
+
+    def _build_ensemble_args(self, options: Dict[str, Any]) -> List[str]:
+        """
+        Build CLI arguments for ensemble processing.
+
+        Args:
+            options: Ensemble configuration options
+
+        Returns:
+            List of CLI arguments
+        """
+        args = []
+
+        # Inputs (required)
+        inputs = options.get('inputs', [])
+        if not inputs:
+            raise ValueError("Please add at least one file or folder.")
+        args.extend(inputs)
+
+        # Ensemble mode uses direct component specification
+        # Use --asr, --vad flags instead of --mode
+        asr = options.get('asr', 'faster_whisper')
+        args += ["--asr", asr]
+
+        vad = options.get('vad', 'none')
+        args += ["--vad", vad]
+
+        # Features
+        features = options.get('features', [])
+        if features:
+            args += ["--features", ",".join(features)]
+
+        # Language settings
+        language = options.get('language', 'ja')
+        args += ["--language", language]
+
+        task = options.get('task', 'transcribe')
+        args += ["--task", task]
+
+        # Output directory
+        output_dir = options.get('output_dir', self.default_output)
+        args += ["--output-dir", output_dir]
+
+        # Parameter overrides - pass as JSON
+        overrides = options.get('overrides', {})
+        if overrides:
+            import json
+            args += ["--overrides", json.dumps(overrides)]
+
+        # Optional paths
+        temp_dir = options.get('temp_dir', '').strip()
+        if temp_dir:
+            args += ["--temp-dir", temp_dir]
+
+        if options.get('keep_temp', False):
+            args += ["--keep-temp"]
+
+        # Verbosity
+        verbosity = options.get('verbosity', 'summary')
+        if verbosity:
+            args += ["--verbosity", verbosity]
+
+        return args
+
     # ========================================================================
     # Test Methods (Phase 1 - Keep for backward compatibility)
     # ========================================================================

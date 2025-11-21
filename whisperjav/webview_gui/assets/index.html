@@ -117,6 +117,16 @@
                         >
                             Transcription Adv. Options
                         </button>
+                        <button
+                            class="tab-button"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="tab3-panel"
+                            id="tab3-button"
+                            data-tab="tab3"
+                        >
+                            Ensemble Mode
+                        </button>
                     </div>
 
                     <!-- Tab Content -->
@@ -326,6 +336,105 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Tab 3: Ensemble Mode -->
+                        <div
+                            class="tab-panel"
+                            id="tab3-panel"
+                            role="tabpanel"
+                            aria-labelledby="tab3-button"
+                        >
+                            <!-- Component Selection Section -->
+                            <div class="ensemble-section">
+                                <h3 class="ensemble-section-title">Component Selection</h3>
+
+                                <!-- ASR Engine -->
+                                <div class="component-row">
+                                    <label for="ensemble-asr" class="component-label">ASR Engine:</label>
+                                    <select id="ensemble-asr" class="form-select component-select">
+                                        <!-- Populated dynamically -->
+                                    </select>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="customize-asr">
+                                        Customize
+                                    </button>
+                                </div>
+
+                                <!-- VAD -->
+                                <div class="component-row">
+                                    <label for="ensemble-vad" class="component-label">VAD:</label>
+                                    <select id="ensemble-vad" class="form-select component-select">
+                                        <option value="none">None</option>
+                                        <!-- More options populated dynamically -->
+                                    </select>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="customize-vad">
+                                        Customize
+                                    </button>
+                                </div>
+
+                                <!-- Features -->
+                                <div class="features-section">
+                                    <label class="component-label">Features:</label>
+                                    <div id="ensemble-features" class="features-list">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Language Settings -->
+                            <div class="ensemble-section">
+                                <h3 class="ensemble-section-title">Language Settings</h3>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="ensemble-language" class="form-label">Source Language:</label>
+                                        <select id="ensemble-language" class="form-select">
+                                            <option value="ja" selected>Japanese (日本語)</option>
+                                            <option value="ko">Korean (한국어)</option>
+                                            <option value="zh">Chinese (中文)</option>
+                                            <option value="en">English</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ensemble-task" class="form-label">Task:</label>
+                                        <select id="ensemble-task" class="form-select">
+                                            <option value="transcribe" selected>Transcribe</option>
+                                            <option value="translate">Translate to English</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Processing Options -->
+                            <div class="ensemble-section">
+                                <h3 class="ensemble-section-title">Processing Options</h3>
+                                <div class="form-row">
+                                    <div class="form-group inline-field">
+                                        <label for="ensemble-verbosity" class="form-label">Verbosity:</label>
+                                        <select id="ensemble-verbosity" class="form-select">
+                                            <option value="quiet">quiet</option>
+                                            <option value="summary" selected>summary</option>
+                                            <option value="normal">normal</option>
+                                            <option value="verbose">verbose</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="ensemble-keep-temp">
+                                            <span>Keep temp files</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Info text -->
+                            <div class="form-row info-row">
+                                <div class="info-group">
+                                    <p class="info-text">
+                                        Ensemble Mode allows fine-grained control over individual component parameters.<br>
+                                        Click "Customize" to adjust settings for each component.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -430,6 +539,25 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" onclick="closeAbout()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customize Component Modal -->
+    <div class="modal-overlay" id="customizeModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-header">
+                <h2 id="customizeModalTitle">Component Settings</h2>
+                <button class="modal-close" id="customizeModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="customizeModalParams" class="param-container">
+                    <!-- Dynamically generated parameter controls -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="customizeModalReset">Reset to Defaults</button>
+                <button class="btn btn-primary" id="customizeModalApply">Apply</button>
             </div>
         </div>
     </div>

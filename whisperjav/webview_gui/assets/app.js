@@ -900,11 +900,495 @@ const DirectoryControls = {
 };
 
 // ============================================================
+// Ensemble Manager
+// ============================================================
+const EnsembleManager = {
+    // State
+    state: {
+        asr: {
+            name: 'faster_whisper',
+            overrides: {}
+        },
+        vad: {
+            name: 'none',
+            overrides: {}
+        },
+        features: {},
+        components: null,  // Cached component list
+        currentCustomize: null  // {type, name} being customized
+    },
+
+    async init() {
+        // Set up event handlers (components loaded in pywebviewready)
+        document.getElementById('customize-asr').addEventListener('click', () => this.openCustomize('asr'));
+        document.getElementById('customize-vad').addEventListener('click', () => this.openCustomize('vad'));
+
+        // ASR selection change
+        document.getElementById('ensemble-asr').addEventListener('change', (e) => {
+            this.state.asr.name = e.target.value;
+            this.state.asr.overrides = {};  // Reset overrides on component change
+        });
+
+        // VAD selection change
+        document.getElementById('ensemble-vad').addEventListener('change', (e) => {
+            this.state.vad.name = e.target.value;
+            this.state.vad.overrides = {};
+            // Disable customize if "none" selected
+            document.getElementById('customize-vad').disabled = e.target.value === 'none';
+        });
+
+        // Modal controls
+        document.getElementById('customizeModalClose').addEventListener('click', () => this.closeModal());
+        document.getElementById('customizeModalApply').addEventListener('click', () => this.applyCustomization());
+        document.getElementById('customizeModalReset').addEventListener('click', () => this.resetToDefaults());
+
+        // Close modal on overlay click
+        document.getElementById('customizeModal').addEventListener('click', (e) => {
+            if (e.target.id === 'customizeModal') {
+                this.closeModal();
+            }
+        });
+    },
+
+    async loadComponents() {
+        try {
+            const result = await pywebview.api.get_available_components();
+
+            if (!result.success) {
+                ConsoleManager.log('Failed to load components: ' + result.error, 'error');
+                return;
+            }
+
+            this.state.components = result.components;
+
+            // Populate ASR dropdown
+            const asrSelect = document.getElementById('ensemble-asr');
+            asrSelect.innerHTML = '';
+            result.components.asr.forEach(comp => {
+                const option = document.createElement('option');
+                option.value = comp.name;
+                option.textContent = comp.display_name;
+                if (comp.name === 'faster_whisper') option.selected = true;
+                asrSelect.appendChild(option);
+            });
+
+            // Populate VAD dropdown
+            const vadSelect = document.getElementById('ensemble-vad');
+            vadSelect.innerHTML = '<option value="none">None</option>';
+            result.components.vad.forEach(comp => {
+                const option = document.createElement('option');
+                option.value = comp.name;
+                option.textContent = comp.display_name;
+                vadSelect.appendChild(option);
+            });
+
+            // Populate features
+            const featuresContainer = document.getElementById('ensemble-features');
+            featuresContainer.innerHTML = '';
+            result.components.features.forEach(comp => {
+                const featureDiv = document.createElement('div');
+                featureDiv.className = 'feature-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `feature-${comp.name}`;
+                checkbox.dataset.feature = comp.name;
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        this.state.features[comp.name] = { enabled: true, overrides: {} };
+                    } else {
+                        delete this.state.features[comp.name];
+                    }
+                    // Enable/disable customize button
+                    const customizeBtn = featureDiv.querySelector('.btn-customize-feature');
+                    if (customizeBtn) customizeBtn.disabled = !e.target.checked;
+                });
+
+                const label = document.createElement('label');
+                label.htmlFor = `feature-${comp.name}`;
+                label.textContent = comp.display_name;
+
+                const customizeBtn = document.createElement('button');
+                customizeBtn.type = 'button';
+                customizeBtn.className = 'btn btn-secondary btn-sm btn-customize-feature';
+                customizeBtn.textContent = 'Customize';
+                customizeBtn.disabled = true;
+                customizeBtn.addEventListener('click', () => this.openCustomize('features', comp.name));
+
+                featureDiv.appendChild(checkbox);
+                featureDiv.appendChild(label);
+                featureDiv.appendChild(customizeBtn);
+                featuresContainer.appendChild(featureDiv);
+            });
+
+            ConsoleManager.log('Ensemble components loaded', 'info');
+
+        } catch (error) {
+            ConsoleManager.log('Error loading components: ' + error, 'error');
+        }
+    },
+
+    async openCustomize(type, name = null) {
+        // Determine component name
+        if (type === 'asr') {
+            name = this.state.asr.name;
+        } else if (type === 'vad') {
+            name = this.state.vad.name;
+            if (name === 'none') return;
+        } else if (type === 'features' && !name) {
+            return;
+        }
+
+        this.state.currentCustomize = { type, name };
+
+        try {
+            // Get component schema
+            const result = await pywebview.api.get_component_schema(type, name);
+
+            if (!result.success) {
+                ErrorHandler.show('Error', 'Failed to load component schema: ' + result.error);
+                return;
+            }
+
+            // Get current values (defaults + overrides)
+            const defaultsResult = await pywebview.api.get_component_defaults(type, name);
+            const defaults = defaultsResult.success ? defaultsResult.defaults : {};
+
+            // Get current overrides
+            let overrides = {};
+            if (type === 'asr') {
+                overrides = this.state.asr.overrides;
+            } else if (type === 'vad') {
+                overrides = this.state.vad.overrides;
+            } else if (type === 'features' && this.state.features[name]) {
+                overrides = this.state.features[name].overrides;
+            }
+
+            // Merge defaults with overrides
+            const currentValues = { ...defaults, ...overrides };
+
+            // Set modal title
+            document.getElementById('customizeModalTitle').textContent =
+                result.metadata.display_name + ' Settings';
+
+            // Generate parameter controls
+            const paramsContainer = document.getElementById('customizeModalParams');
+            paramsContainer.innerHTML = '';
+
+            result.schema.forEach(param => {
+                const control = this.generateParamControl(param, currentValues[param.name], defaults[param.name]);
+                paramsContainer.appendChild(control);
+            });
+
+            // Show modal
+            document.getElementById('customizeModal').classList.add('active');
+
+        } catch (error) {
+            ErrorHandler.show('Error', 'Failed to open customize dialog: ' + error);
+        }
+    },
+
+    generateParamControl(param, value, defaultValue) {
+        const container = document.createElement('div');
+        container.className = 'param-control';
+        container.dataset.param = param.name;
+
+        const label = document.createElement('label');
+        label.textContent = param.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        container.appendChild(label);
+
+        let input;
+        const type = param.type;
+        const constraints = param.constraints || {};
+
+        if (type === 'bool' || type === 'boolean') {
+            // Checkbox for boolean
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = value !== undefined ? value : defaultValue;
+            input.className = 'param-checkbox';
+        } else if (type === 'float' || type === 'number') {
+            // Slider + number input for float
+            const wrapper = document.createElement('div');
+            wrapper.className = 'param-slider-wrapper';
+
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.className = 'param-slider';
+            slider.min = constraints.ge !== undefined ? constraints.ge : 0;
+            slider.max = constraints.le !== undefined ? constraints.le : 100;
+            slider.step = type === 'float' ? 0.01 : 1;
+            slider.value = value !== undefined ? value : defaultValue;
+
+            const numberInput = document.createElement('input');
+            numberInput.type = 'number';
+            numberInput.className = 'param-number';
+            numberInput.min = slider.min;
+            numberInput.max = slider.max;
+            numberInput.step = slider.step;
+            numberInput.value = slider.value;
+
+            // Sync slider and number
+            slider.addEventListener('input', () => {
+                numberInput.value = slider.value;
+            });
+            numberInput.addEventListener('input', () => {
+                slider.value = numberInput.value;
+            });
+
+            wrapper.appendChild(slider);
+            wrapper.appendChild(numberInput);
+            input = wrapper;
+            input._getValue = () => parseFloat(numberInput.value);
+        } else if (type === 'int' || type === 'integer') {
+            // Number input for int
+            input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'param-number';
+            input.min = constraints.ge !== undefined ? constraints.ge : 0;
+            input.max = constraints.le !== undefined ? constraints.le : 9999;
+            input.step = 1;
+            input.value = value !== undefined ? value : defaultValue;
+        } else if (type === 'str' || type === 'string') {
+            // Text input for string
+            input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'param-text';
+            input.value = value !== undefined ? value : (defaultValue || '');
+        } else if (Array.isArray(param.enum)) {
+            // Dropdown for enum
+            input = document.createElement('select');
+            input.className = 'param-select';
+            param.enum.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                if (opt === value || opt === defaultValue) option.selected = true;
+                input.appendChild(option);
+            });
+        } else {
+            // Default to text
+            input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'param-text';
+            input.value = value !== undefined ? String(value) : String(defaultValue || '');
+        }
+
+        if (input.tagName) {
+            input.dataset.default = defaultValue;
+            container.appendChild(input);
+        } else {
+            // For wrapper elements
+            input.dataset = { default: defaultValue };
+            container.appendChild(input);
+        }
+
+        // Description
+        if (param.description) {
+            const desc = document.createElement('p');
+            desc.className = 'param-description';
+            desc.textContent = param.description;
+            container.appendChild(desc);
+        }
+
+        return container;
+    },
+
+    applyCustomization() {
+        const { type, name } = this.state.currentCustomize;
+        const paramsContainer = document.getElementById('customizeModalParams');
+        const overrides = {};
+
+        // Collect values from controls
+        paramsContainer.querySelectorAll('.param-control').forEach(control => {
+            const paramName = control.dataset.param;
+            let value;
+            let defaultValue;
+
+            // Find the input element
+            const checkbox = control.querySelector('.param-checkbox');
+            const slider = control.querySelector('.param-slider');
+            const number = control.querySelector('.param-number');
+            const text = control.querySelector('.param-text');
+            const select = control.querySelector('.param-select');
+
+            if (checkbox) {
+                value = checkbox.checked;
+                defaultValue = checkbox.dataset.default === 'true';
+            } else if (slider) {
+                const numberInput = control.querySelector('.param-number');
+                value = parseFloat(numberInput.value);
+                defaultValue = parseFloat(control.querySelector('.param-slider-wrapper').dataset.default);
+            } else if (number) {
+                value = number.step === '1' ? parseInt(number.value) : parseFloat(number.value);
+                defaultValue = number.step === '1' ? parseInt(number.dataset.default) : parseFloat(number.dataset.default);
+            } else if (text) {
+                value = text.value;
+                defaultValue = text.dataset.default || '';
+            } else if (select) {
+                value = select.value;
+                defaultValue = select.dataset.default;
+            }
+
+            // Only store if different from default
+            if (value !== defaultValue && value !== undefined) {
+                overrides[paramName] = value;
+            }
+        });
+
+        // Store overrides in state
+        if (type === 'asr') {
+            this.state.asr.overrides = overrides;
+        } else if (type === 'vad') {
+            this.state.vad.overrides = overrides;
+        } else if (type === 'features') {
+            if (!this.state.features[name]) {
+                this.state.features[name] = { enabled: true, overrides: {} };
+            }
+            this.state.features[name].overrides = overrides;
+        }
+
+        const overrideCount = Object.keys(overrides).length;
+        ConsoleManager.log(`Applied ${overrideCount} custom parameter(s) for ${name}`, 'info');
+
+        this.closeModal();
+    },
+
+    async resetToDefaults() {
+        const { type, name } = this.state.currentCustomize;
+
+        try {
+            const result = await pywebview.api.get_component_defaults(type, name);
+            if (!result.success) {
+                ErrorHandler.show('Error', 'Failed to get defaults: ' + result.error);
+                return;
+            }
+
+            const defaults = result.defaults;
+
+            // Reset all controls to defaults
+            document.querySelectorAll('#customizeModalParams .param-control').forEach(control => {
+                const paramName = control.dataset.param;
+                const defaultValue = defaults[paramName];
+
+                const checkbox = control.querySelector('.param-checkbox');
+                const slider = control.querySelector('.param-slider');
+                const number = control.querySelector('.param-number');
+                const text = control.querySelector('.param-text');
+                const select = control.querySelector('.param-select');
+
+                if (checkbox) {
+                    checkbox.checked = defaultValue;
+                } else if (slider) {
+                    slider.value = defaultValue;
+                    control.querySelector('.param-number').value = defaultValue;
+                } else if (number) {
+                    number.value = defaultValue;
+                } else if (text) {
+                    text.value = defaultValue || '';
+                } else if (select) {
+                    select.value = defaultValue;
+                }
+            });
+
+            ConsoleManager.log(`Reset ${name} to defaults`, 'info');
+
+        } catch (error) {
+            ErrorHandler.show('Error', 'Failed to reset: ' + error);
+        }
+    },
+
+    closeModal() {
+        document.getElementById('customizeModal').classList.remove('active');
+        this.state.currentCustomize = null;
+    },
+
+    collectConfig() {
+        // Build ensemble configuration for API
+        const config = {
+            inputs: AppState.selectedFiles,
+            output_dir: document.getElementById('outputDir').value,
+            asr: this.state.asr.name,
+            vad: this.state.vad.name,
+            features: Object.keys(this.state.features).filter(k => this.state.features[k].enabled),
+            overrides: {},
+            language: document.getElementById('ensemble-language').value,
+            task: document.getElementById('ensemble-task').value,
+            verbosity: document.getElementById('ensemble-verbosity').value,
+            keep_temp: document.getElementById('ensemble-keep-temp').checked
+        };
+
+        // Flatten overrides with dot notation
+        // e.g., { "asr.beam_size": 10, "vad.threshold": 0.25 }
+        for (const [key, value] of Object.entries(this.state.asr.overrides)) {
+            config.overrides[`asr.${key}`] = value;
+        }
+        for (const [key, value] of Object.entries(this.state.vad.overrides)) {
+            config.overrides[`vad.${key}`] = value;
+        }
+        for (const [featureName, featureState] of Object.entries(this.state.features)) {
+            if (featureState.enabled) {
+                for (const [key, value] of Object.entries(featureState.overrides)) {
+                    config.overrides[`features.${featureName}.${key}`] = value;
+                }
+            }
+        }
+
+        return config;
+    },
+
+    async startProcessing() {
+        // Validate
+        if (AppState.selectedFiles.length === 0) {
+            ErrorHandler.show('No Files Selected', 'Please add at least one file or folder before starting.');
+            return;
+        }
+
+        try {
+            const config = this.collectConfig();
+            const result = await pywebview.api.start_ensemble_process(config);
+
+            if (result.success) {
+                // Update UI state
+                AppState.isRunning = true;
+                ProcessManager.updateButtonStates();
+
+                // Start progress indication
+                ProgressManager.setIndeterminate(true);
+                ProgressManager.setStatus('Running...');
+
+                // Log command
+                if (result.command) {
+                    ConsoleManager.appendRaw(`\n> ${result.command}\n`);
+                }
+
+                // Start polling
+                ProcessManager.startLogPolling();
+                ProcessManager.startStatusMonitoring();
+
+                ConsoleManager.log('Ensemble process started', 'info');
+            } else {
+                ErrorHandler.show('Start Failed', result.message);
+            }
+        } catch (error) {
+            ErrorHandler.show('Start Error', error.toString());
+        }
+    }
+};
+
+// ============================================================
 // Run Controls Integration
 // ============================================================
 const RunControls = {
     init() {
-        document.getElementById('startBtn').addEventListener('click', () => ProcessManager.start());
+        document.getElementById('startBtn').addEventListener('click', () => {
+            // Check if in Ensemble mode
+            if (AppState.activeTab === 'tab3') {
+                EnsembleManager.startProcessing();
+            } else {
+                ProcessManager.start();
+            }
+        });
         document.getElementById('cancelBtn').addEventListener('click', () => ProcessManager.cancel());
     }
 };
@@ -1102,6 +1586,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     RunControls.init();
     KeyboardShortcuts.init();
     ThemeManager.init();
+    EnsembleManager.init();
 
     // Initial validation
     FormManager.validateForm();
@@ -1118,4 +1603,7 @@ window.addEventListener('pywebviewready', () => {
 
     // Reload default output directory from API
     AppState.loadDefaultOutputDir();
+
+    // Load ensemble components (requires API to be ready)
+    EnsembleManager.loadComponents();
 });
