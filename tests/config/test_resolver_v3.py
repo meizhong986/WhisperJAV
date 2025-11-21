@@ -87,31 +87,38 @@ class TestAllCombinations:
 
 
 class TestSensitivityPresets:
-    """Test sensitivity presets work correctly."""
+    """Test sensitivity presets work correctly with v1-accurate values."""
 
     def test_conservative_values(self):
-        """Test conservative preset has expected values."""
+        """Test conservative preset has expected v1 values."""
         config = resolve_config_v3('faster_whisper', 'silero', 'conservative')
 
-        # Higher thresholds for conservative
-        assert config['params']['vad']['threshold'] > 0.5
-        assert config['params']['asr']['beam_size'] < 5
+        # Conservative: strict thresholds, smallest beam
+        assert config['params']['vad']['threshold'] == 0.35
+        assert config['params']['asr']['beam_size'] == 1
+        assert config['params']['asr']['no_speech_threshold'] == 0.74
 
     def test_aggressive_values(self):
-        """Test aggressive preset has expected values."""
+        """Test aggressive preset has expected v1 values."""
         config = resolve_config_v3('faster_whisper', 'silero', 'aggressive')
 
-        # Lower thresholds for aggressive
-        assert config['params']['vad']['threshold'] < 0.5
-        assert config['params']['asr']['beam_size'] > 5
+        # Aggressive: permissive thresholds, low VAD threshold
+        assert config['params']['vad']['threshold'] == 0.05
+        assert config['params']['asr']['beam_size'] == 2
+        assert config['params']['asr']['no_speech_threshold'] == 0.22
+        assert config['params']['asr']['patience'] == 2.9
 
     def test_presets_differ(self):
         """Test presets produce different values."""
         conservative = resolve_config_v3('faster_whisper', 'silero', 'conservative')
         aggressive = resolve_config_v3('faster_whisper', 'silero', 'aggressive')
 
+        # beam_size: conservative=1, aggressive=2
         assert conservative['params']['asr']['beam_size'] != aggressive['params']['asr']['beam_size']
+        # VAD threshold: conservative=0.35, aggressive=0.05
         assert conservative['params']['vad']['threshold'] != aggressive['params']['vad']['threshold']
+        # no_speech_threshold: conservative=0.74, aggressive=0.22
+        assert conservative['params']['asr']['no_speech_threshold'] != aggressive['params']['asr']['no_speech_threshold']
 
 
 class TestOverrides:

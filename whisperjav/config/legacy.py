@@ -91,6 +91,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
     Map v3 config to legacy output structure.
 
     This ensures pipelines that expect the old structure continue to work.
+    Maps ALL parameters from v3 flat structure to v1 nested decoder/provider structure.
     """
     # Build workflow structure (legacy)
     workflow = {
@@ -109,24 +110,50 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
     # Map 'asr' to 'decoder' and 'provider' for backward compat
     asr_params = config['params']['asr']
 
+    # Decoder params - from common_decoder_options
     decoder_params = {
         'task': asr_params.get('task', 'transcribe'),
         'language': asr_params.get('language', 'ja'),
-        'beam_size': asr_params.get('beam_size', 5),
-        'best_of': asr_params.get('best_of', 5),
-        'patience': asr_params.get('patience', 1.2),
+        'beam_size': asr_params.get('beam_size', 2),
+        'best_of': asr_params.get('best_of', 1),
+        'patience': asr_params.get('patience', 2.0),
+        'length_penalty': asr_params.get('length_penalty'),
+        'prefix': asr_params.get('prefix'),
+        'suppress_tokens': asr_params.get('suppress_tokens'),
+        'suppress_blank': asr_params.get('suppress_blank', True),
+        'without_timestamps': asr_params.get('without_timestamps', False),
+        'max_initial_timestamp': asr_params.get('max_initial_timestamp'),
     }
 
+    # Provider params - from common_transcriber_options + engine_options + exclusive
     provider_params = {
-        'temperature': asr_params.get('temperature', 0.0),
+        # From common_transcriber_options
+        'temperature': asr_params.get('temperature', [0.0, 0.1]),
         'compression_ratio_threshold': asr_params.get('compression_ratio_threshold', 2.4),
-        'logprob_threshold': asr_params.get('logprob_threshold', -1.0),
-        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.6),
+        'logprob_threshold': asr_params.get('logprob_threshold', -1.2),
+        'logprob_margin': asr_params.get('logprob_margin', 0.2),
+        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.5),
+        'drop_nonverbal_vocals': asr_params.get('drop_nonverbal_vocals', False),
+        'condition_on_previous_text': asr_params.get('condition_on_previous_text', False),
+        'initial_prompt': asr_params.get('initial_prompt'),
+        'word_timestamps': asr_params.get('word_timestamps', True),
+        'prepend_punctuations': asr_params.get('prepend_punctuations'),
+        'append_punctuations': asr_params.get('append_punctuations'),
+        'clip_timestamps': asr_params.get('clip_timestamps'),
+        # From faster_whisper_engine_options
+        'chunk_length': asr_params.get('chunk_length'),
+        'repetition_penalty': asr_params.get('repetition_penalty', 1.5),
+        'no_repeat_ngram_size': asr_params.get('no_repeat_ngram_size', 2),
+        'prompt_reset_on_temperature': asr_params.get('prompt_reset_on_temperature'),
+        'hotwords': asr_params.get('hotwords'),
+        'multilingual': asr_params.get('multilingual', False),
+        'max_new_tokens': asr_params.get('max_new_tokens'),
+        'language_detection_threshold': asr_params.get('language_detection_threshold'),
+        'language_detection_segments': asr_params.get('language_detection_segments'),
+        'log_progress': asr_params.get('log_progress', False),
+        # From exclusive_whisper_plus_faster_whisper
+        'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold', 2.0),
     }
-
-    # Add hallucination threshold if present
-    if 'hallucination_silence_threshold' in asr_params:
-        provider_params['hallucination_silence_threshold'] = asr_params['hallucination_silence_threshold']
 
     return {
         'pipeline_name': config['pipeline_name'],
