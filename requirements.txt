@@ -29,6 +29,7 @@ librosa
 matplotlib
 pyloudnorm
 requests
+nvidia-ml-py
 
 # Configuration system (v2.0)
 pydantic>=2.0,<3.0
