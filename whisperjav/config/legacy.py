@@ -10,6 +10,46 @@ from typing import Any, Dict, List, Optional
 from .resolver_v3 import resolve_config_v3
 
 
+def _filter_none_values(params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recursively remove None values from a dictionary.
+
+    This is critical for backend compatibility. When passing parameters to
+    libraries like faster-whisper, openai-whisper, or stable-ts:
+
+    - Passing `func(arg=None)` explicitly passes None, NOT the library default
+    - This causes errors like "TypeError: 'NoneType' object is not iterable"
+    - By removing None keys, we allow library defaults to apply
+
+    Preserves valid falsy values: 0, False, "", [], {}
+
+    Args:
+        params: Dictionary of parameters (may be nested)
+
+    Returns:
+        Filtered dictionary with None values removed
+    """
+    if not isinstance(params, dict):
+        return params
+
+    filtered = {}
+    for key, value in params.items():
+        if value is None:
+            # Skip None values - let library defaults apply
+            continue
+        elif isinstance(value, dict):
+            # Recursively filter nested dicts
+            filtered_nested = _filter_none_values(value)
+            # Only include if non-empty after filtering
+            if filtered_nested:
+                filtered[key] = filtered_nested
+        else:
+            # Preserve all other values including falsy ones (0, False, "", [])
+            filtered[key] = value
+
+    return filtered
+
+
 # Legacy pipeline definitions
 LEGACY_PIPELINES = {
     "balanced": {
@@ -31,10 +71,10 @@ LEGACY_PIPELINES = {
         "description": "Stable-TS with scene detection. Good speed/quality balance.",
     },
     "fidelity": {
-        "asr": "faster_whisper",
-        "vad": "none",
-        "features": [],
-        "description": "Faster-Whisper without preprocessing. Direct transcription.",
+        "asr": "openai_whisper",
+        "vad": "silero",
+        "features": ["auditok_scene_detection"],
+        "description": "OpenAI Whisper with VAD and scene detection. Maximum fidelity.",
     },
 }
 
@@ -109,8 +149,9 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
     # Build params structure (legacy)
     # Map 'asr' to 'decoder' and 'provider' for backward compat
     asr_params = config['params']['asr']
+    asr_name = config['asr_name']
 
-    # Decoder params - from common_decoder_options
+    # Decoder params - from common_decoder_options (same for all backends)
     decoder_params = {
         'task': asr_params.get('task', 'transcribe'),
         'language': asr_params.get('language', 'ja'),
@@ -125,9 +166,10 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'max_initial_timestamp': asr_params.get('max_initial_timestamp'),
     }
 
-    # Provider params - from common_transcriber_options + engine_options + exclusive
+    # Provider params - BACKEND-SPECIFIC
+    # Different backends accept different parameters
+    # Common transcriber options (shared by all backends)
     provider_params = {
-        # From common_transcriber_options
         'temperature': asr_params.get('temperature', [0.0, 0.1]),
         'compression_ratio_threshold': asr_params.get('compression_ratio_threshold', 2.4),
         'logprob_threshold': asr_params.get('logprob_threshold', -1.2),
@@ -140,20 +182,81 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'prepend_punctuations': asr_params.get('prepend_punctuations'),
         'append_punctuations': asr_params.get('append_punctuations'),
         'clip_timestamps': asr_params.get('clip_timestamps'),
-        # From faster_whisper_engine_options
-        'chunk_length': asr_params.get('chunk_length'),
-        'repetition_penalty': asr_params.get('repetition_penalty', 1.5),
-        'no_repeat_ngram_size': asr_params.get('no_repeat_ngram_size', 2),
-        'prompt_reset_on_temperature': asr_params.get('prompt_reset_on_temperature'),
-        'hotwords': asr_params.get('hotwords'),
-        'multilingual': asr_params.get('multilingual', False),
-        'max_new_tokens': asr_params.get('max_new_tokens'),
-        'language_detection_threshold': asr_params.get('language_detection_threshold'),
-        'language_detection_segments': asr_params.get('language_detection_segments'),
-        'log_progress': asr_params.get('log_progress', False),
-        # From exclusive_whisper_plus_faster_whisper
-        'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold', 2.0),
     }
+
+    # Add backend-specific engine options
+    if asr_name == 'faster_whisper':
+        # faster_whisper_engine_options
+        provider_params.update({
+            'chunk_length': asr_params.get('chunk_length'),
+            'repetition_penalty': asr_params.get('repetition_penalty', 1.5),
+            'no_repeat_ngram_size': asr_params.get('no_repeat_ngram_size', 2),
+            'prompt_reset_on_temperature': asr_params.get('prompt_reset_on_temperature'),
+            'hotwords': asr_params.get('hotwords'),
+            'multilingual': asr_params.get('multilingual', False),
+            'max_new_tokens': asr_params.get('max_new_tokens'),
+            'language_detection_threshold': asr_params.get('language_detection_threshold'),
+            'language_detection_segments': asr_params.get('language_detection_segments'),
+            'log_progress': asr_params.get('log_progress', False),
+            # exclusive_whisper_plus_faster_whisper
+            'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold', 2.0),
+        })
+    elif asr_name == 'openai_whisper':
+        # openai_whisper_engine_options
+        provider_params.update({
+            'verbose': asr_params.get('verbose'),
+            'carry_initial_prompt': asr_params.get('carry_initial_prompt'),
+            'prompt': asr_params.get('prompt'),
+            'fp16': asr_params.get('fp16', True),
+            # exclusive_whisper_plus_faster_whisper
+            'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold', 2.0),
+        })
+    elif asr_name == 'stable_ts':
+        # stable_ts_engine_options
+        provider_params.update({
+            'stream': asr_params.get('stream'),
+            'mel_first': asr_params.get('mel_first'),
+            'split_callback': asr_params.get('split_callback'),
+            'suppress_ts_tokens': asr_params.get('suppress_ts_tokens', False),
+            'gap_padding': asr_params.get('gap_padding', ' ...'),
+            'only_ffmpeg': asr_params.get('only_ffmpeg', False),
+            'max_instant_words': asr_params.get('max_instant_words', 0.5),
+            'avg_prob_threshold': asr_params.get('avg_prob_threshold'),
+            'nonspeech_skip': asr_params.get('nonspeech_skip'),
+            'progress_callback': asr_params.get('progress_callback'),
+            'ignore_compatibility': asr_params.get('ignore_compatibility', True),
+            'extra_models': asr_params.get('extra_models'),
+            'dynamic_heads': asr_params.get('dynamic_heads'),
+            'nonspeech_error': asr_params.get('nonspeech_error', 0.1),
+            'only_voice_freq': asr_params.get('only_voice_freq', False),
+            'min_word_dur': asr_params.get('min_word_dur'),
+            'min_silence_dur': asr_params.get('min_silence_dur'),
+            'regroup': asr_params.get('regroup', True),
+            'ts_num': asr_params.get('ts_num', 0),
+            'ts_noise': asr_params.get('ts_noise'),
+            'suppress_silence': asr_params.get('suppress_silence', True),
+            'suppress_word_ts': asr_params.get('suppress_word_ts', True),
+            'suppress_attention': asr_params.get('suppress_attention', False),
+            'use_word_position': asr_params.get('use_word_position', True),
+            'q_levels': asr_params.get('q_levels', 20),
+            'k_size': asr_params.get('k_size', 5),
+            'time_scale': asr_params.get('time_scale'),
+            'denoiser': asr_params.get('denoiser'),
+            'denoiser_options': asr_params.get('denoiser_options'),
+            'demucs': asr_params.get('demucs', False),
+            'demucs_options': asr_params.get('demucs_options'),
+            # VAD options for stable_ts
+            'vad': asr_params.get('vad', True),
+            'vad_threshold': asr_params.get('vad_threshold', 0.25),
+        })
+
+    # Filter None values from all param sections
+    # This is critical: passing None explicitly to backends causes errors
+    # By removing None, we let library defaults apply
+    filtered_decoder = _filter_none_values(decoder_params)
+    filtered_provider = _filter_none_values(provider_params)
+    filtered_vad = _filter_none_values(config['params']['vad'])
+    filtered_features = _filter_none_values(config['features'])
 
     return {
         'pipeline_name': config['pipeline_name'],
@@ -161,11 +264,11 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'workflow': workflow,
         'model': config['model'],
         'params': {
-            'decoder': decoder_params,
-            'provider': provider_params,
-            'vad': config['params']['vad'],
+            'decoder': filtered_decoder,
+            'provider': filtered_provider,
+            'vad': filtered_vad,
         },
-        'features': config['features'],
+        'features': filtered_features,
         'task': config['task'],
         'language': config['language'],
     }

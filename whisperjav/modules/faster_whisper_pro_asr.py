@@ -279,6 +279,7 @@ class FasterWhisperProASR:
             'verbose',       # Replaced by log_progress
             'vad',           # We use external VAD
             'vad_threshold', # Our VAD parameter, not faster-whisper's
+            'hallucination_silence_threshold', # Custom post-processing param
         ]
 
         removed = []
@@ -298,6 +299,16 @@ class FasterWhisperProASR:
 
         if self._vad_parameters and 'vad_parameters' not in final_params:
             final_params['vad_parameters'] = self._vad_parameters
+
+        # 5. Remove None values to allow library defaults to apply
+        # This prevents "NoneType is not iterable" errors for params like clip_timestamps
+        # where the library expects a specific type (str/list) or its own default.
+        keys_to_remove = [k for k, v in final_params.items() if v is None]
+        for k in keys_to_remove:
+            del final_params[k]
+        
+        if keys_to_remove:
+            logger.debug(f"Removed None values to use library defaults: {keys_to_remove}")
 
         logger.debug(f"Final faster-whisper parameters ({len(final_params)} params): {final_params}")
 
