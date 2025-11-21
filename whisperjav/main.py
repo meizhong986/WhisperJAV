@@ -40,7 +40,7 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-from whisperjav.config.transcription_tuner import TranscriptionTuner
+from whisperjav.config import resolve_config
 from whisperjav.__version__ import __version__
 
 
@@ -812,8 +812,7 @@ def main():
     if args.verbosity:
         quick_update_ui_preference('console_verbosity', args.verbosity, config_path)
     
-    # V3 Configuration resolution
-    tuner = TranscriptionTuner(config_path=config_path)
+    # V2.0 Configuration resolution (Pydantic-based)
     task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
 
     # Map language name to Whisper language code
@@ -827,10 +826,11 @@ def main():
             kwargs['scene_detection_method'] = args.scene_detection_method
             logger.info(f"Using scene detection method: {args.scene_detection_method}")
 
-        resolved_config = tuner.resolve_params(
+        resolved_config = resolve_config(
             pipeline_name=args.mode,
             sensitivity=args.sensitivity,
             task=task,
+            config_path=config_path,
             **kwargs
         )
     except Exception as e:

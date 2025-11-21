@@ -1,17 +1,17 @@
 """
-WhisperJAV v{{VERSION}} Post-Install Script
+WhisperJAV v1.6.0 Post-Install Script
 ======================================
 
 This script runs after the conda environment is created and:
 1. Performs comprehensive preflight checks (disk space, network, WebView2)
 2. Detects NVIDIA GPU and installs appropriate PyTorch build
 3. Offers CPU-only fallback for systems without NVIDIA GPU
-4. Installs all Python dependencies from requirements_v{{VERSION}}.txt
+4. Installs all Python dependencies from requirements_v1.6.0.txt
 5. Installs WhisperJAV from GitHub
 6. Creates desktop shortcut
 7. Provides detailed installation summary
 
-All output is logged to install_log_v{{VERSION}}.txt
+All output is logged to install_log_v1.6.0.txt
 """
 
 import os
@@ -33,7 +33,7 @@ except ImportError:  # pragma: no cover - optional dependency
     pynvml = None  # type: ignore
     PYNVML_AVAILABLE = False
 
-LOG_FILE = os.path.join(sys.prefix, "install_log_v{{VERSION}}.txt")
+LOG_FILE = os.path.join(sys.prefix, "install_log_v1.6.0.txt")
 
 MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (11, 8, 0)
 CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio"
@@ -567,16 +567,16 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
 
 def create_failure_file(error_message: str):
     """Create a failure marker file with troubleshooting info"""
-    failure_file = os.path.join(sys.prefix, "INSTALLATION_FAILED_v{{VERSION}}.txt")
+    failure_file = os.path.join(sys.prefix, "INSTALLATION_FAILED_v1.6.0.txt")
     try:
         with open(failure_file, "w", encoding="utf-8") as f:
-            f.write("WhisperJAV v{{VERSION}} Installation Failed\n")
+            f.write("WhisperJAV v1.6.0 Installation Failed\n")
             f.write("=" * 80 + "\n\n")
             f.write(f"Error: {error_message}\n\n")
             f.write("Manual Cleanup Steps:\n")
             f.write(f"1. Delete installation directory: {sys.prefix}\n")
-            f.write("2. Delete desktop shortcut: WhisperJAV v{{VERSION}}.lnk\n")
-            f.write(f"3. Check install_log_v{{VERSION}}.txt for details\n\n")
+            f.write("2. Delete desktop shortcut: WhisperJAV v1.6.0.lnk\n")
+            f.write(f"3. Check install_log_v1.6.0.txt for details\n\n")
             f.write("Common Solutions:\n")
             f.write("- Out of disk space: Free up 8GB and retry\n")
             f.write("- Network error: Check internet connection and firewall\n")
@@ -596,7 +596,7 @@ def print_installation_summary(install_start_time: float):
 
     log("\n\n")
     log("=" * 80)
-    log(" " * 20 + "WhisperJAV v{{VERSION}} Installation Complete!")
+    log(" " * 20 + "WhisperJAV v1.6.0 Installation Complete!")
     log("=" * 80)
     log("")
     log(f"Installation Summary:")
@@ -737,7 +737,7 @@ def main() -> int:
     """Main installation workflow"""
     install_start_time = time.time()
 
-    log_section("WhisperJAV v{{VERSION}} Post-Install Started")
+    log_section("WhisperJAV v1.6.0 Post-Install Started")
     log(f"Installation prefix: {sys.prefix}")
     log(f"Python executable: {sys.executable}")
     log(f"Python version: {sys.version}")
@@ -770,9 +770,9 @@ def main() -> int:
     # === Phase 4: Python Dependencies ===
     log_section("Phase 4: Python Dependencies Installation")
 
-    req_path = os.path.join(sys.prefix, "requirements_v{{VERSION}}.txt")
+    req_path = os.path.join(sys.prefix, "requirements_v1.6.0.txt")
     if not os.path.exists(req_path):
-        log(f"ERROR: requirements_v{{VERSION}}.txt not found at {req_path}")
+        log(f"ERROR: requirements_v1.6.0.txt not found at {req_path}")
         create_failure_file(f"Missing requirements file: {req_path}")
         return 1
 
