@@ -1232,77 +1232,133 @@ button:focus-visible,
    Ensemble Tab Styles
    ============================================================ */
 
-/* Ensemble sections */
-.ensemble-section {
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
+/* Main container */
+.ensemble-container {
+    background: #6B7280;
+    border-radius: var(--border-radius-lg);
+    padding: 16px;
+    color: #FFFFFF;
 }
 
-.ensemble-section:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
+/* Header row */
+.ensemble-header {
+    display: grid;
+    grid-template-columns: 140px 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+    align-items: center;
 }
 
-.ensemble-section-title {
+.ensemble-workflow-label {
+    font-weight: 500;
     font-size: var(--font-size-base);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 10px;
+}
+
+.ensemble-pass-label {
+    text-align: center;
+    font-size: var(--font-size-base);
+}
+
+.ensemble-pass-label input[type="checkbox"] {
+    margin-left: 6px;
+    vertical-align: middle;
 }
 
 /* Component rows */
-.component-row {
+.ensemble-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.ensemble-label {
+    font-size: var(--font-size-base);
+    color: #FFFFFF;
+}
+
+/* Cell with dropdown + gear */
+.ensemble-cell {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 6px;
 }
 
-.component-label {
-    width: 100px;
-    flex-shrink: 0;
-    font-weight: 500;
-    color: var(--text-primary);
+.ensemble-cell-wide {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    grid-column: 2 / -1;
 }
 
-.component-select {
+/* Dropdowns */
+.ensemble-select {
     flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-base);
+    background: #FFFFFF;
+    color: var(--text-primary);
     min-width: 0;
 }
 
-/* Features section */
-.features-section {
-    margin-bottom: 10px;
+.ensemble-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
 }
 
-.features-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 8px;
-    margin-left: 110px; /* Align with component selects */
+/* Gear buttons */
+.ensemble-gear {
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    color: #FFFFFF;
+    opacity: 0.8;
 }
 
-.feature-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.ensemble-gear:hover:not(:disabled) {
+    opacity: 1;
 }
 
-.feature-item input[type="checkbox"] {
-    margin: 0;
+.ensemble-gear:disabled {
+    cursor: default;
+    opacity: 0.4;
 }
 
-.feature-item label {
-    flex: 1;
-    font-size: var(--font-size-base);
-    color: var(--text-primary);
+/* Disabled state for cells */
+.ensemble-cell.disabled .ensemble-select,
+.ensemble-cell-wide.disabled .ensemble-select {
+    background: #D1D5DB;
+    color: #9CA3AF;
+    cursor: not-allowed;
 }
 
-.btn-customize-feature {
-    padding: 4px 8px;
+.ensemble-cell.disabled .ensemble-gear,
+.ensemble-cell-wide.disabled .ensemble-gear {
+    opacity: 0.3;
+}
+
+/* Footer */
+.ensemble-footer {
+    margin-top: 16px;
     font-size: var(--font-size-sm);
+}
+
+.ensemble-footer p {
+    margin: 4px 0;
+}
+
+.ensemble-footer .gear-icon {
+    font-size: 14px;
+}
+
+.ensemble-footer .upcoming-features {
+    text-decoration: underline;
+    opacity: 0.8;
 }
 
 /* Large modal for parameter customization */

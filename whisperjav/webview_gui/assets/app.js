@@ -905,36 +905,43 @@ const DirectoryControls = {
 const EnsembleManager = {
     // State
     state: {
-        asr: {
-            name: 'faster_whisper',
+        scene: {
+            name: 'none',
             overrides: {}
         },
         vad: {
             name: 'none',
             overrides: {}
         },
-        features: {},
-        components: null,  // Cached component list
+        asr: {
+            name: 'faster_whisper',
+            overrides: {}
+        },
         currentCustomize: null  // {type, name} being customized
     },
 
     async init() {
-        // Set up event handlers (components loaded in pywebviewready)
-        document.getElementById('customize-asr').addEventListener('click', () => this.openCustomize('asr'));
-        document.getElementById('customize-vad').addEventListener('click', () => this.openCustomize('vad'));
+        // Set up event handlers for gear buttons
+        document.getElementById('customize-scene-1').addEventListener('click', () => this.openCustomize('features', this.state.scene.name));
+        document.getElementById('customize-vad-1').addEventListener('click', () => this.openCustomize('vad', this.state.vad.name));
+        document.getElementById('customize-asr-1').addEventListener('click', () => this.openCustomize('asr', this.state.asr.name));
 
-        // ASR selection change
-        document.getElementById('ensemble-asr').addEventListener('change', (e) => {
-            this.state.asr.name = e.target.value;
-            this.state.asr.overrides = {};  // Reset overrides on component change
+        // Scene detection selection change
+        document.getElementById('ensemble-scene-1').addEventListener('change', (e) => {
+            this.state.scene.name = e.target.value;
+            this.state.scene.overrides = {};
         });
 
         // VAD selection change
-        document.getElementById('ensemble-vad').addEventListener('change', (e) => {
+        document.getElementById('ensemble-vad-1').addEventListener('change', (e) => {
             this.state.vad.name = e.target.value;
             this.state.vad.overrides = {};
-            // Disable customize if "none" selected
-            document.getElementById('customize-vad').disabled = e.target.value === 'none';
+        });
+
+        // ASR selection change
+        document.getElementById('ensemble-asr-1').addEventListener('change', (e) => {
+            this.state.asr.name = e.target.value;
+            this.state.asr.overrides = {};
         });
 
         // Modal controls
@@ -950,92 +957,15 @@ const EnsembleManager = {
         });
     },
 
+    // No longer needed - dropdowns are hardcoded in HTML
     async loadComponents() {
-        try {
-            const result = await pywebview.api.get_available_components();
-
-            if (!result.success) {
-                ConsoleManager.log('Failed to load components: ' + result.error, 'error');
-                return;
-            }
-
-            this.state.components = result.components;
-
-            // Populate ASR dropdown
-            const asrSelect = document.getElementById('ensemble-asr');
-            asrSelect.innerHTML = '';
-            result.components.asr.forEach(comp => {
-                const option = document.createElement('option');
-                option.value = comp.name;
-                option.textContent = comp.display_name;
-                if (comp.name === 'faster_whisper') option.selected = true;
-                asrSelect.appendChild(option);
-            });
-
-            // Populate VAD dropdown
-            const vadSelect = document.getElementById('ensemble-vad');
-            vadSelect.innerHTML = '<option value="none">None</option>';
-            result.components.vad.forEach(comp => {
-                const option = document.createElement('option');
-                option.value = comp.name;
-                option.textContent = comp.display_name;
-                vadSelect.appendChild(option);
-            });
-
-            // Populate features
-            const featuresContainer = document.getElementById('ensemble-features');
-            featuresContainer.innerHTML = '';
-            result.components.features.forEach(comp => {
-                const featureDiv = document.createElement('div');
-                featureDiv.className = 'feature-item';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.id = `feature-${comp.name}`;
-                checkbox.dataset.feature = comp.name;
-                checkbox.addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        this.state.features[comp.name] = { enabled: true, overrides: {} };
-                    } else {
-                        delete this.state.features[comp.name];
-                    }
-                    // Enable/disable customize button
-                    const customizeBtn = featureDiv.querySelector('.btn-customize-feature');
-                    if (customizeBtn) customizeBtn.disabled = !e.target.checked;
-                });
-
-                const label = document.createElement('label');
-                label.htmlFor = `feature-${comp.name}`;
-                label.textContent = comp.display_name;
-
-                const customizeBtn = document.createElement('button');
-                customizeBtn.type = 'button';
-                customizeBtn.className = 'btn btn-secondary btn-sm btn-customize-feature';
-                customizeBtn.textContent = 'Customize';
-                customizeBtn.disabled = true;
-                customizeBtn.addEventListener('click', () => this.openCustomize('features', comp.name));
-
-                featureDiv.appendChild(checkbox);
-                featureDiv.appendChild(label);
-                featureDiv.appendChild(customizeBtn);
-                featuresContainer.appendChild(featureDiv);
-            });
-
-            ConsoleManager.log('Ensemble components loaded', 'info');
-
-        } catch (error) {
-            ConsoleManager.log('Error loading components: ' + error, 'error');
-        }
+        // Placeholder for future dynamic loading
     },
 
     async openCustomize(type, name = null) {
-        // Determine component name
-        if (type === 'asr') {
-            name = this.state.asr.name;
-        } else if (type === 'vad') {
-            name = this.state.vad.name;
-            if (name === 'none') return;
-        } else if (type === 'features' && !name) {
+        // Skip if "none" selected
+        if (name === 'none') {
+            ConsoleManager.log('Select a component first to customize', 'info');
             return;
         }
 
@@ -1075,7 +1005,9 @@ const EnsembleManager = {
             const paramsContainer = document.getElementById('customizeModalParams');
             paramsContainer.innerHTML = '';
 
-            result.schema.forEach(param => {
+            // Schema is { parameters: [...] }
+            const parameters = result.schema.parameters || result.schema;
+            parameters.forEach(param => {
                 const control = this.generateParamControl(param, currentValues[param.name], defaults[param.name]);
                 paramsContainer.appendChild(control);
             });
@@ -1242,10 +1174,7 @@ const EnsembleManager = {
         } else if (type === 'vad') {
             this.state.vad.overrides = overrides;
         } else if (type === 'features') {
-            if (!this.state.features[name]) {
-                this.state.features[name] = { enabled: true, overrides: {} };
-            }
-            this.state.features[name].overrides = overrides;
+            this.state.scene.overrides = overrides;
         }
 
         const overrideCount = Object.keys(overrides).length;
@@ -1255,6 +1184,7 @@ const EnsembleManager = {
     },
 
     async resetToDefaults() {
+        if (!this.state.currentCustomize) return;
         const { type, name } = this.state.currentCustomize;
 
         try {
@@ -1305,32 +1235,36 @@ const EnsembleManager = {
 
     collectConfig() {
         // Build ensemble configuration for API
+        // Scene detection is passed as a feature
+        const features = [];
+        if (this.state.scene.name !== 'none') {
+            features.push(this.state.scene.name);
+        }
+
         const config = {
             inputs: AppState.selectedFiles,
             output_dir: document.getElementById('outputDir').value,
             asr: this.state.asr.name,
             vad: this.state.vad.name,
-            features: Object.keys(this.state.features).filter(k => this.state.features[k].enabled),
+            features: features,
             overrides: {},
-            language: document.getElementById('ensemble-language').value,
-            task: document.getElementById('ensemble-task').value,
-            verbosity: document.getElementById('ensemble-verbosity').value,
-            keep_temp: document.getElementById('ensemble-keep-temp').checked
+            language: 'japanese',  // Default - customizable in ASR settings
+            task: 'transcribe',    // Default
+            verbosity: 'summary',
+            keep_temp: false
         };
 
         // Flatten overrides with dot notation
-        // e.g., { "asr.beam_size": 10, "vad.threshold": 0.25 }
         for (const [key, value] of Object.entries(this.state.asr.overrides)) {
             config.overrides[`asr.${key}`] = value;
         }
         for (const [key, value] of Object.entries(this.state.vad.overrides)) {
             config.overrides[`vad.${key}`] = value;
         }
-        for (const [featureName, featureState] of Object.entries(this.state.features)) {
-            if (featureState.enabled) {
-                for (const [key, value] of Object.entries(featureState.overrides)) {
-                    config.overrides[`features.${featureName}.${key}`] = value;
-                }
+        // Scene detection overrides
+        if (this.state.scene.name !== 'none') {
+            for (const [key, value] of Object.entries(this.state.scene.overrides)) {
+                config.overrides[`features.${this.state.scene.name}.${key}`] = value;
             }
         }
 
@@ -1603,7 +1537,4 @@ window.addEventListener('pywebviewready', () => {
 
     // Reload default output directory from API
     AppState.loadDefaultOutputDir();
-
-    // Load ensemble components (requires API to be ready)
-    EnsembleManager.loadComponents();
 });
