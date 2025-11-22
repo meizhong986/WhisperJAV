@@ -128,6 +128,34 @@ def parse_arguments():
     ensemble_group.add_argument("--overrides", default=None,
                                help="JSON string of parameter overrides")
 
+    # Two-pass ensemble mode arguments
+    twopass_group = parser.add_argument_group("Two-Pass Ensemble Options")
+    twopass_group.add_argument("--ensemble", action="store_true",
+                               help="Enable two-pass ensemble mode")
+    twopass_group.add_argument("--pass1-pipeline", default="balanced",
+                               choices=["balanced", "fast", "faster", "fidelity"],
+                               help="Pipeline for pass 1 (default: balanced)")
+    twopass_group.add_argument("--pass1-sensitivity", default="balanced",
+                               choices=["conservative", "balanced", "aggressive"],
+                               help="Sensitivity for pass 1 (default: balanced)")
+    twopass_group.add_argument("--pass1-overrides", default=None,
+                               help="JSON string of parameter overrides for pass 1 (deprecated)")
+    twopass_group.add_argument("--pass1-params", default=None,
+                               help="JSON string of full parameters for pass 1 (custom mode)")
+    twopass_group.add_argument("--pass2-pipeline", default=None,
+                               choices=["balanced", "fast", "faster", "fidelity"],
+                               help="Pipeline for pass 2 (enables pass 2)")
+    twopass_group.add_argument("--pass2-sensitivity", default="balanced",
+                               choices=["conservative", "balanced", "aggressive"],
+                               help="Sensitivity for pass 2 (default: balanced)")
+    twopass_group.add_argument("--pass2-overrides", default=None,
+                               help="JSON string of parameter overrides for pass 2 (deprecated)")
+    twopass_group.add_argument("--pass2-params", default=None,
+                               help="JSON string of full parameters for pass 2 (custom mode)")
+    twopass_group.add_argument("--merge-strategy", default="confidence",
+                               choices=["confidence", "union", "intersection", "timing"],
+                               help="Merge strategy for two-pass results (default: confidence)")
+
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
     parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
@@ -837,8 +865,13 @@ def main():
     logger.info(f"Transcription language: {args.language} ({language_code})")
 
     try:
-        # Check if ensemble mode (--asr provided)
-        if args.asr:
+        # Check if two-pass ensemble mode
+        if args.ensemble:
+            logger.info("Two-pass ensemble mode enabled")
+            # Config will be handled by EnsembleOrchestrator
+            resolved_config = None  # Not used in ensemble mode
+        # Check if component-based ensemble mode (--asr provided)
+        elif args.asr:
             # Ensemble mode: use ensemble resolver
             logger.info(f"Ensemble mode: ASR={args.asr}, VAD={args.vad or 'none'}")
 
@@ -920,10 +953,90 @@ def main():
         sys.exit(1)
     
     logger.info(f"Found {len(media_files)} media file(s) to process")
-    
+
     try:
-        # Choose sync or async processing
-        if args.async_processing:
+        # Check if two-pass ensemble mode
+        if args.ensemble:
+            # Use EnsembleOrchestrator for two-pass processing
+            from whisperjav.ensemble.orchestrator import EnsembleOrchestrator
+            import json
+
+            # Parse pass 1 full params (custom mode) or overrides (deprecated)
+            pass1_params = None
+            if args.pass1_params:
+                try:
+                    pass1_params = json.loads(args.pass1_params)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass1-params: {e}")
+                    sys.exit(1)
+            elif args.pass1_overrides:
+                # Deprecated: use overrides
+                try:
+                    pass1_params = json.loads(args.pass1_overrides)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass1-overrides: {e}")
+                    sys.exit(1)
+
+            # Parse pass 2 full params or overrides
+            pass2_params = None
+            if args.pass2_params:
+                try:
+                    pass2_params = json.loads(args.pass2_params)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass2-params: {e}")
+                    sys.exit(1)
+            elif args.pass2_overrides:
+                try:
+                    pass2_params = json.loads(args.pass2_overrides)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass2-overrides: {e}")
+                    sys.exit(1)
+
+            # Build pass configurations
+            # Full Configuration Snapshot approach:
+            # - If params provided: use as full config (customized)
+            # - If not: backend resolves from pipeline+sensitivity
+            pass1_config = {
+                'pipeline': args.pass1_pipeline,
+                'sensitivity': args.pass1_sensitivity,
+                'params': pass1_params  # None = use defaults, object = custom
+            }
+
+            pass2_config = None
+            if args.pass2_pipeline:
+                pass2_config = {
+                    'pipeline': args.pass2_pipeline,
+                    'sensitivity': args.pass2_sensitivity,
+                    'params': pass2_params
+                }
+
+            # Create orchestrator
+            orchestrator = EnsembleOrchestrator(
+                output_dir=args.output_dir,
+                temp_dir=args.temp_dir,
+                keep_temp_files=args.keep_temp,
+                subs_language=args.subs_language
+            )
+
+            # Process each file
+            for i, media_info in enumerate(media_files, 1):
+                logger.info(f"Processing file {i}/{len(media_files)}: {media_info['basename']}")
+
+                result = orchestrator.process(
+                    media_info=media_info,
+                    pass1_config=pass1_config,
+                    pass2_config=pass2_config,
+                    merge_strategy=args.merge_strategy
+                )
+
+                if result.get('error'):
+                    logger.error(f"Failed: {result['error']}")
+                else:
+                    output_path = result.get('summary', {}).get('final_output', 'unknown')
+                    logger.info(f"Completed: {output_path}")
+
+        # Choose sync or async processing for normal mode
+        elif args.async_processing:
             process_files_async(media_files, args, resolved_config)
         else:
             process_files_sync(media_files, args, resolved_config)

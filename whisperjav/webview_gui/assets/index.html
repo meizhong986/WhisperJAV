@@ -337,123 +337,94 @@
                             </div>
                         </div>
 
-                        <!-- Tab 3: Ensemble Mode -->
+                        <!-- Tab 3: Two-Pass Ensemble Mode -->
                         <div
                             class="tab-panel"
                             id="tab3-panel"
                             role="tabpanel"
                             aria-labelledby="tab3-button"
                         >
-                            <div class="ensemble-container">
-                                <!-- Header -->
-                                <div class="ensemble-header">
-                                    <span class="ensemble-workflow-label">Customized Workflow:</span>
-                                    <span class="ensemble-pass-label">1<sup>st</sup> pass</span>
-                                    <span class="ensemble-pass-label">
-                                        2nd pass
-                                        <input type="checkbox" id="ensemble-2nd-pass" disabled title="Coming in future release">
-                                    </span>
-                                </div>
-
-                                <!-- Scene detection -->
-                                <div class="ensemble-row">
-                                    <label class="ensemble-label">Scene detection</label>
-                                    <div class="ensemble-cell">
-                                        <select id="ensemble-scene-1" class="ensemble-select">
-                                            <option value="none" selected>None</option>
-                                            <option value="auditok_scene_detection">Auditok Scene Detection</option>
-                                            <option value="silero_scene_detection">Silero Scene Detection</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" id="customize-scene-1" title="Customize">⚙</button>
+                            <div class="ensemble-twopass-container">
+                                <!-- Pass 1 Section -->
+                                <div class="pass-section">
+                                    <div class="pass-header">
+                                        <h3>Pass 1</h3>
+                                        <span id="pass1-badge" class="pass-badge default">Default</span>
                                     </div>
-                                    <div class="ensemble-cell disabled">
-                                        <select class="ensemble-select" disabled>
-                                            <option>None</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" disabled>⚙</button>
-                                    </div>
-                                </div>
-
-                                <!-- Audio preprocess -->
-                                <div class="ensemble-row">
-                                    <label class="ensemble-label">Audio preprocess</label>
-                                    <div class="ensemble-cell disabled">
-                                        <select class="ensemble-select" disabled>
-                                            <option>None</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" disabled>⚙</button>
-                                    </div>
-                                    <div class="ensemble-cell disabled">
-                                        <select class="ensemble-select" disabled>
-                                            <option>None</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" disabled>⚙</button>
+                                    <div class="pass-content">
+                                        <div class="form-group">
+                                            <label for="pass1-pipeline" class="form-label">Pipeline:</label>
+                                            <select id="pass1-pipeline" class="form-select">
+                                                <option value="balanced" selected>Balanced</option>
+                                                <option value="fast">Fast</option>
+                                                <option value="faster">Faster</option>
+                                                <option value="fidelity">Fidelity</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pass1-sensitivity" class="form-label">Sensitivity:</label>
+                                            <select id="pass1-sensitivity" class="form-select">
+                                                <option value="aggressive">Aggressive</option>
+                                                <option value="balanced" selected>Balanced</option>
+                                                <option value="conservative">Conservative</option>
+                                            </select>
+                                        </div>
+                                        <button type="button" class="btn btn-secondary" id="customize-pass1">
+                                            Customize Parameters
+                                        </button>
                                     </div>
                                 </div>
 
-                                <!-- VAD engine -->
-                                <div class="ensemble-row">
-                                    <label class="ensemble-label">VAD engine</label>
-                                    <div class="ensemble-cell">
-                                        <select id="ensemble-vad-1" class="ensemble-select">
-                                            <option value="none" selected>None</option>
-                                            <option value="silero">Silero VAD</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" id="customize-vad-1" title="Customize">⚙</button>
+                                <!-- Pass 2 Section -->
+                                <div class="pass-section">
+                                    <div class="pass-header">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="pass2-enabled">
+                                            <span>Enable Pass 2</span>
+                                        </label>
+                                        <span id="pass2-badge" class="pass-badge default">Default</span>
                                     </div>
-                                    <div class="ensemble-cell disabled">
-                                        <select class="ensemble-select" disabled>
-                                            <option>None</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" disabled>⚙</button>
-                                    </div>
-                                </div>
-
-                                <!-- ASR engine -->
-                                <div class="ensemble-row">
-                                    <label class="ensemble-label">ASR engine</label>
-                                    <div class="ensemble-cell">
-                                        <select id="ensemble-asr-1" class="ensemble-select">
-                                            <option value="faster_whisper" selected>Faster Whisper</option>
-                                            <option value="stable_ts">Stable TS</option>
-                                            <option value="openai_whisper">OpenAI Whisper</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" id="customize-asr-1" title="Customize">⚙</button>
-                                    </div>
-                                    <div class="ensemble-cell disabled">
-                                        <select class="ensemble-select" disabled>
-                                            <option>Faster Whisper</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" disabled>⚙</button>
+                                    <div class="pass-content" id="pass2-content">
+                                        <div class="form-group">
+                                            <label for="pass2-pipeline" class="form-label">Pipeline:</label>
+                                            <select id="pass2-pipeline" class="form-select" disabled>
+                                                <option value="balanced">Balanced</option>
+                                                <option value="fast">Fast</option>
+                                                <option value="faster">Faster</option>
+                                                <option value="fidelity" selected>Fidelity</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pass2-sensitivity" class="form-label">Sensitivity:</label>
+                                            <select id="pass2-sensitivity" class="form-select" disabled>
+                                                <option value="aggressive">Aggressive</option>
+                                                <option value="balanced" selected>Balanced</option>
+                                                <option value="conservative">Conservative</option>
+                                            </select>
+                                        </div>
+                                        <button type="button" class="btn btn-secondary" id="customize-pass2" disabled>
+                                            Customize Parameters
+                                        </button>
                                     </div>
                                 </div>
 
-                                <!-- SRT postprocess (spans both columns) -->
-                                <div class="ensemble-row">
-                                    <label class="ensemble-label">SRT postprocess</label>
-                                    <div class="ensemble-cell-wide disabled">
-                                        <select class="ensemble-select" disabled>
-                                            <option>None</option>
+                                <!-- Merge Strategy Section -->
+                                <div class="merge-section">
+                                    <div class="form-group">
+                                        <label for="merge-strategy" class="form-label">Merge Strategy:</label>
+                                        <select id="merge-strategy" class="form-select" disabled>
+                                            <option value="confidence" selected>Confidence-based</option>
+                                            <option value="union">Union (all unique)</option>
+                                            <option value="intersection">Intersection (confirmed only)</option>
+                                            <option value="timing">Timing-based</option>
                                         </select>
-                                        <button type="button" class="ensemble-gear" disabled>⚙</button>
                                     </div>
                                 </div>
 
-                                <!-- Translation tool (spans both columns) -->
-                                <div class="ensemble-row">
-                                    <label class="ensemble-label">Translation tool</label>
-                                    <div class="ensemble-cell-wide disabled">
-                                        <select class="ensemble-select" disabled>
-                                            <option>None</option>
-                                        </select>
-                                        <button type="button" class="ensemble-gear" disabled>⚙</button>
-                                    </div>
-                                </div>
-
-                                <!-- Footer -->
-                                <div class="ensemble-footer">
-                                    <p>Press <span class="gear-icon">⚙</span> to customize detailed settings</p>
-                                    <p class="upcoming-features">Upcoming features in next releases</p>
+                                <!-- Info Footer -->
+                                <div class="ensemble-info">
+                                    <p>Two-pass ensemble runs two different pipeline configurations and merges results for improved quality.</p>
+                                    <p>Click "Customize Parameters" to adjust detailed settings for each pass.</p>
                                 </div>
                             </div>
                         </div>
