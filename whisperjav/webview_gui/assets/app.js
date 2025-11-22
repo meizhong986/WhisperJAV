@@ -900,49 +900,58 @@ const DirectoryControls = {
 };
 
 // ============================================================
-// Ensemble Manager
+// Two-Pass Ensemble Manager
 // ============================================================
 const EnsembleManager = {
-    // State
+    // State - Full Configuration Snapshot approach
     state: {
-        scene: {
-            name: 'none',
-            overrides: {}
+        pass1: {
+            pipeline: 'balanced',
+            sensitivity: 'balanced',
+            customized: false,
+            params: null  // null = use defaults, object = full custom config
         },
-        vad: {
-            name: 'none',
-            overrides: {}
+        pass2: {
+            enabled: false,
+            pipeline: 'fidelity',
+            sensitivity: 'balanced',
+            customized: false,
+            params: null
         },
-        asr: {
-            name: 'faster_whisper',
-            overrides: {}
-        },
-        currentCustomize: null  // {type, name} being customized
+        mergeStrategy: 'confidence',
+        currentCustomize: null  // 'pass1' or 'pass2'
     },
 
     async init() {
-        // Set up event handlers for gear buttons
-        document.getElementById('customize-scene-1').addEventListener('click', () => this.openCustomize('features', this.state.scene.name));
-        document.getElementById('customize-vad-1').addEventListener('click', () => this.openCustomize('vad', this.state.vad.name));
-        document.getElementById('customize-asr-1').addEventListener('click', () => this.openCustomize('asr', this.state.asr.name));
-
-        // Scene detection selection change
-        document.getElementById('ensemble-scene-1').addEventListener('change', (e) => {
-            this.state.scene.name = e.target.value;
-            this.state.scene.overrides = {};
+        // Pass 2 enable/disable
+        document.getElementById('pass2-enabled').addEventListener('change', (e) => {
+            this.state.pass2.enabled = e.target.checked;
+            this.updatePass2State();
         });
 
-        // VAD selection change
-        document.getElementById('ensemble-vad-1').addEventListener('change', (e) => {
-            this.state.vad.name = e.target.value;
-            this.state.vad.overrides = {};
+        // Pipeline selection changes with customization warning
+        document.getElementById('pass1-pipeline').addEventListener('change', (e) => {
+            this.handlePipelineChange('pass1', e.target.value, e.target);
+        });
+        document.getElementById('pass1-sensitivity').addEventListener('change', (e) => {
+            this.handleSensitivityChange('pass1', e.target.value, e.target);
         });
 
-        // ASR selection change
-        document.getElementById('ensemble-asr-1').addEventListener('change', (e) => {
-            this.state.asr.name = e.target.value;
-            this.state.asr.overrides = {};
+        document.getElementById('pass2-pipeline').addEventListener('change', (e) => {
+            this.handlePipelineChange('pass2', e.target.value, e.target);
         });
+        document.getElementById('pass2-sensitivity').addEventListener('change', (e) => {
+            this.handleSensitivityChange('pass2', e.target.value, e.target);
+        });
+
+        // Merge strategy
+        document.getElementById('merge-strategy').addEventListener('change', (e) => {
+            this.state.mergeStrategy = e.target.value;
+        });
+
+        // Customize buttons
+        document.getElementById('customize-pass1').addEventListener('click', () => this.openCustomize('pass1'));
+        document.getElementById('customize-pass2').addEventListener('click', () => this.openCustomize('pass2'));
 
         // Modal controls
         document.getElementById('customizeModalClose').addEventListener('click', () => this.closeModal());
@@ -955,62 +964,160 @@ const EnsembleManager = {
                 this.closeModal();
             }
         });
+
+        // Initialize Pass 2 state and badges
+        this.updatePass2State();
+        this.updateBadges();
     },
 
-    // No longer needed - dropdowns are hardcoded in HTML
+    handlePipelineChange(passKey, newValue, selectElement) {
+        const passState = this.state[passKey];
+
+        if (passState.customized) {
+            // Warn user that custom params will be reset
+            if (confirm(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the pipeline will reset them. Continue?`)) {
+                passState.pipeline = newValue;
+                passState.customized = false;
+                passState.params = null;
+                this.updateBadges();
+            } else {
+                // Revert selection
+                selectElement.value = passState.pipeline;
+            }
+        } else {
+            passState.pipeline = newValue;
+        }
+    },
+
+    handleSensitivityChange(passKey, newValue, selectElement) {
+        const passState = this.state[passKey];
+
+        if (passState.customized) {
+            // Warn user that custom params will be reset
+            if (confirm(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the sensitivity will reset them. Continue?`)) {
+                passState.sensitivity = newValue;
+                passState.customized = false;
+                passState.params = null;
+                this.updateBadges();
+            } else {
+                // Revert selection
+                selectElement.value = passState.sensitivity;
+            }
+        } else {
+            passState.sensitivity = newValue;
+        }
+    },
+
+    updatePass2State() {
+        const enabled = this.state.pass2.enabled;
+        const pass2Content = document.getElementById('pass2-content');
+
+        // Enable/disable pass 2 controls
+        document.getElementById('pass2-pipeline').disabled = !enabled;
+        document.getElementById('pass2-sensitivity').disabled = !enabled;
+        document.getElementById('customize-pass2').disabled = !enabled;
+        document.getElementById('merge-strategy').disabled = !enabled;
+
+        // Visual feedback
+        if (enabled) {
+            pass2Content.classList.remove('disabled');
+        } else {
+            pass2Content.classList.add('disabled');
+        }
+    },
+
+    updateBadges() {
+        // Update Pass 1 badge
+        const pass1Badge = document.getElementById('pass1-badge');
+        if (pass1Badge) {
+            if (this.state.pass1.customized) {
+                pass1Badge.textContent = 'Custom';
+                pass1Badge.className = 'pass-badge custom';
+            } else {
+                pass1Badge.textContent = 'Default';
+                pass1Badge.className = 'pass-badge default';
+            }
+        }
+
+        // Update Pass 2 badge
+        const pass2Badge = document.getElementById('pass2-badge');
+        if (pass2Badge) {
+            if (this.state.pass2.customized) {
+                pass2Badge.textContent = 'Custom';
+                pass2Badge.className = 'pass-badge custom';
+            } else {
+                pass2Badge.textContent = 'Default';
+                pass2Badge.className = 'pass-badge default';
+            }
+        }
+
+        // Update button text
+        const btn1 = document.getElementById('customize-pass1');
+        const btn2 = document.getElementById('customize-pass2');
+        if (btn1) {
+            btn1.textContent = this.state.pass1.customized ? 'Edit Parameters' : 'Customize Parameters';
+        }
+        if (btn2) {
+            btn2.textContent = this.state.pass2.customized ? 'Edit Parameters' : 'Customize Parameters';
+        }
+    },
+
     async loadComponents() {
         // Placeholder for future dynamic loading
     },
 
-    async openCustomize(type, name = null) {
-        // Skip if "none" selected
-        if (name === 'none') {
-            ConsoleManager.log('Select a component first to customize', 'info');
-            return;
-        }
+    async openCustomize(passKey) {
+        // passKey is 'pass1' or 'pass2'
+        this.state.currentCustomize = passKey;
 
-        this.state.currentCustomize = { type, name };
+        const passState = this.state[passKey];
+        const pipeline = passState.pipeline;
+        const sensitivity = passState.sensitivity;
 
         try {
-            // Get component schema
-            const result = await pywebview.api.get_component_schema(type, name);
+            // Get resolved pipeline parameters (always needed for defaults reference)
+            const result = await pywebview.api.get_pipeline_defaults(pipeline, sensitivity);
 
             if (!result.success) {
-                ErrorHandler.show('Error', 'Failed to load component schema: ' + result.error);
+                ErrorHandler.show('Error', 'Failed to load pipeline parameters: ' + result.error);
                 return;
             }
 
-            // Get current values (defaults + overrides)
-            const defaultsResult = await pywebview.api.get_component_defaults(type, name);
-            const defaults = defaultsResult.success ? defaultsResult.defaults : {};
+            // Flatten default params for display (decoder + provider)
+            const defaultParams = {
+                ...result.params.decoder,
+                ...result.params.provider
+            };
 
-            // Get current overrides
-            let overrides = {};
-            if (type === 'asr') {
-                overrides = this.state.asr.overrides;
-            } else if (type === 'vad') {
-                overrides = this.state.vad.overrides;
-            } else if (type === 'features' && this.state.features[name]) {
-                overrides = this.state.features[name].overrides;
+            // If already customized, use stored params; otherwise use defaults
+            let currentValues;
+            if (passState.customized && passState.params) {
+                currentValues = { ...passState.params };
+            } else {
+                // Create a fresh copy of defaults for customization
+                currentValues = { ...defaultParams };
             }
 
-            // Merge defaults with overrides
-            const currentValues = { ...defaults, ...overrides };
-
             // Set modal title
+            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+            const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
             document.getElementById('customizeModalTitle').textContent =
-                result.metadata.display_name + ' Settings';
+                `${passLabel} Settings (${pipeline} / ${sensitivity})${customStatus}`;
 
             // Generate parameter controls
             const paramsContainer = document.getElementById('customizeModalParams');
             paramsContainer.innerHTML = '';
 
-            // Schema is { parameters: [...] }
-            const parameters = result.schema.parameters || result.schema;
-            parameters.forEach(param => {
-                const control = this.generateParamControl(param, currentValues[param.name], defaults[param.name]);
+            // Create controls for each parameter
+            for (const [paramName, defaultValue] of Object.entries(defaultParams)) {
+                const param = {
+                    name: paramName,
+                    type: this.inferType(defaultValue),
+                    description: ''
+                };
+                const control = this.generateParamControl(param, currentValues[paramName], defaultValue);
                 paramsContainer.appendChild(control);
-            });
+            }
 
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
@@ -1018,6 +1125,16 @@ const EnsembleManager = {
         } catch (error) {
             ErrorHandler.show('Error', 'Failed to open customize dialog: ' + error);
         }
+    },
+
+    inferType(value) {
+        if (typeof value === 'boolean') return 'bool';
+        if (typeof value === 'number') {
+            return Number.isInteger(value) ? 'int' : 'float';
+        }
+        if (typeof value === 'string') return 'str';
+        if (Array.isArray(value)) return 'array';
+        return 'str';
     },
 
     generateParamControl(param, value, defaultValue) {
@@ -1127,15 +1244,14 @@ const EnsembleManager = {
     },
 
     applyCustomization() {
-        const { type, name } = this.state.currentCustomize;
+        const passKey = this.state.currentCustomize;
         const paramsContainer = document.getElementById('customizeModalParams');
-        const overrides = {};
+        const fullParams = {};
 
-        // Collect values from controls
+        // Collect ALL values from controls (full snapshot, not just overrides)
         paramsContainer.querySelectorAll('.param-control').forEach(control => {
             const paramName = control.dataset.param;
             let value;
-            let defaultValue;
 
             // Find the input element
             const checkbox = control.querySelector('.param-checkbox');
@@ -1146,55 +1262,54 @@ const EnsembleManager = {
 
             if (checkbox) {
                 value = checkbox.checked;
-                defaultValue = checkbox.dataset.default === 'true';
             } else if (slider) {
                 const numberInput = control.querySelector('.param-number');
                 value = parseFloat(numberInput.value);
-                defaultValue = parseFloat(control.querySelector('.param-slider-wrapper').dataset.default);
             } else if (number) {
                 value = number.step === '1' ? parseInt(number.value) : parseFloat(number.value);
-                defaultValue = number.step === '1' ? parseInt(number.dataset.default) : parseFloat(number.dataset.default);
             } else if (text) {
                 value = text.value;
-                defaultValue = text.dataset.default || '';
             } else if (select) {
                 value = select.value;
-                defaultValue = select.dataset.default;
             }
 
-            // Only store if different from default
-            if (value !== defaultValue && value !== undefined) {
-                overrides[paramName] = value;
+            // Store ALL values (full configuration snapshot)
+            if (value !== undefined) {
+                fullParams[paramName] = value;
             }
         });
 
-        // Store overrides in state
-        if (type === 'asr') {
-            this.state.asr.overrides = overrides;
-        } else if (type === 'vad') {
-            this.state.vad.overrides = overrides;
-        } else if (type === 'features') {
-            this.state.scene.overrides = overrides;
-        }
+        // Store full params in pass state and mark as customized
+        this.state[passKey].params = fullParams;
+        this.state[passKey].customized = true;
 
-        const overrideCount = Object.keys(overrides).length;
-        ConsoleManager.log(`Applied ${overrideCount} custom parameter(s) for ${name}`, 'info');
+        const paramCount = Object.keys(fullParams).length;
+        const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+        ConsoleManager.log(`Saved ${paramCount} parameters for ${passLabel} (Custom)`, 'info');
 
+        this.updateBadges();
         this.closeModal();
     },
 
     async resetToDefaults() {
         if (!this.state.currentCustomize) return;
-        const { type, name } = this.state.currentCustomize;
+        const passKey = this.state.currentCustomize;
+        const passState = this.state[passKey];
 
         try {
-            const result = await pywebview.api.get_component_defaults(type, name);
+            const result = await pywebview.api.get_pipeline_defaults(
+                passState.pipeline,
+                passState.sensitivity
+            );
             if (!result.success) {
                 ErrorHandler.show('Error', 'Failed to get defaults: ' + result.error);
                 return;
             }
 
-            const defaults = result.defaults;
+            const defaults = {
+                ...result.params.decoder,
+                ...result.params.provider
+            };
 
             // Reset all controls to defaults
             document.querySelectorAll('#customizeModalParams .param-control').forEach(control => {
@@ -1221,7 +1336,14 @@ const EnsembleManager = {
                 }
             });
 
-            ConsoleManager.log(`Reset ${name} to defaults`, 'info');
+            // Clear customized state - will use defaults
+            passState.params = null;
+            passState.customized = false;
+
+            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+            ConsoleManager.log(`Reset ${passLabel} to defaults`, 'info');
+
+            this.updateBadges();
 
         } catch (error) {
             ErrorHandler.show('Error', 'Failed to reset: ' + error);
@@ -1234,39 +1356,33 @@ const EnsembleManager = {
     },
 
     collectConfig() {
-        // Build ensemble configuration for API
-        // Scene detection is passed as a feature
-        const features = [];
-        if (this.state.scene.name !== 'none') {
-            features.push(this.state.scene.name);
-        }
+        // Build two-pass ensemble configuration for API
+        // Uses Full Configuration Snapshot approach:
+        // - If customized: send full params (backend uses as-is)
+        // - If not customized: send pipeline+sensitivity (backend resolves defaults)
 
         const config = {
             inputs: AppState.selectedFiles,
             output_dir: document.getElementById('outputDir').value,
-            asr: this.state.asr.name,
-            vad: this.state.vad.name,
-            features: features,
-            overrides: {},
-            language: 'japanese',  // Default - customizable in ASR settings
-            task: 'transcribe',    // Default
-            verbosity: 'summary',
-            keep_temp: false
+            pass1: {
+                pipeline: this.state.pass1.pipeline,
+                sensitivity: this.state.pass1.sensitivity,
+                customized: this.state.pass1.customized,
+                params: this.state.pass1.customized ? this.state.pass1.params : null
+            },
+            pass2: {
+                enabled: this.state.pass2.enabled,
+                pipeline: this.state.pass2.pipeline,
+                sensitivity: this.state.pass2.sensitivity,
+                customized: this.state.pass2.customized,
+                params: this.state.pass2.customized ? this.state.pass2.params : null
+            },
+            merge_strategy: this.state.mergeStrategy,
+            source_language: document.getElementById('source-language').value,
+            subs_language: document.getElementById('language').value,
+            verbosity: document.getElementById('verbosity').value,
+            keep_temp: document.getElementById('keepTemp').checked
         };
-
-        // Flatten overrides with dot notation
-        for (const [key, value] of Object.entries(this.state.asr.overrides)) {
-            config.overrides[`asr.${key}`] = value;
-        }
-        for (const [key, value] of Object.entries(this.state.vad.overrides)) {
-            config.overrides[`vad.${key}`] = value;
-        }
-        // Scene detection overrides
-        if (this.state.scene.name !== 'none') {
-            for (const [key, value] of Object.entries(this.state.scene.overrides)) {
-                config.overrides[`features.${this.state.scene.name}.${key}`] = value;
-            }
-        }
 
         return config;
     },
@@ -1280,7 +1396,7 @@ const EnsembleManager = {
 
         try {
             const config = this.collectConfig();
-            const result = await pywebview.api.start_ensemble_process(config);
+            const result = await pywebview.api.start_ensemble_twopass(config);
 
             if (result.success) {
                 // Update UI state
@@ -1300,7 +1416,7 @@ const EnsembleManager = {
                 ProcessManager.startLogPolling();
                 ProcessManager.startStatusMonitoring();
 
-                ConsoleManager.log('Ensemble process started', 'info');
+                ConsoleManager.log('Two-pass ensemble started', 'info');
             } else {
                 ErrorHandler.show('Start Failed', result.message);
             }

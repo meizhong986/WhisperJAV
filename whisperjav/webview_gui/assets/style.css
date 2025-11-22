@@ -1361,6 +1361,120 @@ button:focus-visible,
     opacity: 0.8;
 }
 
+/* Two-Pass Ensemble Styles */
+.ensemble-twopass-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.pass-section {
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 16px;
+}
+
+.pass-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pass-header h3 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* Pass badge indicators */
+.pass-badge {
+    font-size: var(--font-size-xs);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.pass-badge.default {
+    background: var(--background-tertiary);
+    color: var(--text-secondary);
+}
+
+.pass-badge.custom {
+    background: var(--primary-color);
+    color: white;
+}
+
+.pass-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.pass-content .form-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.pass-content .form-label {
+    font-weight: 500;
+    white-space: nowrap;
+    margin: 0;
+}
+
+.pass-content .form-select {
+    min-width: 140px;
+}
+
+#pass2-content.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.merge-section {
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 16px;
+}
+
+.merge-section .form-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.merge-section .form-label {
+    font-weight: 500;
+    white-space: nowrap;
+    margin: 0;
+}
+
+.merge-section .form-select {
+    min-width: 200px;
+}
+
+.ensemble-info {
+    padding: 12px;
+    background: var(--background-tertiary);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.ensemble-info p {
+    margin: 4px 0;
+}
+
 /* Large modal for parameter customization */
 .modal-lg {
     max-width: 600px;

@@ -928,6 +928,236 @@ class WhisperJAVAPI:
         return args
 
     # ========================================================================
+    # Two-Pass Ensemble Methods
+    # ========================================================================
+
+    def get_pipeline_defaults(self, pipeline: str, sensitivity: str) -> Dict[str, Any]:
+        """
+        Get resolved parameters for a pipeline+sensitivity combination.
+
+        Args:
+            pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity')
+            sensitivity: Sensitivity level ('conservative', 'balanced', 'aggressive')
+
+        Returns:
+            dict with resolved parameters that can be customized
+        """
+        try:
+            from whisperjav.config.legacy import resolve_legacy_pipeline
+
+            config = resolve_legacy_pipeline(
+                pipeline_name=pipeline,
+                sensitivity=sensitivity,
+                task='transcribe'
+            )
+
+            # Return the params section for customization
+            return {
+                "success": True,
+                "pipeline": pipeline,
+                "sensitivity": sensitivity,
+                "params": {
+                    "decoder": config['params']['decoder'],
+                    "provider": config['params']['provider'],
+                    "vad": config['params']['vad']
+                },
+                "model": config['model']
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_merge_strategies(self) -> Dict[str, Any]:
+        """
+        Get available merge strategies for two-pass ensemble.
+
+        Returns:
+            dict with list of merge strategies and descriptions
+        """
+        try:
+            from whisperjav.ensemble.merge import get_available_strategies
+            return {
+                "success": True,
+                "strategies": get_available_strategies()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def start_ensemble_twopass(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Start two-pass ensemble processing.
+
+        Args:
+            config: Two-pass ensemble configuration:
+                - inputs: List[str] - Input files/folders
+                - pass1: dict - Pass 1 configuration
+                    - pipeline: str - Pipeline name
+                    - sensitivity: str - Sensitivity level
+                    - overrides: dict - Parameter overrides
+                - pass2: dict - Pass 2 configuration (optional)
+                    - enabled: bool - Whether to run pass 2
+                    - pipeline: str - Pipeline name
+                    - sensitivity: str - Sensitivity level
+                    - overrides: dict - Parameter overrides
+                - merge_strategy: str - Merge strategy name
+                - output_dir: str - Output directory
+                - subs_language: str - Subtitle language mode
+                - keep_temp: bool - Keep temp files
+                - verbosity: str - Verbosity level
+
+        Returns:
+            dict: Response with success status and message
+        """
+        # Check if already running
+        if self.process is not None:
+            return {
+                "success": False,
+                "message": "Process already running"
+            }
+
+        try:
+            # Build CLI arguments for two-pass ensemble
+            args = self._build_twopass_args(config)
+
+            # Construct command
+            cmd = [sys.executable, "-X", "utf8", "-m", "whisperjav.main", *args]
+
+            # Force UTF-8 stdio
+            env = os.environ.copy()
+            env["PYTHONUTF8"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8:replace"
+
+            # Log command
+            def quote_arg(a: str) -> str:
+                return f'"{a}"' if (" " in a or "\t" in a) else a
+
+            cmd_display = "whisperjav.main " + " ".join(quote_arg(a) for a in args)
+            self.log_queue.put(f"\n> {cmd_display}\n")
+
+            # Start subprocess
+            self.process = subprocess.Popen(
+                cmd,
+                cwd=str(REPO_ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+                universal_newlines=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+
+            # Update status
+            self.status = "running"
+            self.exit_code = None
+
+            # Start log streaming thread
+            self._stream_thread = threading.Thread(
+                target=self._stream_output,
+                daemon=True
+            )
+            self._stream_thread.start()
+
+            return {
+                "success": True,
+                "message": "Two-pass ensemble started successfully",
+                "command": cmd_display
+            }
+
+        except ValueError as e:
+            return {
+                "success": False,
+                "message": str(e)
+            }
+        except Exception as e:
+            self.status = "error"
+            return {
+                "success": False,
+                "message": f"Failed to start two-pass ensemble: {e}"
+            }
+
+    def _build_twopass_args(self, config: Dict[str, Any]) -> List[str]:
+        """
+        Build CLI arguments for two-pass ensemble processing.
+
+        Supports Full Configuration Snapshot approach:
+        - If pass is customized: send full params as JSON
+        - If not customized: send pipeline+sensitivity for backend resolution
+
+        Args:
+            config: Two-pass ensemble configuration
+
+        Returns:
+            List of CLI arguments
+        """
+        import json
+        args = []
+
+        # Inputs (required)
+        inputs = config.get('inputs', [])
+        if not inputs:
+            raise ValueError("Please add at least one file or folder.")
+        args.extend(inputs)
+
+        # Enable ensemble mode
+        args.append("--ensemble")
+
+        # Pass 1 configuration
+        pass1 = config.get('pass1', {})
+        args += ["--pass1-pipeline", pass1.get('pipeline', 'balanced')]
+        args += ["--pass1-sensitivity", pass1.get('sensitivity', 'balanced')]
+
+        # If customized, send full params; otherwise backend uses defaults
+        if pass1.get('customized') and pass1.get('params'):
+            args += ["--pass1-params", json.dumps(pass1['params'])]
+
+        # Pass 2 configuration
+        pass2 = config.get('pass2', {})
+        if pass2.get('enabled', False):
+            args += ["--pass2-pipeline", pass2.get('pipeline', 'fidelity')]
+            args += ["--pass2-sensitivity", pass2.get('sensitivity', 'balanced')]
+
+            # If customized, send full params
+            if pass2.get('customized') and pass2.get('params'):
+                args += ["--pass2-params", json.dumps(pass2['params'])]
+
+        # Merge strategy
+        merge_strategy = config.get('merge_strategy', 'confidence')
+        args += ["--merge-strategy", merge_strategy]
+
+        # Output directory
+        output_dir = config.get('output_dir', self.default_output)
+        args += ["--output-dir", output_dir]
+
+        # Subtitle language mode
+        subs_language = config.get('subs_language', 'native')
+        args += ["--subs-language", subs_language]
+
+        # Source language
+        source_language = config.get('source_language', 'japanese')
+        args += ["--language", source_language]
+
+        # Optional paths
+        temp_dir = config.get('temp_dir', '').strip()
+        if temp_dir:
+            args += ["--temp-dir", temp_dir]
+
+        if config.get('keep_temp', False):
+            args += ["--keep-temp"]
+
+        # Verbosity
+        verbosity = config.get('verbosity', 'summary')
+        if verbosity:
+            args += ["--verbosity", verbosity]
+
+        return args
+
+    # ========================================================================
     # Test Methods (Phase 1 - Keep for backward compatibility)
     # ========================================================================
 
