@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-import sys
 
 # Read version from __version__.py without importing the package
 version_file = {}
@@ -13,9 +12,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 # Relaxed Python version requirement (allow 3.9 to 3.12)
 python_requires = ">=3.9,<3.13"
 
-# Relaxed dependency versions to allow flexibility
+# ALL dependencies merged into a single flat list
+# Note: Platform-specific markers (win32) are preserved so this setup.py 
+# remains compatible with Linux/Mac without crashing.
 install_requires = [
-    "openai-whisper @ git+https://github.com/openai/whisper@main",  # Use 'main' branch for latest releases
+    # Core Dependencies
+    "openai-whisper @ git+https://github.com/openai/whisper@main",
     "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
     "faster-whisper>=1.1.0",
     "ffmpeg-python",
@@ -38,19 +40,16 @@ install_requires = [
     "openai>=1.35.0",
     "google-genai>=1.39.0",
     "huggingface-hub>=0.25.0",
-    "silero-vad>=6.0",  # Latest Silero VAD for scene detection (separate from torch.hub ASR version)
+    "silero-vad>=6.0",
+
+    # GUI Dependencies (Previously in 'gui' extra)
+    "pywebview>=5.0.0",
+    "pythonnet>=3.0; sys_platform=='win32'", # Only installs on Windows
+    "pywin32>=305; sys_platform=='win32'",   # Only installs on Windows
+
+    # Speedup Dependencies (Previously in 'speedup' extra)
+    "numba",
 ]
-
-# Optional dependencies
-extras_require = {
-    'speedup': ['numba'],
-    'gui': [
-        'pywebview>=5.0.0',  # PyWebView GUI framework
-        'pythonnet>=3.0; sys_platform=="win32"',  # WebView2 backend for Windows
-        'pywin32>=305; sys_platform=="win32"',  # Windows COM support for shortcuts
-    ],
-}
-
 
 # Classifiers for supported Python versions
 classifiers = [
@@ -75,7 +74,7 @@ setup(
     classifiers=classifiers,
     python_requires=python_requires,
     install_requires=install_requires,
-    extras_require=extras_require,
+    # extras_require removed as they are now default
     entry_points={
         "console_scripts": [
             "whisperjav=whisperjav.main:main",
@@ -92,7 +91,7 @@ setup(
             "webview_gui/assets/*.html",
             "webview_gui/assets/*.css",
             "webview_gui/assets/*.js",
-            "Menu/*.json",  # menuinst shortcut definition
+            "Menu/*.json",
         ],
     },
     zip_safe=False,
