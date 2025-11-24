@@ -100,3 +100,17 @@ class BasePipeline(ABC):
                 logger.error(f"Error during temporary file cleanup for {media_basename}: {e}")
         else:
             logger.debug("Skipping cleanup of temporary files as requested by --keep-temp flag.")
+
+    def cleanup(self):
+        """
+        Clean up pipeline resources including ASR model.
+
+        This should be called when the pipeline is no longer needed,
+        especially in batch processing scenarios where models need to be
+        swapped between passes. This frees GPU memory.
+        """
+        # Clean up ASR model if it exists and has cleanup method
+        if hasattr(self, 'asr') and hasattr(self.asr, 'cleanup'):
+            self.asr.cleanup()
+
+        logger.debug(f"{self.__class__.__name__} cleanup complete")

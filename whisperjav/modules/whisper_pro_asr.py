@@ -409,3 +409,37 @@ class WhisperProASR:
             
         logger.debug(f"Saved SRT to: {output_srt_path}")
         return output_srt_path
+
+    def cleanup(self):
+        """
+        Release GPU/CPU memory by unloading models.
+
+        This should be called when the ASR instance is no longer needed,
+        especially in batch processing scenarios where models need to be
+        swapped between passes.
+        """
+        import gc
+
+        logger.debug(f"Cleaning up {self.__class__.__name__} resources...")
+
+        # Delete Whisper model
+        if hasattr(self, 'whisper_model'):
+            del self.whisper_model
+            self.whisper_model = None
+            logger.debug("Whisper model unloaded")
+
+        # Delete VAD model
+        if hasattr(self, 'vad_model'):
+            del self.vad_model
+            self.vad_model = None
+            logger.debug("VAD model unloaded")
+
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            logger.debug("CUDA cache cleared")
+
+        # Force garbage collection
+        gc.collect()
+
+        logger.debug(f"{self.__class__.__name__} cleanup complete")

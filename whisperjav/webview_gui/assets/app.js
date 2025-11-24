@@ -918,7 +918,7 @@ const EnsembleManager = {
             customized: false,
             params: null
         },
-        mergeStrategy: 'confidence',
+        mergeStrategy: 'smart_merge',
         currentCustomize: null  // 'pass1' or 'pass2'
     },
 
@@ -957,6 +957,11 @@ const EnsembleManager = {
         document.getElementById('customizeModalClose').addEventListener('click', () => this.closeModal());
         document.getElementById('customizeModalApply').addEventListener('click', () => this.applyCustomization());
         document.getElementById('customizeModalReset').addEventListener('click', () => this.resetToDefaults());
+
+        // Modal tab switching
+        document.querySelectorAll('.modal-tab').forEach(tab => {
+            tab.addEventListener('click', () => this.switchModalTab(tab.dataset.tab));
+        });
 
         // Close modal on overlay click
         document.getElementById('customizeModal').addEventListener('click', (e) => {
@@ -1066,6 +1071,61 @@ const EnsembleManager = {
         // Placeholder for future dynamic loading
     },
 
+    // Parameter categorization for tabs - complete mapping
+    paramCategories: {
+        transcriber: [
+            'temperature', 'compression_ratio_threshold', 'logprob_threshold',
+            'logprob_margin', 'no_speech_threshold', 'drop_nonverbal_vocals',
+            'condition_on_previous_text', 'initial_prompt', 'word_timestamps',
+            'prepend_punctuations', 'append_punctuations', 'clip_timestamps',
+            'hallucination_silence_threshold'
+        ],
+        decoder: [
+            'task', 'language', 'best_of', 'beam_size', 'patience',
+            'length_penalty', 'prefix', 'suppress_tokens', 'suppress_blank',
+            'without_timestamps', 'max_initial_timestamp'
+        ],
+        vad: [
+            'threshold', 'neg_threshold', 'min_speech_duration_ms',
+            'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
+        ]
+        // Engine options = everything else (varies by pipeline backend)
+    },
+
+    // Parameter metadata with proper constraints for sliders
+    parameterMetadata: {
+        // Transcriber parameters
+        logprob_threshold: { ge: -1.0, le: 0.0, step: 0.01 },
+        logprob_margin: { ge: 0.0, le: 1.0, step: 0.01 },
+        no_speech_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
+        compression_ratio_threshold: { ge: 0.0, le: 10.0, step: 0.1 },
+        temperature: { ge: 0.0, le: 1.0, step: 0.01 },
+        hallucination_silence_threshold: { ge: 0.0, le: 5.0, step: 0.1 },
+
+        // Decoder parameters
+        patience: { ge: 0.0, le: 5.0, step: 0.1 },
+        length_penalty: { ge: 0.0, le: 2.0, step: 0.1 },
+        max_initial_timestamp: { ge: 0.0, le: 30.0, step: 0.5 },
+        beam_size: { ge: 1, le: 10, step: 1 },
+        best_of: { ge: 1, le: 10, step: 1 },
+
+        // VAD parameters
+        threshold: { ge: 0.0, le: 1.0, step: 0.01 },
+        neg_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
+        min_speech_duration_ms: { ge: 0, le: 1000, step: 10 },
+        max_speech_duration_s: { ge: 1.0, le: 60.0, step: 1.0 },
+        min_silence_duration_ms: { ge: 0, le: 2000, step: 10 },
+        speech_pad_ms: { ge: 0, le: 500, step: 10 }
+    },
+
+    // Model compatibility per pipeline (faster-whisper doesn't support turbo)
+    pipelineModelCompatibility: {
+        balanced: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+        faster: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+        fast: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+        fidelity: ['turbo', 'large-v2', 'large-v3']
+    },
+
     async openCustomize(passKey) {
         // passKey is 'pass1' or 'pass2'
         this.state.currentCustomize = passKey;
@@ -1075,7 +1135,7 @@ const EnsembleManager = {
         const sensitivity = passState.sensitivity;
 
         try {
-            // Get resolved pipeline parameters (always needed for defaults reference)
+            // Get resolved pipeline parameters
             const result = await pywebview.api.get_pipeline_defaults(pipeline, sensitivity);
 
             if (!result.success) {
@@ -1083,19 +1143,72 @@ const EnsembleManager = {
                 return;
             }
 
-            // Flatten default params for display (decoder + provider)
-            const defaultParams = {
-                ...result.params.decoder,
-                ...result.params.provider
+            // Store all params by category
+            const allDefaults = {
+                transcriber: {},
+                decoder: {},
+                engine: {},
+                vad: {},
+                scene: { scene_detection_method: 'auditok' }
             };
+
+            // Categorize decoder params (from API's decoder section)
+            for (const [key, value] of Object.entries(result.params.decoder || {})) {
+                if (this.paramCategories.transcriber.includes(key)) {
+                    allDefaults.transcriber[key] = value;
+                } else if (this.paramCategories.decoder.includes(key)) {
+                    allDefaults.decoder[key] = value;
+                } else {
+                    // Everything else goes to engine
+                    allDefaults.engine[key] = value;
+                }
+            }
+
+            // Categorize provider params (from API's provider section)
+            for (const [key, value] of Object.entries(result.params.provider || {})) {
+                if (this.paramCategories.transcriber.includes(key)) {
+                    allDefaults.transcriber[key] = value;
+                } else if (this.paramCategories.decoder.includes(key)) {
+                    allDefaults.decoder[key] = value;
+                } else if (this.paramCategories.vad.includes(key)) {
+                    allDefaults.vad[key] = value;
+                } else {
+                    // Everything else goes to engine
+                    allDefaults.engine[key] = value;
+                }
+            }
+
+            // VAD params (from API's vad section)
+            for (const [key, value] of Object.entries(result.params.vad || {})) {
+                if (this.paramCategories.vad.includes(key)) {
+                    allDefaults.vad[key] = value;
+                } else {
+                    // Some VAD sections have engine-specific params (e.g., stable_ts vad/vad_threshold)
+                    allDefaults.engine[key] = value;
+                }
+            }
+
+            // Get scene detection method if available
+            if (result.scene_detection_method) {
+                allDefaults.scene.scene_detection_method = result.scene_detection_method;
+            }
+
+            // Store defaults for reset functionality
+            this._currentDefaults = allDefaults;
 
             // If already customized, use stored params; otherwise use defaults
             let currentValues;
             if (passState.customized && passState.params) {
                 currentValues = { ...passState.params };
             } else {
-                // Create a fresh copy of defaults for customization
-                currentValues = { ...defaultParams };
+                // Flatten all defaults
+                currentValues = {
+                    ...allDefaults.transcriber,
+                    ...allDefaults.decoder,
+                    ...allDefaults.engine,
+                    ...allDefaults.vad,
+                    ...allDefaults.scene
+                };
             }
 
             // Set modal title
@@ -1104,20 +1217,30 @@ const EnsembleManager = {
             document.getElementById('customizeModalTitle').textContent =
                 `${passLabel} Settings (${pipeline} / ${sensitivity})${customStatus}`;
 
-            // Generate parameter controls
-            const paramsContainer = document.getElementById('customizeModalParams');
-            paramsContainer.innerHTML = '';
+            // Clear all tab panels
+            const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+            tabs.forEach(tab => {
+                document.getElementById(`tab-${tab}`).innerHTML = '';
+            });
 
-            // Create controls for each parameter
-            for (const [paramName, defaultValue] of Object.entries(defaultParams)) {
-                const param = {
-                    name: paramName,
-                    type: this.inferType(defaultValue),
-                    description: ''
-                };
-                const control = this.generateParamControl(param, currentValues[paramName], defaultValue);
-                paramsContainer.appendChild(control);
-            }
+            // Get current model settings
+            const currentModel = passState.customized && passState.params.model_name
+                ? passState.params.model_name
+                : result.model || 'large-v2';
+            const currentDevice = passState.customized && passState.params.device
+                ? passState.params.device
+                : 'cuda';
+
+            // Generate controls for each tab
+            this.generateModelTab('tab-model', currentModel, currentDevice, pipeline);
+            this.generateTabControls('tab-transcriber', allDefaults.transcriber, currentValues);
+            this.generateTabControls('tab-decoder', allDefaults.decoder, currentValues);
+            this.generateTabControls('tab-engine', allDefaults.engine, currentValues);
+            this.generateTabControls('tab-vad', allDefaults.vad, currentValues);
+            this.generateSceneDetectionTab('tab-scene', currentValues.scene_detection_method || 'auditok');
+
+            // Reset to first tab
+            this.switchModalTab('model');
 
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
@@ -1125,6 +1248,169 @@ const EnsembleManager = {
         } catch (error) {
             ErrorHandler.show('Error', 'Failed to open customize dialog: ' + error);
         }
+    },
+
+    generateTabControls(tabId, params, currentValues) {
+        const container = document.getElementById(tabId);
+
+        if (Object.keys(params).length === 0) {
+            container.innerHTML = '<p class="tab-empty">No parameters in this category.</p>';
+            return;
+        }
+
+        for (const [paramName, defaultValue] of Object.entries(params)) {
+            // Look up constraints from metadata
+            const metadata = this.parameterMetadata[paramName] || {};
+            const param = {
+                name: paramName,
+                type: this.inferType(defaultValue),
+                description: '',
+                constraints: metadata
+            };
+            const control = this.generateParamControl(param, currentValues[paramName], defaultValue);
+            container.appendChild(control);
+        }
+    },
+
+    generateSceneDetectionTab(tabId, currentMethod) {
+        const container = document.getElementById(tabId);
+
+        const control = document.createElement('div');
+        control.className = 'param-control';
+        control.dataset.param = 'scene_detection_method';
+
+        const label = document.createElement('label');
+        label.textContent = 'Scene Detection Method';
+        control.appendChild(label);
+
+        const select = document.createElement('select');
+        select.className = 'param-select form-select';
+
+        const options = [
+            { value: 'auditok', label: 'Auditok (Energy-based)' },
+            { value: 'silero', label: 'Silero (Neural VAD)' }
+        ];
+
+        options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            if (opt.value === currentMethod) option.selected = true;
+            select.appendChild(option);
+        });
+
+        control.appendChild(select);
+
+        const desc = document.createElement('p');
+        desc.className = 'param-description';
+        desc.textContent = 'Method used to split audio into scenes before transcription.';
+        control.appendChild(desc);
+
+        container.appendChild(control);
+    },
+
+    generateModelTab(tabId, currentModel, currentDevice, pipeline) {
+        const container = document.getElementById(tabId);
+
+        // Get allowed models for this pipeline
+        const allowedModels = this.pipelineModelCompatibility[pipeline] || ['large-v2', 'large-v3'];
+
+        // Model selection
+        const modelControl = document.createElement('div');
+        modelControl.className = 'param-control';
+        modelControl.dataset.param = 'model_name';
+
+        const modelLabel = document.createElement('label');
+        modelLabel.textContent = 'Model';
+        modelControl.appendChild(modelLabel);
+
+        const modelSelect = document.createElement('select');
+        modelSelect.className = 'param-select form-select';
+        modelSelect.id = 'model-select';
+
+        const allModelOptions = [
+            { value: 'turbo', label: 'Turbo (Fastest)' },
+            { value: 'large-v2', label: 'Large-v2 (Balanced)' },
+            { value: 'large-v3', label: 'Large-v3 (Latest)' },
+            { value: 'kotoba-tech/kotoba-whisper-v2.0-faster', label: 'Kotoba-faster-2.0 (Japanese)' }
+        ];
+
+        // Filter to only allowed models for this pipeline
+        const modelOptions = allModelOptions.filter(opt => allowedModels.includes(opt.value));
+
+        // Validate current model - if not allowed, use first allowed
+        let selectedModel = currentModel;
+        if (!allowedModels.includes(currentModel)) {
+            selectedModel = allowedModels[0];
+        }
+
+        modelOptions.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            if (opt.value === selectedModel) option.selected = true;
+            modelSelect.appendChild(option);
+        });
+
+        modelControl.appendChild(modelSelect);
+
+        const modelDesc = document.createElement('p');
+        modelDesc.className = 'param-description';
+        if (pipeline === 'fidelity') {
+            modelDesc.textContent = 'Whisper model for transcription. Turbo is fastest, Large-v3 is most accurate.';
+        } else {
+            modelDesc.textContent = 'Whisper model for transcription. Large-v3 is most accurate. (Turbo not supported with faster-whisper)';
+        }
+        modelControl.appendChild(modelDesc);
+
+        container.appendChild(modelControl);
+
+        // Device selection
+        const deviceControl = document.createElement('div');
+        deviceControl.className = 'param-control';
+        deviceControl.dataset.param = 'device';
+
+        const deviceLabel = document.createElement('label');
+        deviceLabel.textContent = 'Device';
+        deviceControl.appendChild(deviceLabel);
+
+        const deviceSelect = document.createElement('select');
+        deviceSelect.className = 'param-select form-select';
+        deviceSelect.id = 'device-select';
+
+        const deviceOptions = [
+            { value: 'cuda', label: 'CUDA (GPU)' },
+            { value: 'cpu', label: 'CPU' }
+        ];
+
+        deviceOptions.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            if (opt.value === currentDevice) option.selected = true;
+            deviceSelect.appendChild(option);
+        });
+
+        deviceControl.appendChild(deviceSelect);
+
+        const deviceDesc = document.createElement('p');
+        deviceDesc.className = 'param-description';
+        deviceDesc.textContent = 'Processing device. CUDA (GPU) is much faster if available.';
+        deviceControl.appendChild(deviceDesc);
+
+        container.appendChild(deviceControl);
+    },
+
+    switchModalTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.modal-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+
+        // Update tab panels
+        document.querySelectorAll('.modal-tab-panel').forEach(panel => {
+            panel.classList.toggle('active', panel.id === `tab-${tabName}`);
+        });
     },
 
     inferType(value) {
@@ -1141,6 +1427,7 @@ const EnsembleManager = {
         const container = document.createElement('div');
         container.className = 'param-control';
         container.dataset.param = param.name;
+        container.dataset.originalType = param.type;  // Store original type for conversion
 
         const label = document.createElement('label');
         label.textContent = param.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -1165,8 +1452,8 @@ const EnsembleManager = {
             slider.type = 'range';
             slider.className = 'param-slider';
             slider.min = constraints.ge !== undefined ? constraints.ge : 0;
-            slider.max = constraints.le !== undefined ? constraints.le : 100;
-            slider.step = type === 'float' ? 0.01 : 1;
+            slider.max = constraints.le !== undefined ? constraints.le : 1;
+            slider.step = constraints.step !== undefined ? constraints.step : (type === 'float' ? 0.01 : 1);
             slider.value = value !== undefined ? value : defaultValue;
 
             const numberInput = document.createElement('input');
@@ -1220,7 +1507,13 @@ const EnsembleManager = {
             input = document.createElement('input');
             input.type = 'text';
             input.className = 'param-text';
-            input.value = value !== undefined ? String(value) : String(defaultValue || '');
+            // Use JSON.stringify for arrays to preserve brackets, String for others
+            const displayValue = value !== undefined ? value : (defaultValue || '');
+            if (Array.isArray(displayValue)) {
+                input.value = JSON.stringify(displayValue);
+            } else {
+                input.value = String(displayValue);
+            }
         }
 
         if (input.tagName) {
@@ -1245,38 +1538,83 @@ const EnsembleManager = {
 
     applyCustomization() {
         const passKey = this.state.currentCustomize;
-        const paramsContainer = document.getElementById('customizeModalParams');
         const fullParams = {};
 
-        // Collect ALL values from controls (full snapshot, not just overrides)
-        paramsContainer.querySelectorAll('.param-control').forEach(control => {
-            const paramName = control.dataset.param;
-            let value;
+        // Collect ALL values from all tab panels (including model tab)
+        const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            panel.querySelectorAll('.param-control').forEach(control => {
+                const paramName = control.dataset.param;
+                const originalType = control.dataset.originalType;
+                let value;
 
-            // Find the input element
-            const checkbox = control.querySelector('.param-checkbox');
-            const slider = control.querySelector('.param-slider');
-            const number = control.querySelector('.param-number');
-            const text = control.querySelector('.param-text');
-            const select = control.querySelector('.param-select');
+                // Find the input element
+                const checkbox = control.querySelector('.param-checkbox');
+                const slider = control.querySelector('.param-slider');
+                const number = control.querySelector('.param-number');
+                const text = control.querySelector('.param-text');
+                const select = control.querySelector('.param-select');
 
-            if (checkbox) {
-                value = checkbox.checked;
-            } else if (slider) {
-                const numberInput = control.querySelector('.param-number');
-                value = parseFloat(numberInput.value);
-            } else if (number) {
-                value = number.step === '1' ? parseInt(number.value) : parseFloat(number.value);
-            } else if (text) {
-                value = text.value;
-            } else if (select) {
-                value = select.value;
-            }
+                if (checkbox) {
+                    value = checkbox.checked;
+                } else if (slider) {
+                    const numberInput = control.querySelector('.param-number');
+                    value = parseFloat(numberInput.value);
+                } else if (number) {
+                    // Use original type for proper conversion
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(number.value);
+                    } else {
+                        value = parseFloat(number.value);
+                    }
+                } else if (text) {
+                    // Convert back to original type
+                    const rawValue = text.value;
+                    if (originalType === 'array') {
+                        // Parse array from string representation
+                        try {
+                            // Try JSON parse first (handles "[0, 0.2, 0.4]")
+                            const parsed = JSON.parse(rawValue);
+                            // Ensure result is actually an array
+                            if (Array.isArray(parsed)) {
+                                value = parsed;
+                            } else {
+                                // Single value parsed - wrap in array
+                                value = [parsed];
+                            }
+                        } catch {
+                            // Fallback: split by comma and convert to numbers
+                            value = rawValue.split(',').map(s => {
+                                const trimmed = s.trim();
+                                const num = parseFloat(trimmed);
+                                return isNaN(num) ? trimmed : num;
+                            });
+                        }
+                    } else if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(rawValue) || 0;
+                    } else if (originalType === 'float' || originalType === 'number') {
+                        value = parseFloat(rawValue) || 0;
+                    } else {
+                        value = rawValue;
+                    }
+                } else if (select) {
+                    // Convert select values based on original type
+                    const rawValue = select.value;
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(rawValue);
+                    } else if (originalType === 'float' || originalType === 'number') {
+                        value = parseFloat(rawValue);
+                    } else {
+                        value = rawValue;
+                    }
+                }
 
-            // Store ALL values (full configuration snapshot)
-            if (value !== undefined) {
-                fullParams[paramName] = value;
-            }
+                // Store ALL values (full configuration snapshot)
+                if (value !== undefined) {
+                    fullParams[paramName] = value;
+                }
+            });
         });
 
         // Store full params in pass state and mark as customized
@@ -1296,23 +1634,28 @@ const EnsembleManager = {
         const passKey = this.state.currentCustomize;
         const passState = this.state[passKey];
 
-        try {
-            const result = await pywebview.api.get_pipeline_defaults(
-                passState.pipeline,
-                passState.sensitivity
-            );
-            if (!result.success) {
-                ErrorHandler.show('Error', 'Failed to get defaults: ' + result.error);
-                return;
-            }
+        // Use stored defaults from openCustomize
+        if (!this._currentDefaults) {
+            ErrorHandler.show('Error', 'No defaults available');
+            return;
+        }
 
-            const defaults = {
-                ...result.params.decoder,
-                ...result.params.provider
-            };
+        // Flatten all defaults including model
+        const defaults = {
+            model_name: this._currentDefaults.model || 'large-v2',
+            device: 'cuda',
+            ...this._currentDefaults.transcriber,
+            ...this._currentDefaults.decoder,
+            ...this._currentDefaults.engine,
+            ...this._currentDefaults.vad,
+            ...this._currentDefaults.scene
+        };
 
-            // Reset all controls to defaults
-            document.querySelectorAll('#customizeModalParams .param-control').forEach(control => {
+        // Reset all controls in all tabs (including model tab)
+        const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            panel.querySelectorAll('.param-control').forEach(control => {
                 const paramName = control.dataset.param;
                 const defaultValue = defaults[paramName];
 
@@ -1335,19 +1678,16 @@ const EnsembleManager = {
                     select.value = defaultValue;
                 }
             });
+        });
 
-            // Clear customized state - will use defaults
-            passState.params = null;
-            passState.customized = false;
+        // Clear customized state - will use defaults
+        passState.params = null;
+        passState.customized = false;
 
-            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
-            ConsoleManager.log(`Reset ${passLabel} to defaults`, 'info');
+        const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+        ConsoleManager.log(`Reset ${passLabel} to defaults`, 'info');
 
-            this.updateBadges();
-
-        } catch (error) {
-            ErrorHandler.show('Error', 'Failed to reset: ' + error);
-        }
+        this.updateBadges();
     },
 
     closeModal() {
