@@ -2,7 +2,7 @@
 
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from whisperjav.config.legacy import resolve_legacy_pipeline
@@ -66,7 +66,7 @@ class EnsembleOrchestrator:
         media_info: Dict,
         pass1_config: Dict[str, Any],
         pass2_config: Optional[Dict[str, Any]] = None,
-        merge_strategy: str = 'confidence'
+        merge_strategy: str = 'smart_merge'
     ) -> Dict:
         """
         Process media file through two-pass ensemble.
@@ -79,7 +79,7 @@ class EnsembleOrchestrator:
                 - overrides: Optional parameter overrides dict
             pass2_config: Configuration for pass 2 (same structure as pass1)
                          If None, only pass 1 is executed
-            merge_strategy: Merge strategy name ('confidence', 'union', 'intersection', 'timing')
+            merge_strategy: Merge strategy name ('smart_merge', 'full_merge', 'pass1_primary', etc.)
 
         Returns:
             Dictionary containing processing metadata and results
@@ -207,6 +207,340 @@ class EnsembleOrchestrator:
             ensemble_metadata['status'] = 'failed'
             raise
 
+    def process_batch(
+        self,
+        media_files: List[Dict],
+        pass1_config: Dict[str, Any],
+        pass2_config: Optional[Dict[str, Any]] = None,
+        merge_strategy: str = 'smart_merge'
+    ) -> List[Dict]:
+        """
+        Process multiple media files through two-pass ensemble with optimized memory usage.
+
+        This method loads each model only once for all files, significantly reducing
+        VRAM usage compared to processing files individually.
+
+        Args:
+            media_files: List of media info dictionaries
+            pass1_config: Configuration for pass 1
+            pass2_config: Configuration for pass 2 (optional)
+            merge_strategy: Merge strategy name
+
+        Returns:
+            List of ensemble metadata dictionaries, one per file
+        """
+        if not media_files:
+            return []
+
+        batch_start_time = time.time()
+        total_files = len(media_files)
+
+        logger.info(f"Starting batch ensemble processing for {total_files} files")
+
+        # Storage for intermediate results
+        pass1_results = {}  # basename -> result metadata
+        pass1_srts = {}     # basename -> Path to pass1 SRT
+        pass2_results = {}  # basename -> result metadata
+        pass2_srts = {}     # basename -> Path to pass2 SRT
+        failed_files = []   # List of failed basenames
+        all_metadata = []   # Final results
+
+        # ========== PASS 1 PROCESSING ==========
+        logger.info(f"=== Pass 1: {pass1_config['pipeline']} ({pass1_config.get('sensitivity', 'balanced')}) ===")
+
+        # Create Pass 1 pipeline once
+        pass1_pipeline = self._create_pipeline(pass1_config, pass_number=1)
+
+        try:
+            for i, media_info in enumerate(media_files, 1):
+                media_basename = media_info['basename']
+                logger.info(f"Pass 1 - File {i}/{total_files}: {media_basename}")
+
+                try:
+                    result = pass1_pipeline.process(media_info)
+                    pass1_srt = Path(result['output_files']['final_srt'])
+
+                    # Store result with distinct name
+                    pass1_output = self.output_dir / f"{media_basename}_pass1.srt"
+                    if pass1_srt.exists():
+                        import shutil
+                        shutil.copy2(pass1_srt, pass1_output)
+
+                    pass1_results[media_basename] = result
+                    pass1_srts[media_basename] = pass1_output
+
+                except Exception as e:
+                    logger.error(f"Pass 1 failed for {media_basename}: {e}")
+                    failed_files.append(media_basename)
+                    continue
+
+        finally:
+            # Always cleanup Pass 1 pipeline to free VRAM
+            logger.info("Cleaning up Pass 1 pipeline...")
+            pass1_pipeline.cleanup()
+            del pass1_pipeline
+
+        # ========== PASS 2 PROCESSING ==========
+        if pass2_config:
+            logger.info(f"=== Pass 2: {pass2_config['pipeline']} ({pass2_config.get('sensitivity', 'balanced')}) ===")
+
+            # Create Pass 2 pipeline
+            pass2_pipeline = self._create_pipeline(pass2_config, pass_number=2)
+
+            try:
+                for i, media_info in enumerate(media_files, 1):
+                    media_basename = media_info['basename']
+
+                    # Skip files that failed in Pass 1
+                    if media_basename in failed_files:
+                        logger.debug(f"Skipping {media_basename} (failed in Pass 1)")
+                        continue
+
+                    logger.info(f"Pass 2 - File {i}/{total_files}: {media_basename}")
+
+                    try:
+                        result = pass2_pipeline.process(media_info)
+                        pass2_srt = Path(result['output_files']['final_srt'])
+
+                        # Store result with distinct name
+                        pass2_output = self.output_dir / f"{media_basename}_pass2.srt"
+                        if pass2_srt.exists():
+                            import shutil
+                            shutil.copy2(pass2_srt, pass2_output)
+
+                        pass2_results[media_basename] = result
+                        pass2_srts[media_basename] = pass2_output
+
+                    except Exception as e:
+                        logger.error(f"Pass 2 failed for {media_basename}: {e}")
+                        # Don't add to failed_files - we still have Pass 1 result
+                        continue
+
+            finally:
+                # Always cleanup Pass 2 pipeline to free VRAM
+                logger.info("Cleaning up Pass 2 pipeline...")
+                pass2_pipeline.cleanup()
+                del pass2_pipeline
+
+        # ========== MERGE PHASE ==========
+        logger.info("=== Merging results ===")
+
+        for media_info in media_files:
+            media_basename = media_info['basename']
+
+            # Create ensemble metadata for this file
+            ensemble_metadata = self._create_ensemble_metadata(
+                media_info, pass1_config, pass2_config, merge_strategy
+            )
+
+            # Handle failed files
+            if media_basename in failed_files:
+                ensemble_metadata['status'] = 'failed'
+                ensemble_metadata['error'] = 'Failed in Pass 1'
+                all_metadata.append(ensemble_metadata)
+                continue
+
+            # Get Pass 1 result
+            if media_basename in pass1_results:
+                pass1_result = pass1_results[media_basename]
+                ensemble_metadata['pass1'] = {
+                    'status': 'completed',
+                    'srt_path': str(pass1_srts[media_basename]),
+                    'subtitles': pass1_result['summary'].get('final_subtitles_refined', 0),
+                    'processing_time': pass1_result['summary'].get('total_processing_time_seconds', 0)
+                }
+            else:
+                ensemble_metadata['pass1'] = {'status': 'failed'}
+                ensemble_metadata['status'] = 'failed'
+                all_metadata.append(ensemble_metadata)
+                continue
+
+            # Get Pass 2 result and merge
+            if pass2_config and media_basename in pass2_results:
+                pass2_result = pass2_results[media_basename]
+                ensemble_metadata['pass2'] = {
+                    'status': 'completed',
+                    'srt_path': str(pass2_srts[media_basename]),
+                    'subtitles': pass2_result['summary'].get('final_subtitles_refined', 0),
+                    'processing_time': pass2_result['summary'].get('total_processing_time_seconds', 0)
+                }
+
+                # Merge results
+                merged_srt = self.output_dir / f"{media_basename}.merged.srt"
+                try:
+                    merge_stats = self.merge_engine.merge(
+                        srt1_path=pass1_srts[media_basename],
+                        srt2_path=pass2_srts[media_basename],
+                        output_path=merged_srt,
+                        strategy=merge_strategy
+                    )
+
+                    ensemble_metadata['merge'] = {
+                        'status': 'completed',
+                        'strategy': merge_strategy,
+                        'output_path': str(merged_srt),
+                        'statistics': merge_stats
+                    }
+                    final_output = merged_srt
+                except Exception as e:
+                    logger.error(f"Merge failed for {media_basename}: {e}")
+                    ensemble_metadata['merge'] = {'status': 'failed', 'error': str(e)}
+                    final_output = pass1_srts[media_basename]
+            else:
+                # Single pass or Pass 2 failed
+                if pass2_config:
+                    ensemble_metadata['pass2'] = {'status': 'failed'}
+                else:
+                    ensemble_metadata['pass2'] = {'status': 'skipped'}
+                ensemble_metadata['merge'] = {'status': 'skipped'}
+                final_output = pass1_srts[media_basename]
+
+            # Determine language code for final output naming
+            if self.subs_language == 'direct-to-english':
+                lang_code = 'en'
+            else:
+                if pass1_config.get('params'):
+                    lang_code = pass1_config['params'].get('language', 'ja')
+                else:
+                    lang_code = pass1_config.get('overrides', {}).get('language', 'ja')
+
+            # Create final output with standard naming
+            final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
+            if final_output.exists() and final_output != final_srt_path:
+                import shutil
+                shutil.copy2(final_output, final_srt_path)
+
+            # Update metadata
+            ensemble_metadata['summary'] = {
+                'final_output': str(final_srt_path),
+                'passes_completed': 2 if (pass2_config and media_basename in pass2_results) else 1
+            }
+            ensemble_metadata['output_files'] = {
+                'final_srt': str(final_srt_path),
+                'pass1_srt': str(pass1_srts.get(media_basename)) if media_basename in pass1_srts else None,
+                'pass2_srt': str(pass2_srts.get(media_basename)) if media_basename in pass2_srts else None
+            }
+
+            all_metadata.append(ensemble_metadata)
+
+        # Cleanup intermediate files if not keeping
+        if not self.keep_temp_files:
+            for media_info in media_files:
+                self._cleanup_intermediate(media_info['basename'])
+
+        batch_time = time.time() - batch_start_time
+        logger.info(f"Batch ensemble processing completed in {batch_time:.1f}s for {total_files} files")
+
+        return all_metadata
+
+    def _create_pipeline(
+        self,
+        pass_config: Dict[str, Any],
+        pass_number: int
+    ):
+        """
+        Create a pipeline instance for the given configuration.
+
+        Args:
+            pass_config: Pass configuration
+            pass_number: Pass number (1 or 2)
+
+        Returns:
+            Pipeline instance
+        """
+        pipeline_name = pass_config['pipeline']
+        sensitivity = pass_config.get('sensitivity', 'balanced')
+
+        # Model compatibility validation (faster-whisper doesn't support turbo)
+        PIPELINE_MODEL_COMPATIBILITY = {
+            'balanced': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+            'faster': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+            'fast': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+            'fidelity': ['turbo', 'large-v2', 'large-v3']
+        }
+
+        # Check if custom params have an incompatible model
+        if pass_config.get('params'):
+            custom_model = pass_config['params'].get('model_name')
+            if custom_model:
+                allowed_models = PIPELINE_MODEL_COMPATIBILITY.get(pipeline_name, ['large-v2', 'large-v3'])
+                if custom_model not in allowed_models:
+                    raise ValueError(
+                        f"Model '{custom_model}' is not compatible with pipeline '{pipeline_name}'. "
+                        f"Allowed models: {allowed_models}"
+                    )
+
+        # Resolve configuration
+        resolved_config = resolve_legacy_pipeline(
+            pipeline_name=pipeline_name,
+            sensitivity=sensitivity,
+            task='transcribe',
+            overrides=pass_config.get('overrides')
+        )
+
+        # Apply custom params if provided
+        if pass_config.get('params'):
+            custom_params = pass_config['params']
+            decoder_params = resolved_config['params']['decoder']
+            provider_params = resolved_config['params']['provider']
+            vad_params = resolved_config['params'].get('vad', {})
+            model_config = resolved_config['model']
+
+            # Define which params belong to which category
+            VAD_PARAM_NAMES = {
+                'threshold', 'neg_threshold', 'min_speech_duration_ms',
+                'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
+            }
+
+            # Parameters to skip (handled elsewhere or not applicable)
+            SKIP_PARAMS = {'scene_detection_method'}
+
+            for key, value in custom_params.items():
+                # Skip params that are handled elsewhere
+                if key in SKIP_PARAMS:
+                    continue
+                # Handle model config overrides
+                elif key == 'model_name':
+                    model_config['model_name'] = value
+                    logger.debug(f"Pass {pass_number}: Overriding model to {value}")
+                elif key == 'device':
+                    model_config['device'] = value
+                    logger.debug(f"Pass {pass_number}: Overriding device to {value}")
+                # Handle VAD parameter overrides
+                elif key in VAD_PARAM_NAMES:
+                    vad_params[key] = value
+                # Handle parameter overrides
+                elif key in decoder_params:
+                    decoder_params[key] = value
+                elif key in provider_params:
+                    provider_params[key] = value
+                else:
+                    # Unknown params go to provider (safer than decoder)
+                    provider_params[key] = value
+                    logger.debug(f"Pass {pass_number}: Unknown param '{key}' added to provider_params")
+
+        # Get pipeline class
+        pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
+        if not pipeline_class:
+            raise ValueError(f"Unknown pipeline: {pipeline_name}")
+
+        # Create temp directory for this pass
+        pass_temp_dir = self.temp_dir / f"pass{pass_number}"
+        pass_temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Instantiate pipeline
+        pipeline = pipeline_class(
+            output_dir=str(self.output_dir),
+            temp_dir=str(pass_temp_dir),
+            keep_temp_files=True,
+            subs_language=self.subs_language,
+            resolved_config=resolved_config,
+            progress_display=self.progress_display,
+            **self.extra_kwargs
+        )
+
+        return pipeline
+
     def _execute_pass(
         self,
         media_info: Dict,
@@ -227,24 +561,39 @@ class EnsembleOrchestrator:
             Pipeline processing result metadata
         """
         pipeline_name = pass_config['pipeline']
+        sensitivity = pass_config.get('sensitivity', 'balanced')
 
-        # Check if full params provided (customized mode)
+        # Always resolve base config to get proper structure
+        resolved_config = resolve_legacy_pipeline(
+            pipeline_name=pipeline_name,
+            sensitivity=sensitivity,
+            task='transcribe',
+            overrides=pass_config.get('overrides')
+        )
+
+        # If custom params provided, merge them into the resolved config
         if pass_config.get('params'):
-            # Use full configuration snapshot directly
-            resolved_config = pass_config['params']
-            logger.debug(f"Pass {pass_number}: Using custom configuration snapshot")
-        else:
-            # Resolve from pipeline + sensitivity presets (default mode)
-            sensitivity = pass_config.get('sensitivity', 'balanced')
-            overrides = pass_config.get('overrides')
+            custom_params = pass_config['params']
+            logger.debug(f"Pass {pass_number}: Applying custom parameters to {pipeline_name}/{sensitivity}")
 
-            resolved_config = resolve_legacy_pipeline(
-                pipeline_name=pipeline_name,
-                sensitivity=sensitivity,
-                task='transcribe',
-                overrides=overrides
-            )
-            logger.debug(f"Pass {pass_number}: Resolved config from {pipeline_name}/{sensitivity}")
+            # Custom params are flat dict of decoder+provider params from GUI
+            # Merge them into the appropriate sections
+            decoder_params = resolved_config['params']['decoder']
+            provider_params = resolved_config['params']['provider']
+
+            for key, value in custom_params.items():
+                # Check if param belongs to decoder or provider
+                if key in decoder_params:
+                    decoder_params[key] = value
+                elif key in provider_params:
+                    provider_params[key] = value
+                else:
+                    # Unknown param - add to decoder as fallback
+                    decoder_params[key] = value
+
+            logger.debug(f"Pass {pass_number}: Custom params applied")
+        else:
+            logger.debug(f"Pass {pass_number}: Using defaults for {pipeline_name}/{sensitivity}")
 
         # Get pipeline class
         pipeline_class = PIPELINE_CLASSES.get(pipeline_name)

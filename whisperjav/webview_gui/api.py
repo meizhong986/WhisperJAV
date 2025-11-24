@@ -951,6 +951,12 @@ class WhisperJAVAPI:
                 task='transcribe'
             )
 
+            # Determine scene detection method (default: auditok)
+            scene_detection_method = 'auditok'
+            if 'features' in config and config['features'].get('scene_detection'):
+                # Could be enhanced to read from config if specified
+                pass
+
             # Return the params section for customization
             return {
                 "success": True,
@@ -961,7 +967,8 @@ class WhisperJAVAPI:
                     "provider": config['params']['provider'],
                     "vad": config['params']['vad']
                 },
-                "model": config['model']
+                "model": config['model'],
+                "scene_detection_method": scene_detection_method
             }
         except Exception as e:
             return {
@@ -1127,7 +1134,7 @@ class WhisperJAVAPI:
                 args += ["--pass2-params", json.dumps(pass2['params'])]
 
         # Merge strategy
-        merge_strategy = config.get('merge_strategy', 'confidence')
+        merge_strategy = config.get('merge_strategy', 'smart_merge')
         args += ["--merge-strategy", merge_strategy]
 
         # Output directory

@@ -152,9 +152,9 @@ def parse_arguments():
                                help="JSON string of parameter overrides for pass 2 (deprecated)")
     twopass_group.add_argument("--pass2-params", default=None,
                                help="JSON string of full parameters for pass 2 (custom mode)")
-    twopass_group.add_argument("--merge-strategy", default="confidence",
-                               choices=["confidence", "union", "intersection", "timing"],
-                               help="Merge strategy for two-pass results (default: confidence)")
+    twopass_group.add_argument("--merge-strategy", default="smart_merge",
+                               choices=["smart_merge", "full_merge", "pass1_primary", "pass2_primary", "pass1_overlap", "pass2_overlap"],
+                               help="Merge strategy for two-pass results (default: smart_merge)")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -916,8 +916,8 @@ def main():
 
     logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
     
-    # Apply model override if specified via CLI
-    if args.model:
+    # Apply model override if specified via CLI (not for ensemble mode)
+    if args.model and resolved_config is not None:
         logger.info(f"Overriding model with CLI argument: {args.model}")
         # Create a model configuration for the CLI-specified model
         override_model_config = {
@@ -930,8 +930,8 @@ def main():
         resolved_config["model"] = override_model_config
         logger.debug(f"Model override applied: {args.model}")
 
-    # Apply language override to decoder params
-    if "params" in resolved_config and "decoder" in resolved_config["params"]:
+    # Apply language override to decoder params (not for ensemble mode)
+    if resolved_config is not None and "params" in resolved_config and "decoder" in resolved_config["params"]:
         resolved_config["params"]["decoder"]["language"] = language_code
         logger.debug(f"Language override applied to decoder params: {language_code}")
 
@@ -1018,19 +1018,20 @@ def main():
                 subs_language=args.subs_language
             )
 
-            # Process each file
-            for i, media_info in enumerate(media_files, 1):
-                logger.info(f"Processing file {i}/{len(media_files)}: {media_info['basename']}")
+            # Process all files with batch processing for optimal VRAM usage
+            # This loads each model only once for all files instead of per-file
+            results = orchestrator.process_batch(
+                media_files=media_files,
+                pass1_config=pass1_config,
+                pass2_config=pass2_config,
+                merge_strategy=args.merge_strategy
+            )
 
-                result = orchestrator.process(
-                    media_info=media_info,
-                    pass1_config=pass1_config,
-                    pass2_config=pass2_config,
-                    merge_strategy=args.merge_strategy
-                )
-
-                if result.get('error'):
-                    logger.error(f"Failed: {result['error']}")
+            # Report results
+            for result in results:
+                basename = result.get('input', {}).get('basename', 'unknown')
+                if result.get('error') or result.get('status') == 'failed':
+                    logger.error(f"Failed: {basename} - {result.get('error', 'Unknown error')}")
                 else:
                     output_path = result.get('summary', {}).get('final_output', 'unknown')
                     logger.info(f"Completed: {output_path}")

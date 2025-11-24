@@ -712,10 +712,38 @@ class StableTSASR:
         """Save transcription result to SRT file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Saving SRT to: {output_path}")
-        
+
         # Suppress output from stable_whisper
         with suppress_output():
             result.to_srt_vtt(str(output_path),
                               word_level=False,
                               segment_level=True,
                               strip=True)
+
+    def cleanup(self):
+        """
+        Release GPU/CPU memory by unloading models.
+
+        This should be called when the ASR instance is no longer needed,
+        especially in batch processing scenarios where models need to be
+        swapped between passes.
+        """
+        import gc
+
+        logger.debug(f"Cleaning up {self.__class__.__name__} resources...")
+
+        # Delete the stable-ts model (either standard or faster-whisper backend)
+        if hasattr(self, 'model'):
+            del self.model
+            self.model = None
+            logger.debug("Stable-ts model unloaded")
+
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            logger.debug("CUDA cache cleared")
+
+        # Force garbage collection
+        gc.collect()
+
+        logger.debug(f"{self.__class__.__name__} cleanup complete")

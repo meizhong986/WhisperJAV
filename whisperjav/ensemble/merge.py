@@ -11,10 +11,12 @@ from whisperjav.utils.logger import logger
 
 class MergeStrategy(Enum):
     """Available merge strategies."""
-    CONFIDENCE = 'confidence'
-    UNION = 'union'
-    INTERSECTION = 'intersection'
-    TIMING = 'timing'
+    FULL_MERGE = 'full_merge'
+    PASS1_PRIMARY = 'pass1_primary'
+    PASS2_PRIMARY = 'pass2_primary'
+    PASS1_OVERLAP = 'pass1_overlap'
+    PASS2_OVERLAP = 'pass2_overlap'
+    SMART_MERGE = 'smart_merge'
 
 
 @dataclass
@@ -33,13 +35,18 @@ class Subtitle:
 class MergeEngine:
     """Merges SRT files from two-pass processing."""
 
+    # Overlap threshold: 30% of base subtitle duration
+    OVERLAP_THRESHOLD = 0.30
+
     def __init__(self):
         """Initialize the merge engine."""
         self.strategies = {
-            'confidence': self._merge_confidence,
-            'union': self._merge_union,
-            'intersection': self._merge_intersection,
-            'timing': self._merge_timing,
+            'full_merge': self._merge_full,
+            'pass1_primary': self._merge_pass1_primary,
+            'pass2_primary': self._merge_pass2_primary,
+            'pass1_overlap': self._merge_pass1_overlap,
+            'pass2_overlap': self._merge_pass2_overlap,
+            'smart_merge': self._merge_smart,
         }
 
     def merge(
@@ -47,7 +54,7 @@ class MergeEngine:
         srt1_path: Path,
         srt2_path: Path,
         output_path: Path,
-        strategy: str = 'confidence'
+        strategy: str = 'smart_merge'
     ) -> Dict[str, Any]:
         """
         Merge two SRT files using the specified strategy.
@@ -207,21 +214,153 @@ class MergeEngine:
 
     # Merge Strategies
 
-    def _merge_confidence(
+    def _has_overlap(self, base_sub: Subtitle, other_sub: Subtitle, allow_threshold: bool = False) -> bool:
+        """
+        Check if two subtitles overlap.
+
+        Args:
+            base_sub: The base subtitle to check against
+            other_sub: The other subtitle
+            allow_threshold: If True, allow up to OVERLAP_THRESHOLD overlap
+
+        Returns:
+            True if they overlap (considering threshold)
+        """
+        overlap_start = max(base_sub.start_time, other_sub.start_time)
+        overlap_end = min(base_sub.end_time, other_sub.end_time)
+
+        if overlap_end <= overlap_start:
+            return False  # No overlap
+
+        overlap_duration = overlap_end - overlap_start
+
+        if allow_threshold:
+            # Allow overlap up to threshold of base duration
+            allowed_overlap = base_sub.duration * self.OVERLAP_THRESHOLD
+            return overlap_duration > allowed_overlap
+        else:
+            return True  # Any overlap counts
+
+    def _merge_full(
         self,
         subs1: List[Subtitle],
         subs2: List[Subtitle]
     ) -> List[Subtitle]:
         """
-        Confidence-based merge: prefer longer, more detailed subtitles.
+        Full Merge: include every subtitle line from both passes.
 
-        For overlapping segments, choose the one with more text content
-        as it likely captured more detail.
+        No filtering - combines all subtitles and sorts by time.
+        """
+        merged = []
+
+        # Add all from both passes
+        for sub in subs1:
+            merged.append(Subtitle(0, sub.start_time, sub.end_time, sub.text))
+        for sub in subs2:
+            merged.append(Subtitle(0, sub.start_time, sub.end_time, sub.text))
+
+        # Sort by start time
+        merged.sort(key=lambda s: s.start_time)
+        return merged
+
+    def _merge_pass1_primary(
+        self,
+        subs1: List[Subtitle],
+        subs2: List[Subtitle]
+    ) -> List[Subtitle]:
+        """
+        Pass 1 + Fill From Pass 2: keeps Pass 1 as primary, fills gaps from Pass 2.
+
+        Only adds from Pass 2 if there's no overlap with any Pass 1 subtitle.
+        """
+        return self._merge_primary_fill(subs1, subs2, allow_threshold=False)
+
+    def _merge_pass2_primary(
+        self,
+        subs1: List[Subtitle],
+        subs2: List[Subtitle]
+    ) -> List[Subtitle]:
+        """
+        Pass 2 + Fill From Pass 1: keeps Pass 2 as primary, fills gaps from Pass 1.
+
+        Only adds from Pass 1 if there's no overlap with any Pass 2 subtitle.
+        """
+        return self._merge_primary_fill(subs2, subs1, allow_threshold=False)
+
+    def _merge_pass1_overlap(
+        self,
+        subs1: List[Subtitle],
+        subs2: List[Subtitle]
+    ) -> List[Subtitle]:
+        """
+        Pass 1 + Fill with Overlap Threshold: Pass 1 primary with 30% overlap tolerance.
+
+        Adds from Pass 2 unless overlap exceeds 30% of Pass 1 subtitle duration.
+        """
+        return self._merge_primary_fill(subs1, subs2, allow_threshold=True)
+
+    def _merge_pass2_overlap(
+        self,
+        subs1: List[Subtitle],
+        subs2: List[Subtitle]
+    ) -> List[Subtitle]:
+        """
+        Pass 2 + Fill with Overlap Threshold: Pass 2 primary with 30% overlap tolerance.
+
+        Adds from Pass 1 unless overlap exceeds 30% of Pass 2 subtitle duration.
+        """
+        return self._merge_primary_fill(subs2, subs1, allow_threshold=True)
+
+    def _merge_primary_fill(
+        self,
+        primary: List[Subtitle],
+        secondary: List[Subtitle],
+        allow_threshold: bool
+    ) -> List[Subtitle]:
+        """
+        Core logic for primary + fill strategies.
+
+        Args:
+            primary: Primary subtitle list (kept as-is)
+            secondary: Secondary list to fill gaps from
+            allow_threshold: Whether to allow partial overlap
+        """
+        merged = []
+
+        # Add all primary subtitles
+        for sub in primary:
+            merged.append(Subtitle(0, sub.start_time, sub.end_time, sub.text))
+
+        # Add secondary subtitles that don't overlap with primary
+        for sec_sub in secondary:
+            has_conflict = False
+            for pri_sub in primary:
+                if self._has_overlap(pri_sub, sec_sub, allow_threshold):
+                    has_conflict = True
+                    break
+
+            if not has_conflict:
+                merged.append(Subtitle(0, sec_sub.start_time, sec_sub.end_time, sec_sub.text))
+
+        # Sort by start time
+        merged.sort(key=lambda s: s.start_time)
+        return merged
+
+    def _merge_smart(
+        self,
+        subs1: List[Subtitle],
+        subs2: List[Subtitle]
+    ) -> List[Subtitle]:
+        """
+        Smart Merge: automatically picks the better subtitle from each pass.
+
+        For overlapping segments, chooses the one with longer text (more detail).
+        Non-overlapping segments are included from both passes.
         """
         if not subs1:
-            return subs2.copy()
+            return [Subtitle(0, s.start_time, s.end_time, s.text) for s in subs2]
         if not subs2:
-            return subs1.copy()
+            return [Subtitle(0, s.start_time, s.end_time, s.text) for s in subs1]
 
         merged = []
         used_from_2 = set()
@@ -240,13 +379,16 @@ class MergeEngine:
                     best_overlap = overlap
                     best_match = (i, sub2)
 
-            if best_match and best_overlap > 0.5:
+            if best_match and best_overlap > 0.3:  # Minimum 30% overlap to consider match
                 i, sub2 = best_match
                 used_from_2.add(i)
 
-                # Choose subtitle with more content
-                if len(sub2.text) > len(sub1.text):
-                    # Use sub2's text with averaged timing
+                # Choose subtitle with longer text (normalized by stripping whitespace)
+                text1_len = len(sub1.text.strip())
+                text2_len = len(sub2.text.strip())
+
+                if text2_len > text1_len:
+                    # Use sub2's text with expanded timing
                     merged.append(Subtitle(
                         index=0,
                         start_time=min(sub1.start_time, sub2.start_time),
@@ -254,6 +396,7 @@ class MergeEngine:
                         text=sub2.text
                     ))
                 else:
+                    # Use sub1's text with expanded timing
                     merged.append(Subtitle(
                         index=0,
                         start_time=min(sub1.start_time, sub2.start_time),
@@ -283,193 +426,38 @@ class MergeEngine:
         merged.sort(key=lambda s: s.start_time)
         return merged
 
-    def _merge_union(
-        self,
-        subs1: List[Subtitle],
-        subs2: List[Subtitle]
-    ) -> List[Subtitle]:
-        """
-        Union merge: include all unique subtitles from both passes.
-
-        Remove duplicates based on timing and text similarity.
-        """
-        if not subs1:
-            return subs2.copy()
-        if not subs2:
-            return subs1.copy()
-
-        # Start with all from subs1
-        merged = [Subtitle(0, s.start_time, s.end_time, s.text) for s in subs1]
-
-        # Add from subs2 only if not duplicate
-        for sub2 in subs2:
-            is_duplicate = False
-            for sub1 in merged:
-                overlap = self._calculate_overlap(sub1, sub2)
-                text_sim = self._text_similarity(sub1.text, sub2.text)
-
-                # Consider duplicate if high overlap and similar text
-                if overlap > 0.7 and text_sim > 0.5:
-                    is_duplicate = True
-                    break
-
-            if not is_duplicate:
-                merged.append(Subtitle(
-                    index=0,
-                    start_time=sub2.start_time,
-                    end_time=sub2.end_time,
-                    text=sub2.text
-                ))
-
-        # Sort by start time
-        merged.sort(key=lambda s: s.start_time)
-        return merged
-
-    def _merge_intersection(
-        self,
-        subs1: List[Subtitle],
-        subs2: List[Subtitle]
-    ) -> List[Subtitle]:
-        """
-        Intersection merge: only include subtitles present in both passes.
-
-        High precision, lower recall. Good for confident output.
-        """
-        if not subs1 or not subs2:
-            return []
-
-        merged = []
-        used_from_2 = set()
-
-        for sub1 in subs1:
-            best_match = None
-            best_score = 0.0
-
-            for i, sub2 in enumerate(subs2):
-                if i in used_from_2:
-                    continue
-
-                overlap = self._calculate_overlap(sub1, sub2)
-                text_sim = self._text_similarity(sub1.text, sub2.text)
-
-                # Combined score
-                score = overlap * 0.6 + text_sim * 0.4
-
-                if score > best_score:
-                    best_score = score
-                    best_match = (i, sub2)
-
-            # Only include if both passes agree (score > 0.5)
-            if best_match and best_score > 0.5:
-                i, sub2 = best_match
-                used_from_2.add(i)
-
-                # Merge timing and choose longer text
-                merged.append(Subtitle(
-                    index=0,
-                    start_time=(sub1.start_time + sub2.start_time) / 2,
-                    end_time=(sub1.end_time + sub2.end_time) / 2,
-                    text=sub1.text if len(sub1.text) >= len(sub2.text) else sub2.text
-                ))
-
-        # Sort by start time
-        merged.sort(key=lambda s: s.start_time)
-        return merged
-
-    def _merge_timing(
-        self,
-        subs1: List[Subtitle],
-        subs2: List[Subtitle]
-    ) -> List[Subtitle]:
-        """
-        Timing-based merge: prefer subtitles with tighter timing.
-
-        Shorter duration often indicates more precise timing boundaries.
-        """
-        if not subs1:
-            return subs2.copy()
-        if not subs2:
-            return subs1.copy()
-
-        merged = []
-        used_from_2 = set()
-
-        for sub1 in subs1:
-            best_match = None
-            best_overlap = 0.0
-
-            for i, sub2 in enumerate(subs2):
-                if i in used_from_2:
-                    continue
-
-                overlap = self._calculate_overlap(sub1, sub2)
-                if overlap > best_overlap:
-                    best_overlap = overlap
-                    best_match = (i, sub2)
-
-            if best_match and best_overlap > 0.5:
-                i, sub2 = best_match
-                used_from_2.add(i)
-
-                # Choose subtitle with tighter timing (shorter duration)
-                # but keep text from longer one
-                if sub1.duration <= sub2.duration:
-                    timing_source = sub1
-                    text_source = sub1 if len(sub1.text) >= len(sub2.text) else sub2
-                else:
-                    timing_source = sub2
-                    text_source = sub1 if len(sub1.text) >= len(sub2.text) else sub2
-
-                merged.append(Subtitle(
-                    index=0,
-                    start_time=timing_source.start_time,
-                    end_time=timing_source.end_time,
-                    text=text_source.text
-                ))
-            else:
-                merged.append(Subtitle(
-                    index=0,
-                    start_time=sub1.start_time,
-                    end_time=sub1.end_time,
-                    text=sub1.text
-                ))
-
-        # Add unmatched from subs2
-        for i, sub2 in enumerate(subs2):
-            if i not in used_from_2:
-                merged.append(Subtitle(
-                    index=0,
-                    start_time=sub2.start_time,
-                    end_time=sub2.end_time,
-                    text=sub2.text
-                ))
-
-        # Sort by start time
-        merged.sort(key=lambda s: s.start_time)
-        return merged
-
 
 def get_available_strategies() -> List[Dict[str, str]]:
     """Return list of available merge strategies with descriptions."""
     return [
         {
-            'name': 'confidence',
-            'label': 'Confidence-based',
-            'description': 'Prefer subtitles with more content detail'
+            'name': 'smart_merge',
+            'label': 'Smart Merge (Best Quality)',
+            'description': 'Automatically picks the better subtitle line from each pass'
         },
         {
-            'name': 'union',
-            'label': 'Union',
-            'description': 'Include all unique subtitles from both passes'
+            'name': 'full_merge',
+            'label': 'Full Merge (All Lines)',
+            'description': 'Includes every subtitle line from both passes'
         },
         {
-            'name': 'intersection',
-            'label': 'Intersection',
-            'description': 'Only include subtitles confirmed by both passes'
+            'name': 'pass1_primary',
+            'label': 'Pass 1 + Fill From Pass 2',
+            'description': 'Keeps Pass 1 as primary and fills missing parts from Pass 2'
         },
         {
-            'name': 'timing',
-            'label': 'Timing-based',
-            'description': 'Prefer subtitles with tighter timing boundaries'
+            'name': 'pass2_primary',
+            'label': 'Pass 2 + Fill From Pass 1',
+            'description': 'Keeps Pass 2 as primary and fills missing parts from Pass 1'
+        },
+        {
+            'name': 'pass1_overlap',
+            'label': 'Pass 1 + Fill (30% Overlap)',
+            'description': 'Pass 1 primary, allows partial overlap when filling from Pass 2'
+        },
+        {
+            'name': 'pass2_overlap',
+            'label': 'Pass 2 + Fill (30% Overlap)',
+            'description': 'Pass 2 primary, allows partial overlap when filling from Pass 1'
         }
     ]

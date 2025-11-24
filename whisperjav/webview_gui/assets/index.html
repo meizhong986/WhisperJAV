@@ -345,80 +345,68 @@
                             aria-labelledby="tab3-button"
                         >
                             <div class="ensemble-twopass-container">
-                                <!-- Pass 1 Section -->
-                                <div class="pass-section">
-                                    <div class="pass-header">
-                                        <h3>Pass 1</h3>
-                                        <span id="pass1-badge" class="pass-badge default">Default</span>
-                                    </div>
-                                    <div class="pass-content">
-                                        <div class="form-group">
-                                            <label for="pass1-pipeline" class="form-label">Pipeline:</label>
-                                            <select id="pass1-pipeline" class="form-select">
-                                                <option value="balanced" selected>Balanced</option>
-                                                <option value="fast">Fast</option>
-                                                <option value="faster">Faster</option>
-                                                <option value="fidelity">Fidelity</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="pass1-sensitivity" class="form-label">Sensitivity:</label>
-                                            <select id="pass1-sensitivity" class="form-select">
-                                                <option value="aggressive">Aggressive</option>
-                                                <option value="balanced" selected>Balanced</option>
-                                                <option value="conservative">Conservative</option>
-                                            </select>
-                                        </div>
-                                        <button type="button" class="btn btn-secondary" id="customize-pass1">
-                                            Customize Parameters
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Pass 2 Section -->
-                                <div class="pass-section">
-                                    <div class="pass-header">
-                                        <label class="checkbox-label">
-                                            <input type="checkbox" id="pass2-enabled">
-                                            <span>Enable Pass 2</span>
-                                        </label>
-                                        <span id="pass2-badge" class="pass-badge default">Default</span>
-                                    </div>
-                                    <div class="pass-content" id="pass2-content">
-                                        <div class="form-group">
-                                            <label for="pass2-pipeline" class="form-label">Pipeline:</label>
-                                            <select id="pass2-pipeline" class="form-select" disabled>
-                                                <option value="balanced">Balanced</option>
-                                                <option value="fast">Fast</option>
-                                                <option value="faster">Faster</option>
-                                                <option value="fidelity" selected>Fidelity</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="pass2-sensitivity" class="form-label">Sensitivity:</label>
-                                            <select id="pass2-sensitivity" class="form-select" disabled>
-                                                <option value="aggressive">Aggressive</option>
-                                                <option value="balanced" selected>Balanced</option>
-                                                <option value="conservative">Conservative</option>
-                                            </select>
-                                        </div>
-                                        <button type="button" class="btn btn-secondary" id="customize-pass2" disabled>
-                                            Customize Parameters
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Merge Strategy Section -->
-                                <div class="merge-section">
-                                    <div class="form-group">
-                                        <label for="merge-strategy" class="form-label">Merge Strategy:</label>
-                                        <select id="merge-strategy" class="form-select" disabled>
-                                            <option value="confidence" selected>Confidence-based</option>
-                                            <option value="union">Union (all unique)</option>
-                                            <option value="intersection">Intersection (confirmed only)</option>
-                                            <option value="timing">Timing-based</option>
+                                <!-- Pass 1 Row -->
+                                <div class="pass-row">
+                                    <span class="pass-label">Pass 1</span>
+                                    <div class="pass-controls">
+                                        <label for="pass1-pipeline" class="control-label">Pipeline:</label>
+                                        <select id="pass1-pipeline" class="form-select compact">
+                                            <option value="balanced" selected>Balanced</option>
+                                            <option value="fast">Fast</option>
+                                            <option value="faster">Faster</option>
+                                            <option value="fidelity">Fidelity</option>
                                         </select>
+                                        <label for="pass1-sensitivity" class="control-label">Sensitivity:</label>
+                                        <select id="pass1-sensitivity" class="form-select compact">
+                                            <option value="aggressive">Aggressive</option>
+                                            <option value="balanced" selected>Balanced</option>
+                                            <option value="conservative">Conservative</option>
+                                        </select>
+                                        <button type="button" class="btn btn-secondary btn-compact" id="customize-pass1">
+                                            Customize Parameters
+                                        </button>
                                     </div>
+                                    <span id="pass1-badge" class="pass-badge default">DEFAULT</span>
+                                </div>
+
+                                <!-- Pass 2 Row -->
+                                <div class="pass-row">
+                                    <label class="pass-label checkbox-label">
+                                        <input type="checkbox" id="pass2-enabled">
+                                        <span>Enable Pass 2</span>
+                                    </label>
+                                    <div class="pass-controls" id="pass2-content">
+                                        <label for="pass2-pipeline" class="control-label">Pipeline:</label>
+                                        <select id="pass2-pipeline" class="form-select compact" disabled>
+                                            <option value="balanced">Balanced</option>
+                                            <option value="fast">Fast</option>
+                                            <option value="faster">Faster</option>
+                                            <option value="fidelity" selected>Fidelity</option>
+                                        </select>
+                                        <label for="pass2-sensitivity" class="control-label">Sensitivity:</label>
+                                        <select id="pass2-sensitivity" class="form-select compact" disabled>
+                                            <option value="aggressive">Aggressive</option>
+                                            <option value="balanced" selected>Balanced</option>
+                                            <option value="conservative">Conservative</option>
+                                        </select>
+                                        <button type="button" class="btn btn-secondary btn-compact" id="customize-pass2" disabled>
+                                            Customize Parameters
+                                        </button>
+                                    </div>
+                                    <span id="pass2-badge" class="pass-badge default">DEFAULT</span>
+                                </div>
+
+                                <!-- Merge Strategy Row -->
+                                <div class="merge-row">
+                                    <label for="merge-strategy" class="control-label">Merge Strategy:</label>
+                                    <select id="merge-strategy" class="form-select merge-select" disabled>
+                                        <option value="smart_merge" selected>Smart Merge (Best Quality)</option>
+                                        <option value="full_merge">Full Merge (All Lines)</option>
+                                        <option value="pass1_primary">Pass 1 + Fill From Pass 2</option>
+                                        <option value="pass2_primary">Pass 2 + Fill From Pass 1</option>
+                                        <option value="pass1_overlap">Pass 1 + Fill (30% Overlap)</option>
+                                        <option value="pass2_overlap">Pass 2 + Fill (30% Overlap)</option>
+                                    </select>
                                 </div>
 
                                 <!-- Info Footer -->
@@ -544,8 +532,35 @@
                 <button class="modal-close" id="customizeModalClose" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
-                <div id="customizeModalParams" class="param-container">
-                    <!-- Dynamically generated parameter controls -->
+                <!-- Tab Navigation -->
+                <div class="modal-tabs">
+                    <button class="modal-tab active" data-tab="model">Model</button>
+                    <button class="modal-tab" data-tab="transcriber">Transcriber</button>
+                    <button class="modal-tab" data-tab="decoder">Decoder</button>
+                    <button class="modal-tab" data-tab="engine">Engine</button>
+                    <button class="modal-tab" data-tab="vad">VAD</button>
+                    <button class="modal-tab" data-tab="scene">Scene</button>
+                </div>
+                <!-- Tab Panels -->
+                <div class="modal-tab-content">
+                    <div id="tab-model" class="modal-tab-panel active">
+                        <!-- Model selection: model name and device -->
+                    </div>
+                    <div id="tab-transcriber" class="modal-tab-panel">
+                        <!-- Transcriber params: temperature, thresholds, etc. -->
+                    </div>
+                    <div id="tab-decoder" class="modal-tab-panel">
+                        <!-- Decoder params: task, language, beam_size, etc. -->
+                    </div>
+                    <div id="tab-engine" class="modal-tab-panel">
+                        <!-- Engine params: varies by pipeline backend -->
+                    </div>
+                    <div id="tab-vad" class="modal-tab-panel">
+                        <!-- VAD params: threshold, durations, etc. -->
+                    </div>
+                    <div id="tab-scene" class="modal-tab-panel">
+                        <!-- Scene detection: auditok/silero selector -->
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
