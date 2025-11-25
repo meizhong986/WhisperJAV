@@ -213,7 +213,7 @@
                             role="tabpanel"
                             aria-labelledby="tab2-button"
                         >
-                            <!-- Row 1 (new): Model override + model select + Async + Verbosity -->
+                            <!-- Row 1 (new): Model override + model select + Async + Debug -->
                             <div class="form-row" id="adv-row-1">
                                 <div class="form-group">
                                     <label class="checkbox-label">
@@ -234,14 +234,11 @@
                                         <span>Async processing</span>
                                     </label>
                                 </div>
-                                <div class="form-group inline-field">
-                                    <label for="verbosity" class="form-label" style="white-space: nowrap;">Verbosity:</label>
-                                    <select id="verbosity" class="form-select">
-                                        <option value="quiet">quiet</option>
-                                        <option value="summary" selected>summary</option>
-                                        <option value="normal">normal</option>
-                                        <option value="verbose">verbose</option>
-                                    </select>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="debugLogging">
+                                        <span>Debug logging</span>
+                                    </label>
                                 </div>
                                 <div class="form-group inline-field">
                                     <label for="sceneDetectionMethod" class="form-label" style="white-space: nowrap;">Scene detection:</label>

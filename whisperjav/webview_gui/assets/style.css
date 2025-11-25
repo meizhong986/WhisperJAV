@@ -622,10 +622,10 @@ body {
 /* =====================
    Tab 2 Advanced Options
    ===================== */
-/* Row 1: 4 columns (Model override, model select tight, Async, Verbosity) */
+/* Row 1: 4 columns (Model override, model select tight, Async, Debug) */
 #tab2-panel #adv-row-1 {
     /* Make the first two columns a bit tighter so the select sits closer */
-    grid-template-columns: minmax(160px, 0.75fr) minmax(140px, 0.7fr) minmax(160px, 0.8fr) minmax(180px, 1fr);
+    grid-template-columns: minmax(160px, 0.75fr) minmax(140px, 0.7fr) minmax(160px, 0.8fr) minmax(160px, 0.8fr);
     column-gap: 3px; /* bring model select closer to the checkbox */
 }
 
@@ -634,7 +634,7 @@ body {
     width: 155px; /* slightly narrower to visually tuck in */
 }
 
-/* Make the model select’s container shrink and hug the left edge */
+/* Make the model select's container shrink and hug the left edge */
 #tab2-panel #adv-row-1 .form-group:nth-child(2) {
     justify-self: start;      /* align this grid item to the left */
     width: max-content;       /* let the item shrink to its content width */
@@ -649,11 +649,6 @@ body {
 /* Keep the model override label from wrapping and avoid extra right padding */
 #tab2-panel #adv-row-1 .checkbox-label {
     white-space: nowrap;
-}
-
-/* Keep Verbosity select a reasonable width */
-#verbosity {
-    width: 160px;
 }
 
 /* Generic inline field helper: label + control in a single row */

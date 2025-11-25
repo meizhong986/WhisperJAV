@@ -174,13 +174,15 @@ def parse_arguments():
     
     # Progress control
     progress_group = parser.add_argument_group("Progress Display Options")
-    progress_group.add_argument("--no-progress", action="store_true", 
+    progress_group.add_argument("--no-progress", action="store_true",
                                help="Disable progress bars")
-    progress_group.add_argument("--verbosity", 
+    progress_group.add_argument("--verbosity",
                                choices=["quiet", "summary", "normal", "verbose"],
                                default=None,
                                help="Console output verbosity (overrides config)")
-    
+    progress_group.add_argument("--debug", action="store_true",
+                               help="Enable debug logging (comprehensive diagnostic output)")
+
     # Enhancement features
     enhancement_group = parser.add_argument_group("Optional Enhancement Features")
     enhancement_group.add_argument("--adaptive-classification", action="store_true")
@@ -839,9 +841,16 @@ def main():
 
     # Setup logging
     global logger
-    logger = setup_logger("whisperjav", args.log_level, args.log_file)
+    log_level = "DEBUG" if args.debug else args.log_level
+    logger = setup_logger("whisperjav", log_level, args.log_file)
+
+    if args.debug:
+        logger.info("=" * 70)
+        logger.info("DEBUG MODE ENABLED - Comprehensive diagnostic logging active")
+        logger.info("=" * 70)
+
     print_banner()
-    
+
     if not args.input:
         logger.error("No input files specified. Use -h for help.")
         sys.exit(1)

@@ -171,6 +171,16 @@ class FasterWhisperProASR:
             f"on device: {self.device}, compute_type: {self.compute_type}"
         )
 
+        # DIAGNOSTIC: Log exact initialization parameters
+        logger.debug("=" * 60)
+        logger.debug("DIAGNOSTIC: Faster-Whisper Model Initialization")
+        logger.debug(f"  model_size_or_path: {self.model_name}")
+        logger.debug(f"  device: {self.device}")
+        logger.debug(f"  compute_type: {self.compute_type}")
+        logger.debug(f"  cpu_threads: 0 (default=4)")
+        logger.debug(f"  num_workers: 1")
+        logger.debug("=" * 60)
+
         try:
             self.whisper_model = WhisperModel(
                 model_size_or_path=self.model_name,
@@ -183,8 +193,11 @@ class FasterWhisperProASR:
                 f"Faster-Whisper model loaded successfully "
                 f"(backend: ctranslate2, direct API - no stable-ts wrapper)"
             )
+            logger.debug(f"Model type: {type(self.whisper_model)}")
         except Exception as e:
             logger.error(f"Failed to load Faster-Whisper model: {e}", exc_info=True)
+            logger.error(f"Model name that failed: {self.model_name}")
+            logger.error(f"Device: {self.device}, Compute type: {self.compute_type}")
             raise
 
     def _log_sensitivity_parameters(self):
@@ -329,22 +342,51 @@ class FasterWhisperProASR:
         audio_path = Path(audio_path)
         logger.debug(f"Transcribing with VAD: {audio_path.name}")
 
+        # DIAGNOSTIC: Log audio file info
+        logger.debug("=" * 60)
+        logger.debug("DIAGNOSTIC: Audio File Loading")
+        logger.debug(f"  File path: {audio_path}")
+        logger.debug(f"  File exists: {audio_path.exists()}")
+        if audio_path.exists():
+            logger.debug(f"  File size: {audio_path.stat().st_size / 1024 / 1024:.2f} MB")
+
         try:
             audio_data, sample_rate = sf.read(str(audio_path), dtype='float32')
+            logger.debug(f"  Audio loaded successfully")
+            logger.debug(f"  Sample rate: {sample_rate} Hz")
+            logger.debug(f"  Original shape: {audio_data.shape}")
+            logger.debug(f"  Data type: {audio_data.dtype}")
+
             if audio_data.ndim > 1:
                 audio_data = np.mean(audio_data, axis=1)
+                logger.debug(f"  Converted stereo to mono")
+                logger.debug(f"  Final shape: {audio_data.shape}")
+            logger.debug("=" * 60)
         except Exception as e:
             logger.error(f"Failed to read audio file {audio_path}: {e}")
             raise
 
         vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
 
+        # DIAGNOSTIC: Log VAD results
+        logger.debug("=" * 60)
+        logger.debug("DIAGNOSTIC: VAD Processing Results")
+        logger.debug(f"  VAD groups detected: {len(vad_segments)}")
+        if vad_segments:
+            total_segments = sum(len(group) for group in vad_segments)
+            logger.debug(f"  Total VAD segments: {total_segments}")
+            for i, group in enumerate(vad_segments):
+                logger.debug(f"  Group {i+1}: {len(group)} segments, "
+                           f"duration {group[-1]['end_sec'] - group[0]['start_sec']:.2f}s")
+        logger.debug("=" * 60)
+
         if not vad_segments:
             logger.debug(f"No speech detected in {audio_path.name}")
             return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
 
         all_segments = []
-        for vad_group in vad_segments:
+        for i, vad_group in enumerate(vad_segments, 1):
+            logger.debug(f"Processing VAD group {i}/{len(vad_segments)}")
             segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
             all_segments.extend(segments)
 
@@ -423,15 +465,37 @@ class FasterWhisperProASR:
         # Get cleaned parameters from tuner
         whisper_params = self._prepare_whisper_params()
 
-        # Use logger to output the final parameters at debug level
-        logging.debug("Final Parameters for faster-whisper: %s", whisper_params)
+        # DIAGNOSTIC: Log pre-transcription state
+        logger.debug("=" * 60)
+        logger.debug("DIAGNOSTIC: Pre-Transcription State")
+        logger.debug(f"  Model: {self.model_name}")
+        logger.debug(f"  VAD group span: {start_sec:.2f}s - {end_sec:.2f}s (duration: {end_sec - start_sec:.2f}s)")
+        logger.debug(f"  Group audio type: {type(group_audio)}")
+        logger.debug(f"  Group audio shape: {group_audio.shape}")
+        logger.debug(f"  Group audio dtype: {group_audio.dtype}")
+        logger.debug(f"  Sample rate: {sample_rate} Hz")
+        logger.debug(f"  Audio is numpy array: {isinstance(group_audio, np.ndarray)}")
+        logger.debug(f"  Audio length: {len(group_audio)} samples = {len(group_audio)/sample_rate:.2f}s")
+        logger.debug(f"  Whisper params keys: {list(whisper_params.keys())}")
+        logger.debug(f"  Full whisper params: {whisper_params}")
+        logger.debug("=" * 60)
 
         try:
+            # DIAGNOSTIC: Log exact transcribe call
+            logger.debug("DIAGNOSTIC: Calling whisper_model.transcribe()...")
+            logger.debug(f"  Input type: {type(group_audio)}")
+            logger.debug(f"  Input shape: {group_audio.shape}")
+            logger.debug(f"  Kwargs count: {len(whisper_params)}")
+
             # CHANGED: faster-whisper returns (generator, info) tuple
             segments_generator, transcription_info = self.whisper_model.transcribe(
                 group_audio,
                 **whisper_params
             )
+
+            logger.debug("DIAGNOSTIC: transcribe() call successful, got generator and info")
+            logger.debug(f"  Info type: {type(transcription_info)}")
+            logger.debug(f"  Generator type: {type(segments_generator)}")
 
             # CHANGED: Consume generator and convert to dict format
             raw_segments = []
@@ -443,10 +507,21 @@ class FasterWhisperProASR:
                     "avg_logprob": segment.avg_logprob
                 })
 
+            logger.debug(f"DIAGNOSTIC: Generator consumed successfully, got {len(raw_segments)} raw segments")
             result = {"segments": raw_segments}
 
         except Exception as e:
-            logger.error(f"Transcription of a VAD group failed: {e}", exc_info=True)
+            # DIAGNOSTIC: Enhanced error logging
+            logger.error("=" * 60)
+            logger.error("DIAGNOSTIC: Transcription FAILED")
+            logger.error(f"  Exception type: {type(e).__name__}")
+            logger.error(f"  Exception message: {e}")
+            logger.error(f"  Model: {self.model_name}")
+            logger.error(f"  Audio input type: {type(group_audio)}")
+            logger.error(f"  Audio shape: {group_audio.shape}")
+            logger.error(f"  Params that were passed: {whisper_params}")
+            logger.error("=" * 60)
+            logger.error(f"Full traceback:", exc_info=True)
 
             # Fallback to minimal parameters
             try:
@@ -476,9 +551,17 @@ class FasterWhisperProASR:
                     })
 
                 result = {"segments": raw_segments}
+                logger.info("DIAGNOSTIC: Minimal parameters fallback succeeded")
 
             except Exception as e2:
-                logger.error(f"Even minimal transcribe failed: {e2}")
+                logger.error("=" * 60)
+                logger.error("DIAGNOSTIC: Even MINIMAL PARAMETERS failed")
+                logger.error(f"  Exception type: {type(e2).__name__}")
+                logger.error(f"  Exception message: {e2}")
+                logger.error(f"  Model: {self.model_name}")
+                logger.error(f"  Minimal params tried: {minimal_params}")
+                logger.error("=" * 60)
+                logger.error(f"Full traceback:", exc_info=True)
                 return []
 
         if not result or not result.get("segments"):

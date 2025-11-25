@@ -504,8 +504,8 @@ const FormManager = {
             source_language: document.getElementById('source-language').value,
             subs_language: document.getElementById('language').value,
 
-            // Optional verbosity
-            verbosity: document.getElementById('verbosity').value,
+            // Debug logging
+            debug: document.getElementById('debugLogging').checked,
 
             // Scene detection method (optional)
             scene_detection_method: document.getElementById('sceneDetectionMethod').value,
@@ -1720,7 +1720,7 @@ const EnsembleManager = {
             merge_strategy: this.state.mergeStrategy,
             source_language: document.getElementById('source-language').value,
             subs_language: document.getElementById('language').value,
-            verbosity: document.getElementById('verbosity').value,
+            debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked
         };
 
