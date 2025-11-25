@@ -97,7 +97,7 @@ class WhisperJAVAPI:
                 - output_dir: str - Output directory path
                 - temp_dir: str - Temporary directory path (optional)
                 - keep_temp: bool - Keep temporary files
-                - verbosity: str - Verbosity level (quiet/summary/normal/verbose)
+                - debug: bool - Enable debug logging
                 - adaptive_classification: bool - Adaptive classification (WIP)
                 - adaptive_audio_enhancement: bool - Adaptive audio enhancements (WIP)
                 - smart_postprocessing: bool - Smart postprocessing (WIP)
@@ -156,10 +156,9 @@ class WhisperJAVAPI:
         if options.get('keep_temp', False):
             args += ["--keep-temp"]
 
-        # Verbosity
-        verbosity = options.get('verbosity', 'summary')
-        if verbosity:
-            args += ["--verbosity", verbosity]
+        # Debug logging
+        if options.get('debug', False):
+            args += ["--debug"]
 
         # Advanced options (WIP features)
         if options.get('adaptive_classification', False):
@@ -1157,10 +1156,9 @@ class WhisperJAVAPI:
         if config.get('keep_temp', False):
             args += ["--keep-temp"]
 
-        # Verbosity
-        verbosity = config.get('verbosity', 'summary')
-        if verbosity:
-            args += ["--verbosity", verbosity]
+        # Debug logging
+        if config.get('debug', False):
+            args += ["--debug"]
 
         return args
 
