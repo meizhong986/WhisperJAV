@@ -245,7 +245,7 @@ class SileroSceneDetectionOptions(BaseModel):
         description="Silero VAD negative threshold for deactivation."
     )
     silero_min_silence_ms: int = Field(
-        7800,
+        2000,
         ge=100, le=30000,
         description="Minimum silence duration to split in milliseconds."
     )
@@ -255,7 +255,7 @@ class SileroSceneDetectionOptions(BaseModel):
         description="Minimum speech duration in milliseconds."
     )
     silero_max_speech_s: float = Field(
-        960.0,
+        890.0,
         ge=10.0, le=3600.0,
         description="Maximum speech segment duration in seconds."
     )

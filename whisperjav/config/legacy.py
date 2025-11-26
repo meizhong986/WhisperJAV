@@ -76,6 +76,13 @@ LEGACY_PIPELINES = {
         "features": ["auditok_scene_detection"],
         "description": "OpenAI Whisper with VAD and scene detection. Maximum fidelity.",
     },
+    "kotoba-faster-whisper": {
+        "asr": "kotoba_faster_whisper",
+        "vad": "none",  # Uses internal VAD (faster-whisper built-in)
+        "features": ["auditok_scene_detection"],  # Scene detection always enabled
+        "description": "Japanese-optimized Kotoba Faster-Whisper with internal VAD.",
+        "use_v3_structure": True,  # Return V3 config, not legacy mapped
+    },
 }
 
 
@@ -91,7 +98,7 @@ def resolve_legacy_pipeline(
     This provides backward compatibility with the old CLI interface.
 
     Args:
-        pipeline_name: Legacy pipeline name ('balanced', 'faster', 'fast', 'fidelity')
+        pipeline_name: Legacy pipeline name ('balanced', 'faster', 'fast', 'fidelity', 'kotoba-faster-whisper')
         sensitivity: Sensitivity level
         task: Task type
         overrides: Parameter overrides
@@ -121,6 +128,11 @@ def resolve_legacy_pipeline(
     # Add legacy compatibility fields
     config['pipeline_name'] = pipeline_name
     config['sensitivity_name'] = sensitivity
+
+    # For pipelines that use V3 structure (like kotoba-faster-whisper),
+    # return V3 config directly without legacy mapping
+    if pipeline_def.get("use_v3_structure", False):
+        return config
 
     # Map to old output structure for backward compatibility
     return _map_to_legacy_structure(config, pipeline_def)

@@ -40,6 +40,7 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
+from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
 from whisperjav.__version__ import __version__
 
@@ -104,7 +105,7 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster"], default="balanced",
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "kotoba-faster-whisper"], default="balanced",
                        help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
@@ -133,7 +134,7 @@ def parse_arguments():
     twopass_group.add_argument("--ensemble", action="store_true",
                                help="Enable two-pass ensemble mode")
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity"],
+                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper"],
                                help="Pipeline for pass 1 (default: balanced)")
     twopass_group.add_argument("--pass1-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -143,7 +144,7 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-params", default=None,
                                help="JSON string of full parameters for pass 1 (custom mode)")
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity"],
+                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper"],
                                help="Pipeline for pass 2 (enables pass 2)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -204,6 +205,8 @@ def parse_arguments():
                                  "auditok (energy-based, default) or "
                                  "silero (VAD-based, experimental)"
                              ))
+    tuning_group.add_argument("--no-vad", action="store_true",
+                             help="Disable internal VAD for kotoba-faster-whisper mode")
 
     # Async processing
     async_group = parser.add_argument_group("Processing Options")
@@ -499,7 +502,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "progress_display": progress,
         **enhancement_kwargs
     }
-    
+
     # Select pipeline
     if args.mode == "faster":
         pipeline = FasterPipeline(**pipeline_args)
@@ -507,6 +510,13 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         pipeline = FastPipeline(**pipeline_args)
     elif args.mode == "balanced":
         pipeline = BalancedPipeline(**pipeline_args)
+    elif args.mode == "kotoba-faster-whisper":
+        # Kotoba Faster-Whisper pipeline with scene detection (always on)
+        scene_method = getattr(args, 'scene_detection_method', None) or 'auditok'
+        pipeline = KotobaFasterWhisperPipeline(
+            scene_method=scene_method,
+            **pipeline_args
+        )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
     
@@ -674,6 +684,9 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     # Enhancement options
     for opt in ['adaptive_classification', 'adaptive_audio_enhancement', 'smart_postprocessing']:
         resolved_config[opt] = getattr(args, opt)
+    
+    # Add scene detection method for kotoba pipeline
+    resolved_config['scene_method'] = getattr(args, 'scene_detection_method', None) or 'auditok'
     
     # Create async manager
     def progress_callback(message: Dict):
@@ -943,6 +956,15 @@ def main():
     if resolved_config is not None and "params" in resolved_config and "decoder" in resolved_config["params"]:
         resolved_config["params"]["decoder"]["language"] = language_code
         logger.debug(f"Language override applied to decoder params: {language_code}")
+
+    # Apply --no-vad override for kotoba-faster-whisper mode
+    if args.mode == "kotoba-faster-whisper" and getattr(args, 'no_vad', False) and resolved_config is not None:
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+        if "asr" not in resolved_config["params"]:
+            resolved_config["params"]["asr"] = {}
+        resolved_config["params"]["asr"]["vad_filter"] = False
+        logger.info("Internal VAD disabled via --no-vad flag")
 
     # Setup temp directory
     if args.temp_dir:

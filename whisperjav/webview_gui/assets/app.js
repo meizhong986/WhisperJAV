@@ -1088,6 +1088,11 @@ const EnsembleManager = {
         vad: [
             'threshold', 'neg_threshold', 'min_speech_duration_ms',
             'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
+        ],
+        // Internal VAD parameters for kotoba-faster-whisper pipeline
+        internalVad: [
+            'vad_filter', 'vad_threshold', 'min_speech_duration_ms',
+            'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
         ]
         // Engine options = everything else (varies by pipeline backend)
     },
@@ -1109,9 +1114,12 @@ const EnsembleManager = {
         beam_size: { ge: 1, le: 10, step: 1 },
         best_of: { ge: 1, le: 10, step: 1 },
 
-        // VAD parameters
+        // VAD parameters (external Silero VAD)
         threshold: { ge: 0.0, le: 1.0, step: 0.01 },
         neg_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
+        // Internal VAD parameters (kotoba-faster-whisper)
+        vad_filter: { type: 'boolean', default: true },
+        vad_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
         min_speech_duration_ms: { ge: 0, le: 1000, step: 10 },
         max_speech_duration_s: { ge: 1.0, le: 60.0, step: 1.0 },
         min_silence_duration_ms: { ge: 0, le: 2000, step: 10 },
@@ -1123,7 +1131,8 @@ const EnsembleManager = {
         balanced: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
         faster: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
         fast: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
-        fidelity: ['turbo', 'large-v2', 'large-v3']
+        fidelity: ['turbo', 'large-v2', 'large-v3'],
+        'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster']
     },
 
     async openCustomize(passKey) {
@@ -1236,7 +1245,22 @@ const EnsembleManager = {
             this.generateTabControls('tab-transcriber', allDefaults.transcriber, currentValues);
             this.generateTabControls('tab-decoder', allDefaults.decoder, currentValues);
             this.generateTabControls('tab-engine', allDefaults.engine, currentValues);
-            this.generateTabControls('tab-vad', allDefaults.vad, currentValues);
+
+            // Determine if this is kotoba pipeline (uses internal VAD)
+            const isKotobaPipeline = pipeline === 'kotoba-faster-whisper';
+
+            // Generate VAD tab based on pipeline type
+            if (isKotobaPipeline) {
+                // Show Internal VAD tab for kotoba
+                this.generateInternalVadTab('tab-vad', allDefaults.engine, currentValues);
+                // Update tab label to indicate internal VAD
+                document.querySelector('[data-tab="vad"]').textContent = 'Internal VAD';
+            } else {
+                // Show External VAD tab for other pipelines
+                this.generateTabControls('tab-vad', allDefaults.vad, currentValues);
+                document.querySelector('[data-tab="vad"]').textContent = 'VAD';
+            }
+
             this.generateSceneDetectionTab('tab-scene', currentValues.scene_detection_method || 'auditok');
 
             // Reset to first tab
@@ -1307,6 +1331,54 @@ const EnsembleManager = {
         control.appendChild(desc);
 
         container.appendChild(control);
+    },
+
+    generateInternalVadTab(tabId, engineParams, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Internal VAD parameters for kotoba pipeline
+        const internalVadParams = {
+            vad_filter: engineParams.vad_filter !== undefined ? engineParams.vad_filter : true,
+            vad_threshold: engineParams.vad_threshold !== undefined ? engineParams.vad_threshold : 0.01,
+            min_speech_duration_ms: engineParams.min_speech_duration_ms || 90,
+            max_speech_duration_s: engineParams.max_speech_duration_s || 28.0,
+            min_silence_duration_ms: engineParams.min_silence_duration_ms || 150,
+            speech_pad_ms: engineParams.speech_pad_ms || 400
+        };
+
+        // Add description header
+        const descDiv = document.createElement('div');
+        descDiv.className = 'tab-description';
+        descDiv.innerHTML = `
+            <p><strong>Internal VAD (faster-whisper built-in)</strong></p>
+            <p>Kotoba pipeline uses faster-whisper's internal Silero VAD for speech detection within each scene.</p>
+        `;
+        container.appendChild(descDiv);
+
+        // Generate controls for each internal VAD parameter
+        for (const [paramName, defaultValue] of Object.entries(internalVadParams)) {
+            const currentValue = currentValues[paramName] !== undefined ? currentValues[paramName] : defaultValue;
+            const metadata = this.parameterMetadata[paramName] || {};
+            const param = {
+                name: paramName,
+                type: this.inferType(defaultValue),
+                description: this.getInternalVadDescription(paramName),
+                constraints: metadata
+            };
+            container.innerHTML += this.generateParamControl(param, currentValue);
+        }
+    },
+
+    getInternalVadDescription(paramName) {
+        const descriptions = {
+            vad_filter: 'Enable/disable internal VAD filtering (recommended: ON)',
+            vad_threshold: 'Speech detection threshold (lower = more sensitive, 0.01 default)',
+            min_speech_duration_ms: 'Minimum speech segment duration in milliseconds',
+            max_speech_duration_s: 'Maximum speech segment duration before splitting',
+            min_silence_duration_ms: 'Minimum silence duration to trigger split',
+            speech_pad_ms: 'Padding added around detected speech segments'
+        };
+        return descriptions[paramName] || '';
     },
 
     generateModelTab(tabId, currentModel, currentDevice, pipeline) {
