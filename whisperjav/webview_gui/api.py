@@ -935,7 +935,7 @@ class WhisperJAVAPI:
         Get resolved parameters for a pipeline+sensitivity combination.
 
         Args:
-            pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity')
+            pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity', 'kotoba-faster-whisper')
             sensitivity: Sensitivity level ('conservative', 'balanced', 'aggressive')
 
         Returns:
@@ -956,11 +956,56 @@ class WhisperJAVAPI:
                 # Could be enhanced to read from config if specified
                 pass
 
-            # Return the params section for customization
+            # Check if this is kotoba pipeline (uses V3 config structure)
+            is_kotoba = pipeline == 'kotoba-faster-whisper'
+
+            if is_kotoba:
+                # Kotoba uses V3 structure with params.asr
+                asr_params = config.get('params', {}).get('asr', {})
+                return {
+                    "success": True,
+                    "pipeline": pipeline,
+                    "sensitivity": sensitivity,
+                    "model": config.get('model', {}).get('model_name', 'kotoba-tech/kotoba-whisper-v2.0-faster'),
+                    "is_kotoba": True,
+                    "params": {
+                        "decoder": {
+                            "task": asr_params.get('task', 'transcribe'),
+                            "language": asr_params.get('language', 'ja'),
+                            "beam_size": asr_params.get('beam_size', 3),
+                            "best_of": asr_params.get('best_of', 3),
+                            "patience": asr_params.get('patience', 2.0),
+                            "suppress_blank": asr_params.get('suppress_blank', True),
+                            "without_timestamps": asr_params.get('without_timestamps', False),
+                        },
+                        "provider": {
+                            "temperature": asr_params.get('temperature', [0.0, 0.3]),
+                            "compression_ratio_threshold": asr_params.get('compression_ratio_threshold', 2.4),
+                            "logprob_threshold": asr_params.get('logprob_threshold', -1.5),
+                            "no_speech_threshold": asr_params.get('no_speech_threshold', 0.34),
+                            "condition_on_previous_text": asr_params.get('condition_on_previous_text', True),
+                            "word_timestamps": asr_params.get('word_timestamps', False),
+                            # Internal VAD parameters (kotoba-specific)
+                            "vad_filter": asr_params.get('vad_filter', True),
+                            "vad_threshold": asr_params.get('vad_threshold', 0.01),
+                            "min_speech_duration_ms": asr_params.get('min_speech_duration_ms', 90),
+                            "max_speech_duration_s": asr_params.get('max_speech_duration_s', 28.0),
+                            "min_silence_duration_ms": asr_params.get('min_silence_duration_ms', 150),
+                            "speech_pad_ms": asr_params.get('speech_pad_ms', 400),
+                            "repetition_penalty": asr_params.get('repetition_penalty', 1.0),
+                            "no_repeat_ngram_size": asr_params.get('no_repeat_ngram_size', 0),
+                        },
+                        "vad": {}  # Empty - kotoba uses internal VAD, not external
+                    },
+                    "scene_detection_method": scene_detection_method
+                }
+
+            # Return the params section for customization (standard pipelines)
             return {
                 "success": True,
                 "pipeline": pipeline,
                 "sensitivity": sensitivity,
+                "is_kotoba": False,
                 "params": {
                     "decoder": config['params']['decoder'],
                     "provider": config['params']['provider'],

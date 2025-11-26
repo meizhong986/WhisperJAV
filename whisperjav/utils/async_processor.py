@@ -448,6 +448,9 @@ class AsyncPipelineManager:
         elif pipeline_mode == "balanced":
             from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
             pipeline_class = BalancedPipeline
+        elif pipeline_mode == "kotoba-faster-whisper":
+            from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
+            pipeline_class = KotobaFasterWhisperPipeline
         else:  # fidelity
             from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
             pipeline_class = FidelityPipeline
@@ -458,7 +461,8 @@ class AsyncPipelineManager:
             'temp_dir': resolved_config.get('temp_dir', './temp'),
             'keep_temp_files': resolved_config.get('keep_temp_files', False),
             'subs_language': resolved_config.get('subs_language', 'japanese'),
-            'resolved_config': resolved_config
+            'resolved_config': resolved_config,
+            'scene_method': resolved_config.get('scene_method', 'auditok')
         }
         
         # Submit the batch for processing. This call is non-blocking.
