@@ -14,7 +14,6 @@ Key Features:
 import shutil
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Dict
 
 from whisperjav.pipelines.base_pipeline import BasePipeline
@@ -281,7 +280,6 @@ class KotobaFasterWhisperPipeline(BasePipeline):
                 )
                 # Create a symlink or copy of the extracted audio as the single "scene"
                 single_scene_path = scenes_dir / f"{media_basename}_scene_000.wav"
-                import shutil
                 shutil.copy2(extracted_audio, single_scene_path)
                 scene_paths = [(single_scene_path, 0.0, duration, duration)]
 

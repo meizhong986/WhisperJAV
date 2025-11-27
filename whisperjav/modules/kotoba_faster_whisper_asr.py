@@ -15,7 +15,7 @@ import gc
 import datetime
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Union
 
 import srt
 import torch
@@ -143,7 +143,7 @@ class KotobaFasterWhisperASR:
                 cpu_threads=0,  # Use default
                 num_workers=1,
             )
-            logger.info(f"Kotoba model loaded successfully")
+            logger.info("Kotoba model loaded successfully")
         except Exception as e:
             # C4: VRAM exhaustion fallback - try int8 if float16 fails on CUDA
             if self.device == "cuda" and actual_compute_type == "float16":
