@@ -33,6 +33,22 @@ class KotobaFasterWhisperPipeline(BasePipeline):
 
     Scene detection is ALWAYS enabled. User selects method (auditok or silero).
     Internal VAD is enabled by default but can be disabled via config.
+
+    Config Contract:
+        This pipeline requires V3 config structure from resolver_v3:
+        - resolved_config["model"]: Model configuration (model_name, device, compute_type)
+        - resolved_config["params"]["asr"]: All ASR parameters including VAD settings
+        - resolved_config["features"]: Optional scene_detection/post_processing settings
+        - resolved_config["task"]: "transcribe" or "translate"
+
+    VAD Coupling:
+        The --no-vad CLI flag modifies resolved_config["params"]["asr"]["vad_filter"]
+        in main.py AFTER resolver but BEFORE pipeline initialization. This means:
+        1. Resolver sets default vad_filter=True from kotoba component
+        2. main.py may override to False if --no-vad is passed
+        3. Pipeline receives the already-modified config
+
+        This coupling is intentional to allow CLI override of component defaults.
     """
 
     def __init__(
@@ -68,8 +84,21 @@ class KotobaFasterWhisperPipeline(BasePipeline):
 
         self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
-        self.scene_method = scene_method
         self.progress_reporter = kwargs.get('progress_reporter', None)
+
+        # --- M4: Validate scene detection method early ---
+        valid_scene_methods = {"auditok", "silero"}
+        if scene_method not in valid_scene_methods:
+            raise ValueError(
+                f"Invalid scene_method '{scene_method}'. "
+                f"Must be one of: {sorted(valid_scene_methods)}"
+            )
+        self.scene_method = scene_method
+
+        # --- V3 STRUCTURED CONFIG CONTRACT VALIDATION ---
+        # Kotoba pipeline expects V3 config structure with 'asr' params
+        # This validates the contract to catch config structure mismatches early
+        self._validate_v3_config(resolved_config)
 
         # --- V3 STRUCTURED CONFIG UNPACKING ---
         model_cfg = resolved_config.get("model", {})
@@ -115,6 +144,14 @@ class KotobaFasterWhisperPipeline(BasePipeline):
 
         # Language code for post-processor and output filenames
         if self.subs_language == 'direct-to-english':
+            # WARNING: Kotoba model does NOT support direct translation to English.
+            # The ASR will transcribe in Japanese, but output will be labeled as English.
+            # User should use a separate translation step for actual English subtitles.
+            logger.warning(
+                "direct-to-english selected but Kotoba model does not support translation. "
+                "Output will be Japanese transcription labeled as English. "
+                "Use whisperjav-translate for actual translation."
+            )
             self.lang_code = 'en'
         else:
             self.lang_code = asr_params.get("language", "ja")
@@ -124,6 +161,54 @@ class KotobaFasterWhisperPipeline(BasePipeline):
     def get_mode_name(self) -> str:
         """Return pipeline mode name."""
         return "kotoba-faster-whisper"
+
+    def _validate_v3_config(self, resolved_config: Dict) -> None:
+        """
+        Validate V3 config structure for Kotoba pipeline.
+
+        Expected structure:
+            resolved_config = {
+                "model": {"model_name": str, "device": str, "compute_type": str},
+                "params": {"asr": {...asr_params...}},
+                "features": {"scene_detection": {...}, "post_processing": {...}},
+                "task": str
+            }
+
+        Raises:
+            ValueError: If config structure doesn't match V3 contract
+        """
+        if not isinstance(resolved_config, dict):
+            raise ValueError(
+                f"KotobaFasterWhisperPipeline requires dict config, got {type(resolved_config).__name__}"
+            )
+
+        # Check required top-level keys
+        required_keys = ["model", "params"]
+        missing_keys = [k for k in required_keys if k not in resolved_config]
+        if missing_keys:
+            raise ValueError(
+                f"KotobaFasterWhisperPipeline: Missing required config keys: {missing_keys}. "
+                "Expected V3 config structure with 'model' and 'params' sections."
+            )
+
+        # Check V3-specific: params must contain 'asr' (not 'decoder'/'provider')
+        params = resolved_config.get("params", {})
+        if "asr" not in params:
+            # Check if this looks like a legacy config (has 'decoder' or 'provider')
+            if "decoder" in params or "provider" in params:
+                raise ValueError(
+                    "KotobaFasterWhisperPipeline received legacy config structure "
+                    "(has 'params.decoder'/'params.provider'). "
+                    "Kotoba pipeline requires V3 config with 'params.asr'. "
+                    "Check that resolver_v3 is being used for kotoba-faster-whisper mode."
+                )
+            else:
+                raise ValueError(
+                    "KotobaFasterWhisperPipeline: Missing 'params.asr' in config. "
+                    "Kotoba pipeline requires V3 config structure."
+                )
+
+        logger.debug("V3 config contract validation passed")
 
     def process(self, media_info: Dict) -> Dict:
         """
@@ -187,6 +272,18 @@ class KotobaFasterWhisperPipeline(BasePipeline):
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
             scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+
+            # Fallback: if scene detection returns zero scenes, use entire audio as single scene
+            if not scene_paths:
+                logger.warning(
+                    f"Scene detection produced zero scenes for {media_basename}. "
+                    "Using entire audio as single scene."
+                )
+                # Create a symlink or copy of the extracted audio as the single "scene"
+                single_scene_path = scenes_dir / f"{media_basename}_scene_000.wav"
+                import shutil
+                shutil.copy2(extracted_audio, single_scene_path)
+                scene_paths = [(single_scene_path, 0.0, duration, duration)]
 
             master_metadata["scenes_detected"] = []
             for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):

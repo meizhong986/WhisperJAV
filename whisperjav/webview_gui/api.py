@@ -956,10 +956,12 @@ class WhisperJAVAPI:
                 # Could be enhanced to read from config if specified
                 pass
 
-            # Check if this is kotoba pipeline (uses V3 config structure)
-            is_kotoba = pipeline == 'kotoba-faster-whisper'
+            # M11: Detect V3 config by structure, not pipeline name string
+            # V3 configs (like kotoba) have 'params.asr', legacy have 'params.decoder'
+            is_v3_config = 'asr' in config.get('params', {})
+            is_kotoba = is_v3_config  # Currently only kotoba uses V3
 
-            if is_kotoba:
+            if is_v3_config:
                 # Kotoba uses V3 structure with params.asr
                 asr_params = config.get('params', {}).get('asr', {})
                 return {
