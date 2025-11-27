@@ -42,6 +42,9 @@ install_requires = [
     "huggingface-hub>=0.25.0",
     "silero-vad>=6.0",
 
+    # Configuration system
+    "pydantic>=2.0,<3.0",
+
     # GUI Dependencies (Previously in 'gui' extra)
     "pywebview>=5.0.0",
     "pythonnet>=3.0; sys_platform=='win32'", # Only installs on Windows

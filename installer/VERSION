@@ -5,11 +5,11 @@
 
 [version]
 major = 1
-minor = 6
-patch = 1
-prerelease =
-label = stable
-architecture = v4.3
+minor = 7
+patch = 0
+prerelease = beta
+label = beta
+architecture = v4.4
 
 [metadata]
 app_name = WhisperJAV
