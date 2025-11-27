@@ -96,22 +96,37 @@ echo   - Config file: %CONFIG_FILE% (found)
 echo   - Config file: %CONFIG_FILE% >> "%BUILD_LOG%"
 echo.
 
-REM ===== Phase 2: Build WhisperJAV Wheel from Local Source =====
-echo [Phase 2/6] Building WhisperJAV wheel from local source...
-echo [Phase 2/6] Building local wheel... >> "%BUILD_LOG%"
+REM ===== Phase 2: Verify WhisperJAV Wheel =====
+echo [Phase 2/6] Checking for WhisperJAV wheel...
+echo [Phase 2/6] Checking wheel... >> "%BUILD_LOG%"
 
-call build_whisperjav_wheel.bat
-if errorlevel 1 (
-    echo.
-    echo ERROR: Failed to build WhisperJAV wheel!
-    echo ERROR: Wheel build failed >> "%BUILD_LOG%"
-    echo.
-    pause
-    exit /b 1
+REM Check if wheel already exists (built by build_release.py)
+set WHEEL_FOUND=0
+for %%f in (whisperjav-*.whl) do (
+    set WHEEL_FOUND=1
+    set WHEEL_FILE=%%f
 )
 
-echo   - WhisperJAV wheel built successfully
-echo   - Wheel: whisperjav-*.whl (local build) >> "%BUILD_LOG%"
+if !WHEEL_FOUND!==1 (
+    echo   - Found existing wheel: !WHEEL_FILE!
+    echo   - Wheel: !WHEEL_FILE! (pre-built) >> "%BUILD_LOG%"
+) else (
+    echo   - No wheel found, building from source...
+    REM Call parent directory script
+    call ..\build_whisperjav_wheel.bat
+    if errorlevel 1 (
+        echo.
+        echo ERROR: Failed to build WhisperJAV wheel!
+        echo ERROR: Wheel build failed >> "%BUILD_LOG%"
+        echo.
+        pause
+        exit /b 1
+    )
+    REM Copy the wheel to current directory
+    copy "..\whisperjav-*.whl" . >nul 2>nul
+    echo   - WhisperJAV wheel built and copied
+    echo   - Wheel: whisperjav-*.whl (local build) >> "%BUILD_LOG%"
+)
 echo.
 
 REM ===== Phase 3: Validate Configuration =====
