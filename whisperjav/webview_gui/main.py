@@ -398,7 +398,7 @@ def main():
         try:
             import ctypes
             # Unique identifier for WhisperJAV (company.product.subproduct.version format)
-            appid = 'WhisperJAV.GUI.PyWebView.v1.5.3'
+            appid = 'WhisperJAV.GUI.PyWebView.v1.x'
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appid)
             print(f"Windows AppUserModelID set: {appid}")
         except Exception as e:

@@ -55,8 +55,10 @@ REQUIRED_FILES = [
     "whisperjav_icon.ico",
 ]
 
-# Wheel file pattern (will be checked separately with glob)
-WHEEL_PATTERN = "whisperjav-*.whl"
+# Wheel file pattern - matches version with PEP 440 normalization
+# e.g., "1.7.0-beta" becomes "1.7.0b0" in wheel filename
+WHEEL_PATTERN = "whisperjav-{{VERSION}}*.whl"
+WHEEL_PATTERN_FALLBACK = "whisperjav-*.whl"
 
 # Expected module path (no old Tkinter GUI references)
 CORRECT_MODULE_PATH = "whisperjav.webview_gui.main"
@@ -98,13 +100,23 @@ def validate_required_files():
         if not exists:
             all_passed = False
 
-    # Check for wheel file using glob pattern
+    # Check for wheel file using glob pattern (try version-specific first)
     import glob
     wheels = glob.glob(WHEEL_PATTERN)
+    if not wheels:
+        # Fall back to any wheel file
+        wheels = glob.glob(WHEEL_PATTERN_FALLBACK)
+
     if wheels:
-        print_check(f"{WHEEL_PATTERN} ({wheels[0]})", True, f"Found: {wheels[0]}")
+        # Prefer the one matching our version
+        wheel_file = wheels[0]
+        for w in wheels:
+            if EXPECTED_VERSION.replace("-", "") in w or EXPECTED_VERSION in w:
+                wheel_file = w
+                break
+        print_check(f"Wheel file", True, f"Found: {wheel_file}")
     else:
-        print_check(WHEEL_PATTERN, False, "No wheel file found matching pattern")
+        print_check("Wheel file", False, "No wheel file found matching pattern")
         all_passed = False
 
     return all_passed
@@ -115,11 +127,13 @@ def validate_version_consistency():
     print_header("Phase 2: Version Consistency Check")
 
     all_passed = True
+    # Version regex now supports prerelease suffixes like -beta, -alpha, -rc1
+    version_pattern = r"(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)"
     version_files = [
-        ("construct_v{{VERSION}}.yaml", r"version:\s*['\"]?(\d+\.\d+\.\d+)"),
-        ("post_install_v{{VERSION}}.py", r"WhisperJAV v(\d+\.\d+\.\d+)"),
-        ("WhisperJAV_Launcher_v{{VERSION}}.py", r"v(\d+\.\d+\.\d+)"),
-        ("README_INSTALLER_v{{VERSION}}.txt", r"WhisperJAV v(\d+\.\d+\.\d+)"),
+        ("construct_v{{VERSION}}.yaml", rf"version:\s*['\"]?{version_pattern}"),
+        ("post_install_v{{VERSION}}.py", rf"WhisperJAV v{version_pattern}"),
+        ("WhisperJAV_Launcher_v{{VERSION}}.py", rf"v{version_pattern}"),
+        ("README_INSTALLER_v{{VERSION}}.txt", rf"WhisperJAV v{version_pattern}"),
     ]
 
     for filename, pattern in version_files:

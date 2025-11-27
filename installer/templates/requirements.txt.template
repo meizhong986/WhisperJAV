@@ -64,7 +64,11 @@ jsonschema            # Config validation
 Pillow                # Image processing
 colorama              # Colored console output
 requests              # HTTP requests
-pynvml                # NVIDIA driver detection helper
+
+# ----------------------------------------
+# Configuration System
+# ----------------------------------------
+pydantic>=2.0,<3.0    # Data validation (used in config schemas)
 
 # ----------------------------------------
 # Optional: Performance Optimization

@@ -172,7 +172,7 @@ class KotobaFasterWhisperASRComponent(ASRComponent):
 
     # === Compute ===
     default_device = "cuda"
-    default_compute_type = "float32"
+    default_compute_type = "float16"
 
     # === Schema ===
     Options = KotobaFasterWhisperOptions
