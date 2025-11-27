@@ -459,7 +459,7 @@ class EnsembleOrchestrator:
             'faster': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
             'fast': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
             'fidelity': ['turbo', 'large-v2', 'large-v3'],
-            'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster']
+            'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster', 'RoachLin/kotoba-whisper-v2.2-faster']
         }
 
         # Check if custom params have an incompatible model

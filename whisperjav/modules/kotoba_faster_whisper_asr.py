@@ -297,11 +297,20 @@ class KotobaFasterWhisperASR:
         Release GPU/CPU memory by unloading the model.
 
         Should be called when the ASR instance is no longer needed.
+        Idempotent - safe to call multiple times.
         """
+        # Guard against double cleanup (native code can crash on double-free)
+        if not hasattr(self, 'model') or self.model is None:
+            logger.debug(f"{self.__class__.__name__} already cleaned up, skipping")
+            return
+
         logger.debug(f"Cleaning up {self.__class__.__name__} resources...")
 
-        if hasattr(self, 'model'):
+        try:
             del self.model
+        except Exception as e:
+            logger.warning(f"Error deleting model: {e}")
+        finally:
             self.model = None
             logger.debug("Kotoba model unloaded")
 
