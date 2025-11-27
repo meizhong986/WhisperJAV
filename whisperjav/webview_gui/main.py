@@ -376,14 +376,18 @@ def main():
     """
     import webview
     import logging
-    from whisperjav.__version__ import __version__
+    # Use display version for user-facing output, fallback to PEP 440 version
+    try:
+        from whisperjav.__version__ import __version_display__ as version
+    except ImportError:
+        from whisperjav.__version__ import __version__ as version
 
     # Suppress HTTP server logs from pywebview's bottle server
     # This prevents Chrome DevTools 404 messages from cluttering console
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
     logging.getLogger('bottle').setLevel(logging.ERROR)
 
-    print(f"WhisperJAV GUI v{__version__}")
+    print(f"WhisperJAV GUI v{version}")
     print("=" * 50)
 
     # Check WebView2 on Windows

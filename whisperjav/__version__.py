@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Version information for WhisperJAV."""
 
-__version__ = "1.7.0-beta"  # uses v4.4 config architecture
+# PEP 440 compliant version for pip/wheel
+__version__ = "1.7.0b0"
 
-# Optional: Add version metadata
+# Human-readable version for display in UI
+__version_display__ = "1.7.0-beta"
+
+# Version metadata
 __version_info__ = {
     "major": 1,
     "minor": 7,

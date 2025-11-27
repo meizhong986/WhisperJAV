@@ -62,7 +62,11 @@ class ReleaseBuilder:
         return config
 
     def _get_version_string(self):
-        """Build version string from components."""
+        """Build PEP 440 compliant version string for wheel/pip.
+
+        PEP 440 prerelease format: 1.7.0b0 (no hyphen!)
+        Valid suffixes: a0, a1, b0, b1, rc0, rc1, etc.
+        """
         major = self.config.get('version', 'major')
         minor = self.config.get('version', 'minor')
         patch = self.config.get('version', 'patch')
@@ -70,13 +74,41 @@ class ReleaseBuilder:
 
         version = f"{major}.{minor}.{patch}"
         if prerelease:
-            version += f"-{prerelease}"
+            # PEP 440: prerelease is concatenated directly (no hyphen)
+            version += prerelease
+        return version
+
+    def _get_display_version(self):
+        """Build human-readable version string for display.
+
+        Example: 1.7.0-beta (with hyphen for readability)
+        """
+        major = self.config.get('version', 'major')
+        minor = self.config.get('version', 'minor')
+        patch = self.config.get('version', 'patch')
+        display_label = self.config.get('version', 'display_label', fallback='')
+
+        version = f"{major}.{minor}.{patch}"
+        if display_label:
+            version += f"-{display_label}"
         return version
 
     def _build_placeholders(self):
-        """Build placeholder dictionary for template substitution."""
+        """Build placeholder dictionary for template substitution.
+
+        Two version formats are available:
+        - {{VERSION}}: PEP 440 compliant (1.7.0b0) for wheel/pip/filenames
+        - {{DISPLAY_VERSION}}: Human-readable (1.7.0-beta) for UI/documentation
+        """
+        display_version = self._get_display_version()
+        display_label = self.config.get('version', 'display_label', fallback='stable')
+
         return {
+            # PEP 440 version for wheel/pip/filenames
             '{{VERSION}}': self.version,
+            # Human-readable version for display
+            '{{DISPLAY_VERSION}}': display_version,
+            '{{DISPLAY_LABEL}}': display_label,
             '{{VERSION_MAJOR}}': self.config.get('version', 'major'),
             '{{VERSION_MINOR}}': self.config.get('version', 'minor'),
             '{{VERSION_PATCH}}': self.config.get('version', 'patch'),
@@ -86,8 +118,9 @@ class ReleaseBuilder:
             '{{LICENSE}}': self.config.get('metadata', 'license'),
             '{{URL}}': self.config.get('metadata', 'url'),
             '{{PYTHON_VERSION}}': self.config.get('installer', 'python_version'),
-            '{{SHORTCUT_NAME}}': self.config.get('installer', 'shortcut_name_template').format(version=self.version),
-            '{{SHORTCUT_DESCRIPTION}}': self.config.get('installer', 'shortcut_description').format(version=self.version),
+            # User-facing names use display version
+            '{{SHORTCUT_NAME}}': self.config.get('installer', 'shortcut_name_template').format(version=display_version),
+            '{{SHORTCUT_DESCRIPTION}}': self.config.get('installer', 'shortcut_description').format(version=display_version),
             '{{INSTALL_PREFIX}}': self.config.get('installer', 'install_prefix'),
             '{{ARCHITECTURE}}': self.config.get('version', 'architecture'),
         }
@@ -114,28 +147,37 @@ class ReleaseBuilder:
         minor = self.config.get('version', 'minor')
         patch = self.config.get('version', 'patch')
         arch = self.config.get('version', 'architecture')
-        label = self.config.get('version', 'label', fallback='stable')
+        display_label = self.config.get('version', 'display_label', fallback='stable')
+        display_version = self._get_display_version()
 
         content = f'''#!/usr/bin/env python3
 """Version information for WhisperJAV."""
 
-__version__ = "{self.version}"  # uses {arch} config architecture
+# PEP 440 compliant version for pip/wheel
+__version__ = "{self.version}"
 
-# Optional: Add version metadata
+# Human-readable version for display in UI
+__version_display__ = "{display_version}"
+
+# Version metadata
 __version_info__ = {{
     "major": {major},
     "minor": {minor},
     "patch": {patch},
-    "release": "{label}",
+    "release": "{display_label}",
     "architecture": "{arch}"
 }}
 '''
 
         if self.dry_run:
             print(f"  [DRY-RUN] Would update {version_py}")
+            print(f"            PEP 440 version: {self.version}")
+            print(f"            Display version: {display_version}")
         else:
             version_py.write_text(content)
             print(f"  {GREEN}✓{RESET} Updated {version_py}")
+            print(f"      PEP 440 version: {self.version}")
+            print(f"      Display version: {display_version}")
 
         return True
 

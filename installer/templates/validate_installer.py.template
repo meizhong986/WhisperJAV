@@ -127,8 +127,10 @@ def validate_version_consistency():
     print_header("Phase 2: Version Consistency Check")
 
     all_passed = True
-    # Version regex now supports prerelease suffixes like -beta, -alpha, -rc1
-    version_pattern = r"(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)"
+    # Version regex supports both formats:
+    # - PEP 440: 1.7.0b0, 1.7.0a1, 1.7.0rc1 (no hyphen)
+    # - Display: 1.7.0-beta, 1.7.0-alpha (with hyphen)
+    version_pattern = r"(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:-[a-zA-Z0-9]+)?)"
     version_files = [
         ("construct_v{{VERSION}}.yaml", rf"version:\s*['\"]?{version_pattern}"),
         ("post_install_v{{VERSION}}.py", rf"WhisperJAV v{version_pattern}"),

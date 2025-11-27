@@ -101,18 +101,16 @@ echo [Phase 2/6] Checking for WhisperJAV wheel...
 echo [Phase 2/6] Checking wheel... >> "%BUILD_LOG%"
 
 REM Check if wheel already exists (built by build_release.py)
-set WHEEL_FOUND=0
-for %%f in (whisperjav-*.whl) do (
-    set WHEEL_FOUND=1
-    set WHEEL_FILE=%%f
-)
-
-if !WHEEL_FOUND!==1 (
+REM Use dir command for reliable wildcard detection
+dir /b whisperjav-*.whl >nul 2>nul
+if !errorlevel!==0 (
+    REM Wheel found - get the filename
+    for /f "delims=" %%f in ('dir /b whisperjav-*.whl 2^>nul') do set WHEEL_FILE=%%f
     echo   - Found existing wheel: !WHEEL_FILE!
     echo   - Wheel: !WHEEL_FILE! (pre-built) >> "%BUILD_LOG%"
 ) else (
     echo   - No wheel found, building from source...
-    REM Call parent directory script
+    REM Call parent directory script (uses %~dp0 so works from any location)
     call ..\build_whisperjav_wheel.bat
     if errorlevel 1 (
         echo.
@@ -122,10 +120,19 @@ if !WHEEL_FOUND!==1 (
         pause
         exit /b 1
     )
-    REM Copy the wheel to current directory
-    copy "..\whisperjav-*.whl" . >nul 2>nul
-    echo   - WhisperJAV wheel built and copied
-    echo   - Wheel: whisperjav-*.whl (local build) >> "%BUILD_LOG%"
+    REM Verify wheel now exists
+    dir /b whisperjav-*.whl >nul 2>nul
+    if errorlevel 1 (
+        echo.
+        echo ERROR: Wheel still not found after build!
+        echo ERROR: Wheel missing after build >> "%BUILD_LOG%"
+        echo.
+        pause
+        exit /b 1
+    )
+    for /f "delims=" %%f in ('dir /b whisperjav-*.whl 2^>nul') do set WHEEL_FILE=%%f
+    echo   - WhisperJAV wheel built: !WHEEL_FILE!
+    echo   - Wheel: !WHEEL_FILE! (local build) >> "%BUILD_LOG%"
 )
 echo.
 
