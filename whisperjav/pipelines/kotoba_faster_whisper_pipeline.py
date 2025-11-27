@@ -369,7 +369,5 @@ class KotobaFasterWhisperPipeline(BasePipeline):
             raise
 
     def cleanup(self) -> None:
-        """Clean up resources."""
-        if hasattr(self, 'asr') and self.asr:
-            self.asr.cleanup()
+        """Clean up resources. Delegates to BasePipeline which handles ASR cleanup."""
         super().cleanup()

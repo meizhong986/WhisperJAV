@@ -1132,7 +1132,7 @@ const EnsembleManager = {
         faster: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
         fast: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
         fidelity: ['turbo', 'large-v2', 'large-v3'],
-        'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster']
+        'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster', 'RoachLin/kotoba-whisper-v2.2-faster']
     },
 
     async openCustomize(passKey) {
@@ -1404,7 +1404,8 @@ const EnsembleManager = {
             { value: 'turbo', label: 'Turbo (Fastest)' },
             { value: 'large-v2', label: 'Large-v2 (Balanced)' },
             { value: 'large-v3', label: 'Large-v3 (Latest)' },
-            { value: 'kotoba-tech/kotoba-whisper-v2.0-faster', label: 'Kotoba-faster-2.0 (Japanese)' }
+            { value: 'kotoba-tech/kotoba-whisper-v2.0-faster', label: 'Kotoba-faster-2.0 (Japanese)' },
+            { value: 'RoachLin/kotoba-whisper-v2.2-faster', label: 'Kotoba-faster-2.2 (Japanese)' }
         ];
 
         // Filter to only allowed models for this pipeline
