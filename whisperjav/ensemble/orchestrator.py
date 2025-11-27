@@ -435,6 +435,82 @@ class EnsembleOrchestrator:
 
         return all_metadata
 
+    def _apply_custom_params(
+        self,
+        resolved_config: Dict[str, Any],
+        custom_params: Dict[str, Any],
+        pass_number: int
+    ) -> None:
+        """
+        Apply custom parameters to a resolved config (M1: extracted from duplicate code).
+
+        Handles both V3 config structure (kotoba with params.asr) and legacy structure
+        (params.decoder/provider/vad). Modifies resolved_config in place.
+
+        Args:
+            resolved_config: Resolved pipeline configuration to modify
+            custom_params: Custom parameters to apply
+            pass_number: Pass number for logging
+        """
+        model_config = resolved_config['model']
+
+        # Detect config structure: V3 uses params.asr, legacy uses params.decoder
+        is_v3_config = 'asr' in resolved_config['params']
+
+        # Parameters to skip (handled elsewhere or not applicable)
+        SKIP_PARAMS = {'scene_detection_method'}
+
+        if is_v3_config:
+            # V3 config (kotoba): all params go to params.asr
+            asr_params = resolved_config['params']['asr']
+
+            for key, value in custom_params.items():
+                if key in SKIP_PARAMS:
+                    continue
+                elif key == 'model_name':
+                    model_config['model_name'] = value
+                    logger.debug(f"Pass {pass_number}: Overriding model to {value}")
+                elif key == 'device':
+                    model_config['device'] = value
+                    logger.debug(f"Pass {pass_number}: Overriding device to {value}")
+                else:
+                    # All other params go to asr_params for V3 config
+                    asr_params[key] = value
+                    logger.debug(f"Pass {pass_number}: Set asr param '{key}' = {value}")
+        else:
+            # Legacy config: params split into decoder/provider/vad
+            decoder_params = resolved_config['params']['decoder']
+            provider_params = resolved_config['params']['provider']
+            vad_params = resolved_config['params'].get('vad', {})
+
+            # Define which params belong to VAD
+            VAD_PARAM_NAMES = {
+                'threshold', 'neg_threshold', 'min_speech_duration_ms',
+                'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
+            }
+
+            for key, value in custom_params.items():
+                if key in SKIP_PARAMS:
+                    continue
+                elif key == 'model_name':
+                    model_config['model_name'] = value
+                    logger.debug(f"Pass {pass_number}: Overriding model to {value}")
+                elif key == 'device':
+                    model_config['device'] = value
+                    logger.debug(f"Pass {pass_number}: Overriding device to {value}")
+                elif key in VAD_PARAM_NAMES:
+                    vad_params[key] = value
+                elif key in decoder_params:
+                    decoder_params[key] = value
+                elif key in provider_params:
+                    provider_params[key] = value
+                else:
+                    # Unknown params go to provider (safer than decoder)
+                    provider_params[key] = value
+                    logger.debug(f"Pass {pass_number}: Unknown param '{key}' added to provider_params")
+
+        logger.debug(f"Pass {pass_number}: Custom params applied")
+
     def _create_pipeline(
         self,
         pass_config: Dict[str, Any],
@@ -455,9 +531,9 @@ class EnsembleOrchestrator:
 
         # Model compatibility validation (faster-whisper doesn't support turbo)
         PIPELINE_MODEL_COMPATIBILITY = {
-            'balanced': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
-            'faster': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
-            'fast': ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+            'balanced': ['large-v2', 'large-v3'],
+            'faster': ['large-v2', 'large-v3'],
+            'fast': ['large-v2', 'large-v3'],
             'fidelity': ['turbo', 'large-v2', 'large-v3'],
             'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster', 'RoachLin/kotoba-whisper-v2.2-faster']
         }
@@ -481,72 +557,9 @@ class EnsembleOrchestrator:
             overrides=pass_config.get('overrides')
         )
 
-        # Apply custom params if provided
+        # Apply custom params if provided (M1: use shared helper)
         if pass_config.get('params'):
-            custom_params = pass_config['params']
-            model_config = resolved_config['model']
-
-            # Detect config structure: V3 uses params.asr, legacy uses params.decoder
-            is_v3_config = 'asr' in resolved_config['params']
-
-            if is_v3_config:
-                # V3 config (kotoba): all params go to params.asr
-                asr_params = resolved_config['params']['asr']
-
-                # Parameters to skip (handled elsewhere or not applicable)
-                SKIP_PARAMS = {'scene_detection_method'}
-
-                for key, value in custom_params.items():
-                    if key in SKIP_PARAMS:
-                        continue
-                    elif key == 'model_name':
-                        model_config['model_name'] = value
-                        logger.debug(f"Pass {pass_number}: Overriding model to {value}")
-                    elif key == 'device':
-                        model_config['device'] = value
-                        logger.debug(f"Pass {pass_number}: Overriding device to {value}")
-                    else:
-                        # All other params go to asr_params for V3 config
-                        asr_params[key] = value
-                        logger.debug(f"Pass {pass_number}: Set asr param '{key}' = {value}")
-            else:
-                # Legacy config: params split into decoder/provider/vad
-                decoder_params = resolved_config['params']['decoder']
-                provider_params = resolved_config['params']['provider']
-                vad_params = resolved_config['params'].get('vad', {})
-
-                # Define which params belong to which category
-                VAD_PARAM_NAMES = {
-                    'threshold', 'neg_threshold', 'min_speech_duration_ms',
-                    'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
-                }
-
-                # Parameters to skip (handled elsewhere or not applicable)
-                SKIP_PARAMS = {'scene_detection_method'}
-
-                for key, value in custom_params.items():
-                    # Skip params that are handled elsewhere
-                    if key in SKIP_PARAMS:
-                        continue
-                    # Handle model config overrides
-                    elif key == 'model_name':
-                        model_config['model_name'] = value
-                        logger.debug(f"Pass {pass_number}: Overriding model to {value}")
-                    elif key == 'device':
-                        model_config['device'] = value
-                        logger.debug(f"Pass {pass_number}: Overriding device to {value}")
-                    # Handle VAD parameter overrides
-                    elif key in VAD_PARAM_NAMES:
-                        vad_params[key] = value
-                    # Handle parameter overrides
-                    elif key in decoder_params:
-                        decoder_params[key] = value
-                    elif key in provider_params:
-                        provider_params[key] = value
-                    else:
-                        # Unknown params go to provider (safer than decoder)
-                        provider_params[key] = value
-                        logger.debug(f"Pass {pass_number}: Unknown param '{key}' added to provider_params")
+            self._apply_custom_params(resolved_config, pass_config['params'], pass_number)
 
         # Get pipeline class
         pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
@@ -600,60 +613,10 @@ class EnsembleOrchestrator:
             overrides=pass_config.get('overrides')
         )
 
-        # If custom params provided, merge them into the resolved config
+        # If custom params provided, merge them into the resolved config (M1: use shared helper)
         if pass_config.get('params'):
-            custom_params = pass_config['params']
-            model_config = resolved_config['model']
             logger.debug(f"Pass {pass_number}: Applying custom parameters to {pipeline_name}/{sensitivity}")
-
-            # Detect config structure: V3 uses params.asr, legacy uses params.decoder
-            is_v3_config = 'asr' in resolved_config['params']
-
-            if is_v3_config:
-                # V3 config (kotoba): all params go to params.asr
-                asr_params = resolved_config['params']['asr']
-
-                # Parameters to skip (handled elsewhere or not applicable)
-                SKIP_PARAMS = {'scene_detection_method'}
-
-                for key, value in custom_params.items():
-                    if key in SKIP_PARAMS:
-                        continue
-                    elif key == 'model_name':
-                        model_config['model_name'] = value
-                        logger.debug(f"Pass {pass_number}: Overriding model to {value}")
-                    elif key == 'device':
-                        model_config['device'] = value
-                        logger.debug(f"Pass {pass_number}: Overriding device to {value}")
-                    else:
-                        asr_params[key] = value
-                        logger.debug(f"Pass {pass_number}: Set asr param '{key}' = {value}")
-            else:
-                # Legacy config: params split into decoder/provider/vad
-                decoder_params = resolved_config['params']['decoder']
-                provider_params = resolved_config['params']['provider']
-                vad_params = resolved_config['params'].get('vad', {})
-
-                # Define which params belong to VAD
-                VAD_PARAM_NAMES = {
-                    'threshold', 'neg_threshold', 'min_speech_duration_ms',
-                    'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
-                }
-
-                for key, value in custom_params.items():
-                    # Handle VAD parameter overrides
-                    if key in VAD_PARAM_NAMES:
-                        vad_params[key] = value
-                    # Check if param belongs to decoder or provider
-                    elif key in decoder_params:
-                        decoder_params[key] = value
-                    elif key in provider_params:
-                        provider_params[key] = value
-                    else:
-                        # Unknown param - add to decoder as fallback
-                        decoder_params[key] = value
-
-            logger.debug(f"Pass {pass_number}: Custom params applied")
+            self._apply_custom_params(resolved_config, pass_config['params'], pass_number)
         else:
             logger.debug(f"Pass {pass_number}: Using defaults for {pipeline_name}/{sensitivity}")
 

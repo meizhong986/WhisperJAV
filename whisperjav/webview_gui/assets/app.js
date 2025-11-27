@@ -1128,9 +1128,9 @@ const EnsembleManager = {
 
     // Model compatibility per pipeline (faster-whisper doesn't support turbo)
     pipelineModelCompatibility: {
-        balanced: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
-        faster: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
-        fast: ['large-v2', 'large-v3', 'kotoba-tech/kotoba-whisper-v2.0-faster'],
+        balanced: ['large-v2', 'large-v3'],
+        faster: ['large-v2', 'large-v3'],
+        fast: ['large-v2', 'large-v3'],
         fidelity: ['turbo', 'large-v2', 'large-v3'],
         'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster', 'RoachLin/kotoba-whisper-v2.2-faster']
     },

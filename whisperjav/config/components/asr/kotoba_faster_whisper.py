@@ -4,8 +4,14 @@ Kotoba Faster-Whisper ASR Component.
 Japanese-optimized Whisper model from kotoba-tech using faster-whisper backend.
 Uses internal VAD (faster-whisper's built-in vad_filter) for speech detection.
 
-Reference: kotoba-tech/kotoba-whisper-v2.0-faster
-Parameter values derived from reference implementation.
+Reference Implementation:
+    - Model: https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster
+    - Alternative: https://huggingface.co/RoachLin/kotoba-whisper-v2.2-faster
+    - Base paper: https://arxiv.org/abs/2412.01307 (Kotoba-Whisper training)
+    - Parameter values derived from kotoba-tech model card recommendations
+
+Default VAD parameters (vad_threshold=0.01, min_speech_duration_ms=90, etc.)
+are optimized for Japanese speech patterns per kotoba-tech documentation.
 """
 
 from typing import List, Optional, Union

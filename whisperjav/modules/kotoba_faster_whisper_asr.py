@@ -57,6 +57,9 @@ class KotobaFasterWhisperASR:
         # Task
         self.task = task
 
+        # M7: Log warning for missing key params to aid debugging
+        self._warn_missing_params(params)
+
         # VAD control (KEY FEATURE)
         self.vad_filter = params.get("vad_filter", True)
         self.vad_parameters = self._build_vad_parameters(params) if self.vad_filter else None
@@ -94,6 +97,26 @@ class KotobaFasterWhisperASR:
             "speech_pad_ms": params.get("speech_pad_ms", 400),
         }
 
+    def _warn_missing_params(self, params: Dict[str, Any]) -> None:
+        """Log debug warnings for missing key ASR parameters to aid config debugging."""
+        # Only warn if debug logging is enabled to avoid noise
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        # Key params that affect quality if missing (using defaults)
+        key_params = [
+            "beam_size", "best_of", "patience", "temperature",
+            "compression_ratio_threshold", "logprob_threshold", "no_speech_threshold",
+            "vad_filter", "vad_threshold"
+        ]
+
+        missing = [p for p in key_params if p not in params]
+        if missing:
+            logger.debug(
+                f"KotobaFasterWhisperASR: Using defaults for missing params: {missing}. "
+                "This is normal if using preset defaults."
+            )
+
     def _initialize_model(self) -> None:
         """Initialize the faster-whisper model."""
         logger.info(f"Loading Kotoba model: {self.model_name}")
@@ -122,6 +145,43 @@ class KotobaFasterWhisperASR:
             )
             logger.info(f"Kotoba model loaded successfully")
         except Exception as e:
+            # C4: VRAM exhaustion fallback - try int8 if float16 fails on CUDA
+            if self.device == "cuda" and actual_compute_type == "float16":
+                vram_error_indicators = [
+                    "out of memory",
+                    "cuda out of memory",
+                    "outofmemoryerror",
+                    "cuda error",
+                    "cublas",
+                    "insufficient memory",
+                ]
+                error_str = str(e).lower()
+                if any(indicator in error_str for indicator in vram_error_indicators):
+                    logger.warning(
+                        f"CUDA float16 failed (likely VRAM exhaustion): {e}. "
+                        "Falling back to int8 compute type."
+                    )
+                    try:
+                        # Clear CUDA cache before retry
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                            gc.collect()
+
+                        self.model = WhisperModel(
+                            model_size_or_path=self.model_name,
+                            device=self.device,
+                            compute_type="int8",
+                            download_root=None,
+                            cpu_threads=0,
+                            num_workers=1,
+                        )
+                        self.compute_type = "int8"  # Update for logging/metadata
+                        logger.info("Kotoba model loaded successfully with int8 fallback")
+                        return
+                    except Exception as fallback_e:
+                        logger.error(f"int8 fallback also failed: {fallback_e}")
+                        raise fallback_e
+
             logger.error(f"Failed to load Kotoba model: {e}")
             raise
 
@@ -144,7 +204,14 @@ class KotobaFasterWhisperASR:
             logger.debug("------------------------------------------")
 
     def _prepare_transcribe_params(self) -> Dict[str, Any]:
-        """Prepare parameters for model.transcribe() call."""
+        """
+        Prepare parameters for model.transcribe() call.
+
+        Parameter Name Mapping:
+            Config uses 'logprob_threshold' (consistent with other components),
+            but faster-whisper API expects 'log_prob_threshold' (with underscore).
+            This method performs the conversion automatically.
+        """
         params = {
             "language": self.language,
             "task": self.task,
@@ -153,6 +220,7 @@ class KotobaFasterWhisperASR:
             "patience": self.patience,
             "temperature": self.temperature,
             "compression_ratio_threshold": self.compression_ratio_threshold,
+            # Note: Config uses 'logprob_threshold', API uses 'log_prob_threshold'
             "log_prob_threshold": self.logprob_threshold,
             "no_speech_threshold": self.no_speech_threshold,
             "condition_on_previous_text": self.condition_on_previous_text,
