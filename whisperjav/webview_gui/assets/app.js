@@ -1098,32 +1098,51 @@ const EnsembleManager = {
     },
 
     // Parameter metadata with proper constraints for sliders
+    // AUDIT FIX: Ranges aligned with backend Pydantic Field constraints
     parameterMetadata: {
-        // Transcriber parameters
-        logprob_threshold: { ge: -1.0, le: 0.0, step: 0.01 },
-        logprob_margin: { ge: 0.0, le: 1.0, step: 0.01 },
+        // === Transcriber parameters ===
+        logprob_threshold: { ge: -5.0, le: 0.0, step: 0.1 },           // Fixed: was -1.0, backend allows -5.0
+        logprob_margin: { ge: 0.0, le: 5.0, step: 0.1 },               // Fixed: was 1.0, backend allows 5.0
         no_speech_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        compression_ratio_threshold: { ge: 0.0, le: 10.0, step: 0.1 },
-        temperature: { ge: 0.0, le: 1.0, step: 0.01 },
-        hallucination_silence_threshold: { ge: 0.0, le: 5.0, step: 0.1 },
+        compression_ratio_threshold: { ge: 1.0, le: 5.0, step: 0.1 }, // Fixed: was 0.0-10.0, backend is 1.0-5.0
+        temperature: { ge: 0.0, le: 1.0, step: 0.01, isArrayAllowed: true },  // Note: can be array
+        hallucination_silence_threshold: { ge: 0.0, le: 10.0, step: 0.1 },    // Fixed: was 5.0, backend allows 10.0
 
-        // Decoder parameters
+        // === Decoder parameters ===
         patience: { ge: 0.0, le: 5.0, step: 0.1 },
         length_penalty: { ge: 0.0, le: 2.0, step: 0.1 },
         max_initial_timestamp: { ge: 0.0, le: 30.0, step: 0.5 },
-        beam_size: { ge: 1, le: 10, step: 1 },
+        beam_size: { ge: 1, le: 20, step: 1 },                        // Fixed: was 10, backend allows 20
         best_of: { ge: 1, le: 10, step: 1 },
 
-        // VAD parameters (external Silero VAD)
+        // === External VAD parameters (Silero VAD for balanced/fidelity) ===
         threshold: { ge: 0.0, le: 1.0, step: 0.01 },
         neg_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        // Internal VAD parameters (kotoba-faster-whisper)
+
+        // === Internal VAD parameters (kotoba-faster-whisper) ===
+        // Also applies to external Silero VAD - use larger ranges to cover both
         vad_filter: { type: 'boolean', default: true },
         vad_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        min_speech_duration_ms: { ge: 0, le: 1000, step: 10 },
-        max_speech_duration_s: { ge: 1.0, le: 60.0, step: 1.0 },
-        min_silence_duration_ms: { ge: 0, le: 2000, step: 10 },
-        speech_pad_ms: { ge: 0, le: 500, step: 10 }
+        min_speech_duration_ms: { ge: 0, le: 5000, step: 10 },        // Fixed: was 1000, backend allows 5000
+        max_speech_duration_s: { ge: 0.0, le: 300.0, step: 1.0 },     // Fixed: was 60.0, silero allows 300.0
+        min_silence_duration_ms: { ge: 0, le: 5000, step: 10 },       // Fixed: was 2000, backend allows 5000
+        speech_pad_ms: { ge: 0, le: 2000, step: 10 },                 // Fixed: was 500, backend allows 2000
+
+        // === Engine parameters (NEW - were missing) ===
+        repetition_penalty: { ge: 1.0, le: 3.0, step: 0.1 },          // Added: for faster_whisper/kotoba
+        no_repeat_ngram_size: { ge: 0, le: 10, step: 1 },             // Added: for faster_whisper/kotoba
+        chunk_length: { ge: 1, le: 30, step: 1 },                     // Added: for faster_whisper
+
+        // === Boolean parameters (explicit type for robustness) ===
+        suppress_blank: { type: 'boolean', default: true },
+        without_timestamps: { type: 'boolean', default: false },
+        condition_on_previous_text: { type: 'boolean', default: false },
+        word_timestamps: { type: 'boolean', default: true },
+        drop_nonverbal_vocals: { type: 'boolean', default: false },
+        log_progress: { type: 'boolean', default: false },
+        multilingual: { type: 'boolean', default: false },
+        regroup: { type: 'boolean', default: true },
+        vad: { type: 'boolean', default: true }
     },
 
     // Model compatibility per pipeline (faster-whisper doesn't support turbo)
@@ -1287,7 +1306,8 @@ const EnsembleManager = {
             const metadata = this.parameterMetadata[paramName] || {};
             const param = {
                 name: paramName,
-                type: this.inferType(defaultValue),
+                // AUDIT FIX: Pass paramName to inferType for metadata-based type detection
+                type: this.inferType(defaultValue, paramName),
                 description: '',
                 constraints: metadata
             };
@@ -1361,7 +1381,8 @@ const EnsembleManager = {
             const metadata = this.parameterMetadata[paramName] || {};
             const param = {
                 name: paramName,
-                type: this.inferType(defaultValue),
+                // AUDIT FIX: Pass paramName to inferType for metadata-based type detection
+                type: this.inferType(defaultValue, paramName),
                 description: this.getInternalVadDescription(paramName),
                 constraints: metadata
             };
@@ -1486,7 +1507,17 @@ const EnsembleManager = {
         });
     },
 
-    inferType(value) {
+    // AUDIT FIX: Enhanced type inference that checks metadata first
+    inferType(value, paramName = null) {
+        // Check metadata for explicit type first (most reliable)
+        if (paramName && this.parameterMetadata[paramName]) {
+            const metadata = this.parameterMetadata[paramName];
+            if (metadata.type) {
+                return metadata.type === 'boolean' ? 'bool' : metadata.type;
+            }
+        }
+
+        // Fall back to runtime type inference
         if (typeof value === 'boolean') return 'bool';
         if (typeof value === 'number') {
             return Number.isInteger(value) ? 'int' : 'float';
@@ -1509,6 +1540,50 @@ const EnsembleManager = {
         let input;
         const type = param.type;
         const constraints = param.constraints || {};
+
+        // AUDIT FIX: Special handling for array-capable parameters (temperature, suppress_tokens)
+        const arrayCapableParams = ['temperature', 'suppress_tokens'];
+        if (arrayCapableParams.includes(param.name)) {
+            // Create text input with format hint for array values
+            input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'param-text param-array-input';
+
+            // Display value
+            const displayValue = value !== undefined ? value : defaultValue;
+            if (Array.isArray(displayValue)) {
+                input.value = JSON.stringify(displayValue);
+            } else if (displayValue !== null && displayValue !== undefined) {
+                // Single value - show as-is, will be parsed appropriately
+                input.value = String(displayValue);
+            } else {
+                input.value = '';
+            }
+
+            // Set placeholder with format hint
+            if (param.name === 'temperature') {
+                input.placeholder = 'e.g., [0.0, 0.2, 0.4] or 0.0';
+                input.title = 'Temperature for sampling. Use array for fallback temperatures: [0.0, 0.2, 0.4]';
+            } else if (param.name === 'suppress_tokens') {
+                input.placeholder = 'e.g., [1, 2, 3] or leave empty';
+                input.title = 'Token IDs to suppress. Use array format: [1, 2, 3]. Leave empty for default.';
+            }
+
+            // Mark as array type for proper parsing
+            container.dataset.originalType = 'array';
+
+            container.appendChild(input);
+
+            // Add format hint description
+            const hint = document.createElement('p');
+            hint.className = 'param-description param-format-hint';
+            hint.textContent = param.name === 'temperature'
+                ? 'Single value or array of fallback temperatures (e.g., [0.0, 0.2, 0.4])'
+                : 'Array of token IDs to suppress (e.g., [1, 2, 3]). Empty for defaults.';
+            container.appendChild(hint);
+
+            return container;
+        }
 
         if (type === 'bool' || type === 'boolean') {
             // Checkbox for boolean
@@ -1609,9 +1684,68 @@ const EnsembleManager = {
         return container;
     },
 
+    // AUDIT FIX: Validate and clamp parameter values against metadata constraints
+    validateAndClampValue(paramName, value, originalType) {
+        const metadata = this.parameterMetadata[paramName];
+        if (!metadata) return value;  // No metadata, pass through
+
+        // Skip validation for arrays (temperature can be array)
+        if (Array.isArray(value)) {
+            // Validate each element in array if it's numeric
+            if (metadata.ge !== undefined || metadata.le !== undefined) {
+                return value.map(v => {
+                    if (typeof v === 'number') {
+                        let clamped = v;
+                        if (metadata.ge !== undefined && v < metadata.ge) clamped = metadata.ge;
+                        if (metadata.le !== undefined && v > metadata.le) clamped = metadata.le;
+                        return clamped;
+                    }
+                    return v;
+                });
+            }
+            return value;
+        }
+
+        // Validate numeric values
+        if (typeof value === 'number' && !isNaN(value)) {
+            let clamped = value;
+            let wasClamped = false;
+
+            if (metadata.ge !== undefined && value < metadata.ge) {
+                clamped = metadata.ge;
+                wasClamped = true;
+            }
+            if (metadata.le !== undefined && value > metadata.le) {
+                clamped = metadata.le;
+                wasClamped = true;
+            }
+
+            if (wasClamped) {
+                console.warn(`Parameter '${paramName}': value ${value} clamped to ${clamped} (range: ${metadata.ge}-${metadata.le})`);
+            }
+
+            // Ensure integer types stay as integers
+            if (originalType === 'int' || originalType === 'integer') {
+                return Math.round(clamped);
+            }
+            return clamped;
+        }
+
+        // Convert empty strings to null for optional string params
+        if (typeof value === 'string' && value.trim() === '') {
+            const optionalStringParams = ['initial_prompt', 'prefix', 'hotwords', 'prompt', 'prepend_punctuations', 'append_punctuations', 'clip_timestamps'];
+            if (optionalStringParams.includes(paramName)) {
+                return null;
+            }
+        }
+
+        return value;
+    },
+
     applyCustomization() {
         const passKey = this.state.currentCustomize;
         const fullParams = {};
+        const validationWarnings = [];
 
         // Collect ALL values from all tab panels (including model tab)
         const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
@@ -1658,11 +1792,16 @@ const EnsembleManager = {
                             }
                         } catch {
                             // Fallback: split by comma and convert to numbers
-                            value = rawValue.split(',').map(s => {
-                                const trimmed = s.trim();
-                                const num = parseFloat(trimmed);
-                                return isNaN(num) ? trimmed : num;
-                            });
+                            if (rawValue.trim()) {
+                                value = rawValue.split(',').map(s => {
+                                    const trimmed = s.trim();
+                                    const num = parseFloat(trimmed);
+                                    return isNaN(num) ? trimmed : num;
+                                });
+                            } else {
+                                // Empty string for array - use default or empty array
+                                value = [];
+                            }
                         }
                     } else if (originalType === 'int' || originalType === 'integer') {
                         value = parseInt(rawValue) || 0;
@@ -1683,12 +1822,29 @@ const EnsembleManager = {
                     }
                 }
 
-                // Store ALL values (full configuration snapshot)
+                // AUDIT FIX: Validate and clamp value against metadata constraints
                 if (value !== undefined) {
-                    fullParams[paramName] = value;
+                    const originalValue = value;
+                    value = this.validateAndClampValue(paramName, value, originalType);
+
+                    // Track if value was modified
+                    if (value !== originalValue && typeof originalValue === 'number') {
+                        validationWarnings.push(`${paramName}: ${originalValue} -> ${value}`);
+                    }
+
+                    // Store validated value (skip null for optional params that were empty)
+                    if (value !== null) {
+                        fullParams[paramName] = value;
+                    }
                 }
             });
         });
+
+        // Log validation warnings if any
+        if (validationWarnings.length > 0) {
+            ConsoleManager.log(`Clamped ${validationWarnings.length} out-of-range values`, 'warn');
+            console.log('Validation adjustments:', validationWarnings);
+        }
 
         // Store full params in pass state and mark as customized
         this.state[passKey].params = fullParams;
