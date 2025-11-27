@@ -1058,14 +1058,38 @@ def main():
                 merge_strategy=args.merge_strategy
             )
 
-            # Report results
+            # Report individual results
+            failed_files = []
+            successful_count = 0
+            total_processing_time = 0.0
+
             for result in results:
                 basename = result.get('input', {}).get('basename', 'unknown')
                 if result.get('error') or result.get('status') == 'failed':
                     logger.error(f"Failed: {basename} - {result.get('error', 'Unknown error')}")
+                    failed_files.append(basename)
                 else:
                     output_path = result.get('summary', {}).get('final_output', 'unknown')
                     logger.info(f"Completed: {output_path}")
+                    successful_count += 1
+                    total_processing_time += result.get('summary', {}).get('total_processing_time_seconds', 0.0)
+
+            # Print ensemble processing summary (matching standard pipeline format)
+            print("\n" + "="*50)
+            print("ENSEMBLE PROCESSING SUMMARY")
+            print("="*50)
+            print(f"Total files: {len(media_files)}")
+            print(f"Successful: {successful_count}")
+            print(f"Failed: {len(failed_files)}")
+            if total_processing_time > 0:
+                print(f"Total processing time: {total_processing_time:.2f}s")
+                if successful_count > 0:
+                    print(f"Average per file: {total_processing_time / successful_count:.2f}s")
+            if failed_files:
+                print("\nFailed files:")
+                for f in failed_files:
+                    print(f"  - {f}")
+            print("="*50)
 
         # Choose sync or async processing for normal mode
         elif args.async_processing:
