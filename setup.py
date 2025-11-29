@@ -40,6 +40,8 @@ install_requires = [
     "openai>=1.35.0",
     "google-genai>=1.39.0",
     "huggingface-hub>=0.25.0",
+    "transformers>=4.40.0",  # HuggingFace Transformers for ASR pipeline
+    "accelerate>=0.26.0",    # Efficient model loading for Transformers
     "silero-vad>=6.0",
 
     # Configuration system
