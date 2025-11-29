@@ -1,0 +1,163 @@
+# =============================================================================
+# Auditok Scene Detection Tool Configuration
+# =============================================================================
+# Audio-based scene splitting using energy/silence detection.
+# Two-pass segmentation with audio preprocessing for reliable results.
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: auditok-scene-detection
+  displayName: "Auditok Scene Detection"
+  description: |
+    Audio-based scene splitting using silence detection with two-pass segmentation.
+    Uses energy thresholds to detect speech vs silence boundaries.
+    Reliable for most content types including JAV audio.
+  version: "1.0.0"
+  tags:
+    - scene-detection
+    - auditok
+    - energy-based
+    - reliable
+    - default
+
+tool_type: scene_detection
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio_path: path
+    sample_rate: int
+  output:
+    segments: list  # List of {start: float, end: float}
+
+# =============================================================================
+# Tool Parameters
+# =============================================================================
+spec:
+  # --- Core Options ---
+  core.max_duration_s: 29.0
+  core.min_duration_s: 0.2
+  core.target_sr: 16000
+  core.force_mono: true
+  core.preserve_original_sr: true
+  core.verbose_summary: true
+
+  # --- Pass 1: Coarse Segmentation ---
+  pass1.min_duration_s: 2.0
+  pass1.max_duration_s: 2700.0
+  pass1.max_silence_s: 2.5
+  pass1.energy_threshold: 32
+
+  # --- Pass 2: Fine Segmentation ---
+  pass2.min_duration_s: 0.1
+  pass2.max_duration_s: 1800.0
+  pass2.max_silence_s: 1.8
+  pass2.energy_threshold: 38
+
+  # --- Audio Preprocessing ---
+  audio.bandpass_low_hz: 200
+  audio.bandpass_high_hz: 4000
+  audio.drc_threshold_db: -24.0
+  audio.drc_ratio: 4.0
+  audio.drc_attack_ms: 5.0
+  audio.drc_release_ms: 100.0
+
+  # --- Fallback Options ---
+  fallback.brute_force: true
+  fallback.chunk_s: 29.0
+  fallback.pad_edges_s: 0.0
+  fallback.fade_ms: 0
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  conservative:
+    # Higher thresholds, fewer splits
+    pass1.energy_threshold: 40
+    pass2.energy_threshold: 45
+    pass1.max_silence_s: 3.0
+    pass2.max_silence_s: 2.5
+
+  balanced: {}
+
+  aggressive:
+    # Lower thresholds, more splits
+    pass1.energy_threshold: 28
+    pass2.energy_threshold: 32
+    pass1.max_silence_s: 2.0
+    pass2.max_silence_s: 1.2
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  core.max_duration_s:
+    widget: slider
+    label: "Max Scene Duration"
+    description: "Maximum scene duration in seconds"
+    min: 10
+    max: 120
+    step: 1
+    group: core
+
+  core.min_duration_s:
+    widget: number
+    label: "Min Scene Duration"
+    description: "Minimum scene duration in seconds"
+    min: 0.1
+    max: 5.0
+    step: 0.1
+    group: core
+
+  pass1.energy_threshold:
+    widget: slider
+    label: "Pass 1 Energy"
+    description: "Energy threshold for coarse segmentation (dB)"
+    min: 10
+    max: 60
+    step: 1
+    group: pass1
+
+  pass2.energy_threshold:
+    widget: slider
+    label: "Pass 2 Energy"
+    description: "Energy threshold for fine segmentation (dB)"
+    min: 10
+    max: 60
+    step: 1
+    group: pass2
+
+  pass1.max_silence_s:
+    widget: number
+    label: "Pass 1 Max Silence"
+    description: "Maximum silence before split (seconds)"
+    min: 0.5
+    max: 10.0
+    step: 0.1
+    group: pass1
+
+  pass2.max_silence_s:
+    widget: number
+    label: "Pass 2 Max Silence"
+    description: "Maximum silence before split (seconds)"
+    min: 0.5
+    max: 5.0
+    step: 0.1
+    group: pass2
+
+  fallback.brute_force:
+    widget: checkbox
+    label: "Brute Force Fallback"
+    description: "Use fixed chunking as fallback"
+    group: fallback
+
+# Implementation provider
+provider:
+  module: whisperjav.modules.scene_detection
+  class: AuditokSceneDetector

@@ -1,0 +1,119 @@
+# =============================================================================
+# Whisper Large v3 Model Configuration
+# =============================================================================
+# OpenAI's Whisper Large v3 via HuggingFace Transformers pipeline.
+# Full-size model for maximum accuracy.
+#
+# Reference: https://huggingface.co/openai/whisper-large-v3
+# =============================================================================
+
+schemaVersion: v1
+kind: Model
+
+metadata:
+  name: whisper-large-v3
+  ecosystem: transformers
+  displayName: "Whisper Large v3"
+  description: |
+    OpenAI's Whisper Large v3 model via HuggingFace Transformers.
+    Full-size model providing maximum accuracy at the cost of speed.
+    Good for difficult audio or when accuracy is paramount.
+  version: "1.0.0"
+  tags:
+    - openai
+    - large
+    - accurate
+    - multilingual
+
+provider: transformers
+
+# =============================================================================
+# Model Parameters
+# =============================================================================
+spec:
+  # --- Model Loading ---
+  model.id: "openai/whisper-large-v3"
+  model.device: auto
+  model.dtype: auto
+  model.attention: sdpa
+
+  # --- Chunked Processing ---
+  chunk.length_s: 30
+  chunk.stride_s: null
+  chunk.batch_size: 8  # Lower batch size for larger model
+
+  # --- Decoding ---
+  decode.language: ja
+  decode.task: transcribe
+  decode.beam_size: 5
+  decode.temperature: 0.0
+  decode.condition_on_previous: true
+
+  # --- Quality Thresholds ---
+  quality.compression_ratio: 2.4
+  quality.logprob: -1.0
+  quality.no_speech: 0.6
+
+  # --- Timestamps ---
+  timestamps.mode: segment
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  conservative:
+    decode.beam_size: 3
+    decode.temperature: 0.0
+    quality.no_speech: 0.7
+    chunk.batch_size: 4
+
+  balanced: {}
+
+  aggressive:
+    decode.beam_size: 7
+    decode.temperature: 0.2
+    quality.no_speech: 0.4
+    chunk.batch_size: 12
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  model.id:
+    widget: text
+    label: "Model ID"
+    group: model
+    readonly: true
+
+  model.device:
+    widget: dropdown
+    label: "Device"
+    options: [auto, cuda, cpu]
+    group: model
+
+  chunk.length_s:
+    widget: slider
+    label: "Chunk Length"
+    min: 10
+    max: 60
+    step: 5
+    group: chunk
+
+  chunk.batch_size:
+    widget: spinner
+    label: "Batch Size"
+    min: 1
+    max: 32
+    step: 1
+    group: chunk
+
+  decode.beam_size:
+    widget: spinner
+    label: "Beam Size"
+    min: 1
+    max: 20
+    group: decode
+
+compatible_tools:
+  - auditok-scene-detection
+  - silero-scene-detection

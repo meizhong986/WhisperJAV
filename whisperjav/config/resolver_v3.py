@@ -1,6 +1,17 @@
 """
 Configuration Resolver v3.0 - Component-Based.
 
+.. deprecated:: 1.7.0
+    This module is part of the LEGACY configuration system (v1-v3).
+    For new development, use the v4 YAML-driven configuration system:
+
+        from whisperjav.config.v4 import ConfigManager
+        manager = ConfigManager()
+        config = manager.get_model_config("kotoba-whisper-v2", "balanced")
+
+    See: whisperjav/config/v4/README.md
+    ADR: docs/adr/ADR-001-yaml-config-architecture.md
+
 Resolves configuration from component selections instead of JSON.
 """
 

@@ -1,5 +1,15 @@
 # v1 Configuration Parameter Reference
 
+> **LEGACY REFERENCE DOCUMENT**
+>
+> This document describes the v1/v3 configuration system which is now **superseded by v4**.
+> For new development, see: `whisperjav/config/v4/README.md`
+>
+> The v4 system uses YAML-driven configuration and does not require Python changes
+> to add new models. See [ADR-001](adr/ADR-001-yaml-config-architecture.md) for details.
+
+---
+
 This document contains the complete parameter values from v1 (asr_config.json) for reference during v3 implementation.
 
 **Source:** `whisperjav/config/asr_config.json` version 4.4
