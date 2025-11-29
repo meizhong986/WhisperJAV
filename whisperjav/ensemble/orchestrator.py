@@ -625,7 +625,7 @@ class EnsembleOrchestrator:
         """
         # Default HF parameters (model uses its tuned defaults)
         hf_defaults = {
-            'hf_model_id': 'kotoba-tech/kotoba-whisper-v2.0',
+            'hf_model_id': 'kotoba-tech/kotoba-whisper-v2.2',
             'hf_chunk_length': 15,
             'hf_stride': None,
             'hf_batch_size': 16,

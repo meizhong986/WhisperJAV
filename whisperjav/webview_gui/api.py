@@ -1014,10 +1014,10 @@ class WhisperJAVAPI:
 
         # Default fallback if registry loading fails
         fallback = {
-            "default_model": "kotoba-tech/kotoba-whisper-v2.0",
+            "default_model": "kotoba-tech/kotoba-whisper-v2.2",
             "models": [
-                {"id": "kotoba-tech/kotoba-whisper-v2.0", "label": "Kotoba v2.0 (Stable)", "category": "kotoba"},
-                {"id": "openai/whisper-large-v3", "label": "Whisper Large v3", "category": "openai"},
+                {"id": "kotoba-tech/kotoba-whisper-v2.2", "label": "Kotoba v2.2 (Latest)", "category": "kotoba"},
+                {"id": "kotoba-tech/kotoba-whisper-v2.0", "label": "Kotoba v2.0", "category": "kotoba"},
                 {"id": "openai/whisper-large-v3-turbo", "label": "Whisper Large v3 Turbo", "category": "openai"},
             ]
         }
@@ -1206,7 +1206,7 @@ class WhisperJAVAPI:
                 "sensitivity": None,  # Sensitivity not applicable for Transformers
                 "is_transformers": True,
                 "params": {
-                    "model_id": "kotoba-tech/kotoba-whisper-v2.0",
+                    "model_id": "kotoba-tech/kotoba-whisper-v2.2",
                     "chunk_length_s": 15,
                     "stride_length_s": None,
                     "batch_size": 16,
@@ -1219,7 +1219,7 @@ class WhisperJAVAPI:
                     "device": "auto",
                     "dtype": "auto",
                 },
-                "model": "kotoba-tech/kotoba-whisper-v2.0",
+                "model": "kotoba-tech/kotoba-whisper-v2.2",
             }
 
         try:
