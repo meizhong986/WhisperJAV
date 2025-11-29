@@ -423,23 +423,35 @@ class WhisperProASR:
         logger.debug(f"Cleaning up {self.__class__.__name__} resources...")
 
         # Delete Whisper model
-        if hasattr(self, 'whisper_model'):
-            del self.whisper_model
-            self.whisper_model = None
-            logger.debug("Whisper model unloaded")
+        try:
+            if hasattr(self, 'whisper_model') and self.whisper_model is not None:
+                del self.whisper_model
+                self.whisper_model = None
+                logger.debug("Whisper model unloaded")
+        except Exception as e:
+            logger.warning(f"Error unloading Whisper model: {e}")
 
         # Delete VAD model
-        if hasattr(self, 'vad_model'):
-            del self.vad_model
-            self.vad_model = None
-            logger.debug("VAD model unloaded")
+        try:
+            if hasattr(self, 'vad_model') and self.vad_model is not None:
+                del self.vad_model
+                self.vad_model = None
+                logger.debug("VAD model unloaded")
+        except Exception as e:
+            logger.warning(f"Error unloading VAD model: {e}")
 
-        # Clear CUDA cache if available
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            logger.debug("CUDA cache cleared")
+        # Force garbage collection first (before CUDA cache clear)
+        try:
+            gc.collect()
+        except Exception as e:
+            logger.warning(f"Error during garbage collection: {e}")
 
-        # Force garbage collection
-        gc.collect()
+        # Clear CUDA cache if available (can sometimes cause issues on Windows)
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.debug("CUDA cache cleared")
+        except Exception as e:
+            logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
 
         logger.debug(f"{self.__class__.__name__} cleanup complete")

@@ -134,7 +134,7 @@ def parse_arguments():
     twopass_group.add_argument("--ensemble", action="store_true",
                                help="Enable two-pass ensemble mode")
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper"],
+                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper", "transformers"],
                                help="Pipeline for pass 1 (default: balanced)")
     twopass_group.add_argument("--pass1-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -143,8 +143,10 @@ def parse_arguments():
                                help="JSON string of parameter overrides for pass 1 (deprecated)")
     twopass_group.add_argument("--pass1-params", default=None,
                                help="JSON string of full parameters for pass 1 (custom mode)")
+    twopass_group.add_argument("--pass1-hf-params", default=None,
+                               help="JSON string of HuggingFace Transformers parameters for pass 1 (when pipeline=transformers)")
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper"],
+                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper", "transformers"],
                                help="Pipeline for pass 2 (enables pass 2)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -153,6 +155,8 @@ def parse_arguments():
                                help="JSON string of parameter overrides for pass 2 (deprecated)")
     twopass_group.add_argument("--pass2-params", default=None,
                                help="JSON string of full parameters for pass 2 (custom mode)")
+    twopass_group.add_argument("--pass2-hf-params", default=None,
+                               help="JSON string of HuggingFace Transformers parameters for pass 2 (when pipeline=transformers)")
     twopass_group.add_argument("--merge-strategy", default="smart_merge",
                                choices=["smart_merge", "full_merge", "pass1_primary", "pass2_primary", "pass1_overlap", "pass2_overlap"],
                                help="Merge strategy for two-pass results (default: smart_merge)")
@@ -1085,14 +1089,33 @@ def main():
                     logger.error(f"Invalid JSON in --pass2-overrides: {e}")
                     sys.exit(1)
 
+            # Parse HuggingFace Transformers params (for pipeline=transformers)
+            pass1_hf_params = None
+            if args.pass1_hf_params:
+                try:
+                    pass1_hf_params = json.loads(args.pass1_hf_params)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass1-hf-params: {e}")
+                    sys.exit(1)
+
+            pass2_hf_params = None
+            if args.pass2_hf_params:
+                try:
+                    pass2_hf_params = json.loads(args.pass2_hf_params)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass2-hf-params: {e}")
+                    sys.exit(1)
+
             # Build pass configurations
             # Full Configuration Snapshot approach:
             # - If params provided: use as full config (customized)
             # - If not: backend resolves from pipeline+sensitivity
+            # - For transformers: use hf_params if provided
             pass1_config = {
                 'pipeline': args.pass1_pipeline,
                 'sensitivity': args.pass1_sensitivity,
-                'params': pass1_params  # None = use defaults, object = custom
+                'params': pass1_params,  # None = use defaults, object = custom
+                'hf_params': pass1_hf_params  # For transformers pipeline
             }
 
             pass2_config = None
@@ -1100,7 +1123,8 @@ def main():
                 pass2_config = {
                     'pipeline': args.pass2_pipeline,
                     'sensitivity': args.pass2_sensitivity,
-                    'params': pass2_params
+                    'params': pass2_params,
+                    'hf_params': pass2_hf_params  # For transformers pipeline
                 }
 
             # Create orchestrator

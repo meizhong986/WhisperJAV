@@ -152,6 +152,7 @@
                                             <option value="fast">fast&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4GB VRAM)</option>
                                             <option value="faster">faster&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8-batch8&nbsp;&nbsp;6GB VRAM)</option>
                                             <option value="kotoba-faster-whisper">kotoba&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(kotoba-v2-fp16&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
+                                            <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-v2.0&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>
                                     </div>
@@ -201,6 +202,16 @@
                                 <div class="info-group">
                                     <p class="info-text">
                                         Details vs. Noise: 'conservative' reduces false positives; <br>'aggressive' may include noise while capturing more detail.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Row 3: Transformers Info (shown when transformers mode selected) -->
+                            <div class="form-row info-row transformers-info" id="transformersInfoRow" style="display: none;">
+                                <div class="info-group full-width">
+                                    <p class="info-text info-transformers">
+                                        <strong>Transformers Mode:</strong> Uses HuggingFace pipeline with chunked long-form algorithm.
+                                        Sensitivity presets do not apply. Use Ensemble tab's "Customize Parameters" button for fine-tuning.
                                     </p>
                                 </div>
                             </div>
@@ -353,6 +364,7 @@
                                             <option value="faster">Faster</option>
                                             <option value="fidelity">Fidelity</option>
                                             <option value="kotoba-faster-whisper">Kotoba (Japanese)</option>
+                                            <option value="transformers">Transformers (HF)</option>
                                         </select>
                                         <label for="pass1-sensitivity" class="control-label">Sensitivity:</label>
                                         <select id="pass1-sensitivity" class="form-select compact">
@@ -381,6 +393,7 @@
                                             <option value="faster">Faster</option>
                                             <option value="fidelity" selected>Fidelity</option>
                                             <option value="kotoba-faster-whisper">Kotoba (Japanese)</option>
+                                            <option value="transformers">Transformers (HF)</option>
                                         </select>
                                         <label for="pass2-sensitivity" class="control-label">Sensitivity:</label>
                                         <select id="pass2-sensitivity" class="form-select compact" disabled>

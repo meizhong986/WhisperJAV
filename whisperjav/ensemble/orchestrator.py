@@ -11,6 +11,7 @@ from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
+from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.utils.logger import logger
 from whisperjav.utils.metadata_manager import MetadataManager
 
@@ -24,6 +25,7 @@ PIPELINE_CLASSES = {
     'faster': FasterPipeline,
     'fidelity': FidelityPipeline,
     'kotoba-faster-whisper': KotobaFasterWhisperPipeline,
+    'transformers': TransformersPipeline,
 }
 
 
@@ -279,8 +281,14 @@ class EnsembleOrchestrator:
         finally:
             # Always cleanup Pass 1 pipeline to free VRAM
             logger.info("Cleaning up Pass 1 pipeline...")
-            pass1_pipeline.cleanup()
-            del pass1_pipeline
+            try:
+                pass1_pipeline.cleanup()
+            except Exception as e:
+                logger.warning(f"Pass 1 cleanup error (non-fatal): {e}")
+            finally:
+                del pass1_pipeline
+                # Give CUDA time to release resources before next model load
+                time.sleep(0.5)
 
         # ========== PASS 2 PROCESSING ==========
         if pass2_config:
@@ -321,8 +329,14 @@ class EnsembleOrchestrator:
             finally:
                 # Always cleanup Pass 2 pipeline to free VRAM
                 logger.info("Cleaning up Pass 2 pipeline...")
-                pass2_pipeline.cleanup()
-                del pass2_pipeline
+                try:
+                    pass2_pipeline.cleanup()
+                except Exception as e:
+                    logger.warning(f"Pass 2 cleanup error (non-fatal): {e}")
+                finally:
+                    del pass2_pipeline
+                    # Give CUDA time to release resources before merge
+                    time.sleep(0.5)
 
         # ========== MERGE PHASE ==========
         logger.info("=== Merging results ===")
@@ -529,6 +543,20 @@ class EnsembleOrchestrator:
         pipeline_name = pass_config['pipeline']
         sensitivity = pass_config.get('sensitivity', 'balanced')
 
+        # Get pipeline class
+        pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
+        if not pipeline_class:
+            raise ValueError(f"Unknown pipeline: {pipeline_name}")
+
+        # Create temp directory for this pass
+        pass_temp_dir = self.temp_dir / f"pass{pass_number}"
+        pass_temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Handle Transformers pipeline separately (uses hf_* params, not resolved_config)
+        if pipeline_name == 'transformers':
+            return self._create_transformers_pipeline(pass_config, pass_number, pass_temp_dir)
+
+        # Legacy pipeline handling
         # Model compatibility validation (faster-whisper doesn't support turbo)
         PIPELINE_MODEL_COMPATIBILITY = {
             'balanced': ['large-v2', 'large-v3'],
@@ -561,16 +589,7 @@ class EnsembleOrchestrator:
         if pass_config.get('params'):
             self._apply_custom_params(resolved_config, pass_config['params'], pass_number)
 
-        # Get pipeline class
-        pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
-        if not pipeline_class:
-            raise ValueError(f"Unknown pipeline: {pipeline_name}")
-
-        # Create temp directory for this pass
-        pass_temp_dir = self.temp_dir / f"pass{pass_number}"
-        pass_temp_dir.mkdir(parents=True, exist_ok=True)
-
-        # Instantiate pipeline
+        # Instantiate legacy pipeline
         pipeline = pipeline_class(
             output_dir=str(self.output_dir),
             temp_dir=str(pass_temp_dir),
@@ -579,6 +598,85 @@ class EnsembleOrchestrator:
             resolved_config=resolved_config,
             progress_display=self.progress_display,
             **self.extra_kwargs
+        )
+
+        return pipeline
+
+    def _create_transformers_pipeline(
+        self,
+        pass_config: Dict[str, Any],
+        pass_number: int,
+        pass_temp_dir: Path
+    ):
+        """
+        Create a TransformersPipeline instance.
+
+        TransformersPipeline uses dedicated hf_* parameters instead of
+        resolved_config. If hf_params are provided (customized), use them.
+        Otherwise, use model defaults (minimal args pattern).
+
+        Args:
+            pass_config: Pass configuration with optional 'hf_params'
+            pass_number: Pass number (1 or 2)
+            pass_temp_dir: Temporary directory for this pass
+
+        Returns:
+            TransformersPipeline instance
+        """
+        # Default HF parameters (model uses its tuned defaults)
+        hf_defaults = {
+            'hf_model_id': 'kotoba-tech/kotoba-whisper-v2.0',
+            'hf_chunk_length': 15,
+            'hf_stride': None,
+            'hf_batch_size': 16,
+            'hf_scene': 'none',
+            'hf_beam_size': 5,
+            'hf_temperature': 0.0,
+            'hf_attn': 'sdpa',
+            'hf_timestamps': 'segment',
+            'hf_language': 'ja',
+            'hf_task': 'transcribe',
+            'hf_device': 'auto',
+            'hf_dtype': 'auto',
+        }
+
+        # If customized HF params provided, merge with defaults
+        hf_params = pass_config.get('hf_params', {})
+        if hf_params:
+            logger.debug(f"Pass {pass_number}: Using customized Transformers parameters")
+            # Map GUI param names to pipeline param names if needed
+            param_mapping = {
+                'model_id': 'hf_model_id',
+                'chunk_length_s': 'hf_chunk_length',
+                'stride_length_s': 'hf_stride',
+                'batch_size': 'hf_batch_size',
+                'scene': 'hf_scene',
+                'beam_size': 'hf_beam_size',
+                'temperature': 'hf_temperature',
+                'attn_implementation': 'hf_attn',
+                'timestamps': 'hf_timestamps',
+                'language': 'hf_language',
+                'device': 'hf_device',
+                'dtype': 'hf_dtype',
+            }
+            for gui_key, hf_key in param_mapping.items():
+                if gui_key in hf_params:
+                    hf_defaults[hf_key] = hf_params[gui_key]
+            # Also accept direct hf_* keys
+            for key, value in hf_params.items():
+                if key.startswith('hf_'):
+                    hf_defaults[key] = value
+        else:
+            logger.debug(f"Pass {pass_number}: Using default Transformers parameters (minimal args)")
+
+        # Create TransformersPipeline with HF parameters
+        pipeline = TransformersPipeline(
+            output_dir=str(self.output_dir),
+            temp_dir=str(pass_temp_dir),
+            keep_temp_files=True,
+            progress_display=self.progress_display,
+            subs_language=self.subs_language,
+            **hf_defaults
         )
 
         return pipeline
@@ -597,12 +695,25 @@ class EnsembleOrchestrator:
             pass_config: Pass configuration with either:
                 - params: Full configuration snapshot (when customized)
                 - pipeline + sensitivity: Resolve from presets (when default)
+                - hf_params: HuggingFace params (for transformers pipeline)
             pass_number: Pass number (1 or 2)
 
         Returns:
             Pipeline processing result metadata
         """
         pipeline_name = pass_config['pipeline']
+
+        # Create pass-specific temp directory to avoid conflicts
+        pass_temp_dir = self.temp_dir / f"pass{pass_number}"
+        pass_temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Handle Transformers pipeline separately
+        if pipeline_name == 'transformers':
+            pipeline = self._create_transformers_pipeline(pass_config, pass_number, pass_temp_dir)
+            result = pipeline.process(media_info)
+            return result
+
+        # Legacy pipeline handling
         sensitivity = pass_config.get('sensitivity', 'balanced')
 
         # Always resolve base config to get proper structure
@@ -625,11 +736,7 @@ class EnsembleOrchestrator:
         if not pipeline_class:
             raise ValueError(f"Unknown pipeline: {pipeline_name}")
 
-        # Create pass-specific temp directory to avoid conflicts
-        pass_temp_dir = self.temp_dir / f"pass{pass_number}"
-        pass_temp_dir.mkdir(parents=True, exist_ok=True)
-
-        # Instantiate pipeline
+        # Instantiate legacy pipeline
         pipeline = pipeline_class(
             output_dir=str(self.output_dir),
             temp_dir=str(pass_temp_dir),

@@ -316,15 +316,26 @@ class TransformersASR:
         """Free GPU memory by unloading the model."""
         if self.pipe is not None:
             logger.debug("Unloading HF Transformers pipeline...")
-            del self.pipe
-            self.pipe = None
+            try:
+                del self.pipe
+            except Exception as e:
+                logger.warning(f"Error deleting pipeline: {e}")
+            finally:
+                self.pipe = None
 
-            # Force garbage collection
+            # Force garbage collection first (before CUDA cache clear)
             import gc
-            gc.collect()
+            try:
+                gc.collect()
+            except Exception as e:
+                logger.warning(f"Error during garbage collection: {e}")
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # Clear CUDA cache if available (can sometimes cause issues on Windows)
+            try:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception as e:
+                logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
 
             logger.debug("Pipeline unloaded, GPU memory freed")
 
