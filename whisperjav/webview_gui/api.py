@@ -1002,13 +1002,77 @@ class WhisperJAVAPI:
     # Transformers Pipeline Methods
     # ========================================================================
 
+    def _load_hf_models_registry(self) -> Dict[str, Any]:
+        """
+        Load HuggingFace models registry from YAML config.
+
+        Returns:
+            Dict with 'models' list and 'default_model' string.
+            Falls back to hardcoded defaults if file not found or invalid.
+        """
+        import yaml
+
+        # Default fallback if registry loading fails
+        fallback = {
+            "default_model": "kotoba-tech/kotoba-whisper-v2.0",
+            "models": [
+                {"id": "kotoba-tech/kotoba-whisper-v2.0", "label": "Kotoba v2.0 (Stable)", "category": "kotoba"},
+                {"id": "openai/whisper-large-v3", "label": "Whisper Large v3", "category": "openai"},
+                {"id": "openai/whisper-large-v3-turbo", "label": "Whisper Large v3 Turbo", "category": "openai"},
+            ]
+        }
+
+        # Locate registry file relative to this module
+        registry_path = (
+            Path(__file__).parent.parent /
+            "config" / "v4" / "ecosystems" / "transformers" / "hf_models_registry.yaml"
+        )
+
+        if not registry_path.exists():
+            # Try alternate path (if running from different location)
+            alt_path = REPO_ROOT / "whisperjav" / "config" / "v4" / "ecosystems" / "transformers" / "hf_models_registry.yaml"
+            if alt_path.exists():
+                registry_path = alt_path
+            else:
+                return fallback
+
+        try:
+            with open(registry_path, "r", encoding="utf-8") as f:
+                registry = yaml.safe_load(f)
+
+            if not registry or "models" not in registry:
+                return fallback
+
+            return {
+                "default_model": registry.get("default_model", fallback["default_model"]),
+                "models": registry.get("models", fallback["models"])
+            }
+
+        except Exception:
+            # YAML parse error or other issue - fall back silently
+            return fallback
+
     def get_transformers_schema(self) -> Dict[str, Any]:
         """
         Get parameter schema for Transformers pipeline customize modal.
 
         Returns the schema used by the frontend to generate the customize
         modal UI for Transformers/HuggingFace pipeline parameters.
+
+        Model options are loaded from the v4 config registry at:
+        whisperjav/config/v4/ecosystems/transformers/hf_models_registry.yaml
         """
+        # Load models from v4 config registry
+        registry = self._load_hf_models_registry()
+
+        # Convert registry format to dropdown options format
+        # Registry: {"id": "...", "label": "..."} -> Options: {"value": "...", "label": "..."}
+        model_options = [
+            {"value": m["id"], "label": m["label"]}
+            for m in registry["models"]
+        ]
+        default_model = registry["default_model"]
+
         return {
             "success": True,
             "schema": {
@@ -1016,12 +1080,8 @@ class WhisperJAVAPI:
                     "model_id": {
                         "type": "dropdown",
                         "label": "Model",
-                        "options": [
-                            {"value": "kotoba-tech/kotoba-whisper-v2.0", "label": "Kotoba v2.0 (Japanese)"},
-                            {"value": "openai/whisper-large-v3", "label": "Whisper Large v3"},
-                            {"value": "openai/whisper-large-v3-turbo", "label": "Whisper Large v3 Turbo"},
-                        ],
-                        "default": "kotoba-tech/kotoba-whisper-v2.0"
+                        "options": model_options,
+                        "default": default_model
                     },
                     "device": {
                         "type": "dropdown",

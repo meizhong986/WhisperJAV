@@ -1,5 +1,6 @@
 # Include configuration and instruction files
 include whisperjav/config/*.json
+recursive-include whisperjav/config/v4 *.yaml
 include whisperjav/translate/defaults/*.txt
 include whisperjav/instructions/*.txt
 
