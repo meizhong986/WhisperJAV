@@ -44,6 +44,7 @@ install_requires = [
 
     # Configuration system
     "pydantic>=2.0,<3.0",
+    "PyYAML>=6.0",
 
     # GUI Dependencies (Previously in 'gui' extra)
     "pywebview>=5.0.0",
@@ -89,6 +90,7 @@ setup(
     package_data={
         "whisperjav": [
             "config/*.json",
+            "config/v4/**/*.yaml",
             "instructions/*.txt",
             "translate/defaults/*.txt",
             "webview_gui/assets/*.html",
