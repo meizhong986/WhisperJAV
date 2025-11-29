@@ -1,6 +1,47 @@
 """
 Legacy Pipeline Mappings for WhisperJAV v3.0.
 
+.. deprecated:: 1.7.0
+    This module is part of the LEGACY configuration system (v1-v3).
+    For new development, use the v4 YAML-driven configuration system:
+
+        from whisperjav.config.v4 import ConfigManager
+
+    See: whisperjav/config/v4/README.md
+    ADR: docs/adr/ADR-001-yaml-config-architecture.md
+
+PURPOSE AND SCOPE
+=================
+This module provides configuration resolution for pipelines that use the
+LEGACY CONFIG SYSTEM. It maps pipeline mode names (e.g., "balanced", "fast")
+to component-based configurations with ASR, VAD, and feature settings.
+
+WHAT BELONGS HERE
+-----------------
+Pipelines that:
+- Use the `resolve_legacy_pipeline()` function for configuration
+- Accept `resolved_config` parameter in their __init__
+- Rely on the v3 config structure with model, params, and features sections
+- Examples: balanced, fast, faster, fidelity, kotoba-faster-whisper
+
+WHAT DOES NOT BELONG HERE
+-------------------------
+Pipelines that:
+- Use dedicated CLI arguments instead of legacy config resolution
+- Bypass `resolve_legacy_pipeline()` entirely in main.py
+- Have their own independent configuration system
+- Example: "transformers" mode uses --hf-* arguments directly
+
+ADDING NEW PIPELINES
+--------------------
+Before adding a new pipeline to LEGACY_PIPELINES, ask:
+1. Does it need the legacy config resolution system?
+2. Will it accept `resolved_config` in its __init__?
+3. Does it use the standard ASR/VAD/features component model?
+
+If NO to any of these, the pipeline should NOT be added here.
+Instead, handle its config resolution separately in main.py.
+
 Maps old pipeline names to new component-based configurations
 for backward compatibility.
 """
@@ -83,6 +124,9 @@ LEGACY_PIPELINES = {
         "description": "Japanese-optimized Kotoba Faster-Whisper with internal VAD.",
         "use_v3_structure": True,  # Return V3 config, not legacy mapped
     },
+    # NOTE: "transformers" mode is NOT listed here.
+    # It uses dedicated --hf-* CLI arguments and bypasses legacy config resolution entirely.
+    # See whisperjav/pipelines/transformers_pipeline.py for its implementation.
 }
 
 

@@ -105,7 +105,7 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "kotoba-faster-whisper"], default="balanced",
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "kotoba-faster-whisper", "transformers"], default="balanced",
                        help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
@@ -260,6 +260,39 @@ def parse_arguments():
         action="store_true",
         help="Hide translation progress messages (default: show progress)"
     )
+
+    # HuggingFace Transformers mode arguments
+    hf_group = parser.add_argument_group("HuggingFace Transformers Mode Options (--mode transformers)")
+    hf_group.add_argument("--hf-model-id", type=str,
+                         default="kotoba-tech/kotoba-whisper-v2.0",
+                         help="HuggingFace model ID (default: kotoba-tech/kotoba-whisper-v2.0)")
+    hf_group.add_argument("--hf-chunk-length", type=int, default=15,
+                         help="Chunk length in seconds (default: 15)")
+    hf_group.add_argument("--hf-stride", type=float, default=None,
+                         help="Stride/overlap between chunks in seconds (default: chunk_length/6)")
+    hf_group.add_argument("--hf-batch-size", type=int, default=16,
+                         help="Batch size for parallel chunk processing (default: 16)")
+    hf_group.add_argument("--hf-scene", type=str, default="none",
+                         choices=["none", "auditok", "silero"],
+                         help="Scene detection method (default: none)")
+    hf_group.add_argument("--hf-beam-size", type=int, default=5,
+                         help="Beam size for beam search (default: 5)")
+    hf_group.add_argument("--hf-temperature", type=float, default=0.0,
+                         help="Sampling temperature (0=greedy, default: 0.0)")
+    hf_group.add_argument("--hf-attn", type=str, default="sdpa",
+                         choices=["sdpa", "flash_attention_2", "eager"],
+                         help="Attention implementation (default: sdpa)")
+    hf_group.add_argument("--hf-timestamps", type=str, default="segment",
+                         choices=["segment", "word"],
+                         help="Timestamp granularity (default: segment)")
+    hf_group.add_argument("--hf-language", type=str, default="ja",
+                         help="Language code for transcription (default: ja)")
+    hf_group.add_argument("--hf-device", type=str, default="auto",
+                         choices=["auto", "cuda", "cpu"],
+                         help="Device to use (default: auto)")
+    hf_group.add_argument("--hf-dtype", type=str, default="auto",
+                         choices=["auto", "float16", "bfloat16", "float32"],
+                         help="Data type (default: auto)")
 
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
@@ -516,6 +549,29 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         pipeline = KotobaFasterWhisperPipeline(
             scene_method=scene_method,
             **pipeline_args
+        )
+    elif args.mode == "transformers":
+        # HuggingFace Transformers pipeline with dedicated --hf-* arguments
+        from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
+        pipeline = TransformersPipeline(
+            output_dir=args.output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp,
+            progress_display=progress,
+            hf_model_id=getattr(args, 'hf_model_id', 'kotoba-tech/kotoba-whisper-v2.0'),
+            hf_chunk_length=getattr(args, 'hf_chunk_length', 15),
+            hf_stride=getattr(args, 'hf_stride', None),
+            hf_batch_size=getattr(args, 'hf_batch_size', 16),
+            hf_scene=getattr(args, 'hf_scene', 'none'),
+            hf_beam_size=getattr(args, 'hf_beam_size', 5),
+            hf_temperature=getattr(args, 'hf_temperature', 0.0),
+            hf_attn=getattr(args, 'hf_attn', 'sdpa'),
+            hf_timestamps=getattr(args, 'hf_timestamps', 'segment'),
+            hf_language=getattr(args, 'hf_language', 'ja'),
+            hf_task='translate' if args.subs_language == 'direct-to-english' else 'transcribe',
+            hf_device=getattr(args, 'hf_device', 'auto'),
+            hf_dtype=getattr(args, 'hf_dtype', 'auto'),
+            subs_language=args.subs_language,
         )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
@@ -920,6 +976,12 @@ def main():
                 features=features,
                 overrides=overrides,
             )
+
+        elif args.mode == "transformers":
+            # Transformers mode: uses dedicated --hf-* arguments, not legacy config
+            # No config resolution needed - pipeline receives args directly
+            resolved_config = None
+            logger.debug("Transformers mode: skipping legacy config resolution (uses --hf-* args)")
 
         else:
             # Legacy mode: use pipeline resolver

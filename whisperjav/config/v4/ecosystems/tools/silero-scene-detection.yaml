@@ -1,0 +1,148 @@
+# =============================================================================
+# Silero Scene Detection Tool Configuration
+# =============================================================================
+# VAD-based scene splitting using Silero neural network model.
+# More accurate speech detection than energy-based methods.
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: silero-scene-detection
+  displayName: "Silero Scene Detection"
+  description: |
+    Scene splitting using Silero VAD neural network model.
+    More accurate speech detection than energy-based methods.
+    Better for speech-heavy content with background noise.
+  version: "1.0.0"
+  tags:
+    - scene-detection
+    - silero
+    - vad-based
+    - neural
+    - accurate
+
+tool_type: scene_detection
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio_path: path
+    sample_rate: int
+  output:
+    segments: list
+
+# =============================================================================
+# Tool Parameters
+# =============================================================================
+spec:
+  # --- Core Options ---
+  core.max_duration_s: 29.0
+  core.min_duration_s: 0.2
+  core.target_sr: 16000
+  core.force_mono: true
+  core.verbose_summary: true
+
+  # --- Pass 1: Coarse Segmentation ---
+  pass1.min_duration_s: 2.0
+  pass1.max_duration_s: 2700.0
+  pass1.max_silence_s: 2.5
+  pass1.energy_threshold: 32
+
+  # --- Pass 2: Silero VAD ---
+  pass2.min_duration_s: 0.1
+  pass2.max_duration_s: 960.0
+
+  # --- Silero VAD Options ---
+  silero.threshold: 0.02
+  silero.neg_threshold: 0.1
+  silero.min_silence_ms: 2000
+  silero.min_speech_ms: 100
+  silero.max_speech_s: 890.0
+  silero.min_silence_at_max: 750
+  silero.speech_pad_ms: 500
+
+  # --- Audio Preprocessing ---
+  audio.bandpass_low_hz: 200
+  audio.bandpass_high_hz: 4000
+  audio.drc_threshold_db: -24.0
+  audio.drc_ratio: 4.0
+
+  # --- Fallback Options ---
+  fallback.brute_force: true
+  fallback.chunk_s: 29.0
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  conservative:
+    # Higher thresholds, less sensitive
+    silero.threshold: 0.1
+    silero.neg_threshold: 0.2
+    silero.min_silence_ms: 3000
+    silero.min_speech_ms: 200
+
+  balanced: {}
+
+  aggressive:
+    # Lower thresholds, more sensitive
+    silero.threshold: 0.005
+    silero.neg_threshold: 0.05
+    silero.min_silence_ms: 1000
+    silero.min_speech_ms: 50
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  core.max_duration_s:
+    widget: slider
+    label: "Max Scene Duration"
+    min: 10
+    max: 120
+    step: 1
+    group: core
+
+  silero.threshold:
+    widget: number
+    label: "VAD Threshold"
+    description: "Speech probability threshold (lower = more sensitive)"
+    min: 0.0
+    max: 1.0
+    step: 0.01
+    group: silero
+
+  silero.min_silence_ms:
+    widget: spinner
+    label: "Min Silence (ms)"
+    description: "Minimum silence duration to split"
+    min: 100
+    max: 10000
+    step: 100
+    group: silero
+
+  silero.min_speech_ms:
+    widget: spinner
+    label: "Min Speech (ms)"
+    description: "Minimum speech duration to keep"
+    min: 10
+    max: 2000
+    step: 10
+    group: silero
+
+  silero.speech_pad_ms:
+    widget: spinner
+    label: "Speech Padding (ms)"
+    description: "Padding around detected speech"
+    min: 0
+    max: 2000
+    step: 50
+    group: silero
+
+provider:
+  module: whisperjav.modules.scene_detection
+  class: SileroSceneDetector

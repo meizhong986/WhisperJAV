@@ -1,0 +1,71 @@
+# =============================================================================
+# Aggressive Sensitivity Preset
+# =============================================================================
+# Lower thresholds, captures more detail.
+# May produce more artifacts but catches quiet speech.
+# =============================================================================
+
+schemaVersion: v1
+kind: Preset
+
+metadata:
+  name: aggressive
+  displayName: "Aggressive"
+  description: "Lower thresholds, captures more detail. May produce more artifacts."
+  version: "1.0.0"
+  tags:
+    - sensitivity
+    - aggressive
+    - detailed
+
+level: aggressive
+
+description_long: |
+  The aggressive preset prioritizes recall over precision.
+
+  Use this preset when:
+  - Audio quality is poor
+  - Speech is quiet or whispered
+  - You need to capture everything, even at cost of artifacts
+  - Multiple speakers or overlapping audio
+
+  Characteristics:
+  - Lower no-speech threshold
+  - Higher temperature for diversity
+  - Larger batch sizes for speed
+  - Lower energy thresholds for scene detection
+
+  Trade-offs:
+  - May produce more hallucinations
+  - May include non-speech sounds
+  - May have more timing errors
+
+# Cross-cutting overrides
+overrides:
+  # Decoding overrides
+  decode.beam_size: 7
+  decode.temperature: 0.2
+
+  # Quality thresholds
+  quality.no_speech: 0.4
+  quality.logprob: -1.5
+  quality.compression_ratio: 3.0
+
+  # Scene detection
+  pass1.energy_threshold: 28
+  pass2.energy_threshold: 32
+
+  # VAD
+  silero.threshold: 0.005
+  silero.min_silence_ms: 1000
+
+recommended_for:
+  - "Noisy audio"
+  - "Quiet or whispered speech"
+  - "Multiple overlapping speakers"
+  - "Low-quality recordings"
+  - "When completeness matters more than accuracy"
+
+not_recommended_for:
+  - "Clean studio recordings (may produce artifacts)"
+  - "Content where precision is critical"

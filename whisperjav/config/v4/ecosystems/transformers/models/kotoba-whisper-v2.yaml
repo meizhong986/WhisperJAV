@@ -1,0 +1,190 @@
+# =============================================================================
+# Kotoba Whisper v2.0 Model Configuration
+# =============================================================================
+# Japanese-optimized distil-whisper model from kotoba-tech.
+# Uses chunked long-form algorithm for processing long audio files.
+#
+# Reference: https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0
+# Paper: https://arxiv.org/abs/2412.01307
+# =============================================================================
+
+schemaVersion: v1
+kind: Model
+
+metadata:
+  name: kotoba-whisper-v2
+  ecosystem: transformers
+  displayName: "Kotoba Whisper v2.0"
+  description: |
+    Japanese-optimized distil-whisper model from kotoba-tech.
+    Based on distil-large-v3 architecture with Japanese language tuning.
+    Excellent balance of speed and accuracy for Japanese audio.
+  version: "1.0.0"
+  tags:
+    - japanese
+    - distil
+    - kotoba
+    - fast
+    - recommended
+
+provider: transformers
+
+# =============================================================================
+# Model Parameters
+# =============================================================================
+# Uses flat dot-prefix notation for clarity and easy patching
+spec:
+  # --- Model Loading ---
+  model.id: "kotoba-tech/kotoba-whisper-v2.0"
+  model.device: auto
+  model.dtype: auto
+  model.attention: sdpa
+
+  # --- Chunked Processing ---
+  chunk.length_s: 15
+  chunk.stride_s: null  # null = chunk_length / 6 (auto)
+  chunk.batch_size: 16
+
+  # --- Decoding ---
+  decode.language: ja
+  decode.task: transcribe
+  decode.beam_size: 5
+  decode.temperature: 0.0
+  decode.condition_on_previous: true
+
+  # --- Quality Thresholds ---
+  quality.compression_ratio: 2.4
+  quality.logprob: -1.0
+  quality.no_speech: 0.6
+
+  # --- Timestamps ---
+  timestamps.mode: segment  # "segment" or "word"
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+# Override values for different use cases
+presets:
+  conservative:
+    # Higher thresholds, fewer false positives
+    decode.beam_size: 3
+    decode.temperature: 0.0
+    quality.no_speech: 0.7
+    quality.logprob: -0.8
+    chunk.batch_size: 8
+
+  balanced:
+    # Default settings (empty = use spec values)
+    {}
+
+  aggressive:
+    # Lower thresholds, capture more detail
+    decode.beam_size: 7
+    decode.temperature: 0.1
+    quality.no_speech: 0.4
+    quality.logprob: -1.5
+    chunk.batch_size: 24
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+# Widget hints for automatic GUI generation
+gui:
+  model.id:
+    widget: text
+    label: "Model ID"
+    description: "HuggingFace model identifier"
+    group: model
+    readonly: true
+
+  model.device:
+    widget: dropdown
+    label: "Device"
+    description: "Compute device for inference"
+    options:
+      - auto
+      - cuda
+      - cpu
+    group: model
+
+  model.dtype:
+    widget: dropdown
+    label: "Data Type"
+    description: "Floating point precision"
+    options:
+      - auto
+      - float16
+      - bfloat16
+      - float32
+    group: model
+    advanced: true
+
+  model.attention:
+    widget: dropdown
+    label: "Attention"
+    description: "Attention implementation"
+    options:
+      - sdpa
+      - flash_attention_2
+      - eager
+    group: model
+    advanced: true
+
+  chunk.length_s:
+    widget: slider
+    label: "Chunk Length"
+    description: "Audio chunk length in seconds"
+    min: 5
+    max: 30
+    step: 1
+    group: chunk
+
+  chunk.batch_size:
+    widget: spinner
+    label: "Batch Size"
+    description: "Number of chunks processed in parallel"
+    min: 1
+    max: 64
+    step: 1
+    group: chunk
+
+  decode.beam_size:
+    widget: spinner
+    label: "Beam Size"
+    description: "Beam search width (higher = more accurate, slower)"
+    min: 1
+    max: 20
+    step: 1
+    group: decode
+
+  decode.temperature:
+    widget: number
+    label: "Temperature"
+    description: "Sampling temperature (0 = greedy/deterministic)"
+    min: 0.0
+    max: 1.0
+    step: 0.1
+    group: decode
+
+  quality.no_speech:
+    widget: slider
+    label: "No Speech Threshold"
+    description: "Threshold for detecting non-speech segments"
+    min: 0.0
+    max: 1.0
+    step: 0.05
+    group: quality
+
+  timestamps.mode:
+    widget: dropdown
+    label: "Timestamp Mode"
+    description: "Granularity of timestamps"
+    options:
+      - segment
+      - word
+    group: timestamps
+
+# Compatible tools
+compatible_tools:
+  - auditok-scene-detection
+  - silero-scene-detection

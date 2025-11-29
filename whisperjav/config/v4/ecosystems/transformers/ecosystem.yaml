@@ -1,0 +1,53 @@
+# =============================================================================
+# Transformers Ecosystem Configuration
+# =============================================================================
+# HuggingFace Transformers pipeline for ASR using chunked long-form algorithm.
+# Supports any HuggingFace whisper model with batched chunk processing.
+# =============================================================================
+
+schemaVersion: v1
+kind: Ecosystem
+
+metadata:
+  name: transformers
+  displayName: "HuggingFace Transformers"
+  description: |
+    ASR using HuggingFace Transformers pipeline with chunked long-form algorithm.
+    Supports batched processing for faster inference on long audio files.
+    Optimized for models like kotoba-whisper and distil-whisper variants.
+  version: "1.0.0"
+  tags:
+    - huggingface
+    - transformers
+    - chunked
+    - batched
+    - japanese
+  author: "WhisperJAV Team"
+
+# Default values inherited by all models in this ecosystem
+defaults:
+  model.device: auto
+  model.dtype: auto
+  model.attention: sdpa
+  chunk.batch_size: 16
+  decode.language: ja
+  decode.task: transcribe
+
+# Implementation provider
+provider:
+  module: whisperjav.modules.transformers_asr
+  class: TransformersASR
+  install_requires:
+    - transformers>=4.36.0
+    - torch>=2.0.0
+    - accelerate>=0.20.0
+
+# Compatible auxiliary tools
+compatible_tools:
+  - auditok-scene-detection
+  - silero-scene-detection
+
+# Ecosystem capabilities
+supports_gpu: true
+supports_batching: true
+default_language: ja

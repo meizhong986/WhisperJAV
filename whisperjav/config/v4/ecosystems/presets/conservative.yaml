@@ -1,0 +1,64 @@
+# =============================================================================
+# Conservative Sensitivity Preset
+# =============================================================================
+# Higher thresholds, fewer false positives.
+# May miss quiet speech but produces cleaner output.
+# =============================================================================
+
+schemaVersion: v1
+kind: Preset
+
+metadata:
+  name: conservative
+  displayName: "Conservative"
+  description: "Higher thresholds, fewer false positives. May miss quiet speech."
+  version: "1.0.0"
+  tags:
+    - sensitivity
+    - conservative
+    - clean
+
+level: conservative
+
+description_long: |
+  The conservative preset prioritizes precision over recall.
+
+  Use this preset when:
+  - Audio quality is good
+  - You prefer fewer errors over completeness
+  - Content has clear, distinct speech
+  - You want to minimize hallucinations
+
+  Characteristics:
+  - Higher no-speech threshold
+  - Lower temperature (deterministic)
+  - Smaller batch sizes for stability
+  - Higher energy thresholds for scene detection
+
+# Cross-cutting overrides applied to all models/tools
+overrides:
+  # Decoding overrides
+  decode.beam_size: 3
+  decode.temperature: 0.0
+
+  # Quality thresholds
+  quality.no_speech: 0.7
+  quality.logprob: -0.8
+  quality.compression_ratio: 2.2
+
+  # Scene detection
+  pass1.energy_threshold: 40
+  pass2.energy_threshold: 45
+
+  # VAD
+  silero.threshold: 0.1
+
+recommended_for:
+  - "Clean studio recordings"
+  - "Clear single-speaker audio"
+  - "Content where accuracy matters more than completeness"
+
+not_recommended_for:
+  - "Noisy environments"
+  - "Quiet or whispered speech"
+  - "Multiple overlapping speakers"

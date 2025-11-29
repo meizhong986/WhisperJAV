@@ -1,0 +1,48 @@
+# =============================================================================
+# Balanced Sensitivity Preset
+# =============================================================================
+# Default settings providing good balance of accuracy and completeness.
+# Recommended for most use cases.
+# =============================================================================
+
+schemaVersion: v1
+kind: Preset
+
+metadata:
+  name: balanced
+  displayName: "Balanced"
+  description: "Default settings balancing accuracy and completeness. Recommended for most use cases."
+  version: "1.0.0"
+  tags:
+    - sensitivity
+    - balanced
+    - default
+    - recommended
+
+level: balanced
+
+description_long: |
+  The balanced preset provides optimal trade-offs for general use.
+
+  Use this preset when:
+  - You're not sure which preset to use
+  - Content has typical audio quality
+  - You want reliable results without tuning
+
+  Characteristics:
+  - Moderate thresholds
+  - Default beam sizes and temperatures
+  - Good for typical JAV content
+
+# Empty overrides = use model/tool defaults
+overrides: {}
+
+recommended_for:
+  - "General purpose transcription"
+  - "Typical JAV content"
+  - "Mixed audio quality"
+  - "When you're unsure which preset to use"
+
+not_recommended_for:
+  - "Extremely noisy audio (use aggressive)"
+  - "Very clean audio where precision is critical (use conservative)"
