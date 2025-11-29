@@ -53,7 +53,13 @@ srt                   # SRT utilities
 PySubtrans>=0.7.0     # AI-powered subtitle translation
 openai>=1.35.0        # Required for GPT provider in PySubtrans
 google-genai>=1.39.0  # Required for Gemini provider in PySubtrans
+
+# ----------------------------------------
+# HuggingFace Transformers Pipeline
+# ----------------------------------------
 huggingface-hub>=0.25.0  # Hugging Face cache management (faster-whisper models)
+transformers>=4.40.0     # HuggingFace Transformers for ASR pipeline (kotoba-whisper)
+accelerate>=0.26.0       # Efficient model loading for Transformers
 
 # ----------------------------------------
 # Utilities
@@ -69,6 +75,7 @@ requests              # HTTP requests
 # Configuration System
 # ----------------------------------------
 pydantic>=2.0,<3.0    # Data validation (used in config schemas)
+PyYAML>=6.0           # YAML config file parsing
 
 # ----------------------------------------
 # Optional: Performance Optimization

@@ -23,7 +23,7 @@ specs:
   - python=3.10.18  # Pinned for stability (tested version)
   - pip             # Package installer
   - git             # Required for GitHub installs
-  - ffmpeg          # Audio/video processing (conda version preferred)
+  - ffmpeg>=6,<8    # Audio/video processing (v6 or v7 required, v8+ incompatible)
   - menuinst        # Desktop/Start Menu shortcut creation
 
 # Install in dependency order for reliability
