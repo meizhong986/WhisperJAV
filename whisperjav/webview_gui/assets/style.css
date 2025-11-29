@@ -1679,3 +1679,63 @@ button:focus-visible,
     outline: none;
     border-color: var(--primary-color);
 }
+
+/* ============================================================
+   Transformers Mode Styles
+   ============================================================ */
+
+/* Info row for Transformers mode */
+.info-transformers {
+    background: rgba(23, 162, 184, 0.1);
+    border-left: 3px solid var(--info-color);
+    padding: 10px 14px;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    margin: 0;
+}
+
+.info-transformers strong {
+    color: var(--info-color);
+}
+
+/* Full width info group */
+.info-group.full-width {
+    flex: 1;
+    width: 100%;
+}
+
+/* Disabled select styling */
+.form-select:disabled {
+    background-color: var(--disabled-bg);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.form-select option[value="n/a"] {
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+/* Pass controls disabled sensitivity */
+.pass-controls .form-select:disabled {
+    opacity: 0.6;
+}
+
+/* Slider container for Transformers customization */
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.slider-container .param-slider {
+    flex: 1;
+}
+
+.slider-container .slider-value {
+    min-width: 40px;
+    text-align: right;
+    font-weight: 500;
+    color: var(--primary-color);
+}

@@ -382,9 +382,18 @@ class KotobaFasterWhisperASR:
             self.model = None
             logger.debug("Kotoba model unloaded")
 
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            logger.debug("CUDA cache cleared")
+        # Force garbage collection first (before CUDA cache clear)
+        try:
+            gc.collect()
+        except Exception as e:
+            logger.warning(f"Error during garbage collection: {e}")
 
-        gc.collect()
+        # Clear CUDA cache if available (can sometimes cause issues on Windows)
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.debug("CUDA cache cleared")
+        except Exception as e:
+            logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
+
         logger.debug(f"{self.__class__.__name__} cleanup complete")

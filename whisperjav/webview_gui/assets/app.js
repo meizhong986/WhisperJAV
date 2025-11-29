@@ -119,6 +119,102 @@ const TabManager = {
 };
 
 // ============================================================
+// Mode-Specific UI Manager (Transformers sensitivity handling)
+// ============================================================
+const ModeManager = {
+    noSensitivityModes: ['transformers'],
+
+    init() {
+        const modeSelect = document.getElementById('mode');
+        modeSelect.addEventListener('change', (e) => this.handleModeChange(e.target.value));
+        // Apply initial state
+        this.handleModeChange(modeSelect.value);
+    },
+
+    handleModeChange(mode) {
+        const sensitivitySelect = document.getElementById('sensitivity');
+        const sensitivityLabel = sensitivitySelect.previousElementSibling;
+        const transformersInfoRow = document.getElementById('transformersInfoRow');
+
+        if (this.noSensitivityModes.includes(mode)) {
+            // Disable sensitivity and show N/A
+            sensitivitySelect.disabled = true;
+            sensitivitySelect.dataset.previousValue = sensitivitySelect.value;
+
+            // Add N/A option if not exists
+            let naOption = sensitivitySelect.querySelector('option[value="n/a"]');
+            if (!naOption) {
+                naOption = document.createElement('option');
+                naOption.value = 'n/a';
+                naOption.textContent = 'N/A (not applicable)';
+                sensitivitySelect.appendChild(naOption);
+            }
+            sensitivitySelect.value = 'n/a';
+
+            // Show info row
+            if (transformersInfoRow) transformersInfoRow.style.display = 'block';
+            sensitivityLabel.textContent = 'Sensitivity (not used for this mode):';
+        } else {
+            // Re-enable sensitivity
+            sensitivitySelect.disabled = false;
+            if (sensitivitySelect.dataset.previousValue && sensitivitySelect.dataset.previousValue !== 'n/a') {
+                sensitivitySelect.value = sensitivitySelect.dataset.previousValue;
+            } else if (sensitivitySelect.value === 'n/a') {
+                // Default to aggressive if no previous value
+                sensitivitySelect.value = 'aggressive';
+            }
+
+            // Hide info row
+            if (transformersInfoRow) transformersInfoRow.style.display = 'none';
+            sensitivityLabel.textContent = 'Sensitivity (accuracy vs false-positives):';
+        }
+    },
+
+    isTransformersMode() {
+        return document.getElementById('mode').value === 'transformers';
+    }
+};
+
+// ============================================================
+// Transformers Parameter Manager
+// ============================================================
+const TransformersManager = {
+    params: null,
+    customized: false,
+
+    defaults: {
+        model_id: 'kotoba-tech/kotoba-whisper-v2.0',
+        chunk_length_s: 15,
+        stride_length_s: null,
+        batch_size: 16,
+        scene: 'none',
+        beam_size: 5,
+        temperature: 0.0,
+        attn_implementation: 'sdpa',
+        timestamps: 'segment',
+        language: 'ja',
+        device: 'auto',
+        dtype: 'auto',
+    },
+
+    getParams() {
+        return this.customized && this.params
+            ? { ...this.defaults, ...this.params }
+            : { ...this.defaults };
+    },
+
+    setParams(params) {
+        this.params = params;
+        this.customized = true;
+    },
+
+    resetToDefaults() {
+        this.params = null;
+        this.customized = false;
+    }
+};
+
+// ============================================================
 // UI Helpers - Loading States
 // ============================================================
 const UIHelpers = {
@@ -492,20 +588,64 @@ const FormManager = {
 
     collectFormData() {
         // Collect all form values for API
+        const mode = document.getElementById('mode').value;
+        const isTransformers = mode === 'transformers';
+
+        // Base options common to all modes
+        const baseOptions = {
+            inputs: AppState.selectedFiles,
+            output_dir: document.getElementById('outputDir').value,
+            mode: mode,
+            source_language: document.getElementById('source-language').value,
+            subs_language: document.getElementById('language').value,
+            debug: document.getElementById('debugLogging').checked,
+            keep_temp: document.getElementById('keepTemp').checked,
+            temp_dir: document.getElementById('tempDir').value.trim(),
+            accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
+        };
+
+        // Transformers mode: Minimal args by default (use model's internal defaults)
+        // Only pass full params if user explicitly customized via Ensemble tab
+        if (isTransformers) {
+            const isCustomized = TransformersManager.customized;
+
+            // Essential args (always passed)
+            const essentialOptions = {
+                ...baseOptions,
+                hf_device: 'auto',  // Always pass device
+                hf_customized: isCustomized,  // Signal to backend
+            };
+
+            // If customized, include all HF parameters
+            if (isCustomized) {
+                const hfParams = TransformersManager.getParams();
+                return {
+                    ...essentialOptions,
+                    hf_model_id: hfParams.model_id,
+                    hf_chunk_length: hfParams.chunk_length_s,
+                    hf_stride: hfParams.stride_length_s,
+                    hf_batch_size: hfParams.batch_size,
+                    hf_scene: hfParams.scene,
+                    hf_beam_size: hfParams.beam_size,
+                    hf_temperature: hfParams.temperature,
+                    hf_attn: hfParams.attn_implementation,
+                    hf_timestamps: hfParams.timestamps,
+                    hf_language: hfParams.language,
+                    hf_dtype: hfParams.dtype,
+                };
+            }
+
+            // Default: minimal args - let model use its tuned defaults
+            return essentialOptions;
+        }
+
+        // Legacy mode handling (all other modes)
         const modelOverrideEnabled = document.getElementById('modelOverrideEnabled').checked;
         const asyncProcessingEnabled = document.getElementById('asyncProcessing').checked;
 
         return {
-            // Required fields
-            inputs: AppState.selectedFiles,
-            output_dir: document.getElementById('outputDir').value,
-            mode: document.getElementById('mode').value,
+            ...baseOptions,
             sensitivity: document.getElementById('sensitivity').value,
-            source_language: document.getElementById('source-language').value,
-            subs_language: document.getElementById('language').value,
-
-            // Debug logging
-            debug: document.getElementById('debugLogging').checked,
 
             // Scene detection method (optional)
             scene_detection_method: document.getElementById('sceneDetectionMethod').value,
@@ -523,9 +663,6 @@ const FormManager = {
 
             // Other options
             credit: document.getElementById('openingCredit').value.trim(),
-            keep_temp: document.getElementById('keepTemp').checked,
-            temp_dir: document.getElementById('tempDir').value.trim(),
-            accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
 
             // WIP features (currently disabled, but include for future)
             adaptive_classification: document.getElementById('adaptiveClassification').checked,
@@ -909,14 +1046,16 @@ const EnsembleManager = {
             pipeline: 'balanced',
             sensitivity: 'balanced',
             customized: false,
-            params: null  // null = use defaults, object = full custom config
+            params: null,  // null = use defaults, object = full custom config
+            isTransformers: false  // Track if using Transformers pipeline
         },
         pass2: {
             enabled: false,
             pipeline: 'fidelity',
             sensitivity: 'balanced',
             customized: false,
-            params: null
+            params: null,
+            isTransformers: false  // Track if using Transformers pipeline
         },
         mergeStrategy: 'smart_merge',
         currentCustomize: null  // 'pass1' or 'pass2'
@@ -977,6 +1116,7 @@ const EnsembleManager = {
 
     handlePipelineChange(passKey, newValue, selectElement) {
         const passState = this.state[passKey];
+        const isTransformers = newValue === 'transformers';
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -984,13 +1124,36 @@ const EnsembleManager = {
                 passState.pipeline = newValue;
                 passState.customized = false;
                 passState.params = null;
+                passState.isTransformers = isTransformers;
                 this.updateBadges();
+                this.updatePassSensitivityState(passKey);
             } else {
                 // Revert selection
                 selectElement.value = passState.pipeline;
             }
         } else {
             passState.pipeline = newValue;
+            passState.isTransformers = isTransformers;
+            this.updatePassSensitivityState(passKey);
+        }
+    },
+
+    // Update sensitivity dropdown visibility based on pipeline type
+    updatePassSensitivityState(passKey) {
+        const passState = this.state[passKey];
+        const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
+
+        if (passState.isTransformers) {
+            // Disable sensitivity for Transformers
+            sensitivitySelect.disabled = true;
+            sensitivitySelect.style.opacity = '0.5';
+            sensitivitySelect.title = 'Sensitivity not applicable for Transformers mode';
+        } else {
+            // Re-enable sensitivity (unless pass2 is disabled)
+            const isPass2Disabled = passKey === 'pass2' && !this.state.pass2.enabled;
+            sensitivitySelect.disabled = isPass2Disabled;
+            sensitivitySelect.style.opacity = isPass2Disabled ? '0.5' : '1';
+            sensitivitySelect.title = '';
         }
     },
 
@@ -1156,9 +1319,16 @@ const EnsembleManager = {
 
     async openCustomize(passKey) {
         // passKey is 'pass1' or 'pass2'
-        this.state.currentCustomize = passKey;
-
         const passState = this.state[passKey];
+
+        // Route to Transformers-specific handler if applicable
+        if (passState.isTransformers) {
+            await this.openTransformersCustomize(passKey);
+            return;
+        }
+
+        // Legacy pipeline customize flow
+        this.state.currentCustomize = passKey;
         const pipeline = passState.pipeline;
         const sensitivity = passState.sensitivity;
 
@@ -1400,6 +1570,285 @@ const EnsembleManager = {
             speech_pad_ms: 'Padding added around detected speech segments'
         };
         return descriptions[paramName] || '';
+    },
+
+    // ========== Transformers Pipeline Customization ==========
+
+    async openTransformersCustomize(passKey) {
+        this.state.currentCustomize = passKey;
+        const passState = this.state[passKey];
+
+        try {
+            // Get Transformers parameter schema from API
+            const result = await pywebview.api.get_transformers_schema();
+
+            if (!result.success) {
+                ErrorHandler.show('Error', 'Failed to load Transformers parameters: ' + (result.error || 'Unknown error'));
+                return;
+            }
+
+            // Set modal title
+            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+            const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
+            document.getElementById('customizeModalTitle').textContent =
+                `${passLabel} Settings (Transformers / HuggingFace)${customStatus}`;
+
+            // Store schema for reset functionality
+            this._transformersSchema = result.schema;
+
+            // Get current values (use stored params or defaults)
+            const currentValues = passState.customized && passState.params
+                ? { ...passState.params }
+                : { ...TransformersManager.defaults };
+
+            // Generate Transformers-specific tabs
+            this.generateTransformersTabs(result.schema, currentValues);
+
+            // Show modal
+            document.getElementById('customizeModal').classList.add('active');
+
+        } catch (error) {
+            ErrorHandler.show('Error', 'Failed to open Transformers customize dialog: ' + error);
+        }
+    },
+
+    generateTransformersTabs(schema, currentValues) {
+        // Update tab labels for Transformers context
+        const tabLabels = {
+            'model': 'Model',
+            'transcriber': 'Chunking',
+            'decoder': 'Quality',
+            'engine': 'Engine',
+            'vad': 'VAD',
+            'scene': 'Scene'
+        };
+
+        // Clear all tab panels and update labels
+        const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            panel.innerHTML = '';
+            const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
+            if (tabBtn) {
+                tabBtn.textContent = tabLabels[tab];
+                // Hide VAD tab for Transformers (not applicable)
+                tabBtn.style.display = tab === 'vad' ? 'none' : '';
+            }
+        });
+
+        // Generate Model tab
+        this.generateTransformersModelTab('tab-model', schema.model, currentValues);
+
+        // Generate Chunking tab (transcriber slot)
+        this.generateTransformersChunkingTab('tab-transcriber', schema.chunking, currentValues);
+
+        // Generate Quality tab (decoder slot)
+        this.generateTransformersQualityTab('tab-decoder', schema.quality, currentValues);
+
+        // Engine tab - not used for Transformers
+        document.getElementById('tab-engine').innerHTML =
+            '<p class="tab-empty">Engine options not applicable for Transformers mode.</p>';
+
+        // VAD tab - hidden for Transformers
+        document.getElementById('tab-vad').innerHTML =
+            '<p class="tab-empty">VAD is handled internally by HuggingFace chunked algorithm.</p>';
+
+        // Generate Scene tab
+        this.generateTransformersSceneTab('tab-scene', schema.scene, currentValues);
+
+        // Reset to first tab
+        this.switchModalTab('model');
+    },
+
+    generateTransformersModelTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Model ID dropdown
+        const modelDef = schemaSection.model_id;
+        container.appendChild(this.createTransformersDropdown(
+            'model_id', 'Model',
+            modelDef.options,
+            currentValues.model_id || modelDef.default,
+            'HuggingFace model identifier'
+        ));
+
+        // Device dropdown
+        const deviceDef = schemaSection.device;
+        container.appendChild(this.createTransformersDropdown(
+            'device', 'Device',
+            deviceDef.options,
+            currentValues.device || deviceDef.default,
+            'Compute device (auto will detect GPU availability)'
+        ));
+
+        // Data type dropdown
+        const dtypeDef = schemaSection.dtype;
+        container.appendChild(this.createTransformersDropdown(
+            'dtype', 'Data Type',
+            dtypeDef.options,
+            currentValues.dtype || dtypeDef.default,
+            'Model precision (auto selects based on hardware)'
+        ));
+    },
+
+    generateTransformersChunkingTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Chunk length slider
+        const chunkDef = schemaSection.chunk_length_s;
+        container.appendChild(this.createTransformersSlider(
+            'chunk_length_s', chunkDef.label,
+            chunkDef.min, chunkDef.max, chunkDef.step,
+            currentValues.chunk_length_s ?? chunkDef.default,
+            'Length of audio chunks for parallel processing'
+        ));
+
+        // Stride slider
+        const strideDef = schemaSection.stride_length_s;
+        container.appendChild(this.createTransformersSlider(
+            'stride_length_s', strideDef.label,
+            strideDef.min, strideDef.max, strideDef.step,
+            currentValues.stride_length_s ?? (currentValues.chunk_length_s ? Math.floor(currentValues.chunk_length_s / 6) : 2),
+            'Overlap between chunks (null = auto-calculate as chunk/6)'
+        ));
+
+        // Batch size slider
+        const batchDef = schemaSection.batch_size;
+        container.appendChild(this.createTransformersSlider(
+            'batch_size', batchDef.label,
+            batchDef.min, batchDef.max, batchDef.step,
+            currentValues.batch_size ?? batchDef.default,
+            'Number of chunks to process simultaneously (reduce if OOM)'
+        ));
+    },
+
+    generateTransformersQualityTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Beam size slider
+        const beamDef = schemaSection.beam_size;
+        container.appendChild(this.createTransformersSlider(
+            'beam_size', beamDef.label,
+            beamDef.min, beamDef.max, beamDef.step,
+            currentValues.beam_size ?? beamDef.default,
+            'Beam search width (higher = better quality, slower)'
+        ));
+
+        // Temperature slider
+        const tempDef = schemaSection.temperature;
+        container.appendChild(this.createTransformersSlider(
+            'temperature', tempDef.label,
+            tempDef.min, tempDef.max, tempDef.step,
+            currentValues.temperature ?? tempDef.default,
+            'Sampling temperature (0 = greedy decoding)'
+        ));
+
+        // Attention implementation dropdown
+        const attnDef = schemaSection.attn_implementation;
+        container.appendChild(this.createTransformersDropdown(
+            'attn_implementation', attnDef.label,
+            attnDef.options,
+            currentValues.attn_implementation || attnDef.default,
+            'Attention mechanism (SDPA is fastest for most GPUs)'
+        ));
+
+        // Timestamps dropdown
+        const tsDef = schemaSection.timestamps;
+        container.appendChild(this.createTransformersDropdown(
+            'timestamps', tsDef.label,
+            tsDef.options,
+            currentValues.timestamps || tsDef.default,
+            'Timestamp granularity (word requires batch_size=1)'
+        ));
+    },
+
+    generateTransformersSceneTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Scene detection dropdown
+        const sceneDef = schemaSection.scene;
+        container.appendChild(this.createTransformersDropdown(
+            'scene', sceneDef.label,
+            sceneDef.options,
+            currentValues.scene || sceneDef.default,
+            'Split audio into scenes before processing (none = process whole file)'
+        ));
+    },
+
+    createTransformersDropdown(paramName, label, options, currentValue, description) {
+        const control = document.createElement('div');
+        control.className = 'param-control';
+        control.dataset.param = paramName;
+
+        const labelEl = document.createElement('label');
+        labelEl.textContent = label;
+        control.appendChild(labelEl);
+
+        const select = document.createElement('select');
+        select.className = 'param-select form-select';
+        select.id = `hf-${paramName}`;
+
+        options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            if (opt.value === currentValue) option.selected = true;
+            select.appendChild(option);
+        });
+
+        control.appendChild(select);
+
+        if (description) {
+            const desc = document.createElement('p');
+            desc.className = 'param-description';
+            desc.textContent = description;
+            control.appendChild(desc);
+        }
+
+        return control;
+    },
+
+    createTransformersSlider(paramName, label, min, max, step, currentValue, description) {
+        const control = document.createElement('div');
+        control.className = 'param-control';
+        control.dataset.param = paramName;
+
+        const labelEl = document.createElement('label');
+        labelEl.textContent = label;
+        control.appendChild(labelEl);
+
+        const sliderContainer = document.createElement('div');
+        sliderContainer.className = 'slider-container';
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.className = 'param-slider';
+        slider.id = `hf-${paramName}`;
+        slider.min = min;
+        slider.max = max;
+        slider.step = step;
+        slider.value = currentValue ?? min;
+
+        const valueDisplay = document.createElement('span');
+        valueDisplay.className = 'slider-value';
+        valueDisplay.textContent = currentValue ?? min;
+
+        slider.addEventListener('input', () => {
+            valueDisplay.textContent = slider.value;
+        });
+
+        sliderContainer.appendChild(slider);
+        sliderContainer.appendChild(valueDisplay);
+        control.appendChild(sliderContainer);
+
+        if (description) {
+            const desc = document.createElement('p');
+            desc.className = 'param-description';
+            desc.textContent = description;
+            control.appendChild(desc);
+        }
+
+        return control;
     },
 
     generateModelTab(tabId, currentModel, currentDevice, pipeline) {
@@ -1744,6 +2193,15 @@ const EnsembleManager = {
 
     applyCustomization() {
         const passKey = this.state.currentCustomize;
+        const passState = this.state[passKey];
+
+        // Handle Transformers separately
+        if (passState.isTransformers) {
+            this.applyTransformersCustomization(passKey);
+            return;
+        }
+
+        // Legacy pipeline customization
         const fullParams = {};
         const validationWarnings = [];
 
@@ -1858,10 +2316,72 @@ const EnsembleManager = {
         this.closeModal();
     },
 
+    applyTransformersCustomization(passKey) {
+        // Collect Transformers-specific parameters
+        const hfParams = {};
+
+        // Model parameters
+        const modelIdSelect = document.getElementById('hf-model_id');
+        if (modelIdSelect) hfParams.model_id = modelIdSelect.value;
+
+        const deviceSelect = document.getElementById('hf-device');
+        if (deviceSelect) hfParams.device = deviceSelect.value;
+
+        const dtypeSelect = document.getElementById('hf-dtype');
+        if (dtypeSelect) hfParams.dtype = dtypeSelect.value;
+
+        // Chunking parameters
+        const chunkLengthSlider = document.getElementById('hf-chunk_length_s');
+        if (chunkLengthSlider) hfParams.chunk_length_s = parseInt(chunkLengthSlider.value);
+
+        const strideLengthSlider = document.getElementById('hf-stride_length_s');
+        if (strideLengthSlider) {
+            const strideVal = parseFloat(strideLengthSlider.value);
+            hfParams.stride_length_s = strideVal > 0 ? strideVal : null;
+        }
+
+        const batchSizeSlider = document.getElementById('hf-batch_size');
+        if (batchSizeSlider) hfParams.batch_size = parseInt(batchSizeSlider.value);
+
+        // Quality parameters
+        const beamSizeSlider = document.getElementById('hf-beam_size');
+        if (beamSizeSlider) hfParams.beam_size = parseInt(beamSizeSlider.value);
+
+        const temperatureSlider = document.getElementById('hf-temperature');
+        if (temperatureSlider) hfParams.temperature = parseFloat(temperatureSlider.value);
+
+        const attnSelect = document.getElementById('hf-attn_implementation');
+        if (attnSelect) hfParams.attn_implementation = attnSelect.value;
+
+        const timestampsSelect = document.getElementById('hf-timestamps');
+        if (timestampsSelect) hfParams.timestamps = timestampsSelect.value;
+
+        // Scene detection
+        const sceneSelect = document.getElementById('hf-scene');
+        if (sceneSelect) hfParams.scene = sceneSelect.value;
+
+        // Store params
+        this.state[passKey].params = hfParams;
+        this.state[passKey].customized = true;
+
+        const paramCount = Object.keys(hfParams).length;
+        const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+        ConsoleManager.log(`Saved ${paramCount} Transformers parameters for ${passLabel} (Custom)`, 'info');
+
+        this.updateBadges();
+        this.closeModal();
+    },
+
     async resetToDefaults() {
         if (!this.state.currentCustomize) return;
         const passKey = this.state.currentCustomize;
         const passState = this.state[passKey];
+
+        // Handle Transformers separately
+        if (passState.isTransformers) {
+            this.resetTransformersToDefaults(passKey);
+            return;
+        }
 
         // Use stored defaults from openCustomize
         if (!this._currentDefaults) {
@@ -1919,6 +2439,41 @@ const EnsembleManager = {
         this.updateBadges();
     },
 
+    resetTransformersToDefaults(passKey) {
+        // Reset Transformers controls to defaults
+        const defaults = TransformersManager.defaults;
+
+        // Reset sliders
+        const sliderParams = ['chunk_length_s', 'stride_length_s', 'batch_size', 'beam_size', 'temperature'];
+        sliderParams.forEach(param => {
+            const slider = document.getElementById(`hf-${param}`);
+            if (slider) {
+                const defaultVal = defaults[param] ?? slider.min;
+                slider.value = defaultVal;
+                const valueDisplay = slider.parentElement.querySelector('.slider-value');
+                if (valueDisplay) valueDisplay.textContent = defaultVal;
+            }
+        });
+
+        // Reset dropdowns
+        const dropdownParams = ['model_id', 'device', 'dtype', 'attn_implementation', 'timestamps', 'scene'];
+        dropdownParams.forEach(param => {
+            const select = document.getElementById(`hf-${param}`);
+            if (select && defaults[param]) {
+                select.value = defaults[param];
+            }
+        });
+
+        // Clear customized state
+        this.state[passKey].params = null;
+        this.state[passKey].customized = false;
+
+        const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+        ConsoleManager.log(`Reset ${passLabel} Transformers parameters to defaults`, 'info');
+
+        this.updateBadges();
+    },
+
     closeModal() {
         document.getElementById('customizeModal').classList.remove('active');
         this.state.currentCustomize = null;
@@ -1935,16 +2490,18 @@ const EnsembleManager = {
             output_dir: document.getElementById('outputDir').value,
             pass1: {
                 pipeline: this.state.pass1.pipeline,
-                sensitivity: this.state.pass1.sensitivity,
+                sensitivity: this.state.pass1.isTransformers ? null : this.state.pass1.sensitivity,
                 customized: this.state.pass1.customized,
-                params: this.state.pass1.customized ? this.state.pass1.params : null
+                params: this.state.pass1.customized ? this.state.pass1.params : null,
+                isTransformers: this.state.pass1.isTransformers
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
                 pipeline: this.state.pass2.pipeline,
-                sensitivity: this.state.pass2.sensitivity,
+                sensitivity: this.state.pass2.isTransformers ? null : this.state.pass2.sensitivity,
                 customized: this.state.pass2.customized,
-                params: this.state.pass2.customized ? this.state.pass2.params : null
+                params: this.state.pass2.customized ? this.state.pass2.params : null,
+                isTransformers: this.state.pass2.isTransformers
             },
             merge_strategy: this.state.mergeStrategy,
             source_language: document.getElementById('source-language').value,
@@ -2197,6 +2754,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize components
     TabManager.init();
+    ModeManager.init();
     FileListManager.init();
     FormManager.init();
     ConsoleManager.init();

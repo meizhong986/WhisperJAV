@@ -733,17 +733,26 @@ class StableTSASR:
         logger.debug(f"Cleaning up {self.__class__.__name__} resources...")
 
         # Delete the stable-ts model (either standard or faster-whisper backend)
-        if hasattr(self, 'model'):
-            del self.model
-            self.model = None
-            logger.debug("Stable-ts model unloaded")
+        try:
+            if hasattr(self, 'model') and self.model is not None:
+                del self.model
+                self.model = None
+                logger.debug("Stable-ts model unloaded")
+        except Exception as e:
+            logger.warning(f"Error unloading model: {e}")
 
-        # Clear CUDA cache if available
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            logger.debug("CUDA cache cleared")
+        # Force garbage collection first (before CUDA cache clear)
+        try:
+            gc.collect()
+        except Exception as e:
+            logger.warning(f"Error during garbage collection: {e}")
 
-        # Force garbage collection
-        gc.collect()
+        # Clear CUDA cache if available (can sometimes cause issues on Windows)
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.debug("CUDA cache cleared")
+        except Exception as e:
+            logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
 
         logger.debug(f"{self.__class__.__name__} cleanup complete")

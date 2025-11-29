@@ -129,6 +129,10 @@ class WhisperJAVAPI:
         mode = options.get('mode', 'fidelity')
         args += ["--mode", mode]
 
+        # Handle Transformers mode separately (uses --hf-* arguments)
+        if mode == 'transformers':
+            return self._build_transformers_args(args, options)
+
         # Source audio language (for transcription)
         source_language = options.get('source_language', 'japanese')
         args += ["--language", source_language]
@@ -184,6 +188,74 @@ class WhisperJAVAPI:
             args += ["--credit", credit]
 
         # Accept CPU mode (skip GPU warning)
+        if options.get('accept_cpu_mode', False):
+            args += ["--accept-cpu-mode"]
+
+        return args
+
+    def _build_transformers_args(self, args: List[str], options: Dict[str, Any]) -> List[str]:
+        """
+        Build CLI arguments for Transformers mode.
+
+        Transformers mode uses dedicated --hf-* arguments and does not use
+        sensitivity presets (those are for legacy pipelines only).
+
+        Minimal Args by Default:
+        - If hf_customized=False: Only pass essential args (language, device)
+          and let the model use its tuned internal defaults.
+        - If hf_customized=True: Pass all HF parameters explicitly.
+        """
+        # Source/subtitle language
+        source_language = options.get('source_language', 'japanese')
+        args += ["--language", source_language]
+
+        subs_language = options.get('subs_language', 'native')
+        args += ["--subs-language", subs_language]
+
+        # Output directory
+        output_dir = options.get('output_dir', self.default_output)
+        args += ["--output-dir", output_dir]
+
+        # Device is always passed (essential arg)
+        hf_device = options.get('hf_device', 'auto')
+        args += ["--hf-device", str(hf_device)]
+
+        # Check if user explicitly customized parameters
+        is_customized = options.get('hf_customized', False)
+
+        if is_customized:
+            # Full params mode: pass all HF parameters explicitly
+            hf_optional_params = {
+                'hf_model_id': '--hf-model-id',
+                'hf_chunk_length': '--hf-chunk-length',
+                'hf_stride': '--hf-stride',
+                'hf_batch_size': '--hf-batch-size',
+                'hf_scene': '--hf-scene',
+                'hf_beam_size': '--hf-beam-size',
+                'hf_temperature': '--hf-temperature',
+                'hf_attn': '--hf-attn',
+                'hf_timestamps': '--hf-timestamps',
+                'hf_language': '--hf-language',
+                'hf_dtype': '--hf-dtype',
+            }
+
+            for key, cli_arg in hf_optional_params.items():
+                value = options.get(key)
+                if value is not None:
+                    args += [cli_arg, str(value)]
+        # else: Minimal args mode - let model use its internal defaults
+
+        # Common arguments
+        temp_dir = options.get('temp_dir', '').strip()
+        if temp_dir:
+            args += ["--temp-dir", temp_dir]
+
+        if options.get('keep_temp', False):
+            args += ["--keep-temp"]
+
+        if options.get('debug', False):
+            args += ["--debug"]
+
         if options.get('accept_cpu_mode', False):
             args += ["--accept-cpu-mode"]
 
@@ -927,6 +999,131 @@ class WhisperJAVAPI:
         return args
 
     # ========================================================================
+    # Transformers Pipeline Methods
+    # ========================================================================
+
+    def get_transformers_schema(self) -> Dict[str, Any]:
+        """
+        Get parameter schema for Transformers pipeline customize modal.
+
+        Returns the schema used by the frontend to generate the customize
+        modal UI for Transformers/HuggingFace pipeline parameters.
+        """
+        return {
+            "success": True,
+            "schema": {
+                "model": {
+                    "model_id": {
+                        "type": "dropdown",
+                        "label": "Model",
+                        "options": [
+                            {"value": "kotoba-tech/kotoba-whisper-v2.0", "label": "Kotoba v2.0 (Japanese)"},
+                            {"value": "openai/whisper-large-v3", "label": "Whisper Large v3"},
+                            {"value": "openai/whisper-large-v3-turbo", "label": "Whisper Large v3 Turbo"},
+                        ],
+                        "default": "kotoba-tech/kotoba-whisper-v2.0"
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "options": [
+                            {"value": "auto", "label": "Auto (detect GPU)"},
+                            {"value": "cuda", "label": "CUDA (GPU)"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto"
+                    },
+                    "dtype": {
+                        "type": "dropdown",
+                        "label": "Data Type",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "float16", "label": "Float16 (faster)"},
+                            {"value": "bfloat16", "label": "BFloat16"},
+                            {"value": "float32", "label": "Float32 (slower)"},
+                        ],
+                        "default": "auto"
+                    },
+                },
+                "chunking": {
+                    "chunk_length_s": {
+                        "type": "slider",
+                        "label": "Chunk Length (s)",
+                        "min": 5,
+                        "max": 30,
+                        "step": 1,
+                        "default": 15
+                    },
+                    "stride_length_s": {
+                        "type": "slider",
+                        "label": "Stride Length (s)",
+                        "min": 0,
+                        "max": 10,
+                        "step": 0.5,
+                        "default": 0  # 0 means auto-calculate as chunk/6
+                    },
+                    "batch_size": {
+                        "type": "slider",
+                        "label": "Batch Size",
+                        "min": 1,
+                        "max": 32,
+                        "step": 1,
+                        "default": 16
+                    },
+                },
+                "quality": {
+                    "beam_size": {
+                        "type": "slider",
+                        "label": "Beam Size",
+                        "min": 1,
+                        "max": 10,
+                        "step": 1,
+                        "default": 5
+                    },
+                    "temperature": {
+                        "type": "slider",
+                        "label": "Temperature",
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.1,
+                        "default": 0.0
+                    },
+                    "attn_implementation": {
+                        "type": "dropdown",
+                        "label": "Attention",
+                        "options": [
+                            {"value": "sdpa", "label": "SDPA (fastest)"},
+                            {"value": "flash_attention_2", "label": "Flash Attention 2"},
+                            {"value": "eager", "label": "Eager (slowest)"},
+                        ],
+                        "default": "sdpa"
+                    },
+                    "timestamps": {
+                        "type": "dropdown",
+                        "label": "Timestamps",
+                        "options": [
+                            {"value": "segment", "label": "Segment-level"},
+                            {"value": "word", "label": "Word-level"},
+                        ],
+                        "default": "segment"
+                    },
+                },
+                "scene": {
+                    "scene": {
+                        "type": "dropdown",
+                        "label": "Scene Detection",
+                        "options": [
+                            {"value": "none", "label": "None (process whole file)"},
+                            {"value": "auditok", "label": "Auditok (energy-based)"},
+                            {"value": "silero", "label": "Silero (neural VAD)"},
+                        ],
+                        "default": "none"
+                    },
+                },
+            }
+        }
+
+    # ========================================================================
     # Two-Pass Ensemble Methods
     # ========================================================================
 
@@ -935,12 +1132,36 @@ class WhisperJAVAPI:
         Get resolved parameters for a pipeline+sensitivity combination.
 
         Args:
-            pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity', 'kotoba-faster-whisper')
+            pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity', 'kotoba-faster-whisper', 'transformers')
             sensitivity: Sensitivity level ('conservative', 'balanced', 'aggressive')
 
         Returns:
             dict with resolved parameters that can be customized
         """
+        # Handle Transformers separately (doesn't use legacy config resolution)
+        if pipeline == 'transformers':
+            return {
+                "success": True,
+                "pipeline": "transformers",
+                "sensitivity": None,  # Sensitivity not applicable for Transformers
+                "is_transformers": True,
+                "params": {
+                    "model_id": "kotoba-tech/kotoba-whisper-v2.0",
+                    "chunk_length_s": 15,
+                    "stride_length_s": None,
+                    "batch_size": 16,
+                    "scene": "none",
+                    "beam_size": 5,
+                    "temperature": 0.0,
+                    "attn_implementation": "sdpa",
+                    "timestamps": "segment",
+                    "language": "ja",
+                    "device": "auto",
+                    "dtype": "auto",
+                },
+                "model": "kotoba-tech/kotoba-whisper-v2.0",
+            }
+
         try:
             from whisperjav.config.legacy import resolve_legacy_pipeline
 
@@ -1142,6 +1363,10 @@ class WhisperJAVAPI:
         - If pass is customized: send full params as JSON
         - If not customized: send pipeline+sensitivity for backend resolution
 
+        Transformers Pass Handling:
+        - isTransformers=True: Skip sensitivity, pass HF params if customized
+        - isTransformers=False: Standard legacy handling with sensitivity
+
         Args:
             config: Two-pass ensemble configuration
 
@@ -1163,21 +1388,33 @@ class WhisperJAVAPI:
         # Pass 1 configuration
         pass1 = config.get('pass1', {})
         args += ["--pass1-pipeline", pass1.get('pipeline', 'balanced')]
-        args += ["--pass1-sensitivity", pass1.get('sensitivity', 'balanced')]
 
-        # If customized, send full params; otherwise backend uses defaults
-        if pass1.get('customized') and pass1.get('params'):
-            args += ["--pass1-params", json.dumps(pass1['params'])]
+        if pass1.get('isTransformers'):
+            # Transformers pass: no sensitivity, handle HF params
+            if pass1.get('customized') and pass1.get('params'):
+                args += ["--pass1-hf-params", json.dumps(pass1['params'])]
+            # else: minimal args - backend uses model defaults
+        else:
+            # Legacy pass: use sensitivity
+            args += ["--pass1-sensitivity", pass1.get('sensitivity', 'balanced')]
+            if pass1.get('customized') and pass1.get('params'):
+                args += ["--pass1-params", json.dumps(pass1['params'])]
 
         # Pass 2 configuration
         pass2 = config.get('pass2', {})
         if pass2.get('enabled', False):
             args += ["--pass2-pipeline", pass2.get('pipeline', 'fidelity')]
-            args += ["--pass2-sensitivity", pass2.get('sensitivity', 'balanced')]
 
-            # If customized, send full params
-            if pass2.get('customized') and pass2.get('params'):
-                args += ["--pass2-params", json.dumps(pass2['params'])]
+            if pass2.get('isTransformers'):
+                # Transformers pass: no sensitivity, handle HF params
+                if pass2.get('customized') and pass2.get('params'):
+                    args += ["--pass2-hf-params", json.dumps(pass2['params'])]
+                # else: minimal args - backend uses model defaults
+            else:
+                # Legacy pass: use sensitivity
+                args += ["--pass2-sensitivity", pass2.get('sensitivity', 'balanced')]
+                if pass2.get('customized') and pass2.get('params'):
+                    args += ["--pass2-params", json.dumps(pass2['params'])]
 
         # Merge strategy
         merge_strategy = config.get('merge_strategy', 'smart_merge')
