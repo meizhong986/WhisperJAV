@@ -105,7 +105,8 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "kotoba-faster-whisper", "transformers"], default="balanced",
+    # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers"], default="balanced",
                        help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
@@ -133,8 +134,9 @@ def parse_arguments():
     twopass_group = parser.add_argument_group("Two-Pass Ensemble Options")
     twopass_group.add_argument("--ensemble", action="store_true",
                                help="Enable two-pass ensemble mode")
+    # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper", "transformers"],
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers"],
                                help="Pipeline for pass 1 (default: balanced)")
     twopass_group.add_argument("--pass1-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -145,8 +147,9 @@ def parse_arguments():
                                help="JSON string of full parameters for pass 1 (custom mode)")
     twopass_group.add_argument("--pass1-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 1 (when pipeline=transformers)")
+    # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "kotoba-faster-whisper", "transformers"],
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers"],
                                help="Pipeline for pass 2 (enables pass 2)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
