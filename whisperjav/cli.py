@@ -2,8 +2,26 @@
 #!/usr/bin/env python3
 """Command line interface entry point for WhisperJAV."""
 
-import sys
+# ===========================================================================
+# EARLY WARNING SUPPRESSION - Must be before any library imports
+# ===========================================================================
 import os
+import warnings
+
+# TensorFlow/oneDNN warnings - suppress before TF is loaded as side effect
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
+
+# Suppress specific Python warnings from dependencies
+warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
+warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resources")
+warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
+warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
+warnings.filterwarnings("ignore", message=".*sparse_softmax_cross_entropy.*deprecated.*")
+# ===========================================================================
+
+import sys
 import io
 import shutil
 

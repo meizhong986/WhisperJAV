@@ -183,7 +183,7 @@ const TransformersManager = {
     customized: false,
 
     defaults: {
-        model_id: 'kotoba-tech/kotoba-whisper-v2.0',
+        model_id: 'kotoba-tech/kotoba-whisper-v2.2',
         chunk_length_s: 15,
         stride_length_s: null,
         batch_size: 16,

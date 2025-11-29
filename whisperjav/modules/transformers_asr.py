@@ -3,12 +3,19 @@
 HuggingFace Transformers ASR Module for WhisperJAV.
 
 Uses the HuggingFace Transformers pipeline with chunked long-form algorithm
-for audio transcription. Designed for Japanese audio with kotoba-whisper-v2.0
+for audio transcription. Designed for Japanese audio with kotoba-whisper-v2.2
 as default, but supports any HuggingFace whisper model.
 
 Based on: https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0#chunked-long-form
 """
 
+# Suppress TensorFlow and oneDNN warnings before importing transformers
+# These are loaded as side effects and produce noisy output
+import os
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Suppress TF INFO/WARNING
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")  # Disable oneDNN warnings
+
+import warnings
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Any
 import time
@@ -16,6 +23,10 @@ import time
 import torch
 
 from whisperjav.utils.logger import logger
+
+# Suppress specific transformers warnings that are informational only
+warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
+warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
 
 
 class TransformersASR:
@@ -27,8 +38,8 @@ class TransformersASR:
     long audio files.
     """
 
-    # Default values optimized for kotoba-whisper-v2.0
-    DEFAULT_MODEL_ID = "kotoba-tech/kotoba-whisper-v2.0"
+    # Default values optimized for kotoba-whisper-v2.2
+    DEFAULT_MODEL_ID = "kotoba-tech/kotoba-whisper-v2.2"
     DEFAULT_CHUNK_LENGTH = 15  # Optimal for distil-large-v3 architecture
     DEFAULT_STRIDE = None  # None = chunk_length / 6
     DEFAULT_BATCH_SIZE = 16
@@ -60,7 +71,7 @@ class TransformersASR:
         Initialize TransformersASR.
 
         Args:
-            model_id: HuggingFace model ID (default: kotoba-tech/kotoba-whisper-v2.0)
+            model_id: HuggingFace model ID (default: kotoba-tech/kotoba-whisper-v2.2)
             device: Device to use ('auto', 'cuda', 'cpu')
             dtype: Data type ('auto', 'float16', 'bfloat16', 'float32')
             attn_implementation: Attention implementation ('sdpa', 'flash_attention_2', 'eager')

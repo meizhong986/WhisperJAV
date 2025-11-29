@@ -9,7 +9,7 @@
 #   - models: List of available models with metadata
 #
 # To add a new model:
-#   1. Add an entry to the 'models' list
+#   1. Uncomment or add an entry to the 'models' list
 #   2. Ensure the model exists on HuggingFace Hub
 #   3. The model will appear in the GUI dropdown automatically
 # =============================================================================
@@ -24,19 +24,19 @@ metadata:
   description: |
     Registry of HuggingFace models available for selection in the Transformers
     pipeline. These models are displayed in the customize modal dropdown.
-  version: "1.0.0"
+  version: "1.1.0"
 
 # Default model selected when opening the customize modal
-default_model: "kotoba-tech/kotoba-whisper-v2.0"
+default_model: "kotoba-tech/kotoba-whisper-v2.2"
 
 # =============================================================================
 # Available Models
 # =============================================================================
 # Categories:
 #   - kotoba: Official Kotoba-tech Japanese models (recommended)
-#   - anime: Anime-optimized fine-tuned models
-#   - community: Community-contributed Japanese models
 #   - openai: OpenAI Whisper reference models
+#   - anime: Anime-optimized fine-tuned models (commented - pending testing)
+#   - community: Community-contributed models (commented - pending testing)
 # =============================================================================
 
 models:
@@ -51,6 +51,7 @@ models:
       - japanese
       - recommended
       - latest
+      - default
 
   - id: "kotoba-tech/kotoba-whisper-v2.1"
     label: "Kotoba v2.1"
@@ -61,13 +62,12 @@ models:
       - stable
 
   - id: "kotoba-tech/kotoba-whisper-v2.0"
-    label: "Kotoba v2.0 (Stable)"
+    label: "Kotoba v2.0"
     category: kotoba
     description: "Well-tested baseline for Japanese transcription"
     tags:
       - japanese
       - stable
-      - default
 
   - id: "kotoba-tech/kotoba-whisper-bilingual-v1.0"
     label: "Kotoba Bilingual v1.0"
@@ -79,100 +79,115 @@ models:
       - bilingual
 
   # ---------------------------------------------------------------------------
-  # Anime-Optimized Models
+  # OpenAI Whisper Standard Models
   # ---------------------------------------------------------------------------
-  - id: "litagin/anime-whisper"
-    label: "Anime Whisper (litagin)"
-    category: anime
-    description: "Fine-tuned for anime voice transcription"
-    tags:
-      - japanese
-      - anime
-      - finetuned
-
-  - id: "chaitnya26/anime-whisper-fork"
-    label: "Anime Whisper Fork"
-    category: anime
-    description: "Community fork of anime-whisper with enhancements"
-    tags:
-      - japanese
-      - anime
-      - community
-
-  - id: "Sacmi5/whisper-large-v2-anime"
-    label: "Whisper Large v2 Anime"
-    category: anime
-    description: "Large-v2 fine-tuned on anime dataset"
-    tags:
-      - japanese
-      - anime
-      - large
-
-  - id: "efwkjn/whisper-ja-anime-v0.3"
-    label: "Whisper JA Anime v0.3"
-    category: anime
-    description: "Japanese anime-focused model v0.3"
-    tags:
-      - japanese
-      - anime
-
-  # ---------------------------------------------------------------------------
-  # Community Japanese Models
-  # ---------------------------------------------------------------------------
-  - id: "zary0/faster-whisper-ja-distill"
-    label: "Faster Whisper JA Distill"
-    category: community
-    description: "Distilled Japanese model for faster inference"
-    tags:
-      - japanese
-      - distilled
-      - fast
-
-  - id: "drepic/whisper-medium-jp-ct2"
-    label: "Whisper Medium JP (CT2)"
-    category: community
-    description: "Medium model optimized for Japanese with CTranslate2"
-    tags:
-      - japanese
-      - medium
-      - ctranslate2
-
-  - id: "vlzcrz/vlzcrz-whisper-small-japanese-2"
-    label: "Whisper Small Japanese 2"
-    category: community
-    description: "Small model fine-tuned for Japanese"
-    tags:
-      - japanese
-      - small
-      - lightweight
-
-  - id: "CheeLi03/whisper-tiny-ja-puct-combine-4k"
-    label: "Whisper Tiny JA (4k)"
-    category: community
-    description: "Tiny Japanese model with punctuation training"
-    tags:
-      - japanese
-      - tiny
-      - lightweight
-      - punctuation
-
-  # ---------------------------------------------------------------------------
-  # OpenAI Whisper Reference Models
-  # ---------------------------------------------------------------------------
-  - id: "openai/whisper-large-v3"
-    label: "Whisper Large v3"
-    category: openai
-    description: "OpenAI's most accurate multilingual model"
-    tags:
-      - multilingual
-      - accurate
-      - large
-
   - id: "openai/whisper-large-v3-turbo"
     label: "Whisper Large v3 Turbo"
     category: openai
-    description: "Faster variant of Large v3"
+    description: "Fast multilingual model, good for general use"
     tags:
       - multilingual
       - fast
       - turbo
+
+  - id: "openai/whisper-large-v2"
+    label: "Whisper Large v2"
+    category: openai
+    description: "Stable multilingual model"
+    tags:
+      - multilingual
+      - stable
+
+  # ---------------------------------------------------------------------------
+  # Anime-Optimized Models (Commented - Pending Testing)
+  # ---------------------------------------------------------------------------
+  # Uncomment these models after testing to make them available to users
+  #
+  # - id: "litagin/anime-whisper"
+  #   label: "Anime Whisper (litagin)"
+  #   category: anime
+  #   description: "Fine-tuned for anime voice transcription"
+  #   tags:
+  #     - japanese
+  #     - anime
+  #     - finetuned
+  #
+  # - id: "chaitnya26/anime-whisper-fork"
+  #   label: "Anime Whisper Fork"
+  #   category: anime
+  #   description: "Community fork of anime-whisper with enhancements"
+  #   tags:
+  #     - japanese
+  #     - anime
+  #     - community
+  #
+  # - id: "Sacmi5/whisper-large-v2-anime"
+  #   label: "Whisper Large v2 Anime"
+  #   category: anime
+  #   description: "Large-v2 fine-tuned on anime dataset"
+  #   tags:
+  #     - japanese
+  #     - anime
+  #     - large
+  #
+  # - id: "efwkjn/whisper-ja-anime-v0.3"
+  #   label: "Whisper JA Anime v0.3"
+  #   category: anime
+  #   description: "Japanese anime-focused model v0.3"
+  #   tags:
+  #     - japanese
+  #     - anime
+
+  # ---------------------------------------------------------------------------
+  # Community Japanese Models (Commented - Pending Testing)
+  # ---------------------------------------------------------------------------
+  # Uncomment these models after testing to make them available to users
+  #
+  # - id: "zary0/faster-whisper-ja-distill"
+  #   label: "Faster Whisper JA Distill"
+  #   category: community
+  #   description: "Distilled Japanese model for faster inference"
+  #   tags:
+  #     - japanese
+  #     - distilled
+  #     - fast
+  #
+  # - id: "drepic/whisper-medium-jp-ct2"
+  #   label: "Whisper Medium JP (CT2)"
+  #   category: community
+  #   description: "Medium model optimized for Japanese with CTranslate2"
+  #   tags:
+  #     - japanese
+  #     - medium
+  #     - ctranslate2
+  #
+  # - id: "vlzcrz/vlzcrz-whisper-small-japanese-2"
+  #   label: "Whisper Small Japanese 2"
+  #   category: community
+  #   description: "Small model fine-tuned for Japanese"
+  #   tags:
+  #     - japanese
+  #     - small
+  #     - lightweight
+  #
+  # - id: "CheeLi03/whisper-tiny-ja-puct-combine-4k"
+  #   label: "Whisper Tiny JA (4k)"
+  #   category: community
+  #   description: "Tiny Japanese model with punctuation training"
+  #   tags:
+  #     - japanese
+  #     - tiny
+  #     - lightweight
+  #     - punctuation
+
+  # ---------------------------------------------------------------------------
+  # OpenAI Whisper Large v3 (Commented - Use Turbo instead for speed)
+  # ---------------------------------------------------------------------------
+  # - id: "openai/whisper-large-v3"
+  #   label: "Whisper Large v3"
+  #   category: openai
+  #   description: "OpenAI's most accurate multilingual model"
+  #   tags:
+  #     - multilingual
+  #     - accurate
+  #     - large

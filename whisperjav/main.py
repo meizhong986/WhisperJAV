@@ -1,7 +1,26 @@
 #!/usr/bin/env python3
 """WhisperJAV Main Entry Point - V3 Enhanced with all improvements."""
 
+# ===========================================================================
+# EARLY WARNING SUPPRESSION - Must be before any library imports
+# ===========================================================================
+# Suppress noisy library warnings that don't affect functionality
 import os
+import warnings
+
+# TensorFlow/oneDNN warnings - suppress before TF is loaded as side effect
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
+
+# Suppress specific Python warnings from dependencies
+warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
+warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resources")
+warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
+warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
+warnings.filterwarnings("ignore", message=".*sparse_softmax_cross_entropy.*deprecated.*")
+# ===========================================================================
+
 import argparse
 import sys
 from pathlib import Path
@@ -271,8 +290,8 @@ def parse_arguments():
     # HuggingFace Transformers mode arguments
     hf_group = parser.add_argument_group("HuggingFace Transformers Mode Options (--mode transformers)")
     hf_group.add_argument("--hf-model-id", type=str,
-                         default="kotoba-tech/kotoba-whisper-v2.0",
-                         help="HuggingFace model ID (default: kotoba-tech/kotoba-whisper-v2.0)")
+                         default="kotoba-tech/kotoba-whisper-v2.2",
+                         help="HuggingFace model ID (default: kotoba-tech/kotoba-whisper-v2.2)")
     hf_group.add_argument("--hf-chunk-length", type=int, default=15,
                          help="Chunk length in seconds (default: 15)")
     hf_group.add_argument("--hf-stride", type=float, default=None,
@@ -565,7 +584,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp,
             progress_display=progress,
-            hf_model_id=getattr(args, 'hf_model_id', 'kotoba-tech/kotoba-whisper-v2.0'),
+            hf_model_id=getattr(args, 'hf_model_id', 'kotoba-tech/kotoba-whisper-v2.2'),
             hf_chunk_length=getattr(args, 'hf_chunk_length', 15),
             hf_stride=getattr(args, 'hf_stride', None),
             hf_batch_size=getattr(args, 'hf_batch_size', 16),
