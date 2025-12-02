@@ -6,6 +6,7 @@ This module uses faster-whisper direct API and is intended for the 'balanced' pi
 
 from pathlib import Path
 from typing import Dict, List, Tuple, Union, Optional, Any
+import gc
 import torch
 from faster_whisper import WhisperModel
 import soundfile as sf
@@ -73,7 +74,8 @@ class FasterWhisperProASR:
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA → MPS → CPU
         self.device = model_config.get("device", get_best_device())
-        self.compute_type = model_config.get("compute_type", "float16")
+        # Default to int8 for quantized models (faster-whisper uses CTranslate2 quantized models)
+        self.compute_type = model_config.get("compute_type", "int8")
 
         decoder_params = params["decoder"]
         vad_params = params["vad"]
@@ -195,6 +197,42 @@ class FasterWhisperProASR:
             )
             logger.debug(f"Model type: {type(self.whisper_model)}")
         except Exception as e:
+            # VRAM exhaustion fallback - try int8 if float16/other fails on CUDA
+            if self.device == "cuda" and self.compute_type != "int8":
+                vram_error_indicators = [
+                    "out of memory",
+                    "cuda out of memory",
+                    "outofmemoryerror",
+                    "cuda error",
+                    "cublas",
+                    "insufficient memory",
+                ]
+                error_str = str(e).lower()
+                if any(indicator in error_str for indicator in vram_error_indicators):
+                    logger.warning(
+                        f"CUDA {self.compute_type} failed (likely VRAM exhaustion): {e}. "
+                        "Falling back to int8 compute type."
+                    )
+                    try:
+                        # Clear CUDA cache before retry
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                            gc.collect()
+
+                        self.whisper_model = WhisperModel(
+                            model_size_or_path=self.model_name,
+                            device=self.device,
+                            compute_type="int8",
+                            cpu_threads=0,
+                            num_workers=1,
+                        )
+                        self.compute_type = "int8"  # Update for logging/metadata
+                        logger.info("Faster-Whisper model loaded successfully with int8 fallback")
+                        return
+                    except Exception as fallback_e:
+                        logger.error(f"int8 fallback also failed: {fallback_e}")
+                        raise fallback_e
+
             logger.error(f"Failed to load Faster-Whisper model: {e}", exc_info=True)
             logger.error(f"Model name that failed: {self.model_name}")
             logger.error(f"Device: {self.device}, Compute type: {self.compute_type}")

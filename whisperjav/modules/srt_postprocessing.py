@@ -85,7 +85,7 @@ class SRTPostProcessor:
             old_stats = {
                 'total_subtitles': stats.get('original_subtitle_count', 0),
                 'removed_hallucinations': stats.get('modifications_by_category', {}).get('hallucination', 0),
-                'removed_repetitions': stats.get('modifications_by_category', {}).get('repetition', 0),
+                'removed_repetitions': stats.get('modifications_by_category', {}).get('repetition_cleaning', 0),
                 'duration_adjustments': stats.get('modifications_by_category', {}).get('timing_adjustment', 0),
                 'cps_filtered': stats.get('modifications_by_category', {}).get('content_cleaning_cps', 0),
                 'empty_removed': stats.get('removals', 0)

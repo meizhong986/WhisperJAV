@@ -163,6 +163,7 @@ class AsyncPipelineProcessor:
         pipeline_args_with_reporter = pipeline_args.copy()
         pipeline_args_with_reporter['progress_reporter'] = progress_reporter
         
+        pipeline = None
         try:
             # CORRECTLY report progress using metadata from media_info
             progress_reporter.report_file_start(
@@ -170,15 +171,15 @@ class AsyncPipelineProcessor:
                 file_number=media_info.get('file_number', 1),
                 total_files=media_info.get('total_files', 1)
             )
-            
+
             # Create pipeline instance with a clean set of args
             pipeline = pipeline_class(**pipeline_args_with_reporter)
-            
+
             if cancellation_token.is_set():
                 raise InterruptedError("Task cancelled before processing started")
-            
+
             result = pipeline.process(media_info)
-            
+
             progress_reporter.report_completion(
                 success=True,
                 stats={
@@ -186,9 +187,9 @@ class AsyncPipelineProcessor:
                     'duration': time.time() - self.tasks[task_id].start_time
                 }
             )
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Task {task_id} failed: {e}", exc_info=True)
             progress_reporter.report_completion(
@@ -196,15 +197,14 @@ class AsyncPipelineProcessor:
                 stats={'error': str(e)}
             )
             raise
-            
-        except Exception as e:
-            # Report error
-            logger.error(f"Task {task_id} failed: {e}", exc_info=True)
-            progress_reporter.report_completion(
-                success=False,
-                stats={'error': str(e)}
-            )
-            raise
+
+        finally:
+            # Ensure pipeline cleanup is always called to release GPU memory
+            if pipeline is not None:
+                try:
+                    pipeline.cleanup()
+                except Exception as cleanup_error:
+                    logger.error(f"Error during pipeline cleanup in async task {task_id}: {cleanup_error}")
     
     def _process_with_cancellation(self,
                                  pipeline: Any,

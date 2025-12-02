@@ -42,7 +42,7 @@ class TransformersASR:
     DEFAULT_MODEL_ID = "kotoba-tech/kotoba-whisper-v2.2"
     DEFAULT_CHUNK_LENGTH = 15  # Optimal for distil-large-v3 architecture
     DEFAULT_STRIDE = None  # None = chunk_length / 6
-    DEFAULT_BATCH_SIZE = 16
+    DEFAULT_BATCH_SIZE = 8
     DEFAULT_LANGUAGE = "ja"
     DEFAULT_TASK = "transcribe"
     DEFAULT_BEAM_SIZE = 5

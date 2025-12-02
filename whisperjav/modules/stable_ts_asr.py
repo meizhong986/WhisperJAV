@@ -148,7 +148,8 @@ class StableTSASR:
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA → MPS → CPU
         self.device = model_config.get("device", get_best_device())
-        self.compute_type = model_config.get("compute_type", "float16")
+        # Default to int8 for quantized models (faster-whisper uses CTranslate2 quantized models)
+        self.compute_type = model_config.get("compute_type", "int8")
         self.turbo_mode = turbo_mode
         self.model_repo = model_config.get("hf_repo")
         if not self.model_repo:

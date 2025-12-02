@@ -114,3 +114,29 @@ class BasePipeline(ABC):
             self.asr.cleanup()
 
         logger.debug(f"{self.__class__.__name__} cleanup complete")
+
+    def __enter__(self):
+        """Context manager entry - returns self for use in with statement."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context manager exit - ensures cleanup is always called.
+
+        This guarantees that GPU resources are released even if an exception
+        occurs during processing, preventing VRAM leaks.
+
+        Args:
+            exc_type: Exception type if an exception was raised, None otherwise
+            exc_val: Exception value if an exception was raised, None otherwise
+            exc_tb: Exception traceback if an exception was raised, None otherwise
+
+        Returns:
+            False to propagate any exception that occurred
+        """
+        try:
+            self.cleanup()
+        except Exception as cleanup_error:
+            logger.error(f"Error during pipeline cleanup: {cleanup_error}")
+            # Don't suppress the original exception if one occurred
+        return False  # Don't suppress exceptions

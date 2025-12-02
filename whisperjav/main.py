@@ -296,8 +296,8 @@ def parse_arguments():
                          help="Chunk length in seconds (default: 15)")
     hf_group.add_argument("--hf-stride", type=float, default=None,
                          help="Stride/overlap between chunks in seconds (default: chunk_length/6)")
-    hf_group.add_argument("--hf-batch-size", type=int, default=16,
-                         help="Batch size for parallel chunk processing (default: 16)")
+    hf_group.add_argument("--hf-batch-size", type=int, default=8,
+                         help="Batch size for parallel chunk processing (default: 8)")
     hf_group.add_argument("--hf-scene", type=str, default="none",
                          choices=["none", "auditok", "silero"],
                          help="Scene detection method (default: none)")
@@ -587,7 +587,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             hf_model_id=getattr(args, 'hf_model_id', 'kotoba-tech/kotoba-whisper-v2.2'),
             hf_chunk_length=getattr(args, 'hf_chunk_length', 15),
             hf_stride=getattr(args, 'hf_stride', None),
-            hf_batch_size=getattr(args, 'hf_batch_size', 16),
+            hf_batch_size=getattr(args, 'hf_batch_size', 8),
             hf_scene=getattr(args, 'hf_scene', 'none'),
             hf_beam_size=getattr(args, 'hf_beam_size', 5),
             hf_temperature=getattr(args, 'hf_temperature', 0.0),
@@ -706,6 +706,13 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 progress.update_overall(1)
                 
     finally:
+        # Ensure pipeline cleanup is called even if an exception occurs
+        # This releases GPU memory and prevents VRAM leaks
+        if pipeline is not None:
+            try:
+                pipeline.cleanup()
+            except Exception as cleanup_error:
+                logger.error(f"Error during pipeline cleanup: {cleanup_error}")
         progress.close()
     
     successful_metadata = [
@@ -1034,7 +1041,7 @@ def main():
             "provider": "openai_whisper",  # Default provider
             "model_name": args.model,
             "device": get_best_device(),  # Auto-detect: CUDA → MPS → CPU
-            "compute_type": "float16",
+            "compute_type": "int8",  # Default to int8 for quantized models (CTranslate2)
             "supported_tasks": ["transcribe", "translate"]
         }
         resolved_config["model"] = override_model_config
