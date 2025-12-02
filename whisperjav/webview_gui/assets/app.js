@@ -186,7 +186,7 @@ const TransformersManager = {
         model_id: 'kotoba-tech/kotoba-whisper-v2.2',
         chunk_length_s: 15,
         stride_length_s: null,
-        batch_size: 16,
+        batch_size: 8,
         scene: 'none',
         beam_size: 5,
         temperature: 0.0,
@@ -1062,6 +1062,20 @@ const EnsembleManager = {
     },
 
     async init() {
+        // SYNC: Initialize state from actual HTML form values
+        // This handles browser form persistence across page reloads/sessions
+        // Without this, checkbox can appear checked but JavaScript state is false
+        this.state.pass2.enabled = document.getElementById('pass2-enabled').checked;
+        this.state.pass2.pipeline = document.getElementById('pass2-pipeline').value;
+        this.state.pass2.sensitivity = document.getElementById('pass2-sensitivity').value;
+        this.state.pass1.pipeline = document.getElementById('pass1-pipeline').value;
+        this.state.pass1.sensitivity = document.getElementById('pass1-sensitivity').value;
+        this.state.mergeStrategy = document.getElementById('merge-strategy').value;
+
+        // Update isTransformers flags based on synced pipeline values
+        this.state.pass1.isTransformers = this.state.pass1.pipeline === 'transformers';
+        this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
+
         // Pass 2 enable/disable
         document.getElementById('pass2-enabled').addEventListener('change', (e) => {
             this.state.pass2.enabled = e.target.checked;
@@ -1109,9 +1123,11 @@ const EnsembleManager = {
             }
         });
 
-        // Initialize Pass 2 state and badges
+        // Initialize UI state based on synced values
         this.updatePass2State();
         this.updateBadges();
+        this.updatePassSensitivityState('pass1');
+        this.updatePassSensitivityState('pass2');
     },
 
     handlePipelineChange(passKey, newValue, selectElement) {

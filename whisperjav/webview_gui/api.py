@@ -1209,7 +1209,7 @@ class WhisperJAVAPI:
                     "model_id": "kotoba-tech/kotoba-whisper-v2.2",
                     "chunk_length_s": 15,
                     "stride_length_s": None,
-                    "batch_size": 16,
+                    "batch_size": 8,
                     "scene": "none",
                     "beam_size": 5,
                     "temperature": 0.0,
