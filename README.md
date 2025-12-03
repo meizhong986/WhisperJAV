@@ -76,35 +76,64 @@ whisperjav /path/to/media_folder --output-dir ./subtitles
 
 ### Processing Modes
 
-| Mode | Speed | When to Use |
-|------|-------|-------------|
-| **Faster** | Fast | Clean audio, just need quick results |
-| **Fast** | Medium | Mixed quality, some background noise |
-| **Balanced** | Slower | Best accuracy, noisy audio, dialogue-heavy content |
+| Mode | Backend | Scene Detection | VAD | Best For |
+|------|---------|-----------------|-----|----------|
+| **faster** | stable-ts (turbo) | No | No | Speed priority, clean audio |
+| **fast** | stable-ts | Yes | No | General use, mixed quality |
+| **balanced** | faster-whisper | Yes | Yes | Default. Noisy audio, dialogue-heavy |
+| **fidelity** | OpenAI Whisper | Yes | Yes (Silero) | Maximum accuracy, slower |
+| **transformers** | HuggingFace | Optional | Internal | Japanese-optimized model, customizable |
 
 ### Sensitivity Settings
 
-- **Conservative**: Fewer false positives, may miss quiet speech. Good for noisy content.
+- **Conservative**: Higher thresholds, fewer hallucinations. Good for noisy content.
 - **Balanced**: Default. Works for most content.
-- **Aggressive**: Catches more dialogue, but may include more errors. Good for ASMR/whisper content.
+- **Aggressive**: Lower thresholds, catches more dialogue. Good for whisper/ASMR content.
 
-### Two-Pass / Ensemble Mode (New in v1.7)
+### Transformers Mode (New in v1.7)
 
-Different AI models catch different things. Ensemble mode runs your video through two pipelines and merges the results for better coverage.
-
-```bash
-whisperjav video.mp4 --ensemble --pass1-pipeline kotoba-faster-whisper --pass2-pipeline balanced
-```
-
-The GUI's Ensemble tab lets you customize parameters like beam size, temperature, and VAD thresholds without editing config files.
-
-### Kotoba Model Support (New in v1.7)
-
-The Kotoba model is specifically trained on Japanese speech and handles conversational patterns better than standard Whisper:
+Uses HuggingFace's `kotoba-tech/kotoba-whisper-v2.2` model, which is optimized for Japanese conversational speech:
 
 ```bash
-whisperjav video.mp4 --mode kotoba-faster-whisper
+whisperjav video.mp4 --mode transformers
+
+# Customize parameters
+whisperjav video.mp4 --mode transformers --hf-beam-size 5 --hf-chunk-length 20
 ```
+
+**Transformers-specific options:**
+- `--hf-model-id`: Model (default: `kotoba-tech/kotoba-whisper-v2.2`)
+- `--hf-chunk-length`: Seconds per chunk (default: 15)
+- `--hf-beam-size`: Beam search width (default: 5)
+- `--hf-temperature`: Sampling temperature (default: 0.0)
+- `--hf-scene`: Scene detection method (`none`, `auditok`, `silero`)
+
+### Two-Pass Ensemble Mode (New in v1.7)
+
+Runs your video through two different pipelines and merges results. Different models catch different things.
+
+```bash
+# Pass 1 with transformers, Pass 2 with balanced
+whisperjav video.mp4 --ensemble --pass1-pipeline transformers --pass2-pipeline balanced
+
+# Custom sensitivity per pass
+whisperjav video.mp4 --ensemble --pass1-pipeline balanced --pass1-sensitivity aggressive --pass2-pipeline fidelity
+```
+
+**Merge strategies:**
+- `smart_merge` (default): Intelligent overlap detection
+- `pass1_primary` / `pass2_primary`: Prioritize one pass, fill gaps from other
+- `full_merge`: Combine everything from both passes
+
+### GUI Parameter Customization
+
+The GUI has three tabs:
+
+1. **Transcription Mode**: Select pipeline, sensitivity, language
+2. **Advanced Options**: Model override, scene detection method, debug settings
+3. **Two-Pass Ensemble**: Configure both passes with full parameter customization via JSON editor
+
+The Ensemble tab lets you customize beam size, temperature, VAD thresholds, and other ASR parameters without editing config files.
 
 ### AI Translation
 
@@ -143,13 +172,14 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Content-Specific Recommendations
 
-| Content Type | Mode | Sensitivity |
-|--------------|------|-------------|
-| Drama / Dialogue Heavy | balanced | aggressive |
-| Group Scenes | faster | conservative |
-| Amateur / Homemade | fast | conservative |
-| ASMR / VR | balanced | aggressive |
-| Heavy Background Music | balanced | conservative |
+| Content Type | Mode | Sensitivity | Notes |
+|--------------|------|-------------|-------|
+| Drama / Dialogue Heavy | balanced | aggressive | Or try transformers mode |
+| Group Scenes | faster | conservative | Speed matters, less precision needed |
+| Amateur / Homemade | fast | conservative | Variable audio quality |
+| ASMR / VR / Whisper | fidelity | aggressive | Maximum accuracy for quiet speech |
+| Heavy Background Music | balanced | conservative | VAD helps filter music |
+| Maximum Accuracy | ensemble | varies | Two-pass with different pipelines |
 
 ---
 
@@ -218,16 +248,23 @@ Download from [python.org](https://www.python.org/downloads/windows/). Check "Ad
 ## CLI Reference
 
 ```bash
-# Basic
+# Basic usage
 whisperjav video.mp4
 whisperjav video.mp4 --mode balanced --sensitivity aggressive
+
+# All modes: faster, fast, balanced, fidelity, transformers
+whisperjav video.mp4 --mode fidelity
+
+# Transformers mode with custom parameters
+whisperjav video.mp4 --mode transformers --hf-beam-size 5 --hf-chunk-length 20
+
+# Two-pass ensemble
+whisperjav video.mp4 --ensemble --pass1-pipeline transformers --pass2-pipeline balanced
+whisperjav video.mp4 --ensemble --pass1-pipeline balanced --pass2-pipeline fidelity --merge-strategy smart_merge
 
 # Output options
 whisperjav video.mp4 --output-dir ./subtitles
 whisperjav video.mp4 --subs-language english-direct
-
-# Ensemble mode
-whisperjav video.mp4 --ensemble --pass1-pipeline kotoba-faster-whisper --pass2-pipeline balanced
 
 # Debugging
 whisperjav video.mp4 --debug --keep-temp
@@ -294,7 +331,9 @@ MIT License. See [LICENSE](LICENSE) file.
 
 - [OpenAI Whisper](https://github.com/openai/whisper) - The underlying ASR model
 - [stable-ts](https://github.com/jianfch/stable-ts) - Timestamp refinement
-- [faster-whisper](https://github.com/guillaumekln/faster-whisper) - Optimized inference
+- [faster-whisper](https://github.com/guillaumekln/faster-whisper) - Optimized CTranslate2 inference
+- [HuggingFace Transformers](https://github.com/huggingface/transformers) - Transformers pipeline backend
+- [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) - Japanese-optimized Whisper model
 - The testing community for feedback and bug reports
 
 ---
