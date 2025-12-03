@@ -201,7 +201,7 @@ class SileroSceneDetectionConfig(BaseConfig):
         description="Pass 2 maximum duration."
     )
     silero_threshold: float = Field(
-        default=0.02,
+        default=0.08,
         description="Silero speech detection threshold."
     )
     silero_neg_threshold: float = Field(

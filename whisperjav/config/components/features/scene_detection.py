@@ -235,7 +235,7 @@ class SileroSceneDetectionOptions(BaseModel):
 
     # === Silero VAD Options ===
     silero_threshold: float = Field(
-        0.02,
+        0.08,
         ge=0.0, le=1.0,
         description="Silero VAD speech probability threshold."
     )
