@@ -6,20 +6,44 @@
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
 
-A subtitle generator for Japanese Adult Videos. Built on OpenAI Whisper with customizations for JAV audio patterns.
+A subtitle generator for Japanese Adult Videos.
 
 ---
 
-## Why a Specialized Tool?
 
-Standard speech-to-text tools struggle with JAV content for a few reasons:
 
-- **Audio challenges**: Background music, sound effects, and ambient noise compete with dialogue
-- **Speech patterns**: Whispered speech, emotional vocalizations, and overlapping voices
-- **Japanese quirks**: Sentence-ending particles, casual contractions, and dialect variations that general models often miss or misinterpret
-- **Hallucinations**: AI models tend to repeat phrases or generate text that wasn't spoken, especially in quiet moments
 
-WhisperJAV addresses these through scene-based processing, voice activity detection, Japanese-specific post-processing, and hallucination filtering. It's not perfect, but it handles these edge cases better than running Whisper directly.
+
+### What is the idea: 
+
+Transformer-based ASR architectures like Whisper suffer significant performance degradation when applied to the **spontaneous and noisy domain of JAV**. This degradation is driven by specific acoustic and temporal characteristics that defy the statistical distributions of standard training data.
+
+#### 1. The Acoustic Profile
+JAV audio is defined by "acoustic hell" and a low Signal-to-Noise Ratio (SNR), characterized by:
+
+*   **Non-Verbal Vocalisations (NVVs):** A high density of physiological sounds (heavy breathing, gasps, sighs) and "obscene sounds" that lack clear harmonic structure.
+*   **Spectral Mimicry:** These vocalizations often possess "curve-like spectrum features" that mimic the formants of fricative consonants or Japanese syllables (e.g., *fu*), acting as accidental adversarial examples that trick the model into recognizing words where none exist.
+*   **Extreme Dynamics:** Volatile shifts in audio intensity, ranging from faint whispers (*sasayaki*) to high-decibel screams, which confuse standard gain control and attention mechanisms.
+*   **Linguistic Variance:** The prevalence of theatrical onomatopoeia and *Role Language* (*Yakuwarigo*) containing exaggerated intonations and slang absent from standard corpora.
+
+#### 2. Temporal Drift and Hallucination
+While standard ASR models are typically trained on short, curated clips, JAV content comprises long-form media often exceeding 120 minutes. Research indicates that processing such extended inputs causes **contextual drift** and error accumulation. Specifically, extended periods of "ambiguous audio" (silence or rhythmic breathing) cause the Transformer's attention mechanism to collapse, triggering repetitive **hallucination loops** where the model generates unrelated text to fill the acoustic void.
+
+#### 3. The Pre-processing Paradox & Fine-Tuning Risks
+Standard audio engineering intuition—such as aggressive denoising or vocal separation—often fails in this domain. Because Whisper relies on specific **log-Mel spectrogram** features, generic normalization tools can inadvertently strip high-frequency transients essential for distinguishing consonants, resulting in "domain shift" and erroneous transcriptions. Consequently, audio processing requires a "surgical," multi-stage approach (like VAD clamping) rather than blanket filtering.
+
+Furthermore, while fine-tuning models on domain-specific data can be effective, it presents a high risk of **overfitting**. Due to the scarcity of high-quality, ethically sourced JAV datasets, fine-tuned models often become brittle, losing their generalization capabilities and leading to inconsistent "hit or miss" quality outputs.
+
+
+
+
+**WhisperJAV** is an attempt to address above failure points. The inference pipelines do:
+
+1.  **Acoustic Filtering:** Deploys **scene-based segmentation** and VAD clamping under the hypothesis that distinct scenes possess uniform acoustic characteristics, ensuring the model processes coherent audio environments rather than mixed streams [1-3].
+2.  **Linguistic Adaptation:** Normalizes **domain-specific terminology** and preserves onomatopoeia, specifically correcting dialect-induced tokenization errors (e.g., in *Kansai-ben*) that standard BPE tokenizers fail to parse [4, 5].
+3.  **Defensive Decoding:** Tunes **log-probability thresholding** and `no_speech_threshold` to systematically discard low-confidence outputs (hallucinations), while utilizing regex filters to clean non-lexical markers (e.g., `(moans)`) from the final subtitle track [6, 7].
+
+
 
 ---
 
@@ -40,10 +64,10 @@ A window opens. Add your files, pick a mode, click Start.
 whisperjav video.mp4
 
 # Specify mode and sensitivity
-whisperjav video.mp4 --mode balanced --sensitivity aggressive
+whisperjav audio.mp3 --mode balanced --sensitivity aggressive
 
 # Process a folder
-whisperjav /path/to/videos/*.mp4 --output-dir ./subtitles
+whisperjav /path/to/media_folder --output-dir ./subtitles
 ```
 
 ---
