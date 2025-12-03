@@ -162,7 +162,7 @@
         "pass1_energy_threshold": 32,
         "pass2_min_duration_s": 0.1,
         "pass2_max_duration_s": 960.0,
-        "silero_threshold": 0.02,
+        "silero_threshold": 0.08,
         "silero_neg_threshold": 0.1,
         "silero_min_silence_ms": 7800,
         "silero_min_speech_ms": 100,

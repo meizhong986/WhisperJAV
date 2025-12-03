@@ -810,7 +810,7 @@ class DynamicSceneDetector:
         """
         # Read Silero-specific parameters from flat config structure
         # Default values are conservative for scene detection (not ultra-sensitive)
-        self.silero_threshold = float(config.get('silero_threshold', 0.35))
+        self.silero_threshold = float(config.get('silero_threshold', 0.08))
         self.silero_neg_threshold = float(config.get('silero_neg_threshold', 0.15))
         self.silero_min_silence_ms = int(config.get('silero_min_silence_ms', 1500))
         self.silero_min_speech_ms = int(config.get('silero_min_speech_ms', 100))
