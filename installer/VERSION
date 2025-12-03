@@ -6,11 +6,11 @@
 [version]
 major = 1
 minor = 7
-patch = 0
+patch = 1
 # PEP 440 prerelease suffix for wheel/pip (a0, b0, rc0, or empty for stable)
-prerelease = b2
-# Human-readable label for display (alpha, beta, rc, stable)
-display_label = beta
+prerelease =
+# Human-readable label for display (alpha, beta, rc, stable, or empty for clean version)
+display_label =
 architecture = v4.4
 
 [metadata]
