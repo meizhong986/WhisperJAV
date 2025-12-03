@@ -86,6 +86,7 @@ setup(
             "whisperjav=whisperjav.main:main",
             "whisperjav-gui=whisperjav.webview_gui.main:main",
             "whisperjav-translate=whisperjav.translate.cli:main",
+            "whisperjav-upgrade=whisperjav.upgrade:main",
         ],
     },
     include_package_data=True,
