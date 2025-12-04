@@ -526,7 +526,23 @@ class StableTSASR:
             self._postprocess(result)
         else:
             logger.debug(f"Skipping Japanese post-processing for task='{task}' (English output)")
-        
+
+            # Validate translation output - warn if translation was requested but output appears Japanese
+            if result.segments:
+                # Check if output contains significant Japanese characters
+                sample_text = ' '.join(seg.text for seg in result.segments[:5])  # First 5 segments
+                japanese_char_count = sum(1 for c in sample_text if '\u3040' <= c <= '\u309f' or  # Hiragana
+                                                                   '\u30a0' <= c <= '\u30ff' or  # Katakana
+                                                                   '\u4e00' <= c <= '\u9fff')    # Kanji
+                total_chars = len(sample_text.replace(' ', ''))
+                if total_chars > 0 and japanese_char_count / total_chars > 0.3:
+                    logger.warning(f"Translation mode was requested but output appears to be in Japanese "
+                                   f"({japanese_char_count}/{total_chars} chars are Japanese). "
+                                   f"This may indicate Whisper translation is not working as expected.")
+                    logger.warning(f"Sample output: {sample_text[:100]}...")
+                else:
+                    logger.info(f"Translation output validation: appears to be English (good)")
+
         return result
 
     def transcribe_to_srt(self, 
