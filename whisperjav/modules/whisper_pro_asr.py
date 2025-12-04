@@ -113,6 +113,12 @@ class WhisperProASR:
         
         # Store task for metadata
         self.task = task
+
+        # Log task for debugging translation issues
+        logger.info(f"WhisperProASR initialized with task='{task}'")
+        if task == 'translate':
+            logger.info("Translation mode enabled - output will be in English")
+
         self._reset_runtime_statistics()
         # --- END V3 PARAMETER UNPACKING ---
 
@@ -223,7 +229,23 @@ class WhisperProASR:
         for vad_group in vad_segments:
             segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
             all_segments.extend(segments)
-            
+
+        # Validate translation output - warn if translation was requested but output appears Japanese
+        if self.task == 'translate' and all_segments:
+            # Check if output contains significant Japanese characters
+            sample_text = ' '.join(seg['text'] for seg in all_segments[:5])  # First 5 segments
+            japanese_char_count = sum(1 for c in sample_text if '\u3040' <= c <= '\u309f' or  # Hiragana
+                                                               '\u30a0' <= c <= '\u30ff' or  # Katakana
+                                                               '\u4e00' <= c <= '\u9fff')    # Kanji
+            total_chars = len(sample_text.replace(' ', ''))
+            if total_chars > 0 and japanese_char_count / total_chars > 0.3:
+                logger.warning(f"Translation mode was requested but output appears to be in Japanese "
+                               f"({japanese_char_count}/{total_chars} chars are Japanese). "
+                               f"This may indicate Whisper translation is not working as expected.")
+                logger.warning(f"Sample output: {sample_text[:100]}...")
+            else:
+                logger.info(f"Translation output validation: appears to be English (good)")
+
         return {
             "segments": all_segments,
             "text": " ".join(seg["text"] for seg in all_segments),

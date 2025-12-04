@@ -144,8 +144,8 @@ def parse_arguments():
                                help="VAD component name (e.g., silero, none)")
     ensemble_group.add_argument("--features", default=None,
                                help="Comma-separated feature names (e.g., auditok_scene_detection)")
-    ensemble_group.add_argument("--task", choices=["transcribe", "translate"], default="transcribe",
-                               help="Task type (default: transcribe)")
+    ensemble_group.add_argument("--task", choices=["transcribe", "translate"], default=None,
+                               help="Task type (overrides --subs-language if provided)")
     ensemble_group.add_argument("--overrides", default=None,
                                help="JSON string of parameter overrides")
 
@@ -970,6 +970,11 @@ def main():
         task = args.task
     else:
         task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
+
+    # Log task determination for debugging translation issues
+    logger.info(f"ASR task: {task}" + (" (translating to English)" if task == 'translate' else " (transcribing in source language)"))
+    if task == 'translate':
+        logger.info("Translation mode: Output subtitles will be in English")
 
     # Map language name to Whisper language code
     language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
