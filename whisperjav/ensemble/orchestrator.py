@@ -1,5 +1,6 @@
 """Ensemble Orchestrator for two-pass pipeline processing."""
 
+import json
 import pickle
 import shutil
 import time
@@ -13,6 +14,7 @@ from whisperjav.utils.metadata_manager import MetadataManager
 
 from .merge import MergeEngine
 from .pass_worker import WorkerPayload, run_pass_worker
+from .utils import resolve_language_code
 
 
 class EnsembleOrchestrator:
@@ -82,6 +84,11 @@ class EnsembleOrchestrator:
 
         batch_start = time.time()
         serialized_media = self._serialize_media_files(media_files)
+        pass_languages = {
+            1: resolve_language_code(pass1_config, self.subs_language),
+        }
+        if pass2_config:
+            pass_languages[2] = resolve_language_code(pass2_config, self.subs_language)
 
         logger.info(
             "Starting batch ensemble processing for %s files (Pass 1: %s)",
@@ -93,6 +100,7 @@ class EnsembleOrchestrator:
             pass_number=1,
             media_files=serialized_media,
             pass_config=pass1_config,
+            language_code=pass_languages[1],
         )
 
         pass2_results: Dict[str, Dict[str, Any]] = {}
@@ -105,6 +113,7 @@ class EnsembleOrchestrator:
                 pass_number=2,
                 media_files=serialized_media,
                 pass_config=pass2_config,
+                language_code=pass_languages[2],
             )
 
         all_metadata: List[Dict[str, Any]] = []
@@ -112,6 +121,7 @@ class EnsembleOrchestrator:
 
         for media_info in serialized_media:
             basename = media_info['basename']
+            lang_code = pass_languages[1]
             ensemble_metadata = self._create_ensemble_metadata(
                 media_info, pass1_config, pass2_config, merge_strategy
             )
@@ -119,20 +129,27 @@ class EnsembleOrchestrator:
             pass1 = pass1_results.get(basename)
             pass2 = pass2_results.get(basename) if pass2_config else None
 
+            row_display = {
+                'file': basename,
+                'pass1': self._format_status(pass1),
+                'pass2': self._format_status(pass2) if pass2_config else 'n/a',
+                'merge': 'n/a' if not pass2_config else 'NOK',
+                'final': f"{basename}: missing",
+            }
+
             if not pass1 or pass1['status'] != 'completed':
                 error_msg = pass1.get('error') if pass1 else 'Pass 1 worker returned no result'
                 ensemble_metadata['pass1'] = {'status': 'failed', 'error': error_msg}
+                if pass2_config:
+                    ensemble_metadata['pass2'] = (
+                        pass2 if pass2 else {'status': 'skipped', 'error': 'Pass 2 not executed'}
+                    )
+                else:
+                    ensemble_metadata['pass2'] = {'status': 'skipped'}
                 ensemble_metadata['status'] = 'failed'
-                table_rows.append(
-                    {
-                        'file': basename,
-                        'pass1': self._format_status(pass1),
-                        'pass2': self._format_status(pass2) if pass2_config else 'n/a',
-                        'merge': 'n/a',
-                        'output': 'n/a',
-                    }
-                )
+                ensemble_metadata['merge'] = {'status': 'skipped'}
                 all_metadata.append(ensemble_metadata)
+                table_rows.append(row_display)
                 continue
 
             pass1_srt = Path(pass1['srt_path']) if pass1.get('srt_path') else None
@@ -143,8 +160,8 @@ class EnsembleOrchestrator:
                 'processing_time': pass1.get('processing_time', 0.0),
             }
 
-            final_output = pass1_srt
-            merge_info: Dict[str, Any] = {'status': 'skipped'}
+            final_output_path: Optional[Path] = None
+            merge_info: Dict[str, Any] = {'status': 'skipped' if not pass2_config else 'pending'}
 
             if pass2_config:
                 if pass2 and pass2['status'] == 'completed' and pass2.get('srt_path'):
@@ -156,79 +173,82 @@ class EnsembleOrchestrator:
                         'processing_time': pass2.get('processing_time', 0.0),
                     }
 
-                    merged_srt = self.output_dir / f"{basename}.merged.srt"
+                    tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
+                    tmp_merge.parent.mkdir(parents=True, exist_ok=True)
+                    final_candidate = self.output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
                     try:
                         merge_stats = self.merge_engine.merge(
                             srt1_path=pass1_srt,
                             srt2_path=pass2_srt,
-                            output_path=merged_srt,
+                            output_path=tmp_merge,
                             strategy=merge_strategy,
                         )
+                        if final_candidate.exists():
+                            final_candidate.unlink()
+                        shutil.move(tmp_merge, final_candidate)
                         merge_info = {
                             'status': 'completed',
                             'strategy': merge_strategy,
-                            'output_path': str(merged_srt),
+                            'output_path': str(final_candidate),
                             'statistics': merge_stats,
                         }
-                        final_output = merged_srt
+                        final_output_path = final_candidate
+                        row_display['merge'] = 'OK'
+                        row_display['final'] = final_candidate.name
                     except Exception as merge_error:
+                        if tmp_merge.exists():
+                            tmp_merge.unlink()
                         logger.error("Merge failed for %s: %s", basename, merge_error)
                         merge_info = {'status': 'failed', 'error': str(merge_error)}
+                        row_display['merge'] = 'NOK'
+                        if pass1_srt:
+                            row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
                 else:
                     ensemble_metadata['pass2'] = (
                         {'status': pass2['status'], 'error': pass2.get('error')}
                         if pass2
                         else {'status': 'failed', 'error': 'Pass 2 did not return a result'}
                     )
+                    merge_info = {'status': 'skipped', 'reason': 'pass2_failed'}
+                    row_display['merge'] = 'NOK'
+                    row_display['pass2'] = self._format_status(ensemble_metadata['pass2'])
+                    if pass1_srt:
+                        row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
             else:
                 ensemble_metadata['pass2'] = {'status': 'skipped'}
 
+            if not pass2_config and pass1_srt:
+                final_output_path = pass1_srt
+                row_display['final'] = pass1_srt.name
+
             ensemble_metadata['merge'] = merge_info
 
-            # Determine final naming
-            params_dict = pass1_config.get('params') or {}
-            overrides_dict = pass1_config.get('overrides') or {}
-            lang_code = 'en' if self.subs_language == 'direct-to-english' else (
-                params_dict.get('language')
-                or overrides_dict.get('language')
-                or 'ja'
-            )
-
-            final_srt_path = self.output_dir / f"{basename}.{lang_code}.whisperjav.srt"
-            if final_output and final_output.exists() and final_output != final_srt_path:
-                shutil.copy2(final_output, final_srt_path)
-
+            passes_completed = 2 if pass2_config and pass2 and pass2.get('status') == 'completed' else 1
+            total_time = pass1.get('processing_time', 0.0) + (pass2.get('processing_time', 0.0) if pass2 else 0.0)
             ensemble_metadata['summary'] = {
-                'final_output': str(final_srt_path),
-                'passes_completed': 2
-                if pass2_config and pass2 and pass2.get('status') == 'completed'
-                else 1,
-                'total_processing_time_seconds': pass1.get('processing_time', 0.0)
-                + (pass2.get('processing_time', 0.0) if pass2 else 0.0),
+                'final_output': str(final_output_path) if final_output_path else None,
+                'passes_completed': passes_completed,
+                'total_processing_time_seconds': total_time,
             }
             ensemble_metadata['output_files'] = {
-                'final_srt': str(final_srt_path),
+                'final_srt': str(final_output_path) if final_output_path else None,
                 'pass1_srt': pass1.get('srt_path'),
                 'pass2_srt': pass2.get('srt_path') if pass2 else None,
             }
 
-            table_rows.append(
-                {
-                    'file': basename,
-                    'pass1': self._format_status(pass1),
-                    'pass2': self._format_status(pass2) if pass2_config else 'n/a',
-                    'merge': self._format_status(merge_info),
-                    'output': final_srt_path.name,
-                }
-            )
+            ensemble_metadata.setdefault('status', 'completed')
 
             all_metadata.append(ensemble_metadata)
+            table_rows.append(row_display)
 
         if not self.keep_temp_files:
             for media_info in serialized_media:
                 self._cleanup_intermediate(media_info['basename'])
 
         self._print_summary_table(table_rows, time.time() - batch_start)
+        summary_path = self._write_batch_summary(all_metadata)
+        if summary_path:
+            logger.info("Batch summary saved to %s", summary_path)
         return all_metadata
 
     def _run_pass_in_subprocess(
@@ -236,6 +256,7 @@ class EnsembleOrchestrator:
         pass_number: int,
         media_files: List[Dict[str, Any]],
         pass_config: Dict[str, Any],
+        language_code: str,
     ) -> Dict[str, Dict[str, Any]]:
         """Execute a pass inside an isolated worker process."""
 
@@ -248,6 +269,7 @@ class EnsembleOrchestrator:
             keep_temp_files=self.keep_temp_files,
             subs_language=self.subs_language,
             extra_kwargs=self.worker_kwargs,
+            language_code=language_code,
         )
 
         try:
@@ -340,11 +362,10 @@ class EnsembleOrchestrator:
             return
 
         columns = [
-            ('File', 'file'),
             ('Pass1', 'pass1'),
             ('Pass2', 'pass2'),
             ('Merge', 'merge'),
-            ('Output', 'output'),
+            ('Final', 'final'),
         ]
 
         widths = {header: len(header) for header, _ in columns}
@@ -362,6 +383,39 @@ class EnsembleOrchestrator:
 
         table_output = '\n'.join(table_lines)
         logger.info("Ensemble summary (%.1fs)\n%s", duration, table_output)
+
+    def _write_batch_summary(self, metadata_list: List[Dict[str, Any]]) -> Optional[Path]:
+        """Persist a lightweight JSON summary for GUI/CLI consumers."""
+        if not metadata_list:
+            return None
+
+        summary = {
+            'generated_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            'files': [],
+        }
+
+        for item in metadata_list:
+            summary['files'].append(
+                {
+                    'basename': item['input']['basename'],
+                    'input_file': item['input']['file'],
+                    'pass1': item.get('pass1'),
+                    'pass2': item.get('pass2'),
+                    'merge': item.get('merge'),
+                    'final_output': item.get('summary', {}).get('final_output'),
+                    'status': item.get('status', 'completed'),
+                }
+            )
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        summary_path = self.output_dir / f"ensemble_summary_{timestamp}.json"
+        try:
+            summary_path.write_text(json.dumps(summary, indent=2), encoding='utf-8')
+        except OSError as exc:
+            logger.warning("Failed to write batch summary: %s", exc)
+            return None
+
+        return summary_path
 
     def _filter_picklable_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Remove objects that cannot be pickled before sending to subprocesses."""
