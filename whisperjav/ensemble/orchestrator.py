@@ -1,32 +1,18 @@
 """Ensemble Orchestrator for two-pass pipeline processing."""
 
+import pickle
+import shutil
 import time
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from whisperjav.config.legacy import resolve_legacy_pipeline
-from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-from whisperjav.pipelines.fast_pipeline import FastPipeline
-from whisperjav.pipelines.faster_pipeline import FasterPipeline
-from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
-from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
-from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.utils.logger import logger
 from whisperjav.utils.metadata_manager import MetadataManager
 
 from .merge import MergeEngine
-
-
-# Pipeline class mapping
-PIPELINE_CLASSES = {
-    'balanced': BalancedPipeline,
-    'fast': FastPipeline,
-    'faster': FasterPipeline,
-    'fidelity': FidelityPipeline,
-    'kotoba-faster-whisper': KotobaFasterWhisperPipeline,
-    'transformers': TransformersPipeline,
-}
+from .pass_worker import WorkerPayload, run_pass_worker
 
 
 class EnsembleOrchestrator:
@@ -58,6 +44,7 @@ class EnsembleOrchestrator:
         self.subs_language = subs_language
         self.progress_display = progress_display
         self.extra_kwargs = kwargs
+        self.worker_kwargs = self._filter_picklable_kwargs(kwargs)
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
@@ -72,144 +59,16 @@ class EnsembleOrchestrator:
         pass2_config: Optional[Dict[str, Any]] = None,
         merge_strategy: str = 'smart_merge'
     ) -> Dict:
-        """
-        Process media file through two-pass ensemble.
-
-        Args:
-            media_info: Dictionary containing media file information
-            pass1_config: Configuration for pass 1
-                - pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity')
-                - sensitivity: Sensitivity level ('conservative', 'balanced', 'aggressive')
-                - overrides: Optional parameter overrides dict
-            pass2_config: Configuration for pass 2 (same structure as pass1)
-                         If None, only pass 1 is executed
-            merge_strategy: Merge strategy name ('smart_merge', 'full_merge', 'pass1_primary', etc.)
-
-        Returns:
-            Dictionary containing processing metadata and results
-        """
-        start_time = time.time()
-        media_basename = media_info['basename']
-
-        logger.info(f"Starting ensemble processing for {media_basename}")
-
-        # Create ensemble metadata
-        ensemble_metadata = self._create_ensemble_metadata(
-            media_info, pass1_config, pass2_config, merge_strategy
+        """Process a single file by delegating to batch processing."""
+        results = self.process_batch(
+            media_files=[media_info],
+            pass1_config=pass1_config,
+            pass2_config=pass2_config,
+            merge_strategy=merge_strategy,
         )
-
-        try:
-            # Execute Pass 1
-            logger.info(f"Pass 1: {pass1_config['pipeline']} ({pass1_config.get('sensitivity', 'balanced')})")
-            pass1_result = self._execute_pass(
-                media_info=media_info,
-                pass_config=pass1_config,
-                pass_number=1
-            )
-            pass1_srt = Path(pass1_result['output_files']['final_srt'])
-
-            # Store pass 1 result with distinct name
-            pass1_output = self.output_dir / f"{media_basename}_pass1.srt"
-            if pass1_srt.exists():
-                import shutil
-                shutil.copy2(pass1_srt, pass1_output)
-
-            ensemble_metadata['pass1'] = {
-                'status': 'completed',
-                'srt_path': str(pass1_output),
-                'subtitles': pass1_result['summary'].get('final_subtitles_refined', 0),
-                'processing_time': pass1_result['summary'].get('total_processing_time_seconds', 0)
-            }
-
-            # Execute Pass 2 if enabled
-            if pass2_config:
-                logger.info(f"Pass 2: {pass2_config['pipeline']} ({pass2_config.get('sensitivity', 'balanced')})")
-                pass2_result = self._execute_pass(
-                    media_info=media_info,
-                    pass_config=pass2_config,
-                    pass_number=2
-                )
-                pass2_srt = Path(pass2_result['output_files']['final_srt'])
-
-                # Store pass 2 result with distinct name
-                pass2_output = self.output_dir / f"{media_basename}_pass2.srt"
-                if pass2_srt.exists():
-                    import shutil
-                    shutil.copy2(pass2_srt, pass2_output)
-
-                ensemble_metadata['pass2'] = {
-                    'status': 'completed',
-                    'srt_path': str(pass2_output),
-                    'subtitles': pass2_result['summary'].get('final_subtitles_refined', 0),
-                    'processing_time': pass2_result['summary'].get('total_processing_time_seconds', 0)
-                }
-
-                # Merge results
-                logger.info(f"Merging results using {merge_strategy} strategy")
-                merged_srt = self.output_dir / f"{media_basename}.merged.srt"
-
-                merge_stats = self.merge_engine.merge(
-                    srt1_path=pass1_output,
-                    srt2_path=pass2_output,
-                    output_path=merged_srt,
-                    strategy=merge_strategy
-                )
-
-                ensemble_metadata['merge'] = {
-                    'status': 'completed',
-                    'strategy': merge_strategy,
-                    'output_path': str(merged_srt),
-                    'statistics': merge_stats
-                }
-
-                final_output = merged_srt
-            else:
-                # Single pass mode - use pass 1 result directly
-                final_output = pass1_output
-                ensemble_metadata['pass2'] = {'status': 'skipped'}
-                ensemble_metadata['merge'] = {'status': 'skipped'}
-
-            # Determine language code for final output naming
-            if self.subs_language == 'direct-to-english':
-                lang_code = 'en'
-            else:
-                # Check params first (customized mode), then overrides (legacy)
-                if pass1_config.get('params'):
-                    lang_code = pass1_config['params'].get('language', 'ja')
-                else:
-                    lang_code = pass1_config.get('overrides', {}).get('language', 'ja')
-
-            # Create final output with standard naming
-            final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
-            if final_output.exists() and final_output != final_srt_path:
-                import shutil
-                shutil.copy2(final_output, final_srt_path)
-
-            # Update metadata
-            total_time = time.time() - start_time
-            ensemble_metadata['summary'] = {
-                'total_processing_time_seconds': round(total_time, 2),
-                'final_output': str(final_srt_path),
-                'passes_completed': 2 if pass2_config else 1
-            }
-            ensemble_metadata['output_files'] = {
-                'final_srt': str(final_srt_path),
-                'pass1_srt': str(pass1_output) if pass1_output.exists() else None,
-                'pass2_srt': str(ensemble_metadata.get('pass2', {}).get('srt_path')) if pass2_config else None
-            }
-
-            # Clean up intermediate files if not keeping
-            if not self.keep_temp_files:
-                self._cleanup_intermediate(media_basename)
-
-            logger.info(f"Ensemble processing completed in {total_time:.1f}s")
-            return ensemble_metadata
-
-        except Exception as e:
-            logger.error(f"Ensemble processing failed: {e}", exc_info=True)
-            ensemble_metadata['error'] = str(e)
-            ensemble_metadata['status'] = 'failed'
-            raise
+        if not results:
+            raise RuntimeError("Ensemble processing produced no results")
+        return results[0]
 
     def process_batch(
         self,
@@ -218,538 +77,301 @@ class EnsembleOrchestrator:
         pass2_config: Optional[Dict[str, Any]] = None,
         merge_strategy: str = 'smart_merge'
     ) -> List[Dict]:
-        """
-        Process multiple media files through two-pass ensemble with optimized memory usage.
-
-        This method loads each model only once for all files, significantly reducing
-        VRAM usage compared to processing files individually.
-
-        Args:
-            media_files: List of media info dictionaries
-            pass1_config: Configuration for pass 1
-            pass2_config: Configuration for pass 2 (optional)
-            merge_strategy: Merge strategy name
-
-        Returns:
-            List of ensemble metadata dictionaries, one per file
-        """
         if not media_files:
             return []
 
-        batch_start_time = time.time()
-        total_files = len(media_files)
+        batch_start = time.time()
+        serialized_media = self._serialize_media_files(media_files)
 
-        logger.info(f"Starting batch ensemble processing for {total_files} files")
+        logger.info(
+            "Starting batch ensemble processing for %s files (Pass 1: %s)",
+            len(serialized_media),
+            pass1_config['pipeline'],
+        )
 
-        # Storage for intermediate results
-        pass1_results = {}  # basename -> result metadata
-        pass1_srts = {}     # basename -> Path to pass1 SRT
-        pass2_results = {}  # basename -> result metadata
-        pass2_srts = {}     # basename -> Path to pass2 SRT
-        failed_files = []   # List of failed basenames
-        all_metadata = []   # Final results
+        pass1_results = self._run_pass_in_subprocess(
+            pass_number=1,
+            media_files=serialized_media,
+            pass_config=pass1_config,
+        )
 
-        # ========== PASS 1 PROCESSING ==========
-        logger.info(f"=== Pass 1: {pass1_config['pipeline']} ({pass1_config.get('sensitivity', 'balanced')}) ===")
-
-        # Create Pass 1 pipeline once
-        pass1_pipeline = self._create_pipeline(pass1_config, pass_number=1)
-
-        try:
-            for i, media_info in enumerate(media_files, 1):
-                media_basename = media_info['basename']
-                logger.info(f"Pass 1 - File {i}/{total_files}: {media_basename}")
-
-                try:
-                    result = pass1_pipeline.process(media_info)
-                    pass1_srt = Path(result['output_files']['final_srt'])
-
-                    # Store result with distinct name
-                    pass1_output = self.output_dir / f"{media_basename}_pass1.srt"
-                    if pass1_srt.exists():
-                        import shutil
-                        shutil.copy2(pass1_srt, pass1_output)
-
-                    pass1_results[media_basename] = result
-                    pass1_srts[media_basename] = pass1_output
-
-                except Exception as e:
-                    logger.error(f"Pass 1 failed for {media_basename}: {e}")
-                    failed_files.append(media_basename)
-                    continue
-
-        finally:
-            # Always cleanup Pass 1 pipeline to free VRAM
-            logger.info("Cleaning up Pass 1 pipeline...")
-            try:
-                pass1_pipeline.cleanup()
-            except Exception as e:
-                logger.warning(f"Pass 1 cleanup error (non-fatal): {e}")
-            finally:
-                del pass1_pipeline
-                # Give CUDA time to release resources before next model load
-                time.sleep(0.5)
-
-        # ========== PASS 2 PROCESSING ==========
+        pass2_results: Dict[str, Dict[str, Any]] = {}
         if pass2_config:
-            logger.info(f"=== Pass 2: {pass2_config['pipeline']} ({pass2_config.get('sensitivity', 'balanced')}) ===")
+            logger.info(
+                "Pass 2 is enabled (%s). Launching worker...",
+                pass2_config['pipeline'],
+            )
+            pass2_results = self._run_pass_in_subprocess(
+                pass_number=2,
+                media_files=serialized_media,
+                pass_config=pass2_config,
+            )
 
-            # Create Pass 2 pipeline
-            pass2_pipeline = self._create_pipeline(pass2_config, pass_number=2)
+        all_metadata: List[Dict[str, Any]] = []
+        table_rows: List[Dict[str, str]] = []
 
-            try:
-                for i, media_info in enumerate(media_files, 1):
-                    media_basename = media_info['basename']
-
-                    # Skip files that failed in Pass 1
-                    if media_basename in failed_files:
-                        logger.debug(f"Skipping {media_basename} (failed in Pass 1)")
-                        continue
-
-                    logger.info(f"Pass 2 - File {i}/{total_files}: {media_basename}")
-
-                    try:
-                        result = pass2_pipeline.process(media_info)
-                        pass2_srt = Path(result['output_files']['final_srt'])
-
-                        # Store result with distinct name
-                        pass2_output = self.output_dir / f"{media_basename}_pass2.srt"
-                        if pass2_srt.exists():
-                            import shutil
-                            shutil.copy2(pass2_srt, pass2_output)
-
-                        pass2_results[media_basename] = result
-                        pass2_srts[media_basename] = pass2_output
-
-                    except Exception as e:
-                        logger.error(f"Pass 2 failed for {media_basename}: {e}")
-                        # Don't add to failed_files - we still have Pass 1 result
-                        continue
-
-            finally:
-                # Always cleanup Pass 2 pipeline to free VRAM
-                logger.info("Cleaning up Pass 2 pipeline...")
-                try:
-                    pass2_pipeline.cleanup()
-                except Exception as e:
-                    logger.warning(f"Pass 2 cleanup error (non-fatal): {e}")
-                finally:
-                    del pass2_pipeline
-                    # Give CUDA time to release resources before merge
-                    time.sleep(0.5)
-
-        # ========== MERGE PHASE ==========
-        logger.info("=== Merging results ===")
-
-        for media_info in media_files:
-            media_basename = media_info['basename']
-
-            # Create ensemble metadata for this file
+        for media_info in serialized_media:
+            basename = media_info['basename']
             ensemble_metadata = self._create_ensemble_metadata(
                 media_info, pass1_config, pass2_config, merge_strategy
             )
 
-            # Handle failed files
-            if media_basename in failed_files:
+            pass1 = pass1_results.get(basename)
+            pass2 = pass2_results.get(basename) if pass2_config else None
+
+            if not pass1 or pass1['status'] != 'completed':
+                error_msg = pass1.get('error') if pass1 else 'Pass 1 worker returned no result'
+                ensemble_metadata['pass1'] = {'status': 'failed', 'error': error_msg}
                 ensemble_metadata['status'] = 'failed'
-                ensemble_metadata['error'] = 'Failed in Pass 1'
-                all_metadata.append(ensemble_metadata)
-                continue
-
-            # Get Pass 1 result
-            if media_basename in pass1_results:
-                pass1_result = pass1_results[media_basename]
-                ensemble_metadata['pass1'] = {
-                    'status': 'completed',
-                    'srt_path': str(pass1_srts[media_basename]),
-                    'subtitles': pass1_result['summary'].get('final_subtitles_refined', 0),
-                    'processing_time': pass1_result['summary'].get('total_processing_time_seconds', 0)
-                }
-            else:
-                ensemble_metadata['pass1'] = {'status': 'failed'}
-                ensemble_metadata['status'] = 'failed'
-                all_metadata.append(ensemble_metadata)
-                continue
-
-            # Get Pass 2 result and merge
-            if pass2_config and media_basename in pass2_results:
-                pass2_result = pass2_results[media_basename]
-                ensemble_metadata['pass2'] = {
-                    'status': 'completed',
-                    'srt_path': str(pass2_srts[media_basename]),
-                    'subtitles': pass2_result['summary'].get('final_subtitles_refined', 0),
-                    'processing_time': pass2_result['summary'].get('total_processing_time_seconds', 0)
-                }
-
-                # Merge results
-                merged_srt = self.output_dir / f"{media_basename}.merged.srt"
-                try:
-                    merge_stats = self.merge_engine.merge(
-                        srt1_path=pass1_srts[media_basename],
-                        srt2_path=pass2_srts[media_basename],
-                        output_path=merged_srt,
-                        strategy=merge_strategy
-                    )
-
-                    ensemble_metadata['merge'] = {
-                        'status': 'completed',
-                        'strategy': merge_strategy,
-                        'output_path': str(merged_srt),
-                        'statistics': merge_stats
+                table_rows.append(
+                    {
+                        'file': basename,
+                        'pass1': self._format_status(pass1),
+                        'pass2': self._format_status(pass2) if pass2_config else 'n/a',
+                        'merge': 'n/a',
+                        'output': 'n/a',
                     }
-                    final_output = merged_srt
-                except Exception as e:
-                    logger.error(f"Merge failed for {media_basename}: {e}")
-                    ensemble_metadata['merge'] = {'status': 'failed', 'error': str(e)}
-                    final_output = pass1_srts[media_basename]
-            else:
-                # Single pass or Pass 2 failed
-                if pass2_config:
-                    ensemble_metadata['pass2'] = {'status': 'failed'}
-                else:
-                    ensemble_metadata['pass2'] = {'status': 'skipped'}
-                ensemble_metadata['merge'] = {'status': 'skipped'}
-                final_output = pass1_srts[media_basename]
+                )
+                all_metadata.append(ensemble_metadata)
+                continue
 
-            # Determine language code for final output naming
-            if self.subs_language == 'direct-to-english':
-                lang_code = 'en'
-            else:
-                if pass1_config.get('params'):
-                    lang_code = pass1_config['params'].get('language', 'ja')
-                else:
-                    lang_code = pass1_config.get('overrides', {}).get('language', 'ja')
+            pass1_srt = Path(pass1['srt_path']) if pass1.get('srt_path') else None
+            ensemble_metadata['pass1'] = {
+                'status': pass1['status'],
+                'srt_path': pass1.get('srt_path'),
+                'subtitles': pass1.get('subtitles', 0),
+                'processing_time': pass1.get('processing_time', 0.0),
+            }
 
-            # Create final output with standard naming
-            final_srt_path = self.output_dir / f"{media_basename}.{lang_code}.whisperjav.srt"
-            if final_output.exists() and final_output != final_srt_path:
-                import shutil
+            final_output = pass1_srt
+            merge_info: Dict[str, Any] = {'status': 'skipped'}
+
+            if pass2_config:
+                if pass2 and pass2['status'] == 'completed' and pass2.get('srt_path'):
+                    pass2_srt = Path(pass2['srt_path'])
+                    ensemble_metadata['pass2'] = {
+                        'status': pass2['status'],
+                        'srt_path': pass2['srt_path'],
+                        'subtitles': pass2.get('subtitles', 0),
+                        'processing_time': pass2.get('processing_time', 0.0),
+                    }
+
+                    merged_srt = self.output_dir / f"{basename}.merged.srt"
+                    try:
+                        merge_stats = self.merge_engine.merge(
+                            srt1_path=pass1_srt,
+                            srt2_path=pass2_srt,
+                            output_path=merged_srt,
+                            strategy=merge_strategy,
+                        )
+                        merge_info = {
+                            'status': 'completed',
+                            'strategy': merge_strategy,
+                            'output_path': str(merged_srt),
+                            'statistics': merge_stats,
+                        }
+                        final_output = merged_srt
+                    except Exception as merge_error:
+                        logger.error("Merge failed for %s: %s", basename, merge_error)
+                        merge_info = {'status': 'failed', 'error': str(merge_error)}
+                else:
+                    ensemble_metadata['pass2'] = (
+                        {'status': pass2['status'], 'error': pass2.get('error')}
+                        if pass2
+                        else {'status': 'failed', 'error': 'Pass 2 did not return a result'}
+                    )
+            else:
+                ensemble_metadata['pass2'] = {'status': 'skipped'}
+
+            ensemble_metadata['merge'] = merge_info
+
+            # Determine final naming
+            lang_code = 'en' if self.subs_language == 'direct-to-english' else (
+                pass1_config.get('params', {}).get('language')
+                or pass1_config.get('overrides', {}).get('language')
+                or 'ja'
+            )
+
+            final_srt_path = self.output_dir / f"{basename}.{lang_code}.whisperjav.srt"
+            if final_output and final_output.exists() and final_output != final_srt_path:
                 shutil.copy2(final_output, final_srt_path)
 
-            # Update metadata
             ensemble_metadata['summary'] = {
                 'final_output': str(final_srt_path),
-                'passes_completed': 2 if (pass2_config and media_basename in pass2_results) else 1
+                'passes_completed': 2
+                if pass2_config and pass2 and pass2.get('status') == 'completed'
+                else 1,
+                'total_processing_time_seconds': pass1.get('processing_time', 0.0)
+                + (pass2.get('processing_time', 0.0) if pass2 else 0.0),
             }
             ensemble_metadata['output_files'] = {
                 'final_srt': str(final_srt_path),
-                'pass1_srt': str(pass1_srts.get(media_basename)) if media_basename in pass1_srts else None,
-                'pass2_srt': str(pass2_srts.get(media_basename)) if media_basename in pass2_srts else None
+                'pass1_srt': pass1.get('srt_path'),
+                'pass2_srt': pass2.get('srt_path') if pass2 else None,
             }
+
+            table_rows.append(
+                {
+                    'file': basename,
+                    'pass1': self._format_status(pass1),
+                    'pass2': self._format_status(pass2) if pass2_config else 'n/a',
+                    'merge': self._format_status(merge_info),
+                    'output': final_srt_path.name,
+                }
+            )
 
             all_metadata.append(ensemble_metadata)
 
-        # Cleanup intermediate files if not keeping
         if not self.keep_temp_files:
-            for media_info in media_files:
+            for media_info in serialized_media:
                 self._cleanup_intermediate(media_info['basename'])
 
-        batch_time = time.time() - batch_start_time
-        logger.info(f"Batch ensemble processing completed in {batch_time:.1f}s for {total_files} files")
-
+        self._print_summary_table(table_rows, time.time() - batch_start)
         return all_metadata
 
-    def _apply_custom_params(
+    def _run_pass_in_subprocess(
         self,
-        resolved_config: Dict[str, Any],
-        custom_params: Dict[str, Any],
-        pass_number: int
-    ) -> None:
-        """
-        Apply custom parameters to a resolved config (M1: extracted from duplicate code).
-
-        Handles both V3 config structure (kotoba with params.asr) and legacy structure
-        (params.decoder/provider/vad). Modifies resolved_config in place.
-
-        Args:
-            resolved_config: Resolved pipeline configuration to modify
-            custom_params: Custom parameters to apply
-            pass_number: Pass number for logging
-        """
-        model_config = resolved_config['model']
-
-        # Detect config structure: V3 uses params.asr, legacy uses params.decoder
-        is_v3_config = 'asr' in resolved_config['params']
-
-        # Parameters to skip (handled elsewhere or not applicable)
-        SKIP_PARAMS = {'scene_detection_method'}
-
-        if is_v3_config:
-            # V3 config (kotoba): all params go to params.asr
-            asr_params = resolved_config['params']['asr']
-
-            for key, value in custom_params.items():
-                if key in SKIP_PARAMS:
-                    continue
-                elif key == 'model_name':
-                    model_config['model_name'] = value
-                    logger.debug(f"Pass {pass_number}: Overriding model to {value}")
-                elif key == 'device':
-                    model_config['device'] = value
-                    logger.debug(f"Pass {pass_number}: Overriding device to {value}")
-                else:
-                    # All other params go to asr_params for V3 config
-                    asr_params[key] = value
-                    logger.debug(f"Pass {pass_number}: Set asr param '{key}' = {value}")
-        else:
-            # Legacy config: params split into decoder/provider/vad
-            decoder_params = resolved_config['params']['decoder']
-            provider_params = resolved_config['params']['provider']
-            vad_params = resolved_config['params'].get('vad', {})
-
-            # Define which params belong to VAD
-            VAD_PARAM_NAMES = {
-                'threshold', 'neg_threshold', 'min_speech_duration_ms',
-                'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
-            }
-
-            for key, value in custom_params.items():
-                if key in SKIP_PARAMS:
-                    continue
-                elif key == 'model_name':
-                    model_config['model_name'] = value
-                    logger.debug(f"Pass {pass_number}: Overriding model to {value}")
-                elif key == 'device':
-                    model_config['device'] = value
-                    logger.debug(f"Pass {pass_number}: Overriding device to {value}")
-                elif key in VAD_PARAM_NAMES:
-                    vad_params[key] = value
-                elif key in decoder_params:
-                    decoder_params[key] = value
-                elif key in provider_params:
-                    provider_params[key] = value
-                else:
-                    # Unknown params go to provider (safer than decoder)
-                    provider_params[key] = value
-                    logger.debug(f"Pass {pass_number}: Unknown param '{key}' added to provider_params")
-
-        logger.debug(f"Pass {pass_number}: Custom params applied")
-
-    def _create_pipeline(
-        self,
-        pass_config: Dict[str, Any],
-        pass_number: int
-    ):
-        """
-        Create a pipeline instance for the given configuration.
-
-        Args:
-            pass_config: Pass configuration
-            pass_number: Pass number (1 or 2)
-
-        Returns:
-            Pipeline instance
-        """
-        pipeline_name = pass_config['pipeline']
-        sensitivity = pass_config.get('sensitivity', 'balanced')
-
-        # Get pipeline class
-        pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
-        if not pipeline_class:
-            raise ValueError(f"Unknown pipeline: {pipeline_name}")
-
-        # Create temp directory for this pass
-        pass_temp_dir = self.temp_dir / f"pass{pass_number}"
-        pass_temp_dir.mkdir(parents=True, exist_ok=True)
-
-        # Handle Transformers pipeline separately (uses hf_* params, not resolved_config)
-        if pipeline_name == 'transformers':
-            return self._create_transformers_pipeline(pass_config, pass_number, pass_temp_dir)
-
-        # Legacy pipeline handling
-        # Model compatibility validation (faster-whisper doesn't support turbo)
-        PIPELINE_MODEL_COMPATIBILITY = {
-            'balanced': ['large-v2', 'large-v3'],
-            'faster': ['large-v2', 'large-v3'],
-            'fast': ['large-v2', 'large-v3'],
-            'fidelity': ['turbo', 'large-v2', 'large-v3'],
-            'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster', 'RoachLin/kotoba-whisper-v2.2-faster']
-        }
-
-        # Check if custom params have an incompatible model
-        if pass_config.get('params'):
-            custom_model = pass_config['params'].get('model_name')
-            if custom_model:
-                allowed_models = PIPELINE_MODEL_COMPATIBILITY.get(pipeline_name, ['large-v2', 'large-v3'])
-                if custom_model not in allowed_models:
-                    raise ValueError(
-                        f"Model '{custom_model}' is not compatible with pipeline '{pipeline_name}'. "
-                        f"Allowed models: {allowed_models}"
-                    )
-
-        # Resolve configuration
-        resolved_config = resolve_legacy_pipeline(
-            pipeline_name=pipeline_name,
-            sensitivity=sensitivity,
-            task='transcribe',
-            overrides=pass_config.get('overrides')
-        )
-
-        # Apply custom params if provided (M1: use shared helper)
-        if pass_config.get('params'):
-            self._apply_custom_params(resolved_config, pass_config['params'], pass_number)
-
-        # Instantiate legacy pipeline
-        pipeline = pipeline_class(
-            output_dir=str(self.output_dir),
-            temp_dir=str(pass_temp_dir),
-            keep_temp_files=True,
-            subs_language=self.subs_language,
-            resolved_config=resolved_config,
-            progress_display=self.progress_display,
-            **self.extra_kwargs
-        )
-
-        return pipeline
-
-    def _create_transformers_pipeline(
-        self,
-        pass_config: Dict[str, Any],
         pass_number: int,
-        pass_temp_dir: Path
-    ):
-        """
-        Create a TransformersPipeline instance.
-
-        TransformersPipeline uses dedicated hf_* parameters instead of
-        resolved_config. If hf_params are provided (customized), use them.
-        Otherwise, use model defaults (minimal args pattern).
-
-        Args:
-            pass_config: Pass configuration with optional 'hf_params'
-            pass_number: Pass number (1 or 2)
-            pass_temp_dir: Temporary directory for this pass
-
-        Returns:
-            TransformersPipeline instance
-        """
-        # Default HF parameters (model uses its tuned defaults)
-        hf_defaults = {
-            'hf_model_id': 'kotoba-tech/kotoba-whisper-v2.2',
-            'hf_chunk_length': 15,
-            'hf_stride': None,
-            'hf_batch_size': 16,
-            'hf_scene': 'none',
-            'hf_beam_size': 5,
-            'hf_temperature': 0.0,
-            'hf_attn': 'sdpa',
-            'hf_timestamps': 'segment',
-            'hf_language': 'ja',
-            'hf_task': 'transcribe',
-            'hf_device': 'auto',
-            'hf_dtype': 'auto',
-        }
-
-        # If customized HF params provided, merge with defaults
-        hf_params = pass_config.get('hf_params', {})
-        if hf_params:
-            logger.debug(f"Pass {pass_number}: Using customized Transformers parameters")
-            # Map GUI param names to pipeline param names if needed
-            param_mapping = {
-                'model_id': 'hf_model_id',
-                'chunk_length_s': 'hf_chunk_length',
-                'stride_length_s': 'hf_stride',
-                'batch_size': 'hf_batch_size',
-                'scene': 'hf_scene',
-                'beam_size': 'hf_beam_size',
-                'temperature': 'hf_temperature',
-                'attn_implementation': 'hf_attn',
-                'timestamps': 'hf_timestamps',
-                'language': 'hf_language',
-                'device': 'hf_device',
-                'dtype': 'hf_dtype',
-            }
-            for gui_key, hf_key in param_mapping.items():
-                if gui_key in hf_params:
-                    hf_defaults[hf_key] = hf_params[gui_key]
-            # Also accept direct hf_* keys
-            for key, value in hf_params.items():
-                if key.startswith('hf_'):
-                    hf_defaults[key] = value
-        else:
-            logger.debug(f"Pass {pass_number}: Using default Transformers parameters (minimal args)")
-
-        # Create TransformersPipeline with HF parameters
-        pipeline = TransformersPipeline(
-            output_dir=str(self.output_dir),
-            temp_dir=str(pass_temp_dir),
-            keep_temp_files=True,
-            progress_display=self.progress_display,
-            subs_language=self.subs_language,
-            **hf_defaults
-        )
-
-        return pipeline
-
-    def _execute_pass(
-        self,
-        media_info: Dict,
+        media_files: List[Dict[str, Any]],
         pass_config: Dict[str, Any],
-        pass_number: int
-    ) -> Dict:
-        """
-        Execute a single pass using the specified pipeline configuration.
+    ) -> Dict[str, Dict[str, Any]]:
+        """Execute a pass inside an isolated worker process."""
 
-        Args:
-            media_info: Media file information
-            pass_config: Pass configuration with either:
-                - params: Full configuration snapshot (when customized)
-                - pipeline + sensitivity: Resolve from presets (when default)
-                - hf_params: HuggingFace params (for transformers pipeline)
-            pass_number: Pass number (1 or 2)
-
-        Returns:
-            Pipeline processing result metadata
-        """
-        pipeline_name = pass_config['pipeline']
-
-        # Create pass-specific temp directory to avoid conflicts
-        pass_temp_dir = self.temp_dir / f"pass{pass_number}"
-        pass_temp_dir.mkdir(parents=True, exist_ok=True)
-
-        # Handle Transformers pipeline separately
-        if pipeline_name == 'transformers':
-            pipeline = self._create_transformers_pipeline(pass_config, pass_number, pass_temp_dir)
-            result = pipeline.process(media_info)
-            return result
-
-        # Legacy pipeline handling
-        sensitivity = pass_config.get('sensitivity', 'balanced')
-
-        # Always resolve base config to get proper structure
-        resolved_config = resolve_legacy_pipeline(
-            pipeline_name=pipeline_name,
-            sensitivity=sensitivity,
-            task='transcribe',
-            overrides=pass_config.get('overrides')
-        )
-
-        # If custom params provided, merge them into the resolved config (M1: use shared helper)
-        if pass_config.get('params'):
-            logger.debug(f"Pass {pass_number}: Applying custom parameters to {pipeline_name}/{sensitivity}")
-            self._apply_custom_params(resolved_config, pass_config['params'], pass_number)
-        else:
-            logger.debug(f"Pass {pass_number}: Using defaults for {pipeline_name}/{sensitivity}")
-
-        # Get pipeline class
-        pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
-        if not pipeline_class:
-            raise ValueError(f"Unknown pipeline: {pipeline_name}")
-
-        # Instantiate legacy pipeline
-        pipeline = pipeline_class(
+        payload = WorkerPayload(
+            pass_number=pass_number,
+            media_files=media_files,
+            pass_config=pass_config,
             output_dir=str(self.output_dir),
-            temp_dir=str(pass_temp_dir),
-            keep_temp_files=True,  # Keep until merge is done
+            temp_dir=str(self.temp_dir),
+            keep_temp_files=self.keep_temp_files,
             subs_language=self.subs_language,
-            resolved_config=resolved_config,
-            progress_display=self.progress_display,
-            **self.extra_kwargs
+            extra_kwargs=self.worker_kwargs,
         )
 
-        # Process
-        result = pipeline.process(media_info)
-        return result
+        try:
+            with ProcessPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(run_pass_worker, payload)
+                worker_output = future.result()
+        except Exception as exc:  # pragma: no cover - catastrophic worker failure
+            logger.exception("Pass %s worker crashed", pass_number)
+            return {
+                info['basename']: {
+                    'status': 'failed',
+                    'error': f'Worker crash: {exc}',
+                }
+                for info in media_files
+            }
+
+        worker_error = worker_output.get('worker_error')
+        if worker_error:
+            logger.error("Pass %s worker reported error:\n%s", pass_number, worker_error)
+
+        results = worker_output.get('results') or []
+        if not results:
+            fallback_error = worker_error or 'Worker produced no results'
+            return {
+                info['basename']: {
+                    'status': 'failed',
+                    'error': fallback_error,
+                }
+                for info in media_files
+            }
+
+        formatted: Dict[str, Dict[str, Any]] = {}
+        for item in results:
+            formatted[item['basename']] = item
+
+        # Ensure every media file has an entry even if the worker skipped it
+        for info in media_files:
+            formatted.setdefault(
+                info['basename'],
+                {
+                    'status': 'failed',
+                    'error': 'Worker returned no result',
+                },
+            )
+
+        return formatted
+
+    def _serialize_media_files(self, media_files: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Convert media descriptors to picklable dicts before multiprocessing."""
+
+        def normalize(value):
+            if isinstance(value, Path):
+                return str(value)
+            if isinstance(value, dict):
+                return {k: normalize(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [normalize(v) for v in value]
+            return value
+
+        serialized = []
+        for info in media_files:
+            normalized = {k: normalize(v) for k, v in info.items()}
+            if 'path' in normalized and normalized['path'] is not None:
+                normalized['path'] = str(normalized['path'])
+            serialized.append(normalized)
+        return serialized
+
+    def _format_status(self, result: Optional[Dict[str, Any]]) -> str:
+        """Render status for summary table."""
+        if not result:
+            return 'n/a'
+
+        status = result.get('status', 'unknown')
+        if status == 'completed':
+            return 'completed'
+
+        error = result.get('error')
+        if not error:
+            return status
+
+        first_line = str(error).strip().splitlines()[0]
+        if len(first_line) > 40:
+            first_line = first_line[:37] + '...'
+        return f"{status}: {first_line}"
+
+    def _print_summary_table(self, rows: List[Dict[str, str]], duration: float) -> None:
+        """Pretty-print a compact summary table for the batch run."""
+        if not rows:
+            logger.info("No files processed (elapsed %.1fs)", duration)
+            return
+
+        columns = [
+            ('File', 'file'),
+            ('Pass1', 'pass1'),
+            ('Pass2', 'pass2'),
+            ('Merge', 'merge'),
+            ('Output', 'output'),
+        ]
+
+        widths = {header: len(header) for header, _ in columns}
+        for row in rows:
+            for header, key in columns:
+                widths[header] = max(widths[header], len(str(row.get(key, ''))))
+
+        header_line = ' | '.join(header.ljust(widths[header]) for header, _ in columns)
+        divider = '-+-'.join('-' * widths[header] for header, _ in columns)
+        table_lines = [header_line, divider]
+        for row in rows:
+            table_lines.append(
+                ' | '.join(str(row.get(key, '')).ljust(widths[header]) for header, key in columns)
+            )
+
+        table_output = '\n'.join(table_lines)
+        logger.info("Ensemble summary (%.1fs)\n%s", duration, table_output)
+
+    def _filter_picklable_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove objects that cannot be pickled before sending to subprocesses."""
+        safe_kwargs = {}
+        for key, value in kwargs.items():
+            try:
+                pickle.dumps(value)
+            except Exception:
+                logger.debug("Dropping non-picklable kwarg '%s' (%s)", key, type(value))
+                continue
+            safe_kwargs[key] = value
+        return safe_kwargs
 
     def _create_ensemble_metadata(
         self,
@@ -783,7 +405,6 @@ class EnsembleOrchestrator:
             for pass_num in [1, 2]:
                 pass_temp = self.temp_dir / f"pass{pass_num}"
                 if pass_temp.exists():
-                    import shutil
                     shutil.rmtree(pass_temp)
                     logger.debug(f"Cleaned up pass {pass_num} temp directory")
 
