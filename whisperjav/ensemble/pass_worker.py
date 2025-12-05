@@ -125,6 +125,7 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
         os.getpid(),
         pass_number,
         len(media_files),
+        extra={'color': 'blue'},
     )
 
     if not media_files:
@@ -161,7 +162,13 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     try:
         for media_info in media_files:
             basename = media_info["basename"]
-            logger.info("[Worker %s] Pass %s processing %s", os.getpid(), pass_number, basename)
+            logger.info(
+                "[Worker %s] Pass %s processing %s",
+                os.getpid(),
+                pass_number,
+                basename,
+                extra={'color': 'blue'},
+            )
             try:
                 result = pipeline.process({
                     **media_info,
