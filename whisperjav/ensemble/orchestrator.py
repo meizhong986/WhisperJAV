@@ -186,9 +186,11 @@ class EnsembleOrchestrator:
             ensemble_metadata['merge'] = merge_info
 
             # Determine final naming
+            params_dict = pass1_config.get('params') or {}
+            overrides_dict = pass1_config.get('overrides') or {}
             lang_code = 'en' if self.subs_language == 'direct-to-english' else (
-                pass1_config.get('params', {}).get('language')
-                or pass1_config.get('overrides', {}).get('language')
+                params_dict.get('language')
+                or overrides_dict.get('language')
                 or 'ja'
             )
 
