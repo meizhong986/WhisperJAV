@@ -19,6 +19,8 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.utils.logger import logger
 
+from .utils import resolve_language_code
+
 PIPELINE_CLASSES = {
     "balanced": BalancedPipeline,
     "fast": FastPipeline,
@@ -55,6 +57,7 @@ class WorkerPayload:
     keep_temp_files: bool
     subs_language: str
     extra_kwargs: Dict[str, Any]
+    language_code: str
 
 
 @dataclass
@@ -115,6 +118,7 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     pass_config = payload.pass_config
     pass_number = payload.pass_number
     media_files = payload.media_files
+    language_code = payload.language_code or resolve_language_code(pass_config, payload.subs_language)
 
     logger.info(
         "[Worker %s] Starting pass %s for %s file(s)",
@@ -164,7 +168,7 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
                     "path": Path(media_info["path"]),
                 })
                 final_srt = Path(result["output_files"]["final_srt"])
-                pass_output = Path(payload.output_dir) / f"{basename}_pass{pass_number}.srt"
+                pass_output = Path(payload.output_dir) / f"{basename}.{language_code}.pass{pass_number}.srt"
                 if final_srt.exists():
                     shutil.copy2(final_srt, pass_output)
                 results.append(
