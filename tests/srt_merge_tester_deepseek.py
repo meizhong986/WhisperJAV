@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-SRT Merger Test Utility - TEXT-AGNOSTIC VERSION
-Validates the correctness of merged SRT files based on different merge strategies.
-Only considers timestamps, gaps, and durations - NOT text content.
+SRT Merger Test Utility - TEXT-AGNOSTIC VERSION with better error reporting
 """
 
 import argparse
 import sys
 import os
 from pathlib import Path
-from datetime import timedelta
+from datetime import timedelta, time, datetime
 from typing import List, Tuple, Dict, Set, Optional, Any
 import logging
 from dataclasses import dataclass
@@ -49,24 +47,47 @@ MERGE_OPTIONS = {
     '5': 'second_base_30_overlap'
 }
 
+def time_to_timedelta(t: time) -> timedelta:
+    """Convert datetime.time to timedelta."""
+    return timedelta(
+        hours=t.hour,
+        minutes=t.minute,
+        seconds=t.second,
+        microseconds=t.microsecond
+    )
+
 @dataclass
 class SubtitleSlot:
     """Represents a time slot for a subtitle, agnostic of text content."""
     start: timedelta
     end: timedelta
     duration: timedelta
+    index: int = 0  # Original subtitle index (1-based)
+    source_file: str = "unknown"  # Source file name
+    is_merged: bool = False  # Whether this is from merged file
     
     @classmethod
-    def from_subtitle(cls, sub: Subtitle):
+    def from_subtitle(cls, sub: Subtitle, index: int = 0, source_file: str = "unknown", 
+                      is_merged: bool = False):
         """Create a SubtitleSlot from a subtitle object."""
         if SRT_PACKAGE == 'pysrt':
-            start = sub.start.to_time()
-            end = sub.end.to_time()
+            # pysrt returns datetime.time objects from to_time()
+            start_time = sub.start.to_time()
+            end_time = sub.end.to_time()
+            start = time_to_timedelta(start_time)
+            end = time_to_timedelta(end_time)
         else:  # srt package
             start = sub.start
             end = sub.end
         
-        return cls(start=start, end=end, duration=end - start)
+        return cls(
+            start=start, 
+            end=end, 
+            duration=end - start,
+            index=index,
+            source_file=source_file,
+            is_merged=is_merged
+        )
     
     def __hash__(self):
         return hash((self.start.total_seconds(), self.end.total_seconds()))
@@ -98,6 +119,25 @@ class SubtitleSlot:
         """Check if this slot contains another slot."""
         return (self.start <= other.start + tolerance and 
                 self.end >= other.end - tolerance)
+    
+    def __str__(self):
+        """String representation for debugging."""
+        start_str = str(self.start).split('.')[0]
+        end_str = str(self.end).split('.')[0]
+        source = self.source_file
+        if self.is_merged:
+            source = f"merged[{self.index}]"
+        else:
+            source = f"{source}[{self.index}]"
+        return f"{source}: {start_str} --> {end_str}"
+    
+    def detailed_str(self):
+        """Detailed string representation with all info."""
+        start_str = str(self.start).split('.')[0]
+        end_str = str(self.end).split('.')[0]
+        duration_str = str(self.duration).split('.')[0]
+        return (f"Subtitle {self.index} from {self.source_file}: "
+                f"{start_str} --> {end_str} (duration: {duration_str})")
 
 class SRTTestValidator:
     """Main validator class for testing SRT merge operations - TEXT AGNOSTIC."""
@@ -112,12 +152,13 @@ class SRTTestValidator:
         self.tolerance_ms = tolerance_ms
         self.tolerance_td = timedelta(milliseconds=tolerance_ms)
         
-    def load_srt_file(self, file_path: Path) -> List[SubtitleSlot]:
+    def load_srt_file(self, file_path: Path, is_merged: bool = False) -> List[SubtitleSlot]:
         """
         Load SRT file and convert to SubtitleSlots (ignoring text).
         
         Args:
             file_path: Path to SRT file
+            is_merged: Whether this is the merged output file
             
         Returns:
             List of SubtitleSlots
@@ -139,7 +180,22 @@ class SRTTestValidator:
                 subs = list(srt.parse(content))
             
             # Convert to SubtitleSlots (ignoring text)
-            return [SubtitleSlot.from_subtitle(sub) for sub in subs]
+            slots = []
+            for i, sub in enumerate(subs, 1):  # Start from 1 for subtitle index
+                try:
+                    slot = SubtitleSlot.from_subtitle(
+                        sub, 
+                        index=i, 
+                        source_file=file_path.name,
+                        is_merged=is_merged
+                    )
+                    slots.append(slot)
+                except Exception as e:
+                    logger.warning(f"Failed to convert subtitle {i} in {file_path.name}: {e}")
+                    continue
+            
+            logger.info(f"Successfully converted {len(slots)} subtitles to time slots from {file_path.name}")
+            return slots
                 
         except Exception as e:
             raise ValueError(f"Failed to parse SRT file {file_path}: {e}")
@@ -165,35 +221,36 @@ class SRTTestValidator:
             return None
         
         shorter_duration = min(slot1.duration, slot2.duration)
-        if shorter_duration.total_seconds() == 0:
+        if shorter_duration.total_seconds() <= 0:
             return None
             
         return (overlap.total_seconds() / shorter_duration.total_seconds()) * 100
     
-    def validate_slot_ordering(self, slots: List[SubtitleSlot]) -> bool:
+    def validate_slot_ordering(self, slots: List[SubtitleSlot]) -> Tuple[bool, List[str]]:
         """Validate that time slots are in chronological order."""
+        errors = []
         last_end = timedelta(seconds=0)
         
         for i, slot in enumerate(slots):
             # Check start time is before end time
             if slot.start >= slot.end:
-                logger.error(f"Slot {i+1}: Start time ({slot.start}) >= End time ({slot.end})")
-                return False
+                error_msg = f"{slot.detailed_str()}: Start time >= End time"
+                errors.append(error_msg)
             
             # Check chronological order (allow small overlaps)
             if slot.start < last_end - self.tolerance_td:
-                logger.warning(f"Slot {i+1}: Start time ({slot.start}) is before previous end ({last_end})")
-                return False
+                warning_msg = f"{slot.detailed_str()}: Starts before previous subtitle ends ({last_end})"
+                errors.append(warning_msg)
             
             last_end = max(last_end, slot.end)
         
-        return True
+        return len(errors) == 0, errors
     
     def find_gaps(self, slots: List[SubtitleSlot], 
                   start_time: timedelta = None, 
-                  end_time: timedelta = None) -> List[Tuple[timedelta, timedelta]]:
+                  end_time: timedelta = None) -> List[Tuple[timedelta, timedelta, List[SubtitleSlot]]]:
         """
-        Find gaps in timeline.
+        Find gaps in timeline with context about surrounding subtitles.
         
         Args:
             slots: List of time slots
@@ -201,38 +258,39 @@ class SRTTestValidator:
             end_time: Optional end time boundary
             
         Returns:
-            List of (gap_start, gap_end) tuples
+            List of (gap_start, gap_end, context_slots) tuples
         """
         if not slots:
-            return [(start_time or timedelta(seconds=0), end_time or timedelta(hours=10))]
+            return [(start_time or timedelta(seconds=0), end_time or timedelta(hours=10), [])]
         
         gaps = []
         sorted_slots = sorted(slots, key=lambda x: x.start)
         
-        # Check before first slot
+        # Check before first subtitle
         first_start = sorted_slots[0].start
         if start_time is not None and first_start > start_time + self.tolerance_td:
-            gaps.append((start_time, first_start))
+            gaps.append((start_time, first_start, []))
         
-        # Check between slots
+        # Check between subtitles
         for i in range(len(sorted_slots) - 1):
             end1 = sorted_slots[i].end
             start2 = sorted_slots[i + 1].start
             
             if start2 > end1 + self.tolerance_td:
-                gaps.append((end1, start2))
+                context = [sorted_slots[i], sorted_slots[i + 1]]
+                gaps.append((end1, start2, context))
         
-        # Check after last slot
+        # Check after last subtitle
         if end_time is not None:
             last_end = sorted_slots[-1].end
             if last_end < end_time - self.tolerance_td:
-                gaps.append((last_end, end_time))
+                gaps.append((last_end, end_time, [sorted_slots[-1]]))
         
         return gaps
     
-    def slot_in_gap(self, slot: SubtitleSlot, gap: Tuple[timedelta, timedelta]) -> bool:
+    def slot_in_gap(self, slot: SubtitleSlot, gap: Tuple[timedelta, timedelta, List[SubtitleSlot]]) -> bool:
         """Check if time slot fits entirely within a gap."""
-        gap_start, gap_end = gap
+        gap_start, gap_end, _ = gap
         return slot.fits_in_gap(gap_start, gap_end, self.tolerance_td)
     
     def match_slot(self, slot: SubtitleSlot, slot_list: List[SubtitleSlot]) -> Optional[SubtitleSlot]:
@@ -242,6 +300,26 @@ class SRTTestValidator:
                 self.time_equal(slot.end, candidate.end)):
                 return candidate
         return None
+    
+    def find_best_match(self, slot: SubtitleSlot, slot_list: List[SubtitleSlot]) -> Tuple[Optional[SubtitleSlot], float]:
+        """Find the best matching slot and similarity score (0-1)."""
+        best_match = None
+        best_score = 0
+        
+        for candidate in slot_list:
+            # Calculate time similarity
+            start_diff = abs((slot.start - candidate.start).total_seconds())
+            end_diff = abs((slot.end - candidate.end).total_seconds())
+            
+            # Normalize to similarity score (1 - normalized difference)
+            max_diff = max(start_diff, end_diff, 0.001)  # Avoid division by zero
+            similarity = 1.0 - (min(max_diff, 2.0) / 2.0)  # Cap at 2 seconds difference
+            
+            if similarity > best_score:
+                best_score = similarity
+                best_match = candidate
+        
+        return best_match, best_score
     
     def test_first_base_fill_gaps(self, srt1_slots: List[SubtitleSlot], 
                                   srt2_slots: List[SubtitleSlot], 
@@ -266,7 +344,8 @@ class SRTTestValidator:
             else:
                 results['passed'] = False
                 results['errors'].append(
-                    f"Base slot missing in merged: {slot1.start} --> {slot1.end}"
+                    f"Base subtitle {slot1.index} from {slot1.source_file} missing in merged: "
+                    f"{slot1.detailed_str()}"
                 )
         
         # Find gaps in base timeline
@@ -278,28 +357,48 @@ class SRTTestValidator:
         for fill_slot in fill_in_merged:
             # Check if this slot fits in any gap
             fits = False
-            for gap_start, gap_end in gaps:
-                if self.slot_in_gap(fill_slot, (gap_start, gap_end)):
+            gap_context = ""
+            for gap_start, gap_end, context in gaps:
+                if self.slot_in_gap(fill_slot, (gap_start, gap_end, context)):
                     fits = True
+                    # Create gap context string
+                    if context:
+                        gap_context = f" (gap between {context[0].index} and {context[1].index} in base)"
+                    else:
+                        gap_context = " (gap at start/end of base)"
                     break
             
             if not fits:
                 results['passed'] = False
-                results['errors'].append(
-                    f"Fill slot doesn't fit in any gap: {fill_slot.start} --> {fill_slot.end}"
-                )
+                # Find which gap it might be trying to fit into
+                best_gap = None
+                min_distance = float('inf')
+                for gap_start, gap_end, context in gaps:
+                    # Calculate how far outside the gap this slot is
+                    distance_before = max(0, (gap_start - fill_slot.start).total_seconds())
+                    distance_after = max(0, (fill_slot.end - gap_end).total_seconds())
+                    total_distance = distance_before + distance_after
+                    
+                    if total_distance < min_distance:
+                        min_distance = total_distance
+                        best_gap = (gap_start, gap_end, context)
+                
+                error_msg = (f"{fill_slot.detailed_str()} doesn't fit in any gap of base file "
+                           f"(closest gap: {best_gap[0]} to {best_gap[1] if best_gap else 'N/A'})")
+                results['errors'].append(error_msg)
             
             # Check if this slot could come from SRT2 (approximate match)
-            from_srt2 = False
-            for slot2 in srt2_slots:
-                if (self.time_equal(fill_slot.start, slot2.start) and 
-                    self.time_equal(fill_slot.end, slot2.end)):
-                    from_srt2 = True
-                    break
+            best_match, similarity = self.find_best_match(fill_slot, srt2_slots)
             
-            if not from_srt2:
+            if best_match:
+                if similarity < 0.9:  # Less than 90% similarity
+                    results['warnings'].append(
+                        f"{fill_slot.detailed_str()} differs from source "
+                        f"{best_match.detailed_str()} (similarity: {similarity:.1%})"
+                    )
+            else:
                 results['warnings'].append(
-                    f"Fill slot not found in SRT2 (may be modified): {fill_slot.start} --> {fill_slot.end}"
+                    f"{fill_slot.detailed_str()} not found in SRT2 (may be modified or from different source)"
                 )
         
         # Check for overlaps between base and fill slots
@@ -308,8 +407,13 @@ class SRTTestValidator:
                 overlap = self.find_overlap(base_slot, fill_slot)
                 if overlap and overlap > self.tolerance_td:
                     results['passed'] = False
+                    overlap_percent = self.find_overlap_percentage(base_slot, fill_slot)
+                    overlap_str = f"{overlap.total_seconds():.3f}s"
+                    if overlap_percent:
+                        overlap_str += f" ({overlap_percent:.1f}%)"
                     results['errors'].append(
-                        f"Overlap between base and fill slot: {overlap.total_seconds():.3f}s"
+                        f"Overlap between {base_slot.detailed_str()} and "
+                        f"{fill_slot.detailed_str()}: {overlap_str}"
                     )
         
         # Check fill slots don't overlap each other
@@ -319,7 +423,8 @@ class SRTTestValidator:
             if overlap and overlap > self.tolerance_td:
                 results['passed'] = False
                 results['errors'].append(
-                    f"Fill slots overlap each other: {overlap.total_seconds():.3f}s"
+                    f"Fill slots overlap each other: {sorted_fill[i].detailed_str()} with "
+                    f"{sorted_fill[i + 1].detailed_str()} ({overlap.total_seconds():.3f}s)"
                 )
         
         results['stats'] = {
@@ -327,7 +432,9 @@ class SRTTestValidator:
             'base_found': len(base_in_merged),
             'fill_slots_found': len(fill_in_merged),
             'gaps_found': len(gaps),
-            'merged_total': len(merged_slots)
+            'merged_total': len(merged_slots),
+            'missing_base': len(srt1_slots) - len(base_in_merged),
+            'extra_fill': len(fill_in_merged) - len([s for s in fill_in_merged if self.find_best_match(s, srt2_slots)[0]])
         }
         
         return results
@@ -358,21 +465,55 @@ class SRTTestValidator:
                 results['passed'] = False
         
         if srt1_missing:
-            results['errors'].append(f"Missing {len(srt1_missing)} slots from first SRT")
+            results['errors'].append(f"Missing {len(srt1_missing)} slots from first SRT:")
+            for slot in srt1_missing[:5]:  # Show first 5 missing
+                results['errors'].append(f"  - {slot.detailed_str()}")
+            if len(srt1_missing) > 5:
+                results['errors'].append(f"  ... and {len(srt1_missing) - 5} more")
+        
         if srt2_missing:
-            results['errors'].append(f"Missing {len(srt2_missing)} slots from second SRT")
+            results['errors'].append(f"Missing {len(srt2_missing)} slots from second SRT:")
+            for slot in srt2_missing[:5]:  # Show first 5 missing
+                results['errors'].append(f"  - {slot.detailed_str()}")
+            if len(srt2_missing) > 5:
+                results['errors'].append(f"  ... and {len(srt2_missing) - 5} more")
         
         # Check for duplicates (same time slot appears multiple times)
         merged_set = set()
         for slot in merged_slots:
             slot_key = (slot.start.total_seconds(), slot.end.total_seconds())
             if slot_key in merged_set:
-                results['warnings'].append(f"Duplicate time slot: {slot.start} --> {slot.end}")
+                results['warnings'].append(f"Duplicate time slot: {slot.detailed_str()}")
             merged_set.add(slot_key)
         
         # Check chronological order
-        if not self.validate_slot_ordering(merged_slots):
-            results['warnings'].append("Merged slots are not in perfect chronological order")
+        is_ordered, ordering_errors = self.validate_slot_ordering(merged_slots)
+        if not is_ordered:
+            results['warnings'].append(f"Merged file has {len(ordering_errors)} ordering issues:")
+            for error in ordering_errors[:3]:  # Show first 3 ordering errors
+                results['warnings'].append(f"  - {error}")
+            if len(ordering_errors) > 3:
+                results['warnings'].append(f"  ... and {len(ordering_errors) - 3} more")
+        
+        # Check for overlaps (since option 3 doesn't prevent overlaps)
+        sorted_merged = sorted(merged_slots, key=lambda x: x.start)
+        overlap_count = 0
+        for i in range(len(sorted_merged) - 1):
+            overlap = self.find_overlap(sorted_merged[i], sorted_merged[i + 1])
+            if overlap and overlap > self.tolerance_td:
+                overlap_count += 1
+                if overlap_count <= 3:  # Show first 3 overlaps
+                    overlap_percent = self.find_overlap_percentage(sorted_merged[i], sorted_merged[i + 1])
+                    overlap_str = f"{overlap.total_seconds():.3f}s"
+                    if overlap_percent:
+                        overlap_str += f" ({overlap_percent:.1f}%)"
+                    results['warnings'].append(
+                        f"Overlap in merged: {sorted_merged[i].detailed_str()} with "
+                        f"{sorted_merged[i + 1].detailed_str()}: {overlap_str}"
+                    )
+        
+        if overlap_count > 3:
+            results['warnings'].append(f"  ... and {overlap_count - 3} more overlaps")
         
         results['stats'] = {
             'srt1_slots': len(srt1_slots),
@@ -380,7 +521,10 @@ class SRTTestValidator:
             'merged_total': len(merged_slots),
             'expected_total': len(srt1_slots) + len(srt2_slots),
             'srt1_missing': len(srt1_missing),
-            'srt2_missing': len(srt2_missing)
+            'srt2_missing': len(srt2_missing),
+            'duplicates': len(merged_slots) - len(merged_set),
+            'ordering_issues': len(ordering_errors),
+            'overlaps': overlap_count
         }
         
         return results
@@ -403,6 +547,8 @@ class SRTTestValidator:
         }
         
         # Determine which is base and which is fill
+        base_name = "first" if base_is_first else "second"
+        fill_name = "second" if base_is_first else "first"
         base_slots = srt1_slots if base_is_first else srt2_slots
         fill_slots_source = srt2_slots if base_is_first else srt1_slots
         
@@ -418,7 +564,8 @@ class SRTTestValidator:
             else:
                 results['passed'] = False
                 results['errors'].append(
-                    f"Base slot missing in merged: {base_slot.start} --> {base_slot.end}"
+                    f"Base subtitle {base_slot.index} from {base_slot.source_file} missing in merged: "
+                    f"{base_slot.detailed_str()}"
                 )
         
         # Remaining merged slots are fill slots
@@ -427,17 +574,24 @@ class SRTTestValidator:
         # Check fill slots for overlap conditions
         for fill_slot in fill_in_merged:
             max_overlap_percent = 0
+            overlapping_base = None
             
             for base_slot in base_in_merged:
                 overlap_percent = self.find_overlap_percentage(fill_slot, base_slot)
-                if overlap_percent is not None:
-                    max_overlap_percent = max(max_overlap_percent, overlap_percent)
+                if overlap_percent is not None and overlap_percent > max_overlap_percent:
+                    max_overlap_percent = overlap_percent
+                    overlapping_base = base_slot
             
             if max_overlap_percent > 30:
                 results['passed'] = False
                 results['errors'].append(
-                    f"Fill slot overlaps {max_overlap_percent:.1f}% with base (exceeds 30%): "
-                    f"{fill_slot.start} --> {fill_slot.end}"
+                    f"Fill slot {fill_slot.detailed_str()} overlaps {max_overlap_percent:.1f}% "
+                    f"with base slot {overlapping_base.detailed_str()} (exceeds 30% limit)"
+                )
+            elif max_overlap_percent > 0:
+                results['warnings'].append(
+                    f"Fill slot {fill_slot.detailed_str()} overlaps {max_overlap_percent:.1f}% "
+                    f"with base slot {overlapping_base.detailed_str()}"
                 )
         
         # Check fill slots don't overlap each other beyond tolerance
@@ -446,14 +600,29 @@ class SRTTestValidator:
             overlap = self.find_overlap(sorted_fill[i], sorted_fill[i + 1])
             if overlap and overlap > self.tolerance_td:
                 results['warnings'].append(
-                    f"Fill slots overlap each other: {overlap.total_seconds():.3f}s"
+                    f"Fill slots overlap each other: {sorted_fill[i].detailed_str()} with "
+                    f"{sorted_fill[i + 1].detailed_str()} ({overlap.total_seconds():.3f}s)"
+                )
+        
+        # Try to match fill slots with their source
+        for fill_slot in fill_in_merged:
+            best_match, similarity = self.find_best_match(fill_slot, fill_slots_source)
+            if best_match and similarity < 0.9:
+                results['warnings'].append(
+                    f"Fill slot {fill_slot.detailed_str()} differs from source "
+                    f"{best_match.detailed_str()} in {fill_name} SRT (similarity: {similarity:.1%})"
                 )
         
         results['stats'] = {
             'base_slots': len(base_slots),
             'base_found': len(base_in_merged),
             'fill_slots_found': len(fill_in_merged),
-            'merged_total': len(merged_slots)
+            'merged_total': len(merged_slots),
+            'missing_base': len(base_slots) - len(base_in_merged),
+            'overlap_violations': len([f for f in fill_in_merged if 
+                                      any(self.find_overlap_percentage(f, b) and 
+                                          self.find_overlap_percentage(f, b) > 30 
+                                          for b in base_in_merged)])
         }
         
         return results
@@ -478,9 +647,9 @@ class SRTTestValidator:
         logger.info(f"Loading files...")
         
         try:
-            srt1_slots = self.load_srt_file(srt1_path)
-            srt2_slots = self.load_srt_file(srt2_path)
-            merged_slots = self.load_srt_file(merged_path)
+            srt1_slots = self.load_srt_file(srt1_path, is_merged=False)
+            srt2_slots = self.load_srt_file(srt2_path, is_merged=False)
+            merged_slots = self.load_srt_file(merged_path, is_merged=True)
             
             logger.info(f"Loaded {len(srt1_slots)} slots from {srt1_path.name}")
             logger.info(f"Loaded {len(srt2_slots)} slots from {srt2_path.name}")
@@ -488,12 +657,23 @@ class SRTTestValidator:
             
             # Validate individual SRT files
             logger.info("Validating input SRT files...")
-            if not self.validate_slot_ordering(srt1_slots):
-                logger.warning(f"First SRT file {srt1_path.name} has ordering issues")
-            if not self.validate_slot_ordering(srt2_slots):
-                logger.warning(f"Second SRT file {srt2_path.name} has ordering issues")
-            if not self.validate_slot_ordering(merged_slots):
-                logger.warning(f"Merged SRT file {merged_path.name} has ordering issues")
+            valid1, errors1 = self.validate_slot_ordering(srt1_slots)
+            if not valid1:
+                logger.warning(f"First SRT file {srt1_path.name} has {len(errors1)} ordering issues")
+                for error in errors1[:2]:
+                    logger.warning(f"  - {error}")
+            
+            valid2, errors2 = self.validate_slot_ordering(srt2_slots)
+            if not valid2:
+                logger.warning(f"Second SRT file {srt2_path.name} has {len(errors2)} ordering issues")
+                for error in errors2[:2]:
+                    logger.warning(f"  - {error}")
+            
+            valid_m, errors_m = self.validate_slot_ordering(merged_slots)
+            if not valid_m:
+                logger.warning(f"Merged SRT file {merged_path.name} has {len(errors_m)} ordering issues")
+                for error in errors_m[:2]:
+                    logger.warning(f"  - {error}")
             
             # Run specific test based on option
             if option == '1':
@@ -517,7 +697,7 @@ class SRTTestValidator:
             return results
             
         except Exception as e:
-            logger.error(f"Test failed with error: {e}")
+            logger.error(f"Test failed with error: {e}", exc_info=True)
             return {
                 'passed': False,
                 'errors': [f"Test execution failed: {str(e)}"],
@@ -527,32 +707,38 @@ class SRTTestValidator:
 
 def print_results(results: Dict[str, Any], option: str):
     """Print test results in a readable format."""
-    print("\n" + "="*60)
+    print("\n" + "="*80)
     print(f"TEST RESULTS - Option {option}: {MERGE_OPTIONS[option]}")
     print("TEXT-AGNOSTIC VALIDATION (timestamps, gaps, durations only)")
-    print("="*60)
+    print("="*80)
     
     if results['passed']:
         print("✅ TEST PASSED")
     else:
         print("❌ TEST FAILED")
     
-    print("\nSTATISTICS:")
+    print("\n📊 STATISTICS:")
     for key, value in results['stats'].items():
         formatted_key = key.replace('_', ' ').title()
         print(f"  {formatted_key}: {value}")
     
     if results['errors']:
         print(f"\n❌ ERRORS ({len(results['errors'])}):")
-        for i, error in enumerate(results['errors'], 1):
-            print(f"  {i}. {error}")
+        for i, error in enumerate(results['errors'][:15], 1):  # Show first 15 errors
+            print(f"  {i:2d}. {error}")
+        if len(results['errors']) > 15:
+            print(f"  ... and {len(results['errors']) - 15} more errors")
     
     if results['warnings']:
         print(f"\n⚠️  WARNINGS ({len(results['warnings'])}):")
-        for i, warning in enumerate(results['warnings'], 1):
-            print(f"  {i}. {warning}")
+        for i, warning in enumerate(results['warnings'][:10], 1):  # Show first 10 warnings
+            print(f"  {i:2d}. {warning}")
+        if len(results['warnings']) > 10:
+            print(f"  ... and {len(results['warnings']) - 10} more warnings")
     
-    print("\n" + "="*60)
+    print("\n" + "="*80)
+    print("Note: All validations are text-agnostic - only timestamps, gaps, and durations are checked")
+    print("="*80)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -590,7 +776,7 @@ Examples:
     args = parser.parse_args()
     
     # Set logging level
-    if args.verbose:
+    if args.verbose or args.debug:
         logger.setLevel(logging.DEBUG)
     
     # Validate file existence

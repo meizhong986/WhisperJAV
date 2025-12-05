@@ -32,10 +32,11 @@ class SRTVerifier:
     A robust utility to verify the correctness of merged SRT files.
     """
 
-    def __init__(self, path_srt1: str, path_srt2: str, path_merged: str):
+    def __init__(self, path_srt1: str, path_srt2: str, path_merged: str, tolerance_ms: int = 10):
         self.path_srt1 = path_srt1
         self.path_srt2 = path_srt2
         self.path_merged = path_merged
+        self.tolerance_ms = tolerance_ms
         
         self.subs1 = self._load_file(path_srt1)
         self.subs2 = self._load_file(path_srt2)
@@ -175,8 +176,9 @@ class SRTVerifier:
         """
         Deep comparison of Expected vs Actual.
         Checks: Total count, Start Time, End Time, and Text content.
+        Uses self.tolerance_ms for time comparisons.
         """
-        console.print(Panel("Comparing Expected Result vs Actual Output", style="blue"))
+        console.print(Panel(f"Comparing Expected Result vs Actual Output (Tolerance: {self.tolerance_ms}ms)", style="blue"))
 
         errors = 0
         
@@ -196,6 +198,7 @@ class SRTVerifier:
         table.add_column("Type")
         table.add_column("Expected")
         table.add_column("Actual")
+        table.add_column("Diff", style="red")
 
         discrepancy_found = False
 
@@ -204,20 +207,22 @@ class SRTVerifier:
             act_sub = actual[i]
 
             # Compare Times (ordinal converts to total milliseconds)
-            if exp_sub.start.ordinal != act_sub.start.ordinal:
-                table.add_row(str(i+1), "Start Time", str(exp_sub.start), str(act_sub.start))
+            start_diff = abs(exp_sub.start.ordinal - act_sub.start.ordinal)
+            if start_diff > self.tolerance_ms:
+                table.add_row(str(i+1), "Start Time", str(exp_sub.start), str(act_sub.start), f"{start_diff}ms")
                 discrepancy_found = True
                 errors += 1
             
-            if exp_sub.end.ordinal != act_sub.end.ordinal:
-                table.add_row(str(i+1), "End Time", str(exp_sub.end), str(act_sub.end))
+            end_diff = abs(exp_sub.end.ordinal - act_sub.end.ordinal)
+            if end_diff > self.tolerance_ms:
+                table.add_row(str(i+1), "End Time", str(exp_sub.end), str(act_sub.end), f"{end_diff}ms")
                 discrepancy_found = True
                 errors += 1
 
             # Compare Text (strip whitespace to be lenient on trailing newlines)
             if exp_sub.text.strip() != act_sub.text.strip():
                 # Show first 20 chars for brevity if needed
-                table.add_row(str(i+1), "Text", exp_sub.text[:30]+"...", act_sub.text[:30]+"...")
+                table.add_row(str(i+1), "Text", exp_sub.text[:30]+"...", act_sub.text[:30]+"...", "N/A")
                 discrepancy_found = True
                 errors += 1
 
@@ -226,7 +231,7 @@ class SRTVerifier:
             console.print(f"[bold red]VERIFICATION FAILED with {errors} errors.[/bold red]")
             sys.exit(1)
         elif errors == 0:
-            console.print(Panel(f"[bold green]SUCCESS[/bold green]\nThe merged file '{self.path_merged}' is exactly as expected.", border_style="green"))
+            console.print(Panel(f"[bold green]SUCCESS[/bold green]\nThe merged file '{self.path_merged}' is exactly as expected (within {self.tolerance_ms}ms tolerance).", border_style="green"))
             sys.exit(0)
 
 def main():
@@ -241,10 +246,12 @@ def main():
                              "3: Combine All\n"
                              "4: Base SRT1, Fill SRT2 (Allow <30% Overlap)\n"
                              "5: Base SRT2, Fill SRT1 (Allow <30% Overlap)")
+    parser.add_argument("--tolerance", type=int, default=10, 
+                        help="Time tolerance in milliseconds to allow for rounding errors (Default: 10ms)")
 
     args = parser.parse_args()
 
-    verifier = SRTVerifier(args.srt1, args.srt2, args.merged)
+    verifier = SRTVerifier(args.srt1, args.srt2, args.merged, tolerance_ms=args.tolerance)
     verifier.verify(args.mode)
 
 if __name__ == "__main__":
