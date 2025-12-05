@@ -4,7 +4,7 @@ import pickle
 import shutil
 import time
 from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -383,7 +383,7 @@ class EnsembleOrchestrator:
         """Create initial ensemble metadata structure."""
         return {
             'metadata_type': 'ensemble',
-            'created_at': datetime.now().isoformat() + 'Z',
+            'created_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             'input': {
                 'file': str(media_info['path']),
                 'basename': media_info['basename']
@@ -401,12 +401,12 @@ class EnsembleOrchestrator:
     def _cleanup_intermediate(self, media_basename: str):
         """Clean up intermediate pass files."""
         try:
-            # Clean pass-specific temp directories
-            for pass_num in [1, 2]:
-                pass_temp = self.temp_dir / f"pass{pass_num}"
+            # Clean pass-specific temp directories created by orchestrator and workers
+            for suffix in ["pass1", "pass2", "pass1_worker", "pass2_worker"]:
+                pass_temp = self.temp_dir / suffix
                 if pass_temp.exists():
                     shutil.rmtree(pass_temp)
-                    logger.debug(f"Cleaned up pass {pass_num} temp directory")
+                    logger.debug(f"Cleaned up temp directory: {pass_temp.name}")
 
             # Optionally remove intermediate SRT files
             # Keep them for now for debugging - user can delete manually
