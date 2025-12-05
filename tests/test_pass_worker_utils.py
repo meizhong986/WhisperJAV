@@ -1,11 +1,14 @@
 """Unit tests for ensemble pass worker helpers."""
 
 from copy import deepcopy
+from pathlib import Path
 
 from whisperjav.ensemble.pass_worker import (
     DEFAULT_HF_PARAMS,
+    WorkerPayload,
     apply_custom_params,
     prepare_transformers_params,
+    run_pass_worker,
 )
 
 
@@ -64,3 +67,85 @@ def test_apply_custom_params_v3_keeps_unknown_list_empty():
     )
 
     assert unknown == []
+
+
+def _install_dummy_pipeline(monkeypatch, legacy_file):
+    class DummyPipeline:
+        def process(self, media_info):
+            legacy_file.write_text("legacy", encoding="utf-8")
+            return {
+                "output_files": {"final_srt": str(legacy_file)},
+                "summary": {
+                    "final_subtitles_refined": 1,
+                    "total_processing_time_seconds": 0.5,
+                },
+            }
+
+        def cleanup(self):
+            pass
+
+    monkeypatch.setattr(
+        "whisperjav.ensemble.pass_worker._build_pipeline",
+        lambda *args, **kwargs: DummyPipeline(),
+    )
+
+
+def test_run_pass_worker_removes_legacy_file_when_not_keeping_temp(tmp_path, monkeypatch):
+    media_path = tmp_path / "sample.wav"
+    media_path.write_text("audio", encoding="utf-8")
+    output_dir = tmp_path / "out"
+    temp_dir = tmp_path / "tmp"
+    output_dir.mkdir()
+    temp_dir.mkdir()
+
+    legacy_file = output_dir / "sample.ja.whisperjav.srt"
+    _install_dummy_pipeline(monkeypatch, legacy_file)
+
+    payload = WorkerPayload(
+        pass_number=1,
+        media_files=[{"basename": "sample", "path": str(media_path)}],
+        pass_config={"pipeline": "balanced"},
+        output_dir=str(output_dir),
+        temp_dir=str(temp_dir),
+        keep_temp_files=False,
+        subs_language="native",
+        extra_kwargs={},
+        language_code="ja",
+    )
+
+    result = run_pass_worker(payload)
+
+    pass_file = output_dir / "sample.ja.pass1.srt"
+    assert pass_file.exists(), "Pass-specific copy should exist"
+    assert not legacy_file.exists(), "Legacy pipeline output should be removed"
+    assert result["results"][0]["srt_path"] == str(pass_file)
+
+
+def test_run_pass_worker_retains_legacy_file_when_keeping_temp(tmp_path, monkeypatch):
+    media_path = tmp_path / "sample.wav"
+    media_path.write_text("audio", encoding="utf-8")
+    output_dir = tmp_path / "out"
+    temp_dir = tmp_path / "tmp"
+    output_dir.mkdir()
+    temp_dir.mkdir()
+
+    legacy_file = output_dir / "sample.ja.whisperjav.srt"
+    _install_dummy_pipeline(monkeypatch, legacy_file)
+
+    payload = WorkerPayload(
+        pass_number=1,
+        media_files=[{"basename": "sample", "path": str(media_path)}],
+        pass_config={"pipeline": "balanced"},
+        output_dir=str(output_dir),
+        temp_dir=str(temp_dir),
+        keep_temp_files=True,
+        subs_language="native",
+        extra_kwargs={},
+        language_code="ja",
+    )
+
+    run_pass_worker(payload)
+
+    pass_file = output_dir / "sample.ja.pass1.srt"
+    assert pass_file.exists()
+    assert legacy_file.exists(), "Legacy file should remain when keep_temp_files is True"

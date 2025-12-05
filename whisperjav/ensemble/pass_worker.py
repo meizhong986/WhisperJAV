@@ -171,6 +171,23 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
                 pass_output = Path(payload.output_dir) / f"{basename}.{language_code}.pass{pass_number}.srt"
                 if final_srt.exists():
                     shutil.copy2(final_srt, pass_output)
+                    if not payload.keep_temp_files:
+                        try:
+                            same_file = final_srt.samefile(pass_output)
+                        except FileNotFoundError:
+                            same_file = False
+                        except OSError:
+                            same_file = False
+
+                        if not same_file:
+                            try:
+                                final_srt.unlink(missing_ok=True)
+                            except OSError:
+                                logger.debug(
+                                    "Pass %s: Unable to remove legacy output %s",
+                                    pass_number,
+                                    final_srt,
+                                )
                 results.append(
                     FileResult(
                         basename=basename,
