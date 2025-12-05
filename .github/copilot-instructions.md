@@ -1,45 +1,38 @@
 # AI Coding Guide for WhisperJAV
 
-## 🧠 Project Architecture
-- **Entry Points**: 
-  - `whisperjav/main.py`: CLI entry, orchestrates pipelines and async processing.
-  - `whisperjav/webview_gui/main.py`: GUI entry point.
-- **Pipelines** (`whisperjav/pipelines/`): 
-  - All pipelines inherit from `BasePipeline`.
-  - `BalancedPipeline` & `FasterPipeline` use `FasterWhisperProASR`.
-  - `FidelityPipeline` uses `WhisperProASR`.
-  - `FastPipeline` uses `StableTSASR`.
-- **Configuration** (`whisperjav/config/`):
-  - **v2.0 Architecture**: Centralized in `ConfigManager` (`manager.py`) handling `asr_config.json` (v4.3 schema).
-  - **Resolution**: Use `TranscriptionTuner` (`transcription_tuner.py`) to resolve parameters based on mode/sensitivity.
-  - **Validation**: `ConfigManager` enforces schema validation.
-- **Translation** (`whisperjav/translate/`):
-  - `cli.py` drives `whisperjav-translate`.
-  - `core.translate_subtitle` wraps PySubtrans.
-  - Providers defined in `providers.py`.
+## 🧭 Architecture Map
+- CLI orchestrator `whisperjav/main.py` (also `cli.py`) wires argument parsing, preflight checks, pipeline invocation, and translation toggles.
+- PyWebView GUI lives in `whisperjav/webview_gui/` (`main.py`, `api.py`, `assets/`); GUI launches pipelines via the same CLI APIs and requires WebView2 on Windows.
+- Pipelines under `whisperjav/pipelines/` inherit `BasePipeline` and select ASR implementations in `whisperjav/modules/` (e.g., `stable_ts_asr.py`, `whisper_pro_asr.py`, `scene_detection.py`, `subtitle_sanitizer.py`).
+- Two-pass/ensemble logic is spec'd in `docs/ENSEMBLE_*` and executed through CLI flags (`--ensemble`, `--pass*-pipeline`, merge strategies).
+- Translation stack (`whisperjav/translate/cli.py`, `core.py`, `providers.py`) wraps PySubtrans, manages provider credentials, and caches instruction presets in `%AppData%/WhisperJAV/translate/cache`.
 
-## 🛠️ Development Workflow
-- **Installation**: `pip install -e .` (requires pre-installed PyTorch with CUDA).
-- **Testing**: 
-  - Run all: `python -m pytest tests/`
-  - Specific: `python -m pytest tests/test_balanced_pipeline.py`
-  - **Note**: Tests often require `sys.path.insert(0, ...)` to resolve `whisperjav` in dev mode.
-- **Linting**: `python -m ruff check whisperjav/`
-- **Installer**: 
-  - Scripts in `installer/`.
-  - Build release: `python installer/build_release.py`.
+## ⚙️ Config & Pipeline Rules
+- Treat `whisperjav/config/v4` as the source of truth: YAML ecosystems/models/presets feed `ConfigManager` (`manager.py`) and expose GUI schemas through `gui_api.py`.
+- When adding or tweaking models, edit YAML under `config/v4/ecosystems/**` and let `ConfigManager().get_model_config(...)` or `list_models()` drive runtime choices—never hardcode defaults in Python.
+- Sensitivity/mode knobs must go through `TranscriptionTuner` (`transcription_tuner.py`) so presets remain consistent across CLI, GUI, and translation flows.
+- Pipelines must accept `**kwargs` so new config keys can be threaded through without breaking legacy constructors; resolve final kwargs with the tuner/config manager before instantiating ASR modules.
 
-## 📝 Coding Conventions
-- **Filesystem**: Always use `pathlib.Path`, never raw strings for paths.
-- **Logging**: Use `whisperjav.utils.logger`. Do not use `print()` except for CLI output.
-- **Configuration**: 
-  - **Do not** read `asr_config.json` directly. Use `ConfigManager` or `TranscriptionTuner`.
-  - Respect `**kwargs` in Pipeline `__init__` to handle evolving config parameters gracefully.
-- **Translation**:
-  - Progress output goes to `stderr`, result paths to `stdout`.
-  - Instructions cached in `%AppData%/WhisperJAV/translate/cache/`.
+## 🧪 Development Workflow
+- Install editable with GPU-ready PyTorch first, then `pip install -e .[dev]`; CLI entry points `whisperjav`, `whisperjav-gui`, and `whisperjav-translate` map to `whisperjav/main.py`, `webview_gui/main.py`, and `translate/cli.py`.
+- Run tests via `python -m pytest tests/` or target suites like `python -m pytest tests/test_config_v4.py -k transformers`; many tests inject `sys.path.insert(0, Path(__file__).parents[1])` so keep relative imports stable.
+- Lint/format with `python -m ruff check whisperjav/` and `python -m ruff format whisperjav/`; translation/GUI JS lives outside Ruff’s scope.
+- Build the Windows installer pipeline from `installer/` using `python installer/build_release.py`, which regenerates `generated/*.bat` and constructor specs before invoking `build_installer_*.bat`.
+
+## 💻 Coding Patterns & Conventions
+- Use `pathlib.Path` for every filesystem interaction (temp dirs, cache, FFmpeg paths) and respect the `temp_dir` resolved from config; never shell out with raw strings.
+- Route logging through `whisperjav.utils.logger` (structured, colorized output) and emit CLI progress via `progress_aggregator.py`; only CLI user prompts may use `print`.
+- Translation progress must go to `stderr`, while resulting subtitle/translation paths go to `stdout` to keep scripts composable.
+- Don’t import `torch` at module import time in utilities—delay until needed so `whisperjav --help` stays fast and skips CUDA probing already handled in `main.py`.
+- When touching subtitle post-processing, keep Japanese-specific regrouping and hallucination filters in `modules/stable_ts_asr.py` and `modules/subtitle_sanitizer.py` synchronized.
+
+## 🔌 External Integrations
+- Expect FFmpeg on PATH and pre-installed PyTorch with CUDA/MPS; `whisperjav/utils/preflight_check.py` handles enforcement, so reuse its helpers instead of duplicating GPU checks.
+- PySubtrans may return `Path` or `str`; normalize with `Path(value)` before downstream use to avoid Windows-only bugs.
+- New translation providers or AI instructions belong in `whisperjav/translate/providers.py` and `translate/instructions.py`, which also handle caching + Gist fetch fallbacks.
 
 ## ⚠️ Gotchas
-- **CUDA**: `torch` import triggers CUDA check. Bypass for `--help` is handled in `main.py`.
-- **Windows Paths**: `PySubtrans` may return `str` or `Path`; handle both.
-- **Temp Files**: Respect `temp_dir` config; default is `%TEMP%/whisperjav`.
+- CUDA detection runs on first `torch` import; guard imports inside functions when adding utilities or tests.
+- Scene detection/VAD temp artifacts must respect the configured `temp_dir` or `%TEMP%/whisperjav`; leaking files breaks GUI cleanup.
+- Ensemble merges expect strictly monotonic timestamps; when altering `modules/srt_postprocessing.py`, rerun `tests/test_tab_spacing.py` and `tests/ensemble_test_output` fixtures.
+- GUI builds require WebView2 and proper icons from `webview_gui/assets`; keep new static assets referenced in `installer/create_icon.py`.

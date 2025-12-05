@@ -347,13 +347,16 @@ class PreflightChecker:
         """Check critical Python dependencies."""
         critical_deps = [
             'whisper',
-            'stable_whisper',
             'faster_whisper',
             'torch',
             'torchaudio',
             'numpy',
             'ffmpeg'
         ]
+
+        optional_deps = {
+            'stable_whisper': "Required only for legacy fast/faster pipelines"
+        }
         
         missing = []
         for dep in critical_deps:
@@ -362,19 +365,35 @@ class PreflightChecker:
             except ImportError:
                 missing.append(dep)
         
-        if not missing:
-            self.results.append(CheckResult(
-                name="Python Dependencies",
-                status=CheckStatus.PASS,
-                message="All critical dependencies installed"
-            ))
-        else:
+        if missing:
             self.results.append(CheckResult(
                 name="Python Dependencies",
                 status=CheckStatus.FAIL,
                 message=f"Missing {len(missing)} critical dependencies",
                 details=[f"Missing: {', '.join(missing)}"],
                 fatal=True
+            ))
+        else:
+            self.results.append(CheckResult(
+                name="Python Dependencies",
+                status=CheckStatus.PASS,
+                message="All critical dependencies installed"
+            ))
+
+        optional_missing_details = []
+        for dep, description in optional_deps.items():
+            try:
+                __import__(dep)
+            except ImportError:
+                optional_missing_details.append(f"{dep}: {description}")
+
+        if optional_missing_details:
+            self.results.append(CheckResult(
+                name="Optional Components",
+                status=CheckStatus.WARN,
+                message="Optional dependencies are missing",
+                details=optional_missing_details,
+                fatal=False
             ))
     
     def _display_results(self):

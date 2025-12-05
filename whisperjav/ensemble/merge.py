@@ -176,41 +176,47 @@ class MergeEngine:
         ms = int((seconds % 1) * 1000)
         return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
-    def _calculate_overlap(self, sub1: Subtitle, sub2: Subtitle) -> float:
-        """Calculate temporal overlap between two subtitles as a ratio."""
+    def _overlap_duration(self, sub1: Subtitle, sub2: Subtitle) -> float:
+        """Return absolute overlap duration between two subtitles in seconds."""
         overlap_start = max(sub1.start_time, sub2.start_time)
         overlap_end = min(sub1.end_time, sub2.end_time)
-
         if overlap_end <= overlap_start:
             return 0.0
+        return overlap_end - overlap_start
 
-        overlap_duration = overlap_end - overlap_start
+    def _calculate_overlap(self, sub1: Subtitle, sub2: Subtitle) -> float:
+        """Calculate temporal overlap as a ratio of the shorter subtitle duration."""
+        overlap_duration = self._overlap_duration(sub1, sub2)
+        if overlap_duration <= 0:
+            return 0.0
+
         min_duration = min(sub1.duration, sub2.duration)
-
         if min_duration <= 0:
             return 0.0
 
         return overlap_duration / min_duration
 
-    def _text_similarity(self, text1: str, text2: str) -> float:
-        """Calculate simple text similarity ratio."""
-        # Normalize texts
-        t1 = text1.lower().strip()
-        t2 = text2.lower().strip()
-
-        if not t1 or not t2:
+    def _coverage_ratio(self, base: Subtitle, overlap_duration: float) -> float:
+        """Return how much of *base* is covered by `overlap_duration`."""
+        if base.duration <= 0:
             return 0.0
+        return min(1.0, max(0.0, overlap_duration / base.duration))
 
-        if t1 == t2:
-            return 1.0
+    def _choose_by_timing(self, sub1: Subtitle, sub2: Subtitle) -> Subtitle:
+        """Select the subtitle whose timing best matches the overlap window."""
+        overlap_duration = self._overlap_duration(sub1, sub2)
+        coverage1 = self._coverage_ratio(sub1, overlap_duration)
+        coverage2 = self._coverage_ratio(sub2, overlap_duration)
 
-        # Simple character-based similarity
-        chars1 = set(t1)
-        chars2 = set(t2)
-        intersection = len(chars1 & chars2)
-        union = len(chars1 | chars2)
+        coverage_delta = coverage1 - coverage2
+        if abs(coverage_delta) > 0.05:
+            return sub1 if coverage_delta >= 0 else sub2
 
-        return intersection / union if union > 0 else 0.0
+        # Coverage is effectively identical; prefer the subtitle with shorter duration
+        # to avoid inflating cue lengths. Fall back to earliest start time for stability.
+        if sub1.duration != sub2.duration:
+            return sub1 if sub1.duration <= sub2.duration else sub2
+        return sub1 if sub1.start_time <= sub2.start_time else sub2
 
     # Merge Strategies
 
@@ -352,10 +358,11 @@ class MergeEngine:
         subs2: List[Subtitle]
     ) -> List[Subtitle]:
         """
-        Smart Merge: automatically picks the better subtitle from each pass.
+        Smart Merge: timing-driven selection for overlapping subtitles.
 
-        For overlapping segments, chooses the one with longer text (more detail).
-        Non-overlapping segments are included from both passes.
+        When segments overlap, prefer the subtitle whose timestamps best match the
+        shared speech window (highest coverage, then shortest duration). Non-overlapping
+        segments are included from both passes.
         """
         if not subs1:
             return [Subtitle(0, s.start_time, s.end_time, s.text) for s in subs2]
@@ -379,30 +386,16 @@ class MergeEngine:
                     best_overlap = overlap
                     best_match = (i, sub2)
 
-            if best_match and best_overlap > 0.3:  # Minimum 30% overlap to consider match
+            if best_match and best_overlap >= self.OVERLAP_THRESHOLD:
                 i, sub2 = best_match
                 used_from_2.add(i)
-
-                # Choose subtitle with longer text (normalized by stripping whitespace)
-                text1_len = len(sub1.text.strip())
-                text2_len = len(sub2.text.strip())
-
-                if text2_len > text1_len:
-                    # Use sub2's text with expanded timing
-                    merged.append(Subtitle(
-                        index=0,
-                        start_time=min(sub1.start_time, sub2.start_time),
-                        end_time=max(sub1.end_time, sub2.end_time),
-                        text=sub2.text
-                    ))
-                else:
-                    # Use sub1's text with expanded timing
-                    merged.append(Subtitle(
-                        index=0,
-                        start_time=min(sub1.start_time, sub2.start_time),
-                        end_time=max(sub1.end_time, sub2.end_time),
-                        text=sub1.text
-                    ))
+                chosen = self._choose_by_timing(sub1, sub2)
+                merged.append(Subtitle(
+                    index=0,
+                    start_time=chosen.start_time,
+                    end_time=chosen.end_time,
+                    text=chosen.text
+                ))
             else:
                 # No good match, keep sub1
                 merged.append(Subtitle(

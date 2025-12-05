@@ -18,6 +18,7 @@ import logging
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
+from whisperjav.modules.vad_failover import should_force_full_transcribe
 
 
 def _is_silero_vad_cached(repo_or_dir: str) -> bool:
@@ -219,16 +220,35 @@ class WhisperProASR:
             logger.error(f"Failed to read audio file {audio_path}: {e}")
             raise
 
+        audio_duration = len(audio_data) / sample_rate if sample_rate else 0.0
         vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
+
+        fallback_triggered = False
+        if should_force_full_transcribe(vad_segments, audio_duration):
+            logger.warning(
+                "VAD produced insufficient coverage (segments=%s, duration=%.1fs). "
+                "Falling back to full-clip transcription.",
+                sum(len(group or []) for group in (vad_segments or [])),
+                audio_duration,
+            )
+            fallback_triggered = True
+            all_segments = self._transcribe_full_audio(audio_data)
+        else:
+            if not vad_segments:
+                logger.debug(f"No speech detected in {audio_path.name}")
+                return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
+
+            all_segments = []
+            for vad_group in vad_segments:
+                segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
+                all_segments.extend(segments)
         
-        if not vad_segments:
-            logger.debug(f"No speech detected in {audio_path.name}")
-            return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
-        
-        all_segments = []
-        for vad_group in vad_segments:
-            segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
-            all_segments.extend(segments)
+        if fallback_triggered and not all_segments:
+            # Safety net: if fallback still produced nothing, log explicitly for debugging.
+            logger.warning(
+                "Full-clip fallback for %s emitted no segments. Returning empty result.",
+                audio_path.name,
+            )
 
         # Validate translation output - warn if translation was requested but output appears Japanese
         if self.task == 'translate' and all_segments:
@@ -311,70 +331,73 @@ class WhisperProASR:
         """
         if not vad_group:
             return []
-            
+
         start_sec = vad_group[0]["start_sec"]
         end_sec = vad_group[-1]["end_sec"]
         start_sample = int(start_sec * sample_rate)
         end_sample = int(end_sec * sample_rate)
         group_audio = audio_data[start_sample:end_sample]
         
-        # Get cleaned parameters from tuner
         whisper_params = self._prepare_whisper_params()
-        
-        # Use logger to output the final parameters at debug level
         logging.debug("Final Parameters for Debugging: %s", whisper_params)
-                
 
-        try:
-            #Pass all parameters together - no artificial separation
-            result = self.whisper_model.transcribe(
-                group_audio,
-                **whisper_params  # All tuner parameters in one go
-            )
-            
-        except Exception as e:
-            logger.error(f"Transcription of a VAD group failed: {e}", exc_info=True)
-            
-            # Fallback to minimal parameters
-            try:
-                minimal_params = {
-                    'task': self.whisper_params.get('task', 'transcribe'),
-                    'language': self.whisper_params.get('language', 'ja'),
-                    'temperature': 0.0,
-                    'beam_size': 5,
-                    'fp16': torch.cuda.is_available(),
-                    'verbose': None
-                }
-                logger.warning(f"Retrying with minimal parameters: {minimal_params}")
-                result = self.whisper_model.transcribe(group_audio, **minimal_params)
-            except Exception as e2:
-                logger.error(f"Even minimal transcribe failed: {e2}")
-                return []
-                    
-        if not result or not result["segments"]:
+        result = self._run_whisper_with_fallback(group_audio, whisper_params)
+        if not result or not result.get("segments"):
             return []
-            
-        # Adjust timestamps and apply suppression (preserved from original)
-        segments = []
-        for seg in result["segments"]:
-            text = seg["text"].strip()
+
+        return self._process_segments(result["segments"], start_sec)
+
+    def _transcribe_full_audio(self, audio_data: np.ndarray) -> List[Dict]:
+        """Transcribe the full audio clip without VAD segmentation."""
+        whisper_params = self._prepare_whisper_params()
+        result = self._run_whisper_with_fallback(audio_data, whisper_params)
+        if not result or not result.get("segments"):
+            return []
+        return self._process_segments(result["segments"], 0.0)
+
+    def _run_whisper_with_fallback(self, audio_chunk: np.ndarray, whisper_params: Dict) -> Optional[Dict]:
+        """Execute whisper transcription with a minimal-params retry."""
+        try:
+            return self.whisper_model.transcribe(audio_chunk, **whisper_params)
+        except Exception as e:
+            logger.error(f"Whisper transcription failed: {e}", exc_info=True)
+
+            minimal_params = self._minimal_whisper_params()
+            try:
+                logger.warning(f"Retrying transcription with minimal parameters: {minimal_params}")
+                return self.whisper_model.transcribe(audio_chunk, **minimal_params)
+            except Exception as e2:
+                logger.error("Minimal parameter transcription also failed", exc_info=True)
+                logger.error(f"Original error: {e}; fallback error: {e2}")
+                return None
+
+    def _minimal_whisper_params(self) -> Dict:
+        return {
+            'task': self.whisper_params.get('task', 'transcribe'),
+            'language': self.whisper_params.get('language', 'ja'),
+            'temperature': 0.0,
+            'beam_size': 5,
+            'fp16': torch.cuda.is_available(),
+            'verbose': None
+        }
+
+    def _process_segments(self, raw_segments: List[Dict], start_sec: float) -> List[Dict]:
+        segments: List[Dict] = []
+        for seg in raw_segments:
+            text = seg.get("text", "").strip()
             if not text:
                 continue
-            
-            # Apply high suppression list filtering
+
             if any(suppress in text for suppress in self.suppress_high):
                 logger.debug(f"Filtered segment due to suppression word: {text[:30]}...")
                 continue
-            
-            # Apply logprob filtering with suppression penalties
-            avg_logprob = seg.get("avg_logprob", 0)
-            
-            # Apply text-based suppression penalties
+
+            avg_logprob = seg.get("avg_logprob", 0.0)
             for suppress_word in self.suppress_low:
-                if suppress_word in text: 
+                if suppress_word in text:
                     avg_logprob -= 0.15
-            
-            segment_duration = max(0.0, float(seg["end"] - seg["start"]))
+
+            segment_duration = max(0.0, float(seg.get("end", 0.0) - seg.get("start", 0.0)))
             should_filter, reason, effective_threshold = self._segment_filter.should_filter(
                 avg_logprob=avg_logprob,
                 duration=segment_duration,
@@ -395,14 +418,16 @@ class WhisperProASR:
                     self._filter_statistics['nonverbal_filtered'] += 1
                 continue
 
+            start_value = float(seg.get("start", 0.0)) + start_sec
+            end_value = float(seg.get("end", 0.0)) + start_sec
             adjusted_seg = {
-                "start": seg["start"] + start_sec,
-                "end": seg["end"] + start_sec,
+                "start": start_value,
+                "end": end_value,
                 "text": text,
                 "avg_logprob": avg_logprob
             }
             segments.append(adjusted_seg)
-            
+
         return segments
 
     def transcribe_to_srt(self, 

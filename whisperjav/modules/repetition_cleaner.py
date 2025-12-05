@@ -72,6 +72,12 @@ class RepetitionCleaner:
 
 
 
+            # 3b. Targets newline/whitespace separated single-character floods (e.g., "あ\nあ\nあ")
+
+            ('single_char_whitespace_flood', regex.compile(r'([ぁ-んァ-ン])(?:[\s　]*\1){3,}'), r'\1\1'),
+
+
+
             # 4. Targets single character with prefix (e.g., "あらららら...")
 
             ('prefix_plus_char', regex.compile(r'([ぁ-んァ-ン]{1,2})([ぁ-んァ-ン])\2{3,}'), r'\1\2\2'),
