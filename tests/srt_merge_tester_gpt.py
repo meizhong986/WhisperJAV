@@ -155,7 +155,26 @@ def assert_base_fill(base: List[srt.Subtitle], filler: List[srt.Subtitle], merge
     # For each filler sub that lies (fully) in a gap, ensure it exists in merged
     for j, f in enumerate(filler):
         fstart = f.start.total_seconds(); fend = f.end.total_seconds()
-        in_gap = any(fstart + 1e-9 >= g[0] - TIME_TOLERANCE_SECONDS and fend <= g[1] + TIME_TOLERANCE_SECONDS for g in gaps)
+        #in_gap = any(fstart + 1e-9 >= g[0] - TIME_TOLERANCE_SECONDS and fend <= g[1] + TIME_TOLERANCE_SECONDS for g in gaps)
+
+# Replace the previous 'in_gap' computation with this robust overlap-check.
+        fstart = f.start.total_seconds()
+        fend = f.end.total_seconds()
+
+        # Consider the filler to be in a gap only if it does NOT significantly overlap ANY base subtitle.
+        # We allow a small edge jitter equal to TIME_TOLERANCE_SECONDS: if overlap <= TIME_TOLERANCE_SECONDS it's ignored.
+        overlaps_any_base = False
+        for b in base:
+            bstart = b.start.total_seconds()
+            bend = b.end.total_seconds()
+            ov = interval_overlap(fstart, fend, bstart, bend)
+            if ov > TIME_TOLERANCE_SECONDS:  # consider that a real overlap
+                overlaps_any_base = True
+                break
+
+        in_gap = not overlaps_any_base
+
+
         if in_gap:
             matches = find_matching_sub(f, merged)
             if not matches:
