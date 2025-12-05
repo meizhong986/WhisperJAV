@@ -284,6 +284,16 @@ def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
 
 def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     """Entry point executed in a separate process for a single pass."""
+    # Ensure clean GPU state in spawned worker process.
+    # This is defensive - 'spawn' gives us a fresh Python interpreter,
+    # but explicit cleanup prevents any edge cases with residual GPU state.
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass  # Non-critical, continue with processing
+
     results: List[FileResult] = []
     pass_config = payload.pass_config
     pass_number = payload.pass_number
