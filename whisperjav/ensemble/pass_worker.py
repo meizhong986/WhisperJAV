@@ -28,6 +28,22 @@ PIPELINE_CLASSES = {
     "transformers": TransformersPipeline,
 }
 
+DEFAULT_HF_PARAMS = {
+    "hf_model_id": "kotoba-tech/kotoba-whisper-v2.2",
+    "hf_chunk_length": 15,
+    "hf_stride": None,
+    "hf_batch_size": 16,
+    "hf_scene": "none",
+    "hf_beam_size": 5,
+    "hf_temperature": 0.0,
+    "hf_attn": "sdpa",
+    "hf_timestamps": "segment",
+    "hf_language": "ja",
+    "hf_task": "transcribe",
+    "hf_device": "auto",
+    "hf_dtype": "auto",
+}
+
 
 @dataclass
 class WorkerPayload:
@@ -51,6 +67,48 @@ class FileResult:
     error: Optional[str] = None
 
 
+def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return hf_* parameters for the Transformers pipeline with overrides applied."""
+
+    params = DEFAULT_HF_PARAMS.copy()
+
+    hf_params = pass_config.get("hf_params") or {}
+    mapping = {
+        "model_id": "hf_model_id",
+        "chunk_length_s": "hf_chunk_length",
+        "stride_length_s": "hf_stride",
+        "batch_size": "hf_batch_size",
+        "scene": "hf_scene",
+        "beam_size": "hf_beam_size",
+        "temperature": "hf_temperature",
+        "attn_implementation": "hf_attn",
+        "timestamps": "hf_timestamps",
+        "language": "hf_language",
+        "task": "hf_task",
+        "device": "hf_device",
+        "dtype": "hf_dtype",
+    }
+
+    for key, value in hf_params.items():
+        if key in mapping:
+            params[mapping[key]] = value
+        elif key.startswith("hf_"):
+            params[key] = value
+
+    overrides = pass_config.get("overrides") or {}
+    override_mapping = {
+        "language": "hf_language",
+        "device": "hf_device",
+        "dtype": "hf_dtype",
+        "task": "hf_task",
+    }
+    for key, hf_key in override_mapping.items():
+        if key in overrides:
+            params[hf_key] = overrides[key]
+
+    return params
+
+
 def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     """Entry point executed in a separate process for a single pass."""
     results: List[FileResult] = []
@@ -68,18 +126,22 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     if not media_files:
         return {"results": [], "worker_error": None}
 
+    pass_temp_dir = Path(payload.temp_dir) / f"pass{pass_number}_worker"
+
     try:
         pipeline = _build_pipeline(
             pass_config=pass_config,
             pass_number=pass_number,
             output_dir=payload.output_dir,
-            temp_dir=payload.temp_dir,
             keep_temp_files=payload.keep_temp_files,
             subs_language=payload.subs_language,
             extra_kwargs=payload.extra_kwargs,
+            pass_temp_dir=pass_temp_dir,
         )
     except Exception:  # pragma: no cover - fatal config issues propagated
         logger.exception("[Worker %s] Failed to initialize pipeline", os.getpid())
+        if not payload.keep_temp_files and pass_temp_dir.exists():
+            shutil.rmtree(pass_temp_dir, ignore_errors=True)
         return {
             "results": [
                 FileResult(
@@ -130,6 +192,8 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
             pipeline.cleanup()
         except Exception:
             logger.warning("[Worker %s] Pipeline cleanup reported errors", os.getpid(), exc_info=True)
+        if not payload.keep_temp_files and pass_temp_dir.exists():
+            shutil.rmtree(pass_temp_dir, ignore_errors=True)
 
     return {"results": [r.__dict__ for r in results], "worker_error": None}
 
@@ -138,63 +202,24 @@ def _build_pipeline(
     pass_config: Dict[str, Any],
     pass_number: int,
     output_dir: str,
-    temp_dir: str,
     keep_temp_files: bool,
     subs_language: str,
     extra_kwargs: Dict[str, Any],
+    pass_temp_dir: Path,
 ):
     pipeline_name = pass_config["pipeline"]
     pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
     if not pipeline_class:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
 
-    pass_temp_dir = Path(temp_dir) / f"pass{pass_number}_worker"
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
 
     if pipeline_name == "transformers":
-        hf_defaults = {
-            "hf_model_id": "kotoba-tech/kotoba-whisper-v2.2",
-            "hf_chunk_length": 15,
-            "hf_stride": None,
-            "hf_batch_size": 16,
-            "hf_scene": "none",
-            "hf_beam_size": 5,
-            "hf_temperature": 0.0,
-            "hf_attn": "sdpa",
-            "hf_timestamps": "segment",
-            "hf_language": "ja",
-            "hf_task": "transcribe",
-            "hf_device": "auto",
-            "hf_dtype": "auto",
-        }
-
-        hf_params = pass_config.get("hf_params", {})
-        if hf_params:
-            mapping = {
-                "model_id": "hf_model_id",
-                "chunk_length_s": "hf_chunk_length",
-                "stride_length_s": "hf_stride",
-                "batch_size": "hf_batch_size",
-                "scene": "hf_scene",
-                "beam_size": "hf_beam_size",
-                "temperature": "hf_temperature",
-                "attn_implementation": "hf_attn",
-                "timestamps": "hf_timestamps",
-                "language": "hf_language",
-                "task": "hf_task",
-                "device": "hf_device",
-                "dtype": "hf_dtype",
-            }
-            for k, v in hf_params.items():
-                if k in mapping:
-                    hf_defaults[mapping[k]] = v
-                elif k.startswith("hf_"):
-                    hf_defaults[k] = v
-
+        hf_defaults = prepare_transformers_params(pass_config)
         return TransformersPipeline(
             output_dir=output_dir,
             temp_dir=str(pass_temp_dir),
-            keep_temp_files=True,
+            keep_temp_files=keep_temp_files,
             progress_display=None,
             subs_language=subs_language,
             **hf_defaults,
@@ -208,12 +233,18 @@ def _build_pipeline(
     )
 
     if pass_config.get("params"):
-        _apply_custom_params(resolved_config, pass_config["params"], pass_number)
+        unknown_params = apply_custom_params(resolved_config, pass_config["params"], pass_number)
+        if unknown_params:
+            logger.warning(
+                "Pass %s: Unrecognized custom parameters forwarded to provider: %s",
+                pass_number,
+                ", ".join(sorted(unknown_params)),
+            )
 
     pipeline = pipeline_class(
         output_dir=output_dir,
         temp_dir=str(pass_temp_dir),
-        keep_temp_files=True,
+        keep_temp_files=keep_temp_files,
         subs_language=subs_language,
         resolved_config=resolved_config,
         progress_display=None,
@@ -222,11 +253,11 @@ def _build_pipeline(
     return pipeline
 
 
-def _apply_custom_params(
+def apply_custom_params(
     resolved_config: Dict[str, Any],
     custom_params: Dict[str, Any],
     pass_number: int,
-) -> None:
+) -> List[str]:
     model_config = resolved_config["model"]
     params = resolved_config["params"]
 
@@ -240,6 +271,8 @@ def _apply_custom_params(
         "speech_pad_ms",
     }
 
+    unknown_params: List[str] = []
+
     if is_v3_config:
         asr_params = params["asr"]
         for key, value in custom_params.items():
@@ -252,7 +285,7 @@ def _apply_custom_params(
             else:
                 asr_params[key] = value
                 logger.debug("Pass %s: Set ASR param %s", pass_number, key)
-        return
+        return unknown_params
 
     decoder_params = params.get("decoder", {})
     provider_params = params.get("provider", {})
@@ -274,3 +307,9 @@ def _apply_custom_params(
         else:
             provider_params[key] = value
             logger.debug("Pass %s: Added provider param %s", pass_number, key)
+            unknown_params.append(key)
+
+    if unknown_params:
+        logger.debug("Pass %s: Unknown params forwarded: %s", pass_number, ", ".join(unknown_params))
+
+    return unknown_params
