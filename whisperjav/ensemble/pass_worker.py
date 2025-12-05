@@ -46,6 +46,160 @@ DEFAULT_HF_PARAMS = {
     "hf_dtype": "auto",
 }
 
+# =============================================================================
+# Parameter Category Constants
+# These define explicit routing rules for custom parameters
+# =============================================================================
+
+# Model-level params (handled separately, always valid)
+MODEL_PARAMS = {
+    "model_name",
+    "device",
+}
+
+# Decoder params - common across all Whisper backends
+DECODER_PARAMS = {
+    "task",
+    "language",
+    "beam_size",
+    "best_of",
+    "patience",
+    "length_penalty",
+    "prefix",
+    "suppress_tokens",
+    "suppress_blank",
+    "without_timestamps",
+    "max_initial_timestamp",
+}
+
+# VAD params - used by Silero VAD, not passed to Whisper
+VAD_PARAMS = {
+    "threshold",
+    "neg_threshold",
+    "min_speech_duration_ms",
+    "max_speech_duration_s",
+    "min_silence_duration_ms",
+    "speech_pad_ms",
+}
+
+# Provider params - common transcriber options shared by all backends
+PROVIDER_PARAMS_COMMON = {
+    "temperature",
+    "compression_ratio_threshold",
+    "logprob_threshold",
+    "logprob_margin",
+    "no_speech_threshold",
+    "drop_nonverbal_vocals",
+    "condition_on_previous_text",
+    "initial_prompt",
+    "word_timestamps",
+    "prepend_punctuations",
+    "append_punctuations",
+    "clip_timestamps",
+}
+
+# Provider params specific to faster-whisper backend
+PROVIDER_PARAMS_FASTER_WHISPER = {
+    "chunk_length",
+    "repetition_penalty",
+    "no_repeat_ngram_size",
+    "prompt_reset_on_temperature",
+    "hotwords",
+    "multilingual",
+    "max_new_tokens",
+    "language_detection_threshold",
+    "language_detection_segments",
+    "log_progress",
+    "hallucination_silence_threshold",
+}
+
+# Provider params specific to openai-whisper backend
+PROVIDER_PARAMS_OPENAI_WHISPER = {
+    "verbose",
+    "carry_initial_prompt",
+    "prompt",
+    "fp16",
+    "hallucination_silence_threshold",
+}
+
+# Provider params specific to stable-ts backend
+PROVIDER_PARAMS_STABLE_TS = {
+    "stream",
+    "mel_first",
+    "split_callback",
+    "suppress_ts_tokens",
+    "gap_padding",
+    "only_ffmpeg",
+    "max_instant_words",
+    "avg_prob_threshold",
+    "nonspeech_skip",
+    "progress_callback",
+    "ignore_compatibility",
+    "extra_models",
+    "dynamic_heads",
+    "nonspeech_error",
+    "only_voice_freq",
+    "min_word_dur",
+    "min_silence_dur",
+    "regroup",
+    "ts_num",
+    "ts_noise",
+    "suppress_silence",
+    "suppress_word_ts",
+    "suppress_attention",
+    "use_word_position",
+    "q_levels",
+    "k_size",
+    "time_scale",
+    "denoiser",
+    "denoiser_options",
+    "demucs",
+    "demucs_options",
+    "vad",
+    "vad_threshold",
+}
+
+# Feature params - handled at pipeline level, NOT passed to ASR modules
+# These should be discarded from custom params with a warning
+FEATURE_PARAMS = {
+    "scene_detection_method",
+    "scene_detection",
+    "post_processing",
+}
+
+# Map pipeline names to their ASR backends for param validation
+PIPELINE_BACKENDS = {
+    "balanced": "faster_whisper",
+    "fast": "stable_ts",
+    "faster": "stable_ts",
+    "fidelity": "openai_whisper",
+    "kotoba-faster-whisper": "kotoba_faster_whisper",
+}
+
+
+def get_valid_provider_params(pipeline_name: str) -> set:
+    """
+    Return the set of valid provider params for a given pipeline.
+
+    Args:
+        pipeline_name: Name of the pipeline (e.g., 'balanced', 'fidelity')
+
+    Returns:
+        Set of valid provider parameter names for the pipeline's backend
+    """
+    backend = PIPELINE_BACKENDS.get(pipeline_name, "faster_whisper")
+
+    valid = PROVIDER_PARAMS_COMMON.copy()
+
+    if backend in ("faster_whisper", "kotoba_faster_whisper"):
+        valid.update(PROVIDER_PARAMS_FASTER_WHISPER)
+    elif backend == "openai_whisper":
+        valid.update(PROVIDER_PARAMS_OPENAI_WHISPER)
+    elif backend == "stable_ts":
+        valid.update(PROVIDER_PARAMS_STABLE_TS)
+
+    return valid
+
 
 @dataclass
 class WorkerPayload:
@@ -92,11 +246,27 @@ def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "dtype": "hf_dtype",
     }
 
+    # Track which hf_* keys were explicitly set by user (via primary mapping)
+    user_set_keys = set()
+
     for key, value in hf_params.items():
         if key in mapping:
             params[mapping[key]] = value
+            user_set_keys.add(mapping[key])
         elif key.startswith("hf_"):
             params[key] = value
+            user_set_keys.add(key)
+
+    # Handle legacy param name mappings (for backward compatibility)
+    # Users might pass legacy names like "scene_detection_method" instead of "scene"
+    # Only apply if the standard key wasn't already set by user
+    legacy_to_hf = {
+        "scene_detection_method": "hf_scene",
+    }
+    for legacy_key, hf_key in legacy_to_hf.items():
+        if legacy_key in hf_params and hf_key not in user_set_keys:
+            params[hf_key] = hf_params[legacy_key]
+            logger.debug("Mapped legacy param '%s' to '%s'", legacy_key, hf_key)
 
     overrides = pass_config.get("overrides") or {}
     override_mapping = {
@@ -261,11 +431,17 @@ def _build_pipeline(
     )
 
     if pass_config.get("params"):
-        unknown_params = apply_custom_params(resolved_config, pass_config["params"], pass_number)
+        unknown_params = apply_custom_params(
+            resolved_config=resolved_config,
+            custom_params=pass_config["params"],
+            pass_number=pass_number,
+            pipeline_name=pipeline_name,
+        )
         if unknown_params:
             logger.warning(
-                "Pass %s: Unrecognized custom parameters forwarded to provider: %s",
+                "Pass %s: %d unrecognized parameter(s) were ignored: %s",
                 pass_number,
+                len(unknown_params),
                 ", ".join(sorted(unknown_params)),
             )
 
@@ -285,59 +461,101 @@ def apply_custom_params(
     resolved_config: Dict[str, Any],
     custom_params: Dict[str, Any],
     pass_number: int,
+    pipeline_name: str,
 ) -> List[str]:
+    """
+    Apply custom parameters to resolved config with explicit category routing.
+
+    This function routes custom parameters to the correct config section based on
+    explicit category membership, not key existence. Feature params are discarded
+    (not passed to ASR), and unknown params are rejected with warnings.
+
+    Args:
+        resolved_config: The resolved configuration from resolve_legacy_pipeline()
+        custom_params: User-provided custom parameters
+        pass_number: Pass number (1 or 2) for logging
+        pipeline_name: Pipeline name for backend-specific param validation
+
+    Returns:
+        List of unknown parameter names that were not applied
+    """
     model_config = resolved_config["model"]
     params = resolved_config["params"]
 
+    # Determine config structure (V3 vs legacy)
     is_v3_config = "asr" in params
-    vad_names = {
-        "threshold",
-        "neg_threshold",
-        "min_speech_duration_ms",
-        "max_speech_duration_s",
-        "min_silence_duration_ms",
-        "speech_pad_ms",
-    }
 
+    # Track results
     unknown_params: List[str] = []
+    discarded_params: List[str] = []
 
-    if is_v3_config:
-        asr_params = params["asr"]
-        for key, value in custom_params.items():
-            if key == "model_name":
-                model_config["model_name"] = value
-                logger.debug("Pass %s: Overriding model to %s", pass_number, value)
-            elif key == "device":
-                model_config["device"] = value
-                logger.debug("Pass %s: Overriding device to %s", pass_number, value)
-            else:
-                asr_params[key] = value
-                logger.debug("Pass %s: Set ASR param %s", pass_number, key)
-        return unknown_params
-
-    decoder_params = params.get("decoder", {})
-    provider_params = params.get("provider", {})
-    vad_params = params.get("vad", {})
+    # Get valid provider params for this pipeline's backend
+    valid_provider_params = get_valid_provider_params(pipeline_name)
 
     for key, value in custom_params.items():
-        if key == "model_name":
-            model_config["model_name"] = value
-            logger.debug("Pass %s: Overriding model to %s", pass_number, value)
-        elif key == "device":
-            model_config["device"] = value
-            logger.debug("Pass %s: Overriding device to %s", pass_number, value)
-        elif key in vad_names:
-            vad_params[key] = value
-        elif key in decoder_params:
-            decoder_params[key] = value
-        elif key in provider_params:
-            provider_params[key] = value
-        else:
-            provider_params[key] = value
-            logger.debug("Pass %s: Added provider param %s", pass_number, key)
-            unknown_params.append(key)
+        # 1. Model-level params (always handled first)
+        if key in MODEL_PARAMS:
+            model_config[key] = value
+            logger.debug("Pass %s: Set model.%s = %s", pass_number, key, value)
+            continue
 
-    if unknown_params:
-        logger.debug("Pass %s: Unknown params forwarded: %s", pass_number, ", ".join(unknown_params))
+        # 2. Feature params - discard with info log (not applicable to ASR)
+        if key in FEATURE_PARAMS:
+            discarded_params.append(key)
+            logger.debug(
+                "Pass %s: Discarding feature param '%s' (not applicable to ASR)",
+                pass_number, key
+            )
+            continue
+
+        # 3. Route based on config structure
+        if is_v3_config:
+            # V3 structure: params["asr"] contains all ASR params
+            asr_params = params["asr"]
+            if key in VAD_PARAMS:
+                # VAD params need special handling in V3
+                if "vad" not in params:
+                    params["vad"] = {}
+                params["vad"][key] = value
+                logger.debug("Pass %s: Set vad.%s", pass_number, key)
+            elif key in DECODER_PARAMS or key in valid_provider_params:
+                asr_params[key] = value
+                logger.debug("Pass %s: Set asr.%s", pass_number, key)
+            else:
+                # Unknown param in V3 - track but don't add
+                unknown_params.append(key)
+                logger.warning(
+                    "Pass %s: Unknown param '%s' not applied (not valid for %s)",
+                    pass_number, key, pipeline_name
+                )
+        else:
+            # Legacy structure: params has decoder/provider/vad
+            decoder_params = params.get("decoder", {})
+            provider_params = params.get("provider", {})
+            vad_params = params.get("vad", {})
+
+            if key in DECODER_PARAMS:
+                decoder_params[key] = value
+                logger.debug("Pass %s: Set decoder.%s", pass_number, key)
+            elif key in VAD_PARAMS:
+                vad_params[key] = value
+                logger.debug("Pass %s: Set vad.%s", pass_number, key)
+            elif key in valid_provider_params:
+                provider_params[key] = value
+                logger.debug("Pass %s: Set provider.%s", pass_number, key)
+            else:
+                # Unknown param - do NOT add to provider, just track it
+                unknown_params.append(key)
+                logger.warning(
+                    "Pass %s: Unknown param '%s' not applied (not valid for %s)",
+                    pass_number, key, pipeline_name
+                )
+
+    # Log summary of discarded feature params
+    if discarded_params:
+        logger.info(
+            "Pass %s: Discarded %d feature param(s): %s",
+            pass_number, len(discarded_params), ", ".join(sorted(discarded_params))
+        )
 
     return unknown_params

@@ -34,6 +34,7 @@ def test_prepare_transformers_params_applies_overrides_and_mapping():
 
 
 def test_apply_custom_params_reports_unknown_for_legacy_config():
+    """Unknown params should be rejected and NOT added to provider."""
     resolved_config = {
         "model": {"model_name": "large-v2", "device": "cuda"},
         "params": {
@@ -44,29 +45,35 @@ def test_apply_custom_params_reports_unknown_for_legacy_config():
     }
 
     unknown = apply_custom_params(
-        resolved_config,
-        {"unknown_setting": 42, "temperature": 1.0},
+        resolved_config=resolved_config,
+        custom_params={"unknown_setting": 42, "temperature": 1.0},
         pass_number=1,
+        pipeline_name="balanced",
     )
 
+    # Unknown params should be tracked but NOT added to provider
     assert "unknown_setting" in unknown
-    assert resolved_config["params"]["decoder"]["temperature"] == 1.0
-    assert resolved_config["params"]["provider"]["unknown_setting"] == 42
+    assert "unknown_setting" not in resolved_config["params"]["provider"]
+    # temperature is a valid common provider param, should be applied
+    assert resolved_config["params"]["provider"]["temperature"] == 1.0
 
 
-def test_apply_custom_params_v3_keeps_unknown_list_empty():
+def test_apply_custom_params_v3_rejects_unknown_params():
+    """In V3 config, unknown params should be rejected (not added to asr)."""
     resolved_config = {
         "model": {"model_name": "large-v2", "device": "cuda"},
         "params": {"asr": {}},
     }
 
     unknown = apply_custom_params(
-        deepcopy(resolved_config),
-        {"custom_alpha": 0.7},
+        resolved_config=deepcopy(resolved_config),
+        custom_params={"custom_alpha": 0.7},
         pass_number=2,
+        pipeline_name="balanced",
     )
 
-    assert unknown == []
+    # Unknown params should be tracked and rejected
+    assert "custom_alpha" in unknown
 
 
 def _install_dummy_pipeline(monkeypatch, legacy_file):
