@@ -99,14 +99,14 @@ class TestSensitivityPresets:
         assert config['params']['asr']['no_speech_threshold'] == 0.74
 
     def test_aggressive_values(self):
-        """Test aggressive preset has expected v1 values."""
+        """Test aggressive preset has expected values."""
         config = resolve_config_v3('faster_whisper', 'silero', 'aggressive')
 
         # Aggressive: permissive thresholds, low VAD threshold
         assert config['params']['vad']['threshold'] == 0.05
         assert config['params']['asr']['beam_size'] == 2
         assert config['params']['asr']['no_speech_threshold'] == 0.22
-        assert config['params']['asr']['patience'] == 2.9
+        assert config['params']['asr']['patience'] == 2.0  # Optimized from 2.9 for better speed
 
     def test_presets_differ(self):
         """Test presets produce different values."""

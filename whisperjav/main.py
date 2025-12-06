@@ -198,7 +198,9 @@ def parse_arguments():
                            default="INFO", help="Logging level")
     path_group.add_argument("--log-file", help="Log file path")
     path_group.add_argument("--stats-file", help="Save processing statistics to JSON")
-    
+    path_group.add_argument("--dump-params", metavar="FILE",
+                           help="Dump resolved parameters to JSON file and exit (no processing)")
+
     # Progress control
     progress_group = parser.add_argument_group("Progress Display Options")
     progress_group.add_argument("--no-progress", action="store_true",
@@ -953,7 +955,8 @@ def main():
 
     print_banner()
 
-    if not args.input:
+    # Skip input validation if --dump-params is used (diagnostic mode)
+    if not args.input and not args.dump_params:
         logger.error("No input files specified. Use -h for help.")
         sys.exit(1)
     
@@ -1065,6 +1068,32 @@ def main():
             resolved_config["params"]["asr"] = {}
         resolved_config["params"]["asr"]["vad_filter"] = False
         logger.info("Internal VAD disabled via --no-vad flag")
+
+    # Handle --dump-params: dump resolved config to JSON and exit
+    if args.dump_params:
+        import json
+        dump_data = {
+            "mode": args.mode,
+            "sensitivity": args.sensitivity,
+            "subs_language": args.subs_language,
+            "language_code": language_code,
+            "resolved_config": resolved_config,
+            "cli_args": {
+                "model": args.model,
+                "ensemble": args.ensemble,
+                "asr": getattr(args, 'asr', None),
+                "vad": getattr(args, 'vad', None),
+                "transformers_two_pass": getattr(args, 'transformers_two_pass', False),
+            }
+        }
+        try:
+            with open(args.dump_params, 'w', encoding='utf-8') as f:
+                json.dump(dump_data, f, indent=2, ensure_ascii=False, default=str)
+            print(f"Parameters dumped to: {args.dump_params}")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"Failed to dump parameters: {e}")
+            sys.exit(1)
 
     # Setup temp directory
     if args.temp_dir:

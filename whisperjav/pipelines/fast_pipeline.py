@@ -71,17 +71,22 @@ class FastPipeline(BasePipeline):
         
         # Store params for metadata logging
         self.scene_detection_params = scene_opts
-        '''
-        self.scene_detection_params = {
-            "detector_type": "AdaptiveSceneDetector",
-            "using_defaults": True
-        }        
-        '''
+        self.vad_params = params.get("vad", {})
+
         # Implement the smart model-switching logic (preserved from V2)
         effective_model_cfg = model_cfg.copy()
         if self.subs_language == 'direct-to-english' and model_cfg.get("model_name") == 'turbo':
             logger.info("Direct translation requested. Switching to 'large-v2' to perform translation.")
             effective_model_cfg["model_name"] = 'large-v2'
+
+        # Store full pipeline options for diagnostic metadata (after model switching)
+        self.pipeline_options = {
+            "model": effective_model_cfg,
+            "decoder": params.get("decoder", {}),
+            "provider": params.get("provider", {}),
+            "vad": self.vad_params,
+            "task": task
+        }
         # --- END V3 CONFIG UNPACKING ---
 
         # Instantiate modules with V3 structured config
@@ -150,7 +155,9 @@ class FastPipeline(BasePipeline):
             self.asr.reset_statistics()
         
         master_metadata["config"]["scene_detection_params"] = self.scene_detection_params
-        
+        master_metadata["config"]["vad_params"] = self.vad_params
+        master_metadata["config"]["pipeline_options"] = self.pipeline_options
+
         try:
             # Step 1: Extract audio
             if self.progress_reporter:

@@ -496,7 +496,7 @@ class StableTSASR:
                 'task': task,
                 'language': self.language,
                 'temperature': (0.0,),
-                'beam_size': 5,
+                'beam_size': 3,  # Reduced from 5 for faster fallback
                 'verbose': None
             }
             

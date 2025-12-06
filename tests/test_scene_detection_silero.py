@@ -43,25 +43,24 @@ class TestSileroInitialization:
         assert hasattr(detector, 'vad_model')
         assert hasattr(detector, 'get_speech_timestamps')
         assert hasattr(detector, 'silero_threshold')
-        assert detector.silero_threshold == 0.11
+        assert detector.silero_threshold == 0.08  # Optimized default for balanced detection
 
     def test_silero_parameters_stored(self):
         """Test that Silero parameters are correctly stored"""
+        # Silero params are passed directly via kwargs, not via pass2_config
         detector = DynamicSceneDetector(
             method="silero",
-            pass2_config={
-                'threshold': 0.15,
-                'neg_threshold': 0.08,
-                'min_silence_duration_ms': 2000,
-                'min_speech_duration_ms': 200,
-                'max_speech_duration_s': 300,
-                'min_silence_at_max_speech': 600,
-                'speech_pad_ms': 150,
-            }
+            silero_threshold=0.15,
+            silero_neg_threshold=0.10,
+            silero_min_silence_ms=2000,
+            silero_min_speech_ms=200,
+            silero_max_speech_s=300,
+            silero_min_silence_at_max=600,
+            silero_speech_pad_ms=150,
         )
 
         assert detector.silero_threshold == 0.15
-        assert detector.silero_neg_threshold == 0.08
+        assert detector.silero_neg_threshold == 0.10
         assert detector.silero_min_silence_ms == 2000
         assert detector.silero_min_speech_ms == 200
         assert detector.silero_max_speech_s == 300
@@ -247,7 +246,7 @@ class TestSileroErrorHandling:
         )
 
         # Check defaults are applied
-        assert detector.silero_threshold == 0.11
+        assert detector.silero_threshold == 0.08  # Optimized default for balanced detection
         assert detector.silero_min_silence_ms == 1500
 
 

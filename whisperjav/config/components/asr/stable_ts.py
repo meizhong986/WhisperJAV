@@ -433,7 +433,7 @@ class StableTSASR(ASRComponent):
             language="ja",
             beam_size=2,
             best_of=1,
-            patience=2.9,
+            patience=2.0,
             length_penalty=None,
             prefix=None,
             suppress_blank=False,  # Different!

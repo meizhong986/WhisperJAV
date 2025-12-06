@@ -63,7 +63,7 @@ class TestSileroSceneDetectionConfig:
         config = SileroSceneDetectionConfig()
         assert config.method == "silero"
         assert config.max_duration_s == 29.0
-        assert config.silero_threshold == 0.02
+        assert config.silero_threshold == 0.08  # Optimized from 0.02 for balanced detection
         assert config.silero_neg_threshold == 0.1
         assert config.silero_min_silence_ms == 7800
         assert config.silero_speech_pad_ms == 500
