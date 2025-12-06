@@ -115,6 +115,45 @@ manager.get_preset(name)
 manager.get_gui_schema(model_name)  # For UI generation
 ```
 
+### Tools (Scene Detection, VAD)
+
+Tools are reusable auxiliary components. **Scene detection** is configured here:
+
+**File locations:**
+```
+whisperjav/config/v4/ecosystems/tools/
+├── auditok-scene-detection.yaml   # Energy-based (default)
+└── silero-scene-detection.yaml    # Neural network-based
+```
+
+**Example: auditok-scene-detection.yaml**
+```yaml
+schemaVersion: v1
+kind: Tool
+metadata:
+  name: auditok-scene-detection
+tool_type: scene_detection
+spec:
+  core.max_duration_s: 29.0
+  pass1.energy_threshold: 32
+  pass2.energy_threshold: 38
+  pass1.max_silence_s: 2.5
+  pass2.max_silence_s: 1.8
+presets:
+  conservative:
+    pass1.energy_threshold: 40
+    pass2.energy_threshold: 45
+  aggressive:
+    pass1.energy_threshold: 28
+    pass2.energy_threshold: 32
+```
+
+**Access via API:**
+```python
+manager.get_tool("auditok-scene-detection")
+manager.get_tool_config("auditok-scene-detection", sensitivity="balanced")
+```
+
 ---
 
 ## 2. LEGACY JSON SYSTEM
@@ -163,6 +202,46 @@ resolved = tuner.resolve_params(
     task="transcribe"
 )
 # Returns: { 'params': {...}, 'workflow': {...}, 'features': {...} }
+```
+
+### Feature Configs (Scene Detection - Legacy)
+
+**Location:** `whisperjav/config/asr_config.json` → `feature_configs` section
+
+```json
+{
+  "feature_configs": {
+    "scene_detection": {
+      "default_method": "auditok",
+      "auditok": {
+        "max_duration_s": 29.0,
+        "pass1_energy_threshold": 32,
+        "pass2_energy_threshold": 38,
+        "pass1_max_silence_s": 2.5,
+        "pass2_max_silence_s": 1.8,
+        "bandpass_low_hz": 200,
+        "bandpass_high_hz": 4000,
+        "brute_force_fallback": true
+      },
+      "silero": { ... }
+    }
+  }
+}
+```
+
+**Pipeline workflow references:**
+```json
+{
+  "pipelines": {
+    "balanced": {
+      "workflow": {
+        "features": {
+          "scene_detection": "default"  // Uses default_method
+        }
+      }
+    }
+  }
+}
 ```
 
 ---
@@ -233,6 +312,29 @@ Pipeline Execution
 | min_speech_duration_ms | int | 100 |
 | max_speech_duration_s | float | 30 |
 | min_silence_duration_ms | int | 300 |
+
+### Scene Detection Parameters (Auditok)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| core.max_duration_s | float | 29.0 | Max scene length (seconds) |
+| core.min_duration_s | float | 0.2 | Min scene length |
+| pass1.energy_threshold | int | 32 | Coarse pass energy (dB) |
+| pass2.energy_threshold | int | 38 | Fine pass energy (dB) |
+| pass1.max_silence_s | float | 2.5 | Max silence before split (P1) |
+| pass2.max_silence_s | float | 1.8 | Max silence before split (P2) |
+| audio.bandpass_low_hz | int | 200 | Low freq filter |
+| audio.bandpass_high_hz | int | 4000 | High freq filter |
+| fallback.brute_force | bool | true | Use fixed chunking as fallback |
+
+**By sensitivity:**
+
+| Parameter | Conservative | Balanced | Aggressive |
+|-----------|-------------|----------|------------|
+| pass1.energy_threshold | 40 | 32 | 28 |
+| pass2.energy_threshold | 45 | 38 | 32 |
+| pass1.max_silence_s | 3.0 | 2.5 | 2.0 |
+| pass2.max_silence_s | 2.5 | 1.8 | 1.2 |
 
 ---
 
