@@ -25,6 +25,7 @@ from whisperjav.modules.srt_postproduction import SRTPostProduction
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
+from whisperjav.utils.parameter_tracer import NullTracer
 
 class BalancedPipeline(BasePipeline):
     """Balanced pipeline using scene detection with FasterWhisperPro ASR (faster-whisper via stable-ts, VAD-enhanced)."""
@@ -54,8 +55,9 @@ class BalancedPipeline(BasePipeline):
         self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
 
-        # ADD THIS LINE - Extract progress reporter from kwargs
+        # Extract progress reporter and parameter tracer from kwargs
         self.progress_reporter = kwargs.get('progress_reporter', None)
+        self.tracer = kwargs.get('parameter_tracer', NullTracer())
 
         # --- V3 STRUCTURED CONFIG UNPACKING ---
         model_cfg = resolved_config["model"]
@@ -140,6 +142,14 @@ class BalancedPipeline(BasePipeline):
                 total_files=media_info.get('total_files', 1)
             )
 
+        # Trace file start
+        self.tracer.emit_file_start(
+            filename=media_basename,
+            file_number=media_info.get('file_number', 1),
+            total_files=media_info.get('total_files', 1),
+            media_info=media_info
+        )
+
         master_metadata = self.metadata_manager.create_master_metadata(
             input_file=input_file,
             mode=self.get_mode_name(),
@@ -167,6 +177,9 @@ class BalancedPipeline(BasePipeline):
                 master_metadata, "audio_extraction", "completed",
                 output_path=str(audio_path), duration_seconds=duration)
 
+            # Trace audio extraction
+            self.tracer.emit_audio_extraction(str(audio_path), duration)
+
             # Step 2: Detect scenes
             if self.progress_reporter:
                 self.progress_reporter.report_step("Detecting audio scenes", 2, 5)
@@ -189,6 +202,25 @@ class BalancedPipeline(BasePipeline):
             self.metadata_manager.update_processing_stage(
                 master_metadata, "scene_detection", "completed",
                 scene_count=len(scene_paths), scenes_dir=str(scenes_dir))
+
+            # Trace scene detection
+            self.tracer.emit_scene_detection(
+                method=getattr(self.scene_detector, 'method', 'auditok'),
+                params=self.scene_detection_params,
+                scenes_found=len(scene_paths),
+                scene_stats={
+                    "total_duration": sum(d for _, _, _, d in scene_paths),
+                    "shortest": min((d for _, _, _, d in scene_paths), default=0),
+                    "longest": max((d for _, _, _, d in scene_paths), default=0),
+                }
+            )
+
+            # Trace ASR config before transcription
+            self.tracer.emit_asr_config(
+                model=self.asr.model_name,
+                backend="faster-whisper",
+                params=self.pipeline_options.get("decoder", {})
+            )
 
             # Step 3: Transcribe scenes
             if self.progress_reporter:
@@ -363,6 +395,17 @@ class BalancedPipeline(BasePipeline):
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
             self.cleanup_temp_files(media_basename)
 
+            # Trace postprocessing
+            self.tracer.emit_postprocessing(stats)
+
+            # Trace completion
+            self.tracer.emit_completion(
+                success=True,
+                final_subtitles=master_metadata["summary"]["final_subtitles_refined"],
+                total_duration=total_time,
+                output_path=str(final_srt_path)
+            )
+
             # Report completion
             if self.progress_reporter:
                 self.progress_reporter.report_completion(
@@ -382,6 +425,15 @@ class BalancedPipeline(BasePipeline):
             self.metadata_manager.update_processing_stage(
                 master_metadata, "error", "failed", error_message=str(e))
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
+
+            # Trace failure
+            self.tracer.emit_completion(
+                success=False,
+                final_subtitles=0,
+                total_duration=time.time() - start_time,
+                output_path="",
+                error=str(e)
+            )
 
             # Report failure
             if self.progress_reporter:

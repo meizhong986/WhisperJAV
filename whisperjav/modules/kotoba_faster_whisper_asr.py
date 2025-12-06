@@ -389,11 +389,19 @@ class KotobaFasterWhisperASR:
             logger.warning(f"Error during garbage collection: {e}")
 
         # Clear CUDA cache if available (can sometimes cause issues on Windows)
-        try:
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                logger.debug("CUDA cache cleared")
-        except Exception as e:
-            logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
+        # Skip in subprocess workers - the process will terminate anyway and the OS
+        # will free all GPU memory. This avoids CUDA driver crashes on Windows.
+        import os
+        is_subprocess_worker = os.environ.get('WHISPERJAV_SUBPROCESS_WORKER') == '1'
+
+        if is_subprocess_worker:
+            logger.debug("Skipping CUDA cache clear in subprocess worker (will be freed on exit)")
+        else:
+            try:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    logger.debug("CUDA cache cleared")
+            except Exception as e:
+                logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
 
         logger.debug(f"{self.__class__.__name__} cleanup complete")

@@ -284,6 +284,10 @@ def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
 
 def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     """Entry point executed in a separate process for a single pass."""
+    # Mark this as a subprocess worker - cleanup routines can check this
+    # to skip risky CUDA operations that can crash on Windows
+    os.environ['WHISPERJAV_SUBPROCESS_WORKER'] = '1'
+
     # Ensure clean GPU state in spawned worker process.
     # This is defensive - 'spawn' gives us a fresh Python interpreter,
     # but explicit cleanup prevents any edge cases with residual GPU state.
@@ -396,12 +400,49 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
                     )
                 )
     finally:
+        # Defensive cleanup: Use BaseException to catch more error types.
+        # On Windows, CUDA driver crashes during cleanup can terminate the process
+        # before Python exception handling kicks in. Since this is a subprocess that
+        # will be terminated after returning, GPU memory is automatically freed by
+        # the OS - explicit CUDA cleanup is optional and we shouldn't crash trying.
         try:
             pipeline.cleanup()
-        except Exception:
-            logger.warning("[Worker %s] Pipeline cleanup reported errors", os.getpid(), exc_info=True)
+        except SystemExit:
+            # Re-raise SystemExit to allow clean process termination
+            raise
+        except BaseException as e:
+            # Catch ALL other exceptions including KeyboardInterrupt, MemoryError, etc.
+            # Log but don't crash - the process will exit anyway and free resources
+            logger.warning(
+                "[Worker %s] Pipeline cleanup failed (non-fatal, resources will be freed on exit): %s",
+                os.getpid(), e
+            )
+
+        # Temp directory cleanup - also make defensive
         if not payload.keep_temp_files and pass_temp_dir.exists():
-            shutil.rmtree(pass_temp_dir, ignore_errors=True)
+            try:
+                shutil.rmtree(pass_temp_dir, ignore_errors=True)
+            except BaseException:
+                pass  # Non-critical, OS will clean up if needed
+
+    # Log pass completion summary for user feedback
+    completed_count = sum(1 for r in results if r.status == 'completed')
+    failed_count = sum(1 for r in results if r.status == 'failed')
+    total_subs = sum(r.subtitles for r in results if r.status == 'completed')
+    total_time = sum(r.processing_time for r in results if r.status == 'completed')
+
+    if completed_count > 0:
+        logger.info(
+            "[Worker %s] Pass %s completed: %d file(s), %d subtitles, %.1fs",
+            os.getpid(), pass_number, completed_count, total_subs, total_time
+        )
+    if failed_count > 0:
+        logger.warning(
+            "[Worker %s] Pass %s had %d failed file(s)",
+            os.getpid(), pass_number, failed_count
+        )
+
+    logger.info("[Worker %s] Worker exiting", os.getpid())
 
     return {"results": [r.__dict__ for r in results], "worker_error": None}
 

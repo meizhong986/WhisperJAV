@@ -67,6 +67,7 @@ from whisperjav.__version__ import __version__
 from whisperjav.utils.preflight_check import enforce_gpu_requirement, run_preflight_checks
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
+from whisperjav.utils.parameter_tracer import create_tracer
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
 
@@ -200,6 +201,8 @@ def parse_arguments():
     path_group.add_argument("--stats-file", help="Save processing statistics to JSON")
     path_group.add_argument("--dump-params", metavar="FILE",
                            help="Dump resolved parameters to JSON file and exit (no processing)")
+    path_group.add_argument("--trace-params", metavar="FILE",
+                           help="Stream parameter snapshots to JSON Lines file during execution (real-time observability)")
 
     # Progress control
     progress_group = parser.add_argument_group("Progress Display Options")
@@ -543,7 +546,25 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "adaptive_audio_enhancement": args.adaptive_audio_enhancement,
         "smart_postprocessing": args.smart_postprocessing
     }
-    
+
+    # Create parameter tracer for real-time observability (if requested)
+    tracer = create_tracer(args.trace_params)
+    if args.trace_params:
+        # Emit initial configuration snapshot
+        tracer.emit_config(
+            mode=args.mode,
+            sensitivity=args.sensitivity,
+            resolved_config=resolved_config,
+            cli_args={
+                "model": args.model,
+                "language": getattr(args, 'language', 'japanese'),
+                "subs_language": args.subs_language,
+                "ensemble": getattr(args, 'ensemble', False),
+                "scene_detection_method": getattr(args, 'scene_detection_method', None),
+            }
+        )
+        logger.info(f"Parameter tracing enabled: {args.trace_params}")
+
     # Initialize unified progress system for better UX and reduced spam
     if args.no_progress:
         from whisperjav.utils.progress_adapter import DummyProgressAdapter
@@ -561,6 +582,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "subs_language": args.subs_language,
         "resolved_config": resolved_config,
         "progress_display": progress,
+        "parameter_tracer": tracer,
         **enhancement_kwargs
     }
 
@@ -749,7 +771,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         with open(args.stats_file, 'w', encoding='utf-8') as f:
             json.dump(all_stats, f, indent=2, ensure_ascii=False)
         print(f"\nStatistics saved to: {args.stats_file}")
-    
+
+    # Close parameter tracer (flushes remaining data)
+    tracer.close()
+
     if not args.keep_temp:
         cleanup_temp_directory(args.temp_dir)
 
@@ -1116,6 +1141,11 @@ def main():
     for f in media_files:
         logger.info(f"  - {f['path']}")
 
+    # Create parameter tracer for ensemble mode (must be created before try block)
+    tracer = create_tracer(args.trace_params) if args.ensemble else None
+    if tracer and args.trace_params:
+        logger.info(f"Parameter tracing enabled: {args.trace_params}")
+
     try:
         # Check if two-pass ensemble mode
         if args.ensemble:
@@ -1197,7 +1227,8 @@ def main():
                 output_dir=args.output_dir,
                 temp_dir=args.temp_dir,
                 keep_temp_files=args.keep_temp,
-                subs_language=args.subs_language
+                subs_language=args.subs_language,
+                parameter_tracer=tracer
             )
 
             # Process all files with batch processing for optimal VRAM usage
@@ -1241,6 +1272,10 @@ def main():
                 for f in failed_files:
                     print(f"  - {f}")
             print("="*50)
+
+            # Close parameter tracer for ensemble mode
+            if tracer:
+                tracer.close()
 
         # Choose sync or async processing for normal mode
         elif args.async_processing:

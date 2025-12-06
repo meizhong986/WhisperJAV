@@ -24,6 +24,7 @@ from whisperjav.modules.audio_preprocessing import AudioPreprocessor
 from whisperjav.modules.srt_postproduction import SRTPostProduction
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
+from whisperjav.utils.parameter_tracer import NullTracer
 
 class FastPipeline(BasePipeline):
     """Fast pipeline using standard Whisper with scene detection (V3 Architecture)."""
@@ -52,9 +53,10 @@ class FastPipeline(BasePipeline):
         
         self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
-        
-        # ADD THIS LINE - Extract progress reporter from kwargs
+
+        # Extract progress reporter and parameter tracer from kwargs
         self.progress_reporter = kwargs.get('progress_reporter', None)
+        self.tracer = kwargs.get('parameter_tracer', NullTracer())
 
         # --- V3 STRUCTURED CONFIG UNPACKING ---
         model_cfg = resolved_config["model"]
@@ -141,7 +143,15 @@ class FastPipeline(BasePipeline):
                 file_number=media_info.get('file_number', 1),
                 total_files=media_info.get('total_files', 1)
             )
-        
+
+        # Trace file start
+        self.tracer.emit_file_start(
+            filename=media_basename,
+            file_number=media_info.get('file_number', 1),
+            total_files=media_info.get('total_files', 1),
+            media_info=media_info
+        )
+
         logger.info(f"Starting FAST pipeline for: {input_file}")
         logger.info(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
         
@@ -171,7 +181,10 @@ class FastPipeline(BasePipeline):
                 output_path=str(audio_path),
                 duration_seconds=duration
             )
-            
+
+            # Trace audio extraction
+            self.tracer.emit_audio_extraction(str(audio_path), duration)
+
             # Step 2: Detect scenes
             if self.progress_reporter:
                 self.progress_reporter.report_step("Detecting audio scenes", 2, 5)
@@ -201,7 +214,26 @@ class FastPipeline(BasePipeline):
                 scene_count=len(scene_paths),
                 scenes_dir=str(scenes_dir)
             )
-            
+
+            # Trace scene detection
+            self.tracer.emit_scene_detection(
+                method=getattr(self.scene_detector, 'method', 'auditok'),
+                params=self.scene_detection_params,
+                scenes_found=len(scene_paths),
+                scene_stats={
+                    "total_duration": sum(d for _, _, _, d in scene_paths),
+                    "shortest": min((d for _, _, _, d in scene_paths), default=0),
+                    "longest": max((d for _, _, _, d in scene_paths), default=0),
+                }
+            )
+
+            # Trace ASR config before transcription
+            self.tracer.emit_asr_config(
+                model=self.asr.model_name,
+                backend="stable-ts/openai-whisper",
+                params=self.pipeline_options.get("decoder", {})
+            )
+
             if hasattr(self, 'smart_postprocessor'):
                 logger.debug("Smart Post-Processing enabled.")
 
@@ -430,6 +462,17 @@ class FastPipeline(BasePipeline):
             logger.debug(f"Completed in {total_time:.1f} seconds")
             logger.info(f"Output saved to: {final_srt_path}")
             
+            # Trace postprocessing
+            self.tracer.emit_postprocessing(stats)
+
+            # Trace completion
+            self.tracer.emit_completion(
+                success=True,
+                final_subtitles=master_metadata["summary"]["final_subtitles_refined"],
+                total_duration=total_time,
+                output_path=str(final_srt_path)
+            )
+
             # Report completion
             if self.progress_reporter:
                 self.progress_reporter.report_completion(
@@ -440,9 +483,9 @@ class FastPipeline(BasePipeline):
                         'scenes': len(scene_paths)
                     }
                 )
-            
+
             return master_metadata
-            
+
         except Exception as e:
             logger.error(f"Pipeline error: {e}", exc_info=True)
             self.metadata_manager.update_processing_stage(
@@ -450,12 +493,21 @@ class FastPipeline(BasePipeline):
                 error_message=str(e)
             )
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
-            
+
+            # Trace failure
+            self.tracer.emit_completion(
+                success=False,
+                final_subtitles=0,
+                total_duration=time.time() - start_time,
+                output_path="",
+                error=str(e)
+            )
+
             # Report failure
             if self.progress_reporter:
                 self.progress_reporter.report_completion(
                     success=False,
                     stats={'error': str(e)}
                 )
-            
+
             raise
