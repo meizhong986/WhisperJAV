@@ -255,7 +255,8 @@ class TransformersASR:
                 chunk_length_s=self.chunk_length_s,
                 stride_length_s=stride,
                 return_timestamps=return_timestamps,
-                generate_kwargs=generate_kwargs
+                generate_kwargs=generate_kwargs,
+                ignore_warning=True,  # Suppress chunk_length_s experimental warning
             )
         except torch.cuda.OutOfMemoryError:
             logger.warning("CUDA out of memory. Reducing batch size and retrying...")
@@ -270,7 +271,8 @@ class TransformersASR:
                 chunk_length_s=self.chunk_length_s,
                 stride_length_s=stride,
                 return_timestamps=return_timestamps,
-                generate_kwargs=generate_kwargs
+                generate_kwargs=generate_kwargs,
+                ignore_warning=True,  # Suppress chunk_length_s experimental warning
             )
             logger.info(f"Retry successful with batch_size={self.batch_size} (was {original_batch})")
 
