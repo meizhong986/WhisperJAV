@@ -86,8 +86,8 @@ class FasterWhisperProASR:
         self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 150)
         self.vad_chunk_threshold = vad_params.get("chunk_threshold", 4.0)
 
-        # VAD engine repo (resolved from config, with fallback for backward compatibility)
-        self.vad_repo = vad_params.get("vad_repo", "snakers4/silero-vad:v3.1")
+        # VAD engine repo (resolved from config, defaults to latest Silero VAD release)
+        self.vad_repo = vad_params.get("vad_repo", "snakers4/silero-vad")
 
         # FIX: Combine all Whisper parameters into a single dictionary
         # The faster-whisper (via stable-ts) expects all parameters in one transcribe() call

@@ -1083,7 +1083,9 @@ def main():
         logger.error(f"No valid media files found in the specified paths: {', '.join(args.input)}")
         sys.exit(1)
     
-    logger.info(f"Found {len(media_files)} media file(s) to process")
+    logger.info(f"Found {len(media_files)} media file(s) to process:")
+    for f in media_files:
+        logger.info(f"  - {f['path']}")
 
     try:
         # Check if two-pass ensemble mode
