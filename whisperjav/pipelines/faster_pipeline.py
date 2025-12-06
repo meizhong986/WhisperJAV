@@ -14,6 +14,7 @@ from whisperjav.modules.srt_postprocessing import SRTPostProcessor
 from whisperjav.utils.logger import logger
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
+from whisperjav.utils.parameter_tracer import NullTracer
 
 class FasterPipeline(BasePipeline):
     """Faster pipeline using Whisper turbo mode without chunking."""
@@ -42,9 +43,10 @@ class FasterPipeline(BasePipeline):
         
         self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
-        
-        # ADD THIS LINE - Extract progress reporter from kwargs
+
+        # Extract progress reporter and parameter tracer from kwargs
         self.progress_reporter = kwargs.get('progress_reporter', None)
+        self.tracer = kwargs.get('parameter_tracer', NullTracer())
 
         # --- V3 STRUCTURED CONFIG UNPACKING ---
         model_cfg = resolved_config["model"]
@@ -121,7 +123,15 @@ class FasterPipeline(BasePipeline):
                 file_number=media_info.get('file_number', 1),
                 total_files=media_info.get('total_files', 1)
             )
-        
+
+        # Trace file start
+        self.tracer.emit_file_start(
+            filename=media_basename,
+            file_number=media_info.get('file_number', 1),
+            total_files=media_info.get('total_files', 1),
+            media_info=media_info
+        )
+
         logger.info(f"Starting FASTER pipeline for: {input_file}")
         logger.debug(f"Media type: {media_info['type']}, Duration: {media_info.get('duration', 'unknown')}s")
          
@@ -157,7 +167,17 @@ class FasterPipeline(BasePipeline):
                 output_path=str(audio_path),
                 duration_seconds=duration
             )
-            
+
+            # Trace audio extraction
+            self.tracer.emit_audio_extraction(str(audio_path), duration)
+
+            # Trace ASR config before transcription (faster mode uses stable-ts with faster-whisper)
+            self.tracer.emit_asr_config(
+                model=self.asr.model_name,
+                backend="stable-ts/faster-whisper",
+                params=self.pipeline_options.get("decoder", {})
+            )
+
             # Step 2: Transcribe entire audio
             if self.progress_reporter:
                 self.progress_reporter.report_step("Transcribing (progress bar for the faster mode is shown in your terminal...)", 2, 3)
@@ -195,7 +215,10 @@ class FasterPipeline(BasePipeline):
            
             # The postprocessor returns the path to the new sanitized file in the temp directory
             processed_srt, stats = self.postprocessor.process(raw_srt_path, final_srt_path)
-            
+
+            # Trace postprocessing
+            self.tracer.emit_postprocessing(stats)
+
             # Explicitly move the sanitized file from the temp location to the final destination
             shutil.move(processed_srt, final_srt_path)
 
@@ -271,7 +294,15 @@ class FasterPipeline(BasePipeline):
                         'scenes': 1  # Direct transcription has no scenes
                     }
                 )
-            
+
+            # Trace completion
+            self.tracer.emit_completion(
+                success=True,
+                final_subtitles=master_metadata["summary"]["final_subtitles_refined"],
+                total_duration=total_time,
+                output_path=str(final_srt_path)
+            )
+
             return master_metadata
             
         except Exception as e:
@@ -288,5 +319,14 @@ class FasterPipeline(BasePipeline):
                     success=False,
                     stats={'error': str(e)}
                 )
-            
+
+            # Trace failure
+            self.tracer.emit_completion(
+                success=False,
+                final_subtitles=0,
+                total_duration=time.time() - start_time,
+                output_path="",
+                error=str(e)
+            )
+
             raise

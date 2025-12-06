@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from whisperjav.utils.logger import logger
 from whisperjav.utils.metadata_manager import MetadataManager
+from whisperjav.utils.parameter_tracer import NullTracer
 
 from .merge import MergeEngine
 from .pass_worker import WorkerPayload, run_pass_worker
@@ -55,6 +56,10 @@ class EnsembleOrchestrator:
         self.metadata_manager = MetadataManager(self.temp_dir, self.output_dir)
         self.merge_engine = MergeEngine()
 
+        # Extract parameter tracer for orchestrator-level tracing
+        # Note: Cannot pass to subprocesses (not picklable), so trace at orchestrator level only
+        self.tracer = kwargs.get('parameter_tracer', NullTracer())
+
     def process(
         self,
         media_info: Dict,
@@ -91,11 +96,27 @@ class EnsembleOrchestrator:
         if pass2_config:
             pass_languages[2] = resolve_language_code(pass2_config, self.subs_language)
 
+        # Trace ensemble configuration
+        self.tracer.emit("ensemble_batch_start", {
+            "files_count": len(serialized_media),
+            "pass1_pipeline": pass1_config.get('pipeline'),
+            "pass2_pipeline": pass2_config.get('pipeline') if pass2_config else None,
+            "merge_strategy": merge_strategy,
+            "subs_language": self.subs_language,
+        })
+
         logger.info(
             "Starting batch ensemble processing for %s files (Pass 1: %s)",
             len(serialized_media),
             pass1_config['pipeline'],
         )
+
+        # Trace pass 1 start
+        self.tracer.emit("ensemble_pass_start", {
+            "pass_number": 1,
+            "pipeline": pass1_config.get('pipeline'),
+            "config": pass1_config,
+        })
 
         pass1_results = self._run_pass_in_subprocess(
             pass_number=1,
@@ -104,17 +125,61 @@ class EnsembleOrchestrator:
             language_code=pass_languages[1],
         )
 
+        # Trace pass 1 complete
+        pass1_completed = sum(1 for r in pass1_results.values() if r.get('status') == 'completed')
+        pass1_failed = sum(1 for r in pass1_results.values() if r.get('status') == 'failed')
+        pass1_subs = sum(r.get('subtitles', 0) for r in pass1_results.values() if r.get('status') == 'completed')
+
+        self.tracer.emit("ensemble_pass_complete", {
+            "pass_number": 1,
+            "results_count": len(pass1_results),
+            "completed": pass1_completed,
+            "failed": pass1_failed,
+        })
+
+        # Log pass 1 completion for user feedback
+        logger.info(
+            "Pass 1 completed: %d/%d file(s) successful, %d subtitles total",
+            pass1_completed, len(pass1_results), pass1_subs
+        )
+
         pass2_results: Dict[str, Dict[str, Any]] = {}
         if pass2_config:
             logger.info(
                 "Pass 2 is enabled (%s). Launching worker...",
                 pass2_config['pipeline'],
             )
+
+            # Trace pass 2 start
+            self.tracer.emit("ensemble_pass_start", {
+                "pass_number": 2,
+                "pipeline": pass2_config.get('pipeline'),
+                "config": pass2_config,
+            })
+
             pass2_results = self._run_pass_in_subprocess(
                 pass_number=2,
                 media_files=serialized_media,
                 pass_config=pass2_config,
                 language_code=pass_languages[2],
+            )
+
+            # Trace pass 2 complete
+            pass2_completed = sum(1 for r in pass2_results.values() if r.get('status') == 'completed')
+            pass2_failed = sum(1 for r in pass2_results.values() if r.get('status') == 'failed')
+            pass2_subs = sum(r.get('subtitles', 0) for r in pass2_results.values() if r.get('status') == 'completed')
+
+            self.tracer.emit("ensemble_pass_complete", {
+                "pass_number": 2,
+                "results_count": len(pass2_results),
+                "completed": pass2_completed,
+                "failed": pass2_failed,
+            })
+
+            # Log pass 2 completion for user feedback
+            logger.info(
+                "Pass 2 completed: %d/%d file(s) successful, %d subtitles total",
+                pass2_completed, len(pass2_results), pass2_subs
             )
 
         all_metadata: List[Dict[str, Any]] = []
@@ -250,6 +315,18 @@ class EnsembleOrchestrator:
         summary_path = self._write_batch_summary(all_metadata)
         if summary_path:
             logger.info("Batch summary saved to %s", summary_path)
+
+        # Trace batch completion
+        batch_duration = time.time() - batch_start
+        completed_count = sum(1 for m in all_metadata if m.get('status') == 'completed')
+        self.tracer.emit("ensemble_batch_complete", {
+            "files_processed": len(all_metadata),
+            "completed": completed_count,
+            "failed": len(all_metadata) - completed_count,
+            "total_duration_seconds": round(batch_duration, 2),
+            "summary_path": str(summary_path) if summary_path else None,
+        })
+
         return all_metadata
 
     def _run_pass_in_subprocess(
