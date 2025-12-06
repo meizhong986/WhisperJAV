@@ -487,18 +487,13 @@ class WhisperProASR:
         except Exception as e:
             logger.warning(f"Error unloading VAD model: {e}")
 
-        # Force garbage collection first (before CUDA cache clear)
+        # Force garbage collection
         try:
             gc.collect()
         except Exception as e:
             logger.warning(f"Error during garbage collection: {e}")
 
-        # Clear CUDA cache if available (can sometimes cause issues on Windows)
-        try:
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                logger.debug("CUDA cache cleared")
-        except Exception as e:
-            logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
+        # NOTE: CUDA cache cleanup is handled by caller via safe_cuda_cleanup()
+        # This keeps ASR modules free of subprocess-awareness logic.
 
         logger.debug(f"{self.__class__.__name__} cleanup complete")

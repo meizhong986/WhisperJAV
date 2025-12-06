@@ -113,6 +113,10 @@ class BasePipeline(ABC):
         if hasattr(self, 'asr') and hasattr(self.asr, 'cleanup'):
             self.asr.cleanup()
 
+        # Centralized CUDA cache cleanup - handles subprocess detection
+        from whisperjav.utils.gpu_utils import safe_cuda_cleanup
+        safe_cuda_cleanup()
+
         logger.debug(f"{self.__class__.__name__} cleanup complete")
 
     def __enter__(self):

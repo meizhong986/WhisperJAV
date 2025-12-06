@@ -382,26 +382,13 @@ class KotobaFasterWhisperASR:
             self.model = None
             logger.debug("Kotoba model unloaded")
 
-        # Force garbage collection first (before CUDA cache clear)
+        # Force garbage collection
         try:
             gc.collect()
         except Exception as e:
             logger.warning(f"Error during garbage collection: {e}")
 
-        # Clear CUDA cache if available (can sometimes cause issues on Windows)
-        # Skip in subprocess workers - the process will terminate anyway and the OS
-        # will free all GPU memory. This avoids CUDA driver crashes on Windows.
-        import os
-        is_subprocess_worker = os.environ.get('WHISPERJAV_SUBPROCESS_WORKER') == '1'
-
-        if is_subprocess_worker:
-            logger.debug("Skipping CUDA cache clear in subprocess worker (will be freed on exit)")
-        else:
-            try:
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    logger.debug("CUDA cache cleared")
-            except Exception as e:
-                logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
+        # NOTE: CUDA cache cleanup is handled by caller via safe_cuda_cleanup()
+        # This keeps ASR modules free of subprocess-awareness logic.
 
         logger.debug(f"{self.__class__.__name__} cleanup complete")
