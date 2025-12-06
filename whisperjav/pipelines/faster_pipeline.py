@@ -58,11 +58,24 @@ class FasterPipeline(BasePipeline):
         # Extract feature configurations (only post-processing for faster pipeline)
         post_proc_opts = features.get("post_processing", {})
         
+        # Store params for metadata logging
+        self.vad_params = params.get("vad", {})
+        self.scene_detection_params = {}  # Faster pipeline doesn't use scene detection
+
         # Implement the smart model-switching logic
         effective_model_cfg = model_cfg.copy()
         if self.subs_language == 'direct-to-english' and model_cfg.get("model_name") == 'turbo':
             logger.info("Direct translation requested. Switching to 'large-v2' to perform translation.")
             effective_model_cfg["model_name"] = 'large-v2'
+
+        # Store full pipeline options for diagnostic metadata (after model switching)
+        self.pipeline_options = {
+            "model": effective_model_cfg,
+            "decoder": params.get("decoder", {}),
+            "provider": params.get("provider", {}),
+            "vad": self.vad_params,
+            "task": task
+        }
         # --- END V3 CONFIG UNPACKING ---
 
         # Instantiate modules with V3 structured config
@@ -121,11 +134,9 @@ class FasterPipeline(BasePipeline):
         if hasattr(self.asr, "reset_statistics"):
             self.asr.reset_statistics()
         
-        master_metadata["config"]["pipeline_options"] = {
-            "model": f"whisper-({self.asr.model_name})",
-            "device": self.asr.device,
-            "language": self.asr.language
-        }
+        master_metadata["config"]["scene_detection_params"] = self.scene_detection_params
+        master_metadata["config"]["vad_params"] = self.vad_params
+        master_metadata["config"]["pipeline_options"] = self.pipeline_options
         
         if hasattr(self, 'smart_postprocessor'):
             logger.debug("Smart Post-Processing enabled.")

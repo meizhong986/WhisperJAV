@@ -376,7 +376,7 @@ class WhisperProASR:
             'task': self.whisper_params.get('task', 'transcribe'),
             'language': self.whisper_params.get('language', 'ja'),
             'temperature': 0.0,
-            'beam_size': 5,
+            'beam_size': 3,  # Reduced from 5 for faster fallback
             'fp16': torch.cuda.is_available(),
             'verbose': None
         }

@@ -42,8 +42,8 @@ description_long: |
 
 # Cross-cutting overrides
 overrides:
-  # Decoding overrides
-  decode.beam_size: 7
+  # Decoding overrides (beam_size 3 balances quality vs speed)
+  decode.beam_size: 3
   decode.temperature: 0.2
 
   # Quality thresholds
@@ -51,13 +51,13 @@ overrides:
   quality.logprob: -1.5
   quality.compression_ratio: 3.0
 
-  # Scene detection
-  pass1.energy_threshold: 28
-  pass2.energy_threshold: 32
+  # Scene detection (raised to reduce excessive scene splitting)
+  pass1.energy_threshold: 32
+  pass2.energy_threshold: 36
 
-  # VAD
-  silero.threshold: 0.005
-  silero.min_silence_ms: 1000
+  # VAD (threshold 0.08 captures quiet speech without pure noise)
+  silero.threshold: 0.08
+  silero.min_silence_ms: 800
 
 recommended_for:
   - "Noisy audio"

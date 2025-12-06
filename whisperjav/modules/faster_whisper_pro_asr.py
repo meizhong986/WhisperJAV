@@ -595,7 +595,7 @@ class FasterWhisperProASR:
                     'task': self.whisper_params.get('task', 'transcribe'),
                     'language': self.whisper_params.get('language', 'ja'),
                     'temperature': 0.0,
-                    'beam_size': 5,
+                    'beam_size': 3,  # Reduced from 5 for faster fallback
                     'log_progress': False  # CHANGED: was 'verbose': None
                 }
                 # Note: Removed 'fp16' - already set at init via compute_type

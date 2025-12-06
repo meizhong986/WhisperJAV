@@ -102,8 +102,8 @@ class TestDecoderParams:
         balanced = resolve_config("balanced", "balanced", "transcribe")
         aggressive = resolve_config("balanced", "aggressive", "transcribe")
 
-        # Aggressive should have different patience
-        assert balanced['params']['decoder']['patience'] != aggressive['params']['decoder']['patience']
+        # Aggressive should have different suppress_blank (True for balanced, False for aggressive)
+        assert balanced['params']['decoder']['suppress_blank'] != aggressive['params']['decoder']['suppress_blank']
 
     def test_task_override(self):
         """Test task is overridden in decoder params."""
