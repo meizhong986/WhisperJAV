@@ -356,19 +356,15 @@ class TransformersASR:
             finally:
                 self.pipe = None
 
-            # Force garbage collection first (before CUDA cache clear)
+            # Force garbage collection
             import gc
             try:
                 gc.collect()
             except Exception as e:
                 logger.warning(f"Error during garbage collection: {e}")
 
-            # Clear CUDA cache if available (can sometimes cause issues on Windows)
-            try:
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            except Exception as e:
-                logger.warning(f"Error clearing CUDA cache (non-fatal): {e}")
+            # NOTE: CUDA cache cleanup is handled by caller via safe_cuda_cleanup()
+            # This keeps ASR modules free of subprocess-awareness logic.
 
             logger.debug("Pipeline unloaded, GPU memory freed")
 
