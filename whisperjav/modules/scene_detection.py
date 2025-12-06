@@ -952,10 +952,16 @@ class DynamicSceneDetector:
         """
         logger.info(f"Starting dynamic scene detection for: {audio_path}")
 
-        # Load detection stream and original stream
+        # Load audio once from disk, then resample in-memory for detection
         try:
-            detection_audio, det_sr = load_audio_unified(audio_path, target_sr=self.target_sr, force_mono=self.force_mono)
             original_audio, orig_sr = load_audio_unified(audio_path, target_sr=None, force_mono=self.force_mono)
+            # Resample in-memory for detection (avoid second disk read)
+            if orig_sr != self.target_sr:
+                detection_audio = librosa.resample(original_audio, orig_sr=orig_sr, target_sr=self.target_sr)
+                det_sr = self.target_sr
+            else:
+                detection_audio = original_audio
+                det_sr = orig_sr
             det_duration = len(detection_audio) / det_sr
             logger.info(f"Detection stream: {det_duration:.1f}s @ {det_sr}Hz; Original stream: {len(original_audio)/orig_sr:.1f}s @ {orig_sr}Hz")
         except Exception as e:
