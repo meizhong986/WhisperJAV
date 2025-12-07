@@ -432,7 +432,7 @@
       "max_speech_duration_s": 14,
       "min_silence_duration_ms": 300,
       "neg_threshold": 0.1,
-      "speech_pad_ms": 600
+      "speech_pad_ms": 400
     }
   },
   "faster_whisper_vad_options": {
