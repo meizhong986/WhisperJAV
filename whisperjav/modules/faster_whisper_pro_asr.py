@@ -141,6 +141,8 @@ class FasterWhisperProASR:
             'logprob_filtered': 0,
             'nonverbal_filtered': 0
         }
+        # VAD segments from the last transcription (for visualization data contract)
+        self._last_vad_segments: List[Dict] = []
 
     def reset_statistics(self) -> None:
         """Public hook for pipelines to clear accumulated statistics."""
@@ -149,6 +151,21 @@ class FasterWhisperProASR:
     def get_filter_statistics(self) -> Dict[str, int]:
         """Return a copy of accumulated filter statistics."""
         return dict(self._filter_statistics)
+
+    def get_last_vad_segments(self) -> List[Dict]:
+        """
+        Return VAD segments from the last transcription.
+
+        Returns:
+            List of dicts with 'start_sec' and 'end_sec' keys representing
+            speech regions detected by Silero VAD before transcription.
+
+        Note:
+            Timestamps are relative to the audio file that was transcribed.
+            For scene-based pipelines, the caller should add the scene's
+            start offset to get absolute timestamps.
+        """
+        return list(self._last_vad_segments)
 
     def _initialize_models(self):
         """Initialize VAD and Faster-Whisper models (direct API)."""
@@ -410,6 +427,16 @@ class FasterWhisperProASR:
             raise
 
         vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
+
+        # Store VAD segments for visualization data contract
+        # Flatten grouped segments into simple list with start_sec/end_sec
+        self._last_vad_segments = []
+        for group in vad_segments:
+            for seg in group:
+                self._last_vad_segments.append({
+                    "start_sec": round(seg["start_sec"], 3),
+                    "end_sec": round(seg["end_sec"], 3)
+                })
 
         # DIAGNOSTIC: Log VAD results
         logger.debug("=" * 60)

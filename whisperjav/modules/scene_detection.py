@@ -787,6 +787,14 @@ class DynamicSceneDetector:
         self.pad_edges_s = float(kwargs.get("pad_edges_s", pad_edges_s))
         self.fade_ms = int(kwargs.get("fade_ms", fade_ms))
 
+        # --- Data Contract: Scene metadata and VAD segments for visualization ---
+        # Populated by detect_scenes() for external consumers (e.g., visualization tools)
+        self.scenes_detected: List[Dict] = []  # Rich metadata per scene
+        self.vad_segments: List[Dict] = []     # VAD speech regions (when using Silero)
+        self.coarse_boundaries: List[Dict] = []  # Pass 1 coarse scene boundaries (before splitting)
+        self.vad_method: Optional[str] = None  # 'silero' or None
+        self.vad_params: Dict = {}             # VAD parameters used
+
         # Initialize Silero VAD if needed
         if self.method == "silero":
             self._init_silero_vad(kwargs)
@@ -888,6 +896,13 @@ class DynamicSceneDetector:
             for seg in speech_timestamps
         ]
 
+        # Data contract: Store VAD segments with absolute timestamps
+        for seg in speech_timestamps:
+            self.vad_segments.append({
+                "start_sec": round(region_start_sec + seg['start'], 3),
+                "end_sec": round(region_start_sec + seg['end'], 3),
+            })
+
         logger.debug(f"Silero VAD detected {len(sub_regions)} segments in Pass 2")
 
         return sub_regions
@@ -946,11 +961,63 @@ class DynamicSceneDetector:
         sf.write(str(scene_path), audio_data, sample_rate, subtype='PCM_16')
         return scene_path
 
+    def _record_scene_metadata(
+        self,
+        scene_idx: int,
+        start_sec: float,
+        end_sec: float,
+        detection_pass: int,
+        scene_path: Optional[Path] = None,
+    ) -> None:
+        """
+        Record rich scene metadata for the data contract.
+
+        Args:
+            scene_idx: Scene index (0-based)
+            start_sec: Start time in seconds
+            end_sec: End time in seconds
+            detection_pass: 1 for Pass 1 (coarse/direct), 2 for Pass 2 (fine/split)
+            scene_path: Optional path to the saved scene file
+        """
+        self.scenes_detected.append({
+            "scene_index": scene_idx,
+            "start_time_seconds": round(start_sec, 3),
+            "end_time_seconds": round(end_sec, 3),
+            "duration_seconds": round(end_sec - start_sec, 3),
+            "detection_pass": detection_pass,
+            "filename": scene_path.name if scene_path else None,
+        })
+
     def detect_scenes(self, audio_path: Path, output_dir: Path, media_basename: str) -> List[Tuple[Path, float, float, float]]:
         """
         Splits audio into scenes using a robust two-pass approach.
+
+        Side Effects:
+            Populates self.scenes_detected with rich metadata per scene including:
+            - scene_index, start_time_seconds, end_time_seconds, duration_seconds
+            - detection_pass: 1 (coarse/direct) or 2 (fine/split)
+
+            When using Silero VAD, also populates:
+            - self.vad_segments: List of {'start_sec', 'end_sec'} speech regions
+            - self.vad_method: 'silero'
+            - self.vad_params: VAD parameters used
         """
         logger.info(f"Starting dynamic scene detection for: {audio_path}")
+
+        # Reset data contract fields for fresh detection run
+        self.scenes_detected = []
+        self.vad_segments = []
+        self.coarse_boundaries = []
+        self.vad_method = self.method if self.method == "silero" else None
+        if self.method == "silero":
+            self.vad_params = {
+                "threshold": self.silero_threshold,
+                "neg_threshold": self.silero_neg_threshold,
+                "min_silence_duration_ms": self.silero_min_silence_ms,
+                "min_speech_duration_ms": self.silero_min_speech_ms,
+                "max_speech_duration_s": self.silero_max_speech_s,
+                "speech_pad_ms": self.silero_speech_pad_ms,
+            }
 
         # Load audio once from disk, then resample in-memory for detection
         try:
@@ -989,6 +1056,15 @@ class DynamicSceneDetector:
         story_lines = list(auditok.split(det_bytes, **pass1_params))
         logger.info(f"Pass 1: Found {len(story_lines)} story line region(s).")
 
+        # Data contract: Capture coarse boundaries BEFORE any splitting (for visualization)
+        for idx, region in enumerate(story_lines):
+            self.coarse_boundaries.append({
+                "scene_index": idx,
+                "start_time_seconds": round(region.start, 3),
+                "end_time_seconds": round(region.end, 3),
+                "duration_seconds": round(region.end - region.start, 3),
+            })
+
         final_scene_tuples: List[Tuple[Path, float, float, float]] = []
         scene_idx = 0
 
@@ -1020,6 +1096,8 @@ class DynamicSceneDetector:
                 end_sample = int(e_sec * save_sr)
                 scene_path = self._save_scene(save_audio[start_sample:end_sample], save_sr, scene_idx, output_dir, media_basename)
                 final_scene_tuples.append((scene_path, s_sec, e_sec, e_sec - s_sec))
+                # Data contract: Record Pass 1 scene (coarse/direct)
+                self._record_scene_metadata(scene_idx, s_sec, e_sec, detection_pass=1, scene_path=scene_path)
                 scene_idx += 1
                 storyline_direct_saves += 1
                 continue
@@ -1070,6 +1148,8 @@ class DynamicSceneDetector:
                     end_sample = int(e_sec * save_sr)
                     scene_path = self._save_scene(save_audio[start_sample:end_sample], save_sr, scene_idx, output_dir, media_basename)
                     final_scene_tuples.append((scene_path, s_sec, e_sec, e_sec - s_sec))
+                    # Data contract: Record Pass 2 scene (fine/split)
+                    self._record_scene_metadata(scene_idx, s_sec, e_sec, detection_pass=2, scene_path=scene_path)
                     scene_idx += 1
             else:
                 if not self.brute_force_fallback:
@@ -1090,6 +1170,8 @@ class DynamicSceneDetector:
                     end_sample = int(e_sec * save_sr)
                     scene_path = self._save_scene(save_audio[start_sample:end_sample], save_sr, scene_idx, output_dir, media_basename)
                     final_scene_tuples.append((scene_path, s_sec, e_sec, e_sec - s_sec))
+                    # Data contract: Record brute-force scene (treated as Pass 2 fallback)
+                    self._record_scene_metadata(scene_idx, s_sec, e_sec, detection_pass=2, scene_path=scene_path)
                     scene_idx += 1
 
         if self.verbose_summary:
@@ -1145,6 +1227,24 @@ class DynamicSceneDetector:
 
         logger.info(f"Detected and saved {len(final_scene_tuples)} final scenes.")
         return final_scene_tuples
+
+    def get_detection_metadata(self) -> Dict:
+        """
+        Export scene detection metadata for the data contract.
+
+        Returns a dictionary suitable for saving to the master metadata JSON file.
+        Should be called after detect_scenes() to get populated data.
+
+        Returns:
+            Dict with 'scenes_detected', 'coarse_boundaries', 'vad_segments', 'vad_method', 'vad_params'
+        """
+        return {
+            "scenes_detected": self.scenes_detected,
+            "coarse_boundaries": self.coarse_boundaries if self.coarse_boundaries else None,
+            "vad_segments": self.vad_segments if self.vad_segments else None,
+            "vad_method": self.vad_method,
+            "vad_params": self.vad_params if self.vad_params else None,
+        }
 
 
 
