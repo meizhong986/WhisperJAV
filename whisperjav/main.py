@@ -237,7 +237,7 @@ def parse_arguments():
                                  "silero (VAD-based, experimental)"
                              ))
     tuning_group.add_argument("--no-vad", action="store_true",
-                             help="Disable internal VAD for kotoba-faster-whisper mode")
+                             help="Disable VAD speech segmentation (balanced/fidelity: skip Silero VAD; kotoba: disable faster-whisper VAD)")
 
     # Async processing
     async_group = parser.add_argument_group("Processing Options")
@@ -1085,14 +1085,23 @@ def main():
         resolved_config["params"]["decoder"]["language"] = language_code
         logger.debug(f"Language override applied to decoder params: {language_code}")
 
-    # Apply --no-vad override for kotoba-faster-whisper mode
-    if args.mode == "kotoba-faster-whisper" and getattr(args, 'no_vad', False) and resolved_config is not None:
+    # Apply --no-vad override for supported modes
+    if getattr(args, 'no_vad', False) and resolved_config is not None:
         if "params" not in resolved_config:
             resolved_config["params"] = {}
-        if "asr" not in resolved_config["params"]:
-            resolved_config["params"]["asr"] = {}
-        resolved_config["params"]["asr"]["vad_filter"] = False
-        logger.info("Internal VAD disabled via --no-vad flag")
+
+        if args.mode == "kotoba-faster-whisper":
+            # Kotoba uses faster-whisper's internal vad_filter
+            if "asr" not in resolved_config["params"]:
+                resolved_config["params"]["asr"] = {}
+            resolved_config["params"]["asr"]["vad_filter"] = False
+            logger.info("Internal VAD disabled via --no-vad flag (kotoba mode)")
+        elif args.mode in ["balanced", "fidelity"]:
+            # Balanced/fidelity use external Silero VAD - set skip_vad flag
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["skip_vad"] = True
+            logger.info("Silero VAD preprocessing disabled via --no-vad flag")
 
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
