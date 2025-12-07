@@ -189,15 +189,40 @@ class BalancedPipeline(BasePipeline):
             scenes_dir.mkdir(exist_ok=True)
             scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
 
-            master_metadata["scenes_detected"] = []
-            for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
-                scene_info = {
-                    "scene_index": idx, "filename": scene_path.name,
-                    "start_time_seconds": round(start_time_sec, 3),
-                    "end_time_seconds": round(end_time_sec, 3),
-                    "duration_seconds": round(duration_sec, 3), "path": str(scene_path)
-                }
-                master_metadata["scenes_detected"].append(scene_info)
+            # Use the new data contract method if available (DynamicSceneDetector)
+            if hasattr(self.scene_detector, 'get_detection_metadata'):
+                detection_meta = self.scene_detector.get_detection_metadata()
+                # Build scenes_detected with full path info
+                master_metadata["scenes_detected"] = []
+                for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
+                    scene_info = {
+                        "scene_index": idx, "filename": scene_path.name,
+                        "start_time_seconds": round(start_time_sec, 3),
+                        "end_time_seconds": round(end_time_sec, 3),
+                        "duration_seconds": round(duration_sec, 3), "path": str(scene_path),
+                        # Add detection_pass from the data contract
+                        "detection_pass": detection_meta["scenes_detected"][idx].get("detection_pass") if idx < len(detection_meta["scenes_detected"]) else None
+                    }
+                    master_metadata["scenes_detected"].append(scene_info)
+                # Include VAD segments if available (Silero method)
+                if detection_meta.get("vad_segments"):
+                    master_metadata["vad_segments"] = detection_meta["vad_segments"]
+                    master_metadata["vad_method"] = detection_meta.get("vad_method")
+                    master_metadata["vad_params"] = detection_meta.get("vad_params")
+                # Include coarse boundaries (Pass 1 scene boundaries before splitting)
+                if detection_meta.get("coarse_boundaries"):
+                    master_metadata["coarse_boundaries"] = detection_meta["coarse_boundaries"]
+            else:
+                # Fallback for legacy scene detectors (SceneDetector, AdaptiveSceneDetector)
+                master_metadata["scenes_detected"] = []
+                for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
+                    scene_info = {
+                        "scene_index": idx, "filename": scene_path.name,
+                        "start_time_seconds": round(start_time_sec, 3),
+                        "end_time_seconds": round(end_time_sec, 3),
+                        "duration_seconds": round(duration_sec, 3), "path": str(scene_path)
+                    }
+                    master_metadata["scenes_detected"].append(scene_info)
             master_metadata["summary"]["total_scenes_detected"] = len(scene_paths)
             self.metadata_manager.update_processing_stage(
                 master_metadata, "scene_detection", "completed",
@@ -246,6 +271,9 @@ class BalancedPipeline(BasePipeline):
 
             # Print initial scene transcription header (always visible)
             print(f"\nTranscribing {total_scenes} scenes with VAD-enhanced processing:")
+
+            # Accumulate VAD segments across all scenes for visualization data contract
+            all_vad_segments = []
 
             for idx, (scene_path, start_time_sec, _, _) in enumerate(scene_paths):
                 scene_srt_path = scene_srts_dir / f"{scene_path.stem}.srt"
@@ -307,6 +335,15 @@ class BalancedPipeline(BasePipeline):
                         master_metadata["scenes_detected"][idx]["transcribed"] = True
                         master_metadata["scenes_detected"][idx]["no_speech_detected"] = True
 
+                    # Collect VAD segments from ASR (adjusted by scene start offset)
+                    if hasattr(self.asr, 'get_last_vad_segments'):
+                        scene_vad = self.asr.get_last_vad_segments()
+                        for seg in scene_vad:
+                            all_vad_segments.append({
+                                "start_sec": round(start_time_sec + seg["start_sec"], 3),
+                                "end_sec": round(start_time_sec + seg["end_sec"], 3),
+                            })
+
                     self.progress.update_subtask(1)
 
                 except Exception as e:
@@ -317,6 +354,12 @@ class BalancedPipeline(BasePipeline):
                     self.progress.update_subtask(1)
 
             self.progress.finish_subtask()
+
+            # Save accumulated ASR-level VAD segments to metadata for visualization
+            if all_vad_segments:
+                master_metadata["vad_segments"] = all_vad_segments
+                master_metadata["vad_method"] = "silero"
+                master_metadata["vad_params"] = self.vad_params
 
             # Print completion message for scene transcription (always visible)
             print(f"\n[DONE] Completed transcription of {total_scenes} scenes")
