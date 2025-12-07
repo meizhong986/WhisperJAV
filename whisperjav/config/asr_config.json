@@ -134,7 +134,7 @@
         "pass2_min_duration_s": 0.1,
         "pass2_max_duration_s": 1900.0,
         "pass2_max_silence_s": 1.8,
-        "pass2_energy_threshold": 28,
+        "pass2_energy_threshold": 25,
         "bandpass_low_hz": 200,
         "bandpass_high_hz": 4000,
         "drc_threshold_db": -24.0,
@@ -411,7 +411,7 @@
   },
   "silero_vad_options": {
     "balanced": {
-      "threshold": 0.18,
+      "threshold": 0.12,
       "min_speech_duration_ms": 100,
       "max_speech_duration_s": 11,
       "min_silence_duration_ms": 300,
@@ -419,7 +419,7 @@
       "speech_pad_ms": 400
     },
     "conservative": {
-      "threshold": 0.35,
+      "threshold": 0.25,
       "min_speech_duration_ms": 150,
       "max_speech_duration_s": 9,
       "min_silence_duration_ms": 300,

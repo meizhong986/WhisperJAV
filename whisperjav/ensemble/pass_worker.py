@@ -368,24 +368,40 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
                 final_srt = Path(result["output_files"]["final_srt"])
                 pass_output = Path(payload.output_dir) / f"{basename}.{language_code}.pass{pass_number}.srt"
                 if final_srt.exists():
-                    shutil.copy2(final_srt, pass_output)
-                    if not payload.keep_temp_files:
+                    # Use atomic move instead of copy+delete to prevent orphan files
+                    # This ensures exactly one output file exists after the operation,
+                    # regardless of --keep-temp-files flag or filesystem errors.
+                    # shutil.move() handles cross-filesystem moves internally (copy+delete).
+                    try:
+                        # Remove destination if it exists (from a previous run)
+                        if pass_output.exists():
+                            pass_output.unlink()
+                        shutil.move(str(final_srt), str(pass_output))
+                        logger.debug(
+                            "Pass %s: Moved %s -> %s",
+                            pass_number,
+                            final_srt.name,
+                            pass_output.name,
+                        )
+                    except OSError as move_err:
+                        # Fallback: if move fails (e.g., cross-device, permissions),
+                        # copy and attempt delete. This handles edge cases like
+                        # network drives or permission-restricted directories.
+                        logger.debug(
+                            "Pass %s: Move failed (%s), falling back to copy",
+                            pass_number,
+                            move_err,
+                        )
+                        shutil.copy2(final_srt, pass_output)
                         try:
-                            same_file = final_srt.samefile(pass_output)
-                        except FileNotFoundError:
-                            same_file = False
+                            final_srt.unlink()
                         except OSError:
-                            same_file = False
-
-                        if not same_file:
-                            try:
-                                final_srt.unlink(missing_ok=True)
-                            except OSError:
-                                logger.debug(
-                                    "Pass %s: Unable to remove legacy output %s",
-                                    pass_number,
-                                    final_srt,
-                                )
+                            # Log at warning level since this leaves an orphan file
+                            logger.warning(
+                                "Pass %s: Could not remove %s (orphan file may remain)",
+                                pass_number,
+                                final_srt.name,
+                            )
                 results.append(
                     FileResult(
                         basename=basename,

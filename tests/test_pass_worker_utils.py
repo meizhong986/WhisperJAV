@@ -128,7 +128,13 @@ def test_run_pass_worker_removes_legacy_file_when_not_keeping_temp(tmp_path, mon
     assert result["results"][0]["srt_path"] == str(pass_file)
 
 
-def test_run_pass_worker_retains_legacy_file_when_keeping_temp(tmp_path, monkeypatch):
+def test_run_pass_worker_moves_legacy_file_even_when_keeping_temp(tmp_path, monkeypatch):
+    """Legacy file is always MOVED (not copied) to pass-specific name.
+
+    With atomic move, there's exactly one output file regardless of keep_temp_files.
+    The keep_temp_files flag controls other temp artifacts (scenes, temp dirs),
+    not the final output renaming.
+    """
     media_path = tmp_path / "sample.wav"
     media_path.write_text("audio", encoding="utf-8")
     output_dir = tmp_path / "out"
@@ -154,5 +160,5 @@ def test_run_pass_worker_retains_legacy_file_when_keeping_temp(tmp_path, monkeyp
     run_pass_worker(payload)
 
     pass_file = output_dir / "sample.ja.pass1.srt"
-    assert pass_file.exists()
-    assert legacy_file.exists(), "Legacy file should remain when keep_temp_files is True"
+    assert pass_file.exists(), "Pass-specific file should exist"
+    assert not legacy_file.exists(), "Legacy file should be moved (not copied), so it should not exist"
