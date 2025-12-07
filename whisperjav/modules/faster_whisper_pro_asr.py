@@ -89,6 +89,9 @@ class FasterWhisperProASR:
         # VAD engine repo (resolved from config, defaults to latest Silero VAD release)
         self.vad_repo = vad_params.get("vad_repo", "snakers4/silero-vad")
 
+        # VAD bypass flag - when True, skip VAD and transcribe full audio directly
+        self.skip_vad = vad_params.get("skip_vad", False)
+
         # FIX: Combine all Whisper parameters into a single dictionary
         # The faster-whisper (via stable-ts) expects all parameters in one transcribe() call
         self.whisper_params = {}
@@ -426,39 +429,45 @@ class FasterWhisperProASR:
             logger.error(f"Failed to read audio file {audio_path}: {e}")
             raise
 
-        vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
+        # Check if VAD should be bypassed
+        if self.skip_vad:
+            logger.info("VAD bypassed via --no-vad flag - transcribing full audio directly")
+            self._last_vad_segments = []  # Empty VAD segments for metadata
+            all_segments = self._transcribe_full_audio(audio_data, sample_rate)
+        else:
+            vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
 
-        # Store VAD segments for visualization data contract
-        # Flatten grouped segments into simple list with start_sec/end_sec
-        self._last_vad_segments = []
-        for group in vad_segments:
-            for seg in group:
-                self._last_vad_segments.append({
-                    "start_sec": round(seg["start_sec"], 3),
-                    "end_sec": round(seg["end_sec"], 3)
-                })
+            # Store VAD segments for visualization data contract
+            # Flatten grouped segments into simple list with start_sec/end_sec
+            self._last_vad_segments = []
+            for group in vad_segments:
+                for seg in group:
+                    self._last_vad_segments.append({
+                        "start_sec": round(seg["start_sec"], 3),
+                        "end_sec": round(seg["end_sec"], 3)
+                    })
 
-        # DIAGNOSTIC: Log VAD results
-        logger.debug("=" * 60)
-        logger.debug("DIAGNOSTIC: VAD Processing Results")
-        logger.debug(f"  VAD groups detected: {len(vad_segments)}")
-        if vad_segments:
-            total_segments = sum(len(group) for group in vad_segments)
-            logger.debug(f"  Total VAD segments: {total_segments}")
-            for i, group in enumerate(vad_segments):
-                logger.debug(f"  Group {i+1}: {len(group)} segments, "
-                           f"duration {group[-1]['end_sec'] - group[0]['start_sec']:.2f}s")
-        logger.debug("=" * 60)
+            # DIAGNOSTIC: Log VAD results
+            logger.debug("=" * 60)
+            logger.debug("DIAGNOSTIC: VAD Processing Results")
+            logger.debug(f"  VAD groups detected: {len(vad_segments)}")
+            if vad_segments:
+                total_segments = sum(len(group) for group in vad_segments)
+                logger.debug(f"  Total VAD segments: {total_segments}")
+                for i, group in enumerate(vad_segments):
+                    logger.debug(f"  Group {i+1}: {len(group)} segments, "
+                               f"duration {group[-1]['end_sec'] - group[0]['start_sec']:.2f}s")
+            logger.debug("=" * 60)
 
-        if not vad_segments:
-            logger.debug(f"No speech detected in {audio_path.name}")
-            return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
+            if not vad_segments:
+                logger.debug(f"No speech detected in {audio_path.name}")
+                return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
 
-        all_segments = []
-        for i, vad_group in enumerate(vad_segments, 1):
-            logger.debug(f"Processing VAD group {i}/{len(vad_segments)}")
-            segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
-            all_segments.extend(segments)
+            all_segments = []
+            for i, vad_group in enumerate(vad_segments, 1):
+                logger.debug(f"Processing VAD group {i}/{len(vad_segments)}")
+                segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
+                all_segments.extend(segments)
 
         return {
             "segments": all_segments,
@@ -517,6 +526,53 @@ class FasterWhisperProASR:
                 seg["end_sec"] = seg["end"] / VAD_SR
 
         return groups
+
+    def _transcribe_full_audio(self, audio_data: np.ndarray, sample_rate: int) -> List[Dict]:
+        """
+        Transcribe full audio without VAD segmentation.
+        Used when --no-vad flag is set to bypass Silero VAD preprocessing.
+        """
+        duration = len(audio_data) / sample_rate
+        logger.debug("=" * 60)
+        logger.debug("DIAGNOSTIC: Full Audio Transcription (VAD bypassed)")
+        logger.debug(f"  Model: {self.model_name}")
+        logger.debug(f"  Audio duration: {duration:.2f}s")
+        logger.debug(f"  Audio shape: {audio_data.shape}")
+        logger.debug(f"  Audio dtype: {audio_data.dtype}")
+        logger.debug(f"  Sample rate: {sample_rate} Hz")
+        logger.debug("=" * 60)
+
+        # Get cleaned parameters from tuner
+        whisper_params = self._prepare_whisper_params()
+
+        try:
+            # faster-whisper returns (generator, info) tuple
+            segments_generator, transcription_info = self.whisper_model.transcribe(
+                audio_data,
+                **whisper_params
+            )
+
+            # Consume generator and convert to dict format
+            raw_segments = []
+            for segment in segments_generator:
+                raw_segments.append({
+                    "start": segment.start,
+                    "end": segment.end,
+                    "text": segment.text.strip(),
+                    "avg_logprob": segment.avg_logprob
+                })
+
+            logger.debug(f"Full audio transcription produced {len(raw_segments)} segments")
+
+            # Apply segment filtering (same as VAD path)
+            filtered_segments = self._segment_filter.filter_segments(raw_segments)
+            logger.debug(f"After filtering: {len(filtered_segments)} segments (removed {len(raw_segments) - len(filtered_segments)})")
+
+            return filtered_segments
+
+        except Exception as e:
+            logger.error(f"Full audio transcription failed: {type(e).__name__}: {e}")
+            raise
 
     def _transcribe_vad_group(self, audio_data: np.ndarray, sample_rate: int,
                              vad_group: List[Dict]) -> List[Dict]:

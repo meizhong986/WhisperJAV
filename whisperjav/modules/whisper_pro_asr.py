@@ -87,6 +87,9 @@ class WhisperProASR:
         # VAD engine repo (resolved from config, with fallback for backward compatibility)
         self.vad_repo = vad_params.get("vad_repo", "snakers4/silero-vad:v3.1")
 
+        # VAD bypass flag - when True, skip VAD and transcribe full audio directly
+        self.skip_vad = vad_params.get("skip_vad", False)
+
         # FIX: Combine all Whisper parameters into a single dictionary
         # The Whisper library expects all parameters in one transcribe() call
         self.whisper_params = {}
@@ -221,28 +224,45 @@ class WhisperProASR:
             raise
 
         audio_duration = len(audio_data) / sample_rate if sample_rate else 0.0
-        vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
 
-        fallback_triggered = False
-        if should_force_full_transcribe(vad_segments, audio_duration):
-            logger.warning(
-                "VAD produced insufficient coverage (segments=%s, duration=%.1fs). "
-                "Falling back to full-clip transcription.",
-                sum(len(group or []) for group in (vad_segments or [])),
-                audio_duration,
-            )
-            fallback_triggered = True
+        # Check if VAD should be bypassed
+        if self.skip_vad:
+            logger.info("VAD bypassed via --no-vad flag - transcribing full audio directly")
+            self._last_vad_segments = []  # Empty VAD segments for metadata
             all_segments = self._transcribe_full_audio(audio_data)
+            fallback_triggered = False
         else:
-            if not vad_segments:
-                logger.debug(f"No speech detected in {audio_path.name}")
-                return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
+            vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
 
-            all_segments = []
-            for vad_group in vad_segments:
-                segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
-                all_segments.extend(segments)
-        
+            # Store VAD segments for visualization data contract
+            self._last_vad_segments = []
+            for group in (vad_segments or []):
+                for seg in group:
+                    self._last_vad_segments.append({
+                        "start_sec": round(seg["start_sec"], 3),
+                        "end_sec": round(seg["end_sec"], 3)
+                    })
+
+            fallback_triggered = False
+            if should_force_full_transcribe(vad_segments, audio_duration):
+                logger.warning(
+                    "VAD produced insufficient coverage (segments=%s, duration=%.1fs). "
+                    "Falling back to full-clip transcription.",
+                    sum(len(group or []) for group in (vad_segments or [])),
+                    audio_duration,
+                )
+                fallback_triggered = True
+                all_segments = self._transcribe_full_audio(audio_data)
+            else:
+                if not vad_segments:
+                    logger.debug(f"No speech detected in {audio_path.name}")
+                    return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
+
+                all_segments = []
+                for vad_group in vad_segments:
+                    segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
+                    all_segments.extend(segments)
+
         if fallback_triggered and not all_segments:
             # Safety net: if fallback still produced nothing, log explicitly for debugging.
             logger.warning(
