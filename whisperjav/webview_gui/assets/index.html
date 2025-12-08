@@ -278,7 +278,7 @@
                                 </div>
                             </div>
 
-                            <!-- Row 3 (new): Adaptive features + Max workers -->
+                            <!-- Row 3: Adaptive features + Skip VAD -->
                             <div class="form-row" id="adv-row-3">
                                 <div class="form-group">
                                     <label class="checkbox-label" title="Work in Progress - Not yet implemented">
@@ -298,17 +298,11 @@
                                         <span>Smart postprocessing (WIP)</span>
                                     </label>
                                 </div>
-                                <div class="form-group inline-field">
-                                    <label for="maxWorkers" class="form-label" style="white-space: nowrap;">Max workers:</label>
-                                    <input
-                                        type="number"
-                                        id="maxWorkers"
-                                        class="form-input"
-                                        value="1"
-                                        min="1"
-                                        max="16"
-                                        style="width: 80px;"
-                                    >
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Skip VAD speech segmentation - may improve transcription quality">
+                                        <input type="checkbox" id="noVad">
+                                        <span>Skip VAD preprocessing</span>
+                                    </label>
                                 </div>
                             </div>
 

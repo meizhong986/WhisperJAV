@@ -36,7 +36,9 @@ Start WhisperJAV transcription process.
 
     // Async processing
     async_processing: false,
-    max_workers: 1,
+
+    // VAD bypass
+    no_vad: false,                         // Skip VAD speech segmentation
 
     // Model override
     model_override: 'large-v3',           // 'large-v3' | 'large-v2' | 'turbo'
@@ -319,7 +321,7 @@ async function startProcessing() {
         output_dir: document.getElementById('output-dir').value,
         verbosity: document.getElementById('verbosity').value,
         async_processing: document.getElementById('async').checked,
-        max_workers: parseInt(document.getElementById('workers').value),
+        no_vad: document.getElementById('noVad').checked,
     };
 
     // Start process

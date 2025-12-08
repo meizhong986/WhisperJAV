@@ -681,15 +681,10 @@ body {
     flex: 1;
 }
 
-/* Row 3: 4 columns (3 WIP checkboxes + Max workers) */
+/* Row 3: 4 columns (3 WIP checkboxes + Skip VAD checkbox) */
 #tab2-panel #adv-row-3 {
-    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
     column-gap: 8px;
-}
-
-/* Keep max workers input compact */
-#maxWorkers {
-    width: 80px;
 }
 
 /* Row 4: Keep temp + Temp dir group (existing layout, small tweak) */

@@ -657,9 +657,9 @@ const FormManager = {
 
             // Async processing (conditional)
             async_processing: asyncProcessingEnabled,
-            max_workers: asyncProcessingEnabled
-                ? parseInt(document.getElementById('maxWorkers').value)
-                : 1,
+
+            // VAD bypass option
+            no_vad: document.getElementById('noVad').checked,
 
             // Other options
             credit: document.getElementById('openingCredit').value.trim(),
