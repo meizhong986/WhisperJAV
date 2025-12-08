@@ -102,7 +102,7 @@ class WhisperJAVAPI:
                 - adaptive_audio_enhancement: bool - Adaptive audio enhancements (WIP)
                 - smart_postprocessing: bool - Smart postprocessing (WIP)
                 - async_processing: bool - Enable async processing
-                - max_workers: int - Max workers for async processing
+                - no_vad: bool - Skip VAD speech segmentation
                 - model_override: str - Model override (large-v3/large-v2/turbo)
                 - credit: str - Opening credit text
 
@@ -174,8 +174,11 @@ class WhisperJAVAPI:
 
         # Async processing
         if options.get('async_processing', False):
-            max_workers = options.get('max_workers', 1)
-            args += ["--async-processing", "--max-workers", str(max_workers)]
+            args += ["--async-processing"]
+
+        # VAD bypass (skip Silero VAD speech segmentation)
+        if options.get('no_vad', False):
+            args += ["--no-vad"]
 
         # Model override
         model_override = options.get('model_override', '').strip()

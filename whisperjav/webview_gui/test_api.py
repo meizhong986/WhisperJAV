@@ -87,7 +87,7 @@ def test_build_args():
         'keep_temp': True,
         'verbosity': 'verbose',
         'async_processing': True,
-        'max_workers': 4,
+        'no_vad': True,
         'model_override': 'large-v3',
         'credit': 'Produced by Test Studio',
     }
@@ -102,8 +102,7 @@ def test_build_args():
     assert '--verbosity' in args, "--verbosity flag should be present"
     assert 'verbose' in args, "Verbosity value should be present"
     assert '--async-processing' in args, "--async-processing flag should be present"
-    assert '--max-workers' in args, "--max-workers flag should be present"
-    assert '4' in args, "Max workers value should be present"
+    assert '--no-vad' in args, "--no-vad flag should be present"
     assert '--model' in args, "--model flag should be present"
     assert 'large-v3' in args, "Model value should be present"
     assert '--credit' in args, "--credit flag should be present"
