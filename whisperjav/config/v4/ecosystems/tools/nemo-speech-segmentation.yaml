@@ -1,0 +1,148 @@
+# =============================================================================
+# NeMo VAD Speech Segmentation Tool Configuration
+# =============================================================================
+# NVIDIA NeMo VAD using NeuralDiarizer (full stack) or frame VAD fallback.
+# Supports hysteresis thresholds for accurate speech boundary detection.
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: nemo-speech-segmentation
+  displayName: "NeMo VAD"
+  description: |
+    Speech segmentation using NVIDIA NeMo toolkit.
+    Primary: NeuralDiarizer with full stack (VAD + TitaNet + MSDD)
+    Fallback: EncDecFrameClassificationModel (lightweight frame VAD)
+    Supports speaker label preservation in metadata (RTTM format).
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - nemo
+    - nvidia
+    - diarization
+    - vad
+    - neural
+  dependencies:
+    - "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+    metadata:
+      speaker_labels: bool  # True if speaker labels preserved
+
+# =============================================================================
+# Tool Parameters
+# =============================================================================
+spec:
+  # --- Domain Configuration ---
+  # "general" = varied audio, music, effects
+  # "meeting" = multi-speaker, dialogue scenes (maps to nemo-crowd)
+  domain: "general"
+
+  # --- Hysteresis Thresholds (key improvement from reference) ---
+  # onset: High threshold to START speech detection (confident start)
+  # offset: Low threshold to END speech detection (extend into tail)
+  vad.onset: 0.8
+  vad.offset: 0.6
+  vad.pad_offset: -0.05  # Can be negative to trim segment ends
+
+  # --- Duration Filters ---
+  min_speech_duration_ms: 100
+  min_silence_duration_ms: 100
+  chunk_threshold_s: 4.0  # Gap threshold for segment grouping
+
+# =============================================================================
+# Domain Presets
+# =============================================================================
+presets:
+  # General domain: varied audio, music, sound effects
+  general:
+    domain: "general"
+    vad.onset: 0.8
+    vad.offset: 0.6
+
+  # Crowd (meeting) domain: multi-speaker, dialogue-heavy scenes
+  crowd:
+    domain: "meeting"
+    vad.onset: 0.75
+    vad.offset: 0.55
+    vad.pad_offset: -0.02  # Less aggressive trimming for dialogue
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  domain:
+    widget: select
+    label: "Domain Type"
+    description: "Audio domain for diarizer optimization"
+    options:
+      - value: general
+        label: "General (varied audio)"
+      - value: meeting
+        label: "Crowd (multi-speaker)"
+    group: domain
+
+  vad.onset:
+    widget: slider
+    label: "Onset Threshold"
+    description: "Speech start threshold (higher = more confident starts)"
+    min: 0.5
+    max: 0.95
+    step: 0.05
+    group: hysteresis
+
+  vad.offset:
+    widget: slider
+    label: "Offset Threshold"
+    description: "Speech end threshold (lower = extend into speech tail)"
+    min: 0.3
+    max: 0.8
+    step: 0.05
+    group: hysteresis
+
+  vad.pad_offset:
+    widget: slider
+    label: "Pad Offset"
+    description: "Padding from offset (negative trims, positive extends)"
+    min: -0.2
+    max: 0.2
+    step: 0.01
+    group: hysteresis
+
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: "Minimum speech segment duration to keep"
+    min: 50
+    max: 500
+    step: 10
+    group: filters
+
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: "Maximum gap to group consecutive segments"
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    group: filters
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.nemo
+  class: NemoSpeechSegmenter

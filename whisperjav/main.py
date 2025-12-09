@@ -238,6 +238,24 @@ def parse_arguments():
                              ))
     tuning_group.add_argument("--no-vad", action="store_true",
                              help="Disable VAD speech segmentation (balanced/fidelity: skip Silero VAD; kotoba: disable faster-whisper VAD)")
+    tuning_group.add_argument("--speech-segmenter",
+                             type=str,
+                             choices=[
+                                 "silero", "silero-v4.0", "silero-v3.1",
+                                 "nemo", "nemo-lite",
+                                 "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
+                                 "ten", "none"
+                             ],
+                             default=None,  # None = use silero (default)
+                             metavar="BACKEND",
+                             help=(
+                                 "Speech segmentation backend: "
+                                 "silero/silero-v4.0 (default), silero-v3.1, "
+                                 "nemo/nemo-lite (fast frame VAD ~0.5GB), "
+                                 "whisper-vad (neural VAD using Whisper small model ~500MB), "
+                                 "whisper-vad-tiny/base/medium (other model sizes), "
+                                 "ten (TEN Framework), none (disable segmentation)"
+                             ))
 
     # Async processing
     async_group = parser.add_argument_group("Processing Options")
@@ -1103,6 +1121,22 @@ def main():
             resolved_config["params"]["vad"]["skip_vad"] = True
             logger.info("Silero VAD preprocessing disabled via --no-vad flag")
 
+    # Apply --speech-segmenter override
+    speech_segmenter = getattr(args, 'speech_segmenter', None)
+    if speech_segmenter is not None and resolved_config is not None:
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+        if "speech_segmenter" not in resolved_config["params"]:
+            resolved_config["params"]["speech_segmenter"] = {}
+        resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
+        logger.info(f"Speech segmenter set to: {speech_segmenter}")
+
+        # If --speech-segmenter none is set, also set skip_vad for backward compatibility
+        if speech_segmenter == "none":
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["skip_vad"] = True
+
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
         import json
@@ -1117,6 +1151,7 @@ def main():
                 "ensemble": args.ensemble,
                 "asr": getattr(args, 'asr', None),
                 "vad": getattr(args, 'vad', None),
+                "speech_segmenter": getattr(args, 'speech_segmenter', None),
                 "transformers_two_pass": getattr(args, 'transformers_two_pass', False),
             }
         }

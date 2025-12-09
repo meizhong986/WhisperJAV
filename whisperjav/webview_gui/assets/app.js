@@ -658,8 +658,8 @@ const FormManager = {
             // Async processing (conditional)
             async_processing: asyncProcessingEnabled,
 
-            // VAD bypass option
-            no_vad: document.getElementById('noVad').checked,
+            // Speech segmenter selection (replaces no_vad checkbox)
+            speech_segmenter: document.getElementById('speechSegmenter').value,
 
             // Other options
             credit: document.getElementById('openingCredit').value.trim(),

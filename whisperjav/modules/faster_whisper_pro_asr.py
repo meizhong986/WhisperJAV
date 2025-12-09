@@ -19,6 +19,7 @@ import logging
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
+from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 
 
 def _is_silero_vad_cached(repo_or_dir: str) -> bool:
@@ -91,6 +92,27 @@ class FasterWhisperProASR:
 
         # VAD bypass flag - when True, skip VAD and transcribe full audio directly
         self.skip_vad = vad_params.get("skip_vad", False)
+
+        # External speech segmenter (optional, for modular VAD support)
+        # If speech_segmenter config is provided with a non-default backend,
+        # use the modular speech segmentation system instead of internal Silero VAD
+        self._external_segmenter = None
+        speech_segmenter_config = params.get("speech_segmenter", {})
+        segmenter_backend = speech_segmenter_config.get("backend", "")
+        if segmenter_backend and segmenter_backend not in ("", "silero", "silero-v4.0"):
+            # Non-default backend requested - use external segmenter
+            try:
+                self._external_segmenter = SpeechSegmenterFactory.create(
+                    segmenter_backend,
+                    config=speech_segmenter_config
+                )
+                logger.info(f"Using external speech segmenter: {self._external_segmenter.name}")
+                # If "none" segmenter, also set skip_vad for consistency
+                if segmenter_backend == "none":
+                    self.skip_vad = True
+            except Exception as e:
+                logger.warning(f"Failed to create external segmenter '{segmenter_backend}': {e}")
+                logger.warning("Falling back to internal Silero VAD")
 
         # FIX: Combine all Whisper parameters into a single dictionary
         # The faster-whisper (via stable-ts) expects all parameters in one transcribe() call
@@ -478,6 +500,38 @@ class FasterWhisperProASR:
     def _run_vad_on_audio(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
         """
         Run VAD on audio data and return grouped segments.
+
+        If an external speech segmenter is configured, uses that instead of
+        the internal Silero VAD. Otherwise, preserves exact logic from original
+        implementation including timestamp adjustments.
+        """
+        # Use external segmenter if available
+        if self._external_segmenter is not None:
+            return self._run_external_segmenter(audio_data, sample_rate)
+
+        # Internal Silero VAD (original implementation)
+        return self._run_internal_silero_vad(audio_data, sample_rate)
+
+    def _run_external_segmenter(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
+        """
+        Run external speech segmenter and convert result to legacy format.
+        """
+        try:
+            result = self._external_segmenter.segment(audio_data, sample_rate=sample_rate)
+            logger.debug(
+                f"External segmenter '{self._external_segmenter.name}' found "
+                f"{result.num_segments} segments in {result.num_groups} groups "
+                f"({result.processing_time_sec:.2f}s)"
+            )
+            return result.to_legacy_format()
+        except Exception as e:
+            logger.warning(f"External segmenter failed: {e}")
+            logger.warning("Falling back to internal Silero VAD")
+            return self._run_internal_silero_vad(audio_data, sample_rate)
+
+    def _run_internal_silero_vad(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
+        """
+        Run internal Silero VAD on audio data and return grouped segments.
         Preserves exact logic from original implementation including timestamp adjustments.
         """
         VAD_SR = 16000

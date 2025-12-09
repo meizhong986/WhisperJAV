@@ -1,0 +1,331 @@
+"""
+TEN Framework VAD speech segmentation backend.
+
+Requires ten-vad package to be installed.
+Install: pip install -U git+https://github.com/TEN-framework/ten-vad.git
+
+See: https://github.com/TEN-framework/ten-vad
+"""
+
+from typing import Union, List, Dict, Any, Tuple
+from pathlib import Path
+import time
+import logging
+
+import numpy as np
+
+from ..base import SpeechSegment, SegmentationResult
+
+logger = logging.getLogger("whisperjav")
+
+
+class TenSpeechSegmenter:
+    """
+    TEN Framework VAD speech segmentation backend.
+
+    Uses TEN's lightweight VAD model for fast speech detection.
+    Processes audio frame-by-frame at 16kHz with configurable hop size.
+    Suitable for real-time and streaming applications.
+
+    Note: TEN VAD requires int16 audio input and operates at 16kHz only.
+
+    Example:
+        segmenter = TenSpeechSegmenter(threshold=0.5)
+        result = segmenter.segment(audio_path)
+    """
+
+    def __init__(
+        self,
+        threshold: float = 0.5,
+        hop_size: int = 256,
+        min_speech_duration_ms: int = 100,
+        min_silence_duration_ms: int = 100,
+        chunk_threshold_s: float = 4.0,
+        **kwargs
+    ):
+        """
+        Initialize TEN VAD segmenter.
+
+        Args:
+            threshold: Speech probability threshold [0.0, 1.0]
+            hop_size: Frame size in samples (160 or 256 recommended)
+            min_speech_duration_ms: Minimum speech segment duration
+            min_silence_duration_ms: Minimum silence between segments
+            chunk_threshold_s: Gap threshold for segment grouping
+            **kwargs: Ignored (for interface compatibility)
+        """
+        self.threshold = threshold
+        self.hop_size = hop_size
+        self.min_speech_duration_ms = min_speech_duration_ms
+        self.min_silence_duration_ms = min_silence_duration_ms
+        self.chunk_threshold_s = chunk_threshold_s
+
+        # Lazy-loaded model
+        self._model = None
+
+    @property
+    def name(self) -> str:
+        return "ten"
+
+    @property
+    def display_name(self) -> str:
+        return "TEN VAD"
+
+    def _ensure_model(self) -> None:
+        """Load TEN VAD model if not already loaded."""
+        if self._model is not None:
+            return
+
+        try:
+            from ten_vad import TenVad
+        except ImportError:
+            raise ImportError(
+                "TEN VAD requires ten-vad package. Install with:\n"
+                "pip install -U git+https://github.com/TEN-framework/ten-vad.git"
+            )
+
+        logger.debug(f"Loading TEN VAD model (hop_size={self.hop_size}, threshold={self.threshold})")
+        try:
+            self._model = TenVad(hop_size=self.hop_size, threshold=self.threshold)
+            logger.debug("TEN VAD model loaded")
+        except Exception as e:
+            logger.error(f"Failed to load TEN VAD model: {e}", exc_info=True)
+            raise
+
+    def segment(
+        self,
+        audio: Union[np.ndarray, Path, str],
+        sample_rate: int = 16000,
+        **kwargs
+    ) -> SegmentationResult:
+        """
+        Detect speech segments using TEN VAD.
+
+        TEN VAD processes audio frame-by-frame and requires:
+        - 16kHz sample rate (audio will be resampled if needed)
+        - int16 audio format (will be converted from float32)
+
+        Args:
+            audio: Audio data as numpy array, or path to audio file
+            sample_rate: Sample rate of input audio
+            **kwargs: Override parameters
+
+        Returns:
+            SegmentationResult with detected speech segments
+        """
+        start_time = time.time()
+        self._ensure_model()
+
+        # Load and prepare audio
+        audio_data, actual_sr = self._load_audio(audio, sample_rate)
+        duration = len(audio_data) / actual_sr
+
+        # TEN VAD requires 16kHz - resample if needed
+        if actual_sr != 16000:
+            audio_data = self._resample_audio(audio_data, actual_sr, 16000)
+            actual_sr = 16000
+
+        # Convert to int16 (TEN VAD requirement)
+        audio_int16 = self._convert_to_int16(audio_data)
+
+        try:
+            # Process frame-by-frame and collect flags
+            flags = []
+            probs = []
+            for i in range(0, len(audio_int16) - self.hop_size, self.hop_size):
+                frame = audio_int16[i:i + self.hop_size]
+                self._model.process(frame)
+                flags.append(self._model.out_flags.value)
+                probs.append(self._model.out_probability.value)
+
+            # Convert frame flags to speech segments
+            segments = self._flags_to_segments(flags, probs, actual_sr)
+
+        except Exception as e:
+            logger.error(f"TEN VAD segmentation failed: {e}", exc_info=True)
+            return SegmentationResult(
+                segments=[],
+                groups=[],
+                method=self.name,
+                audio_duration_sec=duration,
+                parameters=self._get_parameters(),
+                processing_time_sec=time.time() - start_time,
+            )
+
+        # Group segments
+        groups = self._group_segments(segments)
+
+        return SegmentationResult(
+            segments=segments,
+            groups=groups,
+            method=self.name,
+            audio_duration_sec=duration,
+            parameters=self._get_parameters(),
+            processing_time_sec=time.time() - start_time,
+        )
+
+    def _convert_to_int16(self, audio: np.ndarray) -> np.ndarray:
+        """Convert float32 audio to int16 for TEN VAD."""
+        if audio.dtype == np.int16:
+            return audio
+
+        # Normalize and convert
+        if audio.dtype in (np.float32, np.float64):
+            # Clamp to [-1, 1] and scale to int16 range
+            audio_clipped = np.clip(audio, -1.0, 1.0)
+            return (audio_clipped * 32767).astype(np.int16)
+        else:
+            # Assume it's already in int-like range
+            return audio.astype(np.int16)
+
+    def _resample_audio(
+        self,
+        audio: np.ndarray,
+        orig_sr: int,
+        target_sr: int
+    ) -> np.ndarray:
+        """Resample audio to target sample rate."""
+        try:
+            from scipy import signal
+            num_samples = int(len(audio) * target_sr / orig_sr)
+            resampled = signal.resample(audio, num_samples)
+            return resampled.astype(audio.dtype)
+        except ImportError:
+            # Fallback: simple linear interpolation
+            ratio = target_sr / orig_sr
+            indices = np.arange(0, len(audio), 1/ratio)
+            indices = np.clip(indices, 0, len(audio) - 1).astype(int)
+            return audio[indices]
+
+    def _flags_to_segments(
+        self,
+        flags: List[int],
+        probs: List[float],
+        sample_rate: int
+    ) -> List[SpeechSegment]:
+        """Convert frame-level speech flags to speech segments."""
+        segments = []
+        frame_duration = self.hop_size / sample_rate
+
+        in_speech = False
+        speech_start = 0.0
+        speech_start_idx = 0
+
+        for i, flag in enumerate(flags):
+            time_sec = i * frame_duration
+
+            if flag == 1 and not in_speech:
+                # Speech started
+                in_speech = True
+                speech_start = time_sec
+                speech_start_idx = i
+            elif flag == 0 and in_speech:
+                # Speech ended
+                in_speech = False
+                speech_end = time_sec
+
+                # Calculate average confidence for this segment
+                segment_probs = probs[speech_start_idx:i]
+                avg_confidence = sum(segment_probs) / len(segment_probs) if segment_probs else 1.0
+
+                # Apply minimum duration filter
+                duration_ms = (speech_end - speech_start) * 1000
+                if duration_ms >= self.min_speech_duration_ms:
+                    segments.append(SpeechSegment(
+                        start_sec=speech_start,
+                        end_sec=speech_end,
+                        start_sample=int(speech_start * sample_rate),
+                        end_sample=int(speech_end * sample_rate),
+                        confidence=avg_confidence,
+                        metadata={}
+                    ))
+
+        # Handle speech extending to end of audio
+        if in_speech:
+            speech_end = len(flags) * frame_duration
+            segment_probs = probs[speech_start_idx:]
+            avg_confidence = sum(segment_probs) / len(segment_probs) if segment_probs else 1.0
+
+            duration_ms = (speech_end - speech_start) * 1000
+            if duration_ms >= self.min_speech_duration_ms:
+                segments.append(SpeechSegment(
+                    start_sec=speech_start,
+                    end_sec=speech_end,
+                    start_sample=int(speech_start * sample_rate),
+                    end_sample=int(speech_end * sample_rate),
+                    confidence=avg_confidence,
+                    metadata={}
+                ))
+
+        return segments
+
+    def _group_segments(
+        self,
+        segments: List[SpeechSegment]
+    ) -> List[List[SpeechSegment]]:
+        """Group segments based on time gaps."""
+        if not segments:
+            return []
+
+        groups: List[List[SpeechSegment]] = [[]]
+
+        for i, segment in enumerate(segments):
+            if i > 0:
+                prev_end = segments[i - 1].end_sec
+                gap = segment.start_sec - prev_end
+                if gap > self.chunk_threshold_s:
+                    groups.append([])
+            groups[-1].append(segment)
+
+        return groups
+
+    def _load_audio(
+        self,
+        audio: Union[np.ndarray, Path, str],
+        sample_rate: int
+    ) -> Tuple[np.ndarray, int]:
+        """Load audio from path or return array directly."""
+        if isinstance(audio, np.ndarray):
+            return audio, sample_rate
+
+        audio_path = Path(audio) if isinstance(audio, str) else audio
+
+        try:
+            import soundfile as sf
+        except ImportError:
+            raise ImportError("soundfile is required for loading audio files")
+
+        audio_data, actual_sr = sf.read(str(audio_path), dtype='float32')
+
+        if audio_data.ndim > 1:
+            audio_data = np.mean(audio_data, axis=1)
+
+        return audio_data, actual_sr
+
+    def _get_parameters(self) -> Dict[str, Any]:
+        """Return current parameters."""
+        return {
+            "threshold": self.threshold,
+            "hop_size": self.hop_size,
+            "min_speech_duration_ms": self.min_speech_duration_ms,
+            "min_silence_duration_ms": self.min_silence_duration_ms,
+            "chunk_threshold_s": self.chunk_threshold_s,
+        }
+
+    def cleanup(self) -> None:
+        """Release model resources."""
+        if self._model is not None:
+            del self._model
+            self._model = None
+            logger.debug("TEN VAD model resources released")
+
+    def get_supported_sample_rates(self) -> List[int]:
+        """Return supported sample rates.
+
+        Note: TEN VAD only operates at 16kHz internally. Other sample rates
+        will be automatically resampled to 16kHz before processing.
+        """
+        return [16000]
+
+    def __repr__(self) -> str:
+        return f"TenSpeechSegmenter(threshold={self.threshold})"
