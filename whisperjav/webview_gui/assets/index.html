@@ -298,11 +298,18 @@
                                         <span>Smart postprocessing (WIP)</span>
                                     </label>
                                 </div>
-                                <div class="form-group">
-                                    <label class="checkbox-label" title="Skip VAD speech segmentation - may improve transcription quality">
-                                        <input type="checkbox" id="noVad">
-                                        <span>Skip VAD preprocessing</span>
-                                    </label>
+                                <div class="form-group inline-field">
+                                    <label for="speechSegmenter" class="form-label" style="white-space: nowrap;">Speech Segmenter:</label>
+                                    <select id="speechSegmenter" class="form-select">
+                                        <option value="" selected>Silero v4.0 (default)</option>
+                                        <option value="silero-v3.1">Silero v3.1</option>
+                                        <option value="nemo-lite" disabled title="Requires nemo_toolkit">NeMo Lite (~0.5GB) (N/A)</option>
+                                        <option value="whisper-vad">Whisper VAD (small ~500MB)</option>
+                                        <option value="whisper-vad-tiny">Whisper VAD (tiny ~75MB)</option>
+                                        <option value="whisper-vad-medium">Whisper VAD (medium ~1.5GB)</option>
+                                        <option value="ten" disabled title="Requires ten-vad">TEN VAD (N/A)</option>
+                                        <option value="none">None (Skip VAD)</option>
+                                    </select>
                                 </div>
                             </div>
 

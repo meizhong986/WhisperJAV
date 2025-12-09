@@ -102,7 +102,7 @@ class WhisperJAVAPI:
                 - adaptive_audio_enhancement: bool - Adaptive audio enhancements (WIP)
                 - smart_postprocessing: bool - Smart postprocessing (WIP)
                 - async_processing: bool - Enable async processing
-                - no_vad: bool - Skip VAD speech segmentation
+                - speech_segmenter: str - Speech segmentation backend (silero-v3.1, nemo, ten, none, or empty for default)
                 - model_override: str - Model override (large-v3/large-v2/turbo)
                 - credit: str - Opening credit text
 
@@ -176,9 +176,10 @@ class WhisperJAVAPI:
         if options.get('async_processing', False):
             args += ["--async-processing"]
 
-        # VAD bypass (skip Silero VAD speech segmentation)
-        if options.get('no_vad', False):
-            args += ["--no-vad"]
+        # Speech segmenter selection (replaces --no-vad)
+        speech_segmenter = options.get('speech_segmenter', '').strip()
+        if speech_segmenter:
+            args += ["--speech-segmenter", speech_segmenter]
 
         # Model override
         model_override = options.get('model_override', '').strip()

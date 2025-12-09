@@ -41,6 +41,11 @@ tests/temp/
 Thumbs.db
 
 # Project specific
+tests/
+test_media/
+test_output/
+docs/
+.plan/
 temp/
 output/
 *.wav
