@@ -167,6 +167,13 @@ def parse_arguments():
                                help="JSON string of full parameters for pass 1 (custom mode)")
     twopass_group.add_argument("--pass1-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 1 (when pipeline=transformers)")
+    twopass_group.add_argument("--pass1-scene-detector", default=None,
+                               choices=["auditok", "silero", "none"],
+                               help="Scene detection method for pass 1 (default: auditok)")
+    twopass_group.add_argument("--pass1-speech-segmenter", default=None,
+                               help="Speech segmenter backend for pass 1 (e.g., silero, silero-v3.1, whisper-vad)")
+    twopass_group.add_argument("--pass1-model", default=None,
+                               help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
                                choices=["balanced", "fast", "faster", "fidelity", "transformers"],
@@ -180,6 +187,13 @@ def parse_arguments():
                                help="JSON string of full parameters for pass 2 (custom mode)")
     twopass_group.add_argument("--pass2-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 2 (when pipeline=transformers)")
+    twopass_group.add_argument("--pass2-scene-detector", default=None,
+                               choices=["auditok", "silero", "none"],
+                               help="Scene detection method for pass 2 (default: none)")
+    twopass_group.add_argument("--pass2-speech-segmenter", default=None,
+                               help="Speech segmenter backend for pass 2 (e.g., silero, silero-v3.1, whisper-vad)")
+    twopass_group.add_argument("--pass2-model", default=None,
+                               help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--merge-strategy", default="smart_merge",
                                choices=["smart_merge", "full_merge", "pass1_primary", "pass2_primary", "pass1_overlap", "pass2_overlap"],
                                help="Merge strategy for two-pass results (default: smart_merge)")
@@ -1253,6 +1267,9 @@ def main():
             pass1_config = {
                 'pipeline': args.pass1_pipeline,
                 'sensitivity': args.pass1_sensitivity,
+                'scene_detector': args.pass1_scene_detector,
+                'speech_segmenter': args.pass1_speech_segmenter,
+                'model': args.pass1_model,
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params  # For transformers pipeline
             }
@@ -1262,6 +1279,9 @@ def main():
                 pass2_config = {
                     'pipeline': args.pass2_pipeline,
                     'sensitivity': args.pass2_sensitivity,
+                    'scene_detector': args.pass2_scene_detector,
+                    'speech_segmenter': args.pass2_speech_segmenter,
+                    'model': args.pass2_model,
                     'params': pass2_params,
                     'hf_params': pass2_hf_params  # For transformers pipeline
                 }

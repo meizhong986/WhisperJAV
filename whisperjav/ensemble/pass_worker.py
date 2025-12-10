@@ -488,6 +488,15 @@ def _build_pipeline(
 
     if pipeline_name == "transformers":
         hf_defaults = prepare_transformers_params(pass_config)
+        # Apply GUI-specified overrides for transformers pipeline
+        if pass_config.get("model"):
+            hf_defaults["hf_model_id"] = pass_config["model"]
+            logger.debug("Pass %s: Override hf_model_id = %s", pass_number, pass_config["model"])
+        if pass_config.get("scene_detector") and pass_config["scene_detector"] != "none":
+            hf_defaults["hf_scene"] = pass_config["scene_detector"]
+            logger.debug("Pass %s: Override hf_scene = %s", pass_number, pass_config["scene_detector"])
+        elif pass_config.get("scene_detector") == "none":
+            hf_defaults["hf_scene"] = "none"
         return TransformersPipeline(
             output_dir=output_dir,
             temp_dir=str(pass_temp_dir),
@@ -503,6 +512,9 @@ def _build_pipeline(
         task="transcribe",
         overrides=pass_config.get("overrides"),
     )
+
+    # Apply GUI-specified overrides for legacy pipelines
+    _apply_gui_overrides(resolved_config, pass_config, pass_number)
 
     if pass_config.get("params"):
         unknown_params = apply_custom_params(
@@ -633,3 +645,84 @@ def apply_custom_params(
         )
 
     return unknown_params
+
+
+# Map GUI speech segmenter values to VAD backend names
+SPEECH_SEGMENTER_MAP = {
+    "": "silero",  # Default (Silero V4.0)
+    "silero-v4.0": "silero",
+    "silero-v3.1": "silero",  # Same backend, version handled separately
+    "nemo-lite": "nemo",
+    "whisper-vad": "whisper_vad",
+    "whisper-vad-tiny": "whisper_vad",
+    "ten": "ten",
+    "none": "none",
+}
+
+
+def _apply_gui_overrides(
+    resolved_config: Dict[str, Any],
+    pass_config: Dict[str, Any],
+    pass_number: int,
+) -> None:
+    """
+    Apply GUI-specified overrides to resolved config for legacy pipelines.
+
+    This function handles the new GUI fields (model, scene_detector, speech_segmenter)
+    that are passed at the top level of pass_config, not in the 'params' dict.
+
+    Args:
+        resolved_config: The resolved configuration from resolve_legacy_pipeline()
+        pass_config: Pass configuration from GUI/CLI with new override fields
+        pass_number: Pass number (1 or 2) for logging
+    """
+    # Override model name if specified
+    if pass_config.get("model"):
+        model_name = pass_config["model"]
+        if "model" in resolved_config:
+            resolved_config["model"]["model_name"] = model_name
+            logger.debug("Pass %s: Override model_name = %s", pass_number, model_name)
+
+    # Override scene detection method if specified
+    scene_detector = pass_config.get("scene_detector")
+    if scene_detector:
+        if "features" not in resolved_config:
+            resolved_config["features"] = {}
+
+        if scene_detector == "none":
+            # Disable scene detection
+            resolved_config["features"]["scene_detection"] = None
+            if "workflow" in resolved_config and "features" in resolved_config["workflow"]:
+                resolved_config["workflow"]["features"]["scene_detection"] = False
+            logger.debug("Pass %s: Disabled scene detection", pass_number)
+        else:
+            # Set scene detection method (auditok or silero)
+            if "scene_detection" not in resolved_config["features"]:
+                resolved_config["features"]["scene_detection"] = {}
+            if resolved_config["features"]["scene_detection"] is None:
+                resolved_config["features"]["scene_detection"] = {}
+            resolved_config["features"]["scene_detection"]["method"] = scene_detector
+            logger.debug("Pass %s: Override scene_detector = %s", pass_number, scene_detector)
+
+    # Override speech segmenter (VAD backend) if specified
+    speech_segmenter = pass_config.get("speech_segmenter")
+    if speech_segmenter is not None:  # Allow empty string for default
+        vad_backend = SPEECH_SEGMENTER_MAP.get(speech_segmenter, speech_segmenter)
+
+        if vad_backend == "none":
+            # Disable VAD
+            if "params" in resolved_config and "vad" in resolved_config["params"]:
+                resolved_config["params"]["vad"]["enabled"] = False
+            if "workflow" in resolved_config:
+                resolved_config["workflow"]["vad"] = "none"
+            logger.debug("Pass %s: Disabled VAD (speech segmenter = none)", pass_number)
+        else:
+            # Set VAD backend
+            if "params" not in resolved_config:
+                resolved_config["params"] = {}
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["backend"] = vad_backend
+            if "workflow" in resolved_config:
+                resolved_config["workflow"]["vad"] = vad_backend
+            logger.debug("Pass %s: Override vad_backend = %s", pass_number, vad_backend)

@@ -1044,32 +1044,67 @@ const EnsembleManager = {
     state: {
         pass1: {
             pipeline: 'balanced',
-            sensitivity: 'balanced',
+            sensitivity: 'aggressive',
+            sceneDetector: 'auditok',
+            speechEnhancer: 'none',
+            speechSegmenter: '',  // '' = silero default
+            model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
             isTransformers: false  // Track if using Transformers pipeline
         },
         pass2: {
             enabled: false,
-            pipeline: 'fidelity',
-            sensitivity: 'balanced',
+            pipeline: 'transformers',
+            sensitivity: 'none',
+            sceneDetector: 'none',
+            speechEnhancer: 'none',
+            speechSegmenter: 'none',
+            model: 'kotoba-whisper-v2.0',
             customized: false,
             params: null,
-            isTransformers: false  // Track if using Transformers pipeline
+            isTransformers: true  // Default Pass 2 is Transformers
         },
         mergeStrategy: 'smart_merge',
         currentCustomize: null  // 'pass1' or 'pass2'
     },
 
+    // Model options for different pipeline types
+    legacyModels: [
+        { value: 'large-v2', label: 'Large V2' },
+        { value: 'large-v3', label: 'Large V3' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'small', label: 'Small' },
+        { value: 'turbo', label: 'Turbo' }
+    ],
+    transformersModels: [
+        { value: 'kotoba-whisper-v2.0', label: 'Kotoba 2.0' },
+        { value: 'openai/whisper-large-v3', label: 'Whisper Large V3' },
+        { value: 'openai/whisper-large-v2', label: 'Whisper Large V2' }
+    ],
+
     async init() {
         // SYNC: Initialize state from actual HTML form values
         // This handles browser form persistence across page reloads/sessions
         // Without this, checkbox can appear checked but JavaScript state is false
+
+        // Pass 1 state sync
+        this.state.pass1.pipeline = document.getElementById('pass1-pipeline').value;
+        this.state.pass1.sensitivity = document.getElementById('pass1-sensitivity').value;
+        this.state.pass1.sceneDetector = document.getElementById('pass1-scene').value;
+        this.state.pass1.speechEnhancer = document.getElementById('pass1-enhancer').value;
+        this.state.pass1.speechSegmenter = document.getElementById('pass1-segmenter').value;
+        this.state.pass1.model = document.getElementById('pass1-model').value;
+
+        // Pass 2 state sync
         this.state.pass2.enabled = document.getElementById('pass2-enabled').checked;
         this.state.pass2.pipeline = document.getElementById('pass2-pipeline').value;
         this.state.pass2.sensitivity = document.getElementById('pass2-sensitivity').value;
-        this.state.pass1.pipeline = document.getElementById('pass1-pipeline').value;
-        this.state.pass1.sensitivity = document.getElementById('pass1-sensitivity').value;
+        this.state.pass2.sceneDetector = document.getElementById('pass2-scene').value;
+        this.state.pass2.speechEnhancer = document.getElementById('pass2-enhancer').value;
+        this.state.pass2.speechSegmenter = document.getElementById('pass2-segmenter').value;
+        this.state.pass2.model = document.getElementById('pass2-model').value;
+
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
 
         // Update isTransformers flags based on synced pipeline values
@@ -1095,6 +1130,34 @@ const EnsembleManager = {
         });
         document.getElementById('pass2-sensitivity').addEventListener('change', (e) => {
             this.handleSensitivityChange('pass2', e.target.value, e.target);
+        });
+
+        // New dropdown event handlers - Pass 1
+        document.getElementById('pass1-scene').addEventListener('change', (e) => {
+            this.state.pass1.sceneDetector = e.target.value;
+        });
+        document.getElementById('pass1-enhancer').addEventListener('change', (e) => {
+            this.state.pass1.speechEnhancer = e.target.value;
+        });
+        document.getElementById('pass1-segmenter').addEventListener('change', (e) => {
+            this.state.pass1.speechSegmenter = e.target.value;
+        });
+        document.getElementById('pass1-model').addEventListener('change', (e) => {
+            this.state.pass1.model = e.target.value;
+        });
+
+        // New dropdown event handlers - Pass 2
+        document.getElementById('pass2-scene').addEventListener('change', (e) => {
+            this.state.pass2.sceneDetector = e.target.value;
+        });
+        document.getElementById('pass2-enhancer').addEventListener('change', (e) => {
+            this.state.pass2.speechEnhancer = e.target.value;
+        });
+        document.getElementById('pass2-segmenter').addEventListener('change', (e) => {
+            this.state.pass2.speechSegmenter = e.target.value;
+        });
+        document.getElementById('pass2-model').addEventListener('change', (e) => {
+            this.state.pass2.model = e.target.value;
         });
 
         // Merge strategy
@@ -1126,13 +1189,14 @@ const EnsembleManager = {
         // Initialize UI state based on synced values
         this.updatePass2State();
         this.updateBadges();
-        this.updatePassSensitivityState('pass1');
-        this.updatePassSensitivityState('pass2');
+        this.updateRowGreyingState('pass1');
+        this.updateRowGreyingState('pass2');
     },
 
     handlePipelineChange(passKey, newValue, selectElement) {
         const passState = this.state[passKey];
         const isTransformers = newValue === 'transformers';
+        const wasTransformers = passState.isTransformers;
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -1142,7 +1206,11 @@ const EnsembleManager = {
                 passState.params = null;
                 passState.isTransformers = isTransformers;
                 this.updateBadges();
-                this.updatePassSensitivityState(passKey);
+                this.updateRowGreyingState(passKey);
+                // Swap model options if pipeline type changed
+                if (wasTransformers !== isTransformers) {
+                    this.swapModelOptions(passKey, isTransformers);
+                }
             } else {
                 // Revert selection
                 selectElement.value = passState.pipeline;
@@ -1150,26 +1218,66 @@ const EnsembleManager = {
         } else {
             passState.pipeline = newValue;
             passState.isTransformers = isTransformers;
-            this.updatePassSensitivityState(passKey);
+            this.updateRowGreyingState(passKey);
+            // Swap model options if pipeline type changed
+            if (wasTransformers !== isTransformers) {
+                this.swapModelOptions(passKey, isTransformers);
+            }
         }
     },
 
-    // Update sensitivity dropdown visibility based on pipeline type
-    updatePassSensitivityState(passKey) {
+    // Swap model dropdown options based on pipeline type
+    swapModelOptions(passKey, isTransformers) {
+        const modelSelect = document.getElementById(`${passKey}-model`);
+        const models = isTransformers ? this.transformersModels : this.legacyModels;
+
+        // Clear existing options
+        modelSelect.innerHTML = '';
+
+        // Add new options
+        models.forEach((model, index) => {
+            const option = document.createElement('option');
+            option.value = model.value;
+            option.textContent = model.label;
+            if (index === 0) option.selected = true;
+            modelSelect.appendChild(option);
+        });
+
+        // Update state with first option
+        this.state[passKey].model = models[0].value;
+    },
+
+    // Update row greying based on pipeline type (Transformers disables Sensitivity + Speech Segmenter)
+    updateRowGreyingState(passKey) {
         const passState = this.state[passKey];
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
+        const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
+
+        // Check if pass2 is disabled (controls should be disabled regardless of pipeline)
+        const isPass2Disabled = passKey === 'pass2' && !this.state.pass2.enabled;
 
         if (passState.isTransformers) {
-            // Disable sensitivity for Transformers
+            // Disable sensitivity and speech segmenter for Transformers
             sensitivitySelect.disabled = true;
-            sensitivitySelect.style.opacity = '0.5';
             sensitivitySelect.title = 'Sensitivity not applicable for Transformers mode';
+            segmenterSelect.disabled = true;
+            segmenterSelect.title = 'Speech Segmenter not applicable for Transformers mode';
+
+            // Set to 'none' for visual clarity
+            if (sensitivitySelect.querySelector('option[value="none"]')) {
+                sensitivitySelect.value = 'none';
+                passState.sensitivity = 'none';
+            }
+            if (segmenterSelect.querySelector('option[value="none"]')) {
+                segmenterSelect.value = 'none';
+                passState.speechSegmenter = 'none';
+            }
         } else {
-            // Re-enable sensitivity (unless pass2 is disabled)
-            const isPass2Disabled = passKey === 'pass2' && !this.state.pass2.enabled;
+            // Re-enable sensitivity and segmenter (unless pass2 is disabled)
             sensitivitySelect.disabled = isPass2Disabled;
-            sensitivitySelect.style.opacity = isPass2Disabled ? '0.5' : '1';
             sensitivitySelect.title = '';
+            segmenterSelect.disabled = isPass2Disabled;
+            segmenterSelect.title = '';
         }
     },
 
@@ -1194,19 +1302,32 @@ const EnsembleManager = {
 
     updatePass2State() {
         const enabled = this.state.pass2.enabled;
-        const pass2Content = document.getElementById('pass2-content');
+        const pass2Row = document.getElementById('pass2-row');
+        const mergeRow = document.getElementById('merge-row');
 
-        // Enable/disable pass 2 controls
+        // Enable/disable all pass 2 controls
         document.getElementById('pass2-pipeline').disabled = !enabled;
-        document.getElementById('pass2-sensitivity').disabled = !enabled;
+        document.getElementById('pass2-scene').disabled = !enabled;
+        document.getElementById('pass2-enhancer').disabled = !enabled;
+        document.getElementById('pass2-model').disabled = !enabled;
         document.getElementById('customize-pass2').disabled = !enabled;
         document.getElementById('merge-strategy').disabled = !enabled;
 
-        // Visual feedback
+        // Sensitivity and Segmenter handled by updateRowGreyingState (may be additionally disabled for Transformers)
+        if (!enabled) {
+            document.getElementById('pass2-sensitivity').disabled = true;
+            document.getElementById('pass2-segmenter').disabled = true;
+        }
+
+        // Visual feedback - grey out entire row
         if (enabled) {
-            pass2Content.classList.remove('disabled');
+            pass2Row.classList.remove('disabled');
+            mergeRow.classList.remove('disabled');
+            // Re-apply pipeline-specific greying
+            this.updateRowGreyingState('pass2');
         } else {
-            pass2Content.classList.add('disabled');
+            pass2Row.classList.add('disabled');
+            mergeRow.classList.add('disabled');
         }
     },
 
@@ -2507,6 +2628,10 @@ const EnsembleManager = {
             pass1: {
                 pipeline: this.state.pass1.pipeline,
                 sensitivity: this.state.pass1.isTransformers ? null : this.state.pass1.sensitivity,
+                sceneDetector: this.state.pass1.sceneDetector,
+                speechEnhancer: this.state.pass1.speechEnhancer,
+                speechSegmenter: this.state.pass1.isTransformers ? null : this.state.pass1.speechSegmenter,
+                model: this.state.pass1.model,
                 customized: this.state.pass1.customized,
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
                 isTransformers: this.state.pass1.isTransformers
@@ -2515,6 +2640,10 @@ const EnsembleManager = {
                 enabled: this.state.pass2.enabled,
                 pipeline: this.state.pass2.pipeline,
                 sensitivity: this.state.pass2.isTransformers ? null : this.state.pass2.sensitivity,
+                sceneDetector: this.state.pass2.sceneDetector,
+                speechEnhancer: this.state.pass2.speechEnhancer,
+                speechSegmenter: this.state.pass2.isTransformers ? null : this.state.pass2.speechSegmenter,
+                model: this.state.pass2.model,
                 customized: this.state.pass2.customized,
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
                 isTransformers: this.state.pass2.isTransformers
