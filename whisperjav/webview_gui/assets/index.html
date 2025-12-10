@@ -355,83 +355,168 @@
                             role="tabpanel"
                             aria-labelledby="tab3-button"
                         >
-                            <div class="ensemble-twopass-container">
+                            <div class="ensemble-grid">
+                                <!-- Header Row -->
+                                <div class="grid-header">
+                                    <div class="col-label"></div>
+                                    <div class="col-pipeline">Pipeline</div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-sensitivity">Sensitivity</div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-scene">Scene Detector</div>
+                                    <div class="col-enhancer">Speech Enhancer</div>
+                                    <div class="col-segmenter">Speech Segmenter</div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-model">Model</div>
+                                    <div class="col-actions"></div>
+                                </div>
+
                                 <!-- Pass 1 Row -->
-                                <div class="pass-row">
-                                    <span class="pass-label">Pass 1</span>
-                                    <div class="pass-controls">
-                                        <label for="pass1-pipeline" class="control-label">Pipeline:</label>
+                                <div class="grid-row" id="pass1-row">
+                                    <div class="col-label">Pass 1</div>
+                                    <div class="col-pipeline">
                                         <select id="pass1-pipeline" class="form-select compact">
                                             <option value="balanced" selected>Balanced</option>
                                             <option value="fast">Fast</option>
                                             <option value="faster">Faster</option>
                                             <option value="fidelity">Fidelity</option>
-                                            <!-- kotoba-faster-whisper temporarily hidden (implementation preserved)
-                                            <option value="kotoba-faster-whisper">Kotoba (Japanese)</option>
-                                            -->
                                             <option value="transformers">Transformers (HF)</option>
                                         </select>
-                                        <label for="pass1-sensitivity" class="control-label">Sensitivity:</label>
+                                    </div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-sensitivity">
                                         <select id="pass1-sensitivity" class="form-select compact">
-                                            <option value="aggressive">Aggressive</option>
-                                            <option value="balanced" selected>Balanced</option>
+                                            <option value="aggressive" selected>Aggressive</option>
+                                            <option value="balanced">Balanced</option>
                                             <option value="conservative">Conservative</option>
                                         </select>
+                                    </div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-scene">
+                                        <select id="pass1-scene" class="form-select compact">
+                                            <option value="auditok" selected>Auditok</option>
+                                            <option value="silero">Silero</option>
+                                            <option value="none">None</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-enhancer">
+                                        <select id="pass1-enhancer" class="form-select compact">
+                                            <option value="none" selected>None</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-segmenter">
+                                        <select id="pass1-segmenter" class="form-select compact">
+                                            <option value="" selected>Silero V4.0</option>
+                                            <option value="silero-v3.1">Silero V3.1</option>
+                                            <option value="nemo-lite" disabled title="Requires nemo_toolkit">NeMo Lite (N/A)</option>
+                                            <option value="whisper-vad">Whisper VAD</option>
+                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
+                                            <option value="ten" disabled title="Requires ten-vad">TEN (N/A)</option>
+                                            <option value="none">None</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-model">
+                                        <select id="pass1-model" class="form-select compact">
+                                            <option value="large-v2" selected>Large V2</option>
+                                            <option value="large-v3">Large V3</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="small">Small</option>
+                                            <option value="turbo">Turbo</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-actions">
                                         <button type="button" class="btn btn-secondary btn-compact" id="customize-pass1">
                                             Customize Parameters
                                         </button>
+                                        <span id="pass1-badge" class="pass-badge default">DEFAULT</span>
                                     </div>
-                                    <span id="pass1-badge" class="pass-badge default">DEFAULT</span>
                                 </div>
 
                                 <!-- Pass 2 Row -->
-                                <div class="pass-row">
-                                    <label class="pass-label checkbox-label">
-                                        <input type="checkbox" id="pass2-enabled">
-                                        <span>Enable Pass 2</span>
-                                    </label>
-                                    <div class="pass-controls" id="pass2-content">
-                                        <label for="pass2-pipeline" class="control-label">Pipeline:</label>
+                                <div class="grid-row" id="pass2-row">
+                                    <div class="col-label">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="pass2-enabled">
+                                            <span>Pass 2</span>
+                                        </label>
+                                    </div>
+                                    <div class="col-pipeline">
                                         <select id="pass2-pipeline" class="form-select compact" disabled>
                                             <option value="balanced">Balanced</option>
                                             <option value="fast">Fast</option>
                                             <option value="faster">Faster</option>
-                                            <option value="fidelity" selected>Fidelity</option>
-                                            <!-- kotoba-faster-whisper temporarily hidden (implementation preserved)
-                                            <option value="kotoba-faster-whisper">Kotoba (Japanese)</option>
-                                            -->
-                                            <option value="transformers">Transformers (HF)</option>
+                                            <option value="fidelity">Fidelity</option>
+                                            <option value="transformers" selected>Transformers (HF)</option>
                                         </select>
-                                        <label for="pass2-sensitivity" class="control-label">Sensitivity:</label>
+                                    </div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-sensitivity">
                                         <select id="pass2-sensitivity" class="form-select compact" disabled>
                                             <option value="aggressive">Aggressive</option>
-                                            <option value="balanced" selected>Balanced</option>
+                                            <option value="balanced">Balanced</option>
                                             <option value="conservative">Conservative</option>
+                                            <option value="none" selected>None</option>
                                         </select>
+                                    </div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-scene">
+                                        <select id="pass2-scene" class="form-select compact" disabled>
+                                            <option value="auditok">Auditok</option>
+                                            <option value="silero">Silero</option>
+                                            <option value="none" selected>None</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-enhancer">
+                                        <select id="pass2-enhancer" class="form-select compact" disabled>
+                                            <option value="none" selected>None</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-segmenter">
+                                        <select id="pass2-segmenter" class="form-select compact" disabled>
+                                            <option value="">Silero V4.0</option>
+                                            <option value="silero-v3.1">Silero V3.1</option>
+                                            <option value="nemo-lite" disabled title="Requires nemo_toolkit">NeMo Lite (N/A)</option>
+                                            <option value="whisper-vad">Whisper VAD</option>
+                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
+                                            <option value="ten" disabled title="Requires ten-vad">TEN (N/A)</option>
+                                            <option value="none" selected>None</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-separator"></div>
+                                    <div class="col-model">
+                                        <select id="pass2-model" class="form-select compact" disabled>
+                                            <option value="kotoba-whisper-v2.0" selected>Kotoba 2.0</option>
+                                            <option value="openai/whisper-large-v3">Whisper Large V3</option>
+                                            <option value="openai/whisper-large-v2">Whisper Large V2</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-actions">
                                         <button type="button" class="btn btn-secondary btn-compact" id="customize-pass2" disabled>
                                             Customize Parameters
                                         </button>
+                                        <span id="pass2-badge" class="pass-badge default">DEFAULT</span>
                                     </div>
-                                    <span id="pass2-badge" class="pass-badge default">DEFAULT</span>
                                 </div>
 
                                 <!-- Merge Strategy Row -->
-                                <div class="merge-row">
-                                    <label for="merge-strategy" class="control-label">Merge Strategy:</label>
-                                    <select id="merge-strategy" class="form-select merge-select" disabled>
-                                        <option value="smart_merge" selected>Smart Merge (Best Quality)</option>
-                                        <option value="full_merge">Full Merge (All Lines)</option>
-                                        <option value="pass1_primary">Pass 1 + Fill From Pass 2</option>
-                                        <option value="pass2_primary">Pass 2 + Fill From Pass 1</option>
-                                        <option value="pass1_overlap">Pass 1 + Fill (30% Overlap)</option>
-                                        <option value="pass2_overlap">Pass 2 + Fill (30% Overlap)</option>
-                                    </select>
+                                <div class="grid-row" id="merge-row">
+                                    <div class="col-label">Merge</div>
+                                    <div class="col-merge">
+                                        <select id="merge-strategy" class="form-select merge-select" disabled>
+                                            <option value="smart_merge" selected>Smart Merge (Best Quality)</option>
+                                            <option value="full_merge">Full Merge (All Lines)</option>
+                                            <option value="pass1_primary">Pass 1 + Fill From Pass 2</option>
+                                            <option value="pass2_primary">Pass 2 + Fill From Pass 1</option>
+                                            <option value="pass1_overlap">Pass 1 + Fill (30% Overlap)</option>
+                                            <option value="pass2_overlap">Pass 2 + Fill (30% Overlap)</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <!-- Info Footer -->
                                 <div class="ensemble-info">
                                     <p>Two-pass ensemble runs two different pipeline configurations and merges results for improved quality.</p>
-                                    <p>Click "Customize Parameters" to adjust detailed settings for each pass.</p>
                                 </div>
                             </div>
                         </div>

@@ -1464,6 +1464,22 @@ class WhisperJAVAPI:
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-params", json.dumps(pass1['params'])]
 
+        # Pass 1: Scene Detector
+        scene1 = pass1.get('sceneDetector')
+        if scene1 and scene1 != 'none':
+            args += ["--pass1-scene-detector", scene1]
+
+        # Pass 1: Speech Segmenter (only for legacy pipelines)
+        if not pass1.get('isTransformers'):
+            segmenter1 = pass1.get('speechSegmenter')
+            if segmenter1 and segmenter1 != 'none':
+                args += ["--pass1-speech-segmenter", segmenter1]
+
+        # Pass 1: Model
+        model1 = pass1.get('model')
+        if model1:
+            args += ["--pass1-model", model1]
+
         # Pass 2 configuration
         pass2 = config.get('pass2', {})
         if pass2.get('enabled', False):
@@ -1479,6 +1495,22 @@ class WhisperJAVAPI:
                 args += ["--pass2-sensitivity", pass2.get('sensitivity', 'balanced')]
                 if pass2.get('customized') and pass2.get('params'):
                     args += ["--pass2-params", json.dumps(pass2['params'])]
+
+            # Pass 2: Scene Detector
+            scene2 = pass2.get('sceneDetector')
+            if scene2 and scene2 != 'none':
+                args += ["--pass2-scene-detector", scene2]
+
+            # Pass 2: Speech Segmenter (only for legacy pipelines)
+            if not pass2.get('isTransformers'):
+                segmenter2 = pass2.get('speechSegmenter')
+                if segmenter2 and segmenter2 != 'none':
+                    args += ["--pass2-speech-segmenter", segmenter2]
+
+            # Pass 2: Model
+            model2 = pass2.get('model')
+            if model2:
+                args += ["--pass2-model", model2]
 
         # Merge strategy
         merge_strategy = config.get('merge_strategy', 'smart_merge')
