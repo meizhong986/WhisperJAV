@@ -107,39 +107,54 @@ class TestDecoderPresets:
 
 
 class TestSileroVADPresets:
-    """Test SileroVADOptions presets match asr_config.json."""
+    """Test SileroVADOptions presets from v4 YAML configuration."""
 
-    def test_balanced_values(self, asr_config):
-        """Test balanced preset matches JSON."""
-        preset = SILERO_VAD_PRESETS[Sensitivity.BALANCED]
-        json_values = asr_config["silero_vad_options"]["balanced"]
+    @pytest.fixture
+    def silero_tool(self):
+        """Load Silero speech segmentation tool from v4 YAML."""
+        from whisperjav.config.v4.registries.tool_registry import get_tool_registry
+        registry = get_tool_registry()
+        return registry.get("silero-speech-segmentation")
 
-        assert preset.threshold == json_values["threshold"]
-        assert preset.min_speech_duration_ms == json_values["min_speech_duration_ms"]
-        assert preset.max_speech_duration_s == json_values["max_speech_duration_s"]
-        assert preset.speech_pad_ms == json_values["speech_pad_ms"]
+    def test_balanced_values(self, silero_tool):
+        """Test balanced preset values from v4 YAML."""
+        # Balanced uses spec defaults
+        spec = silero_tool.spec
 
-    def test_conservative_values(self, asr_config):
-        """Test conservative preset matches JSON."""
-        preset = SILERO_VAD_PRESETS[Sensitivity.CONSERVATIVE]
-        json_values = asr_config["silero_vad_options"]["conservative"]
+        assert spec["vad.threshold"] == 0.18
+        assert spec["vad.min_speech_duration_ms"] == 100
+        assert spec["vad.max_speech_duration_s"] == 11.0
+        assert spec["vad.speech_pad_ms"] == 400
 
-        assert preset.threshold == json_values["threshold"]
-        assert preset.neg_threshold == json_values["neg_threshold"]
+    def test_conservative_values(self, silero_tool):
+        """Test conservative preset values from v4 YAML."""
+        config = silero_tool.get_resolved_config("conservative")
 
-    def test_aggressive_values(self, asr_config):
-        """Test aggressive preset matches JSON."""
-        preset = SILERO_VAD_PRESETS[Sensitivity.AGGRESSIVE]
-        json_values = asr_config["silero_vad_options"]["aggressive"]
+        assert config["vad.threshold"] == 0.35
+        assert config["vad.neg_threshold"] == 0.3
+        assert config["vad.min_speech_duration_ms"] == 150
+        assert config["vad.max_speech_duration_s"] == 9.0
 
-        assert preset.threshold == json_values["threshold"]
-        assert preset.min_speech_duration_ms == json_values["min_speech_duration_ms"]
-        assert preset.speech_pad_ms == json_values["speech_pad_ms"]
+    def test_aggressive_values(self, silero_tool):
+        """Test aggressive preset values from v4 YAML."""
+        config = silero_tool.get_resolved_config("aggressive")
 
-    def test_getter_function(self):
-        """Test get_silero_vad_preset returns correct preset."""
+        assert config["vad.threshold"] == 0.05
+        assert config["vad.neg_threshold"] == 0.1
+        assert config["vad.min_speech_duration_ms"] == 30
+        assert config["vad.speech_pad_ms"] == 600
+
+    def test_legacy_getter_function(self):
+        """Test legacy get_silero_vad_preset still works."""
+        # Legacy function still available for backward compatibility
         preset = get_silero_vad_preset(Sensitivity.CONSERVATIVE)
         assert preset == SILERO_VAD_PRESETS[Sensitivity.CONSERVATIVE]
+
+    def test_v4_presets_available(self, silero_tool):
+        """Test all expected presets exist in v4 YAML."""
+        assert "conservative" in silero_tool.presets
+        assert "balanced" in silero_tool.presets
+        assert "aggressive" in silero_tool.presets
 
 
 class TestStableTSVADPresets:

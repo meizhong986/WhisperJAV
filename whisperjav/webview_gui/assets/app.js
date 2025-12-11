@@ -1047,7 +1047,7 @@ const EnsembleManager = {
             sensitivity: 'aggressive',
             sceneDetector: 'auditok',
             speechEnhancer: 'none',
-            speechSegmenter: '',  // '' = silero default
+            speechSegmenter: 'silero-v4.0',  // Explicit Silero V4.0 default
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1060,7 +1060,7 @@ const EnsembleManager = {
             sceneDetector: 'none',
             speechEnhancer: 'none',
             speechSegmenter: 'none',
-            model: 'kotoba-whisper-v2.0',
+            model: 'kotoba-tech/kotoba-whisper-v2.2',  // Latest Kotoba model
             customized: false,
             params: null,
             isTransformers: true  // Default Pass 2 is Transformers
@@ -1078,9 +1078,12 @@ const EnsembleManager = {
         { value: 'turbo', label: 'Turbo' }
     ],
     transformersModels: [
-        { value: 'kotoba-whisper-v2.0', label: 'Kotoba 2.0' },
-        { value: 'openai/whisper-large-v3', label: 'Whisper Large V3' },
-        { value: 'openai/whisper-large-v2', label: 'Whisper Large V2' }
+        { value: 'kotoba-tech/kotoba-whisper-v2.2', label: 'Kotoba v2.2 (Latest)' },
+        { value: 'kotoba-tech/kotoba-whisper-v2.1', label: 'Kotoba v2.1' },
+        { value: 'kotoba-tech/kotoba-whisper-v2.0', label: 'Kotoba v2.0' },
+        { value: 'kotoba-tech/kotoba-whisper-bilingual-v1.0', label: 'Kotoba Bilingual v1.0' },
+        { value: 'openai/whisper-large-v3-turbo', label: 'Whisper Large v3 Turbo' },
+        { value: 'openai/whisper-large-v2', label: 'Whisper Large v2' }
     ],
 
     async init() {
@@ -1484,7 +1487,7 @@ const EnsembleManager = {
                 decoder: {},
                 engine: {},
                 vad: {},
-                scene: { scene_detection_method: 'auditok' }
+                scene: { scene_detection_method: passState.sceneDetector || 'auditok' }
             };
 
             // Categorize decoder params (from API's decoder section)
@@ -2444,6 +2447,15 @@ const EnsembleManager = {
         // Store full params in pass state and mark as customized
         this.state[passKey].params = fullParams;
         this.state[passKey].customized = true;
+
+        // Sync scene_detection_method to state and dropdown (bidirectional sync)
+        if (fullParams.scene_detection_method) {
+            this.state[passKey].sceneDetector = fullParams.scene_detection_method;
+            // Also update the Ensemble tab dropdown UI
+            const dropdownId = passKey === 'pass1' ? 'pass1-scene' : 'pass2-scene';
+            const dropdown = document.getElementById(dropdownId);
+            if (dropdown) dropdown.value = fullParams.scene_detection_method;
+        }
 
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';

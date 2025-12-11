@@ -1,0 +1,174 @@
+# =============================================================================
+# Whisper VAD Speech Segmentation Tool Configuration
+# =============================================================================
+# Speech segmentation using Whisper transcription timestamps.
+# Leverages Whisper's semantic understanding for robust speech detection.
+# Works well on low SNR audio where traditional VADs fail.
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: whisper-vad-speech-segmentation
+  displayName: "Whisper VAD"
+  description: |
+    Speech segmentation using Whisper model as neural VAD.
+    Transcription segments become speech regions, leveraging Whisper's
+    deep semantic understanding for robust detection on difficult audio.
+    Proven approach: Used by WhisperX, WhisperSeg (ICASSP 2024).
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - whisper
+    - vad
+    - semantic
+    - neural
+  dependencies:
+    - "faster-whisper"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+    metadata:
+      transcription_cached: bool  # True if cached for future ASR use
+
+# =============================================================================
+# Tool Parameters (Balanced preset as default)
+# =============================================================================
+spec:
+  # --- Model Variant ---
+  # whisper-vad: Small model, good balance (~500MB)
+  # whisper-vad-tiny: Fastest (~75MB)
+  # whisper-vad-base: Fast with decent accuracy (~150MB)
+  # whisper-vad-medium: Most accurate (~1.5GB)
+  variant: "whisper-vad"
+
+  # --- Detection Parameters ---
+  no_speech_threshold: 0.6
+  logprob_threshold: -1.0
+  language: "ja"
+
+  # --- Processing ---
+  compute_type: "float16"
+  device: "auto"
+  cache_results: true
+
+  # --- Segment Filtering/Grouping ---
+  chunk_threshold_s: 4.0
+  min_speech_duration_ms: 100
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  # Conservative: Higher thresholds, fewer false positives
+  # Best for: Clean audio, clear speech
+  conservative:
+    no_speech_threshold: 0.7
+    logprob_threshold: -0.8
+    min_speech_duration_ms: 150
+
+  # Balanced: Default settings for general use
+  balanced: {}  # Uses spec defaults
+
+  # Aggressive: Lower thresholds, maximum capture
+  # Best for: Difficult audio, soft speech, low SNR
+  aggressive:
+    no_speech_threshold: 0.5
+    logprob_threshold: -1.5
+    min_speech_duration_ms: 50
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  variant:
+    widget: dropdown
+    label: "Model Size"
+    description: "Whisper model variant for VAD (larger = more accurate, slower)"
+    options:
+      - "whisper-vad-tiny"
+      - "whisper-vad-base"
+      - "whisper-vad"
+      - "whisper-vad-medium"
+    group: model
+
+  no_speech_threshold:
+    widget: slider
+    label: "No Speech Threshold"
+    description: "Probability threshold for 'no speech' detection (higher = stricter)"
+    min: 0.3
+    max: 0.9
+    step: 0.05
+    group: detection
+
+  logprob_threshold:
+    widget: slider
+    label: "Log Probability Threshold"
+    description: "Filter segments with avg_logprob below this (more negative = less filtering)"
+    min: -2.0
+    max: 0.0
+    step: 0.1
+    group: detection
+
+  language:
+    widget: dropdown
+    label: "Language"
+    description: "Target language for transcription"
+    options:
+      - "ja"
+      - "en"
+      - "zh"
+      - "ko"
+    group: detection
+
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: "Minimum speech segment duration to keep"
+    min: 10
+    max: 500
+    step: 10
+    group: filters
+
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: "Maximum gap to group consecutive segments"
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    group: filters
+
+  cache_results:
+    widget: toggle
+    label: "Cache Results"
+    description: "Save transcription for potential reuse by ASR"
+    group: processing
+
+  compute_type:
+    widget: dropdown
+    label: "Compute Type"
+    description: "GPU compute precision (float16 fastest, int8 smallest)"
+    options:
+      - "float16"
+      - "int8"
+      - "float32"
+    group: processing
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.whisper_vad
+  class: WhisperVadSpeechSegmenter

@@ -1,0 +1,134 @@
+# =============================================================================
+# TEN VAD Speech Segmentation Tool Configuration
+# =============================================================================
+# TEN Framework VAD - lightweight, fast voice activity detection.
+# Suitable for real-time and streaming applications.
+# Requires: pip install -U git+https://github.com/TEN-framework/ten-vad.git
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: ten-speech-segmentation
+  displayName: "TEN VAD"
+  description: |
+    Speech segmentation using TEN Framework VAD.
+    Lightweight neural VAD model for fast speech detection.
+    Processes audio frame-by-frame at 16kHz with configurable hop size.
+    Best for real-time and streaming applications.
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - ten
+    - vad
+    - lightweight
+    - realtime
+  dependencies:
+    - "ten-vad @ git+https://github.com/TEN-framework/ten-vad.git"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+
+# =============================================================================
+# Tool Parameters (Balanced preset as default)
+# =============================================================================
+spec:
+  # --- Core VAD Parameters ---
+  threshold: 0.5
+  hop_size: 256
+
+  # --- Duration Filters ---
+  min_speech_duration_ms: 100
+  min_silence_duration_ms: 100
+
+  # --- Segment Grouping ---
+  chunk_threshold_s: 4.0
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  # Conservative: Higher threshold, fewer false positives
+  # Best for: Clean audio, studio recordings
+  conservative:
+    threshold: 0.7
+    min_speech_duration_ms: 150
+    min_silence_duration_ms: 150
+
+  # Balanced: Default settings for general use
+  balanced: {}  # Uses spec defaults
+
+  # Aggressive: Lower threshold, maximum capture
+  # Best for: Noisy audio, soft speech
+  aggressive:
+    threshold: 0.3
+    min_speech_duration_ms: 50
+    min_silence_duration_ms: 50
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  threshold:
+    widget: slider
+    label: "Speech Threshold"
+    description: "Probability threshold to detect speech (lower = more sensitive)"
+    min: 0.1
+    max: 0.9
+    step: 0.05
+    group: detection
+
+  hop_size:
+    widget: dropdown
+    label: "Hop Size"
+    description: "Frame size in samples (160=10ms, 256=16ms at 16kHz)"
+    options:
+      - "160"
+      - "256"
+      - "512"
+    group: processing
+
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: "Minimum speech segment duration to keep"
+    min: 10
+    max: 500
+    step: 10
+    group: filters
+
+  min_silence_duration_ms:
+    widget: spinner
+    label: "Min Silence Duration (ms)"
+    description: "Minimum silence between speech segments"
+    min: 10
+    max: 500
+    step: 10
+    group: filters
+
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: "Maximum gap to group consecutive segments"
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    group: grouping
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.ten
+  class: TenSpeechSegmenter
