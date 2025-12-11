@@ -100,6 +100,9 @@ DECODER_PRESETS = {
 }
 
 # Silero VAD Options Presets
+# DEPRECATED: Use v4 YAML config at config/v4/ecosystems/tools/silero-speech-segmentation.yaml
+# This dict is kept for backward compatibility. Values should match the v4 YAML.
+# To load in v4: registry.get("silero-speech-segmentation").get_resolved_config("balanced")
 SILERO_VAD_PRESETS = {
     Sensitivity.BALANCED: SileroVADOptions(
         threshold=0.18,
@@ -237,7 +240,12 @@ def get_decoder_preset(sensitivity: Sensitivity) -> DecoderOptions:
 
 
 def get_silero_vad_preset(sensitivity: Sensitivity) -> SileroVADOptions:
-    """Get Silero VAD options for the given sensitivity."""
+    """Get Silero VAD options for the given sensitivity.
+
+    .. deprecated:: 1.7.0
+        Use v4 YAML config instead:
+        ``registry.get("silero-speech-segmentation").get_resolved_config(sensitivity)``
+    """
     return SILERO_VAD_PRESETS[sensitivity]
 
 

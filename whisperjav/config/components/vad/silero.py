@@ -3,6 +3,21 @@ Silero VAD Component.
 
 High-quality Voice Activity Detection from Silero team.
 
+.. deprecated:: 1.7.0
+    This module is deprecated in favor of the v4 YAML configuration.
+    Use ``whisperjav.config.v4.ecosystems.tools.silero-speech-segmentation.yaml``
+    as the source of truth for Silero VAD presets.
+
+    To load Silero VAD config in v4:
+
+        from whisperjav.config.v4.registries.tool_registry import get_tool_registry
+        registry = get_tool_registry()
+        tool = registry.get("silero-speech-segmentation")
+        config = tool.get_resolved_config("balanced")
+
+    This file is kept for backward compatibility with existing code.
+    It will be removed in a future version.
+
 Parameter values match v1 asr_config.json exactly for backward compatibility.
 """
 

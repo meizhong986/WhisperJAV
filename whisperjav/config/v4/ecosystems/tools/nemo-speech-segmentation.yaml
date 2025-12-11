@@ -64,9 +64,22 @@ spec:
   chunk_threshold_s: 4.0  # Gap threshold for segment grouping
 
 # =============================================================================
-# Domain Presets
+# Presets
+# =============================================================================
+# NOTE: NeMo VAD uses DOMAIN-BASED presets (general, crowd) rather than the
+# standard sensitivity-based presets (conservative, balanced, aggressive) used
+# by other speech segmenters.
+#
+# Domain-based presets are more appropriate for NeMo because:
+# - NeMo's diarization-aware architecture is optimized for specific audio types
+# - "General" handles varied audio (music, effects, single speakers)
+# - "Crowd" handles multi-speaker dialogue scenes
+#
+# Standard sensitivity aliases are provided below for GUI compatibility.
 # =============================================================================
 presets:
+  # --- Domain-Based Presets (Primary) ---
+
   # General domain: varied audio, music, sound effects
   general:
     domain: "general"
@@ -80,19 +93,34 @@ presets:
     vad.offset: 0.55
     vad.pad_offset: -0.02  # Less aggressive trimming for dialogue
 
+  # --- Standard Sensitivity Aliases (for GUI compatibility) ---
+  # These map to the domain-based presets for consistency with other tools
+
+  conservative:
+    domain: "general"
+    vad.onset: 0.85
+    vad.offset: 0.7
+    min_speech_duration_ms: 150
+
+  balanced: {}  # Uses spec defaults (general domain)
+
+  aggressive:
+    domain: "meeting"
+    vad.onset: 0.7
+    vad.offset: 0.5
+    min_speech_duration_ms: 50
+
 # =============================================================================
 # GUI Hints
 # =============================================================================
 gui:
   domain:
-    widget: select
+    widget: dropdown
     label: "Domain Type"
     description: "Audio domain for diarizer optimization"
     options:
-      - value: general
-        label: "General (varied audio)"
-      - value: meeting
-        label: "Crowd (multi-speaker)"
+      - "general"
+      - "meeting"
     group: domain
 
   vad.onset:

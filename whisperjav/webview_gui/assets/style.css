@@ -17,8 +17,7 @@
     --tab-bar-bg: #FFFFFF;
     --content-area-bg: #E8EAED;
     --active-tab-bg: #E8EAED;
-#    --content-area-bg: #F0F2F5;
-#    --active-tab-bg: #F0F2F5;
+    /* Alternative lighter colors: #F0F2F5 */
     --inactive-tab-bg: #F7F8FA;
     --hover-tab-bg: #F2F4FA;
     --active-tab-text: #024873;
@@ -69,7 +68,6 @@
     white-space: pre;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
-}
 }
 
 /* ============================================================
@@ -1362,24 +1360,30 @@ button:focus-visible,
     border-radius: var(--border-radius-lg);
 }
 
-/* Header row */
-.grid-header {
+/* Shared grid template for header and data rows */
+/* Columns: Label | Pipeline | Sep | Sensitivity | Sep | Scene | Enhancer | Segmenter | Sep | Model | Actions */
+.grid-header,
+.grid-row {
     display: grid;
     grid-template-columns:
-        60px              /* row label */
-        minmax(95px, 1fr) /* pipeline */
-        1px               /* separator */
-        minmax(85px, 1fr) /* sensitivity */
-        1px               /* separator */
-        minmax(80px, 1fr) /* scene detector */
-        minmax(95px, 1fr) /* speech enhancer */
-        minmax(95px, 1fr) /* speech segmenter */
-        1px               /* separator */
-        minmax(85px, 1fr) /* model */
-        auto;             /* actions */
-    gap: 6px;
+        55px           /* 1: row label */
+        115px          /* 2: pipeline */
+        12px           /* 3: separator */
+        100px          /* 4: sensitivity */
+        12px           /* 5: separator */
+        90px           /* 6: scene detector */
+        90px           /* 7: speech enhancer */
+        115px          /* 8: speech segmenter */
+        12px           /* 9: separator */
+        90px           /* 10: model */
+        170px;         /* 11: actions */
+    gap: 4px;
     align-items: center;
-    padding: 6px 4px;
+    padding: 8px 4px;
+}
+
+/* Header row styling */
+.grid-header {
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -1394,22 +1398,6 @@ button:focus-visible,
 
 /* Data rows */
 .grid-row {
-    display: grid;
-    grid-template-columns:
-        60px              /* row label */
-        minmax(95px, 1fr) /* pipeline */
-        1px               /* separator */
-        minmax(85px, 1fr) /* sensitivity */
-        1px               /* separator */
-        minmax(80px, 1fr) /* scene detector */
-        minmax(95px, 1fr) /* speech enhancer */
-        minmax(95px, 1fr) /* speech segmenter */
-        1px               /* separator */
-        minmax(85px, 1fr) /* model */
-        auto;             /* actions */
-    gap: 6px;
-    align-items: center;
-    padding: 6px 4px;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -1443,15 +1431,17 @@ button:focus-visible,
     cursor: pointer;
 }
 
-/* Vertical separators */
+/* Vertical separators - visible dividers */
 .col-separator {
     width: 1px;
-    height: 24px;
+    height: 100%;
+    min-height: 28px;
     background: var(--border-color);
     justify-self: center;
+    align-self: stretch;
 }
 
-/* Column content containers */
+/* Column content containers - center dropdowns */
 .col-pipeline,
 .col-sensitivity,
 .col-scene,
@@ -1466,27 +1456,47 @@ button:focus-visible,
 .col-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding-left: 8px;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-left: 4px;
 }
 
-/* Merge row special - spans multiple columns */
-#merge-row {
-    grid-template-columns: 60px 1fr auto;
-}
-
-.col-merge {
+/* Merge row - uses same grid, merge dropdown spans multiple columns */
+#merge-row.grid-row .col-merge {
+    grid-column: 2 / 9;  /* Span from pipeline (col 2) through segmenter (col 8) */
     display: flex;
     justify-content: flex-start;
-    padding-left: 8px;
+    padding-left: 0;
 }
 
 /* Compact select dropdowns */
 .form-select.compact {
     padding: 4px 6px;
     font-size: 11px;
-    min-width: 80px;
-    max-width: 120px;
+    width: 100%;
+    max-width: none;
+}
+
+/* Specific column width constraints */
+.col-pipeline .form-select.compact {
+    width: 105px;
+}
+
+.col-sensitivity .form-select.compact {
+    width: 90px;
+}
+
+.col-scene .form-select.compact,
+.col-enhancer .form-select.compact {
+    width: 80px;
+}
+
+.col-segmenter .form-select.compact {
+    width: 105px;
+}
+
+.col-model .form-select.compact {
+    width: 80px;
 }
 
 /* Compact button */
@@ -1522,6 +1532,16 @@ button:focus-visible,
 .grid-row.disabled {
     opacity: 0.5;
     pointer-events: none;
+}
+
+/* Keep checkbox clickable even when row is disabled */
+.grid-row.disabled .col-label {
+    pointer-events: auto;
+    opacity: 1;
+}
+
+.grid-row.disabled .col-label .checkbox-label {
+    cursor: pointer;
 }
 
 .grid-row select:disabled {
