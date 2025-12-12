@@ -172,6 +172,8 @@ def parse_arguments():
                                help="Scene detection method for pass 1 (default: auditok)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
                                help="Speech segmenter backend for pass 1 (e.g., silero, silero-v3.1, whisper-vad)")
+    twopass_group.add_argument("--pass1-speech-enhancer", default=None,
+                               help="Speech enhancer for pass 1 (e.g., none)")
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
@@ -192,6 +194,8 @@ def parse_arguments():
                                help="Scene detection method for pass 2 (default: none)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
                                help="Speech segmenter backend for pass 2 (e.g., silero, silero-v3.1, whisper-vad)")
+    twopass_group.add_argument("--pass2-speech-enhancer", default=None,
+                               help="Speech enhancer for pass 2 (e.g., none)")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--merge-strategy", default="smart_merge",
@@ -1129,11 +1133,13 @@ def main():
             resolved_config["params"]["asr"]["vad_filter"] = False
             logger.info("Internal VAD disabled via --no-vad flag (kotoba mode)")
         elif args.mode in ["balanced", "fidelity"]:
-            # Balanced/fidelity use external Silero VAD - set skip_vad flag
-            if "vad" not in resolved_config["params"]:
-                resolved_config["params"]["vad"] = {}
-            resolved_config["params"]["vad"]["skip_vad"] = True
-            logger.info("Silero VAD preprocessing disabled via --no-vad flag")
+            # Balanced/fidelity use Speech Segmenter - set backend to "none" to disable
+            if "params" not in resolved_config:
+                resolved_config["params"] = {}
+            if "speech_segmenter" not in resolved_config["params"]:
+                resolved_config["params"]["speech_segmenter"] = {}
+            resolved_config["params"]["speech_segmenter"]["backend"] = "none"
+            logger.info("Speech segmentation disabled via --no-vad flag (backend set to 'none')")
 
     # Apply --speech-segmenter override
     speech_segmenter = getattr(args, 'speech_segmenter', None)
@@ -1144,12 +1150,7 @@ def main():
             resolved_config["params"]["speech_segmenter"] = {}
         resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
         logger.info(f"Speech segmenter set to: {speech_segmenter}")
-
-        # If --speech-segmenter none is set, also set skip_vad for backward compatibility
-        if speech_segmenter == "none":
-            if "vad" not in resolved_config["params"]:
-                resolved_config["params"]["vad"] = {}
-            resolved_config["params"]["vad"]["skip_vad"] = True
+        # Note: Speech Segmenter factory handles "none" backend internally
 
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
@@ -1269,6 +1270,7 @@ def main():
                 'sensitivity': args.pass1_sensitivity,
                 'scene_detector': args.pass1_scene_detector,
                 'speech_segmenter': args.pass1_speech_segmenter,
+                'speech_enhancer': args.pass1_speech_enhancer,
                 'model': args.pass1_model,
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params  # For transformers pipeline
@@ -1281,6 +1283,7 @@ def main():
                     'sensitivity': args.pass2_sensitivity,
                     'scene_detector': args.pass2_scene_detector,
                     'speech_segmenter': args.pass2_speech_segmenter,
+                    'speech_enhancer': args.pass2_speech_enhancer,
                     'model': args.pass2_model,
                     'params': pass2_params,
                     'hf_params': pass2_hf_params  # For transformers pipeline

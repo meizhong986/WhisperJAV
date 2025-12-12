@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-WhisperPro ASR wrapper with internal VAD processing, refactored for the V3 architecture.
-This module uses the standard whisper library and is intended for pipelines like 'balanced'.
+WhisperPro ASR wrapper using Speech Segmenter for speech detection.
+This module uses the standard whisper library and is intended for pipelines like 'fidelity'.
+
+Speech segmentation is handled externally by the Speech Segmenter module.
+This ASR module focuses solely on transcription.
 """
 
 from pathlib import Path
@@ -22,45 +25,8 @@ from whisperjav.modules.vad_failover import should_force_full_transcribe
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 
 
-def _is_silero_vad_cached(repo_or_dir: str) -> bool:
-    """
-    Check if a specific silero-vad version is already cached by torch.hub.
-
-    Args:
-        repo_or_dir: Repository string (e.g., "snakers4/silero-vad:v3.1")
-
-    Returns:
-        True if the exact version is cached, False otherwise
-    """
-    try:
-        # Get torch hub cache directory
-        hub_dir = torch.hub.get_dir()
-
-        # Parse repo and version
-        if ':' in repo_or_dir:
-            repo_name, version = repo_or_dir.rsplit(':', 1)
-        else:
-            repo_name = repo_or_dir
-            version = 'master'  # Default branch
-
-        # Construct expected cache path
-        # torch.hub caches repos as: hub_dir/owner_repo_branch
-        repo_safe = repo_name.replace('/', '_')
-        cached_repo_path = Path(hub_dir) / f"{repo_safe}_{version}"
-
-        if cached_repo_path.exists():
-            logger.debug(f"Silero VAD {version} found in cache: {cached_repo_path}")
-            return True
-        else:
-            logger.debug(f"Silero VAD {version} NOT in cache, will download")
-            return False
-    except Exception as e:
-        logger.warning(f"Error checking silero-vad cache: {e}")
-        return False  # If we can't check, assume not cached
-
-
 class WhisperProASR:
-    """Whisper ASR with internal VAD, using structured v3 parameters."""
+    """Whisper ASR using Speech Segmenter for speech detection."""
     
     def __init__(self, model_config: Dict, params: Dict, task: str):
         """
@@ -80,37 +46,25 @@ class WhisperProASR:
         vad_params = params["vad"]
         provider_params = params["provider"]
 
-        # VAD parameters (kept separate as they're used by our VAD logic, not Whisper)
+        # VAD parameters (passed to Speech Segmenter)
         self.vad_threshold = vad_params.get("threshold", 0.4)
         self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 150)
         self.vad_chunk_threshold = vad_params.get("chunk_threshold", 4.0)
 
-        # VAD engine repo (resolved from config, with fallback for backward compatibility)
-        self.vad_repo = vad_params.get("vad_repo", "snakers4/silero-vad:v3.1")
-
-        # VAD bypass flag - when True, skip VAD and transcribe full audio directly
-        self.skip_vad = vad_params.get("skip_vad", False)
-
-        # External speech segmenter (optional, for modular VAD support)
-        # If speech_segmenter config is provided with a non-default backend,
-        # use the modular speech segmentation system instead of internal Silero VAD
-        self._external_segmenter = None
+        # Speech Segmenter (MANDATORY - single owner of speech segmentation)
+        # All speech segmentation goes through this contract
         speech_segmenter_config = params.get("speech_segmenter", {})
-        segmenter_backend = speech_segmenter_config.get("backend", "")
-        if segmenter_backend and segmenter_backend not in ("", "silero", "silero-v4.0"):
-            # Non-default backend requested - use external segmenter
-            try:
-                self._external_segmenter = SpeechSegmenterFactory.create(
-                    segmenter_backend,
-                    config=speech_segmenter_config
-                )
-                logger.info(f"Using external speech segmenter: {self._external_segmenter.name}")
-                # If "none" segmenter, also set skip_vad for consistency
-                if segmenter_backend == "none":
-                    self.skip_vad = True
-            except Exception as e:
-                logger.warning(f"Failed to create external segmenter '{segmenter_backend}': {e}")
-                logger.warning("Falling back to internal Silero VAD")
+        segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")  # Default to silero-v4.0
+
+        try:
+            self._external_segmenter = SpeechSegmenterFactory.create(
+                segmenter_backend,
+                config=speech_segmenter_config
+            )
+            logger.info(f"Speech Segmenter initialized: {self._external_segmenter.name}")
+        except Exception as e:
+            logger.error(f"Failed to create Speech Segmenter '{segmenter_backend}': {e}")
+            raise ValueError(f"Speech Segmenter not configured - this is an architecture violation: {e}")
 
         # FIX: Combine all Whisper parameters into a single dictionary
         # The Whisper library expects all parameters in one transcribe() call
@@ -172,27 +126,8 @@ class WhisperProASR:
         return dict(self._filter_statistics)
         
     def _initialize_models(self):
-        """Initialize VAD and Whisper models."""
-        logger.debug(f"Loading Silero VAD model from: {self.vad_repo}")
-        try:
-            # Use repo from config (resolved by TranscriptionTuner)
-            # Check if already cached to avoid unnecessary download
-            is_cached = _is_silero_vad_cached(self.vad_repo)
-
-            self.vad_model, self.vad_utils = torch.hub.load(
-                repo_or_dir=self.vad_repo,  # Config-driven, not hardcoded
-                model="silero_vad",
-                force_reload=not is_cached,  # Use cache if available
-                onnx=False
-            )
-            (self.get_speech_timestamps, _, _, _, _) = self.vad_utils
-
-            status = "from cache" if is_cached else "downloaded"
-            logger.debug(f"Silero VAD loaded ({status}) from {self.vad_repo}")
-        except Exception as e:
-            logger.error(f"Failed to load Silero VAD model: {e}", exc_info=True)
-            raise
-
+        """Initialize Whisper model."""
+        # Note: Speech segmentation is handled by external Speech Segmenter (set in __init__)
         logger.debug(f"Loading Whisper model: {self.model_name} on device: {self.device}")
         self.whisper_model = whisper.load_model(self.model_name, device=self.device)
 
@@ -247,43 +182,56 @@ class WhisperProASR:
 
         audio_duration = len(audio_data) / sample_rate if sample_rate else 0.0
 
-        # Check if VAD should be bypassed
-        if self.skip_vad:
-            logger.info("VAD bypassed via --no-vad flag - transcribing full audio directly")
-            self._last_vad_segments = []  # Empty VAD segments for metadata
-            all_segments = self._transcribe_full_audio(audio_data)
-            fallback_triggered = False
-        else:
-            vad_segments = self._run_vad_on_audio(audio_data, sample_rate)
+        # Run speech segmentation through the Speech Segmenter contract
+        vad_segments = self._run_speech_segmentation(audio_data, sample_rate)
 
-            # Store VAD segments for visualization data contract
-            self._last_vad_segments = []
-            for group in (vad_segments or []):
-                for seg in group:
-                    self._last_vad_segments.append({
-                        "start_sec": round(seg["start_sec"], 3),
-                        "end_sec": round(seg["end_sec"], 3)
-                    })
+        # Store segments for visualization data contract
+        self._last_vad_segments = []
+        for group in (vad_segments or []):
+            for seg in group:
+                self._last_vad_segments.append({
+                    "start_sec": round(seg["start_sec"], 3),
+                    "end_sec": round(seg["end_sec"], 3)
+                })
 
-            fallback_triggered = False
-            if should_force_full_transcribe(vad_segments, audio_duration):
+        # INFO level summary for user visibility
+        if vad_segments:
+            total_segments = sum(len(group) for group in vad_segments)
+            logger.info(f"Speech segmentation complete: {total_segments} segments in {len(vad_segments)} groups")
+
+        fallback_triggered = False
+
+        # Handle "none" backend case - no segments means transcribe full audio
+        if not vad_segments:
+            if self._external_segmenter.name == "none":
+                logger.info("Speech segmentation: disabled (none backend) - transcribing full audio directly")
+                all_segments = self._transcribe_full_audio(audio_data)
+            elif should_force_full_transcribe(vad_segments, audio_duration):
                 logger.warning(
-                    "VAD produced insufficient coverage (segments=%s, duration=%.1fs). "
+                    "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
                     "Falling back to full-clip transcription.",
-                    sum(len(group or []) for group in (vad_segments or [])),
+                    0,
                     audio_duration,
                 )
                 fallback_triggered = True
                 all_segments = self._transcribe_full_audio(audio_data)
             else:
-                if not vad_segments:
-                    logger.debug(f"No speech detected in {audio_path.name}")
-                    return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
-
-                all_segments = []
-                for vad_group in vad_segments:
-                    segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
-                    all_segments.extend(segments)
+                logger.debug(f"No speech detected in {audio_path.name}")
+                return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
+        elif should_force_full_transcribe(vad_segments, audio_duration):
+            logger.warning(
+                "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
+                "Falling back to full-clip transcription.",
+                sum(len(group or []) for group in (vad_segments or [])),
+                audio_duration,
+            )
+            fallback_triggered = True
+            all_segments = self._transcribe_full_audio(audio_data)
+        else:
+            all_segments = []
+            for vad_group in vad_segments:
+                segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
+                all_segments.extend(segments)
 
         if fallback_triggered and not all_segments:
             # Safety net: if fallback still produced nothing, log explicitly for debugging.
@@ -314,91 +262,31 @@ class WhisperProASR:
             "language": self.whisper_params.get('language', 'ja')
         }
 
-    def _run_vad_on_audio(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
+    def _run_speech_segmentation(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
         """
-        Run VAD on audio data and return grouped segments.
+        Run speech segmentation through the Speech Segmenter contract.
 
-        If an external speech segmenter is configured, uses that instead of
-        the internal Silero VAD. Otherwise, preserves exact logic from original
-        implementation including timestamp adjustments.
+        All speech segmentation is handled by the external Speech Segmenter module.
+        This is the single entry point for segmentation in ASR.
         """
-        # Use external segmenter if available
-        if self._external_segmenter is not None:
-            return self._run_external_segmenter(audio_data, sample_rate)
+        if self._external_segmenter is None:
+            raise ValueError("Speech Segmenter not configured - this is an architecture violation")
 
-        # Internal Silero VAD (original implementation)
-        return self._run_internal_silero_vad(audio_data, sample_rate)
+        logger.info(f"Starting speech segmentation with: {self._external_segmenter.name}")
 
-    def _run_external_segmenter(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
-        """
-        Run external speech segmenter and convert result to legacy format.
-        """
         try:
             result = self._external_segmenter.segment(audio_data, sample_rate=sample_rate)
             logger.debug(
-                f"External segmenter '{self._external_segmenter.name}' found "
+                f"Speech Segmenter '{self._external_segmenter.name}' found "
                 f"{result.num_segments} segments in {result.num_groups} groups "
                 f"({result.processing_time_sec:.2f}s)"
             )
             return result.to_legacy_format()
         except Exception as e:
-            logger.warning(f"External segmenter failed: {e}")
-            logger.warning("Falling back to internal Silero VAD")
-            return self._run_internal_silero_vad(audio_data, sample_rate)
+            logger.error(f"Speech Segmenter failed: {e}")
+            raise
 
-    def _run_internal_silero_vad(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
-        """
-        Run internal Silero VAD on audio data and return grouped segments.
-        Preserves exact logic from original implementation including timestamp adjustments.
-        """
-        VAD_SR = 16000
-
-        # Resample to 16kHz if needed
-        if sample_rate != VAD_SR:
-            resample_ratio = VAD_SR / sample_rate
-            resampled_length = int(len(audio_data) * resample_ratio)
-            indices = np.linspace(0, len(audio_data) - 1, resampled_length).astype(int)
-            audio_16k = audio_data[indices]
-        else:
-            audio_16k = audio_data
-
-        audio_tensor = torch.FloatTensor(audio_16k)
-
-        speech_timestamps = self.get_speech_timestamps(
-            audio_tensor,
-            self.vad_model,
-            sampling_rate=VAD_SR,
-            threshold=self.vad_threshold,
-            min_speech_duration_ms=self.min_speech_duration_ms
-        )
-
-        if not speech_timestamps:
-            return []
-
-        # Apply timestamp adjustments (preserved from original)
-        for i in range(len(speech_timestamps)):
-            speech_timestamps[i]["start"] = max(0, speech_timestamps[i]["start"] - 3200)
-            speech_timestamps[i]["end"] = min(len(audio_tensor) - 16, speech_timestamps[i]["end"] + 20800)
-            if i > 0 and speech_timestamps[i]["start"] < speech_timestamps[i - 1]["end"]:
-                speech_timestamps[i]["start"] = speech_timestamps[i - 1]["end"]
-
-        # Group segments
-        groups = [[]]
-        for i in range(len(speech_timestamps)):
-            if (i > 0 and
-                speech_timestamps[i]["start"] > speech_timestamps[i - 1]["end"] + (self.vad_chunk_threshold * VAD_SR)):
-                groups.append([])
-            groups[-1].append(speech_timestamps[i])
-
-        # Add time in seconds for each segment
-        for group in groups:
-            for seg in group:
-                seg["start_sec"] = seg["start"] / VAD_SR
-                seg["end_sec"] = seg["end"] / VAD_SR
-
-        return groups
-
-    def _transcribe_vad_group(self, audio_data: np.ndarray, sample_rate: int, 
+    def _transcribe_vad_group(self, audio_data: np.ndarray, sample_rate: int,
                              vad_group: List[Dict]) -> List[Dict]:
         """
         Transcribe a group of VAD segments using properly structured tuner parameters.
@@ -552,14 +440,8 @@ class WhisperProASR:
         except Exception as e:
             logger.warning(f"Error unloading Whisper model: {e}")
 
-        # Delete VAD model
-        try:
-            if hasattr(self, 'vad_model') and self.vad_model is not None:
-                del self.vad_model
-                self.vad_model = None
-                logger.debug("VAD model unloaded")
-        except Exception as e:
-            logger.warning(f"Error unloading VAD model: {e}")
+        # Note: Speech Segmenter cleanup is handled by the segmenter itself
+        # No VAD model to clean up - all segmentation is external
 
         # Force garbage collection
         try:

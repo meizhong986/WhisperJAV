@@ -700,6 +700,30 @@ class WhisperJAVAPI:
                 "error": str(e)
             }
 
+    def get_speech_segmenter_backends(self) -> Dict[str, Any]:
+        """
+        Get available speech segmenter backends with availability status.
+
+        Returns:
+            dict with backends list, each containing:
+                - name: backend identifier
+                - display_name: human-readable name
+                - available: boolean
+                - install_hint: installation instructions if not available
+        """
+        try:
+            from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
+            backends = SpeechSegmenterFactory.get_available_backends()
+            return {
+                "success": True,
+                "backends": backends
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     def validate_ensemble_config(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate ensemble configuration before processing.
@@ -1469,11 +1493,17 @@ class WhisperJAVAPI:
         if scene1 and scene1 != 'none':
             args += ["--pass1-scene-detector", scene1]
 
-        # Pass 1: Speech Segmenter (only for legacy pipelines)
+        # Pass 1: Speech Segmenter (legacy pipelines only)
+        # Note: Transformers uses HF internal chunking; segmentation support planned for v1.8.0
         if not pass1.get('isTransformers'):
             segmenter1 = pass1.get('speechSegmenter')
-            if segmenter1 and segmenter1 != 'none':
+            if segmenter1:  # Pass any value including "none" to disable VAD
                 args += ["--pass1-speech-segmenter", segmenter1]
+
+        # Pass 1: Speech Enhancer
+        enhancer1 = pass1.get('speechEnhancer')
+        if enhancer1 and enhancer1 != 'none':
+            args += ["--pass1-speech-enhancer", enhancer1]
 
         # Pass 1: Model
         model1 = pass1.get('model')
@@ -1501,11 +1531,17 @@ class WhisperJAVAPI:
             if scene2 and scene2 != 'none':
                 args += ["--pass2-scene-detector", scene2]
 
-            # Pass 2: Speech Segmenter (only for legacy pipelines)
+            # Pass 2: Speech Segmenter (legacy pipelines only)
+            # Note: Transformers uses HF internal chunking; segmentation support planned for v1.8.0
             if not pass2.get('isTransformers'):
                 segmenter2 = pass2.get('speechSegmenter')
-                if segmenter2 and segmenter2 != 'none':
+                if segmenter2:  # Pass any value including "none" to disable VAD
                     args += ["--pass2-speech-segmenter", segmenter2]
+
+            # Pass 2: Speech Enhancer
+            enhancer2 = pass2.get('speechEnhancer')
+            if enhancer2 and enhancer2 != 'none':
+                args += ["--pass2-speech-enhancer", enhancer2]
 
             # Pass 2: Model
             model2 = pass2.get('model')

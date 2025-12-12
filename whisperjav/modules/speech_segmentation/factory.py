@@ -150,7 +150,7 @@ class SpeechSegmenterFactory:
             "none": "None (Skip)",
         }
 
-        for name in ["silero", "silero-v3.1", "nemo-lite", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "none"]:
+        for name in ["silero", "silero-v3.1", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "none"]:
             available, hint = SpeechSegmenterFactory.is_backend_available(name)
             backends.append({
                 "name": name,
