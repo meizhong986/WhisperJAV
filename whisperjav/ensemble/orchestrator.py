@@ -565,7 +565,7 @@ class EnsembleOrchestrator:
             )
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        summary_path = self.output_dir / f"ensemble_summary_{timestamp}.json"
+        summary_path = self.temp_dir / f"ensemble_summary_{timestamp}.json"
         try:
             summary_path.write_text(json.dumps(summary, indent=2), encoding='utf-8')
         except OSError as exc:
