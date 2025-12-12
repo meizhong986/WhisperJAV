@@ -14,6 +14,11 @@ ffmpeg-python
 soundfile
 auditok
 silero-vad>=6.0
+pydub
+
+# Speech segmentation backends (v1.7.2)
+ten-vad
+nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main
 
 # Utilities
 numpy
@@ -23,12 +28,11 @@ pysrt
 srt
 aiofiles
 jsonschema
-Pillow
 colorama
 librosa
-matplotlib
 pyloudnorm
 requests
+regex
 
 # Configuration system
 pydantic>=2.0,<3.0
