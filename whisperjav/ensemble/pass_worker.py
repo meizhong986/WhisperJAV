@@ -647,14 +647,26 @@ def apply_custom_params(
     return unknown_params
 
 
-# Map GUI speech segmenter values to VAD backend names
+# Map GUI speech segmenter values to factory-compatible backend names
+# IMPORTANT: The factory extracts version/variant from the name itself (e.g., "silero-v3.1" → version="v3.1")
+# DO NOT strip version/variant suffixes - pass them through so the factory can process them correctly
+# This map is primarily for:
+#   1. Handling empty string default
+#   2. Normalizing legacy/alias names
+#   3. Validation via .get() fallback
 SPEECH_SEGMENTER_MAP = {
-    "": "silero",  # Default (Silero V4.0)
-    "silero-v4.0": "silero",
-    "silero-v3.1": "silero",  # Same backend, version handled separately
-    "nemo-lite": "nemo",
-    "whisper-vad": "whisper_vad",
-    "whisper-vad-tiny": "whisper_vad",
+    "": "silero",           # Empty string → default silero (factory defaults to v4.0)
+    "silero": "silero",     # Base silero → factory defaults to v4.0
+    "silero-v4.0": "silero-v4.0",   # Preserve version for factory extraction
+    "silero-v3.1": "silero-v3.1",   # Preserve version for factory extraction
+    "nemo": "nemo-lite",    # Base nemo → default to nemo-lite variant
+    "nemo-lite": "nemo-lite",       # Preserve variant for factory
+    "nemo-diarization": "nemo-diarization",  # Preserve variant for factory
+    "whisper-vad": "whisper-vad",   # Preserve for factory variant extraction
+    "whisper-vad-tiny": "whisper-vad-tiny",
+    "whisper-vad-base": "whisper-vad-base",
+    "whisper-vad-small": "whisper-vad-small",
+    "whisper-vad-medium": "whisper-vad-medium",
     "ten": "ten",
     "none": "none",
 }
@@ -704,25 +716,27 @@ def _apply_gui_overrides(
             resolved_config["features"]["scene_detection"]["method"] = scene_detector
             logger.debug("Pass %s: Override scene_detector = %s", pass_number, scene_detector)
 
-    # Override speech segmenter (VAD backend) if specified
+    # Override speech segmenter if specified
+    # Note: ASR modules read from params["speech_segmenter"]["backend"], not params["vad"]["backend"]
     speech_segmenter = pass_config.get("speech_segmenter")
     if speech_segmenter is not None:  # Allow empty string for default
-        vad_backend = SPEECH_SEGMENTER_MAP.get(speech_segmenter, speech_segmenter)
+        segmenter_backend = SPEECH_SEGMENTER_MAP.get(speech_segmenter, speech_segmenter)
 
-        if vad_backend == "none":
-            # Disable VAD
-            if "params" in resolved_config and "vad" in resolved_config["params"]:
-                resolved_config["params"]["vad"]["enabled"] = False
+        # Ensure params structure exists
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+        if "speech_segmenter" not in resolved_config["params"]:
+            resolved_config["params"]["speech_segmenter"] = {}
+
+        if segmenter_backend == "none":
+            # Disable speech segmentation
+            resolved_config["params"]["speech_segmenter"]["backend"] = "none"
             if "workflow" in resolved_config:
                 resolved_config["workflow"]["vad"] = "none"
-            logger.debug("Pass %s: Disabled VAD (speech segmenter = none)", pass_number)
+            logger.debug("Pass %s: Disabled speech segmentation (backend = none)", pass_number)
         else:
-            # Set VAD backend
-            if "params" not in resolved_config:
-                resolved_config["params"] = {}
-            if "vad" not in resolved_config["params"]:
-                resolved_config["params"]["vad"] = {}
-            resolved_config["params"]["vad"]["backend"] = vad_backend
+            # Set speech segmenter backend
+            resolved_config["params"]["speech_segmenter"]["backend"] = segmenter_backend
             if "workflow" in resolved_config:
-                resolved_config["workflow"]["vad"] = vad_backend
-            logger.debug("Pass %s: Override vad_backend = %s", pass_number, vad_backend)
+                resolved_config["workflow"]["vad"] = segmenter_backend
+            logger.debug("Pass %s: Override speech_segmenter = %s", pass_number, segmenter_backend)
