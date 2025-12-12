@@ -267,6 +267,7 @@ def create_window():
         'resizable': True,
         'frameless': False,
         'easy_drag': True,
+        'text_select': True,
         'min_size': (800, 600)
     }
 
