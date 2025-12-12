@@ -435,13 +435,20 @@ class EnsembleOrchestrator:
 
         # Ensure every media file has an entry even if the worker skipped it
         for info in media_files:
-            formatted.setdefault(
-                info['basename'],
-                {
+            basename = info['basename']
+            if basename not in formatted:
+                # Log when a file has no matching result - helps diagnose Unicode/encoding issues
+                logger.warning(
+                    "Pass %s: No result for basename (len=%d chars, %d UTF-8 bytes). "
+                    "This may indicate a Unicode encoding mismatch between processes.",
+                    pass_number,
+                    len(basename),
+                    len(basename.encode('utf-8')),
+                )
+                formatted[basename] = {
                     'status': 'failed',
-                    'error': 'Worker returned no result',
-                },
-            )
+                    'error': 'Worker returned no result for this file',
+                }
 
         return formatted
 
