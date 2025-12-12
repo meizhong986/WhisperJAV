@@ -22,20 +22,41 @@ echo                     WhisperJAV Upgrade Launcher
 echo ===============================================================================
 echo.
 
-REM Find WhisperJAV installation
-set "INSTALL_DIR=%LOCALAPPDATA%\WhisperJAV"
+REM Detect installation directory
+REM Priority 1: Script's own location (if packaged with installer)
+REM Priority 2: Default location as fallback
 
-if not exist "%INSTALL_DIR%\python.exe" (
-    echo ERROR: WhisperJAV installation not found at:
-    echo        %INSTALL_DIR%
-    echo.
-    echo Please make sure WhisperJAV is installed via the Windows installer.
-    echo.
-    pause
-    exit /b 1
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+
+REM Check if python.exe exists in script's directory (we're in the install folder)
+if exist "%SCRIPT_DIR%\python.exe" (
+    set "INSTALL_DIR=%SCRIPT_DIR%"
+    echo Found WhisperJAV at script location: %INSTALL_DIR%
+    goto :found_install
 )
 
-echo Found WhisperJAV at: %INSTALL_DIR%
+REM Fallback: Check default installation location
+set "INSTALL_DIR=%LOCALAPPDATA%\WhisperJAV"
+if exist "%INSTALL_DIR%\python.exe" (
+    echo Found WhisperJAV at default location: %INSTALL_DIR%
+    goto :found_install
+)
+
+REM Not found in either location
+echo ERROR: WhisperJAV installation not found.
+echo.
+echo Checked locations:
+echo   1. Script location: %SCRIPT_DIR%
+echo   2. Default location: %LOCALAPPDATA%\WhisperJAV
+echo.
+echo Please run this script from your WhisperJAV installation folder,
+echo or reinstall WhisperJAV using the Windows installer.
+echo.
+pause
+exit /b 1
+
+:found_install
 echo.
 
 REM Check if upgrade script exists in same directory as this bat file
