@@ -219,9 +219,18 @@ class EnsembleOrchestrator:
                 continue
 
             pass1_srt = Path(pass1['srt_path']) if pass1.get('srt_path') else None
+
+            # Defensive check: verify pass1 SRT file actually exists
+            if pass1_srt and not pass1_srt.exists():
+                logger.warning(
+                    "Pass 1 reported completed but SRT file not found: %s",
+                    pass1_srt,
+                )
+                pass1_srt = None  # Treat as if no SRT was produced
+
             ensemble_metadata['pass1'] = {
                 'status': pass1['status'],
-                'srt_path': pass1.get('srt_path'),
+                'srt_path': str(pass1_srt) if pass1_srt else None,
                 'subtitles': pass1.get('subtitles', 0),
                 'processing_time': pass1.get('processing_time', 0.0),
             }
@@ -232,43 +241,76 @@ class EnsembleOrchestrator:
             if pass2_config:
                 if pass2 and pass2['status'] == 'completed' and pass2.get('srt_path'):
                     pass2_srt = Path(pass2['srt_path'])
-                    ensemble_metadata['pass2'] = {
-                        'status': pass2['status'],
-                        'srt_path': pass2['srt_path'],
-                        'subtitles': pass2.get('subtitles', 0),
-                        'processing_time': pass2.get('processing_time', 0.0),
-                    }
 
-                    tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
-                    tmp_merge.parent.mkdir(parents=True, exist_ok=True)
-                    final_candidate = self.output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
-                    try:
-                        merge_stats = self.merge_engine.merge(
-                            srt1_path=pass1_srt,
-                            srt2_path=pass2_srt,
-                            output_path=tmp_merge,
-                            strategy=merge_strategy,
+                    # Defensive check: verify pass2 SRT file actually exists
+                    if not pass2_srt.exists():
+                        logger.warning(
+                            "Pass 2 reported completed but SRT file not found: %s",
+                            pass2_srt,
                         )
-                        if final_candidate.exists():
-                            final_candidate.unlink()
-                        shutil.move(tmp_merge, final_candidate)
-                        merge_info = {
-                            'status': 'completed',
-                            'strategy': merge_strategy,
-                            'output_path': str(final_candidate),
-                            'statistics': merge_stats,
+                        # Treat pass2 as failed
+                        ensemble_metadata['pass2'] = {
+                            'status': 'failed',
+                            'error': f'SRT file not found: {pass2_srt}',
+                            'processing_time': pass2.get('processing_time', 0.0),
                         }
-                        final_output_path = final_candidate
-                        row_display['merge'] = 'OK'
-                        row_display['final'] = final_candidate.name
-                    except Exception as merge_error:
-                        if tmp_merge.exists():
-                            tmp_merge.unlink()
-                        logger.error("Merge failed for %s: %s", basename, merge_error)
-                        merge_info = {'status': 'failed', 'error': str(merge_error)}
+                        merge_info = {'status': 'skipped', 'reason': 'pass2_file_missing'}
                         row_display['merge'] = 'NOK'
+                        row_display['pass2'] = 'NOK'
                         if pass1_srt:
                             row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
+                    else:
+                        # pass2_srt exists - record pass2 metadata
+                        ensemble_metadata['pass2'] = {
+                            'status': pass2['status'],
+                            'srt_path': pass2['srt_path'],
+                            'subtitles': pass2.get('subtitles', 0),
+                            'processing_time': pass2.get('processing_time', 0.0),
+                        }
+
+                        # Check if pass1_srt is valid before attempting merge
+                        if not pass1_srt:
+                            logger.warning(
+                                "Cannot merge: Pass 1 SRT file missing or invalid for %s",
+                                basename,
+                            )
+                            merge_info = {'status': 'skipped', 'reason': 'pass1_file_missing'}
+                            row_display['merge'] = 'NOK'
+                            # Use pass2 as final output since pass1 is unavailable
+                            final_output_path = pass2_srt
+                            row_display['final'] = f"pass2 only ({pass2_srt.name})"
+                        else:
+                            # Both pass1 and pass2 SRT files exist - proceed with merge
+                            tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
+                            tmp_merge.parent.mkdir(parents=True, exist_ok=True)
+                            final_candidate = self.output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
+                            try:
+                                merge_stats = self.merge_engine.merge(
+                                    srt1_path=pass1_srt,
+                                    srt2_path=pass2_srt,
+                                    output_path=tmp_merge,
+                                    strategy=merge_strategy,
+                                )
+                                if final_candidate.exists():
+                                    final_candidate.unlink()
+                                shutil.move(tmp_merge, final_candidate)
+                                merge_info = {
+                                    'status': 'completed',
+                                    'strategy': merge_strategy,
+                                    'output_path': str(final_candidate),
+                                    'statistics': merge_stats,
+                                }
+                                final_output_path = final_candidate
+                                row_display['merge'] = 'OK'
+                                row_display['final'] = final_candidate.name
+                            except Exception as merge_error:
+                                if tmp_merge.exists():
+                                    tmp_merge.unlink()
+                                logger.error("Merge failed for %s: %s", basename, merge_error)
+                                merge_info = {'status': 'failed', 'error': str(merge_error)}
+                                row_display['merge'] = 'NOK'
+                                if pass1_srt:
+                                    row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
                 else:
                     ensemble_metadata['pass2'] = (
                         {'status': pass2['status'], 'error': pass2.get('error')}
