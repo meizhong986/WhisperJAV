@@ -23,6 +23,7 @@ install_requires = [
     "ffmpeg-python",
     "soundfile",
     "auditok",
+    "pydub",
     "numpy",
     "scipy",
     "tqdm",
@@ -30,12 +31,11 @@ install_requires = [
     "srt",
     "aiofiles",
     "jsonschema",
-    "Pillow",
     "colorama",
     "librosa",
-    "matplotlib",
     "pyloudnorm",
     "requests",
+    "regex",
     "PySubtrans>=0.7.0",
     "openai>=1.35.0",
     "google-genai>=1.39.0",
@@ -43,6 +43,10 @@ install_requires = [
     "transformers>=4.40.0",  # HuggingFace Transformers for ASR pipeline
     "accelerate>=0.26.0",    # Efficient model loading for Transformers
     "silero-vad>=6.0",
+
+    # Speech segmentation backends (v1.7.2)
+    "ten-vad",
+    "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
 
     # Configuration system
     "pydantic>=2.0,<3.0",
