@@ -154,7 +154,7 @@
                                             <!-- kotoba-faster-whisper temporarily hidden (implementation preserved)
                                             <option value="kotoba-faster-whisper">kotoba&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(kotoba-v2-fp16&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
                                             -->
-                                            <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-v2.0&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
+                                            <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-bilingual&nbsp;6GB VRAM)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>
                                     </div>
@@ -406,12 +406,12 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass1-segmenter" class="form-select compact">
+                                            <!-- Options populated dynamically by updateSegmenterOptions() -->
                                             <option value="silero-v4.0" selected>Silero V4.0</option>
                                             <option value="silero-v3.1">Silero V3.1</option>
-                                            <option value="nemo-lite" disabled title="Requires nemo_toolkit">NeMo Lite (N/A)</option>
-                                            <option value="whisper-vad">Whisper VAD</option>
-                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
-                                            <option value="ten" disabled title="Requires ten-vad">TEN (N/A)</option>
+                                            <option value="nemo-lite">NeMo Lite</option>
+                                            <option value="whisper-vad">Whisper Seg. Medium</option>
+                                            <option value="ten">TEN</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -420,8 +420,6 @@
                                         <select id="pass1-model" class="form-select compact">
                                             <option value="large-v2" selected>Large V2</option>
                                             <option value="large-v3">Large V3</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="small">Small</option>
                                             <option value="turbo">Turbo</option>
                                         </select>
                                     </div>
@@ -453,10 +451,9 @@
                                     <div class="col-separator"></div>
                                     <div class="col-sensitivity">
                                         <select id="pass2-sensitivity" class="form-select compact" disabled>
-                                            <option value="aggressive">Aggressive</option>
+                                            <option value="aggressive" selected>Aggressive</option>
                                             <option value="balanced">Balanced</option>
                                             <option value="conservative">Conservative</option>
-                                            <option value="none" selected>None</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -474,22 +471,22 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
-                                            <option value="">Silero V4.0</option>
+                                            <!-- Options populated dynamically by updateSegmenterOptions() -->
+                                            <option value="silero-v4.0">Silero V4.0</option>
                                             <option value="silero-v3.1">Silero V3.1</option>
-                                            <option value="nemo-lite" disabled title="Requires nemo_toolkit">NeMo Lite (N/A)</option>
-                                            <option value="whisper-vad">Whisper VAD</option>
-                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
-                                            <option value="ten" disabled title="Requires ten-vad">TEN (N/A)</option>
+                                            <option value="nemo-lite">NeMo Lite</option>
+                                            <option value="whisper-vad">Whisper Seg. Medium</option>
+                                            <option value="ten">TEN</option>
                                             <option value="none" selected>None</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
                                     <div class="col-model">
                                         <select id="pass2-model" class="form-select compact" disabled>
-                                            <option value="kotoba-tech/kotoba-whisper-v2.2" selected>Kotoba v2.2 (Latest)</option>
+                                            <option value="kotoba-tech/kotoba-whisper-bilingual-v1.0" selected>Kotoba Bilingual v1.0</option>
+                                            <option value="kotoba-tech/kotoba-whisper-v2.2">Kotoba v2.2 (Latest)</option>
                                             <option value="kotoba-tech/kotoba-whisper-v2.1">Kotoba v2.1</option>
                                             <option value="kotoba-tech/kotoba-whisper-v2.0">Kotoba v2.0</option>
-                                            <option value="kotoba-tech/kotoba-whisper-bilingual-v1.0">Kotoba Bilingual v1.0</option>
                                             <option value="openai/whisper-large-v3-turbo">Whisper Large v3 Turbo</option>
                                             <option value="openai/whisper-large-v2">Whisper Large v2</option>
                                         </select>

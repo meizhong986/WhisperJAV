@@ -183,7 +183,7 @@ const TransformersManager = {
     customized: false,
 
     defaults: {
-        model_id: 'kotoba-tech/kotoba-whisper-v2.2',
+        model_id: 'kotoba-tech/kotoba-whisper-bilingual-v1.0',
         chunk_length_s: 15,
         stride_length_s: null,
         batch_size: 8,
@@ -1056,11 +1056,11 @@ const EnsembleManager = {
         pass2: {
             enabled: false,
             pipeline: 'transformers',
-            sensitivity: 'none',
+            sensitivity: 'aggressive',
             sceneDetector: 'none',
             speechEnhancer: 'none',
             speechSegmenter: 'none',
-            model: 'kotoba-tech/kotoba-whisper-v2.2',  // Latest Kotoba model
+            model: 'kotoba-tech/kotoba-whisper-bilingual-v1.0',  // Kotoba Bilingual for mixed ja/en
             customized: false,
             params: null,
             isTransformers: true  // Default Pass 2 is Transformers
@@ -1073,15 +1073,13 @@ const EnsembleManager = {
     legacyModels: [
         { value: 'large-v2', label: 'Large V2' },
         { value: 'large-v3', label: 'Large V3' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'small', label: 'Small' },
         { value: 'turbo', label: 'Turbo' }
     ],
     transformersModels: [
+        { value: 'kotoba-tech/kotoba-whisper-bilingual-v1.0', label: 'Kotoba Bilingual v1.0' },
         { value: 'kotoba-tech/kotoba-whisper-v2.2', label: 'Kotoba v2.2 (Latest)' },
         { value: 'kotoba-tech/kotoba-whisper-v2.1', label: 'Kotoba v2.1' },
         { value: 'kotoba-tech/kotoba-whisper-v2.0', label: 'Kotoba v2.0' },
-        { value: 'kotoba-tech/kotoba-whisper-bilingual-v1.0', label: 'Kotoba Bilingual v1.0' },
         { value: 'openai/whisper-large-v3-turbo', label: 'Whisper Large v3 Turbo' },
         { value: 'openai/whisper-large-v2', label: 'Whisper Large v2' }
     ],
@@ -1261,10 +1259,12 @@ const EnsembleManager = {
 
         if (passState.isTransformers) {
             // Disable sensitivity and speech segmenter for Transformers
+            // Note: Transformers uses HuggingFace internal chunking, not external VAD
+            // Speech segmentation support planned for v1.8.0
             sensitivitySelect.disabled = true;
             sensitivitySelect.title = 'Sensitivity not applicable for Transformers mode';
             segmenterSelect.disabled = true;
-            segmenterSelect.title = 'Speech Segmenter not applicable for Transformers mode';
+            segmenterSelect.title = 'Transformers uses HF internal chunking (segmentation planned for v1.8.0)';
 
             // Set to 'none' for visual clarity
             if (sensitivitySelect.querySelector('option[value="none"]')) {
@@ -2706,6 +2706,64 @@ const EnsembleManager = {
         } catch (error) {
             ErrorHandler.show('Start Error', error.toString());
         }
+    },
+
+    /**
+     * Update segmenter dropdown options based on backend availability.
+     * Called on pywebviewready when API becomes available.
+     */
+    async updateSegmenterAvailability() {
+        if (!window.pywebview || !pywebview.api) {
+            console.warn('PyWebView API not available for segmenter check');
+            return;
+        }
+
+        try {
+            const result = await pywebview.api.get_speech_segmenter_backends();
+            if (!result.success) {
+                console.error('Failed to get segmenter backends:', result.error);
+                return;
+            }
+
+            const backends = result.backends;
+            const availabilityMap = {};
+            backends.forEach(b => {
+                availabilityMap[b.name] = {
+                    available: b.available,
+                    hint: b.install_hint || ''
+                };
+            });
+
+            // Update both pass1 and pass2 segmenter dropdowns
+            ['pass1-segmenter', 'pass2-segmenter'].forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+
+                Array.from(select.options).forEach(option => {
+                    const backend = option.value;
+                    // Skip 'none' - always available
+                    if (backend === 'none' || backend === '') return;
+
+                    // Normalize backend name for lookup (silero-v4.0 -> silero)
+                    const lookupName = backend === 'silero-v4.0' ? 'silero' : backend;
+                    const info = availabilityMap[lookupName];
+
+                    if (info && !info.available) {
+                        option.disabled = true;
+                        option.title = info.hint || 'Not available';
+                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '') + ' (N/A)';
+                    } else {
+                        option.disabled = false;
+                        option.title = '';
+                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '');
+                    }
+                });
+            });
+
+            console.log('Segmenter availability updated');
+        } catch (error) {
+            console.error('Error updating segmenter availability:', error);
+        }
     }
 };
 
@@ -2937,4 +2995,7 @@ window.addEventListener('pywebviewready', () => {
 
     // Reload default output directory from API
     AppState.loadDefaultOutputDir();
+
+    // Update speech segmenter options based on backend availability
+    EnsembleManager.updateSegmenterAvailability();
 });
