@@ -30,17 +30,28 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 # Version of this upgrade script
-UPGRADE_SCRIPT_VERSION = "1.0.0"
+UPGRADE_SCRIPT_VERSION = "1.7.2"
 
 # GitHub repository URL
 GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
 
 # New dependencies added in v1.7.x that older versions don't have
+# Note: Dependencies that require torch (like nemo_toolkit) are handled separately
+# with constraints to prevent CPU torch reinstallation
 NEW_DEPENDENCIES = [
     "transformers>=4.40.0",
     "accelerate>=0.26.0",
     "pydantic>=2.0,<3.0",
     "PyYAML>=6.0",
+    "pydub",
+    "regex",
+    "ten-vad",
+]
+
+# Dependencies that have torch as a requirement - installed with constraints
+# to prevent pip from reinstalling CPU-only torch
+TORCH_DEPENDENT_PACKAGES = [
+    "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
 ]
 
 # Files to preserve during upgrade (user data)
@@ -94,10 +105,30 @@ def detect_installation() -> Optional[Path]:
     """
     Detect the WhisperJAV installation directory.
 
+    Detection priority:
+    1. Script's own directory (if packaged with installer)
+    2. Python's sys.prefix (if running within installation)
+    3. Default Windows location (%LOCALAPPDATA%\\WhisperJAV)
+
     Returns:
         Path to installation directory, or None if not found
     """
-    # Check if running from within the installation
+    # Priority 1: Check script's own directory
+    # If this script is packaged with the installer, it lives in the install folder
+    script_dir = Path(__file__).resolve().parent
+    if (script_dir / 'python.exe').exists() or (script_dir / 'python').exists():
+        # Verify it's a WhisperJAV installation by checking for whisperjav package
+        try:
+            # Add to path temporarily to check
+            if str(script_dir / 'Lib' / 'site-packages') not in sys.path:
+                sys.path.insert(0, str(script_dir / 'Lib' / 'site-packages'))
+            import whisperjav
+            return script_dir
+        except ImportError:
+            # Still return if python.exe exists - might just need upgrade
+            return script_dir
+
+    # Priority 2: Check if running from within the installation (sys.prefix)
     if hasattr(sys, 'prefix'):
         install_dir = Path(sys.prefix)
         if (install_dir / 'python.exe').exists() or (install_dir / 'python').exists():
@@ -108,7 +139,7 @@ def detect_installation() -> Optional[Path]:
             except ImportError:
                 pass
 
-    # Check default Windows installation location
+    # Priority 3: Check default Windows installation location
     if platform.system() == 'Windows':
         local_app_data = os.environ.get('LOCALAPPDATA', '')
         if local_app_data:
@@ -160,6 +191,69 @@ def check_network() -> bool:
         return True
     except Exception:
         return False
+
+
+def get_torch_version(install_dir: Path) -> Optional[str]:
+    """
+    Get the currently installed PyTorch version (without CUDA suffix).
+
+    Args:
+        install_dir: Path to installation directory
+
+    Returns:
+        Version string (e.g., "2.9.1"), or None if not found
+    """
+    python_exe = install_dir / 'python.exe'
+    if not python_exe.exists():
+        python_exe = install_dir / 'python'
+
+    if not python_exe.exists():
+        return None
+
+    try:
+        result = subprocess.run(
+            [str(python_exe), '-c',
+             "import torch; print(torch.__version__.split('+')[0])"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    return None
+
+
+def create_torch_constraints(install_dir: Path) -> Optional[Path]:
+    """
+    Create a constraints file to lock PyTorch version.
+
+    This prevents pip from reinstalling CPU-only torch when installing
+    packages that have torch as a dependency (like nemo_toolkit).
+
+    Args:
+        install_dir: Path to installation directory
+
+    Returns:
+        Path to constraints file, or None if failed
+    """
+    torch_version = get_torch_version(install_dir)
+    if not torch_version:
+        print_warning("Could not detect PyTorch version for constraints")
+        return None
+
+    constraints_path = install_dir / "torch_constraints.txt"
+    try:
+        with open(constraints_path, 'w') as f:
+            f.write(f"torch=={torch_version}\n")
+            f.write(f"torchaudio=={torch_version}\n")
+        print_success(f"Created torch constraints: torch=={torch_version}")
+        return constraints_path
+    except Exception as e:
+        print_warning(f"Could not create constraints file: {e}")
+        return None
 
 
 def upgrade_package(install_dir: Path) -> bool:
@@ -226,6 +320,8 @@ def install_new_dependencies(install_dir: Path) -> bool:
         return False
 
     success = True
+
+    # Install regular dependencies (no torch conflict)
     for dep in NEW_DEPENDENCIES:
         try:
             result = subprocess.run(
@@ -244,6 +340,46 @@ def install_new_dependencies(install_dir: Path) -> bool:
                     print_warning(f"{dep} - install had issues")
         except Exception as e:
             print_warning(f"{dep} - {e}")
+
+    # Install torch-dependent packages with constraints to preserve CUDA torch
+    if TORCH_DEPENDENT_PACKAGES:
+        print("      Installing torch-dependent packages (with constraints)...")
+        constraints_path = create_torch_constraints(install_dir)
+
+        for dep in TORCH_DEPENDENT_PACKAGES:
+            try:
+                # Build pip command with constraints if available
+                cmd = [str(pip_exe), 'install', dep]
+                if constraints_path and constraints_path.exists():
+                    cmd.extend(['-c', str(constraints_path)])
+
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=600  # 10 min timeout for large packages like NeMo
+                )
+                if result.returncode == 0:
+                    # Extract package name for cleaner output
+                    pkg_name = dep.split('@')[0].strip() if '@' in dep else dep
+                    print_success(pkg_name)
+                else:
+                    if "already satisfied" in result.stdout.lower():
+                        pkg_name = dep.split('@')[0].strip() if '@' in dep else dep
+                        print_success(f"{pkg_name} (already installed)")
+                    else:
+                        print_warning(f"{dep} - install had issues: {result.stderr[:100]}")
+            except subprocess.TimeoutExpired:
+                print_warning(f"{dep} - installation timed out (may still be installing)")
+            except Exception as e:
+                print_warning(f"{dep} - {e}")
+
+        # Cleanup constraints file
+        if constraints_path and constraints_path.exists():
+            try:
+                constraints_path.unlink()
+            except Exception:
+                pass
 
     return success
 
