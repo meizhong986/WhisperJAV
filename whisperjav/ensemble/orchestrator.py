@@ -118,6 +118,12 @@ class EnsembleOrchestrator:
             "config": pass1_config,
         })
 
+        logger.debug(
+            "Starting Pass 1 for %d files with pipeline=%s, sensitivity=%s",
+            len(serialized_media),
+            pass1_config.get('pipeline'), pass1_config.get('sensitivity')
+        )
+
         pass1_results = self._run_pass_in_subprocess(
             pass_number=1,
             media_files=serialized_media,
@@ -129,6 +135,11 @@ class EnsembleOrchestrator:
         pass1_completed = sum(1 for r in pass1_results.values() if r.get('status') == 'completed')
         pass1_failed = sum(1 for r in pass1_results.values() if r.get('status') == 'failed')
         pass1_subs = sum(r.get('subtitles', 0) for r in pass1_results.values() if r.get('status') == 'completed')
+
+        logger.debug(
+            "Pass 1 results: %d completed, %d failed, basenames=%s",
+            pass1_completed, pass1_failed, list(pass1_results.keys())
+        )
 
         self.tracer.emit("ensemble_pass_complete", {
             "pass_number": 1,
@@ -157,6 +168,12 @@ class EnsembleOrchestrator:
                 "config": pass2_config,
             })
 
+            logger.debug(
+                "Starting Pass 2 for %d files with pipeline=%s, sensitivity=%s",
+                len(serialized_media),
+                pass2_config.get('pipeline'), pass2_config.get('sensitivity')
+            )
+
             pass2_results = self._run_pass_in_subprocess(
                 pass_number=2,
                 media_files=serialized_media,
@@ -168,6 +185,11 @@ class EnsembleOrchestrator:
             pass2_completed = sum(1 for r in pass2_results.values() if r.get('status') == 'completed')
             pass2_failed = sum(1 for r in pass2_results.values() if r.get('status') == 'failed')
             pass2_subs = sum(r.get('subtitles', 0) for r in pass2_results.values() if r.get('status') == 'completed')
+
+            logger.debug(
+                "Pass 2 results: %d completed, %d failed, basenames=%s",
+                pass2_completed, pass2_failed, list(pass2_results.keys())
+            )
 
             self.tracer.emit("ensemble_pass_complete", {
                 "pass_number": 2,
