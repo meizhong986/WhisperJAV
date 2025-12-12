@@ -360,11 +360,25 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
                 basename,
                 extra={'color': 'blue'},
             )
+            logger.debug(
+                "[Worker %s] Pass %s: File details - path=%s, basename_len=%d",
+                os.getpid(), pass_number, media_info.get("path"), len(basename)
+            )
             try:
                 result = pipeline.process({
                     **media_info,
                     "path": Path(media_info["path"]),
                 })
+
+                # Debug log: pipeline result summary
+                logger.debug(
+                    "[Worker %s] Pass %s: Pipeline returned - output_files=%s, summary=%s",
+                    os.getpid(), pass_number,
+                    list(result.get("output_files", {}).keys()),
+                    {k: v for k, v in result.get("summary", {}).items() if k in [
+                        "final_subtitles_refined", "total_scenes_detected", "total_processing_time_seconds"
+                    ]}
+                )
 
                 # Defensive check: ensure final_srt path exists in result
                 final_srt_path = result.get("output_files", {}).get("final_srt")
@@ -430,6 +444,12 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
                         subtitles=result["summary"].get("final_subtitles_refined", 0),
                         processing_time=result["summary"].get("total_processing_time_seconds", 0.0),
                     )
+                )
+                logger.debug(
+                    "[Worker %s] Pass %s: SUCCESS - %s → %d subtitles in %.1fs",
+                    os.getpid(), pass_number, basename,
+                    result["summary"].get("final_subtitles_refined", 0),
+                    result["summary"].get("total_processing_time_seconds", 0.0)
                 )
             except Exception:
                 logger.exception(
