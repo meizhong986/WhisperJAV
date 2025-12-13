@@ -20,6 +20,10 @@ pydub
 ten-vad
 nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main
 
+# Speech enhancement backends (v1.7.3)
+clearvoice                      # ClearerVoice denoising (48kHz)
+bs-roformer-infer               # BS-RoFormer vocal isolation (44.1kHz)
+
 # Utilities
 numpy
 scipy
