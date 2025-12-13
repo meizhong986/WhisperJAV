@@ -2764,6 +2764,62 @@ const EnsembleManager = {
         } catch (error) {
             console.error('Error updating segmenter availability:', error);
         }
+    },
+
+    /**
+     * Update enhancer dropdown options based on backend availability.
+     * Called on pywebviewready when API becomes available.
+     */
+    async updateEnhancerAvailability() {
+        if (!window.pywebview || !pywebview.api) {
+            console.warn('PyWebView API not available for enhancer check');
+            return;
+        }
+
+        try {
+            const result = await pywebview.api.get_speech_enhancer_backends();
+            if (!result.success) {
+                console.error('Failed to get enhancer backends:', result.error);
+                return;
+            }
+
+            const backends = result.backends;
+            const availabilityMap = {};
+            backends.forEach(b => {
+                availabilityMap[b.name] = {
+                    available: b.available,
+                    hint: b.install_hint || ''
+                };
+            });
+
+            // Update both pass1 and pass2 enhancer dropdowns
+            ['pass1-enhancer', 'pass2-enhancer'].forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+
+                Array.from(select.options).forEach(option => {
+                    const backend = option.value;
+                    // Skip 'none' - always available
+                    if (backend === 'none' || backend === '') return;
+
+                    const info = availabilityMap[backend];
+
+                    if (info && !info.available) {
+                        option.disabled = true;
+                        option.title = info.hint || 'Not available';
+                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '') + ' (N/A)';
+                    } else {
+                        option.disabled = false;
+                        option.title = '';
+                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '');
+                    }
+                });
+            });
+
+            console.log('Enhancer availability updated');
+        } catch (error) {
+            console.error('Error updating enhancer availability:', error);
+        }
     }
 };
 
@@ -2998,4 +3054,7 @@ window.addEventListener('pywebviewready', () => {
 
     // Update speech segmenter options based on backend availability
     EnsembleManager.updateSegmenterAvailability();
+
+    // Update speech enhancer options based on backend availability
+    EnsembleManager.updateEnhancerAvailability();
 });

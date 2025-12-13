@@ -29,6 +29,13 @@ from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 from whisperjav.utils.progress_display import DummyProgress
 
+from whisperjav.modules.speech_enhancement import (
+    create_enhancer_direct,
+    get_extraction_sample_rate,
+    enhance_scenes,
+    enhance_single_audio,
+)
+
 
 class TransformersPipeline(BasePipeline):
     """
@@ -63,6 +70,9 @@ class TransformersPipeline(BasePipeline):
         hf_task: str = "transcribe",
         hf_device: str = "auto",
         hf_dtype: str = "auto",
+        # Speech enhancement
+        hf_speech_enhancer: str = "none",
+        hf_speech_enhancer_model: Optional[str] = None,
         # Standard options
         subs_language: str = "native",
         **kwargs
@@ -88,6 +98,8 @@ class TransformersPipeline(BasePipeline):
             hf_task: Task type ('transcribe' or 'translate')
             hf_device: Device to use
             hf_dtype: Data type
+            hf_speech_enhancer: Speech enhancement backend ('none', 'clearvoice', 'bs-roformer')
+            hf_speech_enhancer_model: Optional model variant for enhancer
             subs_language: Subtitle language ('native' or 'direct-to-english')
             **kwargs: Additional parameters for base class
         """
@@ -128,8 +140,15 @@ class TransformersPipeline(BasePipeline):
         else:
             self.lang_code = hf_language
 
-        # Initialize modules
-        self.audio_extractor = AudioExtractor()
+        # Initialize speech enhancer (if enabled)
+        self.speech_enhancer = create_enhancer_direct(
+            backend=hf_speech_enhancer,
+            model=hf_speech_enhancer_model
+        )
+
+        # Determine extraction sample rate based on enhancer
+        extraction_sr = get_extraction_sample_rate(self.speech_enhancer)
+        self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
 
         # Scene detector (only if enabled)
         self.scene_detector = None
@@ -162,6 +181,11 @@ class TransformersPipeline(BasePipeline):
         logger.info(f"TransformersPipeline initialized")
         logger.info(f"  Model: {hf_model_id}")
         logger.info(f"  Scene detection: {self.scene_method}")
+        if self.speech_enhancer:
+            logger.info(f"  Speech enhancer: {self.speech_enhancer.display_name}")
+            logger.info(f"  Extraction SR: {extraction_sr}Hz (enhancer preferred rate)")
+        else:
+            logger.info(f"  Speech enhancer: none")
 
     def get_mode_name(self) -> str:
         """Return pipeline mode name."""
@@ -308,6 +332,52 @@ class TransformersPipeline(BasePipeline):
                 logger.info("Step 2/5: Skipping scene detection (disabled)")
                 self.metadata_manager.update_processing_stage(
                     master_metadata, "scene_detection", "skipped"
+                )
+
+            # Step 2.5: Speech enhancement (if enabled)
+            if self.speech_enhancer:
+                enhancer_name = self.speech_enhancer.name
+                logger.info(f"Step 2.5: Enhancing audio with {self.speech_enhancer.display_name}...")
+
+                if scene_paths:
+                    # Enhance each scene
+                    scene_paths = enhance_scenes(
+                        scene_paths,
+                        self.speech_enhancer,
+                        self.temp_dir,
+                        progress_callback=lambda n, t, name: logger.debug(
+                            f"Enhancing scene {n}/{t}: {name}"
+                        )
+                    )
+                    master_metadata["config"]["speech_enhancement"] = {
+                        "backend": enhancer_name,
+                        "enhanced_scenes": len(scene_paths)
+                    }
+                else:
+                    # Enhance full audio file
+                    enhanced_path = self.temp_dir / f"{media_basename}_enhanced.wav"
+                    extracted_audio = enhance_single_audio(
+                        extracted_audio,
+                        self.speech_enhancer,
+                        output_path=enhanced_path
+                    )
+                    master_metadata["config"]["speech_enhancement"] = {
+                        "backend": enhancer_name,
+                        "enhanced_full_audio": True
+                    }
+
+                # Free GPU memory before ASR
+                self.speech_enhancer.cleanup()
+                self.speech_enhancer = None
+                logger.info(f"Speech enhancement complete, GPU memory released")
+
+                self.metadata_manager.update_processing_stage(
+                    master_metadata, "speech_enhancement", "completed",
+                    backend=enhancer_name
+                )
+            else:
+                self.metadata_manager.update_processing_stage(
+                    master_metadata, "speech_enhancement", "skipped"
                 )
 
             # Step 3: Transcription
@@ -469,7 +539,10 @@ class TransformersPipeline(BasePipeline):
             raise
 
     def cleanup(self) -> None:
-        """Clean up resources including ASR model."""
+        """Clean up resources including speech enhancer and ASR model."""
+        if hasattr(self, 'speech_enhancer') and self.speech_enhancer:
+            self.speech_enhancer.cleanup()
+            self.speech_enhancer = None
         if hasattr(self, 'asr') and self.asr:
             self.asr.cleanup()
         super().cleanup()

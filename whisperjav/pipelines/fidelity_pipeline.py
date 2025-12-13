@@ -26,6 +26,12 @@ from whisperjav.modules.srt_postproduction import SRTPostProduction
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
 
+from whisperjav.modules.speech_enhancement import (
+    create_enhancer_from_config,
+    get_extraction_sample_rate,
+    enhance_scenes,
+)
+
 class FidelityPipeline(BasePipeline):
     """Fidelity pipeline using scene detection with WhisperPro ASR (VAD-enhanced)."""
     
@@ -87,8 +93,12 @@ class FidelityPipeline(BasePipeline):
             effective_model_cfg["model_name"] = 'large-v2'
         # --- END V3 CONFIG UNPACKING ---
 
+        # Speech enhancement (v1.7.3) - create before audio extractor
+        self.speech_enhancer = create_enhancer_from_config(resolved_config)
+        extraction_sr = get_extraction_sample_rate(self.speech_enhancer)
+
         # Instantiate modules with V3 structured config
-        self.audio_extractor = AudioExtractor()
+        self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
         #self.scene_detector = SceneDetector(**scene_opts)
         #self.scene_detector = AdaptiveSceneDetector()  # Use all defaults
         self.scene_detector = DynamicSceneDetector(**scene_opts)
@@ -183,9 +193,40 @@ class FidelityPipeline(BasePipeline):
                 master_metadata["scenes_detected"].append(scene_info)
             master_metadata["summary"]["total_scenes_detected"] = len(scene_paths)
             self.metadata_manager.update_processing_stage(
-                master_metadata, "scene_detection", "completed", 
+                master_metadata, "scene_detection", "completed",
                 scene_count=len(scene_paths), scenes_dir=str(scenes_dir))
-            
+
+            # Step 2.5: Speech enhancement (v1.7.3) - enhance scenes before transcription
+            if self.speech_enhancer:
+                enhancer_name = self.speech_enhancer.name
+                enhancer_display = self.speech_enhancer.display_name
+                self.progress.set_current_step("Enhancing audio", 2, 5)
+                logger.info(f"Enhancing {len(scene_paths)} scenes with {enhancer_display}")
+
+                def enhancement_progress(scene_num, total, name):
+                    if scene_num == 1 or scene_num % 5 == 0 or scene_num == total:
+                        pct = (scene_num / total) * 100
+                        print(f"\rEnhancing: [{scene_num}/{total}] {pct:.0f}%", end='', flush=True)
+
+                scene_paths = enhance_scenes(
+                    scene_paths,
+                    self.speech_enhancer,
+                    self.temp_dir,
+                    progress_callback=enhancement_progress,
+                )
+                print()  # Newline after progress
+
+                # Cleanup enhancer to free GPU memory before ASR
+                self.speech_enhancer.cleanup()
+                self.speech_enhancer = None
+
+                master_metadata["config"]["speech_enhancement"] = {
+                    "enabled": True,
+                    "backend": enhancer_name,
+                }
+            else:
+                master_metadata["config"]["speech_enhancement"] = {"enabled": False}
+
             # Step 3: Transcribe scenes
             if self.progress_reporter:
                 self.progress_reporter.report_step("Transcribing scenes with VAD", 3, 5)

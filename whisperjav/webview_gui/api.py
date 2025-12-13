@@ -724,6 +724,30 @@ class WhisperJAVAPI:
                 "error": str(e)
             }
 
+    def get_speech_enhancer_backends(self) -> Dict[str, Any]:
+        """
+        Get available speech enhancer backends with availability status.
+
+        Returns:
+            dict with backends list, each containing:
+                - name: backend identifier
+                - display_name: human-readable name
+                - available: boolean
+                - install_hint: installation instructions if not available
+        """
+        try:
+            from whisperjav.modules.speech_enhancement import SpeechEnhancerFactory
+            backends = SpeechEnhancerFactory.get_available_backends()
+            return {
+                "success": True,
+                "backends": backends
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     def validate_ensemble_config(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate ensemble configuration before processing.

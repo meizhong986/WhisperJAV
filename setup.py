@@ -48,6 +48,10 @@ install_requires = [
     "ten-vad",
     "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
 
+    # Speech enhancement backends (v1.7.3)
+    "clearvoice",
+    "bs-roformer-infer",
+
     # Configuration system
     "pydantic>=2.0,<3.0",
     "PyYAML>=6.0",
@@ -84,7 +88,6 @@ setup(
     classifiers=classifiers,
     python_requires=python_requires,
     install_requires=install_requires,
-    # extras_require removed as they are now default
     entry_points={
         "console_scripts": [
             "whisperjav=whisperjav.main:main",

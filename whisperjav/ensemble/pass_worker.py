@@ -537,6 +537,18 @@ def _build_pipeline(
             logger.debug("Pass %s: Override hf_scene = %s", pass_number, pass_config["scene_detector"])
         elif pass_config.get("scene_detector") == "none":
             hf_defaults["hf_scene"] = "none"
+        # Apply speech enhancer override for transformers pipeline
+        if pass_config.get("speech_enhancer"):
+            enhancer_backend = SPEECH_ENHANCER_MAP.get(
+                pass_config["speech_enhancer"], pass_config["speech_enhancer"]
+            )
+            hf_defaults["hf_speech_enhancer"] = enhancer_backend
+            # Set model variant if GUI specifies a specific one
+            if pass_config["speech_enhancer"].endswith("-16k"):
+                hf_defaults["hf_speech_enhancer_model"] = "FRCRN_SE_16K"
+            elif pass_config["speech_enhancer"].endswith("-48k"):
+                hf_defaults["hf_speech_enhancer_model"] = "FRCRN_SE_48K"
+            logger.debug("Pass %s: Override hf_speech_enhancer = %s", pass_number, enhancer_backend)
         return TransformersPipeline(
             output_dir=output_dir,
             temp_dir=str(pass_temp_dir),
@@ -687,6 +699,17 @@ def apply_custom_params(
     return unknown_params
 
 
+# Map GUI speech enhancer values to factory-compatible backend names
+# Similar to SPEECH_SEGMENTER_MAP, preserves model variants for factory extraction
+SPEECH_ENHANCER_MAP = {
+    "": "none",                 # Empty string → disabled
+    "none": "none",             # Explicit disable
+    "clearvoice": "clearvoice", # Default ClearVoice (48kHz FRCRN)
+    "clearvoice-16k": "clearvoice",     # ClearVoice with 16kHz hint
+    "clearvoice-48k": "clearvoice",     # ClearVoice with 48kHz hint
+    "bs-roformer": "bs-roformer",       # BS-RoFormer vocal isolation
+}
+
 # Map GUI speech segmenter values to factory-compatible backend names
 # IMPORTANT: The factory extracts version/variant from the name itself (e.g., "silero-v3.1" → version="v3.1")
 # DO NOT strip version/variant suffixes - pass them through so the factory can process them correctly
@@ -780,3 +803,29 @@ def _apply_gui_overrides(
             if "workflow" in resolved_config:
                 resolved_config["workflow"]["vad"] = segmenter_backend
             logger.debug("Pass %s: Override speech_segmenter = %s", pass_number, segmenter_backend)
+
+    # Override speech enhancer if specified
+    speech_enhancer = pass_config.get("speech_enhancer")
+    if speech_enhancer is not None:  # Allow empty string for default
+        enhancer_backend = SPEECH_ENHANCER_MAP.get(speech_enhancer, speech_enhancer)
+
+        # Ensure params structure exists
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+        if "speech_enhancer" not in resolved_config["params"]:
+            resolved_config["params"]["speech_enhancer"] = {}
+
+        if enhancer_backend == "none":
+            # Disable speech enhancement
+            resolved_config["params"]["speech_enhancer"]["backend"] = "none"
+            logger.debug("Pass %s: Disabled speech enhancement (backend = none)", pass_number)
+        else:
+            # Set speech enhancer backend
+            resolved_config["params"]["speech_enhancer"]["backend"] = enhancer_backend
+            # Optionally set model if GUI provides a specific variant
+            # e.g., "clearvoice-16k" might map to model="FRCRN_SE_16K"
+            if speech_enhancer.endswith("-16k"):
+                resolved_config["params"]["speech_enhancer"]["model"] = "FRCRN_SE_16K"
+            elif speech_enhancer.endswith("-48k"):
+                resolved_config["params"]["speech_enhancer"]["model"] = "FRCRN_SE_48K"
+            logger.debug("Pass %s: Override speech_enhancer = %s", pass_number, enhancer_backend)
