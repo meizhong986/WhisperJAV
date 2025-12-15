@@ -38,7 +38,7 @@ PIPELINE_CLASSES = {
 }
 
 DEFAULT_HF_PARAMS = {
-    "hf_model_id": "kotoba-tech/kotoba-whisper-v2.2",
+    "hf_model_id": "kotoba-tech/kotoba-whisper-bilingual-v1.0",
     "hf_chunk_length": 15,
     "hf_stride": None,
     "hf_batch_size": 16,
@@ -526,8 +526,26 @@ def _build_pipeline(
 
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
 
+    # Diagnostic: Log full pass_config for debugging Pass 2 issues
+    logger.debug(
+        "[Worker %s] Pass %s: Building pipeline '%s' with config keys: %s",
+        os.getpid(), pass_number, pipeline_name, list(pass_config.keys())
+    )
+    logger.debug(
+        "[Worker %s] Pass %s: pass_config details - model=%s, sensitivity=%s, scene_detector=%s, speech_segmenter=%s",
+        os.getpid(), pass_number,
+        pass_config.get("model"),
+        pass_config.get("sensitivity"),
+        pass_config.get("scene_detector"),
+        pass_config.get("speech_segmenter"),
+    )
+
     if pipeline_name == "transformers":
         hf_defaults = prepare_transformers_params(pass_config)
+        logger.debug(
+            "[Worker %s] Pass %s: Transformers defaults BEFORE overrides - hf_model_id=%s",
+            os.getpid(), pass_number, hf_defaults.get("hf_model_id")
+        )
         # Apply GUI-specified overrides for transformers pipeline
         if pass_config.get("model"):
             hf_defaults["hf_model_id"] = pass_config["model"]
@@ -544,14 +562,33 @@ def _build_pipeline(
             if enhancer_model:
                 hf_defaults["hf_speech_enhancer_model"] = enhancer_model
             logger.debug("Pass %s: Override hf_speech_enhancer = %s, model = %s", pass_number, enhancer_backend, enhancer_model)
-        return TransformersPipeline(
-            output_dir=output_dir,
-            temp_dir=str(pass_temp_dir),
-            keep_temp_files=keep_temp_files,
-            progress_display=None,
-            subs_language=subs_language,
-            **hf_defaults,
+        logger.debug(
+            "[Worker %s] Pass %s: Creating TransformersPipeline with hf_model_id=%s, hf_task=%s, hf_language=%s",
+            os.getpid(), pass_number,
+            hf_defaults.get("hf_model_id"),
+            hf_defaults.get("hf_task"),
+            hf_defaults.get("hf_language"),
         )
+        try:
+            pipeline = TransformersPipeline(
+                output_dir=output_dir,
+                temp_dir=str(pass_temp_dir),
+                keep_temp_files=keep_temp_files,
+                progress_display=None,
+                subs_language=subs_language,
+                **hf_defaults,
+            )
+            logger.debug(
+                "[Worker %s] Pass %s: TransformersPipeline created successfully",
+                os.getpid(), pass_number
+            )
+            return pipeline
+        except Exception as e:
+            logger.error(
+                "[Worker %s] Pass %s: FAILED to create TransformersPipeline - %s: %s",
+                os.getpid(), pass_number, type(e).__name__, e
+            )
+            raise
 
     resolved_config = resolve_legacy_pipeline(
         pipeline_name=pipeline_name,
