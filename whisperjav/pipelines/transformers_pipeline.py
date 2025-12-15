@@ -178,6 +178,7 @@ class TransformersPipeline(BasePipeline):
         # Post-processor
         self.postprocessor = SRTPostProcessor(language=self.lang_code)
 
+        import os
         logger.info(f"TransformersPipeline initialized")
         logger.info(f"  Model: {hf_model_id}")
         logger.info(f"  Scene detection: {self.scene_method}")
@@ -186,6 +187,12 @@ class TransformersPipeline(BasePipeline):
             logger.info(f"  Extraction SR: {extraction_sr}Hz (enhancer preferred rate)")
         else:
             logger.info(f"  Speech enhancer: none")
+
+        # Diagnostic: Log full config for Pass 2 debugging
+        logger.debug(
+            "[TransformersPipeline PID %s] Initialized with model_id=%s, task=%s, language=%s, scene=%s",
+            os.getpid(), hf_model_id, hf_task, hf_language, self.scene_method
+        )
 
     def get_mode_name(self) -> str:
         """Return pipeline mode name."""
@@ -267,10 +274,17 @@ class TransformersPipeline(BasePipeline):
         Returns:
             Master metadata dict
         """
+        import os
         start_time = time.time()
 
         input_file = media_info['path']
         media_basename = media_info['basename']
+
+        # Diagnostic: Log process start for Pass 2 debugging
+        logger.debug(
+            "[TransformersPipeline PID %s] process() started for: %s (model=%s)",
+            os.getpid(), media_basename, self.hf_config.get("model_id")
+        )
 
         # Create master metadata
         master_metadata = self.metadata_manager.create_master_metadata(

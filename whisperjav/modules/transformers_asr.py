@@ -155,6 +155,7 @@ class TransformersASR:
             logger.debug("Pipeline already loaded")
             return
 
+        import os
         from transformers import pipeline
 
         # Detect device and dtype
@@ -168,6 +169,12 @@ class TransformersASR:
         logger.info(f"  Attention: {self.attn_implementation}")
         logger.info(f"  Batch:    {self.batch_size}")
 
+        # Diagnostic: Log worker PID and model details for Pass 2 debugging
+        logger.debug(
+            "[TransformersASR PID %s] Loading model_id=%s on device=%s dtype=%s",
+            os.getpid(), self.model_id, self._device, self._dtype
+        )
+
         # Build model_kwargs
         model_kwargs = {}
         if "cuda" in self._device and self.attn_implementation:
@@ -176,6 +183,10 @@ class TransformersASR:
         start_time = time.time()
 
         try:
+            logger.debug(
+                "[TransformersASR PID %s] Calling HF pipeline() with model=%s...",
+                os.getpid(), self.model_id
+            )
             self.pipe = pipeline(
                 "automatic-speech-recognition",
                 model=self.model_id,
@@ -187,9 +198,16 @@ class TransformersASR:
 
             load_time = time.time() - start_time
             logger.info(f"  Loaded in {load_time:.1f}s")
+            logger.debug(
+                "[TransformersASR PID %s] Model loaded successfully: %s in %.1fs",
+                os.getpid(), self.model_id, load_time
+            )
 
         except Exception as e:
-            logger.error(f"Failed to load model: {e}")
+            logger.error(
+                "[TransformersASR PID %s] FAILED to load model %s: %s: %s",
+                os.getpid(), self.model_id, type(e).__name__, e
+            )
             raise
 
     def transcribe(
@@ -208,6 +226,12 @@ class TransformersASR:
         Returns:
             List of segment dictionaries with 'text', 'start', 'end' keys
         """
+        import os as _os
+        logger.debug(
+            "[TransformersASR PID %s] transcribe() called for: %s (model=%s)",
+            _os.getpid(), audio_path.name if hasattr(audio_path, 'name') else audio_path, self.model_id
+        )
+
         # Lazy load model
         if self.pipe is None:
             self.load_model()
