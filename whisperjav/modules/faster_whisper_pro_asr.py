@@ -41,8 +41,22 @@ class FasterWhisperProASR:
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA → MPS → CPU
         self.device = model_config.get("device", get_best_device())
-        # Default to int8 for quantized models (faster-whisper uses CTranslate2 quantized models)
-        self.compute_type = model_config.get("compute_type", "int8")
+
+        # Smart compute_type default based on device (ctranslate2 backend)
+        # - CUDA: int8_float16 (quantized weights + FP16 tensor cores = fastest)
+        # - MPS:  float16 (safe for Apple Silicon)
+        # - CPU:  int8 (quantized weights + FP32 compute = only fast option)
+        requested_compute_type = model_config.get("compute_type")
+        if requested_compute_type is None or requested_compute_type == "auto":
+            if self.device == "cuda":
+                self.compute_type = "int8_float16"
+            elif self.device == "mps":
+                self.compute_type = "float16"
+            else:  # cpu
+                self.compute_type = "int8"
+            logger.debug(f"Auto-selected compute_type='{self.compute_type}' for device='{self.device}'")
+        else:
+            self.compute_type = requested_compute_type
 
         decoder_params = params["decoder"]
         vad_params = params["vad"]
@@ -154,6 +168,26 @@ class FasterWhisperProASR:
     def _initialize_models(self):
         """Initialize Faster-Whisper model (direct API)."""
         # Note: Speech segmentation is handled by external Speech Segmenter (set in __init__)
+
+        # CPU COMPATIBILITY: float16/bfloat16 are NOT supported on CPU by ctranslate2
+        # Only float32 and int8 work on CPU. This check is ONLY for CPU - GPU paths unchanged.
+        # Note: Apple Silicon MPS (device="mps") DOES support float16/bfloat16 - this only affects CPU mode.
+        if self.device == "cpu" and self.compute_type in ("float16", "bfloat16", "int8_float16", "int8_bfloat16"):
+            import platform
+            original_compute_type = self.compute_type
+            self.compute_type = "int8"  # int8 is faster than float32 on CPU
+
+            # Tailor message based on platform
+            if platform.system() == "Darwin":
+                hint = "For GPU acceleration on Mac, ensure MPS is available (Apple Silicon required)."
+            else:
+                hint = "For GPU acceleration, use a CUDA-compatible GPU."
+
+            logger.warning(
+                f"Compute type '{original_compute_type}' is not supported on CPU. "
+                f"Automatically switching to 'int8' (best CPU performance). {hint}"
+            )
+
         # Faster-Whisper direct API initialization
         logger.debug(
             f"Loading Faster-Whisper model (direct API): {self.model_name} "
