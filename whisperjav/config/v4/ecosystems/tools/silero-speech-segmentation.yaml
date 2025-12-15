@@ -53,7 +53,7 @@ spec:
   vad.speech_pad_ms: 400
 
   # --- Segment Grouping ---
-  chunk_threshold_s: 4.0
+  chunk_threshold_s: 2.5
 
 # =============================================================================
 # Sensitivity Presets

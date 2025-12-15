@@ -61,7 +61,7 @@ spec:
   # --- Duration Filters ---
   min_speech_duration_ms: 100
   min_silence_duration_ms: 100
-  chunk_threshold_s: 4.0  # Gap threshold for segment grouping
+  chunk_threshold_s: 2.5  # Gap threshold for segment grouping
 
 # =============================================================================
 # Presets

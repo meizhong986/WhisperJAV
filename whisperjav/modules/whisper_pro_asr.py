@@ -56,10 +56,15 @@ class WhisperProASR:
         speech_segmenter_config = params.get("speech_segmenter", {})
         segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")  # Default to silero-v4.0
 
+        # CRITICAL: Merge VAD params into speech segmenter config for sensitivity tuning
+        # Without this, sensitivity settings (threshold, min_speech_duration_ms) are lost
+        # and the segmenter uses its own defaults instead of the tuned values
+        merged_segmenter_config = {**vad_params, **speech_segmenter_config}
+
         try:
             self._external_segmenter = SpeechSegmenterFactory.create(
                 segmenter_backend,
-                config=speech_segmenter_config
+                config=merged_segmenter_config
             )
             logger.info(f"Speech Segmenter initialized: {self._external_segmenter.name}")
         except Exception as e:

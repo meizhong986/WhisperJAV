@@ -8,20 +8,20 @@
       "compute_type": "float16"
     },
 
-    "SILERO_VAD_OPTIONS_CONSERVATIVE": { 
-      "threshold": 0.5, 
+    "SILERO_VAD_OPTIONS_CONSERVATIVE": {
+      "threshold": 0.5,
       "min_speech_duration_ms": 300,
-      "chunk_threshold": 5.0
+      "chunk_threshold": 3.0
     },
-    "SILERO_VAD_OPTIONS_BALANCED": { 
-      "threshold": 0.35, 
+    "SILERO_VAD_OPTIONS_BALANCED": {
+      "threshold": 0.35,
       "min_speech_duration_ms": 200,
-      "chunk_threshold": 4.0
+      "chunk_threshold": 2.5
     },
-    "SILERO_VAD_OPTIONS_AGGRESSIVE": { 
-      "threshold": 0.20, 
+    "SILERO_VAD_OPTIONS_AGGRESSIVE": {
+      "threshold": 0.20,
       "min_speech_duration_ms": 100,
-      "chunk_threshold": 4.0
+      "chunk_threshold": 2.5
     },
 
     "WHISPER_TRANSCRIBE_OPTIONS_CONSERVATIVE": {
