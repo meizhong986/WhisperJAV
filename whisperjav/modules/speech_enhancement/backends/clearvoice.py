@@ -6,17 +6,20 @@ including denoising, separation, and super-resolution.
 
 Available models:
 - FRCRN_SE_16K: Speech enhancement at 16kHz
-- FRCRN_SE_48K: Speech enhancement at 48kHz (default, best quality)
-- MossFormer2_SE_48K: MossFormer2 enhancement at 48kHz
-- MossFormer2_SS_16K: MossFormer2 separation at 16kHz
+- MossFormer2_SE_48K: MossFormer2 enhancement at 48kHz (default, best quality)
+- MossFormerGAN_SE_16K: MossFormerGAN enhancement at 16kHz
+- MossFormer2_SS_16K: MossFormer2 separation at 16kHz (for vocal isolation)
 
 Installation: pip install clearvoice
+
+API Reference (batch numpy):
+    myClearVoice = ClearVoice(task='speech_enhancement', model_names=['MossFormer2_SE_48K'])
+    output_wav = myClearVoice(audio, False)  # audio shape: [batch, length], dtype: float32
 """
 
 from typing import Union, List, Dict, Any, Optional
 from pathlib import Path
 import time
-import tempfile
 import numpy as np
 import logging
 
@@ -35,15 +38,15 @@ _MODEL_INFO: Dict[str, Dict[str, Any]] = {
         "task": "speech_enhancement",
         "description": "FRCRN Speech Enhancement (16kHz)",
     },
-    "FRCRN_SE_48K": {
-        "sample_rate": 48000,
-        "task": "speech_enhancement",
-        "description": "FRCRN Speech Enhancement (48kHz)",
-    },
     "MossFormer2_SE_48K": {
         "sample_rate": 48000,
         "task": "speech_enhancement",
         "description": "MossFormer2 Speech Enhancement (48kHz)",
+    },
+    "MossFormerGAN_SE_16K": {
+        "sample_rate": 16000,
+        "task": "speech_enhancement",
+        "description": "MossFormerGAN Speech Enhancement (16kHz)",
     },
     "MossFormer2_SS_16K": {
         "sample_rate": 16000,
@@ -52,7 +55,7 @@ _MODEL_INFO: Dict[str, Dict[str, Any]] = {
     },
 }
 
-DEFAULT_MODEL = "FRCRN_SE_48K"
+DEFAULT_MODEL = "MossFormer2_SE_48K"
 
 
 class ClearVoiceSpeechEnhancer:
@@ -63,7 +66,7 @@ class ClearVoiceSpeechEnhancer:
     ClearVoice models via the clearvoice package.
 
     Example:
-        enhancer = ClearVoiceSpeechEnhancer(model="FRCRN_SE_48K")
+        enhancer = ClearVoiceSpeechEnhancer(model="MossFormer2_SE_48K")
         result = enhancer.enhance(audio_array, sample_rate=48000)
         enhanced_audio = result.audio
 
@@ -81,7 +84,7 @@ class ClearVoiceSpeechEnhancer:
         Initialize ClearVoice enhancer.
 
         Args:
-            model: Model to use (default: FRCRN_SE_48K for best quality)
+            model: Model to use (default: MossFormer2_SE_48K for best quality)
             device: Device to use ("cuda", "cpu", "auto")
             **kwargs: Additional parameters (ignored)
         """
@@ -237,94 +240,37 @@ class ClearVoiceSpeechEnhancer:
 
     def _process_audio(self, audio: np.ndarray, sample_rate: int) -> np.ndarray:
         """
-        Process audio through ClearVoice model.
+        Process audio through ClearVoice using numpy batch API.
+
+        ClearVoice batch API requirements:
+        - Input shape: [batch, length]
+        - Input dtype: float32
+        - API call: myClearVoice(audio, online_write=False)
+        - Output shape: [batch, length]
 
         Args:
             audio: Audio data (float32, mono, at model's sample rate)
-            sample_rate: Sample rate of audio
+            sample_rate: Sample rate of audio (unused, kept for interface consistency)
 
         Returns:
-            Enhanced audio array
+            Enhanced audio array (1D, float32)
         """
-        # ClearVoice API can work with numpy arrays
-        # The exact API depends on the clearvoice version
-        # We'll try the direct array approach first
+        # Ensure [batch, length] shape (ClearVoice requirement)
+        if audio.ndim == 1:
+            audio = audio.reshape(1, -1)
 
-        try:
-            # Try direct numpy array input
-            result = self._clearvoice(audio, sr=sample_rate)
+        # Ensure float32 dtype (ClearVoice requirement)
+        audio = audio.astype(np.float32)
 
-            # Extract audio from result dict
-            if isinstance(result, dict):
-                # Result format: {'output_wav': array, ...}
-                if 'output_wav' in result:
-                    return result['output_wav'].astype(np.float32)
-                elif self._model_name in result:
-                    return result[self._model_name].astype(np.float32)
-                else:
-                    # Return first array value found
-                    for v in result.values():
-                        if isinstance(v, np.ndarray):
-                            return v.astype(np.float32)
+        # Process with ClearVoice batch API
+        # Second param False = online_write disabled (return numpy array instead of writing to file)
+        output_wav = self._clearvoice(audio, False)
 
-            # If result is already an array
-            if isinstance(result, np.ndarray):
-                return result.astype(np.float32)
+        # Extract from batch shape [batch, length] -> [length]
+        if output_wav.ndim == 2:
+            output_wav = output_wav[0, :]
 
-            # Fallback: try via temp file
-            return self._process_via_tempfile(audio, sample_rate)
-
-        except Exception as e:
-            logger.debug(f"Direct array processing failed, trying temp file: {e}")
-            return self._process_via_tempfile(audio, sample_rate)
-
-    def _process_via_tempfile(self, audio: np.ndarray, sample_rate: int) -> np.ndarray:
-        """
-        Process audio via temporary file (fallback method).
-
-        Args:
-            audio: Audio data
-            sample_rate: Sample rate
-
-        Returns:
-            Enhanced audio array
-        """
-        import soundfile as sf
-
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_in:
-            tmp_in_path = Path(tmp_in.name)
-
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_out:
-            tmp_out_path = Path(tmp_out.name)
-
-        try:
-            # Write input to temp file
-            sf.write(str(tmp_in_path), audio, sample_rate)
-
-            # Process with ClearVoice
-            result = self._clearvoice(
-                str(tmp_in_path),
-                output_path=str(tmp_out_path.parent),
-            )
-
-            # Read enhanced audio
-            if tmp_out_path.exists():
-                enhanced, _ = sf.read(str(tmp_out_path), dtype='float32')
-                return enhanced
-
-            # If output file not created, check result
-            if isinstance(result, dict) and 'output_wav' in result:
-                return result['output_wav'].astype(np.float32)
-
-            raise RuntimeError("ClearVoice did not produce output")
-
-        finally:
-            # Cleanup temp files
-            try:
-                tmp_in_path.unlink(missing_ok=True)
-                tmp_out_path.unlink(missing_ok=True)
-            except Exception:
-                pass
+        return output_wav.astype(np.float32)
 
     def get_preferred_sample_rate(self) -> int:
         """Return the model's native sample rate."""

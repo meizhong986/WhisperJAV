@@ -21,6 +21,12 @@ ten-vad
 nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main
 
 # Speech enhancement backends (v1.7.3)
+modelscope>=1.20                # ZipEnhancer 16kHz (recommended, lightweight SOTA)
+addict                          # ModelScope dependency (dict with attribute access)
+datasets                        # ModelScope dependency (HuggingFace datasets)
+simplejson                      # ModelScope dependency (JSON parsing)
+sortedcontainers                # ModelScope dependency (sorted collections)
+packaging                       # ModelScope dependency (version parsing)
 clearvoice                      # ClearerVoice denoising (48kHz)
 bs-roformer-infer               # BS-RoFormer vocal isolation (44.1kHz)
 
@@ -43,6 +49,7 @@ pydantic>=2.0,<3.0
 
 # Optional: speed-up
 numba
+hf_xet                          # Faster HuggingFace downloads (Xet Storage)
 
 # GUI Framework (PyWebView)
 pywebview>=5.0.0

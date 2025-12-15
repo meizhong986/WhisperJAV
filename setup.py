@@ -49,6 +49,12 @@ install_requires = [
     "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
 
     # Speech enhancement backends (v1.7.3)
+    "modelscope>=1.20",      # ZipEnhancer (recommended, lightweight SOTA)
+    "addict",                # ModelScope dependency (dict with attribute access)
+    "datasets",              # ModelScope dependency (HuggingFace datasets)
+    "simplejson",            # ModelScope dependency (JSON parsing)
+    "sortedcontainers",      # ModelScope dependency (sorted collections)
+    "packaging",             # ModelScope dependency (version parsing)
     "clearvoice",
     "bs-roformer-infer",
 

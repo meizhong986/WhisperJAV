@@ -21,6 +21,8 @@ logger = logging.getLogger("whisperjav")
 # Registry of available backends: name -> module path
 _BACKEND_REGISTRY: Dict[str, str] = {
     "none": "whisperjav.modules.speech_enhancement.backends.none.NullSpeechEnhancer",
+    "ffmpeg-dsp": "whisperjav.modules.speech_enhancement.backends.ffmpeg_dsp.FFmpegDSPBackend",
+    "zipenhancer": "whisperjav.modules.speech_enhancement.backends.zipenhancer.ZipEnhancerBackend",
     "clearvoice": "whisperjav.modules.speech_enhancement.backends.clearvoice.ClearVoiceSpeechEnhancer",
     "bs-roformer": "whisperjav.modules.speech_enhancement.backends.bs_roformer.BSRoformerSpeechEnhancer",
 }
@@ -35,6 +37,18 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "install_hint": "",
         "always_available": True,
         "description": "No enhancement (passthrough)",
+    },
+    "ffmpeg-dsp": {
+        "packages": [],
+        "install_hint": "",
+        "always_available": True,  # FFmpeg is bundled/required
+        "description": "FFmpeg audio filters (loudnorm, compress, denoise)",
+    },
+    "zipenhancer": {
+        "packages": ["modelscope"],
+        "install_hint": "pip install modelscope>=1.20",
+        "always_available": False,
+        "description": "ZipEnhancer 16kHz (lightweight, SOTA quality)",
     },
     "clearvoice": {
         "packages": ["clearvoice"],
@@ -52,7 +66,9 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
 
 # Default models for each backend
 _DEFAULT_MODELS: Dict[str, str] = {
-    "clearvoice": "FRCRN_SE_48K",  # 48kHz for best quality
+    "ffmpeg-dsp": "loudnorm",  # Default effect (can be comma-separated for combos)
+    "zipenhancer": "torch",  # torch (GPU) or onnx (CPU/GPU)
+    "clearvoice": "MossFormer2_SE_48K",  # 48kHz for best quality
     "bs-roformer": "vocals",
 }
 
@@ -130,6 +146,8 @@ class SpeechEnhancerFactory:
 
         display_names = {
             "none": "None (Skip Enhancement)",
+            "ffmpeg-dsp": "FFmpeg DSP (Audio Filters)",
+            "zipenhancer": "ZipEnhancer 16kHz (Recommended)",
             "clearvoice": "ClearerVoice (48kHz)",
             "bs-roformer": "BS-RoFormer Vocal Isolation",
         }
@@ -170,8 +188,12 @@ class SpeechEnhancerFactory:
             return models
         except Exception:
             # Return known models as fallback
-            if name == "clearvoice":
-                return ["FRCRN_SE_16K", "FRCRN_SE_48K", "MossFormer2_SE_48K", "MossFormer2_SS_16K"]
+            if name == "ffmpeg-dsp":
+                return ["loudnorm", "normalize", "compress", "denoise", "highpass", "lowpass", "deess", "amplify"]
+            elif name == "zipenhancer":
+                return ["zipenhancer"]  # No model variants
+            elif name == "clearvoice":
+                return ["FRCRN_SE_16K", "MossFormer2_SE_48K", "MossFormerGAN_SE_16K", "MossFormer2_SS_16K"]
             elif name == "bs-roformer":
                 return ["vocals", "other"]
             return []
@@ -238,7 +260,7 @@ class SpeechEnhancerFactory:
             name: Backend name ('none', 'clearvoice', 'bs-roformer')
             config: Configuration dict (from resolved config or GUI)
             **kwargs: Additional backend-specific parameters (override config)
-                - model: Model variant to use (e.g., "FRCRN_SE_48K")
+                - model: Model variant to use (e.g., "MossFormer2_SE_48K")
                 - device: Device to use ("cuda", "cpu", "auto")
 
         Returns:
@@ -292,8 +314,8 @@ class SpeechEnhancerFactory:
         params = resolved_config.get("params", {})
         enhancer_config = params.get("speech_enhancer", {})
 
-        # Get backend from config
-        backend = enhancer_config.get("backend", "none")
+        # Get backend from config (default: zipenhancer for best lightweight quality)
+        backend = enhancer_config.get("backend", "zipenhancer")
 
         # If backend is "none" or empty, return None to indicate no enhancement
         if not backend or backend == "none":

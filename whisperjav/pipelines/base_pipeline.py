@@ -108,7 +108,24 @@ class BasePipeline(ABC):
         This should be called when the pipeline is no longer needed,
         especially in batch processing scenarios where models need to be
         swapped between passes. This frees GPU memory.
+
+        NOTE: In subprocess workers (ensemble mode), explicit cleanup is SKIPPED.
+        The OS automatically reclaims all resources when the subprocess exits.
+        Explicit CUDA cleanup during process termination can crash on Windows
+        due to driver bugs/race conditions. See issue i2.
         """
+        import os
+
+        # Skip ALL cleanup in subprocess workers - OS handles resource reclamation
+        # on process exit. Explicit CUDA operations during subprocess termination
+        # can cause BrokenProcessPool crashes on Windows.
+        if os.environ.get('WHISPERJAV_SUBPROCESS_WORKER') == '1':
+            logger.debug(
+                f"{self.__class__.__name__} cleanup skipped in subprocess "
+                "(resources freed automatically on process exit)"
+            )
+            return
+
         # Clean up ASR model if it exists and has cleanup method
         if hasattr(self, 'asr') and hasattr(self.asr, 'cleanup'):
             self.asr.cleanup()
