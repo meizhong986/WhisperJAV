@@ -1,15 +1,22 @@
 # whisperjav/modules/hallucination_remover.py
-#V12
+#V13 - Added hallucination filter caching for offline use
 
 
 import re
 import json
 import requests
+import time
 from pathlib import Path
 from typing import Dict, List, Set, Tuple, Optional, Any
 from difflib import SequenceMatcher
 from whisperjav.utils.logger import logger
 from whisperjav.config.sanitization_constants import HallucinationConstants
+
+
+# Cache configuration
+CACHE_DIR = Path.home() / ".cache" / "whisperjav" / "hallucination_filters"
+CACHE_MAX_AGE_DAYS = 7  # Re-download if cache is older than this
+DOWNLOAD_TIMEOUT = 10  # Seconds to wait for download
 
 class HallucinationRemover:
     """Handles exact, regex, and fuzzy hallucination detection with improved debugging"""
@@ -118,33 +125,149 @@ class HallucinationRemover:
             self._regex_patterns = []
             self._blacklist_phrases = []
 
-    def _load_json_from_url(self, url: str) -> Optional[Dict]:
-        """QUICK FIX: Add timeout and better error handling"""
+    def _get_cache_path(self, url: str) -> Path:
+        """Get cache file path for a URL."""
+        # Extract filename from URL or create hash-based name
+        if "filter" in url.lower():
+            return CACHE_DIR / "filter_list.json"
+        elif "regexp" in url.lower():
+            return CACHE_DIR / "regexp_patterns.json"
+        else:
+            # Fallback: use hash of URL
+            import hashlib
+            url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
+            return CACHE_DIR / f"cached_{url_hash}.json"
+
+    def _is_cache_valid(self, cache_path: Path) -> bool:
+        """Check if cache file exists and is not too old."""
+        if not cache_path.exists():
+            return False
+
+        # Check age
+        cache_age_days = (time.time() - cache_path.stat().st_mtime) / (24 * 3600)
+        return cache_age_days < CACHE_MAX_AGE_DAYS
+
+    def _load_from_cache(self, cache_path: Path) -> Optional[Dict]:
+        """Load JSON from cache file."""
         try:
-            if url.startswith(('http://', 'https://')):
-                logger.debug(f"Loading hallucination patterns from URL: {url}")
-                response = requests.get(url, timeout=5)  # Quick timeout
-                response.raise_for_status()
-                return response.json()
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                logger.debug(f"Loaded hallucination filter from cache: {cache_path.name}")
+                return data
+        except Exception as e:
+            logger.debug(f"Cache read failed for {cache_path}: {e}")
+            return None
+
+    def _save_to_cache(self, cache_path: Path, data: Dict) -> bool:
+        """Save JSON data to cache file."""
+        try:
+            CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            logger.debug(f"Saved hallucination filter to cache: {cache_path.name}")
+            return True
+        except Exception as e:
+            logger.debug(f"Cache write failed for {cache_path}: {e}")
+            return False
+
+    def _load_from_bundled(self, url: str) -> Optional[Dict]:
+        """Load from bundled fallback data in package."""
+        try:
+            from whisperjav.data.hallucination_filters import (
+                get_bundled_filter_list_path,
+                get_bundled_regexp_path
+            )
+
+            if "filter" in url.lower():
+                bundled_path = get_bundled_filter_list_path()
+            elif "regexp" in url.lower():
+                bundled_path = get_bundled_regexp_path()
             else:
+                return None
+
+            if bundled_path.exists():
+                with open(bundled_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    logger.info(f"Loaded hallucination filter from bundled data: {bundled_path.name}")
+                    return data
+        except ImportError:
+            logger.debug("Bundled hallucination filter data not available")
+        except Exception as e:
+            logger.debug(f"Failed to load bundled data: {e}")
+
+        return None
+
+    def _download_from_url(self, url: str) -> Optional[Dict]:
+        """Download JSON from URL with timeout."""
+        try:
+            logger.debug(f"Downloading hallucination filter from: {url}")
+            response = requests.get(url, timeout=DOWNLOAD_TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+        except requests.Timeout:
+            logger.debug(f"Download timeout for {url}")
+            return None
+        except requests.RequestException as e:
+            logger.debug(f"Download failed for {url}: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.debug(f"Invalid JSON from {url}: {e}")
+            return None
+
+    def _load_json_from_url(self, url: str) -> Optional[Dict]:
+        """
+        Load hallucination filter JSON with caching and fallback chain.
+
+        Loading priority:
+        1. Valid cache (< 7 days old)
+        2. Fresh download from URL (updates cache on success)
+        3. Stale cache (> 7 days old but still usable)
+        4. Bundled fallback data in package
+
+        This ensures offline use works (China, air-gapped networks) while
+        still allowing updates when network is available.
+        """
+        # Handle local file paths directly
+        if not url.startswith(('http://', 'https://')):
+            try:
                 logger.debug(f"Loading hallucination patterns from file: {url}")
                 with open(url, 'r', encoding='utf-8') as f:
                     return json.load(f)
-        except requests.Timeout:
-            logger.warning(f"Timeout loading from {url}")
-            return None
-        except requests.RequestException as e:
-            logger.warning(f"Network error loading from {url}: {e}")
-            return None
-        except FileNotFoundError:
-            logger.warning(f"File not found: {url}")
-            return None
-        except json.JSONDecodeError as e:
-            logger.warning(f"Invalid JSON in {url}: {e}")
-            return None
-        except Exception as e:
-            logger.warning(f"Unexpected error loading from {url}: {e}")
-            return None
+            except Exception as e:
+                logger.warning(f"Failed to load from file {url}: {e}")
+                return None
+
+        cache_path = self._get_cache_path(url)
+
+        # 1. Try valid cache first (fast path - no network needed)
+        if self._is_cache_valid(cache_path):
+            cached_data = self._load_from_cache(cache_path)
+            if cached_data:
+                return cached_data
+
+        # 2. Try to download fresh data
+        downloaded_data = self._download_from_url(url)
+        if downloaded_data:
+            # Update cache with fresh data
+            self._save_to_cache(cache_path, downloaded_data)
+            return downloaded_data
+
+        # 3. Download failed - try stale cache (better than nothing)
+        if cache_path.exists():
+            stale_data = self._load_from_cache(cache_path)
+            if stale_data:
+                logger.info(f"Using stale cache for hallucination filter (network unavailable)")
+                return stale_data
+
+        # 4. Last resort - bundled fallback data
+        bundled_data = self._load_from_bundled(url)
+        if bundled_data:
+            # Also save bundled data to cache for next time
+            self._save_to_cache(cache_path, bundled_data)
+            return bundled_data
+
+        logger.warning(f"All sources failed for hallucination filter: {url}")
+        return None
             
     def _extract_blacklist_phrases(self, patterns: List[Dict]) -> List[str]:
         """Extract phrases for fuzzy matching from patterns"""

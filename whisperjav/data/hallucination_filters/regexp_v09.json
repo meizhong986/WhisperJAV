@@ -1,0 +1,311 @@
+{
+  "meta": {
+    "version": "1.1",
+    "description": "Japanese ASR Hallucination Regex Patterns for Adult Video Subtitle Processing",
+    "created": "2025-03-02",
+    "language": "ja"
+  },
+  "parameters": {
+    "repetition_threshold": {
+      "description": "Number of allowed repetitions before cleaning",
+      "default": 2,
+      "min": 1,
+      "max": 10
+    },
+    "aggressiveness_levels": {
+      "low": 0.7,
+      "medium": 1.0,
+      "high": 1.3
+    },
+    "min_confidence_threshold": 0.5,
+    "common_repetitive_words": [
+      "そこそこ",
+      "まあまあ",
+      "どきどき",
+      "わくわく",
+      "いらいら",
+      "うきうき",
+      "きらきら",
+      "パンパン",
+      "ドキドキ",
+      "バンバン"
+    ]
+  },
+  "categories": {
+    "meta_reference": {
+      "description": "References to subtitles, translation, or content creation",
+      "default_confidence": 0.9,
+      "aggressiveness_adjustment": 1.0
+    },
+    "media_reference": {
+      "description": "YouTube-style phrases about channels, videos, watching",
+      "default_confidence": 1.0,
+      "aggressiveness_adjustment": 1.0
+    },
+    "closing_phrase": {
+      "description": "End of video expressions, goodbyes, thank you phrases",
+      "default_confidence": 0.9,
+      "aggressiveness_adjustment": 1.0
+    },
+    "repeated_vocalization": {
+      "description": "Repetitive vocalizations that exceed normal patterns",
+      "default_confidence": 0.8,
+      "aggressiveness_adjustment": 0.9
+    },
+    "sound_effect": {
+      "description": "Textual descriptions of sounds",
+      "default_confidence": 0.9,
+      "aggressiveness_adjustment": 1.0
+    },
+    "nonsensical": {
+      "description": "Random characters, repetitive patterns, gibberish",
+      "default_confidence": 0.95,
+      "aggressiveness_adjustment": 1.0
+    },
+    "emoji": {
+      "description": "Emoji characters",
+      "default_confidence": 1.0,
+      "aggressiveness_adjustment": 1.0
+    }
+  },
+  "patterns": [
+    {
+      "pattern": "\\([^)]+\\)\\s*",
+      "category": "sound_effect",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Sound effect descriptions in parentheses, including trailing whitespace"
+    },
+    {
+      "pattern": "※この動画の字幕は視聴者によって作成されました[。]?",
+      "category": "meta_reference",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Statement about viewer-created subtitles"
+    },
+    {
+      "pattern": "★[^★]+★",
+      "category": "meta_reference",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Content surrounded by stars, often metadata"
+    },
+    {
+      "pattern": "【[^】]+】",
+      "category": "sound_effect",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Content in square brackets, often sound effects or metadata"
+    },
+    {
+      "pattern": "チャンネル登録[をお]?[願いし][いいたしまする]",
+      "category": "media_reference",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Please subscribe message in various forms"
+    },
+    {
+      "pattern": "(ご|お)?視聴(して)?[いただきくれて]?(ありがとう|ございました)",
+      "category": "closing_phrase",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Thank you for watching message in various forms"
+    },
+    {
+      "pattern": "見てくれて(ありがとう|ございました)[!！]?",
+      "category": "closing_phrase",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Thank you for watching message"
+    },
+    {
+      "pattern": "また(ね|[次の]動画でお会いしましょう)[!！]?",
+      "category": "closing_phrase",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "See you later/next time message"
+    },
+    {
+      "pattern": "(私|僕)の[チャンネル]",
+      "category": "media_reference",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Reference to 'my channel'"
+    },
+    {
+      "pattern": "お腹が(すいた|空いた|痛い)ので.*筋肉を取り除きました",
+      "category": "nonsensical",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Nonsensical statement about removing stomach muscles"
+    },
+    {
+      "pattern": "([、，]{2,}|[。．]{2,}|[!！]{2,}|[?？]{2,})",
+      "category": "nonsensical",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Repeated punctuation marks"
+    },
+    {
+      "pattern": "([あアぁァ]{10,}|[いイぃィ]{10,}|[うウぅゥ]{10,}|[えエぇェ]{10,}|[おオぉォ]{10,})",
+      "category": "repeated_vocalization",
+      "confidence": 0.8,
+      "replacement": "${1:0:2}",
+      "notes": "Excessively repeated vowel sounds - keep first 2 occurrences"
+    },
+    {
+      "pattern": "(んん+|ンン+){5,}",
+      "category": "repeated_vocalization",
+      "confidence": 0.8,
+      "replacement": "",
+      "notes": "Excessively repeated 'n' sounds"
+    },
+    {
+      "pattern": "(はぁ|ハァ|あぁ|アァ|うぅ|ウゥ|えぇ|エェ|おぉ|オォ){10,}",
+      "category": "repeated_vocalization",
+      "confidence": 0.7,
+      "replacement": "${1:0:2}",
+      "notes": "Excessively repeated vocalization - keep first 2 occurrences"
+    },
+    {
+      "pattern": "(あっ|アッ|いっ|イッ|うっ|ウッ|えっ|エッ|おっ|オッ){10,}",
+      "category": "repeated_vocalization",
+      "confidence": 0.7,
+      "replacement": "${1:0:2}",
+      "notes": "Excessively repeated vocalization with small tsu - keep first 2 occurrences"
+    },
+    {
+      "pattern": "([～〜ー]{10,})",
+      "category": "repeated_vocalization",
+      "confidence": 0.8,
+      "replacement": "${1:0:3}",
+      "notes": "Excessively long vowel extension - keep first 3 occurrences"
+    },
+    {
+      "pattern": "(?:あ|ア)(?:[、，](?:あ|ア)){5,}",
+      "category": "repeated_vocalization",
+      "confidence": 0.8,
+      "replacement": "",
+      "notes": "Repeated 'a' sounds separated by commas"
+    },
+    {
+      "pattern": "(?:www|ｗｗｗ)[w]*",
+      "category": "nonsensical",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Internet laughter expression"
+    },
+    {
+      "pattern": "(拍手|笑|音楽)",
+      "category": "sound_effect",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Sound effect descriptions in parentheses"
+    },
+    {
+      "pattern": "\\[音楽\\]",
+      "category": "sound_effect",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Music sound effect in brackets"
+    },
+    {
+      "pattern": "(はじめ|編集|字幕)[のさんによる](咳|悲鳴|泣き声|笑い声|鼻息)",
+      "category": "sound_effect",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Sound effect descriptions attributed to people"
+    },
+    {
+      "pattern": "(\\(|（)(拍手|笑い?|音楽|泣き?|鳴き?)(\\)|）)",
+      "category": "sound_effect",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Sound effect descriptions in various bracket types"
+    },
+    {
+      "pattern": "[\\(\\[【][^\\)\\]】]*(字幕|翻訳|編集|製作|クレジット)[^\\)\\]】]*[\\)\\]】]",
+      "category": "meta_reference",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Meta reference to subtitles, translation, editing, etc."
+    },
+    {
+      "pattern": "[\\(\\[【][^\\)\\]】]*(早送り|ED|エンディング)[^\\)\\]】]*[\\)\\]】]",
+      "category": "meta_reference",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Meta reference to fast-forward, ending, etc."
+    },
+    {
+      "pattern": "^[a-zA-Z]+$",
+      "category": "nonsensical",
+      "confidence": 0.85,
+      "replacement": "",
+      "notes": "Single English word in otherwise Japanese context"
+    },
+    {
+      "pattern": "(thank you|thanks|subscribe|follow|watching|translation|translated)",
+      "category": "meta_reference",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "English language meta phrases"
+    },
+    {
+      "pattern": "https?://[a-zA-Z0-9./]+",
+      "category": "meta_reference",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "URLs"
+    },
+    {
+      "pattern": "[\\(\\[（【][^\\)\\]）】]*(犬|猫|赤ちゃん|子供|娘|息子)[の]?(泣き|鳴き)声[\\)\\]）】]",
+      "category": "sound_effect",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Sound effect descriptions for animals or children"
+    },
+    {
+      "pattern": "[\\(\\[（【][^\\)\\]）】]*(嬰兒哭聲|baby crying)[\\)\\]）】]",
+      "category": "sound_effect",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Sound effect descriptions in other languages"
+    },
+    {
+      "pattern": "[♪★☆♡♥❤🐕🐦🐬🐾💦📢]",
+      "category": "emoji",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "Emoji and special characters"
+    },
+    {
+      "pattern": "(?:^|\\s)I'm (hungry|sorry)(?:$|\\s|[.,!?])",
+      "category": "nonsensical",
+      "confidence": 1.0,
+      "replacement": "",
+      "notes": "English phrases in Japanese content"
+    },
+    {
+      "pattern": "あ\\s*(?:[↑↓]\\s*){3,}",
+      "category": "nonsensical",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Text with directional arrows"
+    },
+    {
+      "pattern": "(?:^|\\s)\\d[.,]\\s*\\d\\s*ページ(?:$|\\s)",
+      "category": "meta_reference",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Page number references"
+    },
+    {
+      "pattern": "(?:^|\\s)\\d+\\.\\s*[^。]+を茹でる(?:$|\\s)",
+      "category": "unrelated",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Cooking instructions"
+    }
+  ]
+}
