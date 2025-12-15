@@ -1527,7 +1527,13 @@ class WhisperJAVAPI:
         # Pass 1: Speech Enhancer
         enhancer1 = pass1.get('speechEnhancer')
         if enhancer1 and enhancer1 != 'none':
-            args += ["--pass1-speech-enhancer", enhancer1]
+            # Handle FFmpeg DSP with selected effects
+            if enhancer1 == 'ffmpeg-dsp':
+                dsp_effects = pass1.get('dspEffects', ['loudnorm'])
+                effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
+                args += ["--pass1-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+            else:
+                args += ["--pass1-speech-enhancer", enhancer1]
 
         # Pass 1: Model
         model1 = pass1.get('model')
@@ -1565,7 +1571,13 @@ class WhisperJAVAPI:
             # Pass 2: Speech Enhancer
             enhancer2 = pass2.get('speechEnhancer')
             if enhancer2 and enhancer2 != 'none':
-                args += ["--pass2-speech-enhancer", enhancer2]
+                # Handle FFmpeg DSP with selected effects
+                if enhancer2 == 'ffmpeg-dsp':
+                    dsp_effects = pass2.get('dspEffects', ['loudnorm'])
+                    effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
+                    args += ["--pass2-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+                else:
+                    args += ["--pass2-speech-enhancer", enhancer2]
 
             # Pass 2: Model
             model2 = pass2.get('model')

@@ -402,8 +402,22 @@
                                     <div class="col-enhancer">
                                         <select id="pass1-enhancer" class="form-select compact">
                                             <option value="none" selected>None</option>
-                                            <option value="clearvoice">ClearVoice 48kHz</option>
-                                            <option value="bs-roformer">BS-RoFormer</option>
+                                            <optgroup label="FFmpeg DSP (Lightweight)">
+                                                <option value="ffmpeg-dsp">Audio Filters...</option>
+                                            </optgroup>
+                                            <optgroup label="ZipEnhancer (Recommended)">
+                                                <option value="zipenhancer:torch">Torch (GPU)</option>
+                                                <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
+                                            </optgroup>
+                                            <optgroup label="ClearVoice">
+                                                <option value="clearvoice:MossFormer2_SE_48K">MossFormer2 48kHz (Best)</option>
+                                                <option value="clearvoice:FRCRN_SE_16K">FRCRN 16kHz</option>
+                                                <option value="clearvoice:MossFormerGAN_SE_16K">MossFormerGAN 16kHz</option>
+                                                <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
+                                            </optgroup>
+                                            <optgroup label="BS-RoFormer">
+                                                <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-segmenter">
@@ -430,6 +444,57 @@
                                             Customize Parameters
                                         </button>
                                         <span id="pass1-badge" class="pass-badge default">DEFAULT</span>
+                                    </div>
+                                </div>
+
+                                <!-- Pass 1 DSP Effects Panel (shown when FFmpeg DSP selected) -->
+                                <div class="dsp-effects-panel" id="pass1-dsp-panel" style="display: none;">
+                                    <div class="dsp-effects-header">
+                                        <span class="dsp-icon">🎛️</span>
+                                        <span class="dsp-title">Audio Filters</span>
+                                        <span class="dsp-hint">Select one or more effects to apply</span>
+                                    </div>
+                                    <div class="dsp-effects-grid">
+                                        <label class="dsp-effect-item" title="Normalize loudness to broadcast standard (-16 LUFS)">
+                                            <input type="checkbox" name="pass1-dsp" value="loudnorm" checked>
+                                            <span class="dsp-effect-name">Loudness Norm</span>
+                                            <span class="dsp-effect-desc">EBU R128 standard</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Normalize audio dynamics while preserving natural sound">
+                                            <input type="checkbox" name="pass1-dsp" value="normalize">
+                                            <span class="dsp-effect-name">Dynamic Norm</span>
+                                            <span class="dsp-effect-desc">Preserve natural sound</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Reduce volume difference between loud and quiet parts">
+                                            <input type="checkbox" name="pass1-dsp" value="compress">
+                                            <span class="dsp-effect-name">Compress</span>
+                                            <span class="dsp-effect-desc">Dynamic range control</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Remove background noise using FFT denoising">
+                                            <input type="checkbox" name="pass1-dsp" value="denoise">
+                                            <span class="dsp-effect-name">Denoise</span>
+                                            <span class="dsp-effect-desc">FFT noise reduction</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Remove low rumble and hum below 80Hz">
+                                            <input type="checkbox" name="pass1-dsp" value="highpass">
+                                            <span class="dsp-effect-name">High-pass</span>
+                                            <span class="dsp-effect-desc">Cut below 80Hz</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Remove high frequency hiss above 8kHz">
+                                            <input type="checkbox" name="pass1-dsp" value="lowpass">
+                                            <span class="dsp-effect-name">Low-pass</span>
+                                            <span class="dsp-effect-desc">Cut above 8kHz</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Reduce harsh sibilant sounds (s, sh, ch)">
+                                            <input type="checkbox" name="pass1-dsp" value="deess">
+                                            <span class="dsp-effect-name">De-esser</span>
+                                            <span class="dsp-effect-desc">Reduce sibilance</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Increase volume by 3 decibels">
+                                            <input type="checkbox" name="pass1-dsp" value="amplify">
+                                            <span class="dsp-effect-name">Amplify</span>
+                                            <span class="dsp-effect-desc">+3dB boost</span>
+                                        </label>
                                     </div>
                                 </div>
 
@@ -469,8 +534,22 @@
                                     <div class="col-enhancer">
                                         <select id="pass2-enhancer" class="form-select compact" disabled>
                                             <option value="none" selected>None</option>
-                                            <option value="clearvoice">ClearVoice 48kHz</option>
-                                            <option value="bs-roformer">BS-RoFormer</option>
+                                            <optgroup label="FFmpeg DSP (Lightweight)">
+                                                <option value="ffmpeg-dsp">Audio Filters...</option>
+                                            </optgroup>
+                                            <optgroup label="ZipEnhancer (Recommended)">
+                                                <option value="zipenhancer:torch">Torch (GPU)</option>
+                                                <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
+                                            </optgroup>
+                                            <optgroup label="ClearVoice">
+                                                <option value="clearvoice:MossFormer2_SE_48K">MossFormer2 48kHz (Best)</option>
+                                                <option value="clearvoice:FRCRN_SE_16K">FRCRN 16kHz</option>
+                                                <option value="clearvoice:MossFormerGAN_SE_16K">MossFormerGAN 16kHz</option>
+                                                <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
+                                            </optgroup>
+                                            <optgroup label="BS-RoFormer">
+                                                <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-segmenter">
@@ -500,6 +579,57 @@
                                             Customize Parameters
                                         </button>
                                         <span id="pass2-badge" class="pass-badge default">DEFAULT</span>
+                                    </div>
+                                </div>
+
+                                <!-- Pass 2 DSP Effects Panel (shown when FFmpeg DSP selected) -->
+                                <div class="dsp-effects-panel" id="pass2-dsp-panel" style="display: none;">
+                                    <div class="dsp-effects-header">
+                                        <span class="dsp-icon">🎛️</span>
+                                        <span class="dsp-title">Audio Filters</span>
+                                        <span class="dsp-hint">Select one or more effects to apply</span>
+                                    </div>
+                                    <div class="dsp-effects-grid">
+                                        <label class="dsp-effect-item" title="Normalize loudness to broadcast standard (-16 LUFS)">
+                                            <input type="checkbox" name="pass2-dsp" value="loudnorm" checked>
+                                            <span class="dsp-effect-name">Loudness Norm</span>
+                                            <span class="dsp-effect-desc">EBU R128 standard</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Normalize audio dynamics while preserving natural sound">
+                                            <input type="checkbox" name="pass2-dsp" value="normalize">
+                                            <span class="dsp-effect-name">Dynamic Norm</span>
+                                            <span class="dsp-effect-desc">Preserve natural sound</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Reduce volume difference between loud and quiet parts">
+                                            <input type="checkbox" name="pass2-dsp" value="compress">
+                                            <span class="dsp-effect-name">Compress</span>
+                                            <span class="dsp-effect-desc">Dynamic range control</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Remove background noise using FFT denoising">
+                                            <input type="checkbox" name="pass2-dsp" value="denoise">
+                                            <span class="dsp-effect-name">Denoise</span>
+                                            <span class="dsp-effect-desc">FFT noise reduction</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Remove low rumble and hum below 80Hz">
+                                            <input type="checkbox" name="pass2-dsp" value="highpass">
+                                            <span class="dsp-effect-name">High-pass</span>
+                                            <span class="dsp-effect-desc">Cut below 80Hz</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Remove high frequency hiss above 8kHz">
+                                            <input type="checkbox" name="pass2-dsp" value="lowpass">
+                                            <span class="dsp-effect-name">Low-pass</span>
+                                            <span class="dsp-effect-desc">Cut above 8kHz</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Reduce harsh sibilant sounds (s, sh, ch)">
+                                            <input type="checkbox" name="pass2-dsp" value="deess">
+                                            <span class="dsp-effect-name">De-esser</span>
+                                            <span class="dsp-effect-desc">Reduce sibilance</span>
+                                        </label>
+                                        <label class="dsp-effect-item" title="Increase volume by 3 decibels">
+                                            <input type="checkbox" name="pass2-dsp" value="amplify">
+                                            <span class="dsp-effect-name">Amplify</span>
+                                            <span class="dsp-effect-desc">+3dB boost</span>
+                                        </label>
                                     </div>
                                 </div>
 

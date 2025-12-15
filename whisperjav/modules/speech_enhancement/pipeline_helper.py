@@ -71,8 +71,8 @@ def create_enhancer_from_config(
     if overrides:
         enhancer_config = {**enhancer_config, **overrides}
 
-    # Get backend name
-    backend = enhancer_config.get("backend", "none")
+    # Get backend name (default: zipenhancer for best lightweight quality)
+    backend = enhancer_config.get("backend", "zipenhancer")
 
     # If no backend or "none", return None
     if not backend or backend == "none":
@@ -201,6 +201,11 @@ def enhance_scenes(
         f"Enhancing {total_scenes} scenes with {enhancer.display_name} "
         f"(input: {enhancer_sr}Hz → output: {TARGET_SAMPLE_RATE}Hz)"
     )
+
+    # Pre-warm the enhancer model before starting progress display
+    # This ensures model download/loading happens before the progress bar starts
+    if hasattr(enhancer, '_ensure_initialized'):
+        enhancer._ensure_initialized()
 
     for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
         scene_num = idx + 1

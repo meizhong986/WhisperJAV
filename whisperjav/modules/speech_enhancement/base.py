@@ -30,7 +30,7 @@ class EnhancementResult:
     Attributes:
         audio: Enhanced audio data (float32, mono)
         sample_rate: Sample rate of output audio
-        method: Backend name with model info (e.g., "clearvoice-FRCRN_SE_48K")
+        method: Backend name with model info (e.g., "clearvoice-MossFormer2_SE_48K")
         parameters: Parameters used for enhancement
         processing_time_sec: Time taken to process (seconds)
         metadata: Backend-specific metadata (SNR improvement, etc.)
@@ -177,10 +177,31 @@ class SpeechEnhancer(Protocol):
         """
         Return list of supported model variants.
 
-        Examples for ClearerVoice: ["FRCRN_SE_16K", "FRCRN_SE_48K", "MossFormer2_SE_48K"]
+        Examples for ClearerVoice: ["FRCRN_SE_16K", "MossFormer2_SE_48K", "MossFormerGAN_SE_16K"]
 
         Returns:
             List of model identifiers
+        """
+        ...
+
+    @property
+    def is_lightweight(self) -> bool:
+        """
+        Whether this enhancer has low VRAM requirements.
+
+        Lightweight enhancers (<1GB VRAM) can co-exist with VAD/ASR models
+        and may optionally skip disk intermediates for faster processing.
+
+        Heavy enhancers (>4GB VRAM) require disk intermediates to free
+        GPU memory before loading VAD/ASR models.
+
+        Examples:
+            - ZipEnhancer (2.04M params, ~500MB): True
+            - ClearVoice MossFormer2 (100M+ params, 9-16GB): False
+            - BS-RoFormer: False
+
+        Returns:
+            True if VRAM usage is low enough to stream to VAD
         """
         ...
 

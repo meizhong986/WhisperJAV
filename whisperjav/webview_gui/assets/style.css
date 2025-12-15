@@ -605,9 +605,16 @@ body {
 
 /* Disabled select options styling */
 .form-select option:disabled {
-    color: var(--text-disabled);
+    color: #999 !important;
     font-style: italic;
-    opacity: 0.6;
+    background-color: #f5f5f5;
+}
+
+/* Coming Soon options - more visible greying */
+.form-select option.coming-soon {
+    color: #aaa !important;
+    font-style: italic;
+    background-color: #f0f0f0;
 }
 
 .info-text {
@@ -1570,6 +1577,119 @@ button:focus-visible,
 
 .ensemble-info p {
     margin: 1px 0;
+}
+
+/* ============================================================
+   DSP Effects Panel - FFmpeg Audio Filters UI
+   ============================================================ */
+.dsp-effects-panel {
+    background: linear-gradient(135deg, var(--background-tertiary) 0%, var(--background-secondary) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin: 4px 0 8px 0;
+    padding: 10px 12px;
+    animation: dspSlideIn 0.2s ease-out;
+}
+
+@keyframes dspSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dsp-effects-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dsp-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.dsp-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.dsp-hint {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+    font-style: italic;
+}
+
+.dsp-effects-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.dsp-effect-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px 10px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+    min-height: 48px;
+}
+
+.dsp-effect-item:hover {
+    border-color: var(--primary-color);
+    background: var(--hover-tab-bg);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.dsp-effect-item:has(input:checked) {
+    border-color: var(--primary-color);
+    background: rgba(2, 72, 115, 0.08);
+    box-shadow: inset 0 0 0 1px var(--primary-color);
+}
+
+.dsp-effect-item input[type="checkbox"] {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
+
+.dsp-effect-name {
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    padding-right: 20px; /* Space for checkbox */
+}
+
+.dsp-effect-desc {
+    font-size: 9px;
+    color: var(--text-tertiary);
+    line-height: 1.2;
+}
+
+/* Responsive: Stack on smaller widths */
+@media (max-width: 900px) {
+    .dsp-effects-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 /* Large modal for parameter customization */

@@ -70,8 +70,8 @@ class TransformersPipeline(BasePipeline):
         hf_task: str = "transcribe",
         hf_device: str = "auto",
         hf_dtype: str = "auto",
-        # Speech enhancement
-        hf_speech_enhancer: str = "none",
+        # Speech enhancement (default: zipenhancer for lightweight SOTA quality)
+        hf_speech_enhancer: str = "zipenhancer",
         hf_speech_enhancer_model: Optional[str] = None,
         # Standard options
         subs_language: str = "native",
@@ -98,7 +98,7 @@ class TransformersPipeline(BasePipeline):
             hf_task: Task type ('transcribe' or 'translate')
             hf_device: Device to use
             hf_dtype: Data type
-            hf_speech_enhancer: Speech enhancement backend ('none', 'clearvoice', 'bs-roformer')
+            hf_speech_enhancer: Speech enhancement backend ('none', 'zipenhancer', 'clearvoice', 'bs-roformer')
             hf_speech_enhancer_model: Optional model variant for enhancer
             subs_language: Subtitle language ('native' or 'direct-to-english')
             **kwargs: Additional parameters for base class
@@ -539,7 +539,20 @@ class TransformersPipeline(BasePipeline):
             raise
 
     def cleanup(self) -> None:
-        """Clean up resources including speech enhancer and ASR model."""
+        """Clean up resources including speech enhancer and ASR model.
+
+        NOTE: In subprocess workers (ensemble mode), all cleanup is delegated
+        to super().cleanup() which will skip operations - OS handles resource
+        reclamation on process exit.
+        """
+        import os
+
+        # In subprocess, skip directly to parent which will also skip.
+        # This avoids CUDA crashes during process termination.
+        if os.environ.get('WHISPERJAV_SUBPROCESS_WORKER') == '1':
+            super().cleanup()
+            return
+
         if hasattr(self, 'speech_enhancer') and self.speech_enhancer:
             self.speech_enhancer.cleanup()
             self.speech_enhancer = None

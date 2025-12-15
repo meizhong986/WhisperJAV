@@ -1051,7 +1051,8 @@ const EnsembleManager = {
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
-            isTransformers: false  // Track if using Transformers pipeline
+            isTransformers: false,  // Track if using Transformers pipeline
+            dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         pass2: {
             enabled: false,
@@ -1063,7 +1064,8 @@ const EnsembleManager = {
             model: 'kotoba-tech/kotoba-whisper-bilingual-v1.0',  // Kotoba Bilingual for mixed ja/en
             customized: false,
             params: null,
-            isTransformers: true  // Default Pass 2 is Transformers
+            isTransformers: true,  // Default Pass 2 is Transformers
+            dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'smart_merge',
         currentCustomize: null  // 'pass1' or 'pass2'
@@ -1138,7 +1140,14 @@ const EnsembleManager = {
             this.state.pass1.sceneDetector = e.target.value;
         });
         document.getElementById('pass1-enhancer').addEventListener('change', (e) => {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            // Block selection of disabled/coming-soon options
+            if (selectedOption.disabled || selectedOption.classList.contains('coming-soon')) {
+                e.target.value = this.state.pass1.speechEnhancer; // Revert to previous
+                return;
+            }
             this.state.pass1.speechEnhancer = e.target.value;
+            this.updateDspPanel('pass1');
         });
         document.getElementById('pass1-segmenter').addEventListener('change', (e) => {
             this.state.pass1.speechSegmenter = e.target.value;
@@ -1152,11 +1161,21 @@ const EnsembleManager = {
             this.state.pass2.sceneDetector = e.target.value;
         });
         document.getElementById('pass2-enhancer').addEventListener('change', (e) => {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            // Block selection of disabled/coming-soon options
+            if (selectedOption.disabled || selectedOption.classList.contains('coming-soon')) {
+                e.target.value = this.state.pass2.speechEnhancer; // Revert to previous
+                return;
+            }
             this.state.pass2.speechEnhancer = e.target.value;
+            this.updateDspPanel('pass2');
         });
         document.getElementById('pass2-segmenter').addEventListener('change', (e) => {
             this.state.pass2.speechSegmenter = e.target.value;
         });
+
+        // DSP effects checkbox handlers
+        this.initDspCheckboxes();
         document.getElementById('pass2-model').addEventListener('change', (e) => {
             this.state.pass2.model = e.target.value;
         });
@@ -1332,6 +1351,55 @@ const EnsembleManager = {
             pass2Row.classList.add('disabled');
             mergeRow.classList.add('disabled');
         }
+
+        // Update DSP panel visibility for Pass 2
+        this.updateDspPanel('pass2');
+    },
+
+    // DSP Effects Panel Management
+    updateDspPanel(passId) {
+        const panel = document.getElementById(`${passId}-dsp-panel`);
+        const enhancer = document.getElementById(`${passId}-enhancer`).value;
+        const isEnabled = passId === 'pass1' || this.state.pass2.enabled;
+
+        if (panel) {
+            // Show panel only when FFmpeg DSP is selected and pass is enabled
+            if (enhancer === 'ffmpeg-dsp' && isEnabled) {
+                panel.style.display = 'block';
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+    },
+
+    initDspCheckboxes() {
+        // Initialize event listeners for DSP effect checkboxes
+        ['pass1', 'pass2'].forEach(passId => {
+            const checkboxes = document.querySelectorAll(`input[name="${passId}-dsp"]`);
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    this.updateDspEffectsState(passId);
+                });
+            });
+        });
+
+        // Sync initial state from DOM (in case of browser form persistence)
+        this.updateDspEffectsState('pass1');
+        this.updateDspEffectsState('pass2');
+    },
+
+    updateDspEffectsState(passId) {
+        const checkboxes = document.querySelectorAll(`input[name="${passId}-dsp"]:checked`);
+        const effects = Array.from(checkboxes).map(cb => cb.value);
+
+        // Update state
+        this.state[passId].dspEffects = effects.length > 0 ? effects : ['loudnorm']; // Default to loudnorm if none selected
+    },
+
+    getDspEffectsString(passId) {
+        // Get comma-separated string of selected DSP effects for CLI
+        const effects = this.state[passId].dspEffects;
+        return effects.join(',');
     },
 
     updateBadges() {
@@ -2642,6 +2710,7 @@ const EnsembleManager = {
                 sensitivity: this.state.pass1.isTransformers ? null : this.state.pass1.sensitivity,
                 sceneDetector: this.state.pass1.sceneDetector,
                 speechEnhancer: this.state.pass1.speechEnhancer,
+                dspEffects: this.state.pass1.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass1.dspEffects : null,
                 speechSegmenter: this.state.pass1.isTransformers ? null : this.state.pass1.speechSegmenter,
                 model: this.state.pass1.model,
                 customized: this.state.pass1.customized,
@@ -2654,6 +2723,7 @@ const EnsembleManager = {
                 sensitivity: this.state.pass2.isTransformers ? null : this.state.pass2.sensitivity,
                 sceneDetector: this.state.pass2.sceneDetector,
                 speechEnhancer: this.state.pass2.speechEnhancer,
+                dspEffects: this.state.pass2.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass2.dspEffects : null,
                 speechSegmenter: this.state.pass2.isTransformers ? null : this.state.pass2.speechSegmenter,
                 model: this.state.pass2.model,
                 customized: this.state.pass2.customized,
@@ -2769,6 +2839,7 @@ const EnsembleManager = {
     /**
      * Update enhancer dropdown options based on backend availability.
      * Called on pywebviewready when API becomes available.
+     * Handles both legacy format ("clearvoice") and new format ("clearvoice:MossFormer2_SE_48K").
      */
     async updateEnhancerAvailability() {
         if (!window.pywebview || !pywebview.api) {
@@ -2798,10 +2869,12 @@ const EnsembleManager = {
                 if (!select) return;
 
                 Array.from(select.options).forEach(option => {
-                    const backend = option.value;
+                    const value = option.value;
                     // Skip 'none' - always available
-                    if (backend === 'none' || backend === '') return;
+                    if (value === 'none' || value === '') return;
 
+                    // Extract backend name from "backend:model" format
+                    const backend = value.includes(':') ? value.split(':')[0] : value;
                     const info = availabilityMap[backend];
 
                     if (info && !info.available) {

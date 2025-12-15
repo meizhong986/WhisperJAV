@@ -162,8 +162,8 @@ class FidelityPipeline(BasePipeline):
         try:
             # Step 1: Extract audio
             if self.progress_reporter:
-                self.progress_reporter.report_step("Transforming audio", 1, 5)
-            self.progress.set_current_step("Transforming audio", 1, 5)
+                self.progress_reporter.report_step("Transforming audio", 1, 6)
+            self.progress.set_current_step("Transforming audio", 1, 6)
             
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
@@ -175,8 +175,8 @@ class FidelityPipeline(BasePipeline):
 
             # Step 2: Detect scenes
             if self.progress_reporter:
-                self.progress_reporter.report_step("Detecting audio scenes", 2, 5)
-            self.progress.set_current_step("Detecting audio scenes", 2, 5)
+                self.progress_reporter.report_step("Detecting audio scenes", 2, 6)
+            self.progress.set_current_step("Detecting audio scenes", 2, 6)
             
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
@@ -196,11 +196,11 @@ class FidelityPipeline(BasePipeline):
                 master_metadata, "scene_detection", "completed",
                 scene_count=len(scene_paths), scenes_dir=str(scenes_dir))
 
-            # Step 2.5: Speech enhancement (v1.7.3) - enhance scenes before transcription
+            # Step 3: Speech enhancement (v1.7.3) - enhance scenes before transcription
             if self.speech_enhancer:
                 enhancer_name = self.speech_enhancer.name
                 enhancer_display = self.speech_enhancer.display_name
-                self.progress.set_current_step("Enhancing audio", 2, 5)
+                self.progress.set_current_step("Enhancing audio", 3, 6)
                 logger.info(f"Enhancing {len(scene_paths)} scenes with {enhancer_display}")
 
                 def enhancement_progress(scene_num, total, name):
@@ -227,10 +227,10 @@ class FidelityPipeline(BasePipeline):
             else:
                 master_metadata["config"]["speech_enhancement"] = {"enabled": False}
 
-            # Step 3: Transcribe scenes
+            # Step 4: Transcribe scenes
             if self.progress_reporter:
-                self.progress_reporter.report_step("Transcribing scenes with VAD", 3, 5)
-            self.progress.set_current_step("Transcribing scenes with VAD", 3, 5)
+                self.progress_reporter.report_step("Transcribing scenes with VAD", 4, 6)
+            self.progress.set_current_step("Transcribing scenes with VAD", 4, 6)
             
             scene_srts_dir = self.temp_dir / "scene_srts"
             scene_srts_dir.mkdir(exist_ok=True)
@@ -326,10 +326,10 @@ class FidelityPipeline(BasePipeline):
             # Print completion message for scene transcription (always visible)
             print(f"\n[DONE] Completed transcription of {total_scenes} scenes")
             
-            # Step 4: Stitch scenes
+            # Step 5: Stitch scenes
             if self.progress_reporter:
-                self.progress_reporter.report_step("Combining scene transcriptions", 4, 5)
-            self.progress.set_current_step("Combining scene transcriptions", 4, 5)
+                self.progress_reporter.report_step("Combining scene transcriptions", 5, 6)
+            self.progress.set_current_step("Combining scene transcriptions", 5, 6)
             
             stitched_srt_path = self.temp_dir / f"{media_basename}_stitched.srt"
             num_subtitles = self.stitcher.stitch(scene_srt_info, stitched_srt_path)
@@ -337,10 +337,10 @@ class FidelityPipeline(BasePipeline):
                 master_metadata, "stitching", "completed", 
                 subtitle_count=num_subtitles, output_path=str(stitched_srt_path))
 
-            # Step 5: Post-process
+            # Step 6: Post-process
             if self.progress_reporter:
-                self.progress_reporter.report_step("Post-processing subtitles", 5, 5)
-            self.progress.set_current_step("Post-processing subtitles", 5, 5)
+                self.progress_reporter.report_step("Post-processing subtitles", 6, 6)
+            self.progress.set_current_step("Post-processing subtitles", 6, 6)
 
             final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
             processed_srt_path, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
