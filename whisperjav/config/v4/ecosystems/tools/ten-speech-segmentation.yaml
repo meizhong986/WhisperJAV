@@ -53,7 +53,7 @@ spec:
   min_silence_duration_ms: 100
 
   # --- Segment Grouping ---
-  chunk_threshold_s: 4.0
+  chunk_threshold_s: 2.5
 
 # =============================================================================
 # Sensitivity Presets

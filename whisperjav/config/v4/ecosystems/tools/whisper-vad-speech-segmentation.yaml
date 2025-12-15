@@ -64,7 +64,7 @@ spec:
   cache_results: true
 
   # --- Segment Filtering/Grouping ---
-  chunk_threshold_s: 4.0
+  chunk_threshold_s: 2.5
   min_speech_duration_ms: 100
 
 # =============================================================================

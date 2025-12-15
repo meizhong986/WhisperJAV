@@ -7,7 +7,7 @@ Install: pip install -U git+https://github.com/TEN-framework/ten-vad.git
 See: https://github.com/TEN-framework/ten-vad
 """
 
-from typing import Union, List, Dict, Any, Tuple
+from typing import Union, List, Dict, Any, Tuple, Optional
 from pathlib import Path
 import time
 import logging
@@ -40,7 +40,7 @@ class TenSpeechSegmenter:
         hop_size: int = 256,
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
-        chunk_threshold_s: float = 4.0,
+        chunk_threshold_s: Optional[float] = None,
         **kwargs
     ):
         """
@@ -52,13 +52,21 @@ class TenSpeechSegmenter:
             min_speech_duration_ms: Minimum speech segment duration
             min_silence_duration_ms: Minimum silence between segments
             chunk_threshold_s: Gap threshold for segment grouping
-            **kwargs: Ignored (for interface compatibility)
+            **kwargs: Additional parameters for backward compatibility
+                - chunk_threshold: Legacy alias for chunk_threshold_s
         """
         self.threshold = threshold
         self.hop_size = hop_size
         self.min_speech_duration_ms = min_speech_duration_ms
         self.min_silence_duration_ms = min_silence_duration_ms
-        self.chunk_threshold_s = chunk_threshold_s
+
+        # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
+        if chunk_threshold_s is not None:
+            self.chunk_threshold_s = chunk_threshold_s
+        elif "chunk_threshold" in kwargs:
+            self.chunk_threshold_s = kwargs["chunk_threshold"]
+        else:
+            self.chunk_threshold_s = 2.5  # Default (reduced from 4.0 to minimize silence in Whisper input)
 
         # Lazy-loaded model
         self._model = None

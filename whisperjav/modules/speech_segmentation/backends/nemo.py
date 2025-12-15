@@ -79,7 +79,7 @@ class NemoSpeechSegmenter:
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 200,
         filter_speech_first: bool = True,
-        chunk_threshold_s: float = 4.0,
+        chunk_threshold_s: Optional[float] = None,
         diarization_domain: str = "general",
         temp_dir: Optional[Path] = None,
         use_overlap_smoothing: bool = False,
@@ -112,7 +112,8 @@ class NemoSpeechSegmenter:
                    segmentation (recommended for higher accuracy, slower). Default False.
             smoothing_method: Smoothing method for overlap processing ("median" or "mean").
                    Default "median" for robust noise handling.
-            **kwargs: Ignored (for interface compatibility)
+            **kwargs: Additional parameters for backward compatibility
+                - chunk_threshold: Legacy alias for chunk_threshold_s
         """
         # Normalize variant name
         if variant in ("nemo", "nemo-lite"):
@@ -133,10 +134,17 @@ class NemoSpeechSegmenter:
         self.min_speech_duration_ms = min_speech_duration_ms
         self.min_silence_duration_ms = min_silence_duration_ms
         self.filter_speech_first = filter_speech_first
-        self.chunk_threshold_s = chunk_threshold_s
         self.temp_dir = Path(temp_dir) if temp_dir else None
         self.use_overlap_smoothing = use_overlap_smoothing
         self.smoothing_method = smoothing_method
+
+        # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
+        if chunk_threshold_s is not None:
+            self.chunk_threshold_s = chunk_threshold_s
+        elif "chunk_threshold" in kwargs:
+            self.chunk_threshold_s = kwargs["chunk_threshold"]
+        else:
+            self.chunk_threshold_s = 2.5  # Default (reduced from 4.0 to minimize silence in Whisper input)
 
         # Lazy-loaded models
         self._diarizer = None

@@ -94,7 +94,7 @@ class SileroSpeechSegmenter:
         min_speech_duration_ms: Optional[int] = None,
         min_silence_duration_ms: Optional[int] = None,
         speech_pad_ms: Optional[int] = None,
-        chunk_threshold_s: float = 4.0,
+        chunk_threshold_s: Optional[float] = None,
         start_pad_samples: int = 3200,
         end_pad_samples: int = 20800,
         **kwargs
@@ -111,7 +111,8 @@ class SileroSpeechSegmenter:
             chunk_threshold_s: Gap threshold for segment grouping (seconds)
             start_pad_samples: Samples to pad before speech start (at 16kHz)
             end_pad_samples: Samples to pad after speech end (at 16kHz)
-            **kwargs: Ignored (for interface compatibility)
+            **kwargs: Additional parameters for backward compatibility
+                - chunk_threshold: Legacy alias for chunk_threshold_s
         """
         self.version = version if version in self.REPOS else "v4.0"
         self.repo = self.REPOS.get(self.version, self.REPOS["v4.0"])
@@ -133,7 +134,14 @@ class SileroSpeechSegmenter:
             speech_pad_ms if speech_pad_ms is not None
             else defaults["speech_pad_ms"]
         )
-        self.chunk_threshold_s = chunk_threshold_s
+
+        # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
+        if chunk_threshold_s is not None:
+            self.chunk_threshold_s = chunk_threshold_s
+        elif "chunk_threshold" in kwargs:
+            self.chunk_threshold_s = kwargs["chunk_threshold"]
+        else:
+            self.chunk_threshold_s = 2.5  # Default (reduced from 4.0 to minimize silence in Whisper input)
 
         # Padding in samples (at 16kHz)
         self.start_pad_samples = start_pad_samples

@@ -87,7 +87,7 @@ class WhisperVadSpeechSegmenter:
         device: str = "auto",
         cache_results: bool = True,
         cache_dir: Optional[Path] = None,
-        chunk_threshold_s: float = 4.0,
+        chunk_threshold_s: Optional[float] = None,
         min_speech_duration_ms: int = 100,
         **kwargs
     ):
@@ -107,7 +107,8 @@ class WhisperVadSpeechSegmenter:
             cache_dir: Directory for cache files (default: .whisperjav_cache next to audio)
             chunk_threshold_s: Gap threshold for segment grouping (default 4.0s)
             min_speech_duration_ms: Minimum speech segment duration (default 100ms)
-            **kwargs: Ignored (for interface compatibility)
+            **kwargs: Additional parameters for backward compatibility
+                - chunk_threshold: Legacy alias for chunk_threshold_s
         """
         # Normalize variant name
         if variant not in self.VARIANTS:
@@ -123,8 +124,15 @@ class WhisperVadSpeechSegmenter:
         self.device = device
         self.cache_results = cache_results
         self.cache_dir = Path(cache_dir) if cache_dir else None
-        self.chunk_threshold_s = chunk_threshold_s
         self.min_speech_duration_ms = min_speech_duration_ms
+
+        # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
+        if chunk_threshold_s is not None:
+            self.chunk_threshold_s = chunk_threshold_s
+        elif "chunk_threshold" in kwargs:
+            self.chunk_threshold_s = kwargs["chunk_threshold"]
+        else:
+            self.chunk_threshold_s = 2.5  # Default (reduced from 4.0 to minimize silence in Whisper input)
 
         # Lazy-loaded model
         self._model = None
