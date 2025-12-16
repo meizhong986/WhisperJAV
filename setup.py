@@ -24,8 +24,8 @@ install_requires = [
     "soundfile",
     "auditok",
     "pydub",
-    "numpy",
-    "scipy",
+    "numpy>=2.0",          # NumPy 2.x (modelscope/zipenhancer compatible)
+    "scipy>=1.10.1",
     "tqdm",
     "pysrt",
     "srt",
@@ -49,14 +49,15 @@ install_requires = [
     "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
 
     # Speech enhancement backends (v1.7.3)
-    "modelscope>=1.20",      # ZipEnhancer (recommended, lightweight SOTA)
-    "addict",                # ModelScope dependency (dict with attribute access)
-    "datasets",              # ModelScope dependency (HuggingFace datasets)
-    "simplejson",            # ModelScope dependency (JSON parsing)
-    "sortedcontainers",      # ModelScope dependency (sorted collections)
-    "packaging",             # ModelScope dependency (version parsing)
-    "clearvoice",
-    "bs-roformer-infer",
+    "modelscope>=1.20",       # ZipEnhancer (recommended, lightweight SOTA)
+    "addict",                 # ModelScope dependency (dict with attribute access)
+    "datasets>=2.14.0",       # ModelScope dependency (HuggingFace datasets)
+    "simplejson",             # ModelScope dependency (JSON parsing)
+    "sortedcontainers",       # ModelScope dependency (sorted collections)
+    "packaging",              # ModelScope dependency (version parsing)
+    "clearvoice",             # ClearerVoice denoising (MossFormer2 48kHz)
+    "bs-roformer-infer",      # BS-RoFormer vocal isolation (44.1kHz)
+    "onnxruntime>=1.16.0",    # ONNX inference for ZipEnhancer ONNX mode
 
     # Configuration system
     "pydantic>=2.0,<3.0",
@@ -69,6 +70,7 @@ install_requires = [
 
     # Speedup Dependencies (Previously in 'speedup' extra)
     "numba",
+    "hf_xet",  # Faster HuggingFace downloads (Xet Storage)
 ]
 
 # Classifiers for supported Python versions
