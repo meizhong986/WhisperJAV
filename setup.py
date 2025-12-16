@@ -51,7 +51,7 @@ install_requires = [
     # Speech enhancement backends (v1.7.3)
     "modelscope>=1.20",       # ZipEnhancer (recommended, lightweight SOTA)
     "addict",                 # ModelScope dependency (dict with attribute access)
-    "datasets==2.18.0",       # ModelScope requires exactly this version (4.x breaks it)
+    "datasets>=2.14.0,<4.0",  # 4.x breaks modelscope
     "simplejson",             # ModelScope dependency (JSON parsing)
     "sortedcontainers",       # ModelScope dependency (sorted collections)
     "packaging",              # ModelScope dependency (version parsing)

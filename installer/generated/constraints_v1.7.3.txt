@@ -38,7 +38,7 @@ torchaudio>=2.0.0
 transformers>=4.40.0
 accelerate>=0.26.0
 huggingface-hub>=0.25.0
-datasets==2.18.0          # ModelScope requires exactly this version
+datasets>=2.14.0,<4.0    # 4.x breaks modelscope
 
 # ----------------------------------------
 # Configuration System
