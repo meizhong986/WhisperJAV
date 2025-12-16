@@ -10,7 +10,8 @@ faster-whisper>=1.1.0
 
 
 # Audio and signal processing
-ffmpeg-python
+# NOTE: ffmpeg-python must be installed from GitHub (PyPI tarball fails due to setup.py calling `git rev-parse HEAD`)
+ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git
 soundfile
 auditok
 silero-vad>=6.0
@@ -18,7 +19,7 @@ pydub
 
 # Speech segmentation backends (v1.7.2)
 ten-vad
-nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main
+# NOTE: nemo_toolkit removed - available as optional install for NeMo VAD users
 
 # Speech enhancement backends (v1.7.3)
 modelscope>=1.20                # ZipEnhancer 16kHz (recommended, lightweight SOTA)
@@ -40,7 +41,7 @@ srt
 aiofiles
 jsonschema
 colorama
-librosa
+librosa==0.10.2.post1               # Pinned for clearvoice compatibility
 pyloudnorm
 requests
 regex
