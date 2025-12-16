@@ -32,7 +32,7 @@ install_requires = [
     "aiofiles",
     "jsonschema",
     "colorama",
-    "librosa",
+    "librosa>=0.11.0",        # v0.11.0+ supports NumPy 2.0
     "pyloudnorm",
     "requests",
     "regex",
@@ -46,12 +46,12 @@ install_requires = [
 
     # Speech segmentation backends (v1.7.2)
     "ten-vad",
-    "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
+    # NOTE: nemo_toolkit removed - causes resolution-too-deep errors, only 10% usage
 
     # Speech enhancement backends (v1.7.3)
     "modelscope>=1.20",       # ZipEnhancer (recommended, lightweight SOTA)
     "addict",                 # ModelScope dependency (dict with attribute access)
-    "datasets>=2.14.0",       # ModelScope dependency (HuggingFace datasets)
+    "datasets==2.18.0",       # ModelScope requires exactly this version (4.x breaks it)
     "simplejson",             # ModelScope dependency (JSON parsing)
     "sortedcontainers",       # ModelScope dependency (sorted collections)
     "packaging",              # ModelScope dependency (version parsing)
