@@ -314,8 +314,8 @@ class SpeechEnhancerFactory:
         params = resolved_config.get("params", {})
         enhancer_config = params.get("speech_enhancer", {})
 
-        # Get backend from config (default: zipenhancer for best lightweight quality)
-        backend = enhancer_config.get("backend", "zipenhancer")
+        # Get backend from config (default: none = skip enhancement)
+        backend = enhancer_config.get("backend", "none")
 
         # If backend is "none" or empty, return None to indicate no enhancement
         if not backend or backend == "none":

@@ -71,8 +71,8 @@ def create_enhancer_from_config(
     if overrides:
         enhancer_config = {**enhancer_config, **overrides}
 
-    # Get backend name (default: zipenhancer for best lightweight quality)
-    backend = enhancer_config.get("backend", "zipenhancer")
+    # Get backend name (default: none = skip enhancement)
+    backend = enhancer_config.get("backend", "none")
 
     # If no backend or "none", return None
     if not backend or backend == "none":
