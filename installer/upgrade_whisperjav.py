@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 # Version of this upgrade script
-UPGRADE_SCRIPT_VERSION = "1.7.2"
+UPGRADE_SCRIPT_VERSION = "1.7.3"
 
 # GitHub repository URL
 GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
@@ -46,6 +46,17 @@ NEW_DEPENDENCIES = [
     "pydub",
     "regex",
     "ten-vad",
+    # v1.7.3 Speech Enhancement Dependencies
+    "modelscope>=1.20",       # ZipEnhancer (lightweight SOTA)
+    "addict",                 # ModelScope dependency
+    "datasets>=2.14.0",       # ModelScope dependency
+    "simplejson",             # ModelScope dependency
+    "sortedcontainers",       # ModelScope dependency
+    "clearvoice",             # ClearerVoice denoising (48kHz)
+    "bs-roformer-infer",      # BS-RoFormer vocal isolation (44.1kHz)
+    "onnxruntime>=1.16.0",    # ONNX inference for ZipEnhancer
+    "numpy>=2.0",             # NumPy 2.x (modelscope/zipenhancer compatible)
+    "hf_xet",                 # Faster HuggingFace downloads
 ]
 
 # Dependencies that have torch as a requirement - installed with constraints
