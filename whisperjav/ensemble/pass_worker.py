@@ -540,11 +540,20 @@ def _build_pipeline(
         pass_config.get("speech_segmenter"),
     )
 
+    # Derive ASR task from subs_language
+    asr_task = "translate" if subs_language == "direct-to-english" else "transcribe"
+    logger.debug(
+        "[Worker %s] Pass %s: subs_language=%s → asr_task=%s",
+        os.getpid(), pass_number, subs_language, asr_task
+    )
+
     if pipeline_name == "transformers":
         hf_defaults = prepare_transformers_params(pass_config)
+        # Override task based on subs_language
+        hf_defaults["hf_task"] = asr_task
         logger.debug(
-            "[Worker %s] Pass %s: Transformers defaults BEFORE overrides - hf_model_id=%s",
-            os.getpid(), pass_number, hf_defaults.get("hf_model_id")
+            "[Worker %s] Pass %s: Transformers defaults BEFORE overrides - hf_model_id=%s, hf_task=%s",
+            os.getpid(), pass_number, hf_defaults.get("hf_model_id"), hf_defaults.get("hf_task")
         )
         # Apply GUI-specified overrides for transformers pipeline
         if pass_config.get("model"):
@@ -593,7 +602,7 @@ def _build_pipeline(
     resolved_config = resolve_legacy_pipeline(
         pipeline_name=pipeline_name,
         sensitivity=pass_config.get("sensitivity", "balanced"),
-        task="transcribe",
+        task=asr_task,  # Derived from subs_language above
         overrides=pass_config.get("overrides"),
     )
 
