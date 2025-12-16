@@ -20,7 +20,7 @@ install_requires = [
     "openai-whisper @ git+https://github.com/openai/whisper@main",
     "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
     "faster-whisper>=1.1.0",
-    "ffmpeg-python",
+    "ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git",  # PyPI tarball fails
     "soundfile",
     "auditok",
     "pydub",
