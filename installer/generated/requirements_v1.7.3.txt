@@ -43,7 +43,7 @@ ten-vad                                                          # TEN Framework
 # ----------------------------------------
 modelscope>=1.20          # ZipEnhancer 16kHz (recommended, lightweight SOTA)
 addict                    # ModelScope dependency (dict with attribute access)
-datasets==2.18.0          # ModelScope requires this version (4.x breaks HubDatasetModuleFactoryWithoutScript)
+datasets>=2.14.0,<4.0     # 4.x breaks modelscope
 simplejson                # ModelScope dependency (JSON parsing)
 sortedcontainers          # ModelScope dependency (sorted collections)
 packaging                 # ModelScope dependency (version parsing)
@@ -81,7 +81,7 @@ google-genai>=1.39.0  # Required for Gemini provider in PySubtrans
 # ----------------------------------------
 # HuggingFace Transformers Pipeline
 # ----------------------------------------
-huggingface-hub>=0.25.0  # Hugging Face cache management (faster-whisper models)
+huggingface-hub>=0.25.0  # Hugging Face cache management
 transformers>=4.40.0     # HuggingFace Transformers for ASR pipeline (kotoba-whisper)
 accelerate>=0.26.0       # Efficient model loading for Transformers
 

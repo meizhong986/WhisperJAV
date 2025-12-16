@@ -3,19 +3,19 @@
 WhisperJAV Upgrade Script
 =========================
 
-Upgrades WhisperJAV installations to the latest version without reinstalling
-large packages like PyTorch (~2.5GB).
+Upgrades WhisperJAV installations to the latest version.
 
 Usage:
     whisperjav-upgrade              # Run from command line (after installation)
     python upgrade.py               # Run standalone
 
 Features:
-    - Upgrades whisperjav package from GitHub @main branch
-    - Installs only new dependencies (skips PyTorch)
+    - Upgrades whisperjav package from GitHub @main branch with all dependencies
+    - Fixes numpy/librosa versions (clearvoice metadata workaround)
     - Updates desktop shortcuts with correct version
     - Full cleanup of old version-specific files
     - Preserves user data (model cache, configs)
+    - PyTorch won't be reinstalled if already satisfied
 """
 
 import os
@@ -28,17 +28,15 @@ from pathlib import Path
 from typing import Optional, Tuple, List
 
 # Version of this upgrade script
-UPGRADE_SCRIPT_VERSION = "1.0.0"
+UPGRADE_SCRIPT_VERSION = "1.7.3"
 
 # GitHub repository URL
 GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
 
-# New dependencies added in v1.7.x that older versions don't have
-NEW_DEPENDENCIES = [
-    "transformers>=4.40.0",
-    "accelerate>=0.26.0",
-    "pydantic>=2.0,<3.0",
-    "PyYAML>=6.0",
+# Packages to fix AFTER main installation (clearvoice pulls older versions)
+FIX_PACKAGES = [
+    "numpy>=2.0",
+    "librosa",
 ]
 
 # Files to preserve during upgrade (user data)
@@ -162,7 +160,7 @@ def check_network() -> bool:
 
 def upgrade_package(install_dir: Path) -> bool:
     """
-    Upgrade the whisperjav package from GitHub.
+    Upgrade the whisperjav package from GitHub with all dependencies.
 
     Args:
         install_dir: Path to installation directory
@@ -180,17 +178,19 @@ def upgrade_package(install_dir: Path) -> bool:
         print_error("pip not found in installation")
         return False
 
-    # Upgrade whisperjav without dependencies (to skip PyTorch)
-    print("      Installing whisperjav from GitHub (this may take a minute)...")
+    # Upgrade whisperjav WITH dependencies (pip resolves versions naturally)
+    # PyTorch won't be reinstalled if already satisfied
+    print("      Installing whisperjav from GitHub (this may take several minutes)...")
+    print("      (New dependencies will be downloaded as needed)")
     try:
         result = subprocess.run(
-            [str(pip_exe), 'install', '-U', '--no-deps', GITHUB_REPO],
+            [str(pip_exe), 'install', '-U', GITHUB_REPO],
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=1800  # 30 minute timeout for large downloads
         )
         if result.returncode != 0:
-            print_error(f"Package upgrade failed: {result.stderr[:200]}")
+            print_error(f"Package upgrade failed: {result.stderr[:500]}")
             return False
     except subprocess.TimeoutExpired:
         print_error("Package upgrade timed out")
@@ -203,9 +203,12 @@ def upgrade_package(install_dir: Path) -> bool:
     return True
 
 
-def install_new_dependencies(install_dir: Path) -> bool:
+def fix_package_versions(install_dir: Path) -> bool:
     """
-    Install new dependencies that weren't in older versions.
+    Fix package versions after main installation.
+
+    clearvoice declares numpy<2.0 in its metadata but works with numpy 2.x.
+    This step upgrades numpy and librosa to latest versions.
 
     Args:
         install_dir: Path to installation directory
@@ -223,27 +226,23 @@ def install_new_dependencies(install_dir: Path) -> bool:
         print_error("pip not found in installation")
         return False
 
-    success = True
-    for dep in NEW_DEPENDENCIES:
-        try:
-            result = subprocess.run(
-                [str(pip_exe), 'install', dep],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
-            if result.returncode == 0:
-                print_success(dep)
-            else:
-                # Check if already satisfied
-                if "already satisfied" in result.stdout.lower():
-                    print_success(f"{dep} (already installed)")
-                else:
-                    print_warning(f"{dep} - install had issues")
-        except Exception as e:
-            print_warning(f"{dep} - {e}")
-
-    return success
+    print("      Upgrading numpy and librosa to latest versions...")
+    try:
+        result = subprocess.run(
+            [str(pip_exe), 'install', '--upgrade'] + FIX_PACKAGES,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        if result.returncode == 0:
+            print_success("numpy and librosa upgraded")
+            return True
+        else:
+            print_warning("Package upgrade had issues, but continuing...")
+            return True
+    except Exception as e:
+        print_warning(f"Package upgrade error: {e}")
+        return True  # Non-fatal
 
 
 def update_launcher(install_dir: Path) -> bool:
@@ -432,9 +431,9 @@ def main() -> int:
         print_error("Upgrade failed. Your installation may be in an inconsistent state.")
         return 1
 
-    # Step 2: Install new dependencies
-    print_step(2, total_steps, "Installing new dependencies...")
-    install_new_dependencies(install_dir)
+    # Step 2: Fix package versions (numpy/librosa)
+    print_step(2, total_steps, "Fixing package versions...")
+    fix_package_versions(install_dir)
 
     # Step 3: Update launcher
     print_step(3, total_steps, "Updating launcher executable...")

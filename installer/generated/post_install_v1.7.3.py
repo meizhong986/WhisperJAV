@@ -1021,39 +1021,17 @@ def main() -> int:
             create_failure_file("Dependencies installation failed")
             return 1
 
-    # === Phase 4d: Fix package versions (MUST BE LAST pip phase) ===
-    # This phase runs AFTER all other pip installations to ensure packages
-    # are at the correct versions and don't get downgraded by other installs.
+    # === Phase 4d: Fix numpy and librosa versions (MUST BE LAST pip phase) ===
+    # clearvoice declares numpy<2.0 and older librosa in its metadata, but works with latest.
+    # Upgrade these two - all other packages are resolved correctly by pip.
     log_section("Phase 4d: Fix Package Versions (Final)")
 
-    # Packages to upgrade to latest (clearvoice/modelscope install older versions)
-    upgrade_packages = [
-        ("numpy>=2.0", "NumPy 2.x for modelscope/zipenhancer"),
-        ("librosa>=0.11.0", "librosa 0.11+ for NumPy 2.x support"),
-        ("fsspec", "latest fsspec"),
-        ("huggingface-hub", "latest huggingface-hub"),
-        ("opencv-python", "latest opencv-python"),
-    ]
-
-    log("Upgrading packages to target versions...")
-    for pkg_spec, description in upgrade_packages:
-        log(f"  - {description}")
-
-    upgrade_list = [pkg for pkg, _ in upgrade_packages]
+    log("Upgrading numpy and librosa to latest (clearvoice works with them despite metadata)...")
     if not run_pip(
-        ["install"] + upgrade_list + ["--upgrade", "--progress-bar", "on"],
-        "Upgrade packages to target versions"
+        ["install", "numpy>=2.0", "librosa", "--upgrade", "--progress-bar", "on"],
+        "Upgrade NumPy and librosa to latest"
     ):
         log("WARNING: Package upgrade failed, continuing...")
-
-    # Pin datasets to 2.18.0 (modelscope requires this exact version)
-    # datasets 4.x removes HubDatasetModuleFactoryWithoutScript which modelscope needs
-    log("Pinning datasets==2.18.0 (required by modelscope)...")
-    if not run_pip(
-        ["install", "datasets==2.18.0", "--progress-bar", "on"],
-        "Pin datasets version for modelscope"
-    ):
-        log("WARNING: datasets pinning failed - modelscope may not work correctly")
 
     # === Phase 5: WhisperJAV Application ===
     log_section("Phase 5: WhisperJAV Application Installation")
