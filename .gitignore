@@ -73,6 +73,11 @@ whisperjav/output/
 #old docs in any subdirectory of are ignored
 **.docs_archive/
 
+#wheels 
+installer/generated/*.whl
+installer/*.whl
+
+
 
 # Ignore the nul file
 nul
