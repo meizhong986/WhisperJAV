@@ -1,0 +1,107 @@
+# WhisperJAV v1.7.3 Requirements
+# ================================
+#
+# This file lists all Python dependencies for WhisperJAV.
+# PyTorch is installed separately in post_install_v1.7.3.py
+# with CUDA version detection.
+#
+# IMPORTANT: Use with constraints file to prevent version conflicts:
+# pip install -c constraints_v1.7.3.txt -r requirements_v1.7.3.txt
+#
+# Installation: pip install -r requirements_v1.7.3.txt
+
+# ----------------------------------------
+# Core Whisper Dependencies
+# ----------------------------------------
+# NOTE: Git-based packages (openai-whisper, stable-ts, ffmpeg-python) are installed
+# separately in post_install.py to avoid pip resolution complexity.
+
+# Whisper variants
+faster-whisper>=1.1.0
+
+# ----------------------------------------
+# Audio and Signal Processing
+# ----------------------------------------
+# NOTE: ffmpeg-python is installed separately from GitHub in post_install.py
+# (PyPI tarball fails due to setup.py calling `git rev-parse HEAD`)
+soundfile             # Audio file I/O
+auditok               # Voice Activity Detection (VAD)
+silero-vad>=6.0       # Silero VAD for scene detection
+librosa==0.10.2.post1 # Audio analysis (pinned for clearvoice compatibility)
+pyloudnorm            # Audio normalization
+pydub                 # Audio segment processing
+
+# ----------------------------------------
+# Speech Segmentation Backends (v1.7.2)
+# ----------------------------------------
+ten-vad                                                          # TEN Framework VAD
+# NOTE: nemo_toolkit removed from v1.7.3 installer (500MB+ download, only 10% usage)
+# NeMo VAD option is disabled in GUI. Will be available as optional install in future.
+
+# ----------------------------------------
+# Speech Enhancement Backends (v1.7.3)
+# ----------------------------------------
+modelscope>=1.20          # ZipEnhancer 16kHz (recommended, lightweight SOTA)
+addict                    # ModelScope dependency (dict with attribute access)
+datasets>=2.14.0          # ModelScope dependency (HuggingFace datasets)
+simplejson                # ModelScope dependency (JSON parsing)
+sortedcontainers          # ModelScope dependency (sorted collections)
+packaging                 # ModelScope dependency (version parsing)
+clearvoice                # ClearerVoice denoising (48kHz, noise reduction)
+bs-roformer-infer         # BS-RoFormer vocal isolation (44.1kHz, music separation)
+onnxruntime>=1.16.0       # ONNX inference for ZipEnhancer ONNX mode
+
+# ----------------------------------------
+# GUI Framework (PyWebView)
+# ----------------------------------------
+pywebview>=5.0.0      # Modern web-based GUI framework
+pythonnet>=3.0        # Required for WebView2 backend on Windows
+pywin32>=305; platform_system=="Windows"  # Windows COM support for shortcuts
+
+# ----------------------------------------
+# Scientific Computing
+# ----------------------------------------
+numpy>=2.0            # Array operations (NumPy 2.x, modelscope/zipenhancer compatible)
+scipy>=1.10.1         # Signal processing
+
+# ----------------------------------------
+# Subtitle Processing
+# ----------------------------------------
+pysrt                 # SRT file parsing
+srt                   # SRT utilities
+
+# ----------------------------------------
+# Translation
+# ----------------------------------------
+PySubtrans>=0.7.0     # AI-powered subtitle translation
+openai>=1.35.0        # Required for GPT provider in PySubtrans
+google-genai>=1.39.0  # Required for Gemini provider in PySubtrans
+
+# ----------------------------------------
+# HuggingFace Transformers Pipeline
+# ----------------------------------------
+huggingface-hub>=0.25.0  # Hugging Face cache management (faster-whisper models)
+transformers>=4.40.0     # HuggingFace Transformers for ASR pipeline (kotoba-whisper)
+accelerate>=0.26.0       # Efficient model loading for Transformers
+
+# ----------------------------------------
+# Utilities
+# ----------------------------------------
+tqdm                  # Progress bars
+aiofiles              # Async file I/O
+jsonschema            # Config validation
+colorama              # Colored console output
+requests              # HTTP requests
+regex                 # Advanced regex for Japanese text processing
+
+# ----------------------------------------
+# Configuration System
+# ----------------------------------------
+pydantic>=2.0,<3.0    # Data validation (used in config schemas)
+PyYAML>=6.0           # YAML config file parsing
+
+# ----------------------------------------
+# Optional: Performance Optimization
+# ----------------------------------------
+numba                 # JIT compilation for speedups
+hf_xet                # Faster HuggingFace downloads (Xet Storage)
