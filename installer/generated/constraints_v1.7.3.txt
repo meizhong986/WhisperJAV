@@ -38,7 +38,7 @@ torchaudio>=2.0.0
 transformers>=4.40.0
 accelerate>=0.26.0
 huggingface-hub>=0.25.0
-datasets>=2.14.0
+datasets==2.18.0          # ModelScope requires exactly this version
 
 # ----------------------------------------
 # Configuration System
@@ -50,7 +50,7 @@ PyYAML>=6.0
 # ----------------------------------------
 # Audio Processing
 # ----------------------------------------
-librosa==0.10.2.post1  # Pinned for clearvoice compatibility
+librosa>=0.11.0        # v0.11.0+ supports NumPy 2.0 (clearvoice works despite metadata)
 soundfile>=0.12.0
 
 # ----------------------------------------

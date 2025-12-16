@@ -27,7 +27,7 @@ faster-whisper>=1.1.0
 soundfile             # Audio file I/O
 auditok               # Voice Activity Detection (VAD)
 silero-vad>=6.0       # Silero VAD for scene detection
-librosa==0.10.2.post1 # Audio analysis (pinned for clearvoice compatibility)
+librosa>=0.11.0       # Audio analysis (v0.11.0+ supports NumPy 2.0)
 pyloudnorm            # Audio normalization
 pydub                 # Audio segment processing
 
@@ -43,11 +43,12 @@ ten-vad                                                          # TEN Framework
 # ----------------------------------------
 modelscope>=1.20          # ZipEnhancer 16kHz (recommended, lightweight SOTA)
 addict                    # ModelScope dependency (dict with attribute access)
-datasets>=2.14.0          # ModelScope dependency (HuggingFace datasets)
+datasets==2.18.0          # ModelScope requires this version (4.x breaks HubDatasetModuleFactoryWithoutScript)
 simplejson                # ModelScope dependency (JSON parsing)
 sortedcontainers          # ModelScope dependency (sorted collections)
 packaging                 # ModelScope dependency (version parsing)
-clearvoice                # ClearerVoice denoising (48kHz, noise reduction)
+# NOTE: clearvoice installed separately in Phase 4b of post_install.py
+# Then numpy/librosa upgraded in Phase 4c (clearvoice works with numpy 2.0+)
 bs-roformer-infer         # BS-RoFormer vocal isolation (44.1kHz, music separation)
 onnxruntime>=1.16.0       # ONNX inference for ZipEnhancer ONNX mode
 

@@ -986,8 +986,54 @@ def main() -> int:
             if pkg_name in ("openai-whisper", "stable-ts"):
                 log(f"ERROR: {pkg_name} is required. Installation may be incomplete.")
 
-    # === Phase 4b: Main requirements (no git packages, cleaner resolution) ===
-    log_section("Phase 4b: PyPI Dependencies")
+    # === Phase 4b: Install clearvoice first (with its stated deps) ===
+    # clearvoice's metadata declares numpy<2.0 and librosa==0.10.0, but it actually works
+    # with numpy 2.0+ and librosa 0.11.0+ (tested). We install it first to get all its
+    # dependencies, then upgrade numpy/librosa to the versions we want.
+    log_section("Phase 4b: ClearVoice (install with all dependencies)")
+    log("Installing clearvoice (this brings in numpy<2.0 temporarily)...")
+    if not run_pip(
+        ["install", "clearvoice", "--progress-bar", "on"],
+        "Install clearvoice"
+    ):
+        log("WARNING: clearvoice installation failed, continuing...")
+
+    # === Phase 4c: Fix package versions ===
+    # Some packages get downgraded during installation due to dependency conflicts.
+    # This phase ensures we have the correct versions for WhisperJAV.
+    log_section("Phase 4c: Fix Package Versions")
+
+    # Packages to upgrade to latest (clearvoice/modelscope install older versions)
+    upgrade_packages = [
+        ("numpy>=2.0", "NumPy 2.x for modelscope/zipenhancer"),
+        ("librosa>=0.11.0", "librosa 0.11+ for NumPy 2.x support"),
+        ("fsspec", "latest fsspec"),
+        ("huggingface-hub", "latest huggingface-hub"),
+        ("opencv-python", "latest opencv-python"),
+    ]
+
+    log("Upgrading packages to target versions...")
+    for pkg_spec, description in upgrade_packages:
+        log(f"  - {description}")
+
+    upgrade_list = [pkg for pkg, _ in upgrade_packages]
+    if not run_pip(
+        ["install"] + upgrade_list + ["--upgrade", "--progress-bar", "on"],
+        "Upgrade packages to target versions"
+    ):
+        log("WARNING: Package upgrade failed, continuing...")
+
+    # Pin datasets to 2.18.0 (modelscope requires this exact version)
+    # datasets 4.x removes HubDatasetModuleFactoryWithoutScript which modelscope needs
+    log("Pinning datasets==2.18.0 (required by modelscope)...")
+    if not run_pip(
+        ["install", "datasets==2.18.0", "--progress-bar", "on"],
+        "Pin datasets version for modelscope"
+    ):
+        log("WARNING: datasets pinning failed - modelscope may not work correctly")
+
+    # === Phase 4d: Main requirements ===
+    log_section("Phase 4d: PyPI Dependencies")
     log(f"Installing dependencies from: {req_path}")
     log("This will download ~500MB of packages. Please wait...")
     log("(v1.7.3 includes speech enhancement backends)")
