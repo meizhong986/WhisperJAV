@@ -1,0 +1,60 @@
+# Conda-Constructor Configuration for WhisperJAV v1.7.2
+# =========================================================
+#
+# This creates a Windows installer that:
+# - Installs minimal conda environment to %LOCALAPPDATA%\WhisperJAV
+# - Downloads PyTorch and dependencies during post-install
+# - Defers AI model downloads to first application run
+# - Checks for WebView2 and provides download link if missing
+#
+# Build command: constructor . --config construct_v1.7.2.yaml
+# Output: WhisperJAV-1.7.2-Windows-x86_64.exe
+
+name: WhisperJAV
+version: 1.7.2
+
+# Conda channels for package resolution
+channels:
+  - conda-forge
+  - defaults
+
+# Minimal base environment (heavy dependencies in post-install)
+specs:
+  - python=3.10.18  # Pinned for stability (tested version)
+  - pip             # Package installer
+  - git             # Required for GitHub installs
+  - ffmpeg>=6,<8    # Audio/video processing (v6 or v7 required, v8+ incompatible)
+  - menuinst        # Desktop/Start Menu shortcut creation
+
+# Install in dependency order for reliability
+install_in_dependency_order: true
+
+# Default installation path (user can override during install)
+default_prefix: '%LOCALAPPDATA%\WhisperJAV'
+
+# Post-installation script (runs after conda env setup)
+post_install: post_install_v1.7.2.bat
+
+# Files to include in installer package
+extra_files:
+  - post_install_v1.7.2.bat
+  - post_install_v1.7.2.py
+  - requirements_v1.7.2.txt
+  - WhisperJAV_Launcher_v1.7.2.py
+  - README_INSTALLER_v1.7.2.txt
+  - LICENSE.txt
+  - whisperjav_icon.ico
+  - whisperjav-1.7.2-py3-none-any.whl
+  # Upgrade scripts (for future version upgrades)
+  - upgrade_whisperjav.py
+  - upgrade_whisperjav.bat
+
+# Installer metadata
+license_file: LICENSE.txt
+welcome_image: whisperjav_icon.ico  # Optional: 164x314 PNG or ICO
+icon_image: whisperjav_icon.ico  # Installer executable icon
+nsis_template: custom_template_v1.7.2.nsi.tmpl  # Custom NSIS template with CreateShortcut
+
+# Installation options
+# keep_pkgs: false  # Delete package cache after install (saves space)
+# attempt_hardlinks: true  # Use hardlinks to save disk space
