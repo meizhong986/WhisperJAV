@@ -14,5 +14,4 @@ pkgs/
 # But keep the icon file
 !whisperjav_icon.ico
 
-# Auto-generated release files (from build_release.py)
-generated/
+# Note: generated/ folder is now tracked for v1.7.3 installer documentation
