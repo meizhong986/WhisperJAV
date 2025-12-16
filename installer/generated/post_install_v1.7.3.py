@@ -998,10 +998,33 @@ def main() -> int:
     ):
         log("WARNING: clearvoice installation failed, continuing...")
 
-    # === Phase 4c: Fix package versions ===
-    # Some packages get downgraded during installation due to dependency conflicts.
-    # This phase ensures we have the correct versions for WhisperJAV.
-    log_section("Phase 4c: Fix Package Versions")
+    # === Phase 4c: Main requirements ===
+    log_section("Phase 4c: PyPI Dependencies")
+    log(f"Installing dependencies from: {req_path}")
+    log("This will download ~500MB of packages. Please wait...")
+    log("(v1.7.3 includes speech enhancement backends)")
+
+    # Use constraints file if available to protect PyTorch version
+    if os.path.exists(constraints_path):
+        log(f"Using constraints file to protect PyTorch: {constraints_path}")
+        if not run_pip(
+            ["install", "-c", constraints_path, "-r", req_path, "--progress-bar", "on"],
+            "Install Python dependencies (with constraints)"
+        ):
+            create_failure_file("Dependencies installation failed")
+            return 1
+    else:
+        if not run_pip(
+            ["install", "-r", req_path, "--progress-bar", "on"],
+            "Install Python dependencies"
+        ):
+            create_failure_file("Dependencies installation failed")
+            return 1
+
+    # === Phase 4d: Fix package versions (MUST BE LAST pip phase) ===
+    # This phase runs AFTER all other pip installations to ensure packages
+    # are at the correct versions and don't get downgraded by other installs.
+    log_section("Phase 4d: Fix Package Versions (Final)")
 
     # Packages to upgrade to latest (clearvoice/modelscope install older versions)
     upgrade_packages = [
@@ -1031,29 +1054,6 @@ def main() -> int:
         "Pin datasets version for modelscope"
     ):
         log("WARNING: datasets pinning failed - modelscope may not work correctly")
-
-    # === Phase 4d: Main requirements ===
-    log_section("Phase 4d: PyPI Dependencies")
-    log(f"Installing dependencies from: {req_path}")
-    log("This will download ~500MB of packages. Please wait...")
-    log("(v1.7.3 includes speech enhancement backends)")
-
-    # Use constraints file if available to protect PyTorch version
-    if os.path.exists(constraints_path):
-        log(f"Using constraints file to protect PyTorch: {constraints_path}")
-        if not run_pip(
-            ["install", "-c", constraints_path, "-r", req_path, "--progress-bar", "on"],
-            "Install Python dependencies (with constraints)"
-        ):
-            create_failure_file("Dependencies installation failed")
-            return 1
-    else:
-        if not run_pip(
-            ["install", "-r", req_path, "--progress-bar", "on"],
-            "Install Python dependencies"
-        ):
-            create_failure_file("Dependencies installation failed")
-            return 1
 
     # === Phase 5: WhisperJAV Application ===
     log_section("Phase 5: WhisperJAV Application Installation")
