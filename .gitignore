@@ -73,9 +73,10 @@ whisperjav/output/
 #old docs in any subdirectory of are ignored
 **.docs_archive/
 
-#wheels 
+#wheels and build extras
 installer/generated/*.whl
 installer/*.whl
+installer/generated/build_log_*.txt
 
 
 
