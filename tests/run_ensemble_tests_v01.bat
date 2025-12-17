@@ -343,11 +343,26 @@ exit /b 0
 :MAIN
 REM Run the full suite for each supported media file in TEST_MEDIA_DIR
 set "FOUND_MEDIA=0"
-for %%f in ("%TEST_MEDIA_DIR%\*.*") do call :MAYBE_RUN "%%~ff"
+for %%f in ("%TEST_MEDIA_DIR%\*.*") do (
+    set "EXT=%%~xf"
+    if /I "!EXT!"==".wav"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".mp3"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".m4a"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".aac"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".flac" (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".ogg"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".opus" (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".wma"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".mp4"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".mkv"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".mov"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".avi"  (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff") else ^
+    if /I "!EXT!"==".webm" (set "FOUND_MEDIA=1" & call :RUN_SUITE "%%~ff")
+)
 
 if "%FOUND_MEDIA%"=="0" (
     echo ERROR: No audio/video files found in %TEST_MEDIA_DIR%
-    echo Please add a media file: wav/mp3/mp4/mkv/... to the test_media folder.
+    echo Please add a media file (wav/mp3/mp4/mkv/...) to the test_media folder.
     endlocal
     exit /b 1
 )
@@ -362,21 +377,3 @@ echo Output files:
 dir /b "%OUTPUT_DIR%"
 
 endlocal
-
-exit /b 0
-
-:MAYBE_RUN
-set "CANDIDATE=%~1"
-set "EXT=%~x1"
-
-set "MATCHED=0"
-for %%e in (.wav .mp3 .m4a .aac .flac .ogg .opus .wma .mp4 .mkv .mov .avi .webm) do (
-    if /I "%EXT%"=="%%e" set "MATCHED=1"
-)
-
-if "%MATCHED%"=="1" (
-    set "FOUND_MEDIA=1"
-    call :RUN_SUITE "%CANDIDATE%"
-)
-
-exit /b 0
