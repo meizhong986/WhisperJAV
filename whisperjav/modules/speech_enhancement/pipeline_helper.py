@@ -292,11 +292,16 @@ def enhance_scenes(
                     import torch
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
+                        logger.debug(f"Scene {scene_num}/{total_scenes}: CUDA cache cleared")
                 except ImportError:
                     pass  # torch not available, skip CUDA cleanup
+                except Exception as cuda_err:
+                    # CUDA context may be corrupted - log but continue
+                    logger.debug(f"Scene {scene_num}/{total_scenes}: CUDA cache clear failed: {cuda_err}")
 
-            except Exception:
-                pass  # Non-critical, continue processing
+            except Exception as cleanup_err:
+                # Non-critical, log and continue processing
+                logger.debug(f"Scene {scene_num}/{total_scenes}: cleanup exception: {cleanup_err}")
 
     total_time = time.time() - enhancement_start
     logger.info(f"Enhancement complete: {total_scenes} scenes in {total_time:.1f}s")
