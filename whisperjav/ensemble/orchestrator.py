@@ -405,6 +405,9 @@ class EnsembleOrchestrator:
     ) -> Dict[str, Dict[str, Any]]:
         """Execute a pass inside an isolated worker process."""
 
+        # Get trace file path if tracer is active (ParameterTracer has output_path, NullTracer doesn't)
+        trace_file_path = str(self.tracer.output_path) if hasattr(self.tracer, 'output_path') else None
+
         payload = WorkerPayload(
             pass_number=pass_number,
             media_files=media_files,
@@ -416,6 +419,7 @@ class EnsembleOrchestrator:
             extra_kwargs=self.worker_kwargs,
             language_code=language_code,
             log_level=self.log_level,
+            trace_file_path=trace_file_path,
         )
 
         # Use 'spawn' start method for GPU compatibility across all platforms.

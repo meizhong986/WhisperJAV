@@ -25,6 +25,7 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
 )
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.utils.logger import logger, setup_logger
+from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
 from .utils import resolve_language_code
 
@@ -220,6 +221,7 @@ class WorkerPayload:
     extra_kwargs: Dict[str, Any]
     language_code: str
     log_level: str = "INFO"  # Propagate log level to subprocess workers
+    trace_file_path: Optional[str] = None  # Path for parameter tracer output
 
 
 @dataclass
@@ -300,6 +302,11 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     # (subprocess starts fresh with default INFO level due to 'spawn' context)
     setup_logger("whisperjav", payload.log_level)
 
+    # Create parameter tracer if trace file path is provided
+    # Use append=True since the main process already created the file
+    # JSONL format allows concurrent writers with line-buffered output
+    tracer = create_tracer(payload.trace_file_path, append=True) if payload.trace_file_path else NullTracer()
+
     # Ensure clean GPU state in spawned worker process.
     # This is defensive - 'spawn' gives us a fresh Python interpreter,
     # but explicit cleanup prevents any edge cases with residual GPU state.
@@ -338,6 +345,7 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
             subs_language=payload.subs_language,
             extra_kwargs=payload.extra_kwargs,
             pass_temp_dir=pass_temp_dir,
+            tracer=tracer,
         )
     except Exception:  # pragma: no cover - fatal config issues propagated
         logger.exception("[Worker %s] Failed to initialize pipeline", os.getpid())
@@ -512,6 +520,9 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
 
     logger.info("[Worker %s] Worker exiting", os.getpid())
 
+    # Close tracer to flush any pending writes
+    tracer.close()
+
     return {"results": [r.__dict__ for r in results], "worker_error": None}
 
 
@@ -523,6 +534,7 @@ def _build_pipeline(
     subs_language: str,
     extra_kwargs: Dict[str, Any],
     pass_temp_dir: Path,
+    tracer=None,
 ):
     pipeline_name = pass_config["pipeline"]
     pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
@@ -590,6 +602,7 @@ def _build_pipeline(
                 keep_temp_files=keep_temp_files,
                 progress_display=None,
                 subs_language=subs_language,
+                parameter_tracer=tracer,
                 **hf_defaults,
             )
             logger.debug(
@@ -636,6 +649,7 @@ def _build_pipeline(
         subs_language=subs_language,
         resolved_config=resolved_config,
         progress_display=None,
+        parameter_tracer=tracer,
         **extra_kwargs,
     )
     return pipeline
