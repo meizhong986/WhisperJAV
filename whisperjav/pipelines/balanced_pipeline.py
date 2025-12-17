@@ -36,6 +36,23 @@ from whisperjav.modules.speech_enhancement import (
 # Target sample rate for VAD/ASR (no enhancer case)
 DEFAULT_EXTRACTION_SR = 16000
 
+# =============================================================================
+# IMMORTAL OBJECT PATTERN - Prevents ctranslate2 Destructor Crash
+# =============================================================================
+# The ctranslate2 C++ destructor crashes with Access Violation (0xC0000005) on
+# Windows when explicitly deleted or garbage collected. This is a known issue
+# with the ctranslate2 library's CUDA resource cleanup during Python shutdown.
+#
+# Solution: Store ASR reference here to prevent garbage collection. The Nuclear
+# Exit (os._exit(0)) in pass_worker.py skips Python's cleanup sequence entirely,
+# so the destructor never runs. The OS kernel reclaims all memory on process exit.
+#
+# This variable is intentionally module-level (not class-level) to ensure the
+# reference persists even after the pipeline instance is garbage collected.
+# =============================================================================
+_IMMORTAL_ASR_REFERENCE = None
+
+
 class BalancedPipeline(BasePipeline):
     """Balanced pipeline using scene detection with FasterWhisperPro ASR (faster-whisper via stable-ts, VAD-enhanced)."""
 
@@ -332,14 +349,22 @@ class BalancedPipeline(BasePipeline):
                 master_metadata["config"]["speech_enhancement"] = {"enabled": False}
 
             # =================================================================
-            # PHASE 2: ASR TRANSCRIPTION (Exclusive VRAM Block)
-            # ASR is a LOCAL variable - created after enhancer is destroyed,
-            # and destroyed before function returns.
+            # PHASE 2: ASR TRANSCRIPTION (Exclusive VRAM Block + Immortal Object)
+            # ASR is created after enhancer is destroyed. We store a global
+            # reference to prevent garbage collection - the ctranslate2 C++
+            # destructor crashes on Windows (Access Violation 0xC0000005).
+            # The Nuclear Exit (os._exit(0)) in pass_worker.py handles cleanup.
             # =================================================================
+            global _IMMORTAL_ASR_REFERENCE
 
             # A. Load ONLY the ASR (LOCAL variable, not self.asr)
             logger.info("Initializing ASR model (exclusive VRAM block)")
             asr = FasterWhisperProASR(**self._asr_config)
+
+            # IMMEDIATELY store global reference to prevent ctranslate2 destructor crash
+            # This must happen before ANY code that could raise an exception
+            _IMMORTAL_ASR_REFERENCE = asr
+            logger.debug("ASR stored in _IMMORTAL_ASR_REFERENCE (destructor prevention)")
 
             # Reset statistics after ASR is initialized
             if hasattr(asr, "reset_statistics"):
@@ -529,15 +554,23 @@ class BalancedPipeline(BasePipeline):
                 logprob_filtered = filter_stats.get('logprob_filtered', 0)
                 nonverbal_filtered = filter_stats.get('nonverbal_filtered', 0)
 
-            # C. DESTROY ASR - Trigger C++ destructor while interpreter is STABLE
-            # This prevents the "Zone of Death" crash during Python shutdown
-            logger.debug("Destroying ASR to free VRAM and trigger safe destructor")
-            asr.cleanup()
-            del asr
-            gc.collect()
-            if _torch_available:
-                torch.cuda.empty_cache()
-                logger.debug("GPU memory cleared after ASR - VRAM should be near-zero")
+            # C. ASR CLEANUP INTENTIONALLY SKIPPED (Immortal Object Pattern)
+            # ================================================================
+            # DO NOT call asr.cleanup(), del asr, or gc.collect() here!
+            #
+            # The ctranslate2 C++ destructor crashes with Access Violation
+            # (0xC0000005) on Windows when the WhisperModel is deleted.
+            # This is a known issue with ctranslate2's CUDA resource cleanup.
+            #
+            # Instead, we stored the ASR reference in _IMMORTAL_ASR_REFERENCE
+            # at creation time. This prevents garbage collection. The Nuclear
+            # Exit (os._exit(0)) in pass_worker.py terminates the process
+            # without calling Python destructors - the OS reclaims all memory.
+            #
+            # VRAM stays allocated (~3GB) until process exit, but this is safe
+            # because no other GPU model needs to load after ASR transcription.
+            # ================================================================
+            logger.debug("ASR cleanup skipped (Immortal Object Pattern - Nuclear Exit will handle)")
 
             master_metadata["summary"]["final_subtitles_raw"] += logprob_filtered + nonverbal_filtered
             master_metadata["summary"]["quality_metrics"].update({
