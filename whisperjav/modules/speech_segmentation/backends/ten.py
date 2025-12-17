@@ -66,7 +66,7 @@ class TenSpeechSegmenter:
         elif "chunk_threshold" in kwargs:
             self.chunk_threshold_s = kwargs["chunk_threshold"]
         else:
-            self.chunk_threshold_s = 2.5  # Default (reduced from 4.0 to minimize silence in Whisper input)
+            self.chunk_threshold_s = 0.8  # Default (reduced from 2.5 for tighter grouping)
 
         # Lazy-loaded model
         self._model = None

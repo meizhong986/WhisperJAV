@@ -411,28 +411,31 @@
   },
   "silero_vad_options": {
     "balanced": {
-      "threshold": 0.12,
+      "threshold": 0.25,
       "min_speech_duration_ms": 100,
-      "max_speech_duration_s": 11,
+      "max_speech_duration_s": 6,
       "min_silence_duration_ms": 300,
       "neg_threshold": 0.15,
-      "speech_pad_ms": 400
+      "speech_pad_ms": 400,
+      "chunk_threshold_s": 0.800
     },
     "conservative": {
-      "threshold": 0.25,
+      "threshold": 0.35,
       "min_speech_duration_ms": 150,
-      "max_speech_duration_s": 9,
+      "max_speech_duration_s": 6,
       "min_silence_duration_ms": 300,
-      "neg_threshold": 0.3,
-      "speech_pad_ms": 400
+      "neg_threshold": 0.2,
+      "speech_pad_ms": 400,
+      "chunk_threshold_s": 0.800
     },
     "aggressive": {
-      "threshold": 0.05,
+      "threshold": 0.178,
       "min_speech_duration_ms": 30,
-      "max_speech_duration_s": 14,
+      "max_speech_duration_s": 6,
       "min_silence_duration_ms": 300,
       "neg_threshold": 0.1,
-      "speech_pad_ms": 400
+      "speech_pad_ms": 400,
+      "chunk_threshold_s": 0.800
     }
   },
   "faster_whisper_vad_options": {
