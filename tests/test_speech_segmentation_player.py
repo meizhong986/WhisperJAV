@@ -9,6 +9,10 @@ Usage:
     python tests/test_speech_segmentation_player.py path/to/media.mp4
     python tests/test_speech_segmentation_player.py path/to/audio.wav --backends silero-v4.0 nemo-lite
 
+    # Use production-equivalent VAD parameters (RECOMMENDED for accurate testing):
+    python tests/test_speech_segmentation_player.py path/to/media.mp4 --sensitivity balanced
+    python tests/test_speech_segmentation_player.py path/to/media.mp4 --sensitivity aggressive
+
 Controls:
     SPACE: Play/Stop toggle
     R: Reset to beginning
@@ -20,6 +24,7 @@ Features:
     - Extracts audio from video files automatically
     - Real-time cursor line synchronized with audio playback
     - Click-to-seek functionality
+    - --sensitivity flag to use production-equivalent VAD parameters
 """
 
 import sys
@@ -29,8 +34,8 @@ import tempfile
 import subprocess
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass, asdict, field
 
 import numpy as np
 
@@ -62,6 +67,39 @@ from whisperjav.modules.speech_segmentation.base import (
 )
 from whisperjav.modules.speech_segmentation.factory import SpeechSegmenterFactory
 
+# Import config system for production-equivalent parameters
+from whisperjav.config.transcription_tuner import TranscriptionTuner
+
+
+def load_production_vad_config(sensitivity: str) -> Dict[str, Any]:
+    """
+    Load VAD parameters from production config (asr_config.json).
+
+    This ensures the test uses the same parameter values that would be
+    used when running whisperjav with --sensitivity <sensitivity>.
+
+    Args:
+        sensitivity: One of 'conservative', 'balanced', 'aggressive'
+
+    Returns:
+        Dict of VAD parameters matching production config
+    """
+    try:
+        tuner = TranscriptionTuner()
+        config = tuner.config
+
+        # Get silero_vad_options for the given sensitivity
+        # This is what balanced/fidelity pipelines use
+        if 'silero_vad_options' in config and sensitivity in config['silero_vad_options']:
+            vad_params = config['silero_vad_options'][sensitivity].copy()
+            return vad_params
+        else:
+            print(f"  Warning: silero_vad_options/{sensitivity} not found in config")
+            return {}
+    except Exception as e:
+        print(f"  Warning: Failed to load production config: {e}")
+        return {}
+
 
 @dataclass
 class BackendResult:
@@ -75,7 +113,9 @@ class BackendResult:
     num_segments: int
     num_groups: int
     speech_coverage_ratio: float
-    segments: List[Dict[str, float]]  # [{start_sec, end_sec}, ...]
+    segments: List[Dict[str, float]]  # [{start_sec, end_sec, confidence}, ...]
+    parameters: Dict[str, Any] = field(default_factory=dict)  # Backend configuration parameters
+    method: Optional[str] = None  # Method used (e.g., "nemo-lite:frame_vad")
 
 
 class PlaybackState:
@@ -239,9 +279,20 @@ def run_backend(
     backend_name: str,
     audio_data: np.ndarray,
     sample_rate: int,
-    timeout_sec: int = 120
+    timeout_sec: int = 120,
+    vad_config: Optional[Dict[str, Any]] = None
 ) -> BackendResult:
-    """Run a single backend and return results."""
+    """Run a single backend and return results.
+
+    Args:
+        backend_name: Name of the backend to run
+        audio_data: Audio data as numpy array
+        sample_rate: Sample rate of audio
+        timeout_sec: Timeout in seconds
+        vad_config: Optional VAD configuration from production config.
+                   If provided, these parameters are passed to the factory
+                   to create the segmenter with production-equivalent settings.
+    """
     import threading
     import queue
 
@@ -259,24 +310,43 @@ def run_backend(
             num_segments=0,
             num_groups=0,
             speech_coverage_ratio=0.0,
-            segments=[]
+            segments=[],
+            parameters={},
+            method=None
         )
 
     result_queue = queue.Queue()
 
     def _run_segmentation():
         try:
-            segmenter = SpeechSegmenterFactory.create(backend_name)
+            # Create segmenter with optional production config
+            # vad_config contains parameters like threshold, min_speech_duration_ms, etc.
+            if vad_config:
+                segmenter = SpeechSegmenterFactory.create(backend_name, config=vad_config)
+            else:
+                segmenter = SpeechSegmenterFactory.create(backend_name)
             display_name = segmenter.display_name
+
+            # Get parameters BEFORE running (captures the preset values)
+            parameters = {}
+            if hasattr(segmenter, '_get_parameters'):
+                parameters = segmenter._get_parameters()
 
             start_time = time.time()
             result = segmenter.segment(audio_data, sample_rate=sample_rate)
             elapsed = time.time() - start_time
 
             segments = [
-                {"start_sec": seg.start_sec, "end_sec": seg.end_sec}
+                {"start_sec": seg.start_sec, "end_sec": seg.end_sec, "confidence": seg.confidence}
                 for seg in result.segments
             ]
+
+            # Get method from result (e.g., "nemo-lite:frame_vad")
+            method = result.method if hasattr(result, 'method') else backend_name
+
+            # Also capture parameters from result if available (may have additional info)
+            if hasattr(result, 'parameters') and result.parameters:
+                parameters.update(result.parameters)
 
             segmenter.cleanup()
 
@@ -290,7 +360,9 @@ def run_backend(
                 num_segments=result.num_segments,
                 num_groups=result.num_groups,
                 speech_coverage_ratio=result.speech_coverage_ratio,
-                segments=segments
+                segments=segments,
+                parameters=parameters,
+                method=method
             ))
         except Exception as e:
             result_queue.put(BackendResult(
@@ -303,7 +375,9 @@ def run_backend(
                 num_segments=0,
                 num_groups=0,
                 speech_coverage_ratio=0.0,
-                segments=[]
+                segments=[],
+                parameters={},
+                method=None
             ))
 
     thread = threading.Thread(target=_run_segmentation, daemon=True)
@@ -321,7 +395,9 @@ def run_backend(
             num_segments=0,
             num_groups=0,
             speech_coverage_ratio=0.0,
-            segments=[]
+            segments=[],
+            parameters={},
+            method=None
         )
 
     try:
@@ -337,7 +413,9 @@ def run_backend(
             num_segments=0,
             num_groups=0,
             speech_coverage_ratio=0.0,
-            segments=[]
+            segments=[],
+            parameters={},
+            method=None
         )
 
 
@@ -345,19 +423,43 @@ def run_all_backends(
     audio_data: np.ndarray,
     sample_rate: int,
     backends: Optional[List[str]] = None,
-    timeout_sec: int = 120
+    timeout_sec: int = 120,
+    vad_config: Optional[Dict[str, Any]] = None,
+    sensitivity: Optional[str] = None
 ) -> Dict[str, BackendResult]:
-    """Run all specified backends and return results."""
+    """Run all specified backends and return results.
+
+    Args:
+        audio_data: Audio data as numpy array
+        sample_rate: Sample rate of audio
+        backends: List of backend names to test
+        timeout_sec: Timeout per backend in seconds
+        vad_config: Optional VAD configuration from production config
+        sensitivity: Sensitivity level used (for display purposes)
+    """
 
     if backends is None:
+        # Include nemo-lite for testing (even though it may not be installed by default)
         backends = ["silero-v4.0", "silero-v3.1", "nemo-lite", "whisper-vad", "ten", "none"]
-        print("  Note: whisper-vad (~500MB) downloads models on first run")
+        print("  Note: whisper-vad (~500MB) and nemo-lite (~500MB) download models on first run")
+
+    if vad_config:
+        print(f"  Using production config for Silero backends (sensitivity={sensitivity or 'custom'}):")
+        for key, value in sorted(vad_config.items()):
+            print(f"    {key}: {value}")
+        print("  Note: TEN, nemo-lite, whisper-vad use their own defaults")
+        print()
 
     results = {}
 
+    # VAD config from asr_config.json only applies to Silero backends
+    silero_backends = {"silero-v4.0", "silero-v3.1", "silero"}
+
     for backend_name in backends:
         print(f"  Testing {backend_name}...", end=" ", flush=True)
-        result = run_backend(backend_name, audio_data, sample_rate, timeout_sec=timeout_sec)
+        # Only pass vad_config to Silero backends (TEN and others use their own defaults)
+        backend_config = vad_config if backend_name in silero_backends else None
+        result = run_backend(backend_name, audio_data, sample_rate, timeout_sec=timeout_sec, vad_config=backend_config)
         results[backend_name] = result
 
         if result.success:
@@ -370,6 +472,113 @@ def run_all_backends(
             print(f"FAIL: {result.error}")
 
     return results
+
+
+def save_results_to_json(
+    results: Dict[str, BackendResult],
+    output_path: Path,
+    media_file: Path,
+    audio_duration: float,
+    sample_rate: int,
+    ground_truth: List[Dict[str, float]] = None,
+    sensitivity: Optional[str] = None,
+    vad_config: Optional[Dict[str, Any]] = None
+) -> None:
+    """
+    Save all test results to a JSON file for later review.
+
+    Args:
+        results: Backend results from run_all_backends
+        output_path: Path to save JSON file
+        media_file: Original media file path
+        audio_duration: Duration of audio in seconds
+        sample_rate: Audio sample rate
+        ground_truth: Optional ground truth segments from SRT
+        sensitivity: Sensitivity level used (if any)
+        vad_config: VAD configuration used (from production config)
+    """
+    import json
+    from datetime import datetime
+
+    # Build comprehensive output structure
+    output = {
+        "metadata": {
+            "timestamp": datetime.now().isoformat(),
+            "media_file": str(media_file),
+            "audio_duration_sec": audio_duration,
+            "sample_rate": sample_rate,
+            "test_version": "1.7.3",
+            "sensitivity": sensitivity,
+            "vad_config_used": vad_config or {},
+        },
+        "ground_truth": {
+            "source": str(ground_truth) if ground_truth else None,
+            "num_segments": len(ground_truth) if ground_truth else 0,
+            "segments": ground_truth if ground_truth else [],
+        },
+        "backends": {}
+    }
+
+    # Add each backend result
+    for name, result in results.items():
+        backend_data = {
+            "name": result.name,
+            "display_name": result.display_name,
+            "available": result.available,
+            "success": result.success,
+            "error": result.error,
+            "method": result.method,
+            "processing_time_sec": result.processing_time_sec,
+            "num_segments": result.num_segments,
+            "num_groups": result.num_groups,
+            "speech_coverage_ratio": result.speech_coverage_ratio,
+            "parameters": result.parameters or {},
+            "segments": result.segments,
+        }
+        output["backends"][name] = backend_data
+
+    # Write JSON file
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+
+    print(f"\nResults saved to: {output_path}")
+
+
+def print_parameters_summary(results: Dict[str, BackendResult]) -> None:
+    """Print detailed parameter presets for each backend."""
+    print("\n" + "=" * 70)
+    print("BACKEND PARAMETER PRESETS")
+    print("=" * 70)
+
+    for name, result in results.items():
+        if not result.available:
+            print(f"\n{result.display_name or name}: NOT AVAILABLE")
+            continue
+
+        print(f"\n{result.display_name or name}:")
+        print(f"  Backend name: {result.name}")
+        if result.method:
+            print(f"  Method used: {result.method}")
+        print(f"  Status: {'SUCCESS' if result.success else 'FAILED'}")
+
+        if result.error:
+            print(f"  Error: {result.error}")
+
+        if result.parameters:
+            print("  Parameters:")
+            for key, value in sorted(result.parameters.items()):
+                print(f"    {key}: {value}")
+        else:
+            print("  Parameters: (none captured)")
+
+        if result.success:
+            print(f"  Results:")
+            print(f"    Segments: {result.num_segments}")
+            print(f"    Groups: {result.num_groups}")
+            print(f"    Coverage: {result.speech_coverage_ratio:.1%}")
+            print(f"    Time: {result.processing_time_sec:.2f}s")
+
+    print("\n" + "=" * 70)
 
 
 def add_cursor_lines(axes: List, duration: float) -> List:
@@ -718,9 +927,21 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+    # Basic usage (uses backend defaults, NOT production parameters)
     python tests/test_speech_segmentation_player.py video.mp4
+
+    # RECOMMENDED: Use production-equivalent VAD parameters
+    python tests/test_speech_segmentation_player.py video.mp4 --sensitivity balanced
+    python tests/test_speech_segmentation_player.py video.mp4 --sensitivity aggressive
+
+    # Test specific backends
     python tests/test_speech_segmentation_player.py audio.wav --backends silero-v4.0 nemo-lite
-    python tests/test_speech_segmentation_player.py video.mp4 --srt subtitles.srt
+
+    # Compare with ground truth SRT
+    python tests/test_speech_segmentation_player.py video.mp4 --srt subtitles.srt --sensitivity balanced
+
+    # Non-interactive (just save results)
+    python tests/test_speech_segmentation_player.py video.mp4 --no-player --sensitivity balanced
 
 Controls:
     SPACE: Play/Stop toggle
@@ -768,6 +989,27 @@ Controls:
         type=Path,
         default=None,
         help="Path to SRT subtitle file for ground truth comparison"
+    )
+
+    parser.add_argument(
+        "--output-json", "-o",
+        type=Path,
+        default=None,
+        help="Save results to JSON file for later review"
+    )
+
+    parser.add_argument(
+        "--no-player",
+        action="store_true",
+        help="Skip interactive player, just run tests and save results"
+    )
+
+    parser.add_argument(
+        "--sensitivity", "-s",
+        choices=["conservative", "balanced", "aggressive"],
+        default=None,
+        help="Use production VAD parameters for this sensitivity level. "
+             "If not specified, uses backend defaults (which may differ from production)."
     )
 
     args = parser.parse_args()
@@ -829,13 +1071,32 @@ Controls:
     print(f"Audio: {duration:.2f}s @ {sample_rate} Hz ({len(audio_data):,} samples)")
     print()
 
+    # Load production VAD config if sensitivity specified
+    vad_config = None
+    if args.sensitivity:
+        print(f"Loading production config for sensitivity: {args.sensitivity}")
+        vad_config = load_production_vad_config(args.sensitivity)
+        if not vad_config:
+            print("  Warning: Failed to load production config, using backend defaults")
+        print()
+    else:
+        print("Note: Using backend defaults (no --sensitivity specified)")
+        print("      To use production-equivalent parameters, add --sensitivity balanced")
+        print()
+
     # Run all backends
     print("Running backends:")
-    results = run_all_backends(audio_data, sample_rate, args.backends, args.timeout)
+    results = run_all_backends(
+        audio_data, sample_rate, args.backends, args.timeout,
+        vad_config=vad_config, sensitivity=args.sensitivity
+    )
+
+    # Print detailed parameter presets for each backend
+    print_parameters_summary(results)
 
     # Print summary
     print("\n" + "=" * 60)
-    print("SUMMARY")
+    print("RESULTS SUMMARY")
     print("=" * 60)
     for name, result in results.items():
         if result.success:
@@ -846,18 +1107,52 @@ Controls:
             print(f"  {name}: Failed - {result.error}")
     print("=" * 60)
 
-    # Launch interactive player
-    print("\nLaunching interactive player...")
-    print("Controls: SPACE=Play/Stop, R=Reset, Click=Seek, Q=Quit")
-    print()
+    # Save results to JSON if requested
+    if args.output_json:
+        # Auto-generate filename if directory provided
+        output_path = args.output_json
+        if output_path.is_dir():
+            output_path = output_path / f"segmentation_test_{args.media_file.stem}.json"
 
-    create_interactive_player(
-        audio_data,
-        sample_rate,
-        results,
-        title=f"Speech Segmentation: {args.media_file.name}",
-        ground_truth=ground_truth
-    )
+        save_results_to_json(
+            results=results,
+            output_path=output_path,
+            media_file=args.media_file,
+            audio_duration=duration,
+            sample_rate=sample_rate,
+            ground_truth=ground_truth,
+            sensitivity=args.sensitivity,
+            vad_config=vad_config
+        )
+    else:
+        # Auto-save alongside media file
+        auto_json_path = args.media_file.parent / f"{args.media_file.stem}_segmentation_test.json"
+        save_results_to_json(
+            results=results,
+            output_path=auto_json_path,
+            media_file=args.media_file,
+            audio_duration=duration,
+            sample_rate=sample_rate,
+            ground_truth=ground_truth,
+            sensitivity=args.sensitivity,
+            vad_config=vad_config
+        )
+
+    # Launch interactive player (unless --no-player)
+    if not args.no_player:
+        print("\nLaunching interactive player...")
+        print("Controls: SPACE=Play/Stop, R=Reset, Click=Seek, Q=Quit")
+        print()
+
+        create_interactive_player(
+            audio_data,
+            sample_rate,
+            results,
+            title=f"Speech Segmentation: {args.media_file.name}",
+            ground_truth=ground_truth
+        )
+    else:
+        print("\nSkipping interactive player (--no-player)")
 
     # Cleanup temp file if we created one
     if not is_audio and audio_path.exists():
