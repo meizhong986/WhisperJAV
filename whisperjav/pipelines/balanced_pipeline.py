@@ -343,8 +343,13 @@ class BalancedPipeline(BasePipeline):
                     del enhancer
                     gc.collect()
                     if _torch_available:
-                        torch.cuda.empty_cache()
-                        logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
+                        try:
+                            torch.cuda.empty_cache()
+                            logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
+                        except Exception as e:
+                            # CUDA context may be corrupted from prior OOM during enhancement
+                            # Log and continue - ASR phase will either work (fresh allocation) or fail explicitly
+                            logger.warning(f"CUDA cache clear failed after enhancement: {e}")
             else:
                 master_metadata["config"]["speech_enhancement"] = {"enabled": False}
 
