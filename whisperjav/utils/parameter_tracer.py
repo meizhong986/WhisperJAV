@@ -32,7 +32,8 @@ class ParameterTracer:
     def __init__(self, output_path: Union[str, Path],
                  buffer_size: int = 1,
                  include_timestamps: bool = True,
-                 include_elapsed: bool = True):
+                 include_elapsed: bool = True,
+                 append: bool = False):
         """
         Initialize the parameter tracer.
 
@@ -41,6 +42,7 @@ class ParameterTracer:
             buffer_size: Line buffer size (1 = immediate flush for real-time viewing)
             include_timestamps: Include ISO timestamp in each record
             include_elapsed: Include elapsed time since tracer start
+            append: If True, append to existing file (for subprocess workers)
         """
         self.output_path = Path(output_path)
         self.include_timestamps = include_timestamps
@@ -49,19 +51,23 @@ class ParameterTracer:
         self._lock = threading.Lock()
         self._closed = False
         self._stage_timers: Dict[str, float] = {}
+        self._append_mode = append
 
         # Ensure parent directory exists
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Open file with line buffering for real-time streaming
-        self._file = open(self.output_path, 'w', encoding='utf-8', buffering=buffer_size)
+        # Use append mode for subprocess workers to avoid overwriting main process output
+        file_mode = 'a' if append else 'w'
+        self._file = open(self.output_path, file_mode, encoding='utf-8', buffering=buffer_size)
 
-        # Emit initialization record
-        self._emit_internal("tracer_init", {
-            "version": "1.0",
-            "output_path": str(self.output_path),
-            "start_time": datetime.now().isoformat()
-        })
+        # Only emit initialization record if creating new file (not appending)
+        if not append:
+            self._emit_internal("tracer_init", {
+                "version": "1.0",
+                "output_path": str(self.output_path),
+                "start_time": datetime.now().isoformat()
+            })
 
     def emit(self, stage: str, params: Dict[str, Any],
              level: str = "info",
@@ -352,16 +358,17 @@ class NullTracer:
         pass
 
 
-def create_tracer(output_path: Optional[str] = None) -> Union[ParameterTracer, NullTracer]:
+def create_tracer(output_path: Optional[str] = None, append: bool = False) -> Union[ParameterTracer, NullTracer]:
     """
     Factory function to create appropriate tracer.
 
     Args:
         output_path: Path for trace output, or None for NullTracer
+        append: If True, append to existing file (for subprocess workers)
 
     Returns:
         ParameterTracer if path provided, NullTracer otherwise
     """
     if output_path:
-        return ParameterTracer(output_path)
+        return ParameterTracer(output_path, append=append)
     return NullTracer()
