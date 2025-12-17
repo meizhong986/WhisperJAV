@@ -112,16 +112,18 @@ if %TEST1_RESULT% EQU 0 (
 )
 
 REM ============================================================================
-REM TEST 2: Balanced + Balanced, Silero v3.1, ClearVoice Enhancer
+REM TEST 2: Balanced + Balanced, Silero v3.1, ClearVoice 16kHz Enhancer
+REM NOTE: Using FRCRN_SE_16K instead of MossFormer2_SE_48K due to VRAM
+REM       fragmentation issues on 8GB GPUs. See docs/known_issues/
 REM ============================================================================
 echo.
 echo ============================================================================
 echo TEST 2: Pass1=balanced, Pass2=balanced
-echo         Segmenter: silero-v3.1, Enhancer: clearvoice
+echo         Segmenter: silero-v3.1, Enhancer: clearvoice (16kHz)
 echo ============================================================================
 echo.
 
-set "TEST_NAME=test2_balanced_balanced_silero31_clearvoice"
+set "TEST_NAME=test2_balanced_balanced_silero31_clearvoice16k"
 set "TEST_RUN_ID=%TEST_NAME%_%TEST_BASENAME%"
 
 REM Step 2a: Dump parameters
@@ -131,7 +133,7 @@ whisperjav "%TEST_FILE%" ^
     --pass1-pipeline balanced ^
     --pass1-sensitivity aggressive ^
     --pass1-speech-segmenter silero-v3.1 ^
-    --pass1-speech-enhancer clearvoice ^
+    --pass1-speech-enhancer clearvoice:FRCRN_SE_16K ^
     --pass2-pipeline balanced ^
     --pass2-sensitivity balanced ^
     --pass2-speech-segmenter silero-v3.1 ^
@@ -147,7 +149,7 @@ whisperjav "%TEST_FILE%" ^
     --pass1-pipeline balanced ^
     --pass1-sensitivity aggressive ^
     --pass1-speech-segmenter silero-v3.1 ^
-    --pass1-speech-enhancer clearvoice ^
+    --pass1-speech-enhancer clearvoice:FRCRN_SE_16K ^
     --pass2-pipeline balanced ^
     --pass2-sensitivity balanced ^
     --pass2-speech-segmenter silero-v3.1 ^
@@ -318,7 +320,7 @@ echo Results saved to: %OUTPUT_DIR%
 echo.
 echo Test Results:
 echo   TEST 1 (balanced+fidelity, silero-v4.0, none):       %TEST1_RESULT%
-echo   TEST 2 (balanced+balanced, silero-v3.1, clearvoice): %TEST2_RESULT%
+echo   TEST 2 (balanced+balanced, silero-v3.1, clearvoice-16k): %TEST2_RESULT%
 echo   TEST 3 (fidelity+balanced, ten, ffmpeg-dsp):         %TEST3_RESULT%
 echo   TEST 4 (transformers+balanced, whisper-vad, zip):    %TEST4_RESULT%
 echo.

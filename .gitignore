@@ -45,6 +45,7 @@ Thumbs.db
 test_media/
 test_output/
 docs/
+!docs/known_issues/
 .plan/
 temp/
 output/
