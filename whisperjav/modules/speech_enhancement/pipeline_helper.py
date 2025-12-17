@@ -31,6 +31,7 @@ Usage in pipelines:
 
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
+import gc
 import logging
 import time
 import soundfile as sf
@@ -263,6 +264,40 @@ def enhance_scenes(
             )
             enhanced_paths.append((scene_path, start_sec, end_sec, dur_sec))
 
+        finally:
+            # Aggressive memory cleanup for 8GB VRAM GPUs
+            # PyTorch's memory caching allocator holds onto CUDA memory between
+            # loop iterations, causing OOM on scene 8+ if not explicitly released.
+            # This cleanup ensures bounded memory usage regardless of scene count.
+            try:
+                # Delete references to large arrays/tensors
+                try:
+                    del audio_data
+                except NameError:
+                    pass
+                try:
+                    del enhanced_audio
+                except NameError:
+                    pass
+                try:
+                    del result
+                except NameError:
+                    pass
+
+                # Force Python garbage collection to release tensor references
+                gc.collect()
+
+                # Return PyTorch's cached memory to CUDA driver
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except ImportError:
+                    pass  # torch not available, skip CUDA cleanup
+
+            except Exception:
+                pass  # Non-critical, continue processing
+
     total_time = time.time() - enhancement_start
     logger.info(f"Enhancement complete: {total_scenes} scenes in {total_time:.1f}s")
 
@@ -333,3 +368,28 @@ def enhance_single_audio(
     except Exception as e:
         logger.warning(f"Audio enhancement error: {e}. Using original.")
         return audio_path
+
+    finally:
+        # Memory cleanup after enhancement
+        try:
+            try:
+                del audio_data
+            except NameError:
+                pass
+            try:
+                del enhanced_audio
+            except NameError:
+                pass
+            try:
+                del result
+            except NameError:
+                pass
+            gc.collect()
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except ImportError:
+                pass
+        except Exception:
+            pass
