@@ -159,6 +159,30 @@ class ParameterTracer:
             "word_timestamps": params.get("word_timestamps", True)
         })
 
+    def emit_transcribe_params(self, params: Dict[str, Any],
+                                audio_info: Optional[Dict[str, Any]] = None,
+                                context: Optional[str] = None) -> None:
+        """
+        Emit the exact parameters passed to transcribe() method.
+
+        This captures the full parameters dictionary right before the
+        transcribe() call, enabling verification of actual execution values.
+
+        Args:
+            params: The complete parameters dictionary passed to transcribe()
+            audio_info: Optional audio metadata (path, duration, sample_rate)
+            context: Optional context string (e.g., "scene_3", "chunk_2")
+        """
+        record = {
+            "transcribe_params": params,
+        }
+        if audio_info:
+            record["audio_info"] = audio_info
+        if context:
+            record["context"] = context
+
+        self.emit("transcribe_call", record)
+
     def emit_asr_progress(self, scene_number: int, total_scenes: int,
                           duration: float, segments_found: int) -> None:
         """Emit ASR progress for a scene."""
@@ -300,6 +324,9 @@ class NullTracer:
         pass
 
     def emit_asr_config(self, *args, **kwargs) -> None:
+        pass
+
+    def emit_transcribe_params(self, *args, **kwargs) -> None:
         pass
 
     def emit_asr_progress(self, *args, **kwargs) -> None:

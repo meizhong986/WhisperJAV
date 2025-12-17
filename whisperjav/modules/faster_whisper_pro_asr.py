@@ -21,6 +21,7 @@ import logging
 
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 
@@ -28,7 +29,7 @@ from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 class FasterWhisperProASR:
     """Faster-Whisper ASR (direct API) using Speech Segmenter for speech detection."""
 
-    def __init__(self, model_config: Dict, params: Dict, task: str):
+    def __init__(self, model_config: Dict, params: Dict, task: str, tracer=None):
         """
         Initializes FasterWhisperPro ASR with structured v3 config parameters.
 
@@ -36,7 +37,10 @@ class FasterWhisperProASR:
             model_config: The 'model' section from the resolved config.
             params: The 'params' section containing decoder, vad, and provider settings.
             task: The ASR task to perform ('transcribe' or 'translate').
+            tracer: Optional parameter tracer for capturing transcribe() params.
         """
+        # Parameter tracer for capturing transcribe() call parameters
+        self.tracer = tracer if tracer is not None else NullTracer()
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA → MPS → CPU
@@ -516,6 +520,18 @@ class FasterWhisperProASR:
         # Get cleaned parameters from tuner
         whisper_params = self._prepare_whisper_params()
 
+        # Trace transcribe() parameters for diagnostic visibility
+        self.tracer.emit_transcribe_params(
+            params=whisper_params,
+            audio_info={
+                "duration_sec": duration,
+                "sample_rate": sample_rate,
+                "shape": str(audio_data.shape),
+                "dtype": str(audio_data.dtype),
+            },
+            context="full_audio"
+        )
+
         try:
             # faster-whisper returns (generator, info) tuple
             segments_generator, transcription_info = self.whisper_model.transcribe(
@@ -576,6 +592,20 @@ class FasterWhisperProASR:
         logger.debug(f"  Whisper params keys: {list(whisper_params.keys())}")
         logger.debug(f"  Full whisper params: {whisper_params}")
         logger.debug("=" * 60)
+
+        # Trace transcribe() parameters for diagnostic visibility
+        self.tracer.emit_transcribe_params(
+            params=whisper_params,
+            audio_info={
+                "duration_sec": end_sec - start_sec,
+                "start_sec": start_sec,
+                "end_sec": end_sec,
+                "sample_rate": sample_rate,
+                "shape": str(group_audio.shape),
+                "dtype": str(group_audio.dtype),
+            },
+            context=f"vad_group_{start_sec:.2f}s-{end_sec:.2f}s"
+        )
 
         try:
             # DIAGNOSTIC: Log exact transcribe call

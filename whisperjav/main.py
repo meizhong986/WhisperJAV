@@ -1295,7 +1295,8 @@ def main():
                 temp_dir=args.temp_dir,
                 keep_temp_files=args.keep_temp,
                 subs_language=args.subs_language,
-                parameter_tracer=tracer
+                parameter_tracer=tracer,
+                log_level=log_level,
             )
 
             # Process all files with batch processing for optimal VRAM usage

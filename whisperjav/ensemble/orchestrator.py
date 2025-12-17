@@ -29,6 +29,7 @@ class EnsembleOrchestrator:
         keep_temp_files: bool = False,
         subs_language: str = 'native',
         progress_display=None,
+        log_level: str = "INFO",
         **kwargs
     ):
         """
@@ -40,6 +41,7 @@ class EnsembleOrchestrator:
             keep_temp_files: Whether to keep intermediate files
             subs_language: Language for subtitles ('native' or 'direct-to-english')
             progress_display: Progress display object
+            log_level: Log level to propagate to subprocess workers
             **kwargs: Additional parameters passed to pipelines
         """
         self.output_dir = Path(output_dir)
@@ -47,6 +49,7 @@ class EnsembleOrchestrator:
         self.keep_temp_files = keep_temp_files
         self.subs_language = subs_language
         self.progress_display = progress_display
+        self.log_level = log_level
         self.extra_kwargs = kwargs
         self.worker_kwargs = self._filter_picklable_kwargs(kwargs)
 
@@ -412,6 +415,7 @@ class EnsembleOrchestrator:
             subs_language=self.subs_language,
             extra_kwargs=self.worker_kwargs,
             language_code=language_code,
+            log_level=self.log_level,
         )
 
         # Use 'spawn' start method for GPU compatibility across all platforms.

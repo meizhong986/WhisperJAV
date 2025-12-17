@@ -113,7 +113,8 @@ class BalancedPipeline(BasePipeline):
         self.asr = FasterWhisperProASR(
             model_config=effective_model_cfg,
             params=params,
-            task=task
+            task=task,
+            tracer=self.tracer
         )
 
         self.stitcher = SRTStitcher()
