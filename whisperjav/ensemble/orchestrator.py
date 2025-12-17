@@ -621,9 +621,21 @@ class EnsembleOrchestrator:
         return summary_path
 
     def _filter_picklable_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove objects that cannot be pickled before sending to subprocesses."""
+        """Remove objects that cannot be pickled before sending to subprocesses.
+
+        Also excludes 'parameter_tracer' which is handled separately via
+        trace_file_path in the WorkerPayload. The worker creates its own
+        tracer from the file path, so passing the tracer object would cause
+        'got multiple values for keyword argument' errors.
+        """
+        # Keys to always exclude (handled separately or cause duplicate kwarg errors)
+        excluded_keys = {'parameter_tracer', 'progress_display'}
+
         safe_kwargs = {}
         for key, value in kwargs.items():
+            if key in excluded_keys:
+                logger.debug("Excluding kwarg '%s' from worker (handled separately)", key)
+                continue
             try:
                 pickle.dumps(value)
             except Exception:
