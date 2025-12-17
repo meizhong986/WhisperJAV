@@ -28,6 +28,7 @@ env/
 # Test outputs
 tests/test_outputs/
 tests/temp/
+test_results/
 *.log
 
 # IDE

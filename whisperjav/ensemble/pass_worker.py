@@ -292,8 +292,79 @@ def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     return params
 
 
-def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
-    """Entry point executed in a separate process for a single pass."""
+def _write_dropbox_and_exit(result_file: str, result: Dict[str, Any], tracer, exit_code: int) -> None:
+    """
+    Write result to Drop-Box file and perform Nuclear Exit.
+
+    This helper function:
+    1. Flushes the tracer (if active)
+    2. Flushes all logging handlers
+    3. Writes the result to the Drop-Box file
+    4. Calls os._exit() to skip Python's shutdown sequence
+
+    The Nuclear Exit prevents ctranslate2 C++ destructors from running
+    during Python interpreter shutdown, which crashes on Windows.
+
+    Args:
+        result_file: Path to write the pickled result
+        result: Dictionary to pickle (results + worker_error)
+        tracer: Parameter tracer to flush
+        exit_code: Exit code (0=success, 1=error)
+    """
+    import pickle
+    import logging
+
+    try:
+        # 1. Flush tracer (JSONL file handler)
+        if tracer is not None:
+            try:
+                tracer.close()
+            except Exception:
+                pass  # Non-critical
+
+        # 2. Flush all logging handlers
+        # This ensures we see all logs before the process dies
+        try:
+            logging.shutdown()
+        except Exception:
+            pass  # Non-critical
+
+        # 3. Write result to Drop-Box
+        with open(result_file, 'wb') as f:
+            pickle.dump(result, f)
+
+        logger.debug("[Worker %s] Drop-Box written: %s", os.getpid(), result_file)
+
+    except Exception as e:
+        # If we can't write the Drop-Box, log and exit with error
+        try:
+            logger.error("[Worker %s] Failed to write Drop-Box: %s", os.getpid(), e)
+            logging.shutdown()
+        except Exception:
+            pass
+        exit_code = 1
+
+    # 4. NUCLEAR EXIT - Skip Python shutdown sequence
+    # This prevents ctranslate2 C++ destructor from crashing
+    os._exit(exit_code)
+
+
+def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
+    """
+    Entry point executed in a separate process for a single pass.
+
+    IMPORTANT: This function uses the "Drop-Box + Nuclear Exit" pattern.
+    - Results are written to `result_file` (pickle format) instead of returned
+    - Process exits via os._exit(0) to skip Python's shutdown sequence
+    - This prevents ctranslate2 C++ destructor crashes on Windows
+
+    Args:
+        payload: WorkerPayload with all processing configuration
+        result_file: Path where results will be pickled (the "Drop-Box")
+    """
+    import pickle
+    import logging
+
     # Mark this as a subprocess worker - cleanup routines can check this
     # to skip risky CUDA operations that can crash on Windows
     os.environ['WHISPERJAV_SUBPROCESS_WORKER'] = '1'
@@ -332,7 +403,8 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     )
 
     if not media_files:
-        return {"results": [], "worker_error": None}
+        # Write empty result to Drop-Box and exit
+        _write_dropbox_and_exit(result_file, {"results": [], "worker_error": None}, tracer, 0)
 
     pass_temp_dir = Path(payload.temp_dir) / f"pass{pass_number}_worker"
 
@@ -351,7 +423,8 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
         logger.exception("[Worker %s] Failed to initialize pipeline", os.getpid())
         if not payload.keep_temp_files and pass_temp_dir.exists():
             shutil.rmtree(pass_temp_dir, ignore_errors=True)
-        return {
+        # Write error to Drop-Box and exit
+        error_result = {
             "results": [
                 FileResult(
                     basename=info["basename"],
@@ -362,6 +435,7 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
             ],
             "worker_error": traceback.format_exc(),
         }
+        _write_dropbox_and_exit(result_file, error_result, tracer, 1)
 
     try:
         for media_info in media_files:
@@ -518,12 +592,11 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
             os.getpid(), pass_number, failed_count
         )
 
-    logger.info("[Worker %s] Worker exiting", os.getpid())
+    logger.info("[Worker %s] Worker exiting via Nuclear Exit", os.getpid())
 
-    # Close tracer to flush any pending writes
-    tracer.close()
-
-    return {"results": [r.__dict__ for r in results], "worker_error": None}
+    # Write result to Drop-Box and Nuclear Exit
+    final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
+    _write_dropbox_and_exit(result_file, final_result, tracer, 0)
 
 
 def _build_pipeline(

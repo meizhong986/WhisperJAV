@@ -36,6 +36,9 @@ from whisperjav.modules.speech_enhancement import (
     enhance_single_audio,
 )
 
+# Target sample rate for VAD/ASR (no enhancer case)
+DEFAULT_EXTRACTION_SR = 16000
+
 
 class TransformersPipeline(BasePipeline):
     """
@@ -140,14 +143,34 @@ class TransformersPipeline(BasePipeline):
         else:
             self.lang_code = hf_language
 
-        # Initialize speech enhancer (if enabled)
-        self.speech_enhancer = create_enhancer_direct(
-            backend=hf_speech_enhancer,
-            model=hf_speech_enhancer_model
-        )
+        # =================================================================
+        # SCOPE-BASED RESOURCE MANAGEMENT (v1.7.3+)
+        # GPU models are NOT created in __init__. We store CONFIGS only.
+        # Models are created as LOCAL VARIABLES inside process() and
+        # explicitly destroyed after use to prevent VRAM overlap.
+        # =================================================================
 
-        # Determine extraction sample rate based on enhancer
-        extraction_sr = get_extraction_sample_rate(self.speech_enhancer)
+        # Speech enhancement CONFIG (model created in process())
+        self._enhancer_config = {
+            'backend': hf_speech_enhancer,
+            'model': hf_speech_enhancer_model
+        }
+
+        # Determine extraction sample rate based on enhancer config
+        # We check config to see if enhancement is enabled, without loading the model
+        if hf_speech_enhancer and hf_speech_enhancer != "none":
+            # Enhancement enabled - extract at enhancer's preferred rate
+            if hf_speech_enhancer == "clearvoice":
+                extraction_sr = 48000  # MossFormer2_SE_48K default
+            elif hf_speech_enhancer == "bs-roformer":
+                extraction_sr = 44100  # BS-RoFormer native rate
+            else:
+                extraction_sr = DEFAULT_EXTRACTION_SR
+            self._enhancement_enabled = True
+        else:
+            extraction_sr = DEFAULT_EXTRACTION_SR
+            self._enhancement_enabled = False
+
         self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
 
         # Scene detector (only if enabled)
@@ -156,21 +179,22 @@ class TransformersPipeline(BasePipeline):
             from whisperjav.modules.scene_detection import DynamicSceneDetector
             self.scene_detector = DynamicSceneDetector(method=self.scene_method)
 
-        # ASR module (lazy loaded)
-        self.asr = TransformersASR(
-            model_id=hf_model_id,
-            device=hf_device,
-            dtype=hf_dtype,
-            attn_implementation=hf_attn,
-            batch_size=hf_batch_size,
-            chunk_length_s=hf_chunk_length,
-            stride_length_s=hf_stride,
-            language=hf_language,
-            task=hf_task,
-            timestamps=hf_timestamps,
-            beam_size=hf_beam_size,
-            temperature=hf_temperature,
-        )
+        # ASR CONFIG (model created in process() after enhancement cleanup)
+        self._asr_config = {
+            'model_id': hf_model_id,
+            'device': hf_device,
+            'dtype': hf_dtype,
+            'attn_implementation': hf_attn,
+            'batch_size': hf_batch_size,
+            'chunk_length_s': hf_chunk_length,
+            'stride_length_s': hf_stride,
+            'language': hf_language,
+            'task': hf_task,
+            'timestamps': hf_timestamps,
+            'beam_size': hf_beam_size,
+            'temperature': hf_temperature,
+        }
+        # NOTE: self.asr is NOT created here - it's a local variable in process()
 
         # SRT stitcher (for multi-scene)
         self.stitcher = SRTStitcher()
@@ -182,8 +206,8 @@ class TransformersPipeline(BasePipeline):
         logger.info(f"TransformersPipeline initialized")
         logger.info(f"  Model: {hf_model_id}")
         logger.info(f"  Scene detection: {self.scene_method}")
-        if self.speech_enhancer:
-            logger.info(f"  Speech enhancer: {self.speech_enhancer.display_name}")
+        if self._enhancement_enabled:
+            logger.info(f"  Speech enhancer: {hf_speech_enhancer}")
             logger.info(f"  Extraction SR: {extraction_sr}Hz (enhancer preferred rate)")
         else:
             logger.info(f"  Speech enhancer: none")
@@ -348,51 +372,85 @@ class TransformersPipeline(BasePipeline):
                     master_metadata, "scene_detection", "skipped"
                 )
 
-            # Step 2.5: Speech enhancement (if enabled)
-            if self.speech_enhancer:
-                enhancer_name = self.speech_enhancer.name
-                logger.info(f"Step 2.5: Enhancing audio with {self.speech_enhancer.display_name}...")
+            # =================================================================
+            # PHASE 1: SPEECH ENHANCEMENT (Exclusive VRAM Block)
+            # Enhancer is a LOCAL variable - created, used, and DESTROYED
+            # before ASR is loaded. This prevents the "VRAM Sandwich".
+            # =================================================================
+            import gc
+            try:
+                import torch
+                _torch_available = torch.cuda.is_available()
+            except ImportError:
+                _torch_available = False
 
-                if scene_paths:
-                    # Enhance each scene
-                    scene_paths = enhance_scenes(
-                        scene_paths,
-                        self.speech_enhancer,
-                        self.temp_dir,
-                        progress_callback=lambda n, t, name: logger.debug(
-                            f"Enhancing scene {n}/{t}: {name}"
-                        )
-                    )
-                    master_metadata["config"]["speech_enhancement"] = {
-                        "backend": enhancer_name,
-                        "enhanced_scenes": len(scene_paths)
-                    }
+            if self._enhancement_enabled:
+                # A. Load ONLY the Enhancer (LOCAL variable, not self.enhancer)
+                enhancer = create_enhancer_direct(**self._enhancer_config)
+                if enhancer is None:
+                    logger.warning("Enhancement was enabled but enhancer creation failed. Skipping.")
+                    master_metadata["config"]["speech_enhancement"] = {"enabled": False, "error": "creation_failed"}
                 else:
-                    # Enhance full audio file
-                    enhanced_path = self.temp_dir / f"{media_basename}_enhanced.wav"
-                    extracted_audio = enhance_single_audio(
-                        extracted_audio,
-                        self.speech_enhancer,
-                        output_path=enhanced_path
+                    enhancer_name = enhancer.name
+                    logger.info(f"Step 2.5: Enhancing audio with {enhancer.display_name}...")
+
+                    if scene_paths:
+                        # B. Process Enhancement - Enhance each scene
+                        scene_paths = enhance_scenes(
+                            scene_paths,
+                            enhancer,
+                            self.temp_dir,
+                            progress_callback=lambda n, t, name: logger.debug(
+                                f"Enhancing scene {n}/{t}: {name}"
+                            )
+                        )
+                        master_metadata["config"]["speech_enhancement"] = {
+                            "backend": enhancer_name,
+                            "enhanced_scenes": len(scene_paths)
+                        }
+                    else:
+                        # Enhance full audio file
+                        enhanced_path = self.temp_dir / f"{media_basename}_enhanced.wav"
+                        extracted_audio = enhance_single_audio(
+                            extracted_audio,
+                            enhancer,
+                            output_path=enhanced_path
+                        )
+                        master_metadata["config"]["speech_enhancement"] = {
+                            "backend": enhancer_name,
+                            "enhanced_full_audio": True
+                        }
+
+                    # C. DESTROY Enhancer - This is the "JIT Unload"
+                    # We must confirm VRAM is near-zero before loading ASR
+                    logger.debug("Destroying enhancer to free VRAM before ASR load")
+                    enhancer.cleanup()
+                    del enhancer
+                    gc.collect()
+                    if _torch_available:
+                        torch.cuda.empty_cache()
+                        logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
+
+                    logger.info(f"Speech enhancement complete, GPU memory released")
+
+                    self.metadata_manager.update_processing_stage(
+                        master_metadata, "speech_enhancement", "completed",
+                        backend=enhancer_name
                     )
-                    master_metadata["config"]["speech_enhancement"] = {
-                        "backend": enhancer_name,
-                        "enhanced_full_audio": True
-                    }
-
-                # Free GPU memory before ASR
-                self.speech_enhancer.cleanup()
-                self.speech_enhancer = None
-                logger.info(f"Speech enhancement complete, GPU memory released")
-
-                self.metadata_manager.update_processing_stage(
-                    master_metadata, "speech_enhancement", "completed",
-                    backend=enhancer_name
-                )
             else:
                 self.metadata_manager.update_processing_stage(
                     master_metadata, "speech_enhancement", "skipped"
                 )
+
+            # =================================================================
+            # PHASE 2: ASR TRANSCRIPTION (Exclusive VRAM Block)
+            # ASR is a LOCAL variable - created after enhancer is destroyed,
+            # and destroyed before function returns.
+            # =================================================================
+
+            # A. Load ONLY the ASR (LOCAL variable, not self.asr)
+            logger.info("Initializing ASR model (exclusive VRAM block)")
+            asr = TransformersASR(**self._asr_config)
 
             # Step 3: Transcription
             self.progress.set_current_step("Transcribing with HF Transformers", 3, 5)
@@ -434,7 +492,7 @@ class TransformersPipeline(BasePipeline):
 
                     try:
                         # Transcribe scene
-                        segments = self.asr.transcribe(scene_path)
+                        segments = asr.transcribe(scene_path)
 
                         if segments:
                             # Convert to SRT (timestamps relative to scene start)
@@ -477,7 +535,7 @@ class TransformersPipeline(BasePipeline):
                 # Full-file transcription (no scenes)
                 logger.info("Transcribing full audio file...")
 
-                segments = self.asr.transcribe(extracted_audio)
+                segments = asr.transcribe(extracted_audio)
 
                 # Convert to SRT
                 srt_content = self._segments_to_srt(segments)
@@ -531,6 +589,16 @@ class TransformersPipeline(BasePipeline):
                 "cps_filtered": stats.get('cps_filtered', 0)
             }
 
+            # C. DESTROY ASR - Trigger C++ destructor while interpreter is STABLE
+            # This prevents the "Zone of Death" crash during Python shutdown
+            logger.debug("Destroying ASR to free VRAM and trigger safe destructor")
+            asr.cleanup()
+            del asr
+            gc.collect()
+            if _torch_available:
+                torch.cuda.empty_cache()
+                logger.debug("GPU memory cleared after ASR - VRAM should be near-zero")
+
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
             master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
@@ -553,29 +621,11 @@ class TransformersPipeline(BasePipeline):
             raise
 
     def cleanup(self) -> None:
-        """Clean up resources including speech enhancer and ASR model.
+        """Clean up pipeline resources.
 
-        ALWAYS cleans up model resources (even in subprocess workers) to trigger
-        native destructors during controlled execution, not during interpreter shutdown.
-        This prevents BrokenProcessPool crashes from ctranslate2/PyTorch destructors
-        running during Python shutdown.
+        With Scope-Based Resource Management (v1.7.3+), GPU models are local variables
+        inside process() and are destroyed immediately after use. This cleanup() method
+        only handles non-GPU resources and delegates to parent.
         """
-        # Clean up speech enhancer first (releases GPU memory)
-        if hasattr(self, 'speech_enhancer') and self.speech_enhancer:
-            try:
-                self.speech_enhancer.cleanup()
-                self.speech_enhancer = None
-            except Exception as e:
-                from whisperjav.utils.logger import logger
-                logger.warning(f"Speech enhancer cleanup failed (non-fatal): {e}")
-
-        # Clean up ASR model
-        if hasattr(self, 'asr') and self.asr:
-            try:
-                self.asr.cleanup()
-            except Exception as e:
-                from whisperjav.utils.logger import logger
-                logger.warning(f"ASR cleanup failed (non-fatal): {e}")
-
-        # Delegate to parent for CUDA cache clear (skipped in subprocess)
+        # Delegate to parent for any remaining cleanup (CUDA cache clear, etc.)
         super().cleanup()

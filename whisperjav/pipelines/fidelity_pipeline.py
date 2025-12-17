@@ -33,6 +33,9 @@ from whisperjav.modules.speech_enhancement import (
     enhance_scenes,
 )
 
+# Target sample rate for VAD/ASR (no enhancer case)
+DEFAULT_EXTRACTION_SR = 16000
+
 class FidelityPipeline(BasePipeline):
     """Fidelity pipeline using scene detection with WhisperPro ASR (VAD-enhanced)."""
     
@@ -95,24 +98,46 @@ class FidelityPipeline(BasePipeline):
             effective_model_cfg["model_name"] = 'large-v2'
         # --- END V3 CONFIG UNPACKING ---
 
-        # Speech enhancement (v1.7.3) - create before audio extractor
-        self.speech_enhancer = create_enhancer_from_config(resolved_config)
-        extraction_sr = get_extraction_sample_rate(self.speech_enhancer)
+        # =================================================================
+        # SCOPE-BASED RESOURCE MANAGEMENT (v1.7.3+)
+        # GPU models are NOT created in __init__. We store CONFIGS only.
+        # Models are created as LOCAL VARIABLES inside process() and
+        # explicitly destroyed after use to prevent VRAM overlap.
+        # =================================================================
+
+        # Speech enhancement CONFIG (model created in process())
+        self._enhancer_config = resolved_config  # Store full config for enhancer creation
+
+        # Determine extraction sample rate based on enhancer config
+        # We check config to see if enhancement is enabled, without loading the model
+        enhancer_params = params.get("speech_enhancer", {})
+        enhancer_backend = enhancer_params.get("backend", "none")
+        if enhancer_backend and enhancer_backend != "none":
+            # Enhancement enabled - extract at enhancer's preferred rate (48kHz for ClearVoice)
+            # We hardcode known rates to avoid loading the model just to check
+            if enhancer_backend == "clearvoice":
+                extraction_sr = 48000  # MossFormer2_SE_48K default
+            elif enhancer_backend == "bs-roformer":
+                extraction_sr = 44100  # BS-RoFormer native rate
+            else:
+                extraction_sr = DEFAULT_EXTRACTION_SR
+            self._enhancement_enabled = True
+        else:
+            extraction_sr = DEFAULT_EXTRACTION_SR
+            self._enhancement_enabled = False
 
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
-        #self.scene_detector = SceneDetector(**scene_opts)
-        #self.scene_detector = AdaptiveSceneDetector()  # Use all defaults
         self.scene_detector = DynamicSceneDetector(**scene_opts)
-        
-        
-        # Pass structured config to WhisperProASR
-        self.asr = WhisperProASR(
-            model_config=effective_model_cfg,
-            params=params,
-            task=task,
-            tracer=self.tracer
-        )
+
+        # ASR CONFIG (model created in process() after enhancement cleanup)
+        self._asr_config = {
+            'model_config': effective_model_cfg,
+            'params': params,
+            'task': task,
+            'tracer': self.tracer
+        }
+        # NOTE: self.asr is NOT created here - it's a local variable in process()
 
         self.stitcher = SRTStitcher()
 
@@ -156,9 +181,8 @@ class FidelityPipeline(BasePipeline):
             media_info=media_info
         )
 
-        if hasattr(self.asr, "reset_statistics"):
-            self.asr.reset_statistics()
-        
+        # NOTE: reset_statistics moved to after ASR initialization (deferred loading)
+
         master_metadata["config"]["scene_detection_params"] = self.scene_detection_params
         master_metadata["config"]["vad_params"] = self.vad_params
         
@@ -199,36 +223,75 @@ class FidelityPipeline(BasePipeline):
                 master_metadata, "scene_detection", "completed",
                 scene_count=len(scene_paths), scenes_dir=str(scenes_dir))
 
-            # Step 3: Speech enhancement (v1.7.3) - enhance scenes before transcription
-            if self.speech_enhancer:
-                enhancer_name = self.speech_enhancer.name
-                enhancer_display = self.speech_enhancer.display_name
+            # =================================================================
+            # PHASE 1: SPEECH ENHANCEMENT (Exclusive VRAM Block)
+            # Enhancer is a LOCAL variable - created, used, and DESTROYED
+            # before ASR is loaded. This prevents the "VRAM Sandwich".
+            # =================================================================
+            import gc
+            try:
+                import torch
+                _torch_available = torch.cuda.is_available()
+            except ImportError:
+                _torch_available = False
+
+            if self._enhancement_enabled:
                 self.progress.set_current_step("Enhancing audio", 3, 6)
-                logger.info(f"Enhancing {len(scene_paths)} scenes with {enhancer_display}")
 
-                def enhancement_progress(scene_num, total, name):
-                    if scene_num == 1 or scene_num % 5 == 0 or scene_num == total:
-                        pct = (scene_num / total) * 100
-                        print(f"\rEnhancing: [{scene_num}/{total}] {pct:.0f}%", end='', flush=True)
+                # A. Load ONLY the Enhancer (LOCAL variable, not self.enhancer)
+                enhancer = create_enhancer_from_config(self._enhancer_config)
+                if enhancer is None:
+                    logger.warning("Enhancement was enabled but enhancer creation failed. Skipping.")
+                    master_metadata["config"]["speech_enhancement"] = {"enabled": False, "error": "creation_failed"}
+                else:
+                    enhancer_name = enhancer.name
+                    enhancer_display = enhancer.display_name
+                    logger.info(f"Enhancing {len(scene_paths)} scenes with {enhancer_display}")
 
-                scene_paths = enhance_scenes(
-                    scene_paths,
-                    self.speech_enhancer,
-                    self.temp_dir,
-                    progress_callback=enhancement_progress,
-                )
-                print()  # Newline after progress
+                    def enhancement_progress(scene_num, total, name):
+                        if scene_num == 1 or scene_num % 5 == 0 or scene_num == total:
+                            pct = (scene_num / total) * 100
+                            print(f"\rEnhancing: [{scene_num}/{total}] {pct:.0f}%", end='', flush=True)
 
-                # Cleanup enhancer to free GPU memory before ASR
-                self.speech_enhancer.cleanup()
-                self.speech_enhancer = None
+                    # B. Process Enhancement
+                    scene_paths = enhance_scenes(
+                        scene_paths,
+                        enhancer,
+                        self.temp_dir,
+                        progress_callback=enhancement_progress,
+                    )
+                    print()  # Newline after progress
 
-                master_metadata["config"]["speech_enhancement"] = {
-                    "enabled": True,
-                    "backend": enhancer_name,
-                }
+                    master_metadata["config"]["speech_enhancement"] = {
+                        "enabled": True,
+                        "backend": enhancer_name,
+                    }
+
+                    # C. DESTROY Enhancer - This is the "JIT Unload"
+                    # We must confirm VRAM is near-zero before loading ASR
+                    logger.debug("Destroying enhancer to free VRAM before ASR load")
+                    enhancer.cleanup()
+                    del enhancer
+                    gc.collect()
+                    if _torch_available:
+                        torch.cuda.empty_cache()
+                        logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
             else:
                 master_metadata["config"]["speech_enhancement"] = {"enabled": False}
+
+            # =================================================================
+            # PHASE 2: ASR TRANSCRIPTION (Exclusive VRAM Block)
+            # ASR is a LOCAL variable - created after enhancer is destroyed,
+            # and destroyed before function returns.
+            # =================================================================
+
+            # A. Load ONLY the ASR (LOCAL variable, not self.asr)
+            logger.info("Initializing ASR model (exclusive VRAM block)")
+            asr = WhisperProASR(**self._asr_config)
+
+            # Reset statistics after ASR is initialized
+            if hasattr(asr, "reset_statistics"):
+                asr.reset_statistics()
 
             # Step 4: Transcribe scenes
             if self.progress_reporter:
@@ -302,9 +365,9 @@ class FidelityPipeline(BasePipeline):
                     # Use unified progress manager's external suppression if available
                     if unified_manager:
                         with unified_manager.suppress_external_progress():
-                            self.asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
+                            asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
                     else:
-                        self.asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
+                        asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
                     
                     # Process results - simplified to reduce message spam
                     if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:
@@ -384,10 +447,20 @@ class FidelityPipeline(BasePipeline):
 
             logprob_filtered = 0
             nonverbal_filtered = 0
-            if hasattr(self.asr, "get_filter_statistics"):
-                filter_stats = self.asr.get_filter_statistics() or {}
+            if hasattr(asr, "get_filter_statistics"):
+                filter_stats = asr.get_filter_statistics() or {}
                 logprob_filtered = filter_stats.get('logprob_filtered', 0)
                 nonverbal_filtered = filter_stats.get('nonverbal_filtered', 0)
+
+            # C. DESTROY ASR - Trigger C++ destructor while interpreter is STABLE
+            # This prevents the "Zone of Death" crash during Python shutdown
+            logger.debug("Destroying ASR to free VRAM and trigger safe destructor")
+            asr.cleanup()
+            del asr
+            gc.collect()
+            if _torch_available:
+                torch.cuda.empty_cache()
+                logger.debug("GPU memory cleared after ASR - VRAM should be near-zero")
 
             master_metadata["summary"]["final_subtitles_raw"] += logprob_filtered + nonverbal_filtered
             master_metadata["summary"]["quality_metrics"].update({

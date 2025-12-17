@@ -5,7 +5,8 @@ import multiprocessing as mp
 import pickle
 import shutil
 import time
-from concurrent.futures import ProcessPoolExecutor
+# ProcessPoolExecutor removed - using raw mp.Process with Drop-Box pattern
+# from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -403,7 +404,17 @@ class EnsembleOrchestrator:
         pass_config: Dict[str, Any],
         language_code: str,
     ) -> Dict[str, Dict[str, Any]]:
-        """Execute a pass inside an isolated worker process."""
+        """
+        Execute a pass inside an isolated worker process.
+
+        Uses the "Drop-Box + Nuclear Exit" pattern:
+        - Worker writes results to a pickle file (Drop-Box)
+        - Worker exits via os._exit(0) to skip Python shutdown
+        - Parent reads results from Drop-Box file
+
+        This prevents ctranslate2 C++ destructor crashes on Windows.
+        """
+        import pickle
 
         # Get trace file path if tracer is active (ParameterTracer has output_path, NullTracer doesn't)
         trace_file_path = str(self.tracer.output_path) if hasattr(self.tracer, 'output_path') else None
@@ -422,6 +433,9 @@ class EnsembleOrchestrator:
             trace_file_path=trace_file_path,
         )
 
+        # Setup Drop-Box path (unique per pass)
+        result_file = str(self.temp_dir / f"worker_result_pass{pass_number}.pkl")
+
         # Use 'spawn' start method for GPU compatibility across all platforms.
         # - Linux defaults to 'fork' which breaks CUDA/MPS in child processes
         #   (CUDA context cannot be re-initialized after fork)
@@ -430,16 +444,40 @@ class EnsembleOrchestrator:
         # - Performance impact is negligible (<1% of total processing time)
         mp_context = mp.get_context('spawn')
 
-        try:
-            with ProcessPoolExecutor(max_workers=1, mp_context=mp_context) as executor:
-                future = executor.submit(run_pass_worker, payload)
-                worker_output = future.result()
-        except Exception as exc:  # pragma: no cover - catastrophic worker failure
-            logger.exception("Pass %s worker crashed", pass_number)
+        # Spawn "One-Shot" Process (not using ProcessPoolExecutor)
+        # This gives us precise control over the lifecycle and avoids
+        # pool poisoning when the worker calls os._exit(0)
+        p = mp_context.Process(target=run_pass_worker, args=(payload, result_file))
+        p.start()
+
+        # Wait for process to die (Nuclear Exit or crash)
+        p.join()
+
+        # Analyze the aftermath
+        if p.exitcode != 0:
+            logger.error(
+                "Pass %s worker died with exit code %s",
+                pass_number, p.exitcode
+            )
+
+        # Read result from Drop-Box
+        worker_output = None
+        if Path(result_file).exists():
+            try:
+                with open(result_file, 'rb') as f:
+                    worker_output = pickle.load(f)
+                # Clean up Drop-Box file
+                Path(result_file).unlink()
+            except Exception as e:
+                logger.error("Pass %s: Failed to read Drop-Box: %s", pass_number, e)
+
+        # Handle missing or invalid Drop-Box
+        if worker_output is None:
+            logger.error("Pass %s: Worker produced no Drop-Box (crashed before writing?)", pass_number)
             return {
                 info['basename']: {
                     'status': 'failed',
-                    'error': f'Worker crash: {exc}',
+                    'error': f'Worker crash: exit code {p.exitcode}, no result file',
                 }
                 for info in media_files
             }
