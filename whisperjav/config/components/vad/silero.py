@@ -32,7 +32,7 @@ class SileroVADOptions(BaseModel):
     """
 
     threshold: float = Field(
-        0.18,
+        0.25,
         ge=0.0, le=1.0,
         description="Speech probability threshold. Lower = more sensitive."
     )
@@ -42,7 +42,7 @@ class SileroVADOptions(BaseModel):
         description="Minimum speech segment duration in milliseconds."
     )
     max_speech_duration_s: float = Field(
-        11.0,
+        6.0,
         ge=0.0, le=300.0,
         description="Maximum speech segment duration in seconds."
     )
@@ -60,6 +60,11 @@ class SileroVADOptions(BaseModel):
         400,
         ge=0, le=2000,
         description="Padding added around detected speech in milliseconds."
+    )
+    chunk_threshold_s: float = Field(
+        0.2,
+        ge=0.0, le=30.0,
+        description="Gap threshold for segment grouping (seconds). Segments with gaps larger than this are split into separate groups."
     )
 
 
@@ -85,25 +90,28 @@ class SileroVAD(VADComponent):
         "conservative": SileroVADOptions(
             threshold=0.35,
             min_speech_duration_ms=150,
-            max_speech_duration_s=9.0,
+            max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
-            neg_threshold=0.3,
+            neg_threshold=0.3,  # KEPT from silero.py (asr_config has 0.2)
             speech_pad_ms=400,
+            chunk_threshold_s=0.2,
         ),
         "balanced": SileroVADOptions(
-            threshold=0.18,
+            threshold=0.25,
             min_speech_duration_ms=100,
-            max_speech_duration_s=11.0,
+            max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
-            neg_threshold=0.15,
+            neg_threshold=0.15,  # KEPT from silero.py (asr_config has 0.15)
             speech_pad_ms=400,
+            chunk_threshold_s=0.2,
         ),
         "aggressive": SileroVADOptions(
-            threshold=0.05,
+            threshold=0.178,
             min_speech_duration_ms=30,
-            max_speech_duration_s=14.0,
+            max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
-            neg_threshold=0.1,
-            speech_pad_ms=600,
+            neg_threshold=0.1,  # KEPT from silero.py (asr_config has 0.1)
+            speech_pad_ms=400,
+            chunk_threshold_s=0.2,
         ),
     }

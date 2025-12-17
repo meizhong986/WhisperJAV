@@ -217,7 +217,7 @@ class FasterWhisperASR(ASRComponent):
             language="ja",
             beam_size=1,
             best_of=1,
-            patience=1.5,
+            patience=1.2,  # Changed from 1.5
             length_penalty=None,
             prefix=None,
             suppress_tokens=None,
@@ -257,7 +257,7 @@ class FasterWhisperASR(ASRComponent):
             language="ja",
             beam_size=2,
             best_of=1,
-            patience=2.0,
+            patience=1.4,  # Changed from 2.0
             length_penalty=None,
             prefix=None,
             suppress_tokens=None,
@@ -265,7 +265,7 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.1],
+            temperature=[0.0],  # Changed from [0.0, 0.1]
             compression_ratio_threshold=2.4,
             logprob_threshold=-1.2,
             logprob_margin=0.2,
@@ -289,15 +289,15 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=2.0,
+            hallucination_silence_threshold=1.9,  # Changed from 2.0
         ),
         "aggressive": FasterWhisperOptions(
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=2,
+            beam_size=3,  # Changed from 2
             best_of=1,
-            patience=2.0,
+            patience=1.6,  # Changed from 2.0
             length_penalty=None,
             prefix=None,
             suppress_blank=False,  # Different!
@@ -305,7 +305,7 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.3],
+            temperature=[0.0],  # Changed from [0.0, 0.3]
             compression_ratio_threshold=3.0,
             logprob_threshold=-2.5,
             logprob_margin=0.0,
@@ -329,6 +329,6 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=2.5,
+            hallucination_silence_threshold=2.1,  # Changed from 2.5
         ),
     }
