@@ -555,21 +555,27 @@ class TransformersPipeline(BasePipeline):
     def cleanup(self) -> None:
         """Clean up resources including speech enhancer and ASR model.
 
-        NOTE: In subprocess workers (ensemble mode), all cleanup is delegated
-        to super().cleanup() which will skip operations - OS handles resource
-        reclamation on process exit.
+        ALWAYS cleans up model resources (even in subprocess workers) to trigger
+        native destructors during controlled execution, not during interpreter shutdown.
+        This prevents BrokenProcessPool crashes from ctranslate2/PyTorch destructors
+        running during Python shutdown.
         """
-        import os
-
-        # In subprocess, skip directly to parent which will also skip.
-        # This avoids CUDA crashes during process termination.
-        if os.environ.get('WHISPERJAV_SUBPROCESS_WORKER') == '1':
-            super().cleanup()
-            return
-
+        # Clean up speech enhancer first (releases GPU memory)
         if hasattr(self, 'speech_enhancer') and self.speech_enhancer:
-            self.speech_enhancer.cleanup()
-            self.speech_enhancer = None
+            try:
+                self.speech_enhancer.cleanup()
+                self.speech_enhancer = None
+            except Exception as e:
+                from whisperjav.utils.logger import logger
+                logger.warning(f"Speech enhancer cleanup failed (non-fatal): {e}")
+
+        # Clean up ASR model
         if hasattr(self, 'asr') and self.asr:
-            self.asr.cleanup()
+            try:
+                self.asr.cleanup()
+            except Exception as e:
+                from whisperjav.utils.logger import logger
+                logger.warning(f"ASR cleanup failed (non-fatal): {e}")
+
+        # Delegate to parent for CUDA cache clear (skipped in subprocess)
         super().cleanup()

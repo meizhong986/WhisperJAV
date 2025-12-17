@@ -109,30 +109,51 @@ class BasePipeline(ABC):
         especially in batch processing scenarios where models need to be
         swapped between passes. This frees GPU memory.
 
-        NOTE: In subprocess workers (ensemble mode), explicit cleanup is SKIPPED.
-        The OS automatically reclaims all resources when the subprocess exits.
-        Explicit CUDA cleanup during process termination can crash on Windows
-        due to driver bugs/race conditions. See issue i2.
+        In subprocess workers (ensemble mode):
+        - ASR cleanup IS called to release model references during controlled execution
+          (prevents ctranslate2 destructor from running during interpreter shutdown)
+        - CUDA cache clear is SKIPPED (torch.cuda.empty_cache() can crash on Windows)
+
+        ROOT CAUSE FIX: The previous approach of skipping ALL cleanup in subprocess
+        workers caused BrokenProcessPool crashes because ctranslate2's C++ destructor
+        ran during Python interpreter shutdown - an unsafe phase where CUDA operations
+        are unreliable on Windows. By calling asr.cleanup() during controlled execution,
+        we trigger the destructor NOW (where we can catch errors) rather than during
+        interpreter shutdown (where crashes terminate the process).
         """
         import os
 
-        # Skip ALL cleanup in subprocess workers - OS handles resource reclamation
-        # on process exit. Explicit CUDA operations during subprocess termination
-        # can cause BrokenProcessPool crashes on Windows.
-        if os.environ.get('WHISPERJAV_SUBPROCESS_WORKER') == '1':
-            logger.debug(
-                f"{self.__class__.__name__} cleanup skipped in subprocess "
-                "(resources freed automatically on process exit)"
-            )
-            return
+        is_subprocess = os.environ.get('WHISPERJAV_SUBPROCESS_WORKER') == '1'
 
-        # Clean up ASR model if it exists and has cleanup method
+        # ALWAYS clean up GPU resources - even in subprocess workers
+        # This triggers native destructors during controlled execution,
+        # which is SAFER than letting them run during interpreter shutdown.
+
+        # Clean up speech enhancer if present (may have GPU models)
+        if hasattr(self, 'speech_enhancer') and self.speech_enhancer:
+            try:
+                if hasattr(self.speech_enhancer, 'cleanup'):
+                    self.speech_enhancer.cleanup()
+                self.speech_enhancer = None
+            except Exception as e:
+                logger.warning(f"Speech enhancer cleanup failed (non-fatal): {e}")
+
+        # Clean up ASR model (ctranslate2, PyTorch models)
         if hasattr(self, 'asr') and hasattr(self.asr, 'cleanup'):
-            self.asr.cleanup()
+            try:
+                self.asr.cleanup()
+            except Exception as e:
+                # Log but don't crash - this is best-effort cleanup
+                logger.warning(f"ASR cleanup failed (non-fatal): {e}")
 
-        # Centralized CUDA cache cleanup - handles subprocess detection
-        from whisperjav.utils.gpu_utils import safe_cuda_cleanup
-        safe_cuda_cleanup()
+        # CUDA cache clear - skip in subprocess (known to crash on Windows)
+        if is_subprocess:
+            logger.debug(
+                f"{self.__class__.__name__} CUDA cache clear skipped in subprocess"
+            )
+        else:
+            from whisperjav.utils.gpu_utils import safe_cuda_cleanup
+            safe_cuda_cleanup()
 
         logger.debug(f"{self.__class__.__name__} cleanup complete")
 
