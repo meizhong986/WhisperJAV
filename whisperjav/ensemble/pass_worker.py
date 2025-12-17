@@ -24,7 +24,7 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
     KotobaFasterWhisperPipeline,
 )
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
-from whisperjav.utils.logger import logger
+from whisperjav.utils.logger import logger, setup_logger
 
 from .utils import resolve_language_code
 
@@ -219,6 +219,7 @@ class WorkerPayload:
     subs_language: str
     extra_kwargs: Dict[str, Any]
     language_code: str
+    log_level: str = "INFO"  # Propagate log level to subprocess workers
 
 
 @dataclass
@@ -294,6 +295,10 @@ def run_pass_worker(payload: WorkerPayload) -> Dict[str, Any]:
     # Mark this as a subprocess worker - cleanup routines can check this
     # to skip risky CUDA operations that can crash on Windows
     os.environ['WHISPERJAV_SUBPROCESS_WORKER'] = '1'
+
+    # Reconfigure logger with the log level from main process
+    # (subprocess starts fresh with default INFO level due to 'spawn' context)
+    setup_logger("whisperjav", payload.log_level)
 
     # Ensure clean GPU state in spawned worker process.
     # This is defensive - 'spawn' gives us a fresh Python interpreter,

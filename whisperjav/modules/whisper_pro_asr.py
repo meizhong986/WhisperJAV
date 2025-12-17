@@ -20,6 +20,7 @@ import logging
 
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 from whisperjav.modules.vad_failover import should_force_full_transcribe
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
@@ -28,7 +29,7 @@ from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 class WhisperProASR:
     """Whisper ASR using Speech Segmenter for speech detection."""
     
-    def __init__(self, model_config: Dict, params: Dict, task: str):
+    def __init__(self, model_config: Dict, params: Dict, task: str, tracer=None):
         """
         Initializes WhisperPro ASR with structured v3 config parameters.
 
@@ -36,7 +37,10 @@ class WhisperProASR:
             model_config: The 'model' section from the resolved config.
             params: The 'params' section containing decoder, vad, and provider settings.
             task: The ASR task to perform ('transcribe' or 'translate').
+            tracer: Optional parameter tracer for capturing transcribe() params.
         """
+        # Parameter tracer for capturing transcribe() call parameters
+        self.tracer = tracer if tracer is not None else NullTracer()
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA → MPS → CPU
@@ -322,8 +326,20 @@ class WhisperProASR:
             return []
         return self._process_segments(result["segments"], 0.0)
 
-    def _run_whisper_with_fallback(self, audio_chunk: np.ndarray, whisper_params: Dict) -> Optional[Dict]:
+    def _run_whisper_with_fallback(self, audio_chunk: np.ndarray, whisper_params: Dict,
+                                     audio_info: Optional[Dict] = None, context: Optional[str] = None) -> Optional[Dict]:
         """Execute whisper transcription with a minimal-params retry."""
+        # Trace transcribe() parameters for diagnostic visibility
+        trace_audio_info = audio_info or {
+            "shape": str(audio_chunk.shape),
+            "dtype": str(audio_chunk.dtype),
+        }
+        self.tracer.emit_transcribe_params(
+            params=whisper_params,
+            audio_info=trace_audio_info,
+            context=context or "whisper_transcribe"
+        )
+
         try:
             return self.whisper_model.transcribe(audio_chunk, **whisper_params)
         except Exception as e:

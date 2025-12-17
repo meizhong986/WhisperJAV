@@ -25,6 +25,7 @@ from whisperjav.modules.srt_postproduction import SRTPostProduction
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
+from whisperjav.utils.parameter_tracer import NullTracer
 
 from whisperjav.modules.speech_enhancement import (
     create_enhancer_from_config,
@@ -59,9 +60,10 @@ class FidelityPipeline(BasePipeline):
         
         self.progress = progress_display or DummyProgress()
         self.subs_language = subs_language
-        
-        # ADD THIS LINE - Extract progress reporter from kwargs
+
+        # Extract progress reporter and parameter tracer from kwargs
         self.progress_reporter = kwargs.get('progress_reporter', None)
+        self.tracer = kwargs.get('parameter_tracer', NullTracer())
 
         # --- V3 STRUCTURED CONFIG UNPACKING ---
         model_cfg = resolved_config["model"]
@@ -108,7 +110,8 @@ class FidelityPipeline(BasePipeline):
         self.asr = WhisperProASR(
             model_config=effective_model_cfg,
             params=params,
-            task=task
+            task=task,
+            tracer=self.tracer
         )
 
         self.stitcher = SRTStitcher()
