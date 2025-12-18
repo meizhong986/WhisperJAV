@@ -177,9 +177,30 @@ class WhisperProASR:
         return final_params
 
     def transcribe(self, audio_path: Union[str, Path], **kwargs) -> Dict:
-        """Transcribe audio file with internal VAD processing."""
+        """Transcribe audio file with internal VAD processing.
+
+        Args:
+            audio_path: Path to the audio file
+            **kwargs: Optional overrides. Supports 'task' to override the default task.
+                      If task='translate', output will be in English.
+        """
         audio_path = Path(audio_path)
+
+        # Handle task override from kwargs (important for direct-to-english support)
+        if 'task' in kwargs:
+            runtime_task = kwargs.pop('task')
+            if runtime_task != self.task:
+                logger.info(f"Task override: '{self.task}' → '{runtime_task}' (runtime)")
+                self.whisper_params['task'] = runtime_task
+                self.task = runtime_task
+
         logger.debug(f"Transcribing with VAD: {audio_path.name}")
+
+        # Log current task at INFO level for translation debugging
+        if self.task == 'translate':
+            logger.info(f"Transcribing '{audio_path.name}' with task='translate' → output will be in English")
+        else:
+            logger.debug(f"Transcribing '{audio_path.name}' with task='{self.task}'")
         
         try:
             audio_data, sample_rate = sf.read(str(audio_path), dtype='float32')

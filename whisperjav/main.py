@@ -198,9 +198,9 @@ def parse_arguments():
                                help="Speech enhancer for pass 2 (e.g., none)")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
-    twopass_group.add_argument("--merge-strategy", default="smart_merge",
-                               choices=["smart_merge", "full_merge", "pass1_primary", "pass2_primary", "pass1_overlap", "pass2_overlap"],
-                               help="Merge strategy for two-pass results (default: smart_merge)")
+    twopass_group.add_argument("--merge-strategy", default="pass1_primary",
+                               choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap"],
+                               help="Merge strategy for two-pass results (default: pass1_primary)")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
