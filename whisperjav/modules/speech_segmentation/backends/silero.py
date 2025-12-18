@@ -78,18 +78,18 @@ class SileroSpeechSegmenter:
     # (kept in config for future Silero versions)
     VERSION_DEFAULTS = {
         "v4.0": {
-            "threshold": 0.4,
+            "threshold": 0.25,
             "min_speech_duration_ms": 150,
             "min_silence_duration_ms": 300,
-            "speech_pad_ms": 400,
+            "speech_pad_ms": 700,
             "neg_threshold": 0.15,  # Not used by v4.0, kept for config compatibility
             "max_speech_duration_s": float("inf"),  # No limit by default
         },
         "v3.1": {
-            "threshold": 0.5,
-            "min_speech_duration_ms": 250,
+            "threshold": 0.125,
+            "min_speech_duration_ms": 90,
             "min_silence_duration_ms": 300,
-            "speech_pad_ms": 400,
+            "speech_pad_ms": 700,
             "neg_threshold": 0.35,  # Not used by v3.1, kept for config compatibility
             "max_speech_duration_s": float("inf"),
         },
@@ -105,7 +105,7 @@ class SileroSpeechSegmenter:
         chunk_threshold_s: Optional[float] = None,
         neg_threshold: Optional[float] = None,
         max_speech_duration_s: Optional[float] = None,
-        start_pad_samples: int = 3200,
+        start_pad_samples: int = 11200,
         end_pad_samples: int = 20800,
         **kwargs
     ):
@@ -163,7 +163,7 @@ class SileroSpeechSegmenter:
         elif "chunk_threshold" in kwargs:
             self.chunk_threshold_s = kwargs["chunk_threshold"]
         else:
-            self.chunk_threshold_s = 2.5  # Default (reduced from 4.0 to minimize silence in Whisper input)
+            self.chunk_threshold_s = 1.1  # Default (reduced from 4.0 to minimize silence in Whisper input)
 
         # Padding in samples (at 16kHz)
         self.start_pad_samples = start_pad_samples

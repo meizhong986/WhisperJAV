@@ -57,7 +57,7 @@ class SileroVADOptions(BaseModel):
         description="Negative speech threshold for deactivation."
     )
     speech_pad_ms: int = Field(
-        400,
+        700,
         ge=0, le=2000,
         description="Padding added around detected speech in milliseconds."
     )
@@ -88,21 +88,21 @@ class SileroVAD(VADComponent):
     # === Presets - Exact v1 values ===
     presets = {
         "conservative": SileroVADOptions(
-            threshold=0.35,
+            threshold=0.300,
             min_speech_duration_ms=150,
             max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
             neg_threshold=0.3,  # KEPT from silero.py (asr_config has 0.2)
-            speech_pad_ms=400,
+            speech_pad_ms=700,
             chunk_threshold_s=0.2,
         ),
         "balanced": SileroVADOptions(
-            threshold=0.25,
+            threshold=0.225,
             min_speech_duration_ms=100,
             max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
             neg_threshold=0.15,  # KEPT from silero.py (asr_config has 0.15)
-            speech_pad_ms=400,
+            speech_pad_ms=700,
             chunk_threshold_s=0.2,
         ),
         "aggressive": SileroVADOptions(
@@ -111,7 +111,7 @@ class SileroVAD(VADComponent):
             max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
             neg_threshold=0.1,  # KEPT from silero.py (asr_config has 0.1)
-            speech_pad_ms=400,
+            speech_pad_ms=700,
             chunk_threshold_s=0.2,
         ),
     }
