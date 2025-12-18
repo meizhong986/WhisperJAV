@@ -74,7 +74,8 @@ class SileroSpeechSegmenter:
     # Default parameters per version (v4.0 is more sensitive)
     # Note: These are fallbacks when config doesn't provide values.
     # Production values come from config/components/vad/silero.py presets.
-    # NOT supported in v3.1/v4.0: neg_threshold (kept for future Silero versions)
+    # NOT supported in v3.1/v4.0: neg_threshold, max_speech_duration_s
+    # (kept in config for future Silero versions)
     VERSION_DEFAULTS = {
         "v4.0": {
             "threshold": 0.4,
@@ -250,7 +251,8 @@ class SileroSpeechSegmenter:
         audio_tensor = torch.FloatTensor(audio_16k)
 
         # Build kwargs for get_speech_timestamps
-        # NOT supported in v3.1/v4.0: neg_threshold (kept in config for future versions)
+        # NOT supported in v3.1/v4.0: neg_threshold, max_speech_duration_s
+        # (kept in config for future Silero versions)
         vad_kwargs = {
             "sampling_rate": VAD_SR,
             "threshold": threshold,
@@ -258,9 +260,6 @@ class SileroSpeechSegmenter:
             "min_silence_duration_ms": min_silence_duration_ms,
             "speech_pad_ms": speech_pad_ms,
         }
-        # Only pass max_speech_duration_s if it's a finite value
-        if max_speech_duration_s != float("inf"):
-            vad_kwargs["max_speech_duration_s"] = max_speech_duration_s
 
         speech_timestamps = self._get_speech_timestamps(
             audio_tensor,
