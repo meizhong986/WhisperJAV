@@ -72,18 +72,24 @@ class SileroSpeechSegmenter:
     }
 
     # Default parameters per version (v4.0 is more sensitive)
+    # Note: These are fallbacks when config doesn't provide values.
+    # Production values come from config/components/vad/silero.py presets.
     VERSION_DEFAULTS = {
         "v4.0": {
             "threshold": 0.4,
             "min_speech_duration_ms": 150,
             "min_silence_duration_ms": 300,
             "speech_pad_ms": 400,
+            "neg_threshold": 0.15,  # Hysteresis for speech end detection
+            "max_speech_duration_s": float("inf"),  # No limit by default
         },
         "v3.1": {
             "threshold": 0.5,
             "min_speech_duration_ms": 250,
             "min_silence_duration_ms": 300,
             "speech_pad_ms": 400,
+            "neg_threshold": 0.35,  # v3.1 uses higher threshold
+            "max_speech_duration_s": float("inf"),
         },
     }
 
@@ -95,6 +101,8 @@ class SileroSpeechSegmenter:
         min_silence_duration_ms: Optional[int] = None,
         speech_pad_ms: Optional[int] = None,
         chunk_threshold_s: Optional[float] = None,
+        neg_threshold: Optional[float] = None,
+        max_speech_duration_s: Optional[float] = None,
         start_pad_samples: int = 3200,
         end_pad_samples: int = 20800,
         **kwargs
@@ -109,6 +117,10 @@ class SileroSpeechSegmenter:
             min_silence_duration_ms: Minimum silence between segments
             speech_pad_ms: Padding around detected speech
             chunk_threshold_s: Gap threshold for segment grouping (seconds)
+            neg_threshold: Speech end threshold (hysteresis). When speech prob
+                drops below this, segment ends. Should be <= threshold.
+            max_speech_duration_s: Maximum speech segment duration before
+                forced split. Use float("inf") for no limit.
             start_pad_samples: Samples to pad before speech start (at 16kHz)
             end_pad_samples: Samples to pad after speech end (at 16kHz)
             **kwargs: Additional parameters for backward compatibility
@@ -133,6 +145,14 @@ class SileroSpeechSegmenter:
         self.speech_pad_ms = (
             speech_pad_ms if speech_pad_ms is not None
             else defaults["speech_pad_ms"]
+        )
+        self.neg_threshold = (
+            neg_threshold if neg_threshold is not None
+            else defaults.get("neg_threshold", 0.15)
+        )
+        self.max_speech_duration_s = (
+            max_speech_duration_s if max_speech_duration_s is not None
+            else defaults.get("max_speech_duration_s", float("inf"))
         )
 
         # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
@@ -212,6 +232,14 @@ class SileroSpeechSegmenter:
         min_speech_duration_ms = kwargs.get(
             "min_speech_duration_ms", self.min_speech_duration_ms
         )
+        min_silence_duration_ms = kwargs.get(
+            "min_silence_duration_ms", self.min_silence_duration_ms
+        )
+        speech_pad_ms = kwargs.get("speech_pad_ms", self.speech_pad_ms)
+        neg_threshold = kwargs.get("neg_threshold", self.neg_threshold)
+        max_speech_duration_s = kwargs.get(
+            "max_speech_duration_s", self.max_speech_duration_s
+        )
 
         # Resample to 16kHz for VAD
         VAD_SR = 16000
@@ -220,12 +248,23 @@ class SileroSpeechSegmenter:
         # Run VAD
         audio_tensor = torch.FloatTensor(audio_16k)
 
+        # Build kwargs for get_speech_timestamps - only pass finite max_speech_duration_s
+        vad_kwargs = {
+            "sampling_rate": VAD_SR,
+            "threshold": threshold,
+            "min_speech_duration_ms": min_speech_duration_ms,
+            "min_silence_duration_ms": min_silence_duration_ms,
+            "speech_pad_ms": speech_pad_ms,
+            "neg_threshold": neg_threshold,
+        }
+        # Only pass max_speech_duration_s if it's a finite value (Silero may not accept inf)
+        if max_speech_duration_s != float("inf"):
+            vad_kwargs["max_speech_duration_s"] = max_speech_duration_s
+
         speech_timestamps = self._get_speech_timestamps(
             audio_tensor,
             self._model,
-            sampling_rate=VAD_SR,
-            threshold=threshold,
-            min_speech_duration_ms=min_speech_duration_ms
+            **vad_kwargs
         )
 
         if not speech_timestamps:
@@ -365,6 +404,8 @@ class SileroSpeechSegmenter:
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "speech_pad_ms": self.speech_pad_ms,
+            "neg_threshold": self.neg_threshold,
+            "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
             "start_pad_samples": self.start_pad_samples,
             "end_pad_samples": self.end_pad_samples,
