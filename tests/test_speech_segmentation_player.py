@@ -67,16 +67,16 @@ from whisperjav.modules.speech_segmentation.base import (
 )
 from whisperjav.modules.speech_segmentation.factory import SpeechSegmenterFactory
 
-# Import config system for production-equivalent parameters
-from whisperjav.config.transcription_tuner import TranscriptionTuner
+# Component registry import moved to load_production_vad_config() for lazy loading
 
 
 def load_production_vad_config(sensitivity: str) -> Dict[str, Any]:
     """
-    Load VAD parameters from production config (asr_config.json).
+    Load VAD parameters from production config (config/components/vad/silero.py).
 
     This ensures the test uses the same parameter values that would be
-    used when running whisperjav with --sensitivity <sensitivity>.
+    used when running whisperjav with --sensitivity <sensitivity> via
+    the balanced pipeline (resolver_v3.py path).
 
     Args:
         sensitivity: One of 'conservative', 'balanced', 'aggressive'
@@ -85,16 +85,19 @@ def load_production_vad_config(sensitivity: str) -> Dict[str, Any]:
         Dict of VAD parameters matching production config
     """
     try:
-        tuner = TranscriptionTuner()
-        config = tuner.config
+        # Use the component registry - same path as resolver_v3.py / balanced pipeline
+        from whisperjav.config.components.base import get_vad_registry
 
-        # Get silero_vad_options for the given sensitivity
-        # This is what balanced/fidelity pipelines use
-        if 'silero_vad_options' in config and sensitivity in config['silero_vad_options']:
-            vad_params = config['silero_vad_options'][sensitivity].copy()
+        registry = get_vad_registry()
+        silero_component = registry.get("silero")
+
+        if silero_component and sensitivity in silero_component.presets:
+            preset = silero_component.presets[sensitivity]
+            # Convert Pydantic model to dict
+            vad_params = preset.model_dump()
             return vad_params
         else:
-            print(f"  Warning: silero_vad_options/{sensitivity} not found in config")
+            print(f"  Warning: silero/{sensitivity} preset not found in component registry")
             return {}
     except Exception as e:
         print(f"  Warning: Failed to load production config: {e}")
