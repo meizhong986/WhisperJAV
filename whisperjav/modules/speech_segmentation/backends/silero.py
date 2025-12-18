@@ -74,13 +74,14 @@ class SileroSpeechSegmenter:
     # Default parameters per version (v4.0 is more sensitive)
     # Note: These are fallbacks when config doesn't provide values.
     # Production values come from config/components/vad/silero.py presets.
+    # NOT supported in v3.1/v4.0: neg_threshold (kept for future Silero versions)
     VERSION_DEFAULTS = {
         "v4.0": {
             "threshold": 0.4,
             "min_speech_duration_ms": 150,
             "min_silence_duration_ms": 300,
             "speech_pad_ms": 400,
-            "neg_threshold": 0.15,  # Hysteresis for speech end detection
+            "neg_threshold": 0.15,  # Not used by v4.0, kept for config compatibility
             "max_speech_duration_s": float("inf"),  # No limit by default
         },
         "v3.1": {
@@ -88,7 +89,7 @@ class SileroSpeechSegmenter:
             "min_speech_duration_ms": 250,
             "min_silence_duration_ms": 300,
             "speech_pad_ms": 400,
-            "neg_threshold": 0.35,  # v3.1 uses higher threshold
+            "neg_threshold": 0.35,  # Not used by v3.1, kept for config compatibility
             "max_speech_duration_s": float("inf"),
         },
     }
@@ -117,8 +118,8 @@ class SileroSpeechSegmenter:
             min_silence_duration_ms: Minimum silence between segments
             speech_pad_ms: Padding around detected speech
             chunk_threshold_s: Gap threshold for segment grouping (seconds)
-            neg_threshold: Speech end threshold (hysteresis). When speech prob
-                drops below this, segment ends. Should be <= threshold.
+            neg_threshold: Speech end threshold (hysteresis). NOT supported by
+                Silero v3.1/v4.0 - kept for config compatibility with future versions.
             max_speech_duration_s: Maximum speech segment duration before
                 forced split. Use float("inf") for no limit.
             start_pad_samples: Samples to pad before speech start (at 16kHz)
@@ -248,16 +249,16 @@ class SileroSpeechSegmenter:
         # Run VAD
         audio_tensor = torch.FloatTensor(audio_16k)
 
-        # Build kwargs for get_speech_timestamps - only pass finite max_speech_duration_s
+        # Build kwargs for get_speech_timestamps
+        # NOT supported in v3.1/v4.0: neg_threshold (kept in config for future versions)
         vad_kwargs = {
             "sampling_rate": VAD_SR,
             "threshold": threshold,
             "min_speech_duration_ms": min_speech_duration_ms,
             "min_silence_duration_ms": min_silence_duration_ms,
             "speech_pad_ms": speech_pad_ms,
-            "neg_threshold": neg_threshold,
         }
-        # Only pass max_speech_duration_s if it's a finite value (Silero may not accept inf)
+        # Only pass max_speech_duration_s if it's a finite value
         if max_speech_duration_s != float("inf"):
             vad_kwargs["max_speech_duration_s"] = max_speech_duration_s
 
