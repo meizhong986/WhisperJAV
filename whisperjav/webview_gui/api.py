@@ -227,6 +227,10 @@ class WhisperJAVAPI:
         # Check if user explicitly customized parameters
         is_customized = options.get('hf_customized', False)
 
+        # GUI default model - matches the label "transformers (HF kotoba-bilingual 6GB VRAM)"
+        # This must be passed even in minimal mode to ensure the correct model is used
+        GUI_DEFAULT_MODEL = "kotoba-tech/kotoba-whisper-bilingual-v1.0"
+
         if is_customized:
             # Full params mode: pass all HF parameters explicitly
             hf_optional_params = {
@@ -247,7 +251,10 @@ class WhisperJAVAPI:
                 value = options.get(key)
                 if value is not None:
                     args += [cli_arg, str(value)]
-        # else: Minimal args mode - let model use its internal defaults
+        else:
+            # Minimal args mode - but ALWAYS pass model_id to ensure GUI's default is used
+            # Without this, CLI default (kotoba-v2.2) would be used instead of GUI default (bilingual)
+            args += ["--hf-model-id", GUI_DEFAULT_MODEL]
 
         # Common arguments
         temp_dir = options.get('temp_dir', '').strip()
@@ -1065,10 +1072,12 @@ class WhisperJAVAPI:
         import yaml
 
         # Default fallback if registry loading fails
+        # NOTE: Default model must match GUI label "transformers (HF kotoba-bilingual 6GB VRAM)"
         fallback = {
-            "default_model": "kotoba-tech/kotoba-whisper-v2.2",
+            "default_model": "kotoba-tech/kotoba-whisper-bilingual-v1.0",
             "models": [
-                {"id": "kotoba-tech/kotoba-whisper-v2.2", "label": "Kotoba v2.2 (Latest)", "category": "kotoba"},
+                {"id": "kotoba-tech/kotoba-whisper-bilingual-v1.0", "label": "Kotoba Bilingual v1.0 (Recommended)", "category": "kotoba"},
+                {"id": "kotoba-tech/kotoba-whisper-v2.2", "label": "Kotoba v2.2 (Japanese only)", "category": "kotoba"},
                 {"id": "kotoba-tech/kotoba-whisper-v2.0", "label": "Kotoba v2.0", "category": "kotoba"},
                 {"id": "openai/whisper-large-v3-turbo", "label": "Whisper Large v3 Turbo", "category": "openai"},
             ]
@@ -1251,6 +1260,7 @@ class WhisperJAVAPI:
             dict with resolved parameters that can be customized
         """
         # Handle Transformers separately (doesn't use legacy config resolution)
+        # NOTE: Default model must match GUI label "transformers (HF kotoba-bilingual 6GB VRAM)"
         if pipeline == 'transformers':
             return {
                 "success": True,
@@ -1258,7 +1268,7 @@ class WhisperJAVAPI:
                 "sensitivity": None,  # Sensitivity not applicable for Transformers
                 "is_transformers": True,
                 "params": {
-                    "model_id": "kotoba-tech/kotoba-whisper-v2.2",
+                    "model_id": "kotoba-tech/kotoba-whisper-bilingual-v1.0",
                     "chunk_length_s": 15,
                     "stride_length_s": None,
                     "batch_size": 8,
@@ -1271,7 +1281,7 @@ class WhisperJAVAPI:
                     "device": "auto",
                     "dtype": "auto",
                 },
-                "model": "kotoba-tech/kotoba-whisper-v2.2",
+                "model": "kotoba-tech/kotoba-whisper-bilingual-v1.0",
             }
 
         try:
@@ -1584,8 +1594,8 @@ class WhisperJAVAPI:
             if model2:
                 args += ["--pass2-model", model2]
 
-        # Merge strategy
-        merge_strategy = config.get('merge_strategy', 'smart_merge')
+        # Merge strategy (default: pass1_primary - Pass 1 as base, fill gaps from Pass 2)
+        merge_strategy = config.get('merge_strategy', 'pass1_primary')
         args += ["--merge-strategy", merge_strategy]
 
         # Output directory

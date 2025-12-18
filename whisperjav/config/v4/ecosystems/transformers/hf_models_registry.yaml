@@ -27,7 +27,8 @@ metadata:
   version: "1.1.0"
 
 # Default model selected when opening the customize modal
-default_model: "kotoba-tech/kotoba-whisper-v2.2"
+# NOTE: Must match GUI label "transformers (HF kotoba-bilingual 6GB VRAM)"
+default_model: "kotoba-tech/kotoba-whisper-bilingual-v1.0"
 
 # =============================================================================
 # Available Models
@@ -43,15 +44,24 @@ models:
   # ---------------------------------------------------------------------------
   # Kotoba Official (Recommended for Japanese)
   # ---------------------------------------------------------------------------
-  - id: "kotoba-tech/kotoba-whisper-v2.2"
-    label: "Kotoba v2.2 (Latest)"
+  - id: "kotoba-tech/kotoba-whisper-bilingual-v1.0"
+    label: "Kotoba Bilingual v1.0 (Recommended)"
     category: kotoba
-    description: "Latest Kotoba model with improved accuracy"
+    description: "Japanese-English bilingual model - handles mixed Japanese/English content"
     tags:
       - japanese
+      - english
+      - bilingual
       - recommended
-      - latest
       - default
+
+  - id: "kotoba-tech/kotoba-whisper-v2.2"
+    label: "Kotoba v2.2 (Japanese only)"
+    category: kotoba
+    description: "Latest Kotoba model - optimized for pure Japanese audio"
+    tags:
+      - japanese
+      - latest
 
   - id: "kotoba-tech/kotoba-whisper-v2.1"
     label: "Kotoba v2.1"
@@ -68,15 +78,6 @@ models:
     tags:
       - japanese
       - stable
-
-  - id: "kotoba-tech/kotoba-whisper-bilingual-v1.0"
-    label: "Kotoba Bilingual v1.0"
-    category: kotoba
-    description: "Japanese-English bilingual model"
-    tags:
-      - japanese
-      - english
-      - bilingual
 
   # ---------------------------------------------------------------------------
   # OpenAI Whisper Standard Models

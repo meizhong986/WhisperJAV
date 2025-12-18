@@ -6,6 +6,7 @@ Supports lazy loading to avoid import overhead for unused backends.
 
 from typing import Dict, Type, Optional, Any, List, Tuple
 import importlib
+import importlib.util
 import logging
 
 from .base import SpeechSegmenter, SegmentationResult
@@ -40,7 +41,9 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "always_available": True,
     },
     "nemo": {
-        "packages": ["nemo.collections.asr"],
+        # NOTE: Use top-level "nemo" for availability check to avoid triggering heavy initialization
+        # The actual nemo.collections.asr import happens lazily when the backend is created
+        "packages": ["nemo"],
         "install_hint": "pip install nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
         "always_available": False,
     },
@@ -119,11 +122,11 @@ class SpeechSegmenterFactory:
         if dep_info["always_available"]:
             return True, ""
 
-        # Try importing required packages
+        # Check if required packages are importable WITHOUT actually importing them
+        # This avoids triggering heavy initialization (like NeMo's Megatron init) at startup
         for package in dep_info["packages"]:
-            try:
-                importlib.import_module(package)
-            except ImportError:
+            spec = importlib.util.find_spec(package)
+            if spec is None:
                 return False, dep_info["install_hint"]
 
         return True, ""

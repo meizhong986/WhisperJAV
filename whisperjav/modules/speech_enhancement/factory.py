@@ -12,6 +12,7 @@ Design Decisions (v1.7.3):
 
 from typing import Dict, Type, Optional, Any, List, Tuple
 import importlib
+import importlib.util
 import logging
 
 from .base import SpeechEnhancer, EnhancementResult
@@ -125,11 +126,11 @@ class SpeechEnhancerFactory:
         if dep_info["always_available"]:
             return True, ""
 
-        # Try importing required packages
+        # Check if required packages are importable WITHOUT actually importing them
+        # This avoids triggering heavy initialization at startup
         for package in dep_info["packages"]:
-            try:
-                importlib.import_module(package)
-            except ImportError:
+            spec = importlib.util.find_spec(package)
+            if spec is None:
                 return False, dep_info["install_hint"]
 
         return True, ""
