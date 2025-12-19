@@ -292,7 +292,7 @@ class SubtitleSanitizer:
 
             statistics = self._calculate_statistics(len(original_subtitles), len(final_subtitles))
 
-            logger.debug(f"Sanitization complete in {processing_time:.2f}s. Subtitles: {len(original_subtitles)} → {len(final_subtitles)}")
+            logger.debug(f"Sanitization complete in {processing_time:.2f}s. Subtitles: {len(original_subtitles)} -> {len(final_subtitles)}")
 
             
 
@@ -416,7 +416,7 @@ class SubtitleSanitizer:
 
         
 
-        logger.debug(f"Sanitization complete in {processing_time:.2f}s. Subtitles: {len(original_subtitles)} → {len(final_subtitles)}")
+        logger.debug(f"Sanitization complete in {processing_time:.2f}s. Subtitles: {len(original_subtitles)} -> {len(final_subtitles)}")
 
         return result
 
@@ -1224,7 +1224,7 @@ Config: {self.config.sensitivity_mode}"""
 
                 f"Modified: {entry.modified_text}\n"  # This line is new
 
-                f"Duration: {original_duration:.2f}s → {new_duration:.2f}s"
+                f"Duration: {original_duration:.2f}s -> {new_duration:.2f}s"
 
             )
 

@@ -533,7 +533,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                     )
                 )
                 logger.debug(
-                    "[Worker %s] Pass %s: SUCCESS - %s → %d subtitles in %.1fs",
+                    "[Worker %s] Pass %s: SUCCESS - %s -> %d subtitles in %.1fs",
                     os.getpid(), pass_number, basename,
                     result["summary"].get("final_subtitles_refined", 0),
                     result["summary"].get("total_processing_time_seconds", 0.0)
@@ -633,7 +633,7 @@ def _build_pipeline(
     # Derive ASR task from subs_language
     asr_task = "translate" if subs_language == "direct-to-english" else "transcribe"
     logger.debug(
-        "[Worker %s] Pass %s: subs_language=%s → asr_task=%s",
+        "[Worker %s] Pass %s: subs_language=%s -> asr_task=%s",
         os.getpid(), pass_number, subs_language, asr_task
     )
 
@@ -834,11 +834,11 @@ def apply_custom_params(
 
 # Map GUI speech enhancer values to factory-compatible backend names
 # Supports two formats:
-#   1. Legacy: "clearvoice" → uses default model
-#   2. New:    "clearvoice:MossFormer2_SE_48K" → backend + specific model
-#   3. FFmpeg DSP: "ffmpeg-dsp:loudnorm,denoise" → backend + comma-separated effects
+#   1. Legacy: "clearvoice" -> uses default model
+#   2. New:    "clearvoice:MossFormer2_SE_48K" -> backend + specific model
+#   3. FFmpeg DSP: "ffmpeg-dsp:loudnorm,denoise" -> backend + comma-separated effects
 SPEECH_ENHANCER_MAP = {
-    "": "none",                 # Empty string → disabled
+    "": "none",                 # Empty string -> disabled
     "ffmpeg-dsp": "ffmpeg-dsp", # FFmpeg DSP audio filters
     "none": "none",             # Explicit disable
     "zipenhancer": "zipenhancer",       # ZipEnhancer 16kHz (recommended, lightweight)
@@ -852,10 +852,10 @@ def _parse_speech_enhancer(enhancer_value: str) -> tuple:
     Parse speech enhancer value into (backend, model).
 
     Supports formats:
-        - "none" → ("none", None)
-        - "clearvoice" → ("clearvoice", None)  # Uses factory default
-        - "clearvoice:MossFormer2_SE_48K" → ("clearvoice", "MossFormer2_SE_48K")
-        - "bs-roformer:vocals" → ("bs-roformer", "vocals")
+        - "none" -> ("none", None)
+        - "clearvoice" -> ("clearvoice", None)  # Uses factory default
+        - "clearvoice:MossFormer2_SE_48K" -> ("clearvoice", "MossFormer2_SE_48K")
+        - "bs-roformer:vocals" -> ("bs-roformer", "vocals")
 
     Returns:
         Tuple of (backend_name, model_name or None)
@@ -874,18 +874,18 @@ def _parse_speech_enhancer(enhancer_value: str) -> tuple:
     return (backend, None)
 
 # Map GUI speech segmenter values to factory-compatible backend names
-# IMPORTANT: The factory extracts version/variant from the name itself (e.g., "silero-v3.1" → version="v3.1")
+# IMPORTANT: The factory extracts version/variant from the name itself (e.g., "silero-v3.1" -> version="v3.1")
 # DO NOT strip version/variant suffixes - pass them through so the factory can process them correctly
 # This map is primarily for:
 #   1. Handling empty string default
 #   2. Normalizing legacy/alias names
 #   3. Validation via .get() fallback
 SPEECH_SEGMENTER_MAP = {
-    "": "silero",           # Empty string → default silero (factory defaults to v4.0)
-    "silero": "silero",     # Base silero → factory defaults to v4.0
+    "": "silero",           # Empty string -> default silero (factory defaults to v4.0)
+    "silero": "silero",     # Base silero -> factory defaults to v4.0
     "silero-v4.0": "silero-v4.0",   # Preserve version for factory extraction
     "silero-v3.1": "silero-v3.1",   # Preserve version for factory extraction
-    "nemo": "nemo-lite",    # Base nemo → default to nemo-lite variant
+    "nemo": "nemo-lite",    # Base nemo -> default to nemo-lite variant
     "nemo-lite": "nemo-lite",       # Preserve variant for factory
     "nemo-diarization": "nemo-diarization",  # Preserve variant for factory
     "whisper-vad": "whisper-vad",   # Preserve for factory variant extraction
