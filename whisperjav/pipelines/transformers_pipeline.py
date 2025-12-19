@@ -7,7 +7,7 @@ for Japanese audio transcription. Designed as a drop-in mode with dedicated
 CLI arguments (--hf-*) that don't affect other pipelines.
 
 Key Features:
-- Uses HuggingFace Transformers ASR (default: kotoba-whisper-v2.2)
+- Uses HuggingFace Transformers ASR (default: kotoba-whisper-bilingual-v1.0)
 - Optional scene detection (none, auditok, silero)
 - No external VAD needed (HF pipeline handles chunking internally)
 - Supports any HuggingFace whisper model via --hf-model-id
@@ -60,7 +60,7 @@ class TransformersPipeline(BasePipeline):
         keep_temp_files: bool = False,
         progress_display=None,
         # HF Transformers specific config
-        hf_model_id: str = "kotoba-tech/kotoba-whisper-v2.2",
+        hf_model_id: str = "kotoba-tech/kotoba-whisper-bilingual-v1.0",
         hf_chunk_length: int = 15,
         hf_stride: Optional[float] = None,
         hf_batch_size: int = 16,
