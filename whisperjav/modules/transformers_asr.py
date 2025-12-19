@@ -3,7 +3,7 @@
 HuggingFace Transformers ASR Module for WhisperJAV.
 
 Uses the HuggingFace Transformers pipeline with chunked long-form algorithm
-for audio transcription. Designed for Japanese audio with kotoba-whisper-v2.2
+for audio transcription. Designed for Japanese audio with kotoba-whisper-bilingual-v1.0
 as default, but supports any HuggingFace whisper model.
 
 Based on: https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0#chunked-long-form
@@ -38,8 +38,8 @@ class TransformersASR:
     long audio files.
     """
 
-    # Default values optimized for kotoba-whisper-v2.2
-    DEFAULT_MODEL_ID = "kotoba-tech/kotoba-whisper-v2.2"
+    # Default values optimized for kotoba-whisper-bilingual-v1.0
+    DEFAULT_MODEL_ID = "kotoba-tech/kotoba-whisper-bilingual-v1.0"
     DEFAULT_CHUNK_LENGTH = 15  # Optimal for distil-large-v3 architecture
     DEFAULT_STRIDE = None  # None = chunk_length / 6
     DEFAULT_BATCH_SIZE = 8
@@ -71,7 +71,7 @@ class TransformersASR:
         Initialize TransformersASR.
 
         Args:
-            model_id: HuggingFace model ID (default: kotoba-tech/kotoba-whisper-v2.2)
+            model_id: HuggingFace model ID (default: kotoba-tech/kotoba-whisper-bilingual-v1.0)
             device: Device to use ('auto', 'cuda', 'cpu')
             dtype: Data type ('auto', 'float16', 'bfloat16', 'float32')
             attn_implementation: Attention implementation ('sdpa', 'flash_attention_2', 'eager')
