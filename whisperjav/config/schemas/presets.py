@@ -173,7 +173,7 @@ FASTER_WHISPER_ENGINE_PRESETS = {
         log_progress=False
     ),
     Sensitivity.AGGRESSIVE: FasterWhisperEngineOptions(
-        chunk_length=14,
+        chunk_length=30,  # Increased from 14 to avoid ctranslate2 divide-by-zero crash
         repetition_penalty=1.1,
         no_repeat_ngram_size=2,
         prompt_reset_on_temperature=None,

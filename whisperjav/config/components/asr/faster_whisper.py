@@ -318,7 +318,7 @@ class FasterWhisperASR(ASRComponent):
             append_punctuations=None,
             clip_timestamps=None,
             # Engine options
-            chunk_length=14,  # Only aggressive has this!
+            chunk_length=30,  # Increased from 14 to avoid ctranslate2 divide-by-zero crash
             repetition_penalty=1.1,
             no_repeat_ngram_size=2,
             prompt_reset_on_temperature=None,

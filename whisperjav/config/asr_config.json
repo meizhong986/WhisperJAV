@@ -395,7 +395,7 @@
       "log_progress": false
     },
     "aggressive": {
-      "chunk_length": 14,
+      "chunk_length": 30,
       "repetition_penalty": 1.1,
       "no_repeat_ngram_size": 2.0,
       "prompt_reset_on_temperature": null,
