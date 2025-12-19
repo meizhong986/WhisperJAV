@@ -229,7 +229,7 @@ class DummyProgress:
         getattr(logger, level, logger.info)(message)
     
     def show_file_complete(self, filename: str, subtitle_count: int, output_path: str):
-        logger.info(f"Completed: {Path(filename).name} → {subtitle_count} subtitles")
+        logger.info(f"Completed: {Path(filename).name} -> {subtitle_count} subtitles")
         logger.info(f"Output saved to: {output_path}")
     
     @contextmanager

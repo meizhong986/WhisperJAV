@@ -200,7 +200,7 @@ def enhance_scenes(
 
     logger.info(
         f"Enhancing {total_scenes} scenes with {enhancer.display_name} "
-        f"(input: {enhancer_sr}Hz → output: {TARGET_SAMPLE_RATE}Hz)"
+        f"(input: {enhancer_sr}Hz -> output: {TARGET_SAMPLE_RATE}Hz)"
     )
 
     # Pre-warm the enhancer model before starting progress display
@@ -360,7 +360,7 @@ def enhance_single_audio(
             sf.write(str(output_path), enhanced_audio, TARGET_SAMPLE_RATE)
 
             logger.info(
-                f"Audio enhanced: {audio_path.name} → {output_path.name} "
+                f"Audio enhanced: {audio_path.name} -> {output_path.name} "
                 f"({result.processing_time_sec:.2f}s)"
             )
             return output_path

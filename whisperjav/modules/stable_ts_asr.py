@@ -146,7 +146,7 @@ class StableTSASR:
         """
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
-        # Use smart device detection: CUDA → MPS → CPU
+        # Use smart device detection: CUDA -> MPS -> CPU
         self.device = model_config.get("device", get_best_device())
         # Default to int8 for quantized models (faster-whisper uses CTranslate2 quantized models)
         self.compute_type = model_config.get("compute_type", "int8")

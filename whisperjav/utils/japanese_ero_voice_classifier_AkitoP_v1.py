@@ -202,7 +202,7 @@ def main():
         parser.add_argument("--cache_dir", type=str, default="hf_cache", help="Hugging Face cache directory")
         args = parser.parse_args()
 
-        # Use smart device detection: CUDA → MPS → CPU
+        # Use smart device detection: CUDA -> MPS -> CPU
         device = get_best_device()
         print(f"Device: {device}")
 

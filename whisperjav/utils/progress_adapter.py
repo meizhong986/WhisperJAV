@@ -91,7 +91,7 @@ class ProgressDisplayAdapter:
             
         # Always log completion for user awareness
         short_name = Path(filename).name
-        logger.info(f"✓ {short_name} → {subtitle_count} subtitle{'s' if subtitle_count != 1 else ''}")
+        logger.info(f"✓ {short_name} -> {subtitle_count} subtitle{'s' if subtitle_count != 1 else ''}")
     
     @contextmanager
     def pause_for_input(self):
@@ -136,7 +136,7 @@ class DummyProgressAdapter:
         getattr(logger, level, logger.info)(message)
     
     def show_file_complete(self, filename: str, subtitle_count: int, output_path: str):
-        logger.info(f"✓ Completed: {Path(filename).name} → {subtitle_count} subtitles")
+        logger.info(f"✓ Completed: {Path(filename).name} -> {subtitle_count} subtitles")
         logger.info(f"Output saved to: {output_path}")
     
     @contextmanager

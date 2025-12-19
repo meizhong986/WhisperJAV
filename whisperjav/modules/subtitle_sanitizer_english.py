@@ -312,7 +312,7 @@ class EnglishSubtitleCleaner:
                 sub.content = pattern.sub('', sub.content)
             sub.content = re.sub(r'\s+', ' ', sub.content).strip()
             if original != sub.content:
-                self._add_log(sub, f"[REMOVED ARTEFACTS] {original} → {sub.content}")
+                self._add_log(sub, f"[REMOVED ARTEFACTS] {original} -> {sub.content}")
 
     def _handle_abnormal_cps(self):
         new_subs = []
@@ -377,7 +377,7 @@ class EnglishSubtitleCleaner:
                 sub.content = cleaned
                 duration = self._estimate_duration(cleaned)
                 sub.start = sub.end - timedelta(seconds=duration)
-                self._add_log(sub, f"[REMOVED REPETITIONS] {original} → {cleaned}")
+                self._add_log(sub, f"[REMOVED REPETITIONS] {original} -> {cleaned}")
 
 
     def _drop_empty_subs(self):

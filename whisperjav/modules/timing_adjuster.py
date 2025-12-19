@@ -192,7 +192,7 @@ class TimingAdjuster:
             'modified_text': modified_sub.text
         }]
         
-        logger.debug(f"Sub {modified_sub.index}: {reason} timing: {original_duration:.1f}s → {new_duration:.1f}s")
+        logger.debug(f"Sub {modified_sub.index}: {reason} timing: {original_duration:.1f}s -> {new_duration:.1f}s")
         
         return adjusted_sub, modifications
 
@@ -315,7 +315,7 @@ class TimingAdjuster:
             'strategy': 'user_condition_a'
         }]
         
-        logger.debug(f"Sub {modified_sub.index}: Content-based timing: {original_duration:.1f}s → {new_duration:.1f}s")
+        logger.debug(f"Sub {modified_sub.index}: Content-based timing: {original_duration:.1f}s -> {new_duration:.1f}s")
         return adjusted_sub, modifications
         
     def _apply_threshold_based_timing_adjustment(self,
@@ -374,5 +374,5 @@ class TimingAdjuster:
             'strategy': 'user_condition_b'
         }]
         
-        logger.debug(f"Sub {modified_sub.index}: Threshold-based timing: {current_duration_s:.1f}s → {new_duration:.1f}s")
+        logger.debug(f"Sub {modified_sub.index}: Threshold-based timing: {current_duration_s:.1f}s -> {new_duration:.1f}s")
         return adjusted_sub, modifications

@@ -43,7 +43,7 @@ class FasterWhisperProASR:
         self.tracer = tracer if tracer is not None else NullTracer()
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
-        # Use smart device detection: CUDA → MPS → CPU
+        # Use smart device detection: CUDA -> MPS -> CPU
         self.device = model_config.get("device", get_best_device())
 
         # Smart compute_type default based on device (ctranslate2 backend)
@@ -313,7 +313,7 @@ class FasterWhisperProASR:
         # 1. Parameter name mapping
         if 'logprob_threshold' in final_params:
             final_params['log_prob_threshold'] = final_params.pop('logprob_threshold')
-            logger.debug("Renamed logprob_threshold → log_prob_threshold")
+            logger.debug("Renamed logprob_threshold -> log_prob_threshold")
 
         # 2. Type conversions for ctranslate2 compatibility
 
@@ -325,7 +325,7 @@ class FasterWhisperProASR:
                 logger.debug(f"Converted suppress_tokens from tuple to list ({len(tokens)} tokens)")
             elif isinstance(tokens, int):
                 final_params['suppress_tokens'] = [tokens]
-                logger.debug(f"Wrapped suppress_tokens int in list: {tokens} → [{tokens}]")
+                logger.debug(f"Wrapped suppress_tokens int in list: {tokens} -> [{tokens}]")
             elif not isinstance(tokens, list):
                 logger.warning(f"Invalid suppress_tokens type: {type(tokens)}, removing")
                 del final_params['suppress_tokens']
@@ -335,7 +335,7 @@ class FasterWhisperProASR:
             try:
                 original_value = final_params['no_repeat_ngram_size']
                 final_params['no_repeat_ngram_size'] = int(original_value)
-                logger.debug(f"Converted no_repeat_ngram_size to int: {original_value} → {final_params['no_repeat_ngram_size']}")
+                logger.debug(f"Converted no_repeat_ngram_size to int: {original_value} -> {final_params['no_repeat_ngram_size']}")
             except (ValueError, TypeError):
                 logger.warning(f"Invalid no_repeat_ngram_size value, removing: {final_params['no_repeat_ngram_size']}")
                 del final_params['no_repeat_ngram_size']
@@ -415,7 +415,7 @@ class FasterWhisperProASR:
         if 'task' in kwargs:
             runtime_task = kwargs.pop('task')
             if runtime_task != self.task:
-                logger.info(f"Task override: '{self.task}' → '{runtime_task}' (runtime)")
+                logger.info(f"Task override: '{self.task}' -> '{runtime_task}' (runtime)")
                 self.whisper_params['task'] = runtime_task
                 self.task = runtime_task
 
@@ -423,7 +423,7 @@ class FasterWhisperProASR:
 
         # Log current task at INFO level for translation debugging
         if self.task == 'translate':
-            logger.info(f"Transcribing '{audio_path.name}' with task='translate' → output will be in English")
+            logger.info(f"Transcribing '{audio_path.name}' with task='translate' -> output will be in English")
         else:
             logger.debug(f"Transcribing '{audio_path.name}' with task='{self.task}'")
 

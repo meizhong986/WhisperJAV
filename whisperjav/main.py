@@ -1109,7 +1109,7 @@ def main():
         override_model_config = {
             "provider": "openai_whisper",  # Default provider
             "model_name": args.model,
-            "device": get_best_device(),  # Auto-detect: CUDA → MPS → CPU
+            "device": get_best_device(),  # Auto-detect: CUDA -> MPS -> CPU
             "compute_type": "int8",  # Default to int8 for quantized models (CTranslate2)
             "supported_tasks": ["transcribe", "translate"]
         }

@@ -43,7 +43,7 @@ class WhisperProASR:
         self.tracer = tracer if tracer is not None else NullTracer()
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
-        # Use smart device detection: CUDA → MPS → CPU
+        # Use smart device detection: CUDA -> MPS -> CPU
         self.device = model_config.get("device", get_best_device())
         
         decoder_params = params["decoder"]
@@ -190,7 +190,7 @@ class WhisperProASR:
         if 'task' in kwargs:
             runtime_task = kwargs.pop('task')
             if runtime_task != self.task:
-                logger.info(f"Task override: '{self.task}' → '{runtime_task}' (runtime)")
+                logger.info(f"Task override: '{self.task}' -> '{runtime_task}' (runtime)")
                 self.whisper_params['task'] = runtime_task
                 self.task = runtime_task
 
@@ -198,7 +198,7 @@ class WhisperProASR:
 
         # Log current task at INFO level for translation debugging
         if self.task == 'translate':
-            logger.info(f"Transcribing '{audio_path.name}' with task='translate' → output will be in English")
+            logger.info(f"Transcribing '{audio_path.name}' with task='translate' -> output will be in English")
         else:
             logger.debug(f"Transcribing '{audio_path.name}' with task='{self.task}'")
         
