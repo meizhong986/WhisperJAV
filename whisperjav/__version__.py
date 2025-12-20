@@ -13,6 +13,5 @@ __version_info__ = {
     "minor": 7,
     "patch": 3,
     "release": "",
-    "label": "",
     "architecture": "v4.4"
 }

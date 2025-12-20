@@ -96,45 +96,6 @@ echo   - Config file: %CONFIG_FILE% (found)
 echo   - Config file: %CONFIG_FILE% >> "%BUILD_LOG%"
 echo.
 
-REM ===== Phase 1b: Copy shared files from parent installer/ directory =====
-echo [Phase 1b] Copying shared installer files...
-echo [Phase 1b] Copying shared files... >> "%BUILD_LOG%"
-
-REM Copy upgrade scripts from parent directory if they exist
-if exist "..\upgrade_whisperjav.py" (
-    copy /Y "..\upgrade_whisperjav.py" "upgrade_whisperjav.py" >nul
-    echo   - Copied: upgrade_whisperjav.py
-    echo   - Copied: upgrade_whisperjav.py >> "%BUILD_LOG%"
-) else (
-    echo   - WARNING: upgrade_whisperjav.py not found in parent directory
-    echo   - WARNING: upgrade_whisperjav.py missing >> "%BUILD_LOG%"
-)
-
-if exist "..\upgrade_whisperjav.bat" (
-    copy /Y "..\upgrade_whisperjav.bat" "upgrade_whisperjav.bat" >nul
-    echo   - Copied: upgrade_whisperjav.bat
-    echo   - Copied: upgrade_whisperjav.bat >> "%BUILD_LOG%"
-) else (
-    echo   - WARNING: upgrade_whisperjav.bat not found in parent directory
-    echo   - WARNING: upgrade_whisperjav.bat missing >> "%BUILD_LOG%"
-)
-
-REM Copy LICENSE and icon if not already present
-if not exist "LICENSE.txt" (
-    if exist "..\LICENSE.txt" (
-        copy /Y "..\LICENSE.txt" "LICENSE.txt" >nul
-        echo   - Copied: LICENSE.txt
-    )
-)
-
-if not exist "whisperjav_icon.ico" (
-    if exist "..\whisperjav_icon.ico" (
-        copy /Y "..\whisperjav_icon.ico" "whisperjav_icon.ico" >nul
-        echo   - Copied: whisperjav_icon.ico
-    )
-)
-echo.
-
 REM ===== Phase 2: Verify WhisperJAV Wheel =====
 echo [Phase 2/6] Checking for WhisperJAV wheel...
 echo [Phase 2/6] Checking wheel... >> "%BUILD_LOG%"

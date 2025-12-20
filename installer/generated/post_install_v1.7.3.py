@@ -63,44 +63,35 @@ class TorchInstallPlan(NamedTuple):
     reason: str
 
 
-# IMPORTANT: ctranslate2 (faster-whisper) does NOT support CUDA 13.
-# Even for CUDA 13+ drivers, we must use cu128 wheels.
-# PyTorch 2.9.0 is the maximum version available for cu128.
 TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
-    # CUDA 13.x drivers (580+) - use cu128 due to ctranslate2 compatibility
     DriverMatrixEntry(
         (580, 65, 0),
-        "CUDA 12.8 (cu128)",  # Label reflects actual wheels, not driver CUDA
-        "pip install torch==2.9.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu128"
+        "CUDA 13.0",
+        "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu128"
     ),
-    # CUDA 12.8 drivers (570+)
     DriverMatrixEntry(
         (570, 65, 0),
-        "CUDA 12.8 (cu128)",
-        "pip install torch==2.9.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu128"
+        "CUDA 12.8",
+        "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu128"
     ),
-    # CUDA 12.6 drivers (560+)
     DriverMatrixEntry(
         (560, 76, 0),
-        "CUDA 12.6 (cu126)",
-        "pip install torch==2.9.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu126"
+        "CUDA 12.6",
+        "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu126"
     ),
-    # CUDA 12.4 drivers (551+)
     DriverMatrixEntry(
         (551, 61, 0),
-        "CUDA 12.4 (cu124)",
+        "CUDA 12.4",
         "pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124"
     ),
-    # CUDA 12.1 drivers (531+)
     DriverMatrixEntry(
         (531, 14, 0),
-        "CUDA 12.1 (cu121)",
+        "CUDA 12.1",
         "pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121"
     ),
-    # CUDA 11.8 drivers (520+) - oldest supported
     DriverMatrixEntry(
         (520, 6, 0),
-        "CUDA 11.8 (cu118)",
+        "CUDA 11.8",
         "pip install torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu118"
     ),
 )
@@ -225,188 +216,42 @@ def detect_nvidia_driver() -> DriverInfo:
     return DriverInfo(None, None, "none")
 
 
-def get_installed_torch_info() -> Optional[dict]:
-    """
-    Get information about the currently installed PyTorch.
-
-    Returns:
-        dict with 'torch_version', 'torchaudio_version', 'cuda_version', 'cuda_available'
-        or None if PyTorch is not installed.
-    """
+def verify_existing_torch_stack() -> bool:
+    """Return True if CUDA-enabled torch and torchaudio meet requirements."""
+    log("Checking for existing CUDA-enabled PyTorch and torchaudio...")
     try:
         import torch
-    except ImportError:
-        return None
-
-    info = {
-        'torch_version': torch.__version__,
-        'torchaudio_version': None,
-        'cuda_version': None,
-        'cuda_available': torch.cuda.is_available(),
-    }
-
-    try:
         import torchaudio
-        info['torchaudio_version'] = torchaudio.__version__
-    except ImportError:
-        pass
-
-    if info['cuda_available']:
-        cuda_str = getattr(torch.version, "cuda", "") or ""
-        info['cuda_version'] = parse_version_string(cuda_str)
-
-    return info
-
-
-def extract_versions_from_plan(plan: 'TorchInstallPlan') -> dict:
-    """
-    Extract PyTorch version and CUDA tag from install plan.
-
-    Returns:
-        dict with 'torch_version' (tuple or None), 'cuda_tag' (str or None), 'cuda_version' (tuple or None)
-    """
-    import re
-    result = {
-        'torch_version': None,
-        'cuda_tag': None,
-        'cuda_version': None,
-    }
-
-    if not plan.uses_gpu:
-        return result
-
-    # Extract CUDA tag from URL (e.g., ".../whl/cu128")
-    cuda_match = re.search(r'/whl/(cu\d+)', plan.pip_command)
-    if cuda_match:
-        result['cuda_tag'] = cuda_match.group(1)
-        result['cuda_version'] = cuda_tag_to_version(result['cuda_tag'])
-
-    # Extract PyTorch version if specified (e.g., "torch==2.6.0")
-    torch_match = re.search(r'torch==(\d+\.\d+\.\d+)', plan.pip_command)
-    if torch_match:
-        result['torch_version'] = parse_version_string(torch_match.group(1))
-
-    return result
-
-
-def cuda_tag_to_version(cuda_tag: str) -> Optional[Tuple[int, int, int]]:
-    """
-    Convert CUDA tag (e.g., 'cu121', 'cu128') to version tuple.
-
-    Examples:
-        'cu118' -> (11, 8, 0)
-        'cu121' -> (12, 1, 0)
-        'cu124' -> (12, 4, 0)
-        'cu126' -> (12, 6, 0)
-        'cu128' -> (12, 8, 0)
-    """
-    if not cuda_tag or not cuda_tag.startswith('cu'):
-        return None
-
-    digits = cuda_tag[2:]  # Remove 'cu' prefix
-    if len(digits) == 3:  # cu121 -> 12.1, cu128 -> 12.8
-        major = int(digits[:2])
-        minor = int(digits[2:])
-        return (major, minor, 0)
-    elif len(digits) == 2:  # cu11 -> 11.0 (unlikely but handle)
-        return (int(digits), 0, 0)
-    return None
-
-
-def verify_existing_torch_matches_plan(plan: 'TorchInstallPlan') -> bool:
-    """
-    Check if installed PyTorch matches what the install plan would install.
-
-    Checks BOTH PyTorch version AND CUDA version:
-    - If installed PyTorch >= plan's PyTorch (or plan has no version = latest)
-    - AND installed CUDA >= plan's CUDA
-    - THEN skip installation
-
-    This enables smart skipping for upgrade users who already have the correct
-    PyTorch version installed, avoiding unnecessary reinstallation.
-
-    Returns:
-        True if installed PyTorch satisfies the plan (can skip installation).
-        False if installation is needed.
-    """
-    log("Checking for existing PyTorch installation...")
-
-    installed = get_installed_torch_info()
-    if not installed:
-        log("PyTorch not installed. Installation required.")
+    except ImportError as exc:
+        log(f"PyTorch stack missing: {exc}")
         return False
 
-    log(f"Found PyTorch {installed['torch_version']}")
-    if installed['torchaudio_version']:
-        log(f"Found torchaudio {installed['torchaudio_version']}")
-    else:
-        log("torchaudio not installed.")
+    log(f"Found PyTorch {torch.__version__}")
+    try:
+        log(f"Found torchaudio {torchaudio.__version__}")
+    except Exception:
+        log("Unable to determine torchaudio version.")
+    cuda_available = torch.cuda.is_available()
+    log(f"PyTorch CUDA available: {'YES' if cuda_available else 'NO'}")
 
-    # Case 1: Plan is CPU-only
-    if not plan.uses_gpu:
-        if installed['cuda_available']:
-            log("Plan is CPU-only but CUDA PyTorch is installed. Keeping existing CUDA version.")
-            return True  # Keep the better version
-        else:
-            log("CPU-only PyTorch already installed. Skipping reinstall.")
-            return True
-
-    # Case 2: Plan requires GPU but installed is CPU-only
-    if not installed['cuda_available']:
-        log("Plan requires CUDA but installed PyTorch is CPU-only. Installation required.")
+    if not cuda_available:
         return False
 
-    # Case 3: Both are CUDA - compare BOTH PyTorch and CUDA versions
-    installed_cuda = installed['cuda_version']
-    installed_torch = parse_version_string(installed['torch_version'].split('+')[0])  # Remove +cu128 suffix
-
-    plan_info = extract_versions_from_plan(plan)
-    plan_cuda = plan_info['cuda_version']
-    plan_torch = plan_info['torch_version']
-
-    log(f"Installed: PyTorch {format_version_tuple(installed_torch)}, CUDA {format_version_tuple(installed_cuda)}")
-    log(f"Plan targets: PyTorch {format_version_tuple(plan_torch) if plan_torch else 'latest'}, CUDA {plan_info['cuda_tag']} ({format_version_tuple(plan_cuda)})")
-
-    # Validate we can determine installed versions
-    if not installed_cuda:
-        log("Cannot determine installed CUDA version. Installation required.")
+    cuda_str = getattr(torch.version, "cuda", "") or ""
+    cuda_tuple = parse_version_string(cuda_str)
+    if not cuda_tuple:
+        log("Unable to determine PyTorch CUDA version; reinstall required.")
         return False
 
-    if not installed_torch:
-        log("Cannot determine installed PyTorch version. Installation required.")
-        return False
-
-    if not plan_cuda:
-        log("Cannot determine plan's target CUDA version. Will proceed with installation.")
-        return False
-
-    # Compare CUDA versions (major.minor)
-    installed_cuda_mm = (installed_cuda[0], installed_cuda[1])
-    plan_cuda_mm = (plan_cuda[0], plan_cuda[1])
-
-    cuda_ok = installed_cuda_mm >= plan_cuda_mm
-
-    # Compare PyTorch versions
-    # If plan has no specific version (uses latest), any recent version is OK
-    if plan_torch:
-        torch_ok = installed_torch >= plan_torch
-    else:
-        # Plan uses latest - if user has 2.0+, consider it OK
-        torch_ok = installed_torch >= (2, 0, 0)
-
-    log(f"CUDA check: {installed_cuda_mm} >= {plan_cuda_mm} = {cuda_ok}")
-    log(f"PyTorch check: {format_version_tuple(installed_torch)} >= {format_version_tuple(plan_torch) if plan_torch else '2.0.0'} = {torch_ok}")
-
-    if cuda_ok and torch_ok:
-        log("Both PyTorch and CUDA versions satisfy requirements. Skipping reinstall.")
+    if cuda_tuple >= MIN_TORCH_CUDA_VERSION:
+        log(f"Existing PyTorch satisfies CUDA >= {format_version_tuple(MIN_TORCH_CUDA_VERSION)}. Skipping reinstall.")
         return True
 
-    if not cuda_ok:
-        log(f"Installed CUDA {installed_cuda[0]}.{installed_cuda[1]} < plan's {plan_cuda[0]}.{plan_cuda[1]}.")
-    if not torch_ok:
-        log(f"Installed PyTorch {format_version_tuple(installed_torch)} < plan's {format_version_tuple(plan_torch)}.")
-
-    log("Upgrade recommended.")
+    log(
+        "Installed PyTorch CUDA version "
+        f"{format_version_tuple(cuda_tuple)} is below required "
+        f"{format_version_tuple(MIN_TORCH_CUDA_VERSION)}. Reinstalling..."
+    )
     return False
 
 
@@ -611,37 +456,15 @@ def check_cuda_driver() -> DriverInfo:
 
 
 def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
-    """
-    Install PyTorch/Torchaudio with best available acceleration.
-
-    Smart detection for upgrade users:
-    - Detects currently installed PyTorch version and CUDA
-    - Compares against what would be installed based on driver
-    - Skips installation if existing version is compatible
-    - Only installs/upgrades when necessary
-    """
+    """Install PyTorch/Torchaudio with best available acceleration."""
     log_section("PyTorch Installation")
 
-    # First, detect driver and determine what we WOULD install
+    if verify_existing_torch_stack():
+        return True
+
     driver_info = driver_info or detect_nvidia_driver()
     plan = select_torch_install_plan(driver_info)
 
-    log(f"Installation plan: {plan.description}")
-    if plan.uses_gpu:
-        log(f"Target: {plan.target_label} for {plan.gpu_name or 'GPU'}")
-    else:
-        log(f"Target: CPU-only ({plan.reason})")
-
-    # Check if existing installation satisfies the plan
-    if verify_existing_torch_matches_plan(plan):
-        log("")
-        log("=" * 60)
-        log("  Existing PyTorch installation is compatible!")
-        log("  Skipping PyTorch reinstallation (saves time & bandwidth)")
-        log("=" * 60)
-        return True
-
-    # Need to install - confirm with user for CPU-only
     if plan.uses_gpu:
         log(
             f"Preparing to install CUDA-enabled PyTorch ({plan.target_label}) "
@@ -791,12 +614,6 @@ def print_installation_summary(install_start_time: float):
     except Exception:
         log(f"  ? PyTorch: Status unknown")
 
-    try:
-        import numpy as np
-        log(f"  ✓ NumPy: {np.__version__}")
-    except Exception:
-        log(f"  ? NumPy: Status unknown")
-
     if check_webview2_windows():
         log(f"  ✓ WebView2 runtime: Detected")
     else:
@@ -805,9 +622,6 @@ def print_installation_summary(install_start_time: float):
 
     log(f"  ✓ Desktop shortcut: Created")
     log(f"  ✓ Installation time: {minutes}m {seconds}s")
-    log("")
-    log("New in v1.7.3:")
-    log("  ✓ Speech enhancement backends (ZipEnhancer, ClearVoice, BS-RoFormer)")
     log("")
     log("Next Steps:")
     log("  1. Launch WhisperJAV from the desktop shortcut")
@@ -957,81 +771,20 @@ def main() -> int:
     log_section("Phase 4: Python Dependencies Installation")
 
     req_path = os.path.join(sys.prefix, "requirements_v1.7.3.txt")
-    constraints_path = os.path.join(sys.prefix, "constraints_v1.7.3.txt")
-
     if not os.path.exists(req_path):
         log(f"ERROR: requirements_v1.7.3.txt not found at {req_path}")
         create_failure_file(f"Missing requirements file: {req_path}")
         return 1
 
-    # === Phase 4a: Install git-based packages separately ===
-    # These packages are installed first to avoid pip resolution complexity.
-    # Installing them individually prevents combinatorial explosion in dependency resolution.
-    log_section("Phase 4a: Git-based Packages (installed separately)")
-
-    git_packages = [
-        ("ffmpeg-python", "git+https://github.com/kkroening/ffmpeg-python.git"),
-        ("openai-whisper", "git+https://github.com/openai/whisper@main"),
-        ("stable-ts", "git+https://github.com/meizhong986/stable-ts-fix-setup.git@main"),
-    ]
-
-    for pkg_name, pkg_url in git_packages:
-        log(f"Installing {pkg_name} from GitHub...")
-        if not run_pip(
-            ["install", pkg_url, "--progress-bar", "on"],
-            f"Install {pkg_name}"
-        ):
-            log(f"WARNING: {pkg_name} installation failed, continuing...")
-            # Non-fatal for ffmpeg-python, but whisper packages are important
-            if pkg_name in ("openai-whisper", "stable-ts"):
-                log(f"ERROR: {pkg_name} is required. Installation may be incomplete.")
-
-    # === Phase 4b: Install clearvoice first (with its stated deps) ===
-    # clearvoice's metadata declares numpy<2.0 and librosa==0.10.0, but it actually works
-    # with numpy 2.0+ and librosa 0.11.0+ (tested). We install it first to get all its
-    # dependencies, then upgrade numpy/librosa to the versions we want.
-    log_section("Phase 4b: ClearVoice (install with all dependencies)")
-    log("Installing clearvoice (this brings in numpy<2.0 temporarily)...")
-    if not run_pip(
-        ["install", "clearvoice", "--progress-bar", "on"],
-        "Install clearvoice"
-    ):
-        log("WARNING: clearvoice installation failed, continuing...")
-
-    # === Phase 4c: Main requirements ===
-    log_section("Phase 4c: PyPI Dependencies")
     log(f"Installing dependencies from: {req_path}")
     log("This will download ~500MB of packages. Please wait...")
-    log("(v1.7.3 includes speech enhancement backends)")
 
-    # Use constraints file if available to protect PyTorch version
-    if os.path.exists(constraints_path):
-        log(f"Using constraints file to protect PyTorch: {constraints_path}")
-        if not run_pip(
-            ["install", "-c", constraints_path, "-r", req_path, "--progress-bar", "on"],
-            "Install Python dependencies (with constraints)"
-        ):
-            create_failure_file("Dependencies installation failed")
-            return 1
-    else:
-        if not run_pip(
-            ["install", "-r", req_path, "--progress-bar", "on"],
-            "Install Python dependencies"
-        ):
-            create_failure_file("Dependencies installation failed")
-            return 1
-
-    # === Phase 4d: Fix numpy and librosa versions (MUST BE LAST pip phase) ===
-    # clearvoice declares numpy<2.0 and older librosa in its metadata, but works with latest.
-    # Upgrade these two - all other packages are resolved correctly by pip.
-    log_section("Phase 4d: Fix Package Versions (Final)")
-
-    log("Upgrading numpy and librosa to latest (clearvoice works with them despite metadata)...")
     if not run_pip(
-        ["install", "numpy>=2.0", "librosa", "--upgrade", "--progress-bar", "on"],
-        "Upgrade NumPy and librosa to latest"
+        ["install", "-r", req_path, "--progress-bar", "on"],
+        "Install Python dependencies"
     ):
-        log("WARNING: Package upgrade failed, continuing...")
+        create_failure_file("Dependencies installation failed")
+        return 1
 
     # === Phase 5: WhisperJAV Application ===
     log_section("Phase 5: WhisperJAV Application Installation")
