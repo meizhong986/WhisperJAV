@@ -55,7 +55,7 @@ install_requires = [
     "simplejson",             # ModelScope dependency (JSON parsing)
     "sortedcontainers",       # ModelScope dependency (sorted collections)
     "packaging",              # ModelScope dependency (version parsing)
-    "clearvoice",             # ClearerVoice denoising (MossFormer2 48kHz)
+    "clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",  # Fork with NumPy 2.x support
     "bs-roformer-infer",      # BS-RoFormer vocal isolation (44.1kHz)
     "onnxruntime>=1.16.0",    # ONNX inference for ZipEnhancer ONNX mode
 
