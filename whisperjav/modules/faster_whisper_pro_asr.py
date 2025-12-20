@@ -22,6 +22,7 @@ import logging
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
 from whisperjav.utils.parameter_tracer import NullTracer
+from whisperjav.utils.crash_tracer import get_tracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 
@@ -555,23 +556,83 @@ class FasterWhisperProASR:
         )
 
         try:
+            # CRASH TRACER: Record state before transcribe call
+            crash_tracer = get_tracer()
+            duration = len(audio_data) / sample_rate
+            crash_tracer.trace_transcribe_start(
+                audio_info={
+                    "shape": audio_data.shape,
+                    "dtype": str(audio_data.dtype),
+                    "duration_sec": duration,
+                    "sample_rate": sample_rate,
+                    "context": "full_audio",
+                },
+                params=whisper_params
+            )
+
             # faster-whisper returns (generator, info) tuple
             segments_generator, transcription_info = self.whisper_model.transcribe(
                 audio_data,
                 **whisper_params
             )
 
-            # Consume generator and convert to dict format
+            # CRASH TRACER: Generator created
+            crash_tracer.trace_transcribe_generator_created(transcription_info)
+
+            # Consume generator with explicit next() for granular crash tracing
             raw_segments = []
-            for segment in segments_generator:
+            seg_idx = 0
+            while True:
+                # CRASH TRACER: Before calling next() on generator
+                crash_tracer.checkpoint(
+                    "generator_next_before",
+                    segment_index=seg_idx,
+                    segments_so_far=len(raw_segments),
+                    context="full_audio"
+                )
+
+                try:
+                    segment = next(segments_generator)
+
+                    # CRASH TRACER: After successful next()
+                    crash_tracer.checkpoint(
+                        "generator_next_after",
+                        segment_index=seg_idx,
+                        start=float(segment.start),
+                        end=float(segment.end),
+                        text_len=len(segment.text) if segment.text else 0,
+                        context="full_audio"
+                    )
+
+                except StopIteration:
+                    # CRASH TRACER: Generator exhausted normally
+                    crash_tracer.checkpoint(
+                        "generator_exhausted",
+                        total_segments=len(raw_segments),
+                        context="full_audio"
+                    )
+                    break
+
+                # CRASH TRACER: Each segment
+                crash_tracer.trace_segment(
+                    index=seg_idx,
+                    start=segment.start,
+                    end=segment.end,
+                    text_len=len(segment.text) if segment.text else 0
+                )
+
                 raw_segments.append({
                     "start": segment.start,
                     "end": segment.end,
                     "text": segment.text.strip(),
                     "avg_logprob": segment.avg_logprob
                 })
+                seg_idx += 1
 
             logger.debug(f"Full audio transcription produced {len(raw_segments)} segments")
+
+            # CRASH TRACER: Transcription complete
+            crash_tracer.trace_transcribe_complete(len(raw_segments))
 
             # Apply segment filtering (same as VAD path)
             filtered_segments = self._segment_filter.filter_segments(raw_segments)
@@ -580,6 +641,9 @@ class FasterWhisperProASR:
             return filtered_segments
 
         except Exception as e:
+            # CRASH TRACER: Record error
+            crash_tracer = get_tracer()
+            crash_tracer.trace_error(e, context="full_audio")
             logger.error(f"Full audio transcription failed: {type(e).__name__}: {e}")
             raise
 
@@ -643,27 +707,87 @@ class FasterWhisperProASR:
             else:
                 logger.debug(f"Transcribing with task='{actual_task}'")
 
+            # CRASH TRACER: Record state before transcribe call
+            crash_tracer = get_tracer()
+            crash_tracer.trace_transcribe_start(
+                audio_info={
+                    "shape": group_audio.shape,
+                    "dtype": str(group_audio.dtype),
+                    "duration_sec": end_sec - start_sec,
+                    "start_sec": start_sec,
+                    "end_sec": end_sec,
+                    "sample_rate": sample_rate,
+                },
+                params=whisper_params
+            )
+
             # CHANGED: faster-whisper returns (generator, info) tuple
             segments_generator, transcription_info = self.whisper_model.transcribe(
                 group_audio,
                 **whisper_params
             )
 
+            # CRASH TRACER: Generator created
+            crash_tracer.trace_transcribe_generator_created(transcription_info)
+
             logger.debug("DIAGNOSTIC: transcribe() call successful, got generator and info")
             logger.debug(f"  Info type: {type(transcription_info)}")
             logger.debug(f"  Generator type: {type(segments_generator)}")
 
-            # CHANGED: Consume generator and convert to dict format
+            # CHANGED: Consume generator with explicit next() for granular crash tracing
             raw_segments = []
-            for segment in segments_generator:
+            seg_idx = 0
+            while True:
+                # CRASH TRACER: Before calling next() on generator
+                crash_tracer.checkpoint(
+                    "generator_next_before",
+                    segment_index=seg_idx,
+                    segments_so_far=len(raw_segments)
+                )
+
+                try:
+                    # This is where ctranslate2 does the actual work
+                    segment = next(segments_generator)
+
+                    # CRASH TRACER: After successful next() - segment received
+                    crash_tracer.checkpoint(
+                        "generator_next_after",
+                        segment_index=seg_idx,
+                        start=float(segment.start),
+                        end=float(segment.end),
+                        text_len=len(segment.text) if segment.text else 0,
+                        has_words=hasattr(segment, 'words') and segment.words is not None
+                    )
+
+                except StopIteration:
+                    # CRASH TRACER: Generator exhausted normally
+                    crash_tracer.checkpoint(
+                        "generator_exhausted",
+                        total_segments=len(raw_segments)
+                    )
+                    break
+
+                # CRASH TRACER: Each segment (legacy trace point)
+                crash_tracer.trace_segment(
+                    index=seg_idx,
+                    start=segment.start,
+                    end=segment.end,
+                    text_len=len(segment.text) if segment.text else 0
+                )
+
                 raw_segments.append({
                     "start": segment.start,
                     "end": segment.end,
                     "text": segment.text,
                     "avg_logprob": segment.avg_logprob
                 })
+                seg_idx += 1
 
             logger.debug(f"DIAGNOSTIC: Generator consumed successfully, got {len(raw_segments)} raw segments")
+
+            # CRASH TRACER: Transcription complete
+            crash_tracer.trace_transcribe_complete(len(raw_segments))
+
             result = {"segments": raw_segments}
 
             # Validate translation output - warn if translation was requested but output appears Japanese
@@ -683,6 +807,10 @@ class FasterWhisperProASR:
                     logger.info(f"Translation output validation: appears to be English (good)")
 
         except Exception as e:
+            # CRASH TRACER: Record error
+            crash_tracer = get_tracer()
+            crash_tracer.trace_error(e, context=f"vad_group_{start_sec:.2f}s-{end_sec:.2f}s")
+
             # DIAGNOSTIC: Enhanced error logging
             logger.error("=" * 60)
             logger.error("DIAGNOSTIC: Transcription FAILED")
