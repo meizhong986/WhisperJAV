@@ -5,16 +5,14 @@
 # PyTorch is installed separately in post_install_v1.7.3.py
 # with CUDA version detection.
 #
-# IMPORTANT: Use with constraints file to prevent version conflicts:
-# pip install -c constraints_v1.7.3.txt -r requirements_v1.7.3.txt
-#
 # Installation: pip install -r requirements_v1.7.3.txt
 
 # ----------------------------------------
 # Core Whisper Dependencies
 # ----------------------------------------
-# NOTE: Git-based packages (openai-whisper, stable-ts, ffmpeg-python) are installed
-# separately in post_install.py to avoid pip resolution complexity.
+# Git-based installs from main branches
+openai-whisper @ git+https://github.com/openai/whisper@main
+stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main
 
 # Whisper variants
 faster-whisper>=1.1.0
@@ -22,35 +20,12 @@ faster-whisper>=1.1.0
 # ----------------------------------------
 # Audio and Signal Processing
 # ----------------------------------------
-# NOTE: ffmpeg-python is installed separately from GitHub in post_install.py
-# (PyPI tarball fails due to setup.py calling `git rev-parse HEAD`)
+ffmpeg-python         # FFmpeg Python bindings
 soundfile             # Audio file I/O
 auditok               # Voice Activity Detection (VAD)
 silero-vad>=6.0       # Silero VAD for scene detection
-librosa>=0.11.0       # Audio analysis (v0.11.0+ supports NumPy 2.0)
+librosa               # Audio analysis
 pyloudnorm            # Audio normalization
-pydub                 # Audio segment processing
-
-# ----------------------------------------
-# Speech Segmentation Backends (v1.7.2)
-# ----------------------------------------
-ten-vad                                                          # TEN Framework VAD
-# NOTE: nemo_toolkit removed from v1.7.3 installer (500MB+ download, only 10% usage)
-# NeMo VAD option is disabled in GUI. Will be available as optional install in future.
-
-# ----------------------------------------
-# Speech Enhancement Backends (v1.7.3)
-# ----------------------------------------
-modelscope>=1.20          # ZipEnhancer 16kHz (recommended, lightweight SOTA)
-addict                    # ModelScope dependency (dict with attribute access)
-datasets>=2.14.0,<4.0     # 4.x breaks modelscope
-simplejson                # ModelScope dependency (JSON parsing)
-sortedcontainers          # ModelScope dependency (sorted collections)
-packaging                 # ModelScope dependency (version parsing)
-# NOTE: clearvoice installed separately in Phase 4b of post_install.py
-# Then numpy/librosa upgraded in Phase 4c (clearvoice works with numpy 2.0+)
-bs-roformer-infer         # BS-RoFormer vocal isolation (44.1kHz, music separation)
-onnxruntime>=1.16.0       # ONNX inference for ZipEnhancer ONNX mode
 
 # ----------------------------------------
 # GUI Framework (PyWebView)
@@ -62,8 +37,9 @@ pywin32>=305; platform_system=="Windows"  # Windows COM support for shortcuts
 # ----------------------------------------
 # Scientific Computing
 # ----------------------------------------
-numpy>=2.0            # Array operations (NumPy 2.x, modelscope/zipenhancer compatible)
-scipy>=1.10.1         # Signal processing
+numpy                 # Array operations
+scipy                 # Signal processing
+matplotlib            # Plotting (for diagnostics)
 
 # ----------------------------------------
 # Subtitle Processing
@@ -81,7 +57,7 @@ google-genai>=1.39.0  # Required for Gemini provider in PySubtrans
 # ----------------------------------------
 # HuggingFace Transformers Pipeline
 # ----------------------------------------
-huggingface-hub>=0.25.0  # Hugging Face cache management
+huggingface-hub>=0.25.0  # Hugging Face cache management (faster-whisper models)
 transformers>=4.40.0     # HuggingFace Transformers for ASR pipeline (kotoba-whisper)
 accelerate>=0.26.0       # Efficient model loading for Transformers
 
@@ -91,9 +67,9 @@ accelerate>=0.26.0       # Efficient model loading for Transformers
 tqdm                  # Progress bars
 aiofiles              # Async file I/O
 jsonschema            # Config validation
+Pillow                # Image processing
 colorama              # Colored console output
 requests              # HTTP requests
-regex                 # Advanced regex for Japanese text processing
 
 # ----------------------------------------
 # Configuration System
@@ -105,4 +81,3 @@ PyYAML>=6.0           # YAML config file parsing
 # Optional: Performance Optimization
 # ----------------------------------------
 numba                 # JIT compilation for speedups
-hf_xet                # Faster HuggingFace downloads (Xet Storage)

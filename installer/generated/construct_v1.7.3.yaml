@@ -7,11 +7,6 @@
 # - Defers AI model downloads to first application run
 # - Checks for WebView2 and provides download link if missing
 #
-# New in v1.7.3:
-# - Speech enhancement backends (ZipEnhancer, ClearVoice, BS-RoFormer)
-# - NumPy 2.x support
-# - Constraints file for dependency protection
-#
 # Build command: constructor . --config construct_v1.7.3.yaml
 # Output: WhisperJAV-1.7.3-Windows-x86_64.exe
 
@@ -45,15 +40,11 @@ extra_files:
   - post_install_v1.7.3.bat
   - post_install_v1.7.3.py
   - requirements_v1.7.3.txt
-  - constraints_v1.7.3.txt
   - WhisperJAV_Launcher_v1.7.3.py
   - README_INSTALLER_v1.7.3.txt
   - LICENSE.txt
   - whisperjav_icon.ico
   - whisperjav-1.7.3-py3-none-any.whl
-  # Upgrade scripts (for future version upgrades)
-  - upgrade_whisperjav.py
-  - upgrade_whisperjav.bat
 
 # Installer metadata
 license_file: LICENSE.txt

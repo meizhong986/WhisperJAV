@@ -21,22 +21,35 @@ FIRST RUN NOTE: On your first transcription, AI models will download (~3GB).
 -------------------------------------------------------------------------------
 WHAT'S NEW IN v1.7.3
 -------------------------------------------------------------------------------
-Version 1.7.3 introduces speech enhancement backends for improved audio quality:
+Version 1.7.3 brings major improvements across 5 key areas:
 
-1. SPEECH ENHANCEMENT BACKENDS (NEW)
-   - ZipEnhancer: Lightweight SOTA denoising (16kHz, ~500MB VRAM)
-   - ClearVoice: High-quality MossFormer2 denoising (48kHz)
-   - BS-RoFormer: Vocal isolation from music/background (44.1kHz)
-   - FFmpeg DSP: Basic audio filtering without AI
-   - None: Passthrough (no enhancement)
+1. MULTI-PLATFORM GPU SUPPORT (NEW)
+   - Apple Silicon Macs (M1/M2/M3/M4/M5) with native GPU acceleration
+   - NVIDIA Blackwell architecture (RTX 50-series) support
+   - Automatic device detection for best performance
 
-2. NUMPY 2.x SUPPORT
-   - Full compatibility with NumPy 2.x
-   - ModelScope/ZipEnhancer work with latest numpy
+2. RESUME TRANSLATION FEATURE (NEW)
+   - Never lose translation progress - auto-save after each batch
+   - Resume interrupted translations without re-translating
+   - Saves API costs by preserving completed work
 
-3. DEPENDENCY PROTECTION
-   - Constraints file prevents PyTorch/NumPy downgrade
-   - Protected installation order for ML packages
+3. MULTI-LANGUAGE SUPPORT (EXPERIMENTAL)
+   - Chinese (中文) and Korean (한국어) transcription
+   - Selectable source language in GUI
+   - Optimized for Japanese, basic support for others
+
+4. GUI IMPROVEMENTS
+   - Clearer language selection options
+   - CPU mode acceptance checkbox (skip GPU warnings)
+   - Fixed UI scrolling performance
+   - Enhanced drag & drop support
+
+5. CRITICAL BUG FIXES
+   - Windows UTF-8 encoding fix (Japanese filenames work correctly)
+   - CUDA version detection fix (accurate GPU detection)
+   - UI scrolling performance improvements
+
+For detailed release notes, see RELEASE_NOTES_v1.7.3.md
 
 -------------------------------------------------------------------------------
 WHAT THIS INSTALLER DOES
@@ -52,7 +65,6 @@ This installer sets up a complete, self-contained WhisperJAV environment:
    - PyTorch with CUDA support (for NVIDIA GPU acceleration)
      OR CPU-only PyTorch (if no compatible GPU detected)
    - Python dependencies (Whisper, audio processing, translation)
-   - Speech enhancement backends (ModelScope, ClearVoice, BS-RoFormer)
    - WhisperJAV application from GitHub
 
 3. Setup and Configuration
@@ -80,7 +92,7 @@ RECOMMENDED FOR BEST PERFORMANCE:
   - 16 GB RAM
   - SSD for faster processing
 
-SUPPORTED PLATFORMS:
+SUPPORTED PLATFORMS (v1.7.3):
   - Windows: NVIDIA GPU (RTX 20/30/40/50-series) or CPU-only
   - macOS: Apple Silicon (M1/M2/M3/M4/M5) with native MPS acceleration
   - macOS: Intel (CPU-only, slower)
@@ -93,7 +105,15 @@ CPU-ONLY MODE:
 
 CUDA GPU ACCELERATION:
   The installer automatically detects your NVIDIA driver's CUDA version and
-  installs the best matching PyTorch build for optimal performance.
+  installs the best matching PyTorch build for optimal performance:
+
+  - CUDA 11.8 - 12.0: PyTorch with CUDA 11.8 support
+  - CUDA 12.1 - 12.3: PyTorch with CUDA 12.1 support
+  - CUDA 12.4 - 12.7: PyTorch with CUDA 12.4 support
+  - CUDA 12.8+:       PyTorch with CUDA 12.4+ (Blackwell support)
+
+  This ensures you get the best possible GPU acceleration for your hardware
+  while maintaining compatibility with your driver version.
 
 -------------------------------------------------------------------------------
 AFTER INSTALLATION
@@ -119,34 +139,35 @@ OUTPUT FILES:
   - Filename pattern: [original_name]_output/[original_name].srt
 
 -------------------------------------------------------------------------------
-SPEECH ENHANCEMENT (NEW IN v1.7.3)
+FEATURES
 -------------------------------------------------------------------------------
-Speech enhancement improves transcription quality by cleaning audio:
+PROCESSING MODES:
+  - Balanced: Best quality, uses scene detection + voice activity detection
+  - Fast: Good quality, faster than balanced, uses scene detection
+  - Faster: Fastest processing, direct transcription without preprocessing
 
-BACKENDS:
-  - zipenhancer: Best balance of quality and speed (recommended)
-    - Uses ModelScope ZipEnhancer model
-    - ~500MB VRAM, native 16kHz
-    - Ideal for ASR pre-processing
+SENSITIVITY LEVELS:
+  - Conservative: Fewer false positives, cleaner output
+  - Balanced: Good balance of detail and accuracy (recommended)
+  - Aggressive: Maximum detail capture, may include more background noise
 
-  - clearvoice: Highest quality denoising
-    - Uses MossFormer2 at 48kHz
-    - 9-16GB VRAM required
-    - Best for very noisy audio
+SOURCE LANGUAGES (NEW in v1.7.3):
+  - Japanese (日本語): Fully optimized, best results
+  - Korean (한국어): Experimental, basic support
+  - Chinese (中文): Experimental, basic support
+  - English: Experimental
 
-  - bs-roformer: Vocal isolation
-    - Separates vocals from music/background
-    - Use when background music is present
+OUTPUT LANGUAGES:
+  - Native: Original language transcription (default)
+  - Direct to English: English transcription via Whisper
 
-  - ffmpeg-dsp: Basic DSP filtering
-    - No AI, uses FFmpeg filters
-    - Good for simple audio fixes
-
-  - none: No enhancement (passthrough)
-
-USAGE:
-  Select enhancement backend in GUI settings or via CLI:
-  whisperjav video.mp4 --speech-enhancer zipenhancer
+ADVANCED FEATURES:
+  - Batch processing: Process multiple files sequentially
+  - Model override: Choose specific Whisper models (large-v3, large-v2, turbo)
+  - Opening credits: Add custom credit lines to subtitles
+  - Async processing: Process multiple files simultaneously (experimental)
+  - Translation: Translate subtitles to other languages (via whisperjav-translate)
+  - Resume Translation (NEW): Resume interrupted translations automatically
 
 -------------------------------------------------------------------------------
 TROUBLESHOOTING
@@ -188,10 +209,27 @@ RUNTIME ISSUES:
    - If CPU-only, consider upgrading to an NVIDIA GPU
    - For large videos, use "faster" mode for quicker results
 
-3. "Speech enhancement backend not available":
-   - Ensure modelscope, clearvoice, or bs-roformer-infer is installed
-   - Try: pip install modelscope clearvoice bs-roformer-infer
-   - Check GUI settings for available backends
+3. "Model download stuck":
+   - Large models (3GB) can take 10-20 minutes on slow connections
+   - Check your internet speed: https://fast.com
+   - Models are cached, so this only happens once
+
+4. "Subtitles have errors or gibberish":
+   - Try "balanced" mode for better quality
+   - Use "conservative" sensitivity to reduce false positives
+   - Ensure correct source language is selected (NEW in v1.7.3)
+   - For non-Japanese audio, try English or other languages
+
+5. "Application crashes during processing":
+   - Check logs in the GUI console
+   - Ensure you have enough RAM (16 GB recommended)
+   - Try processing one file at a time instead of batch
+   - Report crashes at: https://github.com/meizhong986/WhisperJAV/issues
+
+6. "Translation interrupted and lost progress" (FIXED in v1.7.3):
+   - v1.7.3 now auto-saves translation progress
+   - Simply re-run the same command to resume from last batch
+   - No more lost work or API costs!
 
 -------------------------------------------------------------------------------
 UNINSTALLING
@@ -214,38 +252,63 @@ NOTE: An automated uninstaller (uninstall_v1.7.3.bat) is included in the
       installation directory for your convenience.
 
 -------------------------------------------------------------------------------
-UPGRADING
+PERFORMANCE TIPS
 -------------------------------------------------------------------------------
-To upgrade an existing WhisperJAV installation:
+1. GPU Acceleration:
+   - Ensure NVIDIA drivers are up to date
+   - Close other GPU-intensive applications before processing
+   - Verify CUDA is enabled by checking console output
 
-1. Run upgrade_whisperjav.bat (or upgrade_whisperjav.py)
-   Located in your installation folder
+2. Processing Speed:
+   - "faster" mode: ~5 minutes per hour of video (GPU)
+   - "fast" mode: ~7 minutes per hour of video (GPU)
+   - "balanced" mode: ~10 minutes per hour of video (GPU)
 
-2. The upgrade script will:
-   - Install new dependencies (including speech enhancement backends)
-   - Update WhisperJAV from GitHub
-   - Preserve your configuration and models
+3. Quality vs Speed:
+   - For best accuracy: Use "balanced" mode with "balanced" sensitivity
+   - For speed: Use "faster" mode with "conservative" sensitivity
+   - For maximum detail: Use "balanced" mode with "aggressive" sensitivity
+
+4. Batch Processing:
+   - Process multiple files overnight using batch mode
+   - Use "async processing" (experimental) for parallel execution
+
+5. Translation Tips (v1.7.3):
+   - Enable resume feature for long translations
+   - Progress auto-saved after each batch
+   - Re-run same command to resume interrupted translations
 
 -------------------------------------------------------------------------------
-VERSION INFORMATION
+ADVANCED USAGE
 -------------------------------------------------------------------------------
-WhisperJAV Version: 1.7.3
-Release Date: December 2025
-Installer Version: v1.7.3 (conda-constructor)
+COMMAND-LINE INTERFACE:
+  WhisperJAV also includes a CLI for automation and scripting:
 
-Key Changes in 1.7.3:
-  - Speech enhancement backends (ZipEnhancer, ClearVoice, BS-RoFormer)
-  - NumPy 2.x compatibility
-  - Dependency conflict protection
-  - ONNX runtime support for ZipEnhancer
+  # Basic transcription
+  whisperjav video.mp4 --mode balanced --sensitivity aggressive
 
-Previous Major Changes (1.7.2):
-  - Multi-platform GPU support (Apple Silicon, Blackwell)
-  - Resume translation feature (auto-save progress)
-  - Multi-language support (Chinese, Korean - experimental)
-  - GUI improvements (language selection, CPU mode checkbox)
+  # With translation
+  whisperjav video.mp4 --translate --target-lang english
 
-For full release notes, see RELEASE_NOTES_v1.7.3.md
+  # Batch processing
+  whisperjav folder/*.mp4 --mode fast --workers 2
+
+  Run "whisperjav --help" for full CLI documentation
+
+TRANSLATION:
+  Use whisperjav-translate for AI-powered subtitle translation:
+
+  # Translate Japanese to English
+  whisperjav-translate -i subtitles.srt --target english
+
+  # Use custom instructions
+  whisperjav-translate -i subtitles.srt --custom-gist [URL]
+
+  # Resume interrupted translation (NEW in v1.7.3)
+  whisperjav-translate -i subtitles.srt
+  # (Progress auto-saves, just re-run if interrupted)
+
+  See translation documentation for setup and API key configuration
 
 -------------------------------------------------------------------------------
 SUPPORT & COMMUNITY
@@ -256,6 +319,30 @@ Documentation: See GitHub README
 
 For bugs, feature requests, or questions, please open an issue on GitHub
 with detailed information about your system and the problem.
+
+-------------------------------------------------------------------------------
+VERSION INFORMATION
+-------------------------------------------------------------------------------
+WhisperJAV Version: 1.7.3
+Release Date: November 2025
+Installer Version: v1.7.3 (conda-constructor)
+
+Key Changes in 1.7.3:
+  - Multi-platform GPU support (Apple Silicon, Blackwell)
+  - Resume translation feature (auto-save progress)
+  - Multi-language support (Chinese, Korean - experimental)
+  - GUI improvements (language selection, CPU mode checkbox)
+  - Critical bug fixes (UTF-8 encoding, CUDA detection, UI scrolling)
+
+Previous Major Changes (1.5.1):
+  - Complete PyWebView GUI takeover - modern, responsive web interface
+  - Removed legacy Tkinter GUI components
+  - Enhanced file management and progress tracking
+  - Improved stability and error handling
+  - Better WebView2 detection and installation guidance
+  - CPU-only fallback for systems without NVIDIA GPUs
+
+For full release notes, see RELEASE_NOTES_v1.7.3.md
 
 -------------------------------------------------------------------------------
 LICENSE

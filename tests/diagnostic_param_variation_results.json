@@ -1,0 +1,116 @@
+{
+  "timestamp": "2025-12-19T20:24:03.588859",
+  "test_file": "C:\\BIN\\git\\whisperJav_V1_Minami_Edition\\test_media\\173_acceptance_test\\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav",
+  "model": "large-v2",
+  "baseline_params": {
+    "task": "transcribe",
+    "language": "ja",
+    "beam_size": 3,
+    "best_of": 1,
+    "patience": 1.6,
+    "suppress_tokens": [],
+    "suppress_blank": false,
+    "without_timestamps": false,
+    "temperature": 0.0,
+    "compression_ratio_threshold": 3.0,
+    "log_prob_threshold": -2.5,
+    "no_speech_threshold": 0.22,
+    "condition_on_previous_text": false,
+    "word_timestamps": true,
+    "chunk_length": 14,
+    "repetition_penalty": 1.1,
+    "no_repeat_ngram_size": 2,
+    "multilingual": false,
+    "log_progress": false,
+    "vad_filter": false,
+    "vad_parameters": {
+      "threshold": 0.187,
+      "neg_threshold": 0.1,
+      "min_speech_duration_ms": 30,
+      "max_speech_duration_s": 6.0,
+      "min_silence_duration_ms": 300,
+      "speech_pad_ms": 500
+    }
+  },
+  "tests_run": [
+    "A_no_vad_params",
+    "B_no_suppress_tokens",
+    "C_suppress_tokens_none",
+    "D_beam_size_1",
+    "E_beam_size_5",
+    "F_no_speech_0.6",
+    "G_word_timestamps_off",
+    "H_clean_params"
+  ],
+  "results": [
+    {
+      "test_name": "A_no_vad_params",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    },
+    {
+      "test_name": "B_no_suppress_tokens",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    },
+    {
+      "test_name": "C_suppress_tokens_none",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    },
+    {
+      "test_name": "D_beam_size_1",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    },
+    {
+      "test_name": "E_beam_size_5",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    },
+    {
+      "test_name": "F_no_speech_0.6",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    },
+    {
+      "test_name": "G_word_timestamps_off",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    },
+    {
+      "test_name": "H_clean_params",
+      "status": "CRASHED",
+      "segments": 0,
+      "duration": 0,
+      "error": "Exit code: 1"
+    }
+  ],
+  "summary": {
+    "passed": [],
+    "failed": [
+      "A_no_vad_params",
+      "B_no_suppress_tokens",
+      "C_suppress_tokens_none",
+      "D_beam_size_1",
+      "E_beam_size_5",
+      "F_no_speech_0.6",
+      "G_word_timestamps_off",
+      "H_clean_params"
+    ]
+  }
+}
