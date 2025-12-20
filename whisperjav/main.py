@@ -232,6 +232,8 @@ def parse_arguments():
                                help="Console output verbosity (overrides config)")
     progress_group.add_argument("--debug", action="store_true",
                                help="Enable debug logging (comprehensive diagnostic output)")
+    progress_group.add_argument("--crash-trace", action="store_true",
+                               help="Enable crash tracing (writes to crash_traces/ for debugging ctranslate2 crashes)")
 
     # Enhancement features
     enhancement_group = parser.add_argument_group("Optional Enhancement Features")
@@ -1012,6 +1014,15 @@ def main():
     if args.debug:
         logger.info("=" * 70)
         logger.info("DEBUG MODE ENABLED - Comprehensive diagnostic logging active")
+        logger.info("=" * 70)
+
+    # Enable crash tracing if requested
+    if args.crash_trace:
+        from whisperjav.utils.crash_tracer import get_tracer
+        tracer = get_tracer()
+        tracer.enable()
+        logger.info("=" * 70)
+        logger.info("CRASH TRACING ENABLED - Writing to crash_traces/")
         logger.info("=" * 70)
 
     print_banner()
