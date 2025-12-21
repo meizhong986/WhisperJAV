@@ -1,17 +1,14 @@
 WhisperJAV v1.7.3 Installer Build Log 
-Build started: Tue 12/16/2025 15:45:48.39 
+Build started: Sun 12/21/2025 13:31:10.78 
  
 [Phase 1/5] Checking prerequisites... 
   - Constructor: constructor 3.11.3 
   - Python: Python 3.11.14 
   - Config file: construct_v1.7.3.yaml 
-[Phase 1b] Copying shared files... 
-  - Copied: upgrade_whisperjav.py 
-  - Copied: upgrade_whisperjav.bat 
 [Phase 2/6] Checking wheel... 
   - Found existing wheel: whisperjav-1.7.3-py3-none-any.whl
   - Wheel: whisperjav-1.7.3-py3-none-any.whl (pre-built
-  - Wheel: whisperjav-1.7.3-py3-none-any.whl (local build) 
+  - Wheel: whisperjav-1.7.3.post3-py3-none-any.whl (local build) 
 [Phase 3/6] Validating configuration... 
   - Validation: PASSED 
 [Phase 4/6] Cleaning previous builds... 
@@ -24,5 +21,5 @@ BUILD SUCCESSFUL
  
 Output file: WhisperJAV-1.7.3-Windows-x86_64.exe 
 File size: 231 MB 
-Build completed: Tue 12/16/2025 15:47:18.60 
+Build completed: Sun 12/21/2025 13:32:47.59 
  
