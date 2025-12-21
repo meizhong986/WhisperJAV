@@ -20,11 +20,37 @@ faster-whisper>=1.1.0
 # ----------------------------------------
 # Audio and Signal Processing
 # ----------------------------------------
-ffmpeg-python         # FFmpeg Python bindings
+ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git  # PyPI tarball fails
 soundfile             # Audio file I/O
 auditok               # Voice Activity Detection (VAD)
 silero-vad>=6.0       # Silero VAD for scene detection
-librosa               # Audio analysis
+pydub                 # Audio segment processing
+
+# ----------------------------------------
+# Speech Segmentation Backends (v1.7.2+)
+# ----------------------------------------
+ten-vad               # TEN Framework VAD
+# NOTE: nemo_toolkit removed - causes resolution-too-deep errors, only 10% usage
+
+# ----------------------------------------
+# Speech Enhancement Backends (v1.7.3+)
+# ----------------------------------------
+modelscope>=1.20                # ZipEnhancer 16kHz (recommended, lightweight SOTA)
+addict                          # ModelScope dependency (dict with attribute access)
+datasets>=2.14.0,<4.0           # 4.x breaks modelscope
+simplejson                      # ModelScope dependency (JSON parsing)
+sortedcontainers                # ModelScope dependency (sorted collections)
+packaging                       # ModelScope dependency (version parsing)
+clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice  # Fork with NumPy 2.x support
+bs-roformer-infer               # BS-RoFormer vocal isolation (44.1kHz)
+onnxruntime>=1.16.0             # ONNX inference for ZipEnhancer ONNX mode
+
+# ----------------------------------------
+# Scientific Computing
+# ----------------------------------------
+numpy>=2.0            # NumPy 2.x (required for modelscope/librosa compatibility)
+scipy>=1.10.1         # Signal processing
+librosa>=0.11.0       # Audio analysis (v0.11.0+ supports NumPy 2.x)
 pyloudnorm            # Audio normalization
 
 # ----------------------------------------
@@ -33,13 +59,6 @@ pyloudnorm            # Audio normalization
 pywebview>=5.0.0      # Modern web-based GUI framework
 pythonnet>=3.0        # Required for WebView2 backend on Windows
 pywin32>=305; platform_system=="Windows"  # Windows COM support for shortcuts
-
-# ----------------------------------------
-# Scientific Computing
-# ----------------------------------------
-numpy                 # Array operations
-scipy                 # Signal processing
-matplotlib            # Plotting (for diagnostics)
 
 # ----------------------------------------
 # Subtitle Processing
@@ -67,9 +86,9 @@ accelerate>=0.26.0       # Efficient model loading for Transformers
 tqdm                  # Progress bars
 aiofiles              # Async file I/O
 jsonschema            # Config validation
-Pillow                # Image processing
 colorama              # Colored console output
 requests              # HTTP requests
+regex                 # Advanced regex for Japanese text processing
 
 # ----------------------------------------
 # Configuration System
@@ -81,3 +100,4 @@ PyYAML>=6.0           # YAML config file parsing
 # Optional: Performance Optimization
 # ----------------------------------------
 numba                 # JIT compilation for speedups
+hf_xet                # Faster HuggingFace downloads (Xet Storage)
