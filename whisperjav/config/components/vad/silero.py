@@ -85,33 +85,33 @@ class SileroVAD(VADComponent):
     # === Schema ===
     Options = SileroVADOptions
 
-    # === Presets - Exact v1 values ===
+    # === Presets - v1.7.1 exact values ===
     presets = {
         "conservative": SileroVADOptions(
-            threshold=0.300,
+            threshold=0.35,  # v1.7.1 value
             min_speech_duration_ms=150,
-            max_speech_duration_s=6.0,
+            max_speech_duration_s=9.0,  # v1.7.1 value
             min_silence_duration_ms=300,
-            neg_threshold=0.3,  # KEPT from silero.py (asr_config has 0.2)
-            speech_pad_ms=500,
-            chunk_threshold_s=0.180,
+            neg_threshold=0.3,
+            speech_pad_ms=400,  # v1.7.1 value
+            chunk_threshold_s=4.0,
         ),
         "balanced": SileroVADOptions(
-            threshold=0.238,
+            threshold=0.18,  # v1.7.1 value
             min_speech_duration_ms=100,
-            max_speech_duration_s=6.0,
+            max_speech_duration_s=11.0,  # v1.7.1 value
             min_silence_duration_ms=300,
-            neg_threshold=0.15,  # KEPT from silero.py (asr_config has 0.15)
-            speech_pad_ms=500,
-            chunk_threshold_s=0.2,
+            neg_threshold=0.15,
+            speech_pad_ms=400,  # v1.7.1 value
+            chunk_threshold_s=4.0,
         ),
         "aggressive": SileroVADOptions(
-            threshold=0.187,
+            threshold=0.05,  # v1.7.1 value
             min_speech_duration_ms=30,
-            max_speech_duration_s=6.0,
+            max_speech_duration_s=14.0,  # v1.7.1 value
             min_silence_duration_ms=300,
-            neg_threshold=0.1,  # KEPT from silero.py (asr_config has 0.1)
-            speech_pad_ms=500,
-            chunk_threshold_s=0.180,
+            neg_threshold=0.1,
+            speech_pad_ms=600,  # v1.7.1 value
+            chunk_threshold_s=4.0,
         ),
     }

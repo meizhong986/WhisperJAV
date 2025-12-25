@@ -163,7 +163,7 @@ class SileroSpeechSegmenter:
         elif "chunk_threshold" in kwargs:
             self.chunk_threshold_s = kwargs["chunk_threshold"]
         else:
-            self.chunk_threshold_s = 1.1  # Default (reduced from 4.0 to minimize silence in Whisper input)
+            self.chunk_threshold_s = 4.0  # Default: matches v1.7.1 behavior for Whisper context
 
         # Padding in samples (at 16kHz)
         self.start_pad_samples = start_pad_samples

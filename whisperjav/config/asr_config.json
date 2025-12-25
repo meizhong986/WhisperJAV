@@ -263,7 +263,8 @@
   "common_transcriber_options": {
     "balanced": {
       "temperature": [
-        0.0
+        0.0,
+        0.1
       ],
       "compression_ratio_threshold": 2.4,
       "logprob_threshold": -1.2,
@@ -295,7 +296,8 @@
     },
     "aggressive": {
       "temperature": [
-        0.0
+        0.0,
+        0.3
       ],
       "no_speech_threshold": 0.22,
       "logprob_threshold": -2.5,
@@ -316,7 +318,7 @@
       "language": "ja",
       "best_of": 1,
       "beam_size": 2,
-      "patience": 1.4,
+      "patience": 2.0,
       "length_penalty": null,
       "prefix": null,
       "suppress_tokens": null,
@@ -329,7 +331,7 @@
       "language": "ja",
       "best_of": 1,
       "beam_size": 1,
-      "patience": 1.2,
+      "patience": 1.5,
       "length_penalty": null,
       "prefix": null,
       "suppress_tokens": null,
@@ -341,8 +343,8 @@
       "task": "transcribe",
       "language": "ja",
       "best_of": 1,
-      "beam_size": 3,
-      "patience": 1.6,
+      "beam_size": 2,
+      "patience": 2.9,
       "length_penalty": null,
       "prefix": null,
       "suppress_blank": false,
@@ -409,31 +411,31 @@
   },
   "silero_vad_options": {
     "balanced": {
-      "threshold": 0.225,
+      "threshold": 0.18,
       "min_speech_duration_ms": 100,
-      "max_speech_duration_s": 6,
+      "max_speech_duration_s": 11,
       "min_silence_duration_ms": 300,
       "neg_threshold": 0.15,
-      "speech_pad_ms": 700,
-      "chunk_threshold_s": 0.200
+      "speech_pad_ms": 400,
+      "chunk_threshold_s": 4.0
     },
     "conservative": {
-      "threshold": 0.300,
+      "threshold": 0.35,
       "min_speech_duration_ms": 150,
-      "max_speech_duration_s": 6,
+      "max_speech_duration_s": 9,
       "min_silence_duration_ms": 300,
-      "neg_threshold": 0.2,
-      "speech_pad_ms": 700,
-      "chunk_threshold_s": 0.200
+      "neg_threshold": 0.3,
+      "speech_pad_ms": 400,
+      "chunk_threshold_s": 4.0
     },
     "aggressive": {
-      "threshold": 0.158,
+      "threshold": 0.05,
       "min_speech_duration_ms": 30,
-      "max_speech_duration_s": 6,
+      "max_speech_duration_s": 14,
       "min_silence_duration_ms": 300,
       "neg_threshold": 0.1,
-      "speech_pad_ms": 700,
-      "chunk_threshold_s": 0.200
+      "speech_pad_ms": 600,
+      "chunk_threshold_s": 4.0
     }
   },
   "faster_whisper_vad_options": {
@@ -570,13 +572,13 @@
   },
   "exclusive_whisper_plus_faster_whisper": {
     "balanced": {
-      "hallucination_silence_threshold": 1.9
+      "hallucination_silence_threshold": 2.0
     },
     "conservative": {
       "hallucination_silence_threshold": 1.5
     },
     "aggressive": {
-      "hallucination_silence_threshold": 2.1
+      "hallucination_silence_threshold": 2.5
     }
   },
   "HF_transformers_engine_options": {
