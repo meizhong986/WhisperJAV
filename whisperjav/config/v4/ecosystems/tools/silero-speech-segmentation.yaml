@@ -54,6 +54,7 @@ spec:
 
   # --- Segment Grouping ---
   chunk_threshold_s: 2.5
+  max_group_duration_s: 29.0  # Upper bound to stay within Whisper's 30s context window
 
 # =============================================================================
 # Sensitivity Presets
@@ -157,6 +158,15 @@ gui:
     min: 1.0
     max: 10.0
     step: 0.5
+    group: grouping
+
+  max_group_duration_s:
+    widget: slider
+    label: "Max Group Duration (s)"
+    description: "Maximum duration for a segment group (prevents exceeding Whisper's 30s context window)"
+    min: 10.0
+    max: 60.0
+    step: 1.0
     group: grouping
 
 # =============================================================================

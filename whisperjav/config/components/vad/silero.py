@@ -66,6 +66,11 @@ class SileroVADOptions(BaseModel):
         ge=0.0, le=30.0,
         description="Gap threshold for segment grouping (seconds). Segments with gaps larger than this are split into separate groups."
     )
+    max_group_duration_s: float = Field(
+        29.0,
+        ge=1.0, le=60.0,
+        description="Maximum duration for a segment group (seconds). Groups are split if adding a segment would exceed this limit. Default 29s to stay within Whisper's 30s context window."
+    )
 
 
 @register_vad
@@ -95,6 +100,7 @@ class SileroVAD(VADComponent):
             neg_threshold=0.3,
             speech_pad_ms=400,  # v1.7.1 value
             chunk_threshold_s=4.0,
+            max_group_duration_s=29.0,  # Whisper 30s context window limit
         ),
         "balanced": SileroVADOptions(
             threshold=0.18,  # v1.7.1 value
@@ -104,6 +110,7 @@ class SileroVAD(VADComponent):
             neg_threshold=0.15,
             speech_pad_ms=400,  # v1.7.1 value
             chunk_threshold_s=4.0,
+            max_group_duration_s=29.0,  # Whisper 30s context window limit
         ),
         "aggressive": SileroVADOptions(
             threshold=0.05,  # v1.7.1 value
@@ -113,5 +120,6 @@ class SileroVAD(VADComponent):
             neg_threshold=0.1,
             speech_pad_ms=600,  # v1.7.1 value
             chunk_threshold_s=4.0,
+            max_group_duration_s=29.0,  # Whisper 30s context window limit
         ),
     }

@@ -13,10 +13,11 @@ import shutil
 class BasePipeline(ABC):
     """Abstract base class for all WhisperJAV pipelines."""
     
-    def __init__(self, 
+    def __init__(self,
                  output_dir: str = "./output",
                  temp_dir: str = "./temp",
                  keep_temp_files: bool = False,
+                 save_metadata_json: bool = False,
                  adaptive_classification: bool = False,
                  adaptive_audio_enhancement: bool = False,
                  smart_postprocessing: bool = False,
@@ -25,6 +26,7 @@ class BasePipeline(ABC):
         self.output_dir = Path(output_dir)
         self.temp_dir = Path(temp_dir)
         self.keep_temp_files = keep_temp_files
+        self.save_metadata_json = save_metadata_json  # Preserve metadata JSON files (enabled by --debug)
         self.metadata_manager = MetadataManager(self.temp_dir, self.output_dir)
 
         self.adaptive_classification = adaptive_classification
@@ -58,7 +60,10 @@ class BasePipeline(ABC):
         pass
         
     def cleanup_temp_files(self, media_basename: str):
-        """Clean up temporary files for a specific media file."""
+        """Clean up temporary files for a specific media file.
+
+        Metadata JSON files are preserved when save_metadata_json is True (via --debug flag).
+        """
         if not self.keep_temp_files:
             logger.debug(f"Cleaning up temporary files for {media_basename}")
             try:
@@ -67,9 +72,14 @@ class BasePipeline(ABC):
                     self.temp_dir / f"{media_basename}_extracted.wav",
                     self.temp_dir / f"{media_basename}_raw.srt",
                     self.temp_dir / f"{media_basename}_stitched.srt",
-                    self.temp_dir / f"{media_basename}_master.json"
                 ]
-                
+
+                # Only delete metadata JSON if save_metadata_json is False
+                if not self.save_metadata_json:
+                    files_to_delete.append(self.temp_dir / f"{media_basename}_master.json")
+                else:
+                    logger.debug(f"Preserving metadata JSON: {media_basename}_master.json (--debug mode)")
+
                 for file_path in files_to_delete:
                     if file_path.exists():
                         file_path.unlink()
