@@ -80,6 +80,7 @@ class NemoSpeechSegmenter:
         min_silence_duration_ms: int = 200,
         filter_speech_first: bool = True,
         chunk_threshold_s: Optional[float] = None,
+        max_group_duration_s: Optional[float] = None,
         diarization_domain: str = "general",
         temp_dir: Optional[Path] = None,
         use_overlap_smoothing: bool = False,
@@ -106,6 +107,9 @@ class NemoSpeechSegmenter:
             filter_speech_first: If True, apply min_duration_on filter before
                    min_duration_off (removes short speech first). Default True.
             chunk_threshold_s: Gap threshold for segment grouping
+            max_group_duration_s: Maximum duration for a segment group (seconds).
+                   Groups are split if adding a segment would exceed this limit.
+                   Default 29s to stay within Whisper's 30s context window.
             diarization_domain: Domain for diarization ("general", "meeting", "telephonic")
             temp_dir: Directory for temporary files (uses system temp if None)
             use_overlap_smoothing: If True, apply overlapping window smoothing before
@@ -145,6 +149,9 @@ class NemoSpeechSegmenter:
             self.chunk_threshold_s = kwargs["chunk_threshold"]
         else:
             self.chunk_threshold_s = 2.5  # Default (reduced from 4.0 to minimize silence in Whisper input)
+
+        # Maximum group duration - prevents groups from exceeding Whisper's context window
+        self.max_group_duration_s = max_group_duration_s if max_group_duration_s is not None else 29.0
 
         # Lazy-loaded models
         self._diarizer = None
@@ -1033,7 +1040,11 @@ class NemoSpeechSegmenter:
         self,
         segments: List[SpeechSegment]
     ) -> List[List[SpeechSegment]]:
-        """Group segments based on time gaps."""
+        """Group segments based on time gaps.
+
+        Groups are split if the gap exceeds chunk_threshold_s OR if adding
+        a segment would cause the group duration to exceed max_group_duration_s.
+        """
         if not segments:
             return []
 
@@ -1043,8 +1054,18 @@ class NemoSpeechSegmenter:
             if i > 0:
                 prev_end = segments[i - 1].end_sec
                 gap = segment.start_sec - prev_end
-                if gap > self.chunk_threshold_s:
+
+                # Check if adding this segment would exceed max group duration
+                would_exceed_max = False
+                if groups[-1]:
+                    group_start = groups[-1][0].start_sec
+                    potential_duration = segment.end_sec - group_start
+                    would_exceed_max = potential_duration > self.max_group_duration_s
+
+                # Start new group if gap too large OR would exceed max duration
+                if gap > self.chunk_threshold_s or would_exceed_max:
                     groups.append([])
+
             groups[-1].append(segment)
 
         return groups
@@ -1087,6 +1108,7 @@ class NemoSpeechSegmenter:
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "filter_speech_first": self.filter_speech_first,
             "chunk_threshold_s": self.chunk_threshold_s,
+            "max_group_duration_s": self.max_group_duration_s,
             "use_overlap_smoothing": self.use_overlap_smoothing,
             "smoothing_method": self.smoothing_method,
         }

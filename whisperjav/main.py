@@ -234,7 +234,7 @@ def parse_arguments():
                                default=None,
                                help="Console output verbosity (overrides config)")
     progress_group.add_argument("--debug", action="store_true",
-                               help="Enable debug logging (comprehensive diagnostic output)")
+                               help="Enable debug logging and preserve metadata JSON files in temp directory")
     progress_group.add_argument("--crash-trace", action="store_true",
                                help="Enable crash tracing (writes to crash_traces/ for debugging ctranslate2 crashes)")
 
@@ -620,6 +620,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "output_dir": args.output_dir,
         "temp_dir": args.temp_dir,
         "keep_temp_files": args.keep_temp,
+        "save_metadata_json": getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
         "subs_language": args.subs_language,
         "resolved_config": resolved_config,
         "progress_display": progress,
@@ -648,6 +649,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             output_dir=args.output_dir,
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp,
+            save_metadata_json=getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
             progress_display=progress,
             hf_model_id=getattr(args, 'hf_model_id', 'kotoba-tech/kotoba-whisper-bilingual-v1.0'),
             hf_chunk_length=getattr(args, 'hf_chunk_length', 15),
@@ -994,13 +996,20 @@ def main():
     # Use --task if provided, otherwise determine from subs-language
     if hasattr(args, 'task') and args.task:
         task = args.task
+        logger.debug(f"Task set from --task argument: '{task}'")
     else:
         task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
+        logger.debug(f"Task derived from --subs-language='{args.subs_language}' -> task='{task}'")
 
     # Log task determination for debugging translation issues
     logger.info(f"ASR task: {task}" + (" (translating to English)" if task == 'translate' else " (transcribing in source language)"))
     if task == 'translate':
         logger.info("Translation mode: Output subtitles will be in English")
+
+    # Explicit warning if direct-to-english was requested but task is not translate
+    if args.subs_language == 'direct-to-english' and task != 'translate':
+        logger.warning(f"WARNING: --subs-language=direct-to-english was set but task='{task}' (expected 'translate'). "
+                      "This may indicate a configuration issue.")
 
     # Map language name to Whisper language code
     language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
@@ -1256,6 +1265,7 @@ def main():
                 output_dir=args.output_dir,
                 temp_dir=args.temp_dir,
                 keep_temp_files=args.keep_temp,
+                save_metadata_json=getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
                 subs_language=args.subs_language,
                 parameter_tracer=tracer,
                 log_level=log_level,

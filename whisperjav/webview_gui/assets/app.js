@@ -2734,7 +2734,8 @@ const EnsembleManager = {
             source_language: document.getElementById('source-language').value,
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,
-            keep_temp: document.getElementById('keepTemp').checked
+            keep_temp: document.getElementById('keepTemp').checked,
+            temp_dir: document.getElementById('tempDir').value.trim()
         };
 
         return config;

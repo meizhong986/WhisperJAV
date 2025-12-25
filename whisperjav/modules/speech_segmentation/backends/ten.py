@@ -41,6 +41,7 @@ class TenSpeechSegmenter:
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
         chunk_threshold_s: Optional[float] = None,
+        max_group_duration_s: Optional[float] = None,
         **kwargs
     ):
         """
@@ -52,6 +53,9 @@ class TenSpeechSegmenter:
             min_speech_duration_ms: Minimum speech segment duration
             min_silence_duration_ms: Minimum silence between segments
             chunk_threshold_s: Gap threshold for segment grouping
+            max_group_duration_s: Maximum duration for a segment group (seconds).
+                Groups are split if adding a segment would exceed this limit.
+                Default 29s to stay within Whisper's 30s context window.
             **kwargs: Additional parameters for backward compatibility
                 - chunk_threshold: Legacy alias for chunk_threshold_s
         """
@@ -67,6 +71,9 @@ class TenSpeechSegmenter:
             self.chunk_threshold_s = kwargs["chunk_threshold"]
         else:
             self.chunk_threshold_s = 0.8  # Default (reduced from 2.5 for tighter grouping)
+
+        # Maximum group duration - prevents groups from exceeding Whisper's context window
+        self.max_group_duration_s = max_group_duration_s if max_group_duration_s is not None else 29.0
 
         # Lazy-loaded model
         self._model = None
@@ -271,7 +278,11 @@ class TenSpeechSegmenter:
         self,
         segments: List[SpeechSegment]
     ) -> List[List[SpeechSegment]]:
-        """Group segments based on time gaps."""
+        """Group segments based on time gaps.
+
+        Groups are split if the gap exceeds chunk_threshold_s OR if adding
+        a segment would cause the group duration to exceed max_group_duration_s.
+        """
         if not segments:
             return []
 
@@ -281,8 +292,18 @@ class TenSpeechSegmenter:
             if i > 0:
                 prev_end = segments[i - 1].end_sec
                 gap = segment.start_sec - prev_end
-                if gap > self.chunk_threshold_s:
+
+                # Check if adding this segment would exceed max group duration
+                would_exceed_max = False
+                if groups[-1]:
+                    group_start = groups[-1][0].start_sec
+                    potential_duration = segment.end_sec - group_start
+                    would_exceed_max = potential_duration > self.max_group_duration_s
+
+                # Start new group if gap too large OR would exceed max duration
+                if gap > self.chunk_threshold_s or would_exceed_max:
                     groups.append([])
+
             groups[-1].append(segment)
 
         return groups
@@ -318,6 +339,7 @@ class TenSpeechSegmenter:
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "chunk_threshold_s": self.chunk_threshold_s,
+            "max_group_duration_s": self.max_group_duration_s,
         }
 
     def cleanup(self) -> None:

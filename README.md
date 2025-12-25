@@ -327,6 +327,16 @@ MIT License. See [LICENSE](LICENSE) file.
 
 ---
 
+## Citation and credits
+
+- Investigation of Whisper ASR Hallucinations Induced by Non-Speech Audio." (2025). arXiv:2501.11378.
+- Calm-Whisper: Reduce Whisper Hallucination On Non-Speech By Calming Crazy Heads Down." (2025). arXiv:2505.12969.
+- PromptASR for Contextualized ASR with Controllable Style." (2024). arXiv:2309.07414.
+- In-Context Learning Boosts Speech Recognition." (2025). arXiv:2505.1
+- Koenecke, A., et al. (2024). "Careless Whisper: Speech-to-Text Hallucination Harms." ACM FAccT 2024.
+- Bain, M., et al. (2023). "WhisperX: Time-Accurate Speech Transcription of Long-Form Audio." arXiv:2303.00747.
+
+
 ## Acknowledgments
 
 - [OpenAI Whisper](https://github.com/openai/whisper) - The underlying ASR model
