@@ -254,7 +254,7 @@ class OpenAIWhisperASR(ASRComponent):
             language="ja",
             beam_size=2,
             best_of=1,
-            patience=2.0,
+            patience=2.9,  # v1.7.1 value
             length_penalty=None,
             prefix=None,
             suppress_blank=False,  # Different!
