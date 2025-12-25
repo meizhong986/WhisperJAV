@@ -1,0 +1,113 @@
+{
+  "audio_file": "C:\\BIN\\git\\WhisperJav_V1_Minami_Edition\\test_media\\25min-HODV-22019.wav",
+  "reference_srt": null,
+  "total_tests": 5,
+  "successful_tests": 5,
+  "failed_tests": 0,
+  "baseline": {
+    "config_name": "v1.7.3_baseline",
+    "hypothesis": "baseline",
+    "total_subtitles": 98,
+    "total_speech_duration_sec": 200.50000000000006,
+    "avg_subtitle_duration_sec": 2.0459183673469394,
+    "very_short_subtitles": 15,
+    "long_subtitles": 2,
+    "processing_time_sec": 150.631667137146,
+    "error": null
+  },
+  "reference_metrics": null,
+  "results": [
+    {
+      "config_name": "v1.7.3_baseline",
+      "hypothesis": "baseline",
+      "total_subtitles": 98,
+      "total_speech_duration_sec": 200.50000000000006,
+      "avg_subtitle_duration_sec": 2.0459183673469394,
+      "very_short_subtitles": 15,
+      "long_subtitles": 2,
+      "processing_time_sec": 150.631667137146,
+      "error": null
+    },
+    {
+      "config_name": "vad_both_zeros",
+      "hypothesis": "vad_params",
+      "total_subtitles": 96,
+      "total_speech_duration_sec": 194.94,
+      "avg_subtitle_duration_sec": 2.030625,
+      "very_short_subtitles": 10,
+      "long_subtitles": 4,
+      "processing_time_sec": 146.5258538722992,
+      "error": null,
+      "comparison": {
+        "subtitle_delta_vs_baseline": -2,
+        "subtitle_delta_vs_reference": 0,
+        "duration_delta_vs_baseline": -5.560000000000059,
+        "duration_delta_vs_reference": 0.0,
+        "improvement_vs_baseline_pct": -2.0408163265306123,
+        "improvement_vs_reference_pct": 0.0
+      }
+    },
+    {
+      "config_name": "asr_both_balanced",
+      "hypothesis": "asr_duration_filter",
+      "total_subtitles": 98,
+      "total_speech_duration_sec": 200.50000000000006,
+      "avg_subtitle_duration_sec": 2.0459183673469394,
+      "very_short_subtitles": 15,
+      "long_subtitles": 2,
+      "processing_time_sec": 145.81435632705688,
+      "error": null,
+      "comparison": {
+        "subtitle_delta_vs_baseline": 0,
+        "subtitle_delta_vs_reference": 0,
+        "duration_delta_vs_baseline": 0.0,
+        "duration_delta_vs_reference": 0.0,
+        "improvement_vs_baseline_pct": 0.0,
+        "improvement_vs_reference_pct": 0.0
+      }
+    },
+    {
+      "config_name": "temp_balanced_fallback",
+      "hypothesis": "temperature_fallback",
+      "total_subtitles": 98,
+      "total_speech_duration_sec": 200.50000000000006,
+      "avg_subtitle_duration_sec": 2.0459183673469394,
+      "very_short_subtitles": 15,
+      "long_subtitles": 2,
+      "processing_time_sec": 140.13607907295227,
+      "error": null,
+      "comparison": {
+        "subtitle_delta_vs_baseline": 0,
+        "subtitle_delta_vs_reference": 0,
+        "duration_delta_vs_baseline": 0.0,
+        "duration_delta_vs_reference": 0.0,
+        "improvement_vs_baseline_pct": 0.0,
+        "improvement_vs_reference_pct": 0.0
+      }
+    },
+    {
+      "config_name": "beam_balanced_combo",
+      "hypothesis": "patience_beam",
+      "total_subtitles": 99,
+      "total_speech_duration_sec": 193.23999999999998,
+      "avg_subtitle_duration_sec": 1.9519191919191918,
+      "very_short_subtitles": 19,
+      "long_subtitles": 2,
+      "processing_time_sec": 134.23329496383667,
+      "error": null,
+      "comparison": {
+        "subtitle_delta_vs_baseline": 1,
+        "subtitle_delta_vs_reference": 0,
+        "duration_delta_vs_baseline": -7.260000000000076,
+        "duration_delta_vs_reference": 0.0,
+        "improvement_vs_baseline_pct": 1.0204081632653061,
+        "improvement_vs_reference_pct": 0.0
+      }
+    }
+  ],
+  "recommendations": [
+    "Found 1 configurations that improved over baseline:",
+    "  1. beam_balanced_combo: +1 subtitles (+1.0%) - patience_beam",
+    "\nMost impactful hypothesis: patience_beam (max improvement: +1 subtitles)"
+  ]
+}
