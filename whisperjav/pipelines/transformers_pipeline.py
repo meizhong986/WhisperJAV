@@ -31,13 +31,10 @@ from whisperjav.utils.progress_display import DummyProgress
 
 from whisperjav.modules.speech_enhancement import (
     create_enhancer_direct,
-    get_extraction_sample_rate,
     enhance_scenes,
     enhance_single_audio,
+    SCENE_EXTRACTION_SR,
 )
-
-# Target sample rate for VAD/ASR (no enhancer case)
-DEFAULT_EXTRACTION_SR = 16000
 
 
 class TransformersPipeline(BasePipeline):
@@ -156,22 +153,11 @@ class TransformersPipeline(BasePipeline):
             'model': hf_speech_enhancer_model
         }
 
-        # Determine extraction sample rate based on enhancer config
-        # We check config to see if enhancement is enabled, without loading the model
-        if hf_speech_enhancer and hf_speech_enhancer != "none":
-            # Enhancement enabled - extract at enhancer's preferred rate
-            if hf_speech_enhancer == "clearvoice":
-                extraction_sr = 48000  # MossFormer2_SE_48K default
-            elif hf_speech_enhancer == "bs-roformer":
-                extraction_sr = 44100  # BS-RoFormer native rate
-            else:
-                extraction_sr = DEFAULT_EXTRACTION_SR
-            self._enhancement_enabled = True
-        else:
-            extraction_sr = DEFAULT_EXTRACTION_SR
-            self._enhancement_enabled = False
+        # v1.7.4+ Clean Contract: ALWAYS extract at 48kHz for scene files
+        # Enhancement ALWAYS runs (even "none" backend does 48kHz→16kHz resampling)
+        # This ensures consistent high-quality input for all enhancer backends
 
-        self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
+        self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
 
         # Scene detector (only if enabled)
         self.scene_detector = None
@@ -206,11 +192,8 @@ class TransformersPipeline(BasePipeline):
         logger.info(f"TransformersPipeline initialized")
         logger.info(f"  Model: {hf_model_id}")
         logger.info(f"  Scene detection: {self.scene_method}")
-        if self._enhancement_enabled:
-            logger.info(f"  Speech enhancer: {hf_speech_enhancer}")
-            logger.info(f"  Extraction SR: {extraction_sr}Hz (enhancer preferred rate)")
-        else:
-            logger.info(f"  Speech enhancer: none")
+        logger.info(f"  Speech enhancer: {hf_speech_enhancer}")
+        logger.info(f"  Extraction SR: {SCENE_EXTRACTION_SR}Hz (v1.7.4+ contract: always 48kHz)")
 
         # Diagnostic: Log full config for Pass 2 debugging
         logger.debug(
@@ -374,6 +357,8 @@ class TransformersPipeline(BasePipeline):
 
             # =================================================================
             # PHASE 1: SPEECH ENHANCEMENT (Exclusive VRAM Block)
+            # v1.7.4+ Clean Contract: Enhancement ALWAYS runs
+            # Even "none" backend performs 48kHz→16kHz resampling for VAD/ASR
             # Enhancer is a LOCAL variable - created, used, and DESTROYED
             # before ASR is loaded. This prevents the "VRAM Sandwich".
             # =================================================================
@@ -384,63 +369,54 @@ class TransformersPipeline(BasePipeline):
             except ImportError:
                 _torch_available = False
 
-            if self._enhancement_enabled:
-                # A. Load ONLY the Enhancer (LOCAL variable, not self.enhancer)
-                enhancer = create_enhancer_direct(**self._enhancer_config)
-                if enhancer is None:
-                    logger.warning("Enhancement was enabled but enhancer creation failed. Skipping.")
-                    master_metadata["config"]["speech_enhancement"] = {"enabled": False, "error": "creation_failed"}
-                else:
-                    enhancer_name = enhancer.name
-                    logger.info(f"Step 2.5: Enhancing audio with {enhancer.display_name}...")
+            # A. Load Enhancer (always succeeds - "none" backend is fallback)
+            enhancer = create_enhancer_direct(**self._enhancer_config)
+            enhancer_name = enhancer.name
+            logger.info(f"Step 2.5: Preparing audio with {enhancer.display_name}...")
 
-                    if scene_paths:
-                        # B. Process Enhancement - Enhance each scene
-                        scene_paths = enhance_scenes(
-                            scene_paths,
-                            enhancer,
-                            self.temp_dir,
-                            progress_callback=lambda n, t, name: logger.debug(
-                                f"Enhancing scene {n}/{t}: {name}"
-                            )
-                        )
-                        master_metadata["config"]["speech_enhancement"] = {
-                            "backend": enhancer_name,
-                            "enhanced_scenes": len(scene_paths)
-                        }
-                    else:
-                        # Enhance full audio file
-                        enhanced_path = self.temp_dir / f"{media_basename}_enhanced.wav"
-                        extracted_audio = enhance_single_audio(
-                            extracted_audio,
-                            enhancer,
-                            output_path=enhanced_path
-                        )
-                        master_metadata["config"]["speech_enhancement"] = {
-                            "backend": enhancer_name,
-                            "enhanced_full_audio": True
-                        }
-
-                    # C. DESTROY Enhancer - This is the "JIT Unload"
-                    # We must confirm VRAM is near-zero before loading ASR
-                    logger.debug("Destroying enhancer to free VRAM before ASR load")
-                    enhancer.cleanup()
-                    del enhancer
-                    gc.collect()
-                    if _torch_available:
-                        torch.cuda.empty_cache()
-                        logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
-
-                    logger.info(f"Speech enhancement complete, GPU memory released")
-
-                    self.metadata_manager.update_processing_stage(
-                        master_metadata, "speech_enhancement", "completed",
-                        backend=enhancer_name
+            if scene_paths:
+                # B. Process Enhancement - Enhance each scene (includes 48kHz→16kHz resampling)
+                scene_paths = enhance_scenes(
+                    scene_paths,
+                    enhancer,
+                    self.temp_dir,
+                    progress_callback=lambda n, t, name: logger.debug(
+                        f"Enhancing scene {n}/{t}: {name}"
                     )
-            else:
-                self.metadata_manager.update_processing_stage(
-                    master_metadata, "speech_enhancement", "skipped"
                 )
+                master_metadata["config"]["speech_enhancement"] = {
+                    "backend": enhancer_name,
+                    "enhanced_scenes": len(scene_paths)
+                }
+            else:
+                # Enhance full audio file (includes 48kHz→16kHz resampling)
+                enhanced_path = self.temp_dir / f"{media_basename}_enhanced.wav"
+                extracted_audio = enhance_single_audio(
+                    extracted_audio,
+                    enhancer,
+                    output_path=enhanced_path
+                )
+                master_metadata["config"]["speech_enhancement"] = {
+                    "backend": enhancer_name,
+                    "enhanced_full_audio": True
+                }
+
+            # C. DESTROY Enhancer - This is the "JIT Unload"
+            # We must confirm VRAM is near-zero before loading ASR
+            logger.debug("Destroying enhancer to free VRAM before ASR load")
+            enhancer.cleanup()
+            del enhancer
+            gc.collect()
+            if _torch_available:
+                torch.cuda.empty_cache()
+                logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
+
+            logger.info(f"Audio preparation complete, GPU memory released")
+
+            self.metadata_manager.update_processing_stage(
+                master_metadata, "speech_enhancement", "completed",
+                backend=enhancer_name
+            )
 
             # =================================================================
             # PHASE 2: ASR TRANSCRIPTION (Exclusive VRAM Block)

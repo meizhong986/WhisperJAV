@@ -189,11 +189,17 @@ class FFmpegDSPBackend:
         return True
 
     def get_preferred_sample_rate(self) -> int:
-        """FFmpeg works with any sample rate, prefer 16kHz for speech."""
-        return 16000
+        """Return 48kHz (v1.7.4+ contract: scene files are always 48kHz).
+
+        FFmpeg DSP benefits from higher sample rates:
+        - More frequency bins for afftdn noise estimation
+        - Deesser can target full sibilant range (4-12kHz)
+        - Better loudnorm LUFS measurement accuracy
+        """
+        return 48000
 
     def get_output_sample_rate(self) -> int:
-        """Output sample rate matches input."""
+        """Return 16kHz (v1.7.4+ contract: output is always 16kHz for VAD/ASR)."""
         return 16000
 
     def get_supported_models(self) -> List[str]:
