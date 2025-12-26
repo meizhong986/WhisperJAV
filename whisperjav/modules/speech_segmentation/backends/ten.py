@@ -36,11 +36,11 @@ class TenSpeechSegmenter:
 
     def __init__(
         self,
-        threshold: float = 0.5,
+        threshold: float = 0.45,
         hop_size: int = 256,
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
-        chunk_threshold_s: Optional[float] = None,
+        chunk_threshold_s: Optional[float] = 0.8,
         max_group_duration_s: Optional[float] = None,
         **kwargs
     ):
