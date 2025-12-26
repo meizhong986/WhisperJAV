@@ -71,6 +71,9 @@ install_requires = [
     # Speedup Dependencies (Previously in 'speedup' extra)
     "numba",
     "hf_xet",  # Faster HuggingFace downloads (Xet Storage)
+
+    # Process Management (v1.7.4)
+    "psutil>=5.9.0",  # Process tree termination for clean subprocess cleanup
 ]
 
 # Classifiers for supported Python versions

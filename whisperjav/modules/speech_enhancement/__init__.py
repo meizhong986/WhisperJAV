@@ -59,6 +59,8 @@ from .pipeline_helper import (
     get_extraction_sample_rate,
     enhance_scenes,
     enhance_single_audio,
+    SCENE_EXTRACTION_SR,
+    TARGET_SAMPLE_RATE,
 )
 
 __all__ = [
@@ -78,4 +80,7 @@ __all__ = [
     "get_extraction_sample_rate",
     "enhance_scenes",
     "enhance_single_audio",
+    # Contract constants (v1.7.4+)
+    "SCENE_EXTRACTION_SR",
+    "TARGET_SAMPLE_RATE",
 ]

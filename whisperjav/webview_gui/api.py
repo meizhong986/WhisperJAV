@@ -17,6 +17,11 @@ from typing import Optional, List, Dict, Any
 import webview
 from webview import FileDialog
 
+from whisperjav.utils.process_manager import (
+    terminate_process_tree,
+    PSUTIL_AVAILABLE,
+)
+
 
 # Determine REPO_ROOT for module resolution
 # Same pattern as Tkinter GUI
@@ -359,7 +364,10 @@ class WhisperJAVAPI:
 
     def cancel_process(self) -> Dict[str, Any]:
         """
-        Cancel the running subprocess.
+        Cancel the running subprocess and all its children.
+
+        Uses psutil to terminate the entire process tree, ensuring
+        GPU workers spawned by the orchestrator are also killed.
 
         Returns:
             dict: Response with success status
@@ -372,23 +380,51 @@ class WhisperJAVAPI:
 
         try:
             self.status = "cancelled"
-            self.process.terminate()
+            pid = self.process.pid
 
-            # Wait briefly for graceful shutdown
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                # Force kill if needed
-                self.process.kill()
-                self.process.wait()
+            if PSUTIL_AVAILABLE:
+                # Use psutil to kill entire process tree
+                result = terminate_process_tree(pid, timeout=5.0, include_parent=True)
 
-            self.log_queue.put("\n[CANCELLED] Process terminated by user.\n")
+                if result["errors"]:
+                    for error in result["errors"]:
+                        self.log_queue.put(f"[WARNING] {error}\n")
+
+                terminated_count = len(result["terminated"]) + len(result["killed"])
+                self.log_queue.put(
+                    f"\n[CANCELLED] Terminated {terminated_count} process(es).\n"
+                )
+
+                if not result["success"]:
+                    # Clean up process reference even on partial failure
+                    self.process = None
+                    return {
+                        "success": False,
+                        "message": f"Some processes may not have been terminated: {result['errors']}"
+                    }
+            else:
+                # Fallback: basic termination (original behavior)
+                self.log_queue.put(
+                    "\n[WARNING] psutil not available - child processes may not be terminated.\n"
+                )
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+                    self.process.wait()
+                self.log_queue.put("[CANCELLED] Process terminated by user.\n")
+
+            # Clean up process reference
+            self.process = None
 
             return {
                 "success": True,
                 "message": "Process cancelled"
             }
         except Exception as e:
+            # Ensure process reference is cleared on error
+            self.process = None
             return {
                 "success": False,
                 "message": f"Failed to cancel process: {e}"
