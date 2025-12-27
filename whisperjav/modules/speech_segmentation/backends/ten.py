@@ -30,32 +30,37 @@ class TenSpeechSegmenter:
     Note: TEN VAD requires int16 audio input and operates at 16kHz only.
 
     Example:
-        segmenter = TenSpeechSegmenter(threshold=0.5)
+        segmenter = TenSpeechSegmenter(threshold=0.20)
         result = segmenter.segment(audio_path)
     """
 
     def __init__(
         self,
-        threshold: float = 0.5,
+        threshold: float = 0.20,
         hop_size: int = 256,
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
-        chunk_threshold_s: Optional[float] = 0.8,
+        chunk_threshold_s: Optional[float] = 1.0,
         max_group_duration_s: Optional[float] = None,
+        start_pad_ms: int = 100,
+        end_pad_ms: int = 200,
         **kwargs
     ):
         """
         Initialize TEN VAD segmenter.
 
         Args:
-            threshold: Speech probability threshold [0.0, 1.0]
+            threshold: Speech probability threshold [0.0, 1.0]. Lower values
+                detect more speech (more sensitive). Default 0.20.
             hop_size: Frame size in samples (160 or 256 recommended)
             min_speech_duration_ms: Minimum speech segment duration
-            min_silence_duration_ms: Minimum silence between segments
-            chunk_threshold_s: Gap threshold for segment grouping
+            min_silence_duration_ms: Minimum silence between segments (not implemented)
+            chunk_threshold_s: Gap threshold for segment grouping (seconds)
             max_group_duration_s: Maximum duration for a segment group (seconds).
                 Groups are split if adding a segment would exceed this limit.
                 Default 29s to stay within Whisper's 30s context window.
+            start_pad_ms: Milliseconds to pad before segment start (shifts start earlier)
+            end_pad_ms: Milliseconds to pad after segment end (shifts end later)
             **kwargs: Additional parameters for backward compatibility
                 - chunk_threshold: Legacy alias for chunk_threshold_s
         """
@@ -63,6 +68,8 @@ class TenSpeechSegmenter:
         self.hop_size = hop_size
         self.min_speech_duration_ms = min_speech_duration_ms
         self.min_silence_duration_ms = min_silence_duration_ms
+        self.start_pad_ms = start_pad_ms
+        self.end_pad_ms = end_pad_ms
 
         # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
         if chunk_threshold_s is not None:
@@ -70,7 +77,7 @@ class TenSpeechSegmenter:
         elif "chunk_threshold" in kwargs:
             self.chunk_threshold_s = kwargs["chunk_threshold"]
         else:
-            self.chunk_threshold_s = 0.8  # Default (reduced from 2.5 for tighter grouping)
+            self.chunk_threshold_s = 1.0  # Default for tighter grouping
 
         # Maximum group duration - prevents groups from exceeding Whisper's context window
         self.max_group_duration_s = max_group_duration_s if max_group_duration_s is not None else 29.0
@@ -153,8 +160,8 @@ class TenSpeechSegmenter:
                 flags.append(self._model.out_flags.value)
                 probs.append(self._model.out_probability.value)
 
-            # Convert frame flags to speech segments
-            segments = self._flags_to_segments(flags, probs, actual_sr)
+            # Convert frame flags to speech segments (with padding)
+            segments = self._flags_to_segments(flags, probs, actual_sr, duration)
 
         except Exception as e:
             logger.error(f"TEN VAD segmentation failed: {e}", exc_info=True)
@@ -216,10 +223,17 @@ class TenSpeechSegmenter:
         self,
         flags: List[int],
         probs: List[float],
-        sample_rate: int
+        sample_rate: int,
+        audio_duration: float
     ) -> List[SpeechSegment]:
-        """Convert frame-level speech flags to speech segments."""
-        segments = []
+        """Convert frame-level speech flags to speech segments with padding.
+
+        Applies start_pad_ms and end_pad_ms to shift segment boundaries:
+        - Start is shifted earlier by start_pad_ms
+        - End is shifted later by end_pad_ms
+        - Overlap between consecutive segments is prevented
+        """
+        raw_segments = []
         frame_duration = self.hop_size / sample_rate
 
         in_speech = False
@@ -246,14 +260,11 @@ class TenSpeechSegmenter:
                 # Apply minimum duration filter
                 duration_ms = (speech_end - speech_start) * 1000
                 if duration_ms >= self.min_speech_duration_ms:
-                    segments.append(SpeechSegment(
-                        start_sec=speech_start,
-                        end_sec=speech_end,
-                        start_sample=int(speech_start * sample_rate),
-                        end_sample=int(speech_end * sample_rate),
-                        confidence=avg_confidence,
-                        metadata={}
-                    ))
+                    raw_segments.append({
+                        'start': speech_start,
+                        'end': speech_end,
+                        'confidence': avg_confidence
+                    })
 
         # Handle speech extending to end of audio
         if in_speech:
@@ -263,13 +274,37 @@ class TenSpeechSegmenter:
 
             duration_ms = (speech_end - speech_start) * 1000
             if duration_ms >= self.min_speech_duration_ms:
+                raw_segments.append({
+                    'start': speech_start,
+                    'end': speech_end,
+                    'confidence': avg_confidence
+                })
+
+        # Apply padding to segments
+        start_pad_sec = self.start_pad_ms / 1000.0
+        end_pad_sec = self.end_pad_ms / 1000.0
+
+        segments = []
+        for i, seg in enumerate(raw_segments):
+            # Apply padding: shift start earlier, shift end later
+            padded_start = max(0.0, seg['start'] - start_pad_sec)
+            padded_end = min(audio_duration, seg['end'] + end_pad_sec)
+
+            # Prevent overlap with previous segment
+            if i > 0 and segments:
+                prev_end = segments[-1].end_sec
+                if padded_start < prev_end:
+                    padded_start = prev_end
+
+            # Ensure segment is still valid after padding adjustments
+            if padded_end > padded_start:
                 segments.append(SpeechSegment(
-                    start_sec=speech_start,
-                    end_sec=speech_end,
-                    start_sample=int(speech_start * sample_rate),
-                    end_sample=int(speech_end * sample_rate),
-                    confidence=avg_confidence,
-                    metadata={}
+                    start_sec=padded_start,
+                    end_sec=padded_end,
+                    start_sample=int(padded_start * sample_rate),
+                    end_sample=int(padded_end * sample_rate),
+                    confidence=seg['confidence'],
+                    metadata={'raw_start': seg['start'], 'raw_end': seg['end']}
                 ))
 
         return segments
@@ -340,6 +375,8 @@ class TenSpeechSegmenter:
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,
+            "start_pad_ms": self.start_pad_ms,
+            "end_pad_ms": self.end_pad_ms,
         }
 
     def cleanup(self) -> None:
