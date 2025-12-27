@@ -2948,9 +2948,12 @@ const EnsembleManager = {
 
                 if (checkbox) {
                     value = checkbox.checked;
+                } else if (slider && number) {
+                    // Slider with linked number input
+                    value = parseFloat(number.value);
                 } else if (slider) {
-                    const numberInput = control.querySelector('.param-number');
-                    value = parseFloat(numberInput.value);
+                    // Slider without number input (fallback)
+                    value = parseFloat(slider.value);
                 } else if (number) {
                     // Use original type for proper conversion
                     if (originalType === 'int' || originalType === 'integer') {
@@ -3107,9 +3110,12 @@ const EnsembleManager = {
 
                 if (checkbox) {
                     value = checkbox.checked;
+                } else if (slider && number) {
+                    // Slider with linked number input
+                    value = parseFloat(number.value);
                 } else if (slider) {
-                    const numberInput = control.querySelector('.param-number');
-                    value = parseFloat(numberInput.value);
+                    // Slider without number input (fallback)
+                    value = parseFloat(slider.value);
                 } else if (number) {
                     if (originalType === 'int' || originalType === 'integer') {
                         value = parseInt(number.value);
