@@ -398,6 +398,10 @@ class NemoSpeechSegmenter:
             # Cleanup diarizer to free GPU memory
             logger.debug("[NeMo/Diarizer] Cleaning up diarizer resources...")
             del diarizer
+            # WARNING: torch.cuda.empty_cache() can cause crashes in subprocess workers
+            # on Windows due to conflicts between PyTorch and ctranslate2 CUDA contexts.
+            # Consider removing if NeMo is used in ensemble subprocess mode.
+            # See: Silero VAD cleanup() for safer pattern (issue #82 root cause).
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 logger.debug("[NeMo/Diarizer] GPU cache cleared")
@@ -1133,6 +1137,10 @@ class NemoSpeechSegmenter:
         import gc
         gc.collect()
 
+        # WARNING: torch.cuda.empty_cache() can cause crashes in subprocess workers
+        # on Windows due to conflicts between PyTorch and ctranslate2 CUDA contexts.
+        # Consider removing if NeMo is used in ensemble subprocess mode.
+        # See: Silero VAD cleanup() for safer pattern (issue #82 root cause).
         try:
             import torch
             if torch.cuda.is_available():

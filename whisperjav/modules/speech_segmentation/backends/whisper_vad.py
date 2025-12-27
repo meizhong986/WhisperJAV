@@ -543,6 +543,10 @@ class WhisperVadSpeechSegmenter:
         import gc
         gc.collect()
 
+        # WARNING: torch.cuda.empty_cache() can cause crashes in subprocess workers
+        # on Windows due to conflicts between PyTorch and ctranslate2 CUDA contexts.
+        # Consider removing if WhisperVAD is used in ensemble subprocess mode.
+        # See: Silero VAD cleanup() for safer pattern (issue #82 root cause).
         try:
             import torch
             if torch.cuda.is_available():
