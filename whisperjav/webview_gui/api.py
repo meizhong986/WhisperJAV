@@ -791,6 +791,392 @@ class WhisperJAVAPI:
                 "error": str(e)
             }
 
+    # ========================================================================
+    # Schema Endpoints for Customize Modal (Phase 1 - GUI Enhancement)
+    # ========================================================================
+
+    def _load_tool_yaml(self, filename: str) -> Dict[str, Any]:
+        """Load a tool YAML config file from v4/ecosystems/tools directory."""
+        import yaml
+
+        tools_dir = Path(__file__).parent.parent / "config" / "v4" / "ecosystems" / "tools"
+        yaml_path = tools_dir / filename
+
+        if not yaml_path.exists():
+            return {}
+
+        try:
+            with open(yaml_path, 'r', encoding='utf-8') as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            return {}
+
+    def _convert_gui_hints_to_schema(self, gui_hints: Dict, spec: Dict) -> Dict[str, Any]:
+        """Convert YAML gui hints to frontend schema format."""
+        schema = {}
+
+        for param_name, hints in gui_hints.items():
+            # Get default value from spec
+            default = spec.get(param_name)
+
+            schema[param_name] = {
+                "type": hints.get("widget", "text"),
+                "label": hints.get("label", param_name.replace("_", " ").title()),
+                "description": hints.get("description", ""),
+                "group": hints.get("group", "general"),
+                "default": default,
+            }
+
+            # Add widget-specific properties
+            if hints.get("widget") == "slider":
+                schema[param_name].update({
+                    "min": hints.get("min", 0),
+                    "max": hints.get("max", 1),
+                    "step": hints.get("step", 0.1),
+                })
+            elif hints.get("widget") == "dropdown":
+                schema[param_name]["options"] = hints.get("options", [])
+            elif hints.get("widget") in ("spinner", "number"):
+                schema[param_name].update({
+                    "min": hints.get("min", 0),
+                    "max": hints.get("max", 100),
+                    "step": hints.get("step", 1),
+                })
+
+        return schema
+
+    def _extract_groups(self, gui_hints: Dict) -> Dict[str, List[str]]:
+        """Extract parameter groups from gui hints."""
+        groups = {}
+        for param_name, hints in gui_hints.items():
+            group = hints.get("group", "general")
+            if group not in groups:
+                groups[group] = []
+            groups[group].append(param_name)
+        return groups
+
+    def get_segmenter_schema(self, backend: str) -> Dict[str, Any]:
+        """
+        Get parameter schema for a speech segmenter backend.
+
+        Args:
+            backend: Segmenter name (silero, ten, whisper-vad, etc.)
+
+        Returns:
+            Schema dict with parameters, defaults, and presets
+        """
+        yaml_files = {
+            "silero": "silero-speech-segmentation.yaml",
+            "silero-v3.1": "silero-speech-segmentation.yaml",
+            "silero-v4.0": "silero-speech-segmentation.yaml",
+            "ten": "ten-speech-segmentation.yaml",
+            "whisper-vad": "whisper-vad-speech-segmentation.yaml",
+            "whisper-vad-tiny": "whisper-vad-speech-segmentation.yaml",
+            "whisper-vad-base": "whisper-vad-speech-segmentation.yaml",
+            "whisper-vad-small": "whisper-vad-speech-segmentation.yaml",
+            "whisper-vad-medium": "whisper-vad-speech-segmentation.yaml",
+            "nemo": "nemo-speech-segmentation.yaml",
+            "nemo-lite": "nemo-speech-segmentation.yaml",
+        }
+
+        # Handle "none" backend
+        if backend == "none":
+            return {
+                "success": True,
+                "backend": "none",
+                "display_name": "None (Skip Speech Segmentation)",
+                "description": "Process entire scene without speech segmentation",
+                "parameters": {},
+                "defaults": {},
+                "info_message": "Audio will be processed without VAD segmentation. "
+                               "This may result in less accurate timing but faster processing.",
+            }
+
+        yaml_file = yaml_files.get(backend)
+        if not yaml_file:
+            return {
+                "success": False,
+                "error": f"Unknown segmenter backend: {backend}"
+            }
+
+        try:
+            config = self._load_tool_yaml(yaml_file)
+            if not config:
+                return {
+                    "success": False,
+                    "error": f"Could not load config for {backend}"
+                }
+
+            return {
+                "success": True,
+                "backend": backend,
+                "display_name": config.get("metadata", {}).get("displayName", backend),
+                "description": config.get("metadata", {}).get("description", ""),
+                "parameters": self._convert_gui_hints_to_schema(
+                    config.get("gui", {}),
+                    config.get("spec", {})
+                ),
+                "defaults": config.get("spec", {}),
+                "presets": config.get("presets", {}),
+                "groups": self._extract_groups(config.get("gui", {})),
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_enhancer_schema(self, backend: str) -> Dict[str, Any]:
+        """
+        Get parameter schema for a speech enhancer backend.
+
+        Args:
+            backend: Enhancer name (ffmpeg-dsp, clearvoice, zipenhancer, etc.)
+
+        Returns:
+            Schema dict with parameters and options
+        """
+        # FFmpeg DSP has hardcoded schema (effects are not in YAML)
+        if backend == "ffmpeg-dsp":
+            return {
+                "success": True,
+                "backend": "ffmpeg-dsp",
+                "display_name": "FFmpeg DSP (Audio Filters)",
+                "description": "Traditional audio processing filters for noise reduction and normalization",
+                "parameters": {
+                    "effects": {
+                        "type": "checkbox_list",
+                        "label": "Audio Effects",
+                        "description": "Select effects to apply (order matters)",
+                        "options": [
+                            {"value": "loudnorm", "label": "Loudness Normalize",
+                             "description": "EBU R128 normalization (-16 LUFS)"},
+                            {"value": "normalize", "label": "Dynamic Normalize",
+                             "description": "Normalize audio dynamics"},
+                            {"value": "compress", "label": "Compress",
+                             "description": "Dynamic range compression"},
+                            {"value": "denoise", "label": "Denoise",
+                             "description": "FFT-based noise reduction"},
+                            {"value": "highpass", "label": "High-pass (80Hz)",
+                             "description": "Remove low frequency rumble"},
+                            {"value": "lowpass", "label": "Low-pass (8kHz)",
+                             "description": "Remove high frequency hiss"},
+                            {"value": "deess", "label": "De-ess",
+                             "description": "Reduce sibilants",
+                             "warning": "Not recommended for Japanese - removes し/す/せ sounds"},
+                            {"value": "amplify", "label": "Amplify (+3dB)",
+                             "description": "Volume boost"},
+                        ],
+                        "default": ["loudnorm"],
+                    }
+                },
+                "defaults": {"effects": ["loudnorm"]},
+            }
+
+        # ClearVoice schema
+        if backend == "clearvoice":
+            return {
+                "success": True,
+                "backend": "clearvoice",
+                "display_name": "ClearVoice Speech Enhancement",
+                "description": "Neural speech enhancement for noise reduction (48kHz processing)",
+                "parameters": {
+                    "model": {
+                        "type": "dropdown",
+                        "label": "Model",
+                        "description": "ClearVoice model variant",
+                        "options": [
+                            {"value": "MossFormer2_SE_48K", "label": "MossFormer2 48kHz (Best quality)"},
+                            {"value": "FRCRN_SE_16K", "label": "FRCRN 16kHz (Fast)"},
+                            {"value": "MossFormerGAN_SE_16K", "label": "MossFormerGAN 16kHz"},
+                            {"value": "MossFormer2_SS_16K", "label": "MossFormer2 SS 16kHz (Source separation)"},
+                        ],
+                        "default": "MossFormer2_SE_48K",
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "description": "Compute device",
+                        "options": [
+                            {"value": "auto", "label": "Auto (detect GPU)"},
+                            {"value": "cuda", "label": "CUDA (GPU)"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto",
+                    },
+                },
+                "defaults": {"model": "MossFormer2_SE_48K", "device": "auto"},
+            }
+
+        # ZipEnhancer schema
+        if backend == "zipenhancer":
+            return {
+                "success": True,
+                "backend": "zipenhancer",
+                "display_name": "ZipEnhancer",
+                "description": "Lightweight SOTA speech enhancement (16kHz)",
+                "parameters": {
+                    "model": {
+                        "type": "dropdown",
+                        "label": "Backend",
+                        "description": "Inference backend",
+                        "options": [
+                            {"value": "torch", "label": "PyTorch (GPU)"},
+                        ],
+                        "default": "torch",
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "cuda", "label": "CUDA"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto",
+                    },
+                },
+                "defaults": {"model": "torch", "device": "auto"},
+            }
+
+        # BS-RoFormer schema
+        if backend == "bs-roformer":
+            return {
+                "success": True,
+                "backend": "bs-roformer",
+                "display_name": "BS-RoFormer Vocal Isolation",
+                "description": "Separate vocals from background music (44.1kHz stereo)",
+                "parameters": {
+                    "model": {
+                        "type": "dropdown",
+                        "label": "Target",
+                        "description": "What to extract",
+                        "options": [
+                            {"value": "vocals", "label": "Vocals (speech/singing)"},
+                            {"value": "other", "label": "Other (background)"},
+                        ],
+                        "default": "vocals",
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "cuda", "label": "CUDA"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto",
+                    },
+                },
+                "defaults": {"model": "vocals", "device": "auto"},
+            }
+
+        # None (passthrough)
+        if backend == "none":
+            return {
+                "success": True,
+                "backend": "none",
+                "display_name": "None (Skip Enhancement)",
+                "description": "No audio enhancement applied",
+                "parameters": {},
+                "defaults": {},
+                "info_message": "Audio will be processed without denoising or enhancement. "
+                               "This is fastest but may produce lower quality on noisy audio.",
+            }
+
+        return {
+            "success": False,
+            "error": f"Unknown enhancer backend: {backend}"
+        }
+
+    def get_scene_detector_schema(self, backend: str) -> Dict[str, Any]:
+        """
+        Get parameter schema for a scene detector backend.
+
+        Args:
+            backend: Detector name (auditok, silero, none)
+
+        Returns:
+            Schema dict with parameters
+        """
+        yaml_files = {
+            "auditok": "auditok-scene-detection.yaml",
+            "silero": "silero-scene-detection.yaml",
+        }
+
+        if backend == "none":
+            return {
+                "success": True,
+                "backend": "none",
+                "display_name": "None (Skip Scene Detection)",
+                "description": "Process entire audio as single scene",
+                "parameters": {},
+                "defaults": {},
+                "info_message": "The entire audio file will be processed as a single scene. "
+                               "This may cause issues with long files (>30 minutes).",
+            }
+
+        yaml_file = yaml_files.get(backend)
+        if not yaml_file:
+            return {
+                "success": False,
+                "error": f"Unknown scene detector: {backend}"
+            }
+
+        try:
+            config = self._load_tool_yaml(yaml_file)
+            if not config:
+                return {
+                    "success": False,
+                    "error": f"Could not load config for {backend}"
+                }
+
+            return {
+                "success": True,
+                "backend": backend,
+                "display_name": config.get("metadata", {}).get("displayName", backend),
+                "description": config.get("metadata", {}).get("description", ""),
+                "parameters": self._convert_gui_hints_to_schema(
+                    config.get("gui", {}),
+                    config.get("spec", {})
+                ),
+                "defaults": config.get("spec", {}),
+                "presets": config.get("presets", {}),
+                "groups": self._extract_groups(config.get("gui", {})),
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_available_backends(self) -> Dict[str, Any]:
+        """
+        Get all available backends with availability status.
+
+        Returns:
+            Dict with segmenters, enhancers, and scene_detectors lists
+        """
+        try:
+            from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
+            from whisperjav.modules.speech_enhancement import SpeechEnhancerFactory
+
+            return {
+                "success": True,
+                "segmenters": SpeechSegmenterFactory.get_available_backends(),
+                "enhancers": SpeechEnhancerFactory.get_available_backends(),
+                "scene_detectors": [
+                    {"name": "auditok", "display_name": "Auditok (Energy-based)", "available": True},
+                    {"name": "silero", "display_name": "Silero (Neural VAD)", "available": True},
+                    {"name": "none", "display_name": "None (Skip)", "available": True},
+                ],
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     def validate_ensemble_config(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate ensemble configuration before processing.

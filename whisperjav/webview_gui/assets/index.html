@@ -301,13 +301,13 @@
                                 <div class="form-group inline-field">
                                     <label for="speechSegmenter" class="form-label" style="white-space: nowrap;">Speech Segmenter:</label>
                                     <select id="speechSegmenter" class="form-select">
-                                        <option value="" selected>Silero v4.0 (default)</option>
+                                        <option value="silero" selected>Silero v4.0 (default)</option>
                                         <option value="silero-v3.1">Silero v3.1</option>
                                         <option value="nemo-lite" disabled title="Requires nemo_toolkit">NeMo Lite (~0.5GB) (N/A)</option>
                                         <option value="whisper-vad">Whisper VAD (small ~500MB)</option>
                                         <option value="whisper-vad-tiny">Whisper VAD (tiny ~75MB)</option>
                                         <option value="whisper-vad-medium">Whisper VAD (medium ~1.5GB)</option>
-                                        <option value="ten" disabled title="Requires ten-vad">TEN VAD (N/A)</option>
+                                        <option value="ten">TEN VAD</option>
                                         <option value="none">None (Skip VAD)</option>
                                     </select>
                                 </div>
@@ -422,12 +422,13 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass1-segmenter" class="form-select compact">
-                                            <!-- Options populated dynamically by updateSegmenterOptions() -->
-                                            <option value="silero-v4.0" selected>Silero V4.0</option>
-                                            <option value="silero-v3.1">Silero V3.1</option>
+                                            <option value="silero" selected>Silero v4.0</option>
+                                            <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
-                                            <option value="whisper-vad">Whisper Seg. Medium</option>
-                                            <option value="ten">TEN</option>
+                                            <option value="whisper-vad">Whisper VAD (small)</option>
+                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
+                                            <option value="whisper-vad-medium">Whisper VAD (medium)</option>
+                                            <option value="ten">TEN VAD</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -554,12 +555,13 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
-                                            <!-- Options populated dynamically by updateSegmenterOptions() -->
-                                            <option value="silero-v4.0">Silero V4.0</option>
-                                            <option value="silero-v3.1">Silero V3.1</option>
+                                            <option value="silero">Silero v4.0</option>
+                                            <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
-                                            <option value="whisper-vad">Whisper Seg. Medium</option>
-                                            <option value="ten">TEN</option>
+                                            <option value="whisper-vad">Whisper VAD (small)</option>
+                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
+                                            <option value="whisper-vad-medium">Whisper VAD (medium)</option>
+                                            <option value="ten">TEN VAD</option>
                                             <option value="none" selected>None</option>
                                         </select>
                                     </div>
@@ -773,10 +775,9 @@
                 <!-- Tab Navigation -->
                 <div class="modal-tabs">
                     <button class="modal-tab active" data-tab="model">Model</button>
-                    <button class="modal-tab" data-tab="transcriber">Transcriber</button>
-                    <button class="modal-tab" data-tab="decoder">Decoder</button>
-                    <button class="modal-tab" data-tab="engine">Engine</button>
-                    <button class="modal-tab" data-tab="vad">VAD</button>
+                    <button class="modal-tab" data-tab="quality">Quality</button>
+                    <button class="modal-tab" data-tab="segmenter">Segmenter</button>
+                    <button class="modal-tab" data-tab="enhancer">Enhancer</button>
                     <button class="modal-tab" data-tab="scene">Scene</button>
                 </div>
                 <!-- Tab Panels -->
@@ -784,20 +785,17 @@
                     <div id="tab-model" class="modal-tab-panel active">
                         <!-- Model selection: model name and device -->
                     </div>
-                    <div id="tab-transcriber" class="modal-tab-panel">
-                        <!-- Transcriber params: temperature, thresholds, etc. -->
+                    <div id="tab-quality" class="modal-tab-panel">
+                        <!-- Quality params: transcriber thresholds, decoder settings -->
                     </div>
-                    <div id="tab-decoder" class="modal-tab-panel">
-                        <!-- Decoder params: task, language, beam_size, etc. -->
+                    <div id="tab-segmenter" class="modal-tab-panel">
+                        <!-- Speech segmenter: backend-specific parameters -->
                     </div>
-                    <div id="tab-engine" class="modal-tab-panel">
-                        <!-- Engine params: varies by pipeline backend -->
-                    </div>
-                    <div id="tab-vad" class="modal-tab-panel">
-                        <!-- VAD params: threshold, durations, etc. -->
+                    <div id="tab-enhancer" class="modal-tab-panel">
+                        <!-- Speech enhancer: backend-specific parameters -->
                     </div>
                     <div id="tab-scene" class="modal-tab-panel">
-                        <!-- Scene detection: auditok/silero selector -->
+                        <!-- Scene detection: method and parameters -->
                     </div>
                 </div>
             </div>
