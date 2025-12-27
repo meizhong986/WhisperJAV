@@ -747,6 +747,16 @@ body {
     background: var(--secondary-hover);
 }
 
+/* Success button (for apply confirmation) */
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #218838;
+}
+
 /* Text button (minimal) */
 .btn-text {
     background: transparent;
