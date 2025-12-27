@@ -1623,10 +1623,11 @@ const EnsembleManager = {
             document.getElementById('customizeModalTitle').textContent =
                 `${passLabel} Settings (${pipeline} / ${sensitivity})${customStatus}`;
 
-            // Clear all tab panels
-            const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+            // Clear all tab panels (new structure: model, quality, segmenter, enhancer, scene)
+            const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
             tabs.forEach(tab => {
-                document.getElementById(`tab-${tab}`).innerHTML = '';
+                const tabEl = document.getElementById(`tab-${tab}`);
+                if (tabEl) tabEl.innerHTML = '';
             });
 
             // Get current model settings
@@ -1637,28 +1638,30 @@ const EnsembleManager = {
                 ? passState.params.device
                 : 'cuda';
 
-            // Generate controls for each tab
+            // Generate Model tab
             this.generateModelTab('tab-model', currentModel, currentDevice, pipeline);
-            this.generateTabControls('tab-transcriber', allDefaults.transcriber, currentValues);
-            this.generateTabControls('tab-decoder', allDefaults.decoder, currentValues);
-            this.generateTabControls('tab-engine', allDefaults.engine, currentValues);
 
+            // Generate Quality tab (combines transcriber, decoder, and engine params)
+            const qualityParams = {
+                ...allDefaults.transcriber,
+                ...allDefaults.decoder,
+                ...allDefaults.engine
+            };
             // Determine if this is kotoba pipeline (uses internal VAD)
             const isKotobaPipeline = pipeline === 'kotoba-faster-whisper';
+            await this.generateQualityTab('tab-quality', qualityParams, currentValues, isKotobaPipeline, allDefaults.engine);
 
-            // Generate VAD tab based on pipeline type
-            if (isKotobaPipeline) {
-                // Show Internal VAD tab for kotoba
-                this.generateInternalVadTab('tab-vad', allDefaults.engine, currentValues);
-                // Update tab label to indicate internal VAD
-                document.querySelector('[data-tab="vad"]').textContent = 'Internal VAD';
-            } else {
-                // Show External VAD tab for other pipelines
-                this.generateTabControls('tab-vad', allDefaults.vad, currentValues);
-                document.querySelector('[data-tab="vad"]').textContent = 'VAD';
-            }
+            // Generate Segmenter tab (backend-specific parameters)
+            const segmenterBackend = passState.speechSegmenter || 'silero';
+            await this.generateSegmenterTab('tab-segmenter', segmenterBackend, allDefaults.vad, currentValues);
 
-            this.generateSceneDetectionTab('tab-scene', currentValues.scene_detection_method || 'auditok');
+            // Generate Enhancer tab (backend-specific parameters)
+            const enhancerBackend = passState.speechEnhancer || 'none';
+            await this.generateEnhancerTab('tab-enhancer', enhancerBackend, passState.dspEffects || ['loudnorm']);
+
+            // Generate Scene tab (backend-specific parameters)
+            const sceneBackend = passState.sceneDetector || 'auditok';
+            await this.generateSceneTab('tab-scene', sceneBackend, currentValues);
 
             // Reset to first tab
             this.switchModalTab('model');
@@ -1780,6 +1783,511 @@ const EnsembleManager = {
         return descriptions[paramName] || '';
     },
 
+    // ========== New Tab Generation Methods (Phase 2) ==========
+
+    /**
+     * Generate Quality tab - combines transcriber, decoder, and engine params.
+     * For kotoba pipeline, also includes internal VAD params in a separate section.
+     */
+    async generateQualityTab(tabId, qualityParams, currentValues, isKotobaPipeline, engineParams) {
+        const container = document.getElementById(tabId);
+        if (!container) return;
+
+        // Group parameters for better organization
+        const groups = {
+            thresholds: {
+                label: 'Quality Thresholds',
+                description: 'Control transcription quality and filtering',
+                params: ['temperature', 'compression_ratio_threshold', 'logprob_threshold',
+                         'logprob_margin', 'no_speech_threshold', 'hallucination_silence_threshold']
+            },
+            decoding: {
+                label: 'Decoding Settings',
+                description: 'Control how the model generates text',
+                params: ['beam_size', 'best_of', 'patience', 'length_penalty',
+                         'suppress_blank', 'without_timestamps', 'condition_on_previous_text']
+            },
+            advanced: {
+                label: 'Advanced Options',
+                description: 'Additional parameters for fine-tuning',
+                params: ['word_timestamps', 'repetition_penalty', 'no_repeat_ngram_size', 'max_initial_timestamp']
+            }
+        };
+
+        // Add kotoba internal VAD section if applicable
+        if (isKotobaPipeline && engineParams) {
+            groups.internalVad = {
+                label: 'Internal VAD (Kotoba)',
+                description: 'Built-in speech detection for kotoba-faster-whisper',
+                params: ['vad_filter', 'vad_threshold', 'min_speech_duration_ms',
+                         'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms']
+            };
+        }
+
+        // Generate each group
+        for (const [groupKey, group] of Object.entries(groups)) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'param-group';
+
+            // Group header
+            const header = document.createElement('div');
+            header.className = 'param-group-header';
+            header.innerHTML = `<h4>${group.label}</h4><p class="param-group-desc">${group.description}</p>`;
+            groupDiv.appendChild(header);
+
+            // Generate controls for params in this group
+            let hasParams = false;
+            for (const paramName of group.params) {
+                // Check if param exists in qualityParams or engineParams
+                let defaultValue = qualityParams[paramName];
+                if (defaultValue === undefined && engineParams) {
+                    defaultValue = engineParams[paramName];
+                }
+                if (defaultValue === undefined) continue;
+
+                hasParams = true;
+                const metadata = this.parameterMetadata[paramName] || {};
+                const param = {
+                    name: paramName,
+                    type: this.inferType(defaultValue, paramName),
+                    description: this.getQualityParamDescription(paramName),
+                    constraints: metadata
+                };
+                const currentValue = currentValues[paramName] !== undefined ? currentValues[paramName] : defaultValue;
+                const control = this.generateParamControl(param, currentValue, defaultValue);
+                groupDiv.appendChild(control);
+            }
+
+            if (hasParams) {
+                container.appendChild(groupDiv);
+            }
+        }
+
+        // If no params at all, show empty message
+        if (container.children.length === 0) {
+            container.innerHTML = '<p class="tab-empty">No quality parameters available for this pipeline.</p>';
+        }
+    },
+
+    getQualityParamDescription(paramName) {
+        const descriptions = {
+            temperature: 'Sampling temperature (0 = deterministic, higher = more random). Can be array for fallback.',
+            compression_ratio_threshold: 'Skip segments with high compression ratio (repetitive text)',
+            logprob_threshold: 'Skip segments with low average log probability',
+            logprob_margin: 'Margin for log probability threshold',
+            no_speech_threshold: 'Threshold for detecting no speech (higher = stricter)',
+            hallucination_silence_threshold: 'Skip silent segments that may cause hallucinations',
+            beam_size: 'Number of beams for beam search (higher = better but slower)',
+            best_of: 'Number of candidates for sampling',
+            patience: 'Patience factor for beam search',
+            length_penalty: 'Penalty for long sequences',
+            suppress_blank: 'Suppress blank outputs at start of sampling',
+            without_timestamps: 'Skip timestamp prediction (faster but no timing)',
+            condition_on_previous_text: 'Use previous text as context (can cause loops)',
+            word_timestamps: 'Enable word-level timestamps',
+            repetition_penalty: 'Penalty for repeating tokens',
+            no_repeat_ngram_size: 'Prevent repeating n-grams of this size',
+            max_initial_timestamp: 'Maximum initial timestamp position'
+        };
+        return descriptions[paramName] || '';
+    },
+
+    /**
+     * Generate Segmenter tab - loads backend-specific parameters from API.
+     */
+    async generateSegmenterTab(tabId, backend, vadDefaults, currentValues) {
+        const container = document.getElementById(tabId);
+        if (!container) return;
+
+        try {
+            // Load schema from API
+            const result = await pywebview.api.get_segmenter_schema(backend);
+
+            if (!result.success) {
+                container.innerHTML = `<p class="tab-error">Failed to load segmenter schema: ${result.error}</p>`;
+                return;
+            }
+
+            // Backend header
+            const header = document.createElement('div');
+            header.className = 'backend-header';
+            header.innerHTML = `
+                <h4>${result.display_name || backend}</h4>
+                <p class="backend-desc">${result.description || ''}</p>
+            `;
+            container.appendChild(header);
+
+            // Show info message if present (for "none" backend)
+            if (result.info_message) {
+                const info = document.createElement('div');
+                info.className = 'backend-info';
+                info.innerHTML = `<p>${result.info_message}</p>`;
+                container.appendChild(info);
+            }
+
+            // Generate controls from schema parameters
+            const parameters = result.parameters || {};
+            const defaults = result.defaults || {};
+
+            if (Object.keys(parameters).length === 0) {
+                if (!result.info_message) {
+                    container.innerHTML += '<p class="tab-empty">No configurable parameters for this segmenter.</p>';
+                }
+                return;
+            }
+
+            // Group parameters if groups are provided
+            const groups = result.groups || { general: Object.keys(parameters) };
+
+            for (const [groupName, paramNames] of Object.entries(groups)) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'param-group';
+
+                if (groupName !== 'general') {
+                    const groupHeader = document.createElement('h5');
+                    groupHeader.className = 'param-group-title';
+                    groupHeader.textContent = groupName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    groupDiv.appendChild(groupHeader);
+                }
+
+                for (const paramName of paramNames) {
+                    const paramSchema = parameters[paramName];
+                    if (!paramSchema) continue;
+
+                    const defaultValue = defaults[paramName];
+                    // Check vadDefaults for legacy values, then currentValues
+                    let currentValue = vadDefaults[paramName];
+                    if (currentValue === undefined) {
+                        currentValue = currentValues[paramName];
+                    }
+                    if (currentValue === undefined) {
+                        currentValue = defaultValue;
+                    }
+
+                    const control = this.generateSchemaControl(paramName, paramSchema, currentValue, defaultValue);
+                    groupDiv.appendChild(control);
+                }
+
+                container.appendChild(groupDiv);
+            }
+
+        } catch (error) {
+            container.innerHTML = `<p class="tab-error">Error loading segmenter parameters: ${error}</p>`;
+        }
+    },
+
+    /**
+     * Generate Enhancer tab - loads backend-specific parameters from API.
+     */
+    async generateEnhancerTab(tabId, backend, currentDspEffects) {
+        const container = document.getElementById(tabId);
+        if (!container) return;
+
+        try {
+            // Load schema from API
+            const result = await pywebview.api.get_enhancer_schema(backend);
+
+            if (!result.success) {
+                container.innerHTML = `<p class="tab-error">Failed to load enhancer schema: ${result.error}</p>`;
+                return;
+            }
+
+            // Backend header
+            const header = document.createElement('div');
+            header.className = 'backend-header';
+            header.innerHTML = `
+                <h4>${result.display_name || backend}</h4>
+                <p class="backend-desc">${result.description || ''}</p>
+            `;
+            container.appendChild(header);
+
+            // Show info message if present
+            if (result.info_message) {
+                const info = document.createElement('div');
+                info.className = 'backend-info';
+                info.innerHTML = `<p>${result.info_message}</p>`;
+                container.appendChild(info);
+            }
+
+            // Generate controls from schema parameters
+            const parameters = result.parameters || {};
+            const defaults = result.defaults || {};
+
+            if (Object.keys(parameters).length === 0) {
+                if (!result.info_message) {
+                    container.innerHTML += '<p class="tab-empty">No configurable parameters for this enhancer.</p>';
+                }
+                return;
+            }
+
+            // Special handling for FFmpeg DSP effects checkbox list
+            for (const [paramName, paramSchema] of Object.entries(parameters)) {
+                if (paramSchema.type === 'checkbox_list') {
+                    const control = this.generateCheckboxListControl(
+                        paramName,
+                        paramSchema,
+                        backend === 'ffmpeg-dsp' ? currentDspEffects : paramSchema.default
+                    );
+                    container.appendChild(control);
+                } else {
+                    const defaultValue = defaults[paramName];
+                    const control = this.generateSchemaControl(paramName, paramSchema, defaultValue, defaultValue);
+                    container.appendChild(control);
+                }
+            }
+
+        } catch (error) {
+            container.innerHTML = `<p class="tab-error">Error loading enhancer parameters: ${error}</p>`;
+        }
+    },
+
+    /**
+     * Generate checkbox list control for FFmpeg DSP effects.
+     */
+    generateCheckboxListControl(paramName, schema, currentValues) {
+        const container = document.createElement('div');
+        container.className = 'param-control checkbox-list-control';
+        container.dataset.param = paramName;
+
+        const label = document.createElement('label');
+        label.textContent = schema.label || paramName;
+        container.appendChild(label);
+
+        if (schema.description) {
+            const desc = document.createElement('p');
+            desc.className = 'param-description';
+            desc.textContent = schema.description;
+            container.appendChild(desc);
+        }
+
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'checkbox-list';
+
+        const options = schema.options || [];
+        const selectedValues = Array.isArray(currentValues) ? currentValues : (schema.default || []);
+
+        for (const opt of options) {
+            const checkboxWrapper = document.createElement('div');
+            checkboxWrapper.className = 'checkbox-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `${paramName}-${opt.value}`;
+            checkbox.value = opt.value;
+            checkbox.checked = selectedValues.includes(opt.value);
+            checkbox.className = 'effect-checkbox';
+
+            const checkboxLabel = document.createElement('label');
+            checkboxLabel.htmlFor = checkbox.id;
+            checkboxLabel.className = 'checkbox-label';
+
+            let labelHtml = `<span class="effect-name">${opt.label}</span>`;
+            if (opt.description) {
+                labelHtml += `<span class="effect-desc">${opt.description}</span>`;
+            }
+            if (opt.warning) {
+                labelHtml += `<span class="effect-warning">${opt.warning}</span>`;
+            }
+            checkboxLabel.innerHTML = labelHtml;
+
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(checkboxLabel);
+            checkboxContainer.appendChild(checkboxWrapper);
+        }
+
+        container.appendChild(checkboxContainer);
+        return container;
+    },
+
+    /**
+     * Generate Scene tab - loads backend-specific parameters from API.
+     */
+    async generateSceneTab(tabId, backend, currentValues) {
+        const container = document.getElementById(tabId);
+        if (!container) return;
+
+        try {
+            // Backend selector
+            const selectorDiv = document.createElement('div');
+            selectorDiv.className = 'param-control';
+            selectorDiv.dataset.param = 'scene_detection_method';
+
+            const selectorLabel = document.createElement('label');
+            selectorLabel.textContent = 'Scene Detection Method';
+            selectorDiv.appendChild(selectorLabel);
+
+            const select = document.createElement('select');
+            select.className = 'param-select form-select';
+            select.id = 'scene-method-select';
+
+            const methodOptions = [
+                { value: 'auditok', label: 'Auditok (Energy-based)' },
+                { value: 'silero', label: 'Silero (Neural VAD)' },
+                { value: 'none', label: 'None (Skip Scene Detection)' }
+            ];
+
+            methodOptions.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                if (opt.value === backend) option.selected = true;
+                select.appendChild(option);
+            });
+
+            selectorDiv.appendChild(select);
+            container.appendChild(selectorDiv);
+
+            // Load and show backend-specific parameters
+            const result = await pywebview.api.get_scene_detector_schema(backend);
+
+            if (!result.success) {
+                const error = document.createElement('p');
+                error.className = 'tab-error';
+                error.textContent = `Failed to load scene detector schema: ${result.error}`;
+                container.appendChild(error);
+                return;
+            }
+
+            // Description
+            if (result.description) {
+                const desc = document.createElement('p');
+                desc.className = 'backend-desc';
+                desc.textContent = result.description;
+                container.appendChild(desc);
+            }
+
+            // Info message for "none" backend
+            if (result.info_message) {
+                const info = document.createElement('div');
+                info.className = 'backend-info';
+                info.innerHTML = `<p>${result.info_message}</p>`;
+                container.appendChild(info);
+            }
+
+            // Parameters
+            const parameters = result.parameters || {};
+            const defaults = result.defaults || {};
+
+            if (Object.keys(parameters).length > 0) {
+                const paramsDiv = document.createElement('div');
+                paramsDiv.className = 'scene-params';
+                paramsDiv.id = 'scene-params-container';
+
+                for (const [paramName, paramSchema] of Object.entries(parameters)) {
+                    const defaultValue = defaults[paramName];
+                    const currentValue = currentValues[paramName] !== undefined
+                        ? currentValues[paramName]
+                        : defaultValue;
+
+                    const control = this.generateSchemaControl(paramName, paramSchema, currentValue, defaultValue);
+                    paramsDiv.appendChild(control);
+                }
+
+                container.appendChild(paramsDiv);
+            }
+
+        } catch (error) {
+            container.innerHTML = `<p class="tab-error">Error loading scene detector parameters: ${error}</p>`;
+        }
+    },
+
+    /**
+     * Generate a control from API schema format.
+     */
+    generateSchemaControl(paramName, schema, currentValue, defaultValue) {
+        const container = document.createElement('div');
+        container.className = 'param-control';
+        container.dataset.param = paramName;
+
+        const label = document.createElement('label');
+        label.textContent = schema.label || paramName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        container.appendChild(label);
+
+        let input;
+        const type = schema.type || 'text';
+
+        switch (type) {
+            case 'slider':
+                input = document.createElement('input');
+                input.type = 'range';
+                input.className = 'param-slider';
+                input.min = schema.min || 0;
+                input.max = schema.max || 1;
+                input.step = schema.step || 0.01;
+                input.value = currentValue !== undefined ? currentValue : defaultValue;
+
+                // Value display
+                const valueDisplay = document.createElement('span');
+                valueDisplay.className = 'slider-value';
+                valueDisplay.textContent = input.value;
+                input.addEventListener('input', () => {
+                    valueDisplay.textContent = input.value;
+                });
+
+                const sliderWrapper = document.createElement('div');
+                sliderWrapper.className = 'slider-wrapper';
+                sliderWrapper.appendChild(input);
+                sliderWrapper.appendChild(valueDisplay);
+                container.appendChild(sliderWrapper);
+                break;
+
+            case 'dropdown':
+                input = document.createElement('select');
+                input.className = 'param-select form-select';
+
+                const options = schema.options || [];
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.value;
+                    option.textContent = opt.label;
+                    if (opt.value === currentValue || opt.value === defaultValue) {
+                        option.selected = true;
+                    }
+                    input.appendChild(option);
+                });
+                container.appendChild(input);
+                break;
+
+            case 'spinner':
+            case 'number':
+                input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'param-spinner';
+                input.min = schema.min || 0;
+                input.max = schema.max || 100;
+                input.step = schema.step || 1;
+                input.value = currentValue !== undefined ? currentValue : defaultValue;
+                container.appendChild(input);
+                break;
+
+            case 'toggle':
+            case 'boolean':
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.className = 'param-checkbox';
+                input.checked = currentValue !== undefined ? currentValue : defaultValue;
+                container.appendChild(input);
+                break;
+
+            default:
+                input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'param-text';
+                input.value = currentValue !== undefined ? currentValue : (defaultValue || '');
+                container.appendChild(input);
+        }
+
+        // Description
+        if (schema.description) {
+            const desc = document.createElement('p');
+            desc.className = 'param-description';
+            desc.textContent = schema.description;
+            container.appendChild(desc);
+        }
+
+        return container;
+    },
+
     // ========== Transformers Pipeline Customization ==========
 
     async openTransformersCustomize(passKey) {
@@ -1822,44 +2330,40 @@ const EnsembleManager = {
 
     generateTransformersTabs(schema, currentValues) {
         // Update tab labels for Transformers context
+        // New structure: model, quality, segmenter, enhancer, scene
         const tabLabels = {
             'model': 'Model',
-            'transcriber': 'Chunking',
-            'decoder': 'Quality',
-            'engine': 'Engine',
-            'vad': 'VAD',
+            'quality': 'Quality',
+            'segmenter': 'Chunking',
+            'enhancer': 'Enhancer',
             'scene': 'Scene'
         };
 
         // Clear all tab panels and update labels
-        const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
-            panel.innerHTML = '';
+            if (panel) panel.innerHTML = '';
             const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
             if (tabBtn) {
                 tabBtn.textContent = tabLabels[tab];
-                // Hide VAD tab for Transformers (not applicable)
-                tabBtn.style.display = tab === 'vad' ? 'none' : '';
+                // Show all tabs for Transformers
+                tabBtn.style.display = '';
             }
         });
 
         // Generate Model tab
         this.generateTransformersModelTab('tab-model', schema.model, currentValues);
 
-        // Generate Chunking tab (transcriber slot)
-        this.generateTransformersChunkingTab('tab-transcriber', schema.chunking, currentValues);
+        // Generate Quality tab (beam_size, temperature, etc.)
+        this.generateTransformersQualityTab('tab-quality', schema.quality, currentValues);
 
-        // Generate Quality tab (decoder slot)
-        this.generateTransformersQualityTab('tab-decoder', schema.quality, currentValues);
+        // Generate Chunking tab (in Segmenter slot - chunk_length, stride, batch_size)
+        this.generateTransformersChunkingTab('tab-segmenter', schema.chunking, currentValues);
 
-        // Engine tab - not used for Transformers
-        document.getElementById('tab-engine').innerHTML =
-            '<p class="tab-empty">Engine options not applicable for Transformers mode.</p>';
-
-        // VAD tab - hidden for Transformers
-        document.getElementById('tab-vad').innerHTML =
-            '<p class="tab-empty">VAD is handled internally by HuggingFace chunked algorithm.</p>';
+        // Enhancer tab - not used for Transformers (speech enhancement happens before)
+        document.getElementById('tab-enhancer').innerHTML =
+            '<p class="tab-empty">Speech enhancement is configured in the main Ensemble tab.<br>Transformers mode uses audio as-is from the enhancement stage.</p>';
 
         // Generate Scene tab
         this.generateTransformersSceneTab('tab-scene', schema.scene, currentValues);
@@ -2409,14 +2913,17 @@ const EnsembleManager = {
             return;
         }
 
-        // Legacy pipeline customization
+        // Non-Transformers pipeline customization (new tab structure)
         const fullParams = {};
         const validationWarnings = [];
 
-        // Collect ALL values from all tab panels (including model tab)
-        const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+        // Collect ALL values from all tab panels (new structure: model, quality, segmenter, enhancer, scene)
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
+            if (!panel) return;
+
+            // Collect standard param-control values
             panel.querySelectorAll('.param-control').forEach(control => {
                 const paramName = control.dataset.param;
                 const originalType = control.dataset.originalType;
@@ -2504,6 +3011,26 @@ const EnsembleManager = {
                     }
                 }
             });
+
+            // Collect backend selector values (used in segmenter, enhancer, scene tabs)
+            panel.querySelectorAll('.backend-selector').forEach(select => {
+                const paramName = select.dataset.param;
+                if (paramName && select.value) {
+                    fullParams[paramName] = select.value;
+                }
+            });
+
+            // Collect checkbox-list values (used for FFmpeg DSP effects)
+            panel.querySelectorAll('.checkbox-list').forEach(list => {
+                const paramName = list.dataset.param;
+                if (paramName) {
+                    const selectedValues = [];
+                    list.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                        selectedValues.push(cb.value);
+                    });
+                    fullParams[paramName] = selectedValues;
+                }
+            });
         });
 
         // Log validation warnings if any
@@ -2534,48 +3061,77 @@ const EnsembleManager = {
     },
 
     applyTransformersCustomization(passKey) {
-        // Collect Transformers-specific parameters
+        // Collect Transformers-specific parameters from the new tab structure
         const hfParams = {};
+        const passState = this.state[passKey];
 
-        // Model parameters
-        const modelIdSelect = document.getElementById('hf-model_id');
-        if (modelIdSelect) hfParams.model_id = modelIdSelect.value;
+        // Collect ALL values from tab panels using the same approach as non-Transformers
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (!panel) return;
 
-        const deviceSelect = document.getElementById('hf-device');
-        if (deviceSelect) hfParams.device = deviceSelect.value;
+            // Collect standard param-control values
+            panel.querySelectorAll('.param-control').forEach(control => {
+                const paramName = control.dataset.param;
+                const originalType = control.dataset.originalType;
+                let value;
 
-        const dtypeSelect = document.getElementById('hf-dtype');
-        if (dtypeSelect) hfParams.dtype = dtypeSelect.value;
+                const checkbox = control.querySelector('.param-checkbox');
+                const slider = control.querySelector('.param-slider');
+                const number = control.querySelector('.param-number');
+                const text = control.querySelector('.param-text');
+                const select = control.querySelector('.param-select');
 
-        // Chunking parameters
-        const chunkLengthSlider = document.getElementById('hf-chunk_length_s');
-        if (chunkLengthSlider) hfParams.chunk_length_s = parseInt(chunkLengthSlider.value);
+                if (checkbox) {
+                    value = checkbox.checked;
+                } else if (slider) {
+                    const numberInput = control.querySelector('.param-number');
+                    value = parseFloat(numberInput.value);
+                } else if (number) {
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(number.value);
+                    } else {
+                        value = parseFloat(number.value);
+                    }
+                } else if (text) {
+                    value = text.value;
+                } else if (select) {
+                    const rawValue = select.value;
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(rawValue);
+                    } else if (originalType === 'float' || originalType === 'number') {
+                        value = parseFloat(rawValue);
+                    } else {
+                        value = rawValue;
+                    }
+                }
 
-        const strideLengthSlider = document.getElementById('hf-stride_length_s');
-        if (strideLengthSlider) {
-            const strideVal = parseFloat(strideLengthSlider.value);
-            hfParams.stride_length_s = strideVal > 0 ? strideVal : null;
-        }
+                if (value !== undefined && value !== null) {
+                    hfParams[paramName] = value;
+                }
+            });
 
-        const batchSizeSlider = document.getElementById('hf-batch_size');
-        if (batchSizeSlider) hfParams.batch_size = parseInt(batchSizeSlider.value);
+            // Collect backend selector values
+            panel.querySelectorAll('.backend-selector').forEach(select => {
+                const paramName = select.dataset.param;
+                if (paramName && select.value) {
+                    hfParams[paramName] = select.value;
+                }
+            });
 
-        // Quality parameters
-        const beamSizeSlider = document.getElementById('hf-beam_size');
-        if (beamSizeSlider) hfParams.beam_size = parseInt(beamSizeSlider.value);
-
-        const temperatureSlider = document.getElementById('hf-temperature');
-        if (temperatureSlider) hfParams.temperature = parseFloat(temperatureSlider.value);
-
-        const attnSelect = document.getElementById('hf-attn_implementation');
-        if (attnSelect) hfParams.attn_implementation = attnSelect.value;
-
-        const timestampsSelect = document.getElementById('hf-timestamps');
-        if (timestampsSelect) hfParams.timestamps = timestampsSelect.value;
-
-        // Scene detection
-        const sceneSelect = document.getElementById('hf-scene');
-        if (sceneSelect) hfParams.scene = sceneSelect.value;
+            // Collect checkbox-list values (for FFmpeg DSP effects)
+            panel.querySelectorAll('.checkbox-list').forEach(list => {
+                const paramName = list.dataset.param;
+                if (paramName) {
+                    const selectedValues = [];
+                    list.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                        selectedValues.push(cb.value);
+                    });
+                    hfParams[paramName] = selectedValues;
+                }
+            });
+        });
 
         // Store params
         this.state[passKey].params = hfParams;
@@ -2617,10 +3173,13 @@ const EnsembleManager = {
             ...this._currentDefaults.scene
         };
 
-        // Reset all controls in all tabs (including model tab)
-        const tabs = ['model', 'transcriber', 'decoder', 'engine', 'vad', 'scene'];
+        // Reset all controls in all tabs (new structure: model, quality, segmenter, enhancer, scene)
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
+            if (!panel) return;
+
+            // Reset standard param-control values
             panel.querySelectorAll('.param-control').forEach(control => {
                 const paramName = control.dataset.param;
                 const defaultValue = defaults[paramName];
@@ -2644,6 +3203,23 @@ const EnsembleManager = {
                     select.value = defaultValue;
                 }
             });
+
+            // Reset backend selectors to default values
+            panel.querySelectorAll('.backend-selector').forEach(select => {
+                const paramName = select.dataset.param;
+                if (paramName && defaults[paramName]) {
+                    select.value = defaults[paramName];
+                }
+            });
+
+            // Reset checkbox lists (e.g., DSP effects) - we'll use the passState default
+            panel.querySelectorAll('.checkbox-list').forEach(list => {
+                const paramName = list.dataset.param;
+                const defaultEffects = paramName === 'dspEffects' ? ['loudnorm'] : [];
+                list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = defaultEffects.includes(cb.value);
+                });
+            });
         });
 
         // Clear customized state - will use defaults
@@ -2657,28 +3233,59 @@ const EnsembleManager = {
     },
 
     resetTransformersToDefaults(passKey) {
-        // Reset Transformers controls to defaults
-        const defaults = TransformersManager.defaults;
+        // Reset Transformers controls using the new tab structure
+        const defaults = TransformersManager.defaults || {};
 
-        // Reset sliders
-        const sliderParams = ['chunk_length_s', 'stride_length_s', 'batch_size', 'beam_size', 'temperature'];
-        sliderParams.forEach(param => {
-            const slider = document.getElementById(`hf-${param}`);
-            if (slider) {
-                const defaultVal = defaults[param] ?? slider.min;
-                slider.value = defaultVal;
-                const valueDisplay = slider.parentElement.querySelector('.slider-value');
-                if (valueDisplay) valueDisplay.textContent = defaultVal;
-            }
-        });
+        // Reset all controls in all tabs (new structure)
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (!panel) return;
 
-        // Reset dropdowns
-        const dropdownParams = ['model_id', 'device', 'dtype', 'attn_implementation', 'timestamps', 'scene'];
-        dropdownParams.forEach(param => {
-            const select = document.getElementById(`hf-${param}`);
-            if (select && defaults[param]) {
-                select.value = defaults[param];
-            }
+            // Reset standard param-control values
+            panel.querySelectorAll('.param-control').forEach(control => {
+                const paramName = control.dataset.param;
+                const defaultValue = defaults[paramName];
+
+                const checkbox = control.querySelector('.param-checkbox');
+                const slider = control.querySelector('.param-slider');
+                const number = control.querySelector('.param-number');
+                const text = control.querySelector('.param-text');
+                const select = control.querySelector('.param-select');
+
+                if (checkbox && defaultValue !== undefined) {
+                    checkbox.checked = defaultValue;
+                } else if (slider && defaultValue !== undefined) {
+                    slider.value = defaultValue;
+                    const numInput = control.querySelector('.param-number');
+                    if (numInput) numInput.value = defaultValue;
+                    const valueDisplay = slider.parentElement?.querySelector('.slider-value');
+                    if (valueDisplay) valueDisplay.textContent = defaultValue;
+                } else if (number && defaultValue !== undefined) {
+                    number.value = defaultValue;
+                } else if (text) {
+                    text.value = defaultValue || '';
+                } else if (select && defaultValue !== undefined) {
+                    select.value = defaultValue;
+                }
+            });
+
+            // Reset backend selectors
+            panel.querySelectorAll('.backend-selector').forEach(select => {
+                const paramName = select.dataset.param;
+                if (paramName && defaults[paramName]) {
+                    select.value = defaults[paramName];
+                }
+            });
+
+            // Reset checkbox lists
+            panel.querySelectorAll('.checkbox-list').forEach(list => {
+                const paramName = list.dataset.param;
+                const defaultEffects = paramName === 'dspEffects' ? ['loudnorm'] : [];
+                list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = defaultEffects.includes(cb.value);
+                });
+            });
         });
 
         // Clear customized state
