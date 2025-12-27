@@ -437,22 +437,22 @@ class SileroSpeechSegmenter:
         }
 
     def cleanup(self) -> None:
-        """Release GPU memory and model resources."""
+        """Release model resources.
+
+        Note: Silero VAD is a small model (~10MB). In subprocess workers,
+        explicit GPU cleanup (del, gc.collect, torch.cuda.empty_cache) is
+        intentionally skipped. The OS reclaims all resources when the process
+        exits via os._exit(). Manual CUDA operations during Python shutdown
+        can cause STATUS_STACK_BUFFER_OVERRUN crashes on Windows due to
+        conflicts between PyTorch and ctranslate2 CUDA contexts.
+
+        See: Root cause analysis for issue #82 (Pass 2 worker crash)
+        """
         if self._model is not None:
-            del self._model
-            del self._utils
-            del self._get_speech_timestamps
             self._model = None
             self._utils = None
             self._get_speech_timestamps = None
-
-            # Force garbage collection to free GPU memory
-            import gc
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-            logger.debug("Silero VAD model resources released")
+            logger.debug("Silero VAD model references cleared")
 
     def get_supported_sample_rates(self) -> List[int]:
         """Return supported sample rates (internally resamples to 16kHz)."""
