@@ -1192,6 +1192,7 @@ const EnsembleManager = {
         // Modal controls
         document.getElementById('customizeModalClose').addEventListener('click', () => this.closeModal());
         document.getElementById('customizeModalApply').addEventListener('click', () => this.applyCustomization());
+        document.getElementById('customizeModalOK').addEventListener('click', () => this.okAndClose());
         document.getElementById('customizeModalReset').addEventListener('click', () => this.resetToDefaults());
 
         // Modal tab switching
@@ -2903,15 +2904,24 @@ const EnsembleManager = {
         return value;
     },
 
-    applyCustomization() {
-        const passKey = this.state.currentCustomize;
-        const passState = this.state[passKey];
+    applyCustomization(closeAfter = false) {
+        try {
+            const passKey = this.state.currentCustomize;
+            if (!passKey) {
+                ConsoleManager.log('Apply failed: No pass selected for customization', 'error');
+                return false;
+            }
 
-        // Handle Transformers separately
-        if (passState.isTransformers) {
-            this.applyTransformersCustomization(passKey);
-            return;
-        }
+            const passState = this.state[passKey];
+            if (!passState) {
+                ConsoleManager.log(`Apply failed: Invalid pass key "${passKey}"`, 'error');
+                return false;
+            }
+
+            // Handle Transformers separately
+            if (passState.isTransformers) {
+                return this.applyTransformersCustomization(passKey, closeAfter);
+            }
 
         // Non-Transformers pipeline customization (new tab structure)
         const fullParams = {};
@@ -3057,13 +3067,25 @@ const EnsembleManager = {
         ConsoleManager.log(`Saved ${paramCount} parameters for ${passLabel} (Custom)`, 'info');
 
         this.updateBadges();
-        this.closeModal();
+        this.showApplyFeedback();
+
+        if (closeAfter) {
+            this.closeModal();
+        }
+        return true;
+
+        } catch (error) {
+            ConsoleManager.log(`Apply failed: ${error.message}`, 'error');
+            console.error('applyCustomization error:', error);
+            return false;
+        }
     },
 
-    applyTransformersCustomization(passKey) {
-        // Collect Transformers-specific parameters from the new tab structure
-        const hfParams = {};
-        const passState = this.state[passKey];
+    applyTransformersCustomization(passKey, closeAfter = false) {
+        try {
+            // Collect Transformers-specific parameters from the new tab structure
+            const hfParams = {};
+            const passState = this.state[passKey];
 
         // Collect ALL values from tab panels using the same approach as non-Transformers
         const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
@@ -3142,7 +3164,38 @@ const EnsembleManager = {
         ConsoleManager.log(`Saved ${paramCount} Transformers parameters for ${passLabel} (Custom)`, 'info');
 
         this.updateBadges();
-        this.closeModal();
+        this.showApplyFeedback();
+
+        if (closeAfter) {
+            this.closeModal();
+        }
+        return true;
+
+        } catch (error) {
+            ConsoleManager.log(`Apply Transformers failed: ${error.message}`, 'error');
+            console.error('applyTransformersCustomization error:', error);
+            return false;
+        }
+    },
+
+    showApplyFeedback() {
+        // Show visual feedback on Apply button to indicate success
+        const applyBtn = document.getElementById('customizeModalApply');
+        if (!applyBtn) return;
+
+        // Store original state
+        const originalText = applyBtn.textContent;
+        const originalClass = applyBtn.className;
+
+        // Show success state
+        applyBtn.textContent = 'Applied';
+        applyBtn.className = 'btn btn-success';
+
+        // Revert after 1.5 seconds
+        setTimeout(() => {
+            applyBtn.textContent = originalText;
+            applyBtn.className = originalClass;
+        }, 1500);
     },
 
     async resetToDefaults() {
@@ -3299,8 +3352,25 @@ const EnsembleManager = {
     },
 
     closeModal() {
-        document.getElementById('customizeModal').classList.remove('active');
-        this.state.currentCustomize = null;
+        try {
+            const modal = document.getElementById('customizeModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+            this.state.currentCustomize = null;
+        } catch (error) {
+            ConsoleManager.log(`Close modal failed: ${error.message}`, 'error');
+            console.error('closeModal error:', error);
+        }
+    },
+
+    okAndClose() {
+        // OK button: Apply changes and close modal
+        const success = this.applyCustomization(true);  // true = close after apply
+        // If apply failed, still try to close modal to avoid trapping user
+        if (!success) {
+            this.closeModal();
+        }
     },
 
     collectConfig() {
