@@ -29,12 +29,9 @@ from whisperjav.utils.parameter_tracer import NullTracer
 
 from whisperjav.modules.speech_enhancement import (
     create_enhancer_from_config,
-    get_extraction_sample_rate,
     enhance_scenes,
+    SCENE_EXTRACTION_SR,
 )
-
-# Target sample rate for VAD/ASR (no enhancer case)
-DEFAULT_EXTRACTION_SR = 16000
 
 # =============================================================================
 # IMMORTAL OBJECT PATTERN - Prevents ctranslate2 Destructor Crash
@@ -128,26 +125,10 @@ class BalancedPipeline(BasePipeline):
         # Speech enhancement CONFIG (model created in process())
         self._enhancer_config = resolved_config  # Store full config for enhancer creation
 
-        # Determine extraction sample rate based on enhancer config
-        # We check config to see if enhancement is enabled, without loading the model
-        enhancer_params = params.get("speech_enhancer", {})
-        enhancer_backend = enhancer_params.get("backend", "none")
-        if enhancer_backend and enhancer_backend != "none":
-            # Enhancement enabled - extract at enhancer's preferred rate (48kHz for ClearVoice)
-            # We hardcode known rates to avoid loading the model just to check
-            if enhancer_backend == "clearvoice":
-                extraction_sr = 48000  # MossFormer2_SE_48K default
-            elif enhancer_backend == "bs-roformer":
-                extraction_sr = 44100  # BS-RoFormer native rate
-            else:
-                extraction_sr = DEFAULT_EXTRACTION_SR
-            self._enhancement_enabled = True
-        else:
-            extraction_sr = DEFAULT_EXTRACTION_SR
-            self._enhancement_enabled = False
-
+        # v1.7.4+ Clean Contract: ALWAYS extract at 48kHz for scene files
+        # Enhancement ALWAYS runs (even "none" backend does 48kHz→16kHz resampling)
         # Instantiate modules with V3 structured config
-        self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
+        self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
         self.scene_detector = DynamicSceneDetector(**scene_opts)
 
         # ASR CONFIG (model created in process() after enhancement cleanup)
@@ -304,54 +285,49 @@ class BalancedPipeline(BasePipeline):
             except ImportError:
                 _torch_available = False
 
-            if self._enhancement_enabled:
-                self.progress.set_current_step("Enhancing audio", 3, 6)
+            # v1.7.4+ Clean Contract: Enhancement ALWAYS runs
+            # Even "none" backend does 48kHz→16kHz resampling for VAD/ASR
+            self.progress.set_current_step("Preparing audio for ASR", 3, 6)
 
-                # A. Load ONLY the Enhancer (LOCAL variable, not self.enhancer)
-                enhancer = create_enhancer_from_config(self._enhancer_config)
-                if enhancer is None:
-                    logger.warning("Enhancement was enabled but enhancer creation failed. Skipping.")
-                    master_metadata["config"]["speech_enhancement"] = {"enabled": False, "error": "creation_failed"}
-                else:
-                    enhancer_name = enhancer.name
-                    enhancer_display = enhancer.display_name
-                    logger.info(f"Enhancing {len(scene_paths)} scenes with {enhancer_display}")
+            # A. Load Enhancer (always succeeds - "none" backend is fallback)
+            enhancer = create_enhancer_from_config(self._enhancer_config)
+            enhancer_name = enhancer.name
+            enhancer_display = enhancer.display_name
+            logger.info(f"Processing {len(scene_paths)} scenes with {enhancer_display}")
 
-                    def enhancement_progress(scene_num, total, name):
-                        if scene_num == 1 or scene_num % 5 == 0 or scene_num == total:
-                            pct = (scene_num / total) * 100
-                            print(f"\rEnhancing: [{scene_num}/{total}] {pct:.0f}%", end='', flush=True)
+            def enhancement_progress(scene_num, total, name):
+                if scene_num == 1 or scene_num % 5 == 0 or scene_num == total:
+                    pct = (scene_num / total) * 100
+                    print(f"\rProcessing: [{scene_num}/{total}] {pct:.0f}%", end='', flush=True)
 
-                    # B. Process Enhancement
-                    scene_paths = enhance_scenes(
-                        scene_paths,
-                        enhancer,
-                        self.temp_dir,
-                        progress_callback=enhancement_progress,
-                    )
-                    print()  # Newline after progress
+            # B. Process scenes (enhancement or passthrough resampling)
+            scene_paths = enhance_scenes(
+                scene_paths,
+                enhancer,
+                self.temp_dir,
+                progress_callback=enhancement_progress,
+            )
+            print()  # Newline after progress
 
-                    master_metadata["config"]["speech_enhancement"] = {
-                        "enabled": True,
-                        "backend": enhancer_name,
-                    }
+            master_metadata["config"]["speech_enhancement"] = {
+                "enabled": True,
+                "backend": enhancer_name,
+            }
 
-                    # C. DESTROY Enhancer - This is the "JIT Unload"
-                    # We must confirm VRAM is near-zero before loading ASR
-                    logger.debug("Destroying enhancer to free VRAM before ASR load")
-                    enhancer.cleanup()
-                    del enhancer
-                    gc.collect()
-                    if _torch_available:
-                        try:
-                            torch.cuda.empty_cache()
-                            logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
-                        except Exception as e:
-                            # CUDA context may be corrupted from prior OOM during enhancement
-                            # Log and continue - ASR phase will either work (fresh allocation) or fail explicitly
-                            logger.warning(f"CUDA cache clear failed after enhancement: {e}")
-            else:
-                master_metadata["config"]["speech_enhancement"] = {"enabled": False}
+            # C. DESTROY Enhancer - This is the "JIT Unload"
+            # We must confirm VRAM is near-zero before loading ASR
+            logger.debug("Destroying enhancer to free VRAM before ASR load")
+            enhancer.cleanup()
+            del enhancer
+            gc.collect()
+            if _torch_available:
+                try:
+                    torch.cuda.empty_cache()
+                    logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
+                except Exception as e:
+                    # CUDA context may be corrupted from prior OOM during enhancement
+                    # Log and continue - ASR phase will either work (fresh allocation) or fail explicitly
+                    logger.warning(f"CUDA cache clear failed after enhancement: {e}")
 
             # =================================================================
             # PHASE 2: ASR TRANSCRIPTION (Exclusive VRAM Block + Immortal Object)

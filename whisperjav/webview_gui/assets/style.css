@@ -747,6 +747,16 @@ body {
     background: var(--secondary-hover);
 }
 
+/* Success button (for apply confirmation) */
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #218838;
+}
+
 /* Text button (minimal) */
 .btn-text {
     background: transparent;
@@ -1875,6 +1885,143 @@ button:focus-visible,
 .param-select:focus {
     outline: none;
     border-color: var(--primary-color);
+}
+
+/* ============================================================
+   Parameter Groups & Backend Selectors
+   ============================================================ */
+
+/* Parameter groups for organizing related params */
+.param-group {
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.param-group:last-child {
+    margin-bottom: 0;
+}
+
+.param-group-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Backend header with selector */
+.backend-header {
+    background: var(--background-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.backend-header label {
+    display: block;
+    font-weight: 500;
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.backend-selector {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-base);
+    background: var(--input-bg);
+    cursor: pointer;
+}
+
+.backend-selector:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(2, 72, 115, 0.1);
+}
+
+/* Backend-specific parameter container */
+.backend-params {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.backend-params-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: 16px;
+}
+
+/* Checkbox list for DSP effects */
+.checkbox-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.checkbox-item:hover {
+    background: var(--background-tertiary);
+    border-color: var(--primary-color);
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
+
+.checkbox-item input[type="checkbox"]:checked + span {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.checkbox-item span {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+/* Enhancer-specific: effects section */
+.effects-section {
+    margin-top: 16px;
+}
+
+.effects-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+/* Backend availability badge */
+.backend-option.unavailable {
+    color: var(--text-secondary);
+    font-style: italic;
 }
 
 /* ============================================================

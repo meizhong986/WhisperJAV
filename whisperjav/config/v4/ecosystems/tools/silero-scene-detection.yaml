@@ -40,40 +40,40 @@ contract:
 # =============================================================================
 spec:
   # --- Core Options ---
-  core.max_duration_s: 29.0
-  core.min_duration_s: 0.2
-  core.target_sr: 16000
-  core.force_mono: true
-  core.verbose_summary: true
+  max_duration_s: 29.0
+  min_duration_s: 0.2
+  target_sr: 16000
+  force_mono: true
+  verbose_summary: true
 
   # --- Pass 1: Coarse Segmentation ---
-  pass1.min_duration_s: 2.0
-  pass1.max_duration_s: 2700.0
-  pass1.max_silence_s: 2.5
-  pass1.energy_threshold: 32
+  pass1_min_duration_s: 2.0
+  pass1_max_duration_s: 2700.0
+  pass1_max_silence_s: 2.5
+  pass1_energy_threshold: 32
 
   # --- Pass 2: Silero VAD ---
-  pass2.min_duration_s: 0.1
-  pass2.max_duration_s: 960.0
+  pass2_min_duration_s: 0.1
+  pass2_max_duration_s: 960.0
 
   # --- Silero VAD Options ---
-  silero.threshold: 0.02
-  silero.neg_threshold: 0.1
-  silero.min_silence_ms: 2000
-  silero.min_speech_ms: 100
-  silero.max_speech_s: 890.0
-  silero.min_silence_at_max: 750
-  silero.speech_pad_ms: 500
+  silero_threshold: 0.02
+  silero_neg_threshold: 0.1
+  silero_min_silence_ms: 2000
+  silero_min_speech_ms: 100
+  silero_max_speech_s: 890.0
+  silero_min_silence_at_max: 750
+  silero_speech_pad_ms: 500
 
   # --- Audio Preprocessing ---
-  audio.bandpass_low_hz: 200
-  audio.bandpass_high_hz: 4000
-  audio.drc_threshold_db: -24.0
-  audio.drc_ratio: 4.0
+  bandpass_low_hz: 200
+  bandpass_high_hz: 4000
+  drc_threshold_db: -24.0
+  drc_ratio: 4.0
 
   # --- Fallback Options ---
-  fallback.brute_force: true
-  fallback.chunk_s: 29.0
+  brute_force_fallback: true
+  brute_force_chunk_s: 29.0
 
 # =============================================================================
 # Sensitivity Presets
@@ -81,25 +81,25 @@ spec:
 presets:
   conservative:
     # Higher thresholds, less sensitive
-    silero.threshold: 0.1
-    silero.neg_threshold: 0.2
-    silero.min_silence_ms: 3000
-    silero.min_speech_ms: 200
+    silero_threshold: 0.1
+    silero_neg_threshold: 0.2
+    silero_min_silence_ms: 3000
+    silero_min_speech_ms: 200
 
   balanced: {}
 
   aggressive:
     # Lower thresholds, more sensitive
-    silero.threshold: 0.005
-    silero.neg_threshold: 0.05
-    silero.min_silence_ms: 1000
-    silero.min_speech_ms: 50
+    silero_threshold: 0.005
+    silero_neg_threshold: 0.05
+    silero_min_silence_ms: 1000
+    silero_min_speech_ms: 50
 
 # =============================================================================
 # GUI Hints
 # =============================================================================
 gui:
-  core.max_duration_s:
+  max_duration_s:
     widget: slider
     label: "Max Scene Duration"
     min: 10
@@ -107,7 +107,7 @@ gui:
     step: 1
     group: core
 
-  silero.threshold:
+  silero_threshold:
     widget: number
     label: "VAD Threshold"
     description: "Speech probability threshold (lower = more sensitive)"
@@ -116,7 +116,7 @@ gui:
     step: 0.01
     group: silero
 
-  silero.min_silence_ms:
+  silero_min_silence_ms:
     widget: spinner
     label: "Min Silence (ms)"
     description: "Minimum silence duration to split"
@@ -125,7 +125,7 @@ gui:
     step: 100
     group: silero
 
-  silero.min_speech_ms:
+  silero_min_speech_ms:
     widget: spinner
     label: "Min Speech (ms)"
     description: "Minimum speech duration to keep"
@@ -134,7 +134,7 @@ gui:
     step: 10
     group: silero
 
-  silero.speech_pad_ms:
+  silero_speech_pad_ms:
     widget: spinner
     label: "Speech Padding (ms)"
     description: "Padding around detected speech"

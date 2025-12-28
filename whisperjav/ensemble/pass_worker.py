@@ -175,6 +175,48 @@ FEATURE_PARAMS = {
     "post_processing",
 }
 
+# Scene detection params - routed to features.scene_detection for DynamicSceneDetector
+# These match the kwargs expected by DynamicSceneDetector.__init__()
+SCENE_DETECTION_PARAMS = {
+    # Core options
+    "max_duration_s",
+    "min_duration_s",
+    "target_sr",
+    "force_mono",
+    "preserve_original_sr",
+    "verbose_summary",
+    # Pass 1: Coarse segmentation (auditok)
+    "pass1_min_duration_s",
+    "pass1_max_duration_s",
+    "pass1_max_silence_s",
+    "pass1_energy_threshold",
+    # Pass 2: Fine segmentation (auditok)
+    "pass2_min_duration_s",
+    "pass2_max_duration_s",
+    "pass2_max_silence_s",
+    "pass2_energy_threshold",
+    # Audio preprocessing
+    "bandpass_low_hz",
+    "bandpass_high_hz",
+    "drc_threshold_db",
+    "drc_ratio",
+    "drc_attack_ms",
+    "drc_release_ms",
+    # Fallback options
+    "brute_force_fallback",
+    "brute_force_chunk_s",
+    "pad_edges_s",
+    "fade_ms",
+    # Silero VAD options (for silero scene detection)
+    "silero_threshold",
+    "silero_neg_threshold",
+    "silero_min_silence_ms",
+    "silero_min_speech_ms",
+    "silero_max_speech_s",
+    "silero_min_silence_at_max",
+    "silero_speech_pad_ms",
+}
+
 # Map pipeline names to their ASR backends for param validation
 PIPELINE_BACKENDS = {
     "balanced": "faster_whisper",
@@ -763,6 +805,14 @@ def apply_custom_params(
     # Get valid provider params for this pipeline's backend
     valid_provider_params = get_valid_provider_params(pipeline_name)
 
+    # Ensure features.scene_detection exists for scene param routing
+    if "features" not in resolved_config:
+        resolved_config["features"] = {}
+    if "scene_detection" not in resolved_config["features"]:
+        resolved_config["features"]["scene_detection"] = {}
+    if resolved_config["features"]["scene_detection"] is None:
+        resolved_config["features"]["scene_detection"] = {}
+
     for key, value in custom_params.items():
         # 1. Model-level params (always handled first)
         if key in MODEL_PARAMS:
@@ -779,7 +829,13 @@ def apply_custom_params(
             )
             continue
 
-        # 3. Route based on config structure
+        # 3. Scene detection params - route to features.scene_detection
+        if key in SCENE_DETECTION_PARAMS:
+            resolved_config["features"]["scene_detection"][key] = value
+            logger.debug("Pass %s: Set scene_detection.%s = %s", pass_number, key, value)
+            continue
+
+        # 4. Route based on config structure
         if is_v3_config:
             # V3 structure: params["asr"] contains all ASR params
             asr_params = params["asr"]
