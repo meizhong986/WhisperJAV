@@ -131,14 +131,17 @@ class BalancedPipeline(BasePipeline):
         self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
         self.scene_detector = DynamicSceneDetector(**scene_opts)
 
-        # ASR CONFIG (model created in process() after enhancement cleanup)
+        # ASR CONFIG (model created lazily on first process() call)
         self._asr_config = {
             'model_config': effective_model_cfg,
             'params': params,
             'task': task,
             'tracer': self.tracer
         }
-        # NOTE: self.asr is NOT created here - it's a local variable in process()
+        # ASR instance - created once, reused for all files in batch
+        # Named with underscore to prevent base_pipeline.cleanup() from touching it
+        # (base cleanup looks for self.asr, not self._asr)
+        self._asr = None
 
         self.stitcher = SRTStitcher()
 
@@ -159,7 +162,33 @@ class BalancedPipeline(BasePipeline):
         if kwargs.get('adaptive_audio_enhancement', False):
             self.preprocessor = AudioPreprocessor()
 
+    def _ensure_asr(self):
+        """
+        Lazy ASR initialization - create once, reuse for all files.
 
+        This implements the Model Reuse pattern to prevent ctranslate2 destructor
+        crashes during multi-file batch processing. The ASR model is created on
+        first call and stored in self._asr. Subsequent calls return the same instance.
+
+        The _IMMORTAL_ASR_REFERENCE global is set once to prevent garbage collection.
+        Nuclear Exit (os._exit(0)) in pass_worker.py handles final cleanup.
+
+        Returns:
+            FasterWhisperProASR: The shared ASR instance
+        """
+        global _IMMORTAL_ASR_REFERENCE
+
+        if self._asr is None:
+            logger.info("Initializing ASR model (exclusive VRAM block)")
+            self._asr = FasterWhisperProASR(**self._asr_config)
+
+            # Store in immortal reference ONCE - this reference never changes
+            _IMMORTAL_ASR_REFERENCE = self._asr
+            logger.debug("ASR stored in _IMMORTAL_ASR_REFERENCE (one-time, destructor prevention)")
+        else:
+            logger.debug("Reusing existing ASR model instance")
+
+        return self._asr
 
     def process(self, media_info: Dict) -> Dict:
         """Process media file through balanced pipeline with scene detection and VAD-enhanced ASR."""
@@ -330,24 +359,19 @@ class BalancedPipeline(BasePipeline):
                     logger.warning(f"CUDA cache clear failed after enhancement: {e}")
 
             # =================================================================
-            # PHASE 2: ASR TRANSCRIPTION (Exclusive VRAM Block + Immortal Object)
-            # ASR is created after enhancer is destroyed. We store a global
-            # reference to prevent garbage collection - the ctranslate2 C++
-            # destructor crashes on Windows (Access Violation 0xC0000005).
-            # The Nuclear Exit (os._exit(0)) in pass_worker.py handles cleanup.
+            # PHASE 2: ASR TRANSCRIPTION (Model Reuse Pattern)
+            # ASR is created ONCE and reused for all files in batch.
+            # This prevents ctranslate2 destructor crashes that occurred when
+            # multiple ASR instances were created and the old ones were GC'd.
+            # The _ensure_asr() method handles lazy initialization and stores
+            # the reference in _IMMORTAL_ASR_REFERENCE (one-time).
+            # Nuclear Exit (os._exit(0)) in pass_worker.py handles final cleanup.
             # =================================================================
-            global _IMMORTAL_ASR_REFERENCE
 
-            # A. Load ONLY the ASR (LOCAL variable, not self.asr)
-            logger.info("Initializing ASR model (exclusive VRAM block)")
-            asr = FasterWhisperProASR(**self._asr_config)
+            # Get or create the shared ASR instance
+            asr = self._ensure_asr()
 
-            # IMMEDIATELY store global reference to prevent ctranslate2 destructor crash
-            # This must happen before ANY code that could raise an exception
-            _IMMORTAL_ASR_REFERENCE = asr
-            logger.debug("ASR stored in _IMMORTAL_ASR_REFERENCE (destructor prevention)")
-
-            # Reset statistics after ASR is initialized
+            # Reset per-file statistics (safe - just Python dict assignment)
             if hasattr(asr, "reset_statistics"):
                 asr.reset_statistics()
 
@@ -535,23 +559,22 @@ class BalancedPipeline(BasePipeline):
                 logprob_filtered = filter_stats.get('logprob_filtered', 0)
                 nonverbal_filtered = filter_stats.get('nonverbal_filtered', 0)
 
-            # C. ASR CLEANUP INTENTIONALLY SKIPPED (Immortal Object Pattern)
+            # C. ASR CLEANUP INTENTIONALLY SKIPPED (Model Reuse Pattern)
             # ================================================================
             # DO NOT call asr.cleanup(), del asr, or gc.collect() here!
             #
-            # The ctranslate2 C++ destructor crashes with Access Violation
-            # (0xC0000005) on Windows when the WhisperModel is deleted.
-            # This is a known issue with ctranslate2's CUDA resource cleanup.
+            # The ASR model (self._asr) is REUSED across all files in the batch.
+            # This prevents ctranslate2 C++ destructor crashes that occurred when
+            # multiple ASR instances were created and old ones were garbage collected.
             #
-            # Instead, we stored the ASR reference in _IMMORTAL_ASR_REFERENCE
-            # at creation time. This prevents garbage collection. The Nuclear
-            # Exit (os._exit(0)) in pass_worker.py terminates the process
+            # The model is stored in both self._asr and _IMMORTAL_ASR_REFERENCE.
+            # Nuclear Exit (os._exit(0)) in pass_worker.py terminates the process
             # without calling Python destructors - the OS reclaims all memory.
             #
             # VRAM stays allocated (~3GB) until process exit, but this is safe
-            # because no other GPU model needs to load after ASR transcription.
+            # because the same model is reused for all files.
             # ================================================================
-            logger.debug("ASR cleanup skipped (Immortal Object Pattern - Nuclear Exit will handle)")
+            logger.debug("ASR cleanup skipped (Model Reuse Pattern - Nuclear Exit will handle)")
 
             master_metadata["summary"]["final_subtitles_raw"] += logprob_filtered + nonverbal_filtered
             master_metadata["summary"]["quality_metrics"].update({
