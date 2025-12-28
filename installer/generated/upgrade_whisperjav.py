@@ -12,8 +12,14 @@ Download this file and run it with your WhisperJAV Python:
 Or if you're in a command prompt with the WhisperJAV environment:
     python upgrade_whisperjav.py
 
+Options:
+    --wheel-only    Hot-patch mode: Only update the whisperjav package itself,
+                    skip all dependency installation. Safest for post-release
+                    upgrades (1.7.4 -> 1.7.4.post1) that don't add new deps.
+
 Features:
     - Upgrades whisperjav package from GitHub @main branch
+    - Version-aware dependency installation (minimizes pip exposure)
     - Installs only new dependencies (skips PyTorch)
     - Updates desktop shortcuts with correct version
     - Full cleanup of old version-specific files
@@ -26,11 +32,12 @@ import glob
 import shutil
 import subprocess
 import platform
+import argparse
 from pathlib import Path
 from typing import Optional, Tuple
 
 # Version of this upgrade script
-UPGRADE_SCRIPT_VERSION = "1.7.3"
+UPGRADE_SCRIPT_VERSION = "1.7.4"
 
 # GitHub repository URL
 GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
@@ -38,7 +45,43 @@ GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
 # New dependencies added in v1.7.x that older versions don't have
 # Note: Dependencies that require torch (like nemo_toolkit) are handled separately
 # with constraints to prevent CPU torch reinstallation
-NEW_DEPENDENCIES = [
+#
+# Organized by version for version-aware upgrades:
+# - v1.7.0-1.7.2: transformers, accelerate, pydantic, PyYAML, pydub, regex, ten-vad
+# - v1.7.3: modelscope, clearvoice, bs-roformer-infer, etc.
+# - v1.7.4: scikit-learn (for semantic scene detection)
+
+# Dependencies added in v1.7.4 (minimal upgrade from v1.7.3.x)
+DEPS_V174 = [
+    "scikit-learn>=1.3.0",    # Agglomerative clustering for semantic scene detection
+]
+
+# Dependencies added in v1.7.3 (speech enhancement)
+# NOTE: Speech enhancement deps (modelscope, clearvoice, bs-roformer) are EXCLUDED
+# from upgrades due to pip resolution conflicts. Users upgrading from < v1.7.3
+# who want speech enhancement should do a fresh install instead.
+# Only safe, non-conflicting deps are included here.
+DEPS_V173 = [
+    "hf_xet",                 # Faster HuggingFace downloads (safe, no conflicts)
+]
+
+# Speech enhancement packages - NOT included in upgrade due to pip conflicts
+# Users can manually install if needed:
+#   pip install modelscope>=1.20 clearvoice bs-roformer-infer
+SPEECH_ENHANCEMENT_DEPS_EXCLUDED = [
+    "modelscope>=1.20",       # ZipEnhancer - complex dep tree
+    "addict",                 # ModelScope dependency
+    "datasets>=2.14.0",       # ModelScope dependency - version conflicts
+    "simplejson",             # ModelScope dependency
+    "sortedcontainers",       # ModelScope dependency
+    "clearvoice",             # ClearerVoice - torch conflicts possible
+    "bs-roformer-infer",      # BS-RoFormer - torch conflicts possible
+    "onnxruntime>=1.16.0",    # ONNX - version sensitive
+    "numpy>=2.0",             # NumPy 2.x - breaking changes risk
+]
+
+# Dependencies added in v1.7.0-1.7.2
+DEPS_V170_V172 = [
     "transformers>=4.40.0",
     "accelerate>=0.26.0",
     "pydantic>=2.0,<3.0",
@@ -46,18 +89,10 @@ NEW_DEPENDENCIES = [
     "pydub",
     "regex",
     "ten-vad",
-    # v1.7.3 Speech Enhancement Dependencies
-    "modelscope>=1.20",       # ZipEnhancer (lightweight SOTA)
-    "addict",                 # ModelScope dependency
-    "datasets>=2.14.0",       # ModelScope dependency
-    "simplejson",             # ModelScope dependency
-    "sortedcontainers",       # ModelScope dependency
-    "clearvoice",             # ClearerVoice denoising (48kHz)
-    "bs-roformer-infer",      # BS-RoFormer vocal isolation (44.1kHz)
-    "onnxruntime>=1.16.0",    # ONNX inference for ZipEnhancer
-    "numpy>=2.0",             # NumPy 2.x (modelscope/zipenhancer compatible)
-    "hf_xet",                 # Faster HuggingFace downloads
 ]
+
+# Full list for fresh installs or very old versions
+NEW_DEPENDENCIES = DEPS_V170_V172 + DEPS_V173 + DEPS_V174
 
 # Dependencies that have torch as a requirement - installed with constraints
 # to prevent pip from reinstalling CPU-only torch
@@ -310,12 +345,81 @@ def upgrade_package(install_dir: Path) -> bool:
     return True
 
 
-def install_new_dependencies(install_dir: Path) -> bool:
+def parse_version(version_str: str) -> Tuple[int, int, int, str]:
+    """
+    Parse version string into components.
+
+    Args:
+        version_str: Version string like "1.7.3", "1.7.3.post4", "1.7.4"
+
+    Returns:
+        Tuple of (major, minor, patch, suffix)
+    """
+    import re
+    # Handle formats: "1.7.3", "1.7.3.post4", "1.7.4a0", etc.
+    match = re.match(r'^(\d+)\.(\d+)\.(\d+)(.*)$', version_str)
+    if match:
+        return (int(match.group(1)), int(match.group(2)),
+                int(match.group(3)), match.group(4) or "")
+    return (0, 0, 0, "")
+
+
+def get_required_dependencies(current_version: Optional[str]) -> list:
+    """
+    Determine which dependencies need to be installed based on current version.
+
+    This minimizes pip exposure by only installing what's truly needed.
+
+    Args:
+        current_version: Currently installed version string
+
+    Returns:
+        List of dependencies to install
+    """
+    if not current_version:
+        # Unknown version - install everything
+        print("      Version unknown, installing all dependencies...")
+        return NEW_DEPENDENCIES
+
+    major, minor, patch, suffix = parse_version(current_version)
+
+    # Determine what's needed based on version
+    deps_needed = []
+
+    if major < 1 or (major == 1 and minor < 7):
+        # Very old version (< 1.7.0) - need everything
+        print(f"      Upgrading from {current_version} (pre-1.7) - installing all dependencies...")
+        return NEW_DEPENDENCIES
+
+    if major == 1 and minor == 7:
+        if patch < 3:
+            # v1.7.0, v1.7.1, v1.7.2 - need v1.7.3 and v1.7.4 deps
+            print(f"      Upgrading from {current_version} - installing safe dependencies...")
+            print("      Note: Speech enhancement deps excluded (pip conflict risk).")
+            print("            For speech enhancement, consider fresh install.")
+            deps_needed = DEPS_V173 + DEPS_V174
+        elif patch == 3:
+            # v1.7.3.x - only need v1.7.4 deps (minimal upgrade!)
+            print(f"      Upgrading from {current_version} - minimal upgrade (scikit-learn only)...")
+            deps_needed = DEPS_V174
+        else:
+            # v1.7.4+ - might still need v1.7.4 deps if they weren't installed
+            print(f"      Upgrading from {current_version} - checking for missing dependencies...")
+            deps_needed = DEPS_V174
+
+    return deps_needed
+
+
+def install_new_dependencies(install_dir: Path, current_version: Optional[str] = None) -> bool:
     """
     Install new dependencies that weren't in older versions.
 
+    Uses version-aware logic to minimize pip exposure and reduce
+    risk of dependency conflicts.
+
     Args:
         install_dir: Path to installation directory
+        current_version: Currently installed version (for version-aware upgrades)
 
     Returns:
         True if successful, False otherwise
@@ -332,8 +436,15 @@ def install_new_dependencies(install_dir: Path) -> bool:
 
     success = True
 
+    # Get version-aware dependency list
+    deps_to_install = get_required_dependencies(current_version)
+
+    if not deps_to_install:
+        print_success("No new dependencies required")
+        return True
+
     # Install regular dependencies (no torch conflict)
-    for dep in NEW_DEPENDENCIES:
+    for dep in deps_to_install:
         try:
             result = subprocess.run(
                 [str(pip_exe), 'install', dep],
@@ -542,7 +653,27 @@ def verify_installation(install_dir: Path) -> Tuple[bool, Optional[str]]:
 
 def main() -> int:
     """Main entry point for the upgrade script."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="WhisperJAV Upgrade Script",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        '--wheel-only',
+        action='store_true',
+        help='Hot-patch mode: Only update whisperjav package, skip all dependency '
+             'installation. Safest for post-release upgrades (e.g., 1.7.4 -> 1.7.4.post1).'
+    )
+    args = parser.parse_args()
+
+    wheel_only_mode = args.wheel_only
+
     print_header()
+
+    if wheel_only_mode:
+        print("Mode: Wheel-only (hot-patch)")
+        print("         Dependencies will be skipped for maximum safety.")
+        print()
 
     # Step 1: Detect installation
     print("Detecting WhisperJAV installation...")
@@ -573,7 +704,8 @@ def main() -> int:
         print("Please check your network connection and try again.")
         return 1
 
-    total_steps = 5
+    # Adjust step count based on mode
+    total_steps = 4 if wheel_only_mode else 5
 
     # Step 1: Upgrade package
     print_step(1, total_steps, "Upgrading WhisperJAV package...")
@@ -581,16 +713,26 @@ def main() -> int:
         print_error("Upgrade failed. Your installation may be in an inconsistent state.")
         return 1
 
-    # Step 2: Install new dependencies
-    print_step(2, total_steps, "Installing new dependencies...")
-    install_new_dependencies(install_dir)
+    # Track current step for conditional steps
+    step_num = 1
+
+    # Step 2: Install new dependencies (skip in wheel-only mode)
+    if not wheel_only_mode:
+        step_num += 1
+        print_step(step_num, total_steps, "Installing new dependencies...")
+        install_new_dependencies(install_dir, current_version)
+    else:
+        print()
+        print("      Skipping dependencies (wheel-only mode)")
 
     # Step 3: Update launcher
-    print_step(3, total_steps, "Updating launcher executable...")
+    step_num += 1
+    print_step(step_num, total_steps, "Updating launcher executable...")
     update_launcher(install_dir)
 
     # Step 4: Verify and get new version
-    print_step(4, total_steps, "Verifying installation...")
+    step_num += 1
+    print_step(step_num, total_steps, "Verifying installation...")
     success, new_version = verify_installation(install_dir)
 
     if not success or not new_version:
@@ -600,7 +742,8 @@ def main() -> int:
     print_success(f"WhisperJAV {new_version} installed successfully")
 
     # Step 5: Update shortcut and cleanup
-    print_step(5, total_steps, "Updating desktop shortcut and cleaning up...")
+    step_num += 1
+    print_step(step_num, total_steps, "Updating desktop shortcut and cleaning up...")
     update_desktop_shortcut(install_dir, new_version)
 
     cleaned = cleanup_old_files(install_dir)
@@ -615,6 +758,10 @@ def main() -> int:
     print()
     print(f"  New version: {new_version}")
     print(f"  Installation: {install_dir}")
+    if wheel_only_mode:
+        print()
+        print("  Note: Dependencies were not updated (wheel-only mode).")
+        print("        If you encounter import errors, run without --wheel-only.")
     print()
     print("  You can now launch WhisperJAV from your desktop shortcut.")
     print()
