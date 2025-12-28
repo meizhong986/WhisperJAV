@@ -1714,7 +1714,8 @@ const EnsembleManager = {
 
         const options = [
             { value: 'auditok', label: 'Auditok (Energy-based)' },
-            { value: 'silero', label: 'Silero (Neural VAD)' }
+            { value: 'silero', label: 'Silero (Neural VAD)' },
+            { value: 'semantic', label: 'Semantic (Texture Clustering)' }
         ];
 
         options.forEach(opt => {
@@ -2124,6 +2125,7 @@ const EnsembleManager = {
             const methodOptions = [
                 { value: 'auditok', label: 'Auditok (Energy-based)' },
                 { value: 'silero', label: 'Silero (Neural VAD)' },
+                { value: 'semantic', label: 'Semantic (Texture Clustering)' },
                 { value: 'none', label: 'None (Skip Scene Detection)' }
             ];
 

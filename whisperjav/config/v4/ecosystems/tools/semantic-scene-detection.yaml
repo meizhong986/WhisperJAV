@@ -1,0 +1,191 @@
+# =============================================================================
+# Semantic Audio Clustering Scene Detection Tool Configuration
+# =============================================================================
+# Texture-based audio segmentation using MFCC features and agglomerative
+# clustering. Groups similar acoustic patterns together rather than splitting
+# at silence points. Ideal for content with natural pauses in dialogue.
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: semantic-scene-detection
+  displayName: "Semantic Audio Clustering"
+  description: |
+    Texture-based scene detection using MFCC features and agglomerative clustering.
+    Groups similar acoustic patterns together rather than splitting at silence.
+    Classifies scenes into types (dialogue, music, silence, high_energy) and
+    provides context-aware ASR prompts for improved transcription accuracy.
+  version: "7.0.0"
+  tags:
+    - scene-detection
+    - semantic
+    - clustering
+    - texture-based
+    - mfcc
+    - context-aware
+
+tool_type: scene_detection
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio_path: path
+    sample_rate: int
+  output:
+    segments: list
+    semantic_metadata: dict  # Additional context and ASR prompts
+
+# =============================================================================
+# Dependencies (Optional - lazy loaded)
+# =============================================================================
+dependencies:
+  required:
+    - librosa>=0.10.0
+    - scikit-learn>=1.3.0
+    - soundfile>=0.12.0
+  optional:
+    - matplotlib>=3.7.0  # For visualization
+
+# =============================================================================
+# Tool Parameters
+# =============================================================================
+spec:
+  # --- Core Segmentation Options ---
+  min_duration: 20.0
+  max_duration: 420.0
+  snap_window: 5.0
+  clustering_threshold: 18.0
+  sample_rate: 16000
+
+  # --- Audio Handling ---
+  preserve_original_sr: true
+  visualize: false
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  # Default: Balanced for general content
+  default: {}
+
+  # Conservative: Fewer, longer segments
+  # Good for: Podcasts, interviews, steady content
+  conservative:
+    min_duration: 30.0
+    max_duration: 420.0
+    snap_window: 6.0
+    clustering_threshold: 22.0
+
+  # Balanced: Default settings
+  balanced: {}
+
+  # Aggressive: More, shorter segments
+  # Good for: Music videos, fast-paced content
+  aggressive:
+    min_duration: 10.0
+    max_duration: 180.0
+    snap_window: 2.0
+    clustering_threshold: 10.0
+
+  # Dialogue-heavy: Optimized for conversation
+  # Good for: Movies, TV shows with lots of dialogue
+  dialogue_heavy:
+    min_duration: 15.0
+    max_duration: 300.0
+    snap_window: 3.0
+    clustering_threshold: 15.0
+
+  # Music-heavy: Frequent transitions
+  # Good for: Music videos, concerts, musicals
+  music_heavy:
+    min_duration: 10.0
+    max_duration: 180.0
+    snap_window: 2.0
+    clustering_threshold: 12.0
+
+  # Action content: Handle dynamic audio
+  # Good for: Action movies, sports, gaming
+  action_content:
+    min_duration: 25.0
+    max_duration: 420.0
+    snap_window: 8.0
+    clustering_threshold: 22.0
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  min_duration:
+    widget: slider
+    label: "Min Segment Duration"
+    description: "Minimum segment length in seconds. Shorter segments are merged."
+    min: 5
+    max: 60
+    step: 1
+    unit: "s"
+    group: core
+
+  max_duration:
+    widget: slider
+    label: "Max Segment Duration"
+    description: "Maximum segment length in seconds. Longer segments are split."
+    min: 60
+    max: 600
+    step: 10
+    unit: "s"
+    group: core
+
+  snap_window:
+    widget: slider
+    label: "Snap Window"
+    description: "Window size for snapping boundaries to silence points."
+    min: 1
+    max: 15
+    step: 0.5
+    unit: "s"
+    group: advanced
+
+  clustering_threshold:
+    widget: slider
+    label: "Clustering Threshold"
+    description: "Distance threshold for grouping. Lower = more segments."
+    min: 5
+    max: 30
+    step: 1
+    group: advanced
+
+  visualize:
+    widget: toggle
+    label: "Generate Visualization"
+    description: "Create a PNG plot showing scene boundaries and types."
+    group: debug
+
+# =============================================================================
+# Scene Types (Output Reference)
+# =============================================================================
+# The semantic clustering engine classifies scenes into these types:
+#
+# | Type            | Description                              | ASR Behavior    |
+# |-----------------|------------------------------------------|-----------------|
+# | quiet_dialogue  | Clear speech, low background noise       | Standard        |
+# | noisy_dialogue  | Speech with rhythmic background noise    | Focus on speech |
+# | music_dominant  | Music is the primary audio               | Transcribe lyrics only |
+# | high_energy     | Loud, dynamic audio (action scenes)      | Focus on speech |
+# | silence         | Very low audio levels                    | Skip or minimal |
+# | mixed_content   | Dialogue with background music           | Focus on speech |
+# | ambient_noise   | Background noise without clear speech    | Minimal         |
+#
+# Each scene includes an 'asr_prompt' field with context-specific guidance
+# for the ASR engine to improve transcription accuracy.
+# =============================================================================
+
+# =============================================================================
+# Provider Information
+# =============================================================================
+provider:
+  module: whisperjav.modules.scene_detection_backends.semantic_adapter
+  class: SemanticClusteringAdapter

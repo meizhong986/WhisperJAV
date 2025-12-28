@@ -799,6 +799,11 @@ class DynamicSceneDetector:
         if self.method == "silero":
             self._init_silero_vad(kwargs)
 
+        # Initialize Semantic Clustering adapter if needed (lazy loaded)
+        self._semantic_adapter = None
+        if self.method == "semantic":
+            self._init_semantic_adapter(kwargs)
+
         logger.debug(
             "DynamicSceneDetector cfg: "
             f"method={self.method}, "
@@ -847,6 +852,51 @@ class DynamicSceneDetector:
                 "Silero VAD method selected but model failed to load. "
                 "Fall back to --scene-detection-method auditok"
             ) from e
+
+    def _init_semantic_adapter(self, config: dict):
+        """
+        Initialize Semantic Audio Clustering adapter for scene detection.
+
+        Uses lazy import to avoid loading dependencies unless needed.
+        """
+        logger.info("Initializing Semantic Audio Clustering adapter...")
+
+        try:
+            # Lazy import to avoid loading dependencies unless method="semantic"
+            from whisperjav.modules.scene_detection_backends.semantic_adapter import (
+                SemanticClusteringAdapter,
+                SemanticClusteringConfig,
+            )
+
+            # Build config from parameters
+            adapter_config = SemanticClusteringConfig(
+                min_duration=float(config.get("min_duration", 20.0)),
+                max_duration=float(config.get("max_duration", 420.0)),
+                snap_window=float(config.get("snap_window", 5.0)),
+                clustering_threshold=float(config.get("clustering_threshold", 18.0)),
+                sample_rate=int(config.get("sample_rate", 16000)),
+                preserve_original_sr=bool(config.get("preserve_original_sr", True)),
+                visualize=bool(config.get("visualize", False)),
+            )
+
+            # Create adapter instance
+            self._semantic_adapter = SemanticClusteringAdapter(
+                config=adapter_config,
+                preset=str(config.get("preset", "default")),
+            )
+
+            logger.info("Semantic Audio Clustering adapter initialized")
+
+        except ImportError as e:
+            logger.error(f"Failed to load Semantic Audio Clustering: {e}")
+            raise RuntimeError(
+                "Semantic method selected but dependencies not available. "
+                "Ensure 'semantic_audio_clustering' module is installed. "
+                "Fall back to --scene-detection-method auditok"
+            ) from e
+        except Exception as e:
+            logger.error(f"Failed to initialize Semantic adapter: {e}")
+            raise
 
     def _detect_pass2_silero(self, region_audio: np.ndarray, sr: int, region_start_sec: float) -> List:
         """
@@ -1008,7 +1058,7 @@ class DynamicSceneDetector:
         self.scenes_detected = []
         self.vad_segments = []
         self.coarse_boundaries = []
-        self.vad_method = self.method if self.method == "silero" else None
+        self.vad_method = self.method if self.method in ("silero", "semantic") else None
         if self.method == "silero":
             self.vad_params = {
                 "threshold": self.silero_threshold,
@@ -1018,6 +1068,33 @@ class DynamicSceneDetector:
                 "max_speech_duration_s": self.silero_max_speech_s,
                 "speech_pad_ms": self.silero_speech_pad_ms,
             }
+
+        # --- Semantic Clustering: Delegate entirely to adapter ---
+        if self.method == "semantic":
+            if self._semantic_adapter is None:
+                raise RuntimeError(
+                    "Semantic adapter not initialized. "
+                    "This should not happen if method='semantic' was set correctly."
+                )
+
+            # Delegate to semantic adapter
+            scene_tuples = self._semantic_adapter.detect_scenes(
+                audio_path=audio_path,
+                output_dir=output_dir,
+                media_basename=media_basename,
+            )
+
+            # Copy data contract fields from adapter to this instance
+            self.scenes_detected = self._semantic_adapter.scenes_detected
+            self.vad_segments = self._semantic_adapter.vad_segments
+            self.coarse_boundaries = self._semantic_adapter.coarse_boundaries
+            self.vad_method = self._semantic_adapter.vad_method
+            self.vad_params = self._semantic_adapter.vad_params
+
+            logger.info(f"Semantic scene detection complete: {len(scene_tuples)} scenes")
+            return scene_tuples
+
+        # --- Auditok/Silero: Original two-pass approach ---
 
         # Load audio once from disk, then resample in-memory for detection
         try:
