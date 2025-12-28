@@ -1,7 +1,7 @@
 # WhisperJAV
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.1-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.7.4-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.9--3.12-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
@@ -106,7 +106,7 @@ whisperjav video.mp4 --mode transformers --hf-beam-size 5 --hf-chunk-length 20
 - `--hf-chunk-length`: Seconds per chunk (default: 15)
 - `--hf-beam-size`: Beam search width (default: 5)
 - `--hf-temperature`: Sampling temperature (default: 0.0)
-- `--hf-scene`: Scene detection method (`none`, `auditok`, `silero`)
+- `--hf-scene`: Scene detection method (`none`, `auditok`, `silero`, `semantic`)
 
 ### Two-Pass Ensemble Mode (New in v1.7)
 
@@ -156,6 +156,11 @@ Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, and OpenRouter.
 ### Scene Detection
 Splits audio at natural breaks instead of forcing fixed-length chunks. This prevents cutting off sentences mid-word.
 
+Three methods are available:
+- **Auditok** (default): Energy-based detection, fast and reliable
+- **Silero**: Neural VAD-based detection, better for noisy audio
+- **Semantic** (new in v1.7.4): Texture-based clustering using MFCC features, groups acoustically similar segments together
+
 ### Voice Activity Detection (VAD)
 Identifies when someone is actually speaking vs. background noise or music. Reduces false transcriptions during quiet moments.
 
@@ -187,7 +192,7 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ### Windows Installer (Easiest)
 
-Download and run: **WhisperJAV-1.7.1-Windows-x86_64.exe**
+Download and run: **WhisperJAV-1.7.4-Windows-x86_64.exe**
 
 This installs everything you need including Python and dependencies.
 

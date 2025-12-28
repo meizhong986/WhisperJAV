@@ -1,11 +1,11 @@
-# WhisperJAV v{{VERSION}} Requirements
+# WhisperJAV v1.7.4 Requirements
 # ================================
 #
 # This file lists all Python dependencies for WhisperJAV.
-# PyTorch is installed separately in post_install_v{{VERSION}}.py
+# PyTorch is installed separately in post_install_v1.7.4.py
 # with CUDA version detection.
 #
-# Installation: pip install -r requirements_v{{VERSION}}.txt
+# Installation: pip install -r requirements_v1.7.4.txt
 
 # ----------------------------------------
 # Core Whisper Dependencies

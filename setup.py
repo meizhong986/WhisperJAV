@@ -74,6 +74,9 @@ install_requires = [
 
     # Process Management (v1.7.4)
     "psutil>=5.9.0",  # Process tree termination for clean subprocess cleanup
+
+    # Semantic Audio Clustering (v1.7.4)
+    "scikit-learn>=1.3.0",  # Agglomerative clustering for texture-based scene detection
 ]
 
 # Classifiers for supported Python versions
