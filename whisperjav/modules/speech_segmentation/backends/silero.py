@@ -84,6 +84,7 @@ class SileroSpeechSegmenter:
             "speech_pad_ms": 700,
             "neg_threshold": 0.15,  # Not used by v4.0, kept for config compatibility
             "max_speech_duration_s": float("inf"),  # No limit by default
+            "max_group_duration_s": 29.0,  # Upper bound for group duration (Whisper 30s limit)
         },
         "v3.1": {
             "threshold": 0.125,
@@ -92,6 +93,7 @@ class SileroSpeechSegmenter:
             "speech_pad_ms": 700,
             "neg_threshold": 0.35,  # Not used by v3.1, kept for config compatibility
             "max_speech_duration_s": float("inf"),
+            "max_group_duration_s": 29.0,  # Upper bound for group duration (Whisper 30s limit)
         },
     }
 
@@ -103,6 +105,7 @@ class SileroSpeechSegmenter:
         min_silence_duration_ms: Optional[int] = None,
         speech_pad_ms: Optional[int] = None,
         chunk_threshold_s: Optional[float] = None,
+        max_group_duration_s: Optional[float] = None,
         neg_threshold: Optional[float] = None,
         max_speech_duration_s: Optional[float] = None,
         start_pad_samples: int = 11200,
@@ -119,6 +122,9 @@ class SileroSpeechSegmenter:
             min_silence_duration_ms: Minimum silence between segments
             speech_pad_ms: Padding around detected speech
             chunk_threshold_s: Gap threshold for segment grouping (seconds)
+            max_group_duration_s: Maximum duration for a segment group (seconds).
+                Groups are split if adding a segment would exceed this limit.
+                Default 29s to stay within Whisper's 30s context window.
             neg_threshold: Speech end threshold (hysteresis). NOT supported by
                 Silero v3.1/v4.0 - kept for config compatibility with future versions.
             max_speech_duration_s: Maximum speech segment duration before
@@ -164,6 +170,12 @@ class SileroSpeechSegmenter:
             self.chunk_threshold_s = kwargs["chunk_threshold"]
         else:
             self.chunk_threshold_s = 4.0  # Default: matches v1.7.1 behavior for Whisper context
+
+        # Maximum group duration - prevents groups from exceeding Whisper's context window
+        self.max_group_duration_s = (
+            max_group_duration_s if max_group_duration_s is not None
+            else defaults.get("max_group_duration_s", 29.0)
+        )
 
         # Padding in samples (at 16kHz)
         self.start_pad_samples = start_pad_samples
@@ -326,7 +338,9 @@ class SileroSpeechSegmenter:
         Group segments based on time gaps for efficient ASR processing.
 
         Segments with gaps larger than chunk_threshold_s are split into
-        separate groups.
+        separate groups. Groups are also split if adding a segment would
+        cause the group duration to exceed max_group_duration_s (default 29s),
+        ensuring groups stay within Whisper's 30-second context window.
         """
         if not segments:
             return []
@@ -337,8 +351,18 @@ class SileroSpeechSegmenter:
             if i > 0:
                 prev_end = segments[i - 1].end_sec
                 gap = segment.start_sec - prev_end
-                if gap > self.chunk_threshold_s:
+
+                # Check if adding this segment would exceed max group duration
+                would_exceed_max = False
+                if groups[-1]:
+                    group_start = groups[-1][0].start_sec
+                    potential_duration = segment.end_sec - group_start
+                    would_exceed_max = potential_duration > self.max_group_duration_s
+
+                # Start new group if gap too large OR would exceed max duration
+                if gap > self.chunk_threshold_s or would_exceed_max:
                     groups.append([])
+
             groups[-1].append(segment)
 
         return groups
@@ -407,27 +431,28 @@ class SileroSpeechSegmenter:
             "neg_threshold": self.neg_threshold,
             "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
+            "max_group_duration_s": self.max_group_duration_s,
             "start_pad_samples": self.start_pad_samples,
             "end_pad_samples": self.end_pad_samples,
         }
 
     def cleanup(self) -> None:
-        """Release GPU memory and model resources."""
+        """Release model resources.
+
+        Note: Silero VAD is a small model (~10MB). In subprocess workers,
+        explicit GPU cleanup (del, gc.collect, torch.cuda.empty_cache) is
+        intentionally skipped. The OS reclaims all resources when the process
+        exits via os._exit(). Manual CUDA operations during Python shutdown
+        can cause STATUS_STACK_BUFFER_OVERRUN crashes on Windows due to
+        conflicts between PyTorch and ctranslate2 CUDA contexts.
+
+        See: Root cause analysis for issue #82 (Pass 2 worker crash)
+        """
         if self._model is not None:
-            del self._model
-            del self._utils
-            del self._get_speech_timestamps
             self._model = None
             self._utils = None
             self._get_speech_timestamps = None
-
-            # Force garbage collection to free GPU memory
-            import gc
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-            logger.debug("Silero VAD model resources released")
+            logger.debug("Silero VAD model references cleared")
 
     def get_supported_sample_rates(self) -> List[int]:
         """Return supported sample rates (internally resamples to 16kHz)."""

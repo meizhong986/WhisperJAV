@@ -3,30 +3,30 @@ Pipeline integration helper for speech enhancement.
 
 Provides a clean interface for pipelines to integrate speech enhancement
 without extensive code changes. Handles:
-- Determining extraction sample rate based on enhancer
+- Extracting audio at consistent 48kHz for scene files
 - Enhancing scene audio files
 - Resampling to 16kHz for VAD/ASR
 - Graceful degradation on failure
 - Resource cleanup
 
+CONTRACTS (v1.7.4+):
+    Input:  Scene files are ALWAYS 48kHz mono (SCENE_EXTRACTION_SR)
+    Output: Enhanced files are ALWAYS 16kHz mono (TARGET_SAMPLE_RATE)
+
 Usage in pipelines:
     from whisperjav.modules.speech_enhancement.pipeline_helper import (
         create_enhancer_from_config,
-        get_extraction_sample_rate,
+        SCENE_EXTRACTION_SR,
         enhance_scenes,
     )
 
-    # In __init__
-    self.speech_enhancer = create_enhancer_from_config(resolved_config)
-    extraction_sr = get_extraction_sample_rate(self.speech_enhancer)
-    self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
+    # In __init__ - ALWAYS use 48kHz for scene extraction
+    self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
 
-    # After scene detection, before transcription
-    if self.speech_enhancer:
-        scene_paths = enhance_scenes(
-            scene_paths, self.speech_enhancer, self.temp_dir, logger
-        )
-        self.speech_enhancer.cleanup()  # Free GPU before ASR
+    # After scene detection - ALWAYS run enhancement (even for "none" backend)
+    enhancer = create_enhancer_from_config(resolved_config)
+    scene_paths = enhance_scenes(scene_paths, enhancer, self.temp_dir)
+    enhancer.cleanup()  # Free GPU before ASR
 """
 
 from pathlib import Path
@@ -41,29 +41,34 @@ from .base import SpeechEnhancer, resample_audio
 
 logger = logging.getLogger("whisperjav")
 
-# Target sample rate for VAD/ASR
+# Contract: Scene files are ALWAYS extracted at 48kHz mono
+SCENE_EXTRACTION_SR = 48000
+
+# Contract: Enhanced files for VAD/ASR are ALWAYS 16kHz mono
 TARGET_SAMPLE_RATE = 16000
 
 
 def create_enhancer_from_config(
     resolved_config: Dict[str, Any],
     **overrides
-) -> Optional[SpeechEnhancer]:
+) -> SpeechEnhancer:
     """
     Create a speech enhancer from resolved pipeline configuration.
+
+    ALWAYS returns an enhancer (v1.7.4+ clean contract).
+    The "none" backend performs 48kHz→16kHz resampling without processing.
 
     Args:
         resolved_config: V3 resolved config dict with 'params' key
         **overrides: Override specific enhancer parameters
 
     Returns:
-        SpeechEnhancer instance, or None if enhancement disabled
+        SpeechEnhancer instance (never None - "none" backend is valid)
 
     Example:
         enhancer = create_enhancer_from_config(resolved_config)
-        if enhancer:
-            # Enhancement is enabled
-            extraction_sr = enhancer.get_preferred_sample_rate()
+        scene_paths = enhance_scenes(scene_paths, enhancer, temp_dir)
+        enhancer.cleanup()
     """
     params = resolved_config.get("params", {})
     enhancer_config = params.get("speech_enhancer", {})
@@ -72,62 +77,68 @@ def create_enhancer_from_config(
     if overrides:
         enhancer_config = {**enhancer_config, **overrides}
 
-    # Get backend name (default: none = skip enhancement)
+    # Get backend name (default: none = passthrough with resampling)
     backend = enhancer_config.get("backend", "none")
 
-    # If no backend or "none", return None
-    if not backend or backend == "none":
-        logger.debug("Speech enhancement disabled (backend='none')")
-        return None
+    # Normalize empty backend to "none"
+    if not backend:
+        backend = "none"
 
-    # Check availability
-    available, hint = SpeechEnhancerFactory.is_backend_available(backend)
-    if not available:
-        logger.warning(
-            f"Speech enhancer '{backend}' not available: {hint}. "
-            "Continuing without enhancement."
-        )
-        return None
+    # Check availability (except for "none" which is always available)
+    if backend != "none":
+        available, hint = SpeechEnhancerFactory.is_backend_available(backend)
+        if not available:
+            logger.warning(
+                f"Speech enhancer '{backend}' not available: {hint}. "
+                "Falling back to 'none' (passthrough with resampling)."
+            )
+            backend = "none"
 
-    # Create enhancer
+    # Create enhancer - ALWAYS succeeds (none is always available)
     try:
         enhancer = SpeechEnhancerFactory.create(backend, config=enhancer_config)
         logger.info(f"Speech enhancer created: {enhancer.display_name}")
         return enhancer
     except Exception as e:
-        logger.warning(f"Failed to create speech enhancer: {e}. Continuing without enhancement.")
-        return None
+        logger.warning(f"Failed to create speech enhancer '{backend}': {e}. Falling back to 'none'.")
+        # Fallback to none backend - guaranteed to work
+        return SpeechEnhancerFactory.create("none", config={})
 
 
 def create_enhancer_direct(
     backend: str,
     model: Optional[str] = None,
     **kwargs
-) -> Optional[SpeechEnhancer]:
+) -> SpeechEnhancer:
     """
     Create a speech enhancer directly (for TransformersPipeline).
 
+    ALWAYS returns an enhancer (v1.7.4+ clean contract).
+    The "none" backend performs 48kHz→16kHz resampling without processing.
+
     Args:
-        backend: Enhancer backend name ("none", "clearvoice", "bs-roformer")
+        backend: Enhancer backend name ("none", "clearvoice", "bs-roformer", "ffmpeg-dsp")
         model: Optional model variant
         **kwargs: Additional parameters
 
     Returns:
-        SpeechEnhancer instance, or None if enhancement disabled
+        SpeechEnhancer instance (never None - "none" backend is valid)
     """
-    if not backend or backend == "none":
-        return None
+    # Normalize empty backend to "none"
+    if not backend:
+        backend = "none"
 
-    # Check availability
-    available, hint = SpeechEnhancerFactory.is_backend_available(backend)
-    if not available:
-        logger.warning(
-            f"Speech enhancer '{backend}' not available: {hint}. "
-            "Continuing without enhancement."
-        )
-        return None
+    # Check availability (except for "none" which is always available)
+    if backend != "none":
+        available, hint = SpeechEnhancerFactory.is_backend_available(backend)
+        if not available:
+            logger.warning(
+                f"Speech enhancer '{backend}' not available: {hint}. "
+                "Falling back to 'none' (passthrough with resampling)."
+            )
+            backend = "none"
 
-    # Create enhancer
+    # Create enhancer - ALWAYS succeeds (none is always available)
     try:
         params = {**kwargs}
         if model:
@@ -136,26 +147,24 @@ def create_enhancer_direct(
         logger.info(f"Speech enhancer created: {enhancer.display_name}")
         return enhancer
     except Exception as e:
-        logger.warning(f"Failed to create speech enhancer: {e}. Continuing without enhancement.")
-        return None
+        logger.warning(f"Failed to create speech enhancer '{backend}': {e}. Falling back to 'none'.")
+        return SpeechEnhancerFactory.create("none", config={})
 
 
-def get_extraction_sample_rate(enhancer: Optional[SpeechEnhancer]) -> int:
+def get_extraction_sample_rate(enhancer: Optional[SpeechEnhancer] = None) -> int:
     """
     Get the sample rate to use for audio extraction.
 
-    If an enhancer is active, returns its preferred rate.
-    Otherwise returns 16kHz (standard for VAD/ASR).
+    ALWAYS returns SCENE_EXTRACTION_SR (48kHz) per v1.7.4+ clean contract.
+    The enhancer parameter is ignored but kept for backwards compatibility.
 
     Args:
-        enhancer: SpeechEnhancer instance or None
+        enhancer: Ignored (kept for backwards compatibility)
 
     Returns:
-        Sample rate in Hz
+        SCENE_EXTRACTION_SR (48000 Hz)
     """
-    if enhancer is None:
-        return TARGET_SAMPLE_RATE
-    return enhancer.get_preferred_sample_rate()
+    return SCENE_EXTRACTION_SR
 
 
 def enhance_scenes(

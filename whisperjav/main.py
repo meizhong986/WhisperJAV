@@ -70,6 +70,9 @@ from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingSta
 from whisperjav.utils.parameter_tracer import create_tracer
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
+# Translation service - direct function call instead of subprocess
+from whisperjav.translate import translate_with_config, TranslationError, ConfigurationError
+
 
 # Language code mapping for Whisper
 LANGUAGE_CODE_MAP = {
@@ -231,7 +234,7 @@ def parse_arguments():
                                default=None,
                                help="Console output verbosity (overrides config)")
     progress_group.add_argument("--debug", action="store_true",
-                               help="Enable debug logging (comprehensive diagnostic output)")
+                               help="Enable debug logging and preserve metadata JSON files in temp directory")
     progress_group.add_argument("--crash-trace", action="store_true",
                                help="Enable crash tracing (writes to crash_traces/ for debugging ctranslate2 crashes)")
 
@@ -617,6 +620,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "output_dir": args.output_dir,
         "temp_dir": args.temp_dir,
         "keep_temp_files": args.keep_temp,
+        "save_metadata_json": getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
         "subs_language": args.subs_language,
         "resolved_config": resolved_config,
         "progress_display": progress,
@@ -645,6 +649,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             output_dir=args.output_dir,
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp,
+            save_metadata_json=getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
             progress_display=progress,
             hf_model_id=getattr(args, 'hf_model_id', 'kotoba-tech/kotoba-whisper-bilingual-v1.0'),
             hf_chunk_length=getattr(args, 'hf_chunk_length', 15),
@@ -696,62 +701,36 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     try:
                         logger.info("Starting translation...")
 
-                        # Build command
-                        cmd = [
-                            "whisperjav-translate",
-                            "-i", output_path,
-                            "--provider", args.translate_provider,
-                            "-t", args.translate_target,
-                            "--tone", args.translate_tone,
-                        ]
+                        # Determine stream mode based on progress settings
+                        stream_mode = not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False)
 
-                        # Stream progress unless suppressed
-                        if not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False):
-                            cmd.append("--stream")
-                        elif getattr(args, 'no_progress', False) or getattr(args, 'translate_quiet', False):
-                            cmd.append("--no-progress")
+                        # Call translation service directly (no subprocess)
+                        translated_path = translate_with_config(
+                            input_path=output_path,
+                            provider=args.translate_provider,
+                            target_lang=args.translate_target,
+                            tone=args.translate_tone,
+                            api_key=getattr(args, 'translate_api_key', None),
+                            model=getattr(args, 'translate_model', None),
+                            stream=stream_mode,
+                            debug=getattr(args, 'debug', False)
+                        )
 
-                        # Add optional args
-                        if hasattr(args, 'translate_api_key') and args.translate_api_key:
-                            cmd.extend(["--api-key", args.translate_api_key])
-                        if hasattr(args, 'translate_model') and args.translate_model:
-                            cmd.extend(["--model", args.translate_model])
-
-                        # Run subprocess
-                        # Default: show progress (stderr visible), quiet: hide everything
-                        if hasattr(args, 'translate_quiet') and args.translate_quiet:
-                            result = subprocess.run(
-                                cmd,
-                                capture_output=True,
-                                text=True,
-                                encoding='utf-8',
-                                timeout=600
-                            )
+                        if translated_path:
+                            metadata.setdefault("output_files", {})["translated_srt"] = str(translated_path)
+                            logger.info(f"Translation complete: {translated_path.name}")
                         else:
-                            # Verbose mode: show stderr (progress), capture stdout (output path)
-                            result = subprocess.run(
-                                cmd,
-                                stdout=subprocess.PIPE,
-                                stderr=None,
-                                text=True,
-                                encoding='utf-8',
-                                timeout=600
-                            )
+                            logger.error("Translation failed: no output generated")
 
-                        if result.returncode == 0:
-                            # Parse output path from stdout
-                            translated_path = result.stdout.strip()
-                            metadata.setdefault("output_files", {})["translated_srt"] = translated_path
-                            logger.info(f"Translation complete: {Path(translated_path).name}")
-                        else:
-                            # In quiet mode, show captured stderr; in verbose mode, already shown
-                            if hasattr(args, 'translate_quiet') and args.translate_quiet and result.stderr:
-                                logger.error(f"Translation failed: {result.stderr}")
-                            else:
-                                logger.error("Translation failed")
-
-                    except subprocess.TimeoutExpired:
-                        logger.error("Translation timed out after 10 minutes")
+                    except ConfigurationError as e:
+                        logger.error(f"Translation configuration error: {e}")
+                        # Don't re-raise - continue with next file
+                    except TranslationError as e:
+                        logger.error(f"Translation failed: {e}")
+                        # Don't re-raise - continue with next file
+                    except FileNotFoundError as e:
+                        logger.error(f"Translation failed: {e}")
+                        # Don't re-raise - continue with next file
                     except Exception as e:
                         logger.error(f"Translation failed: {e}")
                         # Don't re-raise - continue with next file
@@ -892,62 +871,36 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                             try:
                                 logger.info("Starting translation...")
 
-                                # Build command
-                                cmd = [
-                                    "whisperjav-translate",
-                                    "-i", output_path,
-                                    "--provider", args.translate_provider,
-                                    "-t", args.translate_target,
-                                    "--tone", args.translate_tone,
-                                ]
+                                # Determine stream mode based on progress settings
+                                stream_mode = not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False)
 
-                                # Stream progress unless suppressed
-                                if not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False):
-                                    cmd.append("--stream")
-                                elif getattr(args, 'no_progress', False) or getattr(args, 'translate_quiet', False):
-                                    cmd.append("--no-progress")
+                                # Call translation service directly (no subprocess)
+                                translated_path = translate_with_config(
+                                    input_path=output_path,
+                                    provider=args.translate_provider,
+                                    target_lang=args.translate_target,
+                                    tone=args.translate_tone,
+                                    api_key=getattr(args, 'translate_api_key', None),
+                                    model=getattr(args, 'translate_model', None),
+                                    stream=stream_mode,
+                                    debug=getattr(args, 'debug', False)
+                                )
 
-                                # Add optional args
-                                if hasattr(args, 'translate_api_key') and args.translate_api_key:
-                                    cmd.extend(["--api-key", args.translate_api_key])
-                                if hasattr(args, 'translate_model') and args.translate_model:
-                                    cmd.extend(["--model", args.translate_model])
-
-                                # Run subprocess
-                                # Default: show progress (stderr visible), quiet: hide everything
-                                if hasattr(args, 'translate_quiet') and args.translate_quiet:
-                                    result = subprocess.run(
-                                        cmd,
-                                        capture_output=True,
-                                        text=True,
-                                        encoding='utf-8',
-                                        timeout=600
-                                    )
+                                if translated_path:
+                                    task.result.setdefault("output_files", {})["translated_srt"] = str(translated_path)
+                                    logger.info(f"Translation complete: {translated_path.name}")
                                 else:
-                                    # Verbose mode: show stderr (progress), capture stdout (output path)
-                                    result = subprocess.run(
-                                        cmd,
-                                        stdout=subprocess.PIPE,
-                                        stderr=None,
-                                        text=True,
-                                        encoding='utf-8',
-                                        timeout=600
-                                    )
+                                    logger.error("Translation failed: no output generated")
 
-                                if result.returncode == 0:
-                                    # Parse output path from stdout
-                                    translated_path = result.stdout.strip()
-                                    task.result.setdefault("output_files", {})["translated_srt"] = translated_path
-                                    logger.info(f"Translation complete: {Path(translated_path).name}")
-                                else:
-                                    # In quiet mode, show captured stderr; in verbose mode, already shown
-                                    if hasattr(args, 'translate_quiet') and args.translate_quiet and result.stderr:
-                                        logger.error(f"Translation failed: {result.stderr}")
-                                    else:
-                                        logger.error("Translation failed")
-
-                            except subprocess.TimeoutExpired:
-                                logger.error("Translation timed out after 10 minutes")
+                            except ConfigurationError as e:
+                                logger.error(f"Translation configuration error: {e}")
+                                # Don't re-raise - continue with next file
+                            except TranslationError as e:
+                                logger.error(f"Translation failed: {e}")
+                                # Don't re-raise - continue with next file
+                            except FileNotFoundError as e:
+                                logger.error(f"Translation failed: {e}")
+                                # Don't re-raise - continue with next file
                             except Exception as e:
                                 logger.error(f"Translation failed: {e}")
                                 # Don't re-raise - continue with next file
@@ -1043,13 +996,20 @@ def main():
     # Use --task if provided, otherwise determine from subs-language
     if hasattr(args, 'task') and args.task:
         task = args.task
+        logger.debug(f"Task set from --task argument: '{task}'")
     else:
         task = 'translate' if args.subs_language == 'direct-to-english' else 'transcribe'
+        logger.debug(f"Task derived from --subs-language='{args.subs_language}' -> task='{task}'")
 
     # Log task determination for debugging translation issues
     logger.info(f"ASR task: {task}" + (" (translating to English)" if task == 'translate' else " (transcribing in source language)"))
     if task == 'translate':
         logger.info("Translation mode: Output subtitles will be in English")
+
+    # Explicit warning if direct-to-english was requested but task is not translate
+    if args.subs_language == 'direct-to-english' and task != 'translate':
+        logger.warning(f"WARNING: --subs-language=direct-to-english was set but task='{task}' (expected 'translate'). "
+                      "This may indicate a configuration issue.")
 
     # Map language name to Whisper language code
     language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
@@ -1305,6 +1265,7 @@ def main():
                 output_dir=args.output_dir,
                 temp_dir=args.temp_dir,
                 keep_temp_files=args.keep_temp,
+                save_metadata_json=getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
                 subs_language=args.subs_language,
                 parameter_tracer=tracer,
                 log_level=log_level,

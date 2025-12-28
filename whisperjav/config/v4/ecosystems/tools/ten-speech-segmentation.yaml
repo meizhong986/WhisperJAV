@@ -45,15 +45,20 @@ contract:
 # =============================================================================
 spec:
   # --- Core VAD Parameters ---
-  threshold: 0.5
+  threshold: 0.20
   hop_size: 256
 
   # --- Duration Filters ---
   min_speech_duration_ms: 100
-  min_silence_duration_ms: 100
+  min_silence_duration_ms: 100  # Not implemented - reserved for future use
+
+  # --- Segment Padding ---
+  # Padding extends segment boundaries to capture speech onset/offset
+  start_pad_ms: 100  # Shift segment start earlier by 100ms
+  end_pad_ms: 200    # Shift segment end later by 200ms
 
   # --- Segment Grouping ---
-  chunk_threshold_s: 2.5
+  chunk_threshold_s: 1.0
 
 # =============================================================================
 # Sensitivity Presets
@@ -62,9 +67,11 @@ presets:
   # Conservative: Higher threshold, fewer false positives
   # Best for: Clean audio, studio recordings
   conservative:
-    threshold: 0.7
+    threshold: 0.5
     min_speech_duration_ms: 150
     min_silence_duration_ms: 150
+    start_pad_ms: 50
+    end_pad_ms: 100
 
   # Balanced: Default settings for general use
   balanced: {}  # Uses spec defaults
@@ -72,9 +79,11 @@ presets:
   # Aggressive: Lower threshold, maximum capture
   # Best for: Noisy audio, soft speech
   aggressive:
-    threshold: 0.3
+    threshold: 0.10
     min_speech_duration_ms: 50
     min_silence_duration_ms: 50
+    start_pad_ms: 150
+    end_pad_ms: 300
 
 # =============================================================================
 # GUI Hints
@@ -121,10 +130,28 @@ gui:
     widget: slider
     label: "Group Gap Threshold (s)"
     description: "Maximum gap to group consecutive segments"
-    min: 1.0
-    max: 10.0
-    step: 0.5
+    min: 0.5
+    max: 5.0
+    step: 0.1
     group: grouping
+
+  start_pad_ms:
+    widget: spinner
+    label: "Start Padding (ms)"
+    description: "Milliseconds to extend segment start (captures speech onset)"
+    min: 0
+    max: 500
+    step: 10
+    group: padding
+
+  end_pad_ms:
+    widget: spinner
+    label: "End Padding (ms)"
+    description: "Milliseconds to extend segment end (captures speech offset)"
+    min: 0
+    max: 500
+    step: 10
+    group: padding
 
 # =============================================================================
 # Provider Configuration
