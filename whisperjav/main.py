@@ -171,10 +171,10 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 1 (when pipeline=transformers)")
     twopass_group.add_argument("--pass1-scene-detector", default=None,
-                               choices=["auditok", "silero", "none"],
+                               choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 1 (default: auditok)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, silero-v3.1, whisper-vad)")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none)")
     twopass_group.add_argument("--pass1-speech-enhancer", default=None,
                                help="Speech enhancer for pass 1 (e.g., none)")
     twopass_group.add_argument("--pass1-model", default=None,
@@ -193,10 +193,10 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 2 (when pipeline=transformers)")
     twopass_group.add_argument("--pass2-scene-detector", default=None,
-                               choices=["auditok", "silero", "none"],
+                               choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 2 (default: none)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, silero-v3.1, whisper-vad)")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none)")
     twopass_group.add_argument("--pass2-speech-enhancer", default=None,
                                help="Speech enhancer for pass 2 (e.g., none)")
     twopass_group.add_argument("--pass2-model", default=None,
@@ -808,6 +808,9 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         ui_prefs = config_manager.get_ui_preferences()
         verbosity = VerbosityLevel(ui_prefs.get('console_verbosity', 'summary'))
     
+    # Map language name to Whisper language code
+    language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
+
     # Update resolved config with runtime options
     resolved_config['output_dir'] = args.output_dir
     resolved_config['temp_dir'] = args.temp_dir
