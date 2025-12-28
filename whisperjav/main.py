@@ -251,13 +251,14 @@ def parse_arguments():
                              default="aggressive", help="Transcription sensitivity")
     tuning_group.add_argument("--scene-detection-method",
                              type=str,
-                             choices=["auditok", "silero"],
+                             choices=["auditok", "silero", "semantic"],
                              default=None,  # None = use config default
                              metavar="METHOD",
                              help=(
                                  "Scene detection method: "
-                                 "auditok (energy-based, default) or "
-                                 "silero (VAD-based, experimental)"
+                                 "auditok (energy-based, default), "
+                                 "silero (VAD-based), or "
+                                 "semantic (texture-based clustering)"
                              ))
     tuning_group.add_argument("--no-vad", action="store_true",
                              help="Disable VAD speech segmentation (balanced/fidelity: skip Silero VAD; kotoba: disable faster-whisper VAD)")
