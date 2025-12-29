@@ -86,7 +86,7 @@ class KotobaFasterWhisperPipeline(BasePipeline):
         self.progress_reporter = kwargs.get('progress_reporter', None)
 
         # --- M4: Validate scene detection method early ---
-        valid_scene_methods = {"auditok", "silero"}
+        valid_scene_methods = {"none", "auditok", "silero", "semantic"}
         if scene_method not in valid_scene_methods:
             raise ValueError(
                 f"Invalid scene_method '{scene_method}'. "
