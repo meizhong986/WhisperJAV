@@ -131,8 +131,8 @@ class TransformersPipeline(BasePipeline):
 
         # Scene detection config
         self.scene_method = hf_scene
-        if self.scene_method not in ("none", "auditok", "silero"):
-            raise ValueError(f"Invalid scene method: {self.scene_method}. Must be 'none', 'auditok', or 'silero'")
+        if self.scene_method not in ("none", "auditok", "silero", "semantic"):
+            raise ValueError(f"Invalid scene method: {self.scene_method}. Must be 'none', 'auditok', 'silero', or 'semantic'")
 
         # Determine output language code
         if subs_language == 'direct-to-english':
