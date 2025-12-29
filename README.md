@@ -149,6 +149,8 @@ whisperjav-translate -i subtitles.srt --provider deepseek
 
 Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, and OpenRouter.
 
+**Resume Support**: If translation is interrupted, just run the same command again. It automatically resumes from where it left off using the `.subtrans` project file.
+
 ---
 
 ## What Makes It Work for JAV
@@ -210,32 +212,84 @@ This updates WhisperJAV without re-downloading PyTorch (~2.5GB) or your AI model
 
 Requires Python 3.9-3.12, FFmpeg, and Git.
 
-**Recommended: Use the install script** (handles dependency conflicts automatically):
+**Recommended: Use the install scripts** (handles dependency conflicts automatically, auto-detects GPU):
+
+<details>
+<summary><b>Windows</b></summary>
+
+```batch
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+installer\install_windows.bat              # Auto-detects GPU and CUDA version
+installer\install_windows.bat --cpu-only   # Force CPU only
+installer\install_windows.bat --cuda118    # Force CUDA 11.8
+installer\install_windows.bat --cuda124    # Force CUDA 12.4
+installer\install_windows.bat --minimal    # Minimal install (no speech enhancement)
+installer\install_windows.bat --dev        # Development/editable install
+```
+
+The script automatically:
+- Detects your NVIDIA GPU and selects optimal CUDA version
+- Falls back to CPU-only if no GPU found
+- Checks for WebView2 runtime (required for GUI)
+- Logs installation to `install_log_windows.txt`
+- Retries failed downloads up to 3 times
+
+</details>
+
+<details>
+<summary><b>Linux / macOS</b></summary>
+
+```bash
+# Install system dependencies first (Linux only)
+# Debian/Ubuntu:
+sudo apt-get install -y python3-dev build-essential ffmpeg libsndfile1
+
+# Fedora/RHEL:
+sudo dnf install python3-devel gcc ffmpeg libsndfile
+
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+chmod +x installer/install_linux.sh
+./installer/install_linux.sh               # Auto-detects GPU
+./installer/install_linux.sh --cpu-only    # Force CPU only
+./installer/install_linux.sh --minimal     # Minimal install
+```
+
+</details>
+
+<details>
+<summary><b>Cross-Platform Python Script</b></summary>
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
-python install.py              # CUDA 12.1 (default)
+python install.py              # Auto-detects GPU, defaults to CUDA 12.1
 python install.py --cpu-only   # CPU only
 python install.py --cuda118    # CUDA 11.8
+python install.py --cuda121    # CUDA 12.1
+python install.py --cuda124    # CUDA 12.4
 python install.py --minimal    # Minimal install (no speech enhancement)
+python install.py --dev        # Development/editable install
 ```
+
+</details>
 
 **Alternative: Manual pip install** (may encounter dependency conflicts):
 
 ```bash
 # Install PyTorch with GPU support first (NVIDIA example)
-pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # Then install WhisperJAV
 pip install git+https://github.com/meizhong986/whisperjav.git@main
 ```
 
 **Platform Notes:**
-- **Apple Silicon (M1/M2/M3/M4)**: Just `pip install torch torchvision torchaudio` - MPS acceleration works automatically
+- **Apple Silicon (M1/M2/M3/M4)**: Just `pip install torch torchaudio` - MPS acceleration works automatically
 - **AMD GPU (ROCm)**: Experimental. Use `--mode balanced` for best compatibility
 - **CPU only**: Works but slow. Use `--accept-cpu-mode` to skip the GPU warning
-- **Linux server (no GPU)**: Use `python install.py --cpu-only`
+- **Linux server (no GPU)**: The install scripts auto-detect and switch to CPU-only
 - **Linux (Debian/Ubuntu)**: Install system dependencies first: `sudo apt-get install -y python3-dev build-essential ffmpeg libsndfile1`
 
 ### Prerequisites
@@ -285,6 +339,10 @@ whisperjav video.mp4 --ensemble --pass1-pipeline balanced --pass2-pipeline fidel
 # Output options
 whisperjav video.mp4 --output-dir ./subtitles
 whisperjav video.mp4 --subs-language english-direct
+
+# Batch processing
+whisperjav /path/to/folder --output-dir ./subtitles
+whisperjav /path/to/folder --skip-existing    # Resume interrupted batch (skip already processed)
 
 # Debugging
 whisperjav video.mp4 --debug --keep-temp
