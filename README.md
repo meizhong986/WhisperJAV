@@ -210,6 +210,19 @@ This updates WhisperJAV without re-downloading PyTorch (~2.5GB) or your AI model
 
 Requires Python 3.9-3.12, FFmpeg, and Git.
 
+**Recommended: Use the install script** (handles dependency conflicts automatically):
+
+```bash
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+python install.py              # CUDA 12.1 (default)
+python install.py --cpu-only   # CPU only
+python install.py --cuda118    # CUDA 11.8
+python install.py --minimal    # Minimal install (no speech enhancement)
+```
+
+**Alternative: Manual pip install** (may encounter dependency conflicts):
+
 ```bash
 # Install PyTorch with GPU support first (NVIDIA example)
 pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
@@ -222,6 +235,8 @@ pip install git+https://github.com/meizhong986/whisperjav.git@main
 - **Apple Silicon (M1/M2/M3/M4)**: Just `pip install torch torchvision torchaudio` - MPS acceleration works automatically
 - **AMD GPU (ROCm)**: Experimental. Use `--mode balanced` for best compatibility
 - **CPU only**: Works but slow. Use `--accept-cpu-mode` to skip the GPU warning
+- **Linux server (no GPU)**: Use `python install.py --cpu-only`
+- **Linux (Debian/Ubuntu)**: Install system dependencies first: `sudo apt-get install -y python3-dev build-essential ffmpeg libsndfile1`
 
 ### Prerequisites
 
