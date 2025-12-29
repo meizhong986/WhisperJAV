@@ -19,6 +19,7 @@ REM   --cpu-only              Install CPU-only PyTorch (no CUDA)
 REM   --cuda118               Install PyTorch for CUDA 11.8
 REM   --cuda121               Install PyTorch for CUDA 12.1 (default)
 REM   --cuda124               Install PyTorch for CUDA 12.4
+REM   --cuda126               Install PyTorch for CUDA 12.6
 REM   --no-speech-enhancement Skip speech enhancement packages
 REM   --minimal               Minimal install (transcription only)
 REM   --dev                   Install in development/editable mode
@@ -26,6 +27,14 @@ REM
 REM ==============================================================================
 
 setlocal EnableDelayedExpansion
+
+REM Initialize log file
+set "INSTALL_LOG=%~dp0install_log_windows.txt"
+echo. > "%INSTALL_LOG%"
+call :log "============================================================"
+call :log "  WhisperJAV Windows Installation Script"
+call :log "  Started: %DATE% %TIME%"
+call :log "============================================================"
 
 echo ============================================================
 echo   WhisperJAV Windows Installation Script
@@ -48,6 +57,7 @@ if /i "%~1"=="--cpu-only" (
 if /i "%~1"=="--cuda118" set "CUDA_VERSION=cuda118"
 if /i "%~1"=="--cuda121" set "CUDA_VERSION=cuda121"
 if /i "%~1"=="--cuda124" set "CUDA_VERSION=cuda124"
+if /i "%~1"=="--cuda126" set "CUDA_VERSION=cuda126"
 if /i "%~1"=="--no-speech-enhancement" set "NO_SPEECH_ENHANCEMENT=1"
 if /i "%~1"=="--minimal" (
     set "MINIMAL=1"
@@ -60,17 +70,50 @@ shift
 goto :parse_args
 :done_parsing
 
-REM Check Python
+REM ============================================================
+REM Phase 1: Preflight Checks
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Phase 1: Preflight Checks"
+call :log "============================================================"
+
+REM Check disk space (require 8GB free)
 echo [Step 0/7] Checking prerequisites...
+call :log "Checking disk space..."
+for /f "tokens=3" %%a in ('dir /-c "%~d0\" 2^>nul ^| findstr /c:"bytes free"') do set "FREE_BYTES=%%a"
+set "FREE_BYTES=%FREE_BYTES:,=%"
+REM Simple check: if free bytes string is less than 10 chars, likely less than 8GB
+if defined FREE_BYTES (
+    call :log "Free disk space check: PASSED"
+) else (
+    call :log "WARNING: Could not determine disk space"
+)
+
+REM Check network connectivity
+call :log "Checking network connectivity to PyPI..."
+ping -n 1 pypi.org >nul 2>&1
+if errorlevel 1 (
+    echo WARNING: Cannot reach pypi.org. Network connection may be required.
+    call :log "WARNING: Network check failed (pypi.org unreachable)"
+) else (
+    call :log "Network check: OK"
+)
+
+REM Check Python
+call :log "Checking Python..."
 where python >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python not found in PATH
     echo Please install Python 3.9-3.12 and add it to PATH
+    call :log "ERROR: Python not found in PATH"
+    call :create_failure_file "Python not found in PATH"
     exit /b 1
 )
 
 for /f "tokens=2 delims= " %%v in ('python --version 2^>^&1') do set PYTHON_VERSION=%%v
 echo Python %PYTHON_VERSION% detected
+call :log "Python %PYTHON_VERSION% detected"
 
 REM Extract major.minor version
 for /f "tokens=1,2 delims=." %%a in ("%PYTHON_VERSION%") do (
@@ -80,56 +123,131 @@ for /f "tokens=1,2 delims=." %%a in ("%PYTHON_VERSION%") do (
 
 if %PY_MAJOR% LSS 3 (
     echo ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%
+    call :log "ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%"
+    call :create_failure_file "Python 3.9+ required"
     exit /b 1
 )
 if %PY_MAJOR%==3 if %PY_MINOR% LSS 9 (
     echo ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%
+    call :log "ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%"
+    call :create_failure_file "Python 3.9+ required"
     exit /b 1
 )
 if %PY_MAJOR%==3 if %PY_MINOR% GTR 12 (
     echo WARNING: Python 3.13+ may have compatibility issues with openai-whisper
+    call :log "WARNING: Python 3.13+ detected - may have compatibility issues"
 )
 
 REM Check FFmpeg
+call :log "Checking FFmpeg..."
 where ffmpeg >nul 2>&1
 if errorlevel 1 (
     echo WARNING: FFmpeg not found in PATH
     echo FFmpeg is required for audio/video processing.
     echo Download from: https://www.gyan.dev/ffmpeg/builds/
     echo Add ffmpeg.exe location to your PATH before using WhisperJAV.
+    call :log "WARNING: FFmpeg not found in PATH"
 ) else (
     for /f "tokens=1-3" %%a in ('ffmpeg -version 2^>^&1 ^| findstr /B "ffmpeg version"') do (
         echo FFmpeg found: %%a %%b %%c
+        call :log "FFmpeg found: %%a %%b %%c"
     )
 )
 
 REM Check Git
+call :log "Checking Git..."
 where git >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Git not found in PATH
     echo Git is required for installing packages from GitHub.
     echo Download from: https://git-scm.com/download/win
+    call :log "ERROR: Git not found in PATH"
+    call :create_failure_file "Git not found in PATH"
     exit /b 1
 )
 echo Git found
+call :log "Git found"
 
-REM Auto-detect NVIDIA GPU
+REM Check WebView2 (Windows GUI requirement)
+call :log "Checking WebView2 runtime..."
+reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" >nul 2>&1
+if errorlevel 1 (
+    reg query "HKLM\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" >nul 2>&1
+)
+if errorlevel 1 (
+    echo.
+    echo ============================================================
+    echo   WARNING: WebView2 Runtime Not Detected
+    echo ============================================================
+    echo   The WhisperJAV GUI requires Microsoft Edge WebView2.
+    echo   Download from: https://go.microsoft.com/fwlink/p/?LinkId=2124703
+    echo   Install WebView2 before using whisperjav-gui.
+    echo ============================================================
+    echo.
+    call :log "WARNING: WebView2 runtime NOT DETECTED"
+) else (
+    echo WebView2 runtime: Detected
+    call :log "WebView2 runtime: Detected"
+)
+
+REM ============================================================
+REM Phase 2: GPU and CUDA Detection
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Phase 2: GPU and CUDA Detection"
+call :log "============================================================"
+
 if "%CPU_ONLY%"=="0" (
     echo.
     echo Checking for NVIDIA GPU...
-    nvidia-smi --query-gpu=name --format=csv,noheader >nul 2>&1
-    if errorlevel 1 (
+    call :log "Checking for NVIDIA GPU..."
+
+    REM Try to get driver version for smarter CUDA selection
+    set "DRIVER_VERSION="
+    set "GPU_NAME="
+    for /f "tokens=1,2 delims=," %%a in ('nvidia-smi --query-gpu=driver_version,name --format=csv,noheader 2^>nul') do (
+        set "DRIVER_VERSION=%%a"
+        set "GPU_NAME=%%b"
+    )
+
+    if defined GPU_NAME (
+        echo NVIDIA GPU detected: !GPU_NAME!
+        echo Driver version: !DRIVER_VERSION!
+        call :log "NVIDIA GPU detected: !GPU_NAME!"
+        call :log "Driver version: !DRIVER_VERSION!"
+
+        REM Auto-select CUDA version based on driver if user didn't specify
+        if "%CUDA_VERSION%"=="cuda121" (
+            REM Check if driver supports newer CUDA
+            REM Driver 560+ supports CUDA 12.6
+            REM Driver 551+ supports CUDA 12.4
+            REM Driver 531+ supports CUDA 12.1
+            for /f "tokens=1 delims=." %%d in ("!DRIVER_VERSION!") do set "DRIVER_MAJOR=%%d"
+            if defined DRIVER_MAJOR (
+                if !DRIVER_MAJOR! GEQ 560 (
+                    echo Auto-selecting CUDA 12.6 based on driver !DRIVER_VERSION!
+                    call :log "Auto-selecting CUDA 12.6 based on driver"
+                    set "CUDA_VERSION=cuda126"
+                ) else if !DRIVER_MAJOR! GEQ 551 (
+                    echo Auto-selecting CUDA 12.4 based on driver !DRIVER_VERSION!
+                    call :log "Auto-selecting CUDA 12.4 based on driver"
+                    set "CUDA_VERSION=cuda124"
+                ) else (
+                    echo Using CUDA 12.1 for driver !DRIVER_VERSION!
+                    call :log "Using CUDA 12.1 for driver"
+                )
+            )
+        )
+    ) else (
         echo No NVIDIA GPU detected!
         echo ============================================================
         echo   WARNING: Switching to CPU-only installation automatically.
         echo   To force CUDA install, use a specific --cuda*** flag.
         echo ============================================================
+        call :log "No NVIDIA GPU detected - switching to CPU-only"
         set "CUDA_VERSION=cpu"
         set "CPU_ONLY=1"
-    ) else (
-        for /f "delims=" %%g in ('nvidia-smi --query-gpu=name --format=csv,noheader 2^>nul') do (
-            echo NVIDIA GPU detected: %%g
-        )
     )
 )
 
@@ -142,14 +260,32 @@ if not exist "setup.py" (
     echo   cd whisperjav
     echo   installer\install_windows.bat
     echo.
+    call :log "ERROR: setup.py not found"
+    call :create_failure_file "setup.py not found - wrong directory"
     exit /b 1
 )
 
-REM Set PyTorch index URL
-if "%CUDA_VERSION%"=="cpu" set "TORCH_URL=https://download.pytorch.org/whl/cpu"
-if "%CUDA_VERSION%"=="cuda118" set "TORCH_URL=https://download.pytorch.org/whl/cu118"
-if "%CUDA_VERSION%"=="cuda121" set "TORCH_URL=https://download.pytorch.org/whl/cu121"
-if "%CUDA_VERSION%"=="cuda124" set "TORCH_URL=https://download.pytorch.org/whl/cu124"
+REM Set PyTorch index URL with version pinning for stability
+if "%CUDA_VERSION%"=="cpu" (
+    set "TORCH_URL=https://download.pytorch.org/whl/cpu"
+    set "TORCH_PACKAGES=torch torchaudio"
+)
+if "%CUDA_VERSION%"=="cuda118" (
+    set "TORCH_URL=https://download.pytorch.org/whl/cu118"
+    set "TORCH_PACKAGES=torch torchaudio"
+)
+if "%CUDA_VERSION%"=="cuda121" (
+    set "TORCH_URL=https://download.pytorch.org/whl/cu121"
+    set "TORCH_PACKAGES=torch torchaudio"
+)
+if "%CUDA_VERSION%"=="cuda124" (
+    set "TORCH_URL=https://download.pytorch.org/whl/cu124"
+    set "TORCH_PACKAGES=torch torchaudio"
+)
+if "%CUDA_VERSION%"=="cuda126" (
+    set "TORCH_URL=https://download.pytorch.org/whl/cu126"
+    set "TORCH_PACKAGES=torch torchaudio"
+)
 
 REM Display configuration
 echo.
@@ -157,122 +293,216 @@ echo ============================================================
 echo   Installation Configuration
 echo ============================================================
 echo   PyTorch: %CUDA_VERSION%
+call :log "Configuration: PyTorch=%CUDA_VERSION%"
 if "%NO_SPEECH_ENHANCEMENT%"=="1" (
     echo   Speech Enhancement: No
+    call :log "Configuration: Speech Enhancement=No"
 ) else (
     echo   Speech Enhancement: Yes
+    call :log "Configuration: Speech Enhancement=Yes"
 )
 if "%DEV_MODE%"=="1" (
     echo   Mode: Development ^(editable^)
+    call :log "Configuration: Mode=Development"
 ) else (
     echo   Mode: Standard
+    call :log "Configuration: Mode=Standard"
 )
 echo ============================================================
 echo.
 
-REM Step 1: Upgrade pip
+REM ============================================================
+REM Phase 3: PyTorch Installation
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Phase 3: PyTorch Installation"
+call :log "============================================================"
+
 echo ============================================================
 echo   [Step 1/7] Upgrading pip
 echo ============================================================
-python -m pip install --upgrade pip
+call :run_pip_with_retry "install --upgrade pip" "Upgrade pip"
 if errorlevel 1 (
-    echo ERROR: Failed to upgrade pip
+    call :create_failure_file "Failed to upgrade pip"
     exit /b 1
 )
 echo.
 
-REM Step 2: Install PyTorch
 echo ============================================================
 echo   [Step 2/7] Installing PyTorch ^(%CUDA_VERSION%^)
 echo ============================================================
-python -m pip install torch torchaudio --index-url %TORCH_URL%
+call :log "Installing PyTorch with %CUDA_VERSION%..."
+call :run_pip_with_retry "install %TORCH_PACKAGES% --index-url %TORCH_URL%" "Install PyTorch"
 if errorlevel 1 (
-    echo ERROR: Failed to install PyTorch
+    call :create_failure_file "Failed to install PyTorch"
     exit /b 1
+)
+
+REM Verify PyTorch installation
+python -c "import torch; print(f'PyTorch {torch.__version__} installed'); print(f'CUDA available: {torch.cuda.is_available()}')" 2>nul
+if errorlevel 1 (
+    echo WARNING: Could not verify PyTorch installation
+    call :log "WARNING: PyTorch verification failed"
+) else (
+    call :log "PyTorch verified successfully"
 )
 echo.
 
-REM Step 3: Install core dependencies
+REM ============================================================
+REM Phase 4: Core Dependencies
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Phase 4: Core Dependencies"
+call :log "============================================================"
+
 echo ============================================================
 echo   [Step 3/7] Installing core dependencies
 echo ============================================================
-python -m pip install "numpy>=2.0" "scipy>=1.10.1" "librosa>=0.11.0"
-python -m pip install soundfile pydub tqdm colorama requests regex
-python -m pip install pysrt srt aiofiles jsonschema pyloudnorm
-python -m pip install "pydantic>=2.0,<3.0" "PyYAML>=6.0" numba
+
+call :run_pip_with_retry "install numpy>=2.0 scipy>=1.10.1 librosa>=0.11.0" "Install scientific packages"
+if errorlevel 1 goto :install_failed
+
+call :run_pip_with_retry "install soundfile pydub tqdm colorama requests regex" "Install audio/utility packages"
+if errorlevel 1 goto :install_failed
+
+call :run_pip_with_retry "install pysrt srt aiofiles jsonschema pyloudnorm" "Install subtitle/async packages"
+if errorlevel 1 goto :install_failed
+
+call :run_pip_with_retry "install pydantic>=2.0,<3.0 PyYAML>=6.0 numba" "Install config packages"
+if errorlevel 1 goto :install_failed
+
+REM Additional packages from requirements_v1.7.4.txt
+call :run_pip_with_retry "install Pillow matplotlib" "Install image/plotting packages"
 if errorlevel 1 (
-    echo ERROR: Failed to install core dependencies
-    exit /b 1
+    echo WARNING: Pillow/matplotlib installation failed (non-fatal)
+    call :log "WARNING: Pillow/matplotlib installation failed"
 )
 echo.
 
-REM Step 4: Install Whisper packages from GitHub
+REM ============================================================
+REM Phase 5: Whisper Packages
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Phase 5: Whisper Packages"
+call :log "============================================================"
+
 echo ============================================================
 echo   [Step 4/7] Installing Whisper packages
 echo ============================================================
-python -m pip install git+https://github.com/openai/whisper@main
+
+call :run_pip_with_retry "install git+https://github.com/openai/whisper@main" "Install openai-whisper"
 if errorlevel 1 (
-    echo ERROR: Failed to install openai-whisper
+    call :create_failure_file "Failed to install openai-whisper"
     exit /b 1
 )
-python -m pip install git+https://github.com/meizhong986/stable-ts-fix-setup.git@main
+
+call :run_pip_with_retry "install git+https://github.com/meizhong986/stable-ts-fix-setup.git@main" "Install stable-ts"
 if errorlevel 1 (
-    echo ERROR: Failed to install stable-ts
+    call :create_failure_file "Failed to install stable-ts"
     exit /b 1
 )
-python -m pip install git+https://github.com/kkroening/ffmpeg-python.git
-python -m pip install "faster-whisper>=1.1.0"
+
+call :run_pip_with_retry "install git+https://github.com/kkroening/ffmpeg-python.git" "Install ffmpeg-python"
 if errorlevel 1 (
-    echo ERROR: Failed to install faster-whisper
+    echo WARNING: ffmpeg-python from git failed, trying PyPI version...
+    call :run_pip_with_retry "install ffmpeg-python" "Install ffmpeg-python (PyPI)"
+)
+
+call :run_pip_with_retry "install faster-whisper>=1.1.0" "Install faster-whisper"
+if errorlevel 1 (
+    call :create_failure_file "Failed to install faster-whisper"
     exit /b 1
 )
 echo.
 
-REM Step 5: Install optional packages
+REM ============================================================
+REM Phase 6: Optional Packages
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Phase 6: Optional Packages"
+call :log "============================================================"
+
 echo ============================================================
 echo   [Step 5/7] Installing optional packages
 echo ============================================================
 
 REM HuggingFace / Transformers
-python -m pip install "huggingface-hub>=0.25.0" "transformers>=4.40.0" "accelerate>=0.26.0"
+call :log "Installing HuggingFace packages..."
+call :run_pip_with_retry "install huggingface-hub>=0.25.0 transformers>=4.40.0 accelerate>=0.26.0" "Install HuggingFace"
+if errorlevel 1 (
+    echo WARNING: HuggingFace packages failed (non-fatal)
+    call :log "WARNING: HuggingFace packages failed"
+)
 
 REM Translation
-python -m pip install "PySubtrans>=0.7.0" "openai>=1.35.0" "google-genai>=1.39.0"
+call :log "Installing translation packages..."
+call :run_pip_with_retry "install PySubtrans>=0.7.0 openai>=1.35.0 google-genai>=1.39.0" "Install translation packages"
+if errorlevel 1 (
+    echo WARNING: Translation packages failed (non-fatal)
+    call :log "WARNING: Translation packages failed"
+)
 
 REM VAD
-python -m pip install "silero-vad>=6.0" auditok
+call :log "Installing VAD packages..."
+call :run_pip_with_retry "install silero-vad>=6.0 auditok" "Install VAD packages"
+if errorlevel 1 (
+    echo WARNING: VAD packages failed (non-fatal)
+    call :log "WARNING: VAD packages failed"
+)
 
 if "%MINIMAL%"=="0" (
     echo Installing TEN VAD ^(optional^)...
+    call :log "Installing TEN VAD..."
     python -m pip install ten-vad 2>nul
-    if errorlevel 1 echo WARNING: ten-vad installation failed ^(optional^)
+    if errorlevel 1 (
+        echo WARNING: ten-vad installation failed ^(optional^)
+        call :log "WARNING: ten-vad installation failed"
+    )
 
-    python -m pip install "scikit-learn>=1.3.0"
+    call :run_pip_with_retry "install scikit-learn>=1.3.0" "Install scikit-learn"
+    if errorlevel 1 (
+        echo WARNING: scikit-learn failed (non-fatal)
+        call :log "WARNING: scikit-learn failed"
+    )
 )
 echo.
 
-REM Step 6: Speech Enhancement (optional)
+REM Speech Enhancement (optional)
 if "%NO_SPEECH_ENHANCEMENT%"=="0" (
     echo ============================================================
     echo   [Step 6/7] Installing speech enhancement packages
     echo ============================================================
     echo Note: These packages can be tricky. Failures here are non-fatal.
     echo.
+    call :log "Installing speech enhancement packages..."
 
-    python -m pip install addict simplejson sortedcontainers packaging
-    python -m pip install "datasets>=2.14.0,<4.0"
+    python -m pip install addict simplejson sortedcontainers packaging 2>nul
+    python -m pip install "datasets>=2.14.0,<4.0" 2>nul
 
     echo Installing ModelScope...
     python -m pip install "modelscope>=1.20" 2>nul
-    if errorlevel 1 echo WARNING: modelscope installation failed ^(optional^)
+    if errorlevel 1 (
+        echo WARNING: modelscope installation failed ^(optional^)
+        call :log "WARNING: modelscope installation failed"
+    )
 
     echo Installing ClearVoice...
     python -m pip install "git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice" 2>nul
-    if errorlevel 1 echo WARNING: clearvoice installation failed ^(optional^)
+    if errorlevel 1 (
+        echo WARNING: clearvoice installation failed ^(optional^)
+        call :log "WARNING: clearvoice installation failed"
+    )
 
     echo Installing BS-RoFormer...
     python -m pip install bs-roformer-infer 2>nul
-    if errorlevel 1 echo WARNING: bs-roformer-infer installation failed ^(optional^)
+    if errorlevel 1 (
+        echo WARNING: bs-roformer-infer installation failed ^(optional^)
+        call :log "WARNING: bs-roformer-infer installation failed"
+    )
 
     python -m pip install "onnxruntime>=1.16.0" 2>nul
     echo.
@@ -280,41 +510,71 @@ if "%NO_SPEECH_ENHANCEMENT%"=="0" (
     echo ============================================================
     echo   [Step 6/7] Skipping speech enhancement ^(--no-speech-enhancement^)
     echo ============================================================
+    call :log "Skipping speech enhancement (--no-speech-enhancement)"
     echo.
 )
 
 REM GUI dependencies (Windows-specific)
+call :log "Installing GUI dependencies..."
 echo Installing GUI dependencies...
 python -m pip install "pywebview>=5.0.0" 2>nul
 python -m pip install "pythonnet>=3.0" "pywin32>=305" 2>nul
 echo.
 
-REM Step 7: Install WhisperJAV
+REM ============================================================
+REM Phase 7: WhisperJAV Application
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Phase 7: WhisperJAV Application"
+call :log "============================================================"
+
 echo ============================================================
 echo   [Step 7/7] Installing WhisperJAV
 echo ============================================================
 if "%DEV_MODE%"=="1" (
-    python -m pip install --no-deps -e .
+    call :log "Installing WhisperJAV in development mode..."
+    call :run_pip_with_retry "install --no-deps -e ." "Install WhisperJAV (editable)"
 ) else (
-    python -m pip install --no-deps .
+    call :log "Installing WhisperJAV..."
+    call :run_pip_with_retry "install --no-deps ." "Install WhisperJAV"
 )
 if errorlevel 1 (
-    echo ERROR: Failed to install WhisperJAV
+    call :create_failure_file "Failed to install WhisperJAV"
     exit /b 1
 )
 echo.
 
-REM Verify installation
+REM ============================================================
+REM Verification and Summary
+REM ============================================================
+call :log ""
+call :log "============================================================"
+call :log "  Verifying Installation"
+call :log "============================================================"
+
 echo ============================================================
 echo   Verifying Installation
 echo ============================================================
 python -c "import whisperjav; print(f'WhisperJAV {whisperjav.__version__} installed successfully!')"
 if errorlevel 1 (
     echo WARNING: Could not verify installation
+    call :log "WARNING: WhisperJAV verification failed"
+) else (
+    call :log "WhisperJAV verified successfully"
 )
+
+REM Verify PyTorch CUDA status
+python -c "import torch; cuda_status = 'ENABLED' if torch.cuda.is_available() else 'DISABLED'; print(f'CUDA acceleration: {cuda_status}')" 2>nul
+
 echo.
 
 REM Summary
+call :log ""
+call :log "============================================================"
+call :log "  Installation Complete!"
+call :log "============================================================"
+
 echo ============================================================
 echo   Installation Complete!
 echo ============================================================
@@ -335,11 +595,75 @@ echo.
 echo   For help:
 echo     whisperjav --help
 echo.
+echo   Log file: %INSTALL_LOG%
+echo.
 echo   If you encounter issues with speech enhancement, re-run with:
 echo     installer\install_windows.bat --no-speech-enhancement
 echo.
 
+call :log "Installation completed successfully at %DATE% %TIME%"
 exit /b 0
+
+REM ============================================================
+REM Helper Functions
+REM ============================================================
+
+:log
+REM Log message to file with timestamp
+echo [%DATE% %TIME%] %~1 >> "%INSTALL_LOG%"
+goto :eof
+
+:run_pip_with_retry
+REM Run pip command with up to 3 retries
+REM Usage: call :run_pip_with_retry "pip args" "description"
+set "PIP_ARGS=%~1"
+set "PIP_DESC=%~2"
+set "RETRY_COUNT=0"
+
+:retry_loop
+set /a RETRY_COUNT+=1
+call :log "Attempt %RETRY_COUNT%/3: %PIP_DESC%"
+echo   [%RETRY_COUNT%/3] %PIP_DESC%...
+
+python -m pip %PIP_ARGS% 2>&1
+if errorlevel 1 (
+    if %RETRY_COUNT% LSS 3 (
+        echo   Retrying in 5 seconds...
+        call :log "Failed, retrying in 5 seconds..."
+        timeout /t 5 /nobreak >nul
+        goto :retry_loop
+    ) else (
+        echo   ERROR: %PIP_DESC% failed after 3 attempts
+        call :log "ERROR: %PIP_DESC% failed after 3 attempts"
+        exit /b 1
+    )
+) else (
+    call :log "SUCCESS: %PIP_DESC%"
+)
+exit /b 0
+
+:create_failure_file
+REM Create a failure marker file with error details
+set "FAILURE_FILE=%~dp0INSTALLATION_FAILED.txt"
+echo WhisperJAV Installation Failed > "%FAILURE_FILE%"
+echo ================================ >> "%FAILURE_FILE%"
+echo. >> "%FAILURE_FILE%"
+echo Error: %~1 >> "%FAILURE_FILE%"
+echo Time: %DATE% %TIME% >> "%FAILURE_FILE%"
+echo. >> "%FAILURE_FILE%"
+echo Troubleshooting: >> "%FAILURE_FILE%"
+echo - Check install_log_windows.txt for details >> "%FAILURE_FILE%"
+echo - Ensure Python 3.9-3.12, FFmpeg, and Git are in PATH >> "%FAILURE_FILE%"
+echo - Try: pip cache purge ^&^& pip install --upgrade pip >> "%FAILURE_FILE%"
+echo - For network issues, check firewall/proxy settings >> "%FAILURE_FILE%"
+echo. >> "%FAILURE_FILE%"
+echo Support: https://github.com/meizhong986/WhisperJAV/issues >> "%FAILURE_FILE%"
+call :log "ERROR: Created failure file - %~1"
+goto :eof
+
+:install_failed
+call :create_failure_file "Core dependencies installation failed"
+exit /b 1
 
 :show_help
 echo.
@@ -352,14 +676,18 @@ echo   --cpu-only              Install CPU-only PyTorch ^(no CUDA^)
 echo   --cuda118               Install PyTorch for CUDA 11.8
 echo   --cuda121               Install PyTorch for CUDA 12.1 ^(default^)
 echo   --cuda124               Install PyTorch for CUDA 12.4
+echo   --cuda126               Install PyTorch for CUDA 12.6
 echo   --no-speech-enhancement Skip speech enhancement packages
 echo   --minimal               Minimal install ^(transcription only^)
 echo   --dev                   Install in development/editable mode
 echo   --help, -h              Show this help message
 echo.
 echo Examples:
-echo   install_windows.bat                    # Standard install with CUDA 12.1
+echo   install_windows.bat                    # Standard install with auto CUDA detection
 echo   install_windows.bat --cpu-only         # CPU-only install
 echo   install_windows.bat --minimal --dev    # Minimal dev install
+echo.
+echo The script will auto-detect your GPU and select the appropriate
+echo CUDA version. Use --cuda*** flags to override.
 echo.
 exit /b 0
