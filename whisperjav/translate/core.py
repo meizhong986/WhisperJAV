@@ -77,6 +77,13 @@ def translate_subtitle(
         # Initialize project (PySubtrans 1.5.x expects subtitle path in 'filepath' kwarg)
         project = init_project(options, filepath=str(input_path), persistent=True)
 
+        # Check if resuming from existing project
+        if hasattr(project, 'existing_project') and project.existing_project:
+            print("Resuming translation from existing project file...", file=sys.stderr)
+            if hasattr(project, 'subtitles') and project.subtitles:
+                if hasattr(project.subtitles, 'any_translated') and project.subtitles.any_translated:
+                    print("Found previously translated content - will skip already-translated batches", file=sys.stderr)
+
         # Set instructions if provided
         if instruction_file is not None and hasattr(project, 'SetInstructions'):
             try:
@@ -98,6 +105,11 @@ def translate_subtitle(
 
         # Initialize translator and translate
         translator = init_translator(options, translation_provider=provider)
+
+        # Enable resume mode to skip already-translated batches when resuming
+        # This is critical for interrupted translations - without it, the translator
+        # will re-translate everything from the beginning even if a .subtrans file exists
+        translator.resume = True
 
         if emit_raw_output:
             def _emit_raw(message):
