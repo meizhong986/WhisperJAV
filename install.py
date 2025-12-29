@@ -80,6 +80,36 @@ def check_python_version():
     print(f"Python {major}.{minor} detected")
 
 
+def detect_nvidia_gpu():
+    """Detect if NVIDIA GPU is available."""
+    # Try nvidia-smi first (most reliable)
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        gpu_name = result.stdout.strip().split('\n')[0]
+        if gpu_name:
+            print(f"NVIDIA GPU detected: {gpu_name}")
+            return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    # Fallback: check /proc/driver/nvidia (Linux)
+    if sys.platform == "linux":
+        try:
+            if Path("/proc/driver/nvidia/version").exists():
+                print("NVIDIA driver detected")
+                return True
+        except Exception:
+            pass
+
+    print("No NVIDIA GPU detected")
+    return False
+
+
 def check_ffmpeg():
     """Check if FFmpeg is available."""
     try:
@@ -148,6 +178,18 @@ def main():
         cuda_version = "cuda124"
     else:
         cuda_version = "cuda121"  # default
+
+    # Auto-detect GPU and warn if installing CUDA version without GPU
+    if cuda_version != "cpu":
+        has_gpu = detect_nvidia_gpu()
+        if not has_gpu:
+            print("\n" + "!" * 60)
+            print("  WARNING: No NVIDIA GPU detected!")
+            print("  You selected CUDA installation but no GPU was found.")
+            print("  Switching to CPU-only installation automatically.")
+            print("  (To force CUDA install anyway, edit this script)")
+            print("!" * 60 + "\n")
+            cuda_version = "cpu"
 
     # Check we're in the right directory
     setup_py = Path("setup.py")
