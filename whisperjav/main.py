@@ -216,6 +216,8 @@ def parse_arguments():
     path_group.add_argument("--output-dir", default="./output", help="Output directory")
     path_group.add_argument("--temp-dir", default=None, help="Temporary directory")
     path_group.add_argument("--keep-temp", action="store_true", help="Keep temporary files")
+    path_group.add_argument("--skip-existing", action="store_true",
+                           help="Skip files that already have subtitle output (useful for resuming batch processing)")
     path_group.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
                            default="INFO", help="Logging level")
     path_group.add_argument("--log-file", help="Log file path")
@@ -672,13 +674,31 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     
     all_stats, failed_files = [], []
     
+    # Calculate expected output lang_code for skip-existing check
+    if args.subs_language == 'direct-to-english':
+        output_lang_code = 'en'
+    else:
+        output_lang_code = LANGUAGE_CODE_MAP.get(getattr(args, 'language', 'japanese'), 'ja')
+
+    skipped_count = 0
+
     try:
         for i, media_info in enumerate(media_files, 1):
             file_path_str = media_info.get('path', 'Unknown File')
             file_name = Path(file_path_str).name
-            
+            media_basename = media_info.get('basename', Path(file_path_str).stem)
+
+            # Check if output already exists (--skip-existing)
+            if getattr(args, 'skip_existing', False):
+                expected_output = Path(args.output_dir) / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+                if expected_output.exists():
+                    logger.info(f"Skipping (output exists): {file_name}")
+                    skipped_count += 1
+                    all_stats.append({"file": file_path_str, "status": "skipped", "reason": "output_exists"})
+                    continue
+
             progress.set_current_file(file_path_str, i)
-            
+
             try:
                 metadata = pipeline.process(media_info)
                 all_stats.append({"file": file_path_str, "status": "success", "metadata": metadata})
@@ -769,7 +789,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     print("PROCESSING SUMMARY")
     print("="*50)
     print(f"Total files: {len(media_files)}")
-    print(f"Successful: {len(media_files) - len(failed_files)}")
+    print(f"Successful: {len(media_files) - len(failed_files) - skipped_count}")
+    if skipped_count > 0:
+        print(f"Skipped (already processed): {skipped_count}")
     print(f"Failed: {len(failed_files)}")
     if subtitle_totals.get("processing_time_seconds"):
         total_time = subtitle_totals["processing_time_seconds"]
@@ -841,11 +863,35 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         ui_update_callback=progress_callback,
         verbosity=verbosity
     )
-    
+
+    # Calculate expected output lang_code for skip-existing check
+    if args.subs_language == 'direct-to-english':
+        output_lang_code = 'en'
+    else:
+        output_lang_code = language_code
+
+    # Filter out files with existing outputs if --skip-existing is set
+    skipped_files = []
+    files_to_process = media_files
+    if getattr(args, 'skip_existing', False):
+        files_to_process = []
+        for media_info in media_files:
+            file_path_str = media_info.get('path', 'Unknown File')
+            media_basename = media_info.get('basename', Path(file_path_str).stem)
+            expected_output = Path(args.output_dir) / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+            if expected_output.exists():
+                logger.info(f"Skipping (output exists): {Path(file_path_str).name}")
+                skipped_files.append(file_path_str)
+            else:
+                files_to_process.append(media_info)
+
+        if skipped_files:
+            print(f"\nSkipping {len(skipped_files)} files with existing outputs")
+
     try:
         # Process files
-        print(f"\nProcessing {len(media_files)} files asynchronously...")
-        task_ids = manager.process_files(media_files, args.mode, resolved_config)
+        print(f"\nProcessing {len(files_to_process)} files asynchronously...")
+        task_ids = manager.process_files(files_to_process, args.mode, resolved_config)
         
         # Get actual task objects from the processor
         tasks = []
@@ -923,6 +969,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         print("="*50)
         print(f"Total files: {len(media_files)}")
         print(f"Successful: {successful}")
+        if len(skipped_files) > 0:
+            print(f"Skipped (already processed): {len(skipped_files)}")
         print(f"Failed: {failed}")
         if cancelled > 0:
             print(f"Cancelled: {cancelled}")
