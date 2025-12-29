@@ -24,6 +24,7 @@ ffmpeg-python         # FFmpeg Python bindings
 soundfile             # Audio file I/O
 auditok               # Voice Activity Detection (VAD)
 silero-vad>=6.0       # Silero VAD for scene detection
+ten-vad               # TEN Framework VAD for speech segmentation
 librosa               # Audio analysis
 pyloudnorm            # Audio normalization
 

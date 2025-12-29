@@ -14,4 +14,7 @@ pkgs/
 # But keep the icon file
 !whisperjav_icon.ico
 
+# Keep the Linux install script
+!install_linux.sh
+
 # Note: generated/ folder is now tracked for v1.7.3 installer documentation
