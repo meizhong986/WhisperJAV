@@ -98,6 +98,27 @@ fi
 echo -e "${GREEN}Python $PYTHON_VERSION detected${NC}"
 echo ""
 
+# Auto-detect NVIDIA GPU
+if [ "$CPU_ONLY" = false ]; then
+    echo -e "${YELLOW}Checking for NVIDIA GPU...${NC}"
+    if command -v nvidia-smi &> /dev/null; then
+        GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1)
+        if [ -n "$GPU_NAME" ]; then
+            echo -e "${GREEN}NVIDIA GPU detected: $GPU_NAME${NC}"
+        else
+            echo -e "${RED}nvidia-smi found but no GPU detected${NC}"
+            CPU_ONLY=true
+        fi
+    elif [ -f "/proc/driver/nvidia/version" ]; then
+        echo -e "${GREEN}NVIDIA driver detected${NC}"
+    else
+        echo -e "${RED}No NVIDIA GPU detected!${NC}"
+        echo -e "${YELLOW}Switching to CPU-only installation automatically.${NC}"
+        CPU_ONLY=true
+    fi
+    echo ""
+fi
+
 # Upgrade pip
 echo -e "${YELLOW}Step 1/6: Upgrading pip...${NC}"
 python3 -m pip install --upgrade pip
