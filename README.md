@@ -125,6 +125,44 @@ whisperjav video.mp4 --ensemble --pass1-pipeline balanced --pass1-sensitivity ag
 - `pass1_primary` / `pass2_primary`: Prioritize one pass, fill gaps from other
 - `full_merge`: Combine everything from both passes
 
+### Speech Enhancement (New in v1.7.3)
+
+Pre-process audio to improve transcription quality. Enhancement runs per-scene after scene detection.
+
+```bash
+# ClearVoice denoising (48kHz, best quality)
+whisperjav video.mp4 --mode balanced --pass1-speech-enhancer clearvoice
+
+# ClearVoice with specific 16kHz model
+whisperjav video.mp4 --mode balanced --pass1-speech-enhancer clearvoice:FRCRN_SE_16K
+
+# FFmpeg DSP filters (lightweight, always available)
+whisperjav video.mp4 --mode balanced --pass1-speech-enhancer ffmpeg-dsp:loudnorm,denoise
+
+# ZipEnhancer (lightweight SOTA)
+whisperjav video.mp4 --mode balanced --pass1-speech-enhancer zipenhancer
+
+# BS-RoFormer vocal isolation
+whisperjav video.mp4 --mode balanced --pass1-speech-enhancer bs-roformer
+
+# Ensemble with different enhancers per pass
+whisperjav video.mp4 --ensemble \
+    --pass1-pipeline balanced --pass1-speech-enhancer clearvoice \
+    --pass2-pipeline transformers --pass2-speech-enhancer none
+```
+
+**Available backends:**
+
+| Backend | Description | Models/Options |
+|---------|-------------|----------------|
+| `none` | No enhancement (default) | - |
+| `ffmpeg-dsp` | FFmpeg audio filters | `loudnorm`, `denoise`, `compress`, `highpass`, `lowpass`, `deess` |
+| `clearvoice` | ClearerVoice denoising | `MossFormer2_SE_48K` (default), `FRCRN_SE_16K` |
+| `zipenhancer` | ZipEnhancer 16kHz | `torch` (GPU), `onnx` (CPU) |
+| `bs-roformer` | Vocal isolation | `vocals`, `other` |
+
+**Syntax:** `--pass1-speech-enhancer <backend>` or `--pass1-speech-enhancer <backend>:<model>`
+
 ### GUI Parameter Customization
 
 The GUI has three tabs:
