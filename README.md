@@ -125,9 +125,10 @@ whisperjav video.mp4 --ensemble --pass1-pipeline balanced --pass1-sensitivity ag
 - `pass1_primary` / `pass2_primary`: Prioritize one pass, fill gaps from other
 - `full_merge`: Combine everything from both passes
 
-### Speech Enhancement (New in v1.7.3)
+### Speech Enhancement tools (New in v1.7.3)
 
-Pre-process audio to improve transcription quality. Enhancement runs per-scene after scene detection.
+Pre-process audio scenes. When selected runs per-scene after scene detection.
+Note: Only use for surgical reasons. In general any audio processing that may alter mel-spectogram has the potential to introduce more artefacts and hallucination.
 
 ```bash
 # ClearVoice denoising (48kHz, best quality)
