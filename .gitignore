@@ -30,6 +30,10 @@ tests/test_outputs/
 tests/temp/
 test_results/
 *.log
+hypothesis_results.json
+workaround_results.json
+tests/*_results.json
+results/
 
 # IDE
 .vscode/
@@ -79,6 +83,13 @@ whisperjav/output/
 installer/generated/*.whl
 installer/*.whl
 installer/generated/build_log_*.txt
+installer/build_log_*.txt
+
+# Reference scripts (local development only)
+scripts/
+
+# Analysis output files
+*_ANALYSIS_REPORT.md
 
 
 

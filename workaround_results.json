@@ -1,9 +1,0 @@
-{
-  "baseline_crash_params": false,
-  "word_timestamps_false": false,
-  "audio_pad_15s": false,
-  "audio_truncate_13.5s": false,
-  "chunk_length_30": false,
-  "beam_size_1": false,
-  "audio_round_to_15s": false
-}
