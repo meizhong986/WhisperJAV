@@ -643,6 +643,38 @@ class WhisperJAVAPI:
         self.default_output = str(_compute_default_output_dir())
         return self.default_output
 
+    def get_version(self) -> Dict[str, Any]:
+        """
+        Get WhisperJAV version information.
+
+        Returns:
+            dict: Version information
+                {
+                    "success": bool,
+                    "version": str,  # Display version (e.g., "1.7.4")
+                    "version_info": dict  # Full version metadata
+                }
+        """
+        try:
+            from whisperjav.__version__ import (
+                __version__,
+                __version_display__,
+                __version_info__,
+            )
+            return {
+                "success": True,
+                "version": __version_display__,
+                "version_pep440": __version__,
+                "version_info": __version_info__,
+            }
+        except ImportError:
+            # Fallback if version module not found
+            return {
+                "success": False,
+                "version": "unknown",
+                "message": "Could not load version information"
+            }
+
     # ========================================================================
     # Component Introspection (v3.0 - Dynamic GUI support)
     # ========================================================================

@@ -1,0 +1,1037 @@
+[
+  {
+    "gap_index": 0,
+    "start": 2.649,
+    "end": 3.69,
+    "text": null,
+    "confidence": 0.854378879070282,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 1,
+    "start": 4.269,
+    "end": 5.57,
+    "text": null,
+    "confidence": 0.5382112264633179,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 2,
+    "start": 7.849,
+    "end": 8.83,
+    "text": null,
+    "confidence": 0.5132576823234558,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 3,
+    "start": 8.83,
+    "end": 11.31,
+    "text": null,
+    "confidence": 0.7883467078208923,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 4,
+    "start": 13.8,
+    "end": 15.279,
+    "text": null,
+    "confidence": 0.8898158073425293,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 5,
+    "start": 25.248,
+    "end": 27.268,
+    "text": null,
+    "confidence": 0.9223335385322571,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 6,
+    "start": 49.49,
+    "end": 51.829,
+    "text": "今でしていろんでしょう",
+    "confidence": 0.9710658192634583,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 7,
+    "start": 52.77,
+    "end": 53.969,
+    "text": null,
+    "confidence": 0.7870540022850037,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 8,
+    "start": 55.75,
+    "end": 57.829,
+    "text": "ジ見はってだらいよ",
+    "confidence": 0.9639569520950317,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 9,
+    "start": 59.649,
+    "end": 60.429,
+    "text": null,
+    "confidence": 0.5359870791435242,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 10,
+    "start": 61.289,
+    "end": 62.25,
+    "text": null,
+    "confidence": 0.7755993008613586,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 11,
+    "start": 84.28,
+    "end": 85.239,
+    "text": null,
+    "confidence": 0.7828131914138794,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 12,
+    "start": 87.4,
+    "end": 88.239,
+    "text": null,
+    "confidence": 0.6169191598892212,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 13,
+    "start": 88.359,
+    "end": 91.0,
+    "text": "そ出帯バ",
+    "confidence": 0.9063284993171692,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 14,
+    "start": 91.0,
+    "end": 93.099,
+    "text": null,
+    "confidence": 0.8938987851142883,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 15,
+    "start": 127.867,
+    "end": 129.268,
+    "text": null,
+    "confidence": 0.6773118376731873,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 16,
+    "start": 182.349,
+    "end": 183.15,
+    "text": null,
+    "confidence": 0.5294893980026245,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 17,
+    "start": 229.349,
+    "end": 231.03,
+    "text": null,
+    "confidence": 0.7858887910842896,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 18,
+    "start": 250.449,
+    "end": 252.469,
+    "text": null,
+    "confidence": 0.6660646796226501,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 19,
+    "start": 252.469,
+    "end": 253.409,
+    "text": null,
+    "confidence": 0.7888671159744263,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 20,
+    "start": 254.15,
+    "end": 255.949,
+    "text": null,
+    "confidence": 0.59447181224823,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 21,
+    "start": 255.949,
+    "end": 257.43,
+    "text": null,
+    "confidence": 0.7532401084899902,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 22,
+    "start": 257.43,
+    "end": 258.41,
+    "text": null,
+    "confidence": 0.7781412601470947,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 23,
+    "start": 297.37,
+    "end": 299.449,
+    "text": null,
+    "confidence": 0.6168026924133301,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 24,
+    "start": 302.069,
+    "end": 302.73,
+    "text": null,
+    "confidence": 0.6657153964042664,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 25,
+    "start": 323.97,
+    "end": 327.43,
+    "text": "買っきねす",
+    "confidence": 0.9048879742622375,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 26,
+    "start": 356.05,
+    "end": 356.99,
+    "text": null,
+    "confidence": 0.8781342506408691,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 27,
+    "start": 402.689,
+    "end": 403.189,
+    "text": null,
+    "confidence": 0.544523298740387,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 28,
+    "start": 403.189,
+    "end": 403.87,
+    "text": null,
+    "confidence": 0.4257512092590332,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 29,
+    "start": 415.649,
+    "end": 417.43,
+    "text": null,
+    "confidence": 0.9376580715179443,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 30,
+    "start": 419.629,
+    "end": 421.47,
+    "text": null,
+    "confidence": 0.684287965297699,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 31,
+    "start": 421.47,
+    "end": 423.589,
+    "text": null,
+    "confidence": 0.9571948051452637,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 32,
+    "start": 442.069,
+    "end": 443.91,
+    "text": "星しかなっちゃ",
+    "confidence": 0.9540519118309021,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 33,
+    "start": 459.269,
+    "end": 460.709,
+    "text": "しただして",
+    "confidence": 0.9493711590766907,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 34,
+    "start": 469.97,
+    "end": 473.089,
+    "text": null,
+    "confidence": 0.9345468878746033,
+    "was_filtered": true,
+    "filter_reason": "low_japanese_ratio (0.17 < 0.5)"
+  },
+  {
+    "gap_index": 35,
+    "start": 474.649,
+    "end": 475.67,
+    "text": null,
+    "confidence": 0.6423875689506531,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 36,
+    "start": 476.769,
+    "end": 477.61,
+    "text": null,
+    "confidence": 0.643206775188446,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 37,
+    "start": 493.129,
+    "end": 495.79,
+    "text": null,
+    "confidence": 0.4376804530620575,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 38,
+    "start": 495.79,
+    "end": 497.79,
+    "text": null,
+    "confidence": 0.6595854759216309,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 39,
+    "start": 534.241,
+    "end": 534.741,
+    "text": null,
+    "confidence": 0.6484044194221497,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 40,
+    "start": 542.001,
+    "end": 545.621,
+    "text": null,
+    "confidence": 0.7716028094291687,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 41,
+    "start": 555.922,
+    "end": 557.562,
+    "text": "管てハかれ",
+    "confidence": 0.8824920654296875,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 42,
+    "start": 558.802,
+    "end": 560.481,
+    "text": null,
+    "confidence": 0.6910713315010071,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 43,
+    "start": 562.782,
+    "end": 564.221,
+    "text": null,
+    "confidence": 0.7812538743019104,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 44,
+    "start": 564.75,
+    "end": 565.409,
+    "text": null,
+    "confidence": 0.6947975158691406,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 45,
+    "start": 576.69,
+    "end": 579.45,
+    "text": "ゆっくりがか日ててやったない",
+    "confidence": 0.9670093059539795,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 46,
+    "start": 579.45,
+    "end": 581.07,
+    "text": "こしとわんだいだ",
+    "confidence": 0.9620217084884644,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 47,
+    "start": 581.809,
+    "end": 584.529,
+    "text": null,
+    "confidence": 0.7963788509368896,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 48,
+    "start": 592.409,
+    "end": 593.149,
+    "text": null,
+    "confidence": 0.6924730539321899,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 49,
+    "start": 594.75,
+    "end": 596.33,
+    "text": null,
+    "confidence": 0.9216443300247192,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 50,
+    "start": 597.57,
+    "end": 600.11,
+    "text": "もわったしが",
+    "confidence": 0.9598807096481323,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 51,
+    "start": 604.269,
+    "end": 607.029,
+    "text": null,
+    "confidence": 0.9373016357421875,
+    "was_filtered": true,
+    "filter_reason": "low_japanese_ratio (0.17 < 0.5)"
+  },
+  {
+    "gap_index": 52,
+    "start": 624.75,
+    "end": 626.99,
+    "text": null,
+    "confidence": 0.557060182094574,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 53,
+    "start": 629.69,
+    "end": 630.549,
+    "text": null,
+    "confidence": 0.7571611404418945,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 54,
+    "start": 639.961,
+    "end": 641.361,
+    "text": null,
+    "confidence": 0.7930190563201904,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 55,
+    "start": 657.11,
+    "end": 659.23,
+    "text": "フだきがッがとにたでしょ",
+    "confidence": 0.9038628339767456,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 56,
+    "start": 690.529,
+    "end": 691.429,
+    "text": null,
+    "confidence": 0.6488568782806396,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 57,
+    "start": 771.69,
+    "end": 772.629,
+    "text": null,
+    "confidence": 0.8370904922485352,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 58,
+    "start": 788.97,
+    "end": 790.61,
+    "text": null,
+    "confidence": 0.6790099143981934,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 59,
+    "start": 791.158,
+    "end": 791.817,
+    "text": null,
+    "confidence": 0.9159873723983765,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 60,
+    "start": 808.677,
+    "end": 810.197,
+    "text": null,
+    "confidence": 0.7302932739257812,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 61,
+    "start": 815.71,
+    "end": 817.789,
+    "text": null,
+    "confidence": 0.923555314540863,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 62,
+    "start": 859.509,
+    "end": 861.309,
+    "text": null,
+    "confidence": 0.6422292590141296,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 63,
+    "start": 865.61,
+    "end": 866.129,
+    "text": null,
+    "confidence": 0.45524248480796814,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 64,
+    "start": 876.429,
+    "end": 876.87,
+    "text": null,
+    "confidence": 0.6324276328086853,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 65,
+    "start": 877.95,
+    "end": 879.289,
+    "text": null,
+    "confidence": 0.7990497350692749,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 66,
+    "start": 880.11,
+    "end": 881.73,
+    "text": null,
+    "confidence": 0.8726276755332947,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 67,
+    "start": 881.73,
+    "end": 883.889,
+    "text": null,
+    "confidence": 0.6980688571929932,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 68,
+    "start": 883.889,
+    "end": 884.85,
+    "text": null,
+    "confidence": 0.8226548433303833,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 69,
+    "start": 887.789,
+    "end": 888.97,
+    "text": null,
+    "confidence": 0.7621086835861206,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 70,
+    "start": 904.509,
+    "end": 905.21,
+    "text": null,
+    "confidence": 0.4649656414985657,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 71,
+    "start": 905.429,
+    "end": 905.769,
+    "text": null,
+    "confidence": 0.7889391779899597,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 72,
+    "start": 913.594,
+    "end": 914.994,
+    "text": null,
+    "confidence": 0.7454977035522461,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 73,
+    "start": 946.177,
+    "end": 948.357,
+    "text": null,
+    "confidence": 0.6672810912132263,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 74,
+    "start": 1000.549,
+    "end": 1003.11,
+    "text": "そsgとdす",
+    "confidence": 0.9223978519439697,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 75,
+    "start": 1006.11,
+    "end": 1007.37,
+    "text": "ごは",
+    "confidence": 0.9192761778831482,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 76,
+    "start": 1024.289,
+    "end": 1028.509,
+    "text": null,
+    "confidence": 0.9189845323562622,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 77,
+    "start": 1032.809,
+    "end": 1038.97,
+    "text": null,
+    "confidence": 0.9315510988235474,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 78,
+    "start": 1038.97,
+    "end": 1045.089,
+    "text": null,
+    "confidence": 0.9483324289321899,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 79,
+    "start": 1102.385,
+    "end": 1103.425,
+    "text": null,
+    "confidence": 0.45966637134552,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 80,
+    "start": 1111.465,
+    "end": 1111.986,
+    "text": null,
+    "confidence": 0.6303228735923767,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 81,
+    "start": 1117.445,
+    "end": 1118.086,
+    "text": null,
+    "confidence": 0.7178187370300293,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 82,
+    "start": 1124.069,
+    "end": 1126.23,
+    "text": null,
+    "confidence": 0.8885305523872375,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 83,
+    "start": 1127.289,
+    "end": 1129.089,
+    "text": "おさせに上きますよ",
+    "confidence": 0.9639045000076294,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 84,
+    "start": 1129.089,
+    "end": 1131.529,
+    "text": "もったたなフるこっドじよっか",
+    "confidence": 0.9299091696739197,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 85,
+    "start": 1135.109,
+    "end": 1136.289,
+    "text": null,
+    "confidence": 0.8029218912124634,
+    "was_filtered": true,
+    "filter_reason": "low_japanese_ratio (0.17 < 0.5)"
+  },
+  {
+    "gap_index": 86,
+    "start": 1145.21,
+    "end": 1146.849,
+    "text": null,
+    "confidence": 0.6666709780693054,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 87,
+    "start": 1201.425,
+    "end": 1204.306,
+    "text": "まざかしのかしはないでど",
+    "confidence": 0.962483286857605,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 88,
+    "start": 1238.806,
+    "end": 1240.986,
+    "text": null,
+    "confidence": 0.9241573214530945,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 89,
+    "start": 1242.026,
+    "end": 1244.625,
+    "text": null,
+    "confidence": 0.9160491228103638,
+    "was_filtered": true,
+    "filter_reason": "low_japanese_ratio (0.14 < 0.5)"
+  },
+  {
+    "gap_index": 90,
+    "start": 1246.329,
+    "end": 1248.069,
+    "text": "顧的屯難死",
+    "confidence": 0.9627208709716797,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 91,
+    "start": 1248.93,
+    "end": 1250.17,
+    "text": null,
+    "confidence": 0.8142075538635254,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 92,
+    "start": 1279.93,
+    "end": 1281.21,
+    "text": null,
+    "confidence": 0.8204917311668396,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 93,
+    "start": 1293.93,
+    "end": 1297.39,
+    "text": null,
+    "confidence": 0.6667516231536865,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 94,
+    "start": 1297.39,
+    "end": 1297.89,
+    "text": null,
+    "confidence": 0.6059449315071106,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 95,
+    "start": 1303.21,
+    "end": 1304.15,
+    "text": null,
+    "confidence": 0.6497002243995667,
+    "was_filtered": true,
+    "filter_reason": "low_japanese_ratio (0.25 < 0.5)"
+  },
+  {
+    "gap_index": 96,
+    "start": 1305.029,
+    "end": 1306.43,
+    "text": null,
+    "confidence": 0.7720704674720764,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 97,
+    "start": 1316.369,
+    "end": 1317.829,
+    "text": null,
+    "confidence": 0.8163911700248718,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 98,
+    "start": 1325.506,
+    "end": 1326.365,
+    "text": null,
+    "confidence": 0.7319394946098328,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 99,
+    "start": 1333.329,
+    "end": 1334.369,
+    "text": null,
+    "confidence": 0.5721733570098877,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 100,
+    "start": 1345.17,
+    "end": 1347.13,
+    "text": null,
+    "confidence": 0.9034932255744934,
+    "was_filtered": true,
+    "filter_reason": "low_japanese_ratio (0.43 < 0.5)"
+  },
+  {
+    "gap_index": 101,
+    "start": 1349.269,
+    "end": 1351.109,
+    "text": "フlcジがt",
+    "confidence": 0.9280991554260254,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 102,
+    "start": 1351.109,
+    "end": 1353.269,
+    "text": null,
+    "confidence": 0.9051886796951294,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 103,
+    "start": 1394.882,
+    "end": 1397.442,
+    "text": null,
+    "confidence": 0.6010233759880066,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 104,
+    "start": 1397.442,
+    "end": 1399.382,
+    "text": null,
+    "confidence": 0.9118229150772095,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 105,
+    "start": 1400.529,
+    "end": 1401.529,
+    "text": null,
+    "confidence": 0.7123805284500122,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 106,
+    "start": 1412.93,
+    "end": 1414.39,
+    "text": null,
+    "confidence": 0.8448391556739807,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 107,
+    "start": 1420.69,
+    "end": 1421.19,
+    "text": null,
+    "confidence": 0.6888309717178345,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 108,
+    "start": 1421.21,
+    "end": 1423.49,
+    "text": null,
+    "confidence": 0.9212144613265991,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 109,
+    "start": 1430.49,
+    "end": 1433.25,
+    "text": "も僕バなチソさ",
+    "confidence": 0.9513523578643799,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 110,
+    "start": 1433.25,
+    "end": 1437.39,
+    "text": "事い",
+    "confidence": 0.9565012454986572,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 111,
+    "start": 1453.809,
+    "end": 1454.49,
+    "text": null,
+    "confidence": 0.3429720997810364,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 112,
+    "start": 1482.65,
+    "end": 1483.19,
+    "text": null,
+    "confidence": 0.7744622826576233,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 113,
+    "start": 1492.67,
+    "end": 1495.13,
+    "text": null,
+    "confidence": 0.8968555331230164,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  },
+  {
+    "gap_index": 114,
+    "start": 1495.91,
+    "end": 1497.21,
+    "text": null,
+    "confidence": 0.7216895818710327,
+    "was_filtered": true,
+    "filter_reason": "no_japanese_chars"
+  }
+]
