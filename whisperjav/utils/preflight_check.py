@@ -131,18 +131,50 @@ class PreflightChecker:
         """Check for CUDA availability - this is mandatory."""
         try:
             import torch
-            
+
             if torch.cuda.is_available():
-                device_count = torch.cuda.device_count()
-                device_name = torch.cuda.get_device_name(0)
-                cuda_version = torch.version.cuda
-                
-                self.results.append(CheckResult(
-                    name="CUDA Availability",
-                    status=CheckStatus.PASS,
-                    message=f"CUDA {cuda_version} available with {device_count} GPU(s)",
-                    details=[f"Primary GPU: {device_name}"]
-                ))
+                # These calls can throw RuntimeError if CUDA driver is incompatible
+                try:
+                    device_count = torch.cuda.device_count()
+                    device_name = torch.cuda.get_device_name(0)
+                    cuda_version = torch.version.cuda
+
+                    self.results.append(CheckResult(
+                        name="CUDA Availability",
+                        status=CheckStatus.PASS,
+                        message=f"CUDA {cuda_version} available with {device_count} GPU(s)",
+                        details=[f"Primary GPU: {device_name}"]
+                    ))
+                except RuntimeError as e:
+                    error_msg = str(e)
+                    # Handle CUDA driver version mismatch
+                    if "driver version is insufficient" in error_msg.lower():
+                        self.results.append(CheckResult(
+                            name="CUDA Availability",
+                            status=CheckStatus.FAIL,
+                            message="CUDA driver version is too old",
+                            details=[
+                                "Your NVIDIA driver is too old for the installed PyTorch CUDA version.",
+                                "",
+                                "Solutions:",
+                                "1. Update NVIDIA drivers from: https://www.nvidia.com/drivers",
+                                "2. Or reinstall PyTorch with CPU-only version:",
+                                "   pip uninstall torch torchvision torchaudio",
+                                "   pip install torch torchvision torchaudio",
+                                "3. Or use --accept-cpu-mode to run in CPU mode (slower)",
+                                "",
+                                f"Error: {error_msg}",
+                            ],
+                            fatal=True
+                        ))
+                    else:
+                        self.results.append(CheckResult(
+                            name="CUDA Availability",
+                            status=CheckStatus.FAIL,
+                            message="CUDA initialization failed",
+                            details=[f"Error: {error_msg}"],
+                            fatal=True
+                        ))
             else:
                 # This is a fatal error for WhisperJAV
                 self.results.append(CheckResult(

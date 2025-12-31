@@ -27,14 +27,28 @@ def _check_cuda_available() -> Tuple[bool, Optional[str]]:
     """
     Check if CUDA is available and get GPU name.
 
+    Handles CUDA driver version mismatch errors gracefully.
+
     Returns:
         (is_available, gpu_name)
     """
     try:
         import torch
         if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            return True, gpu_name
+            # get_device_name(0) can throw RuntimeError if driver is incompatible
+            try:
+                gpu_name = torch.cuda.get_device_name(0)
+                return True, gpu_name
+            except RuntimeError as e:
+                error_msg = str(e).lower()
+                if "driver version is insufficient" in error_msg:
+                    logger.warning(
+                        "CUDA driver version is too old for PyTorch CUDA runtime. "
+                        "Falling back to CPU mode. Update NVIDIA drivers to enable GPU acceleration."
+                    )
+                else:
+                    logger.warning(f"CUDA initialization failed: {e}")
+                return False, None
         return False, None
     except Exception as e:
         logger.debug(f"CUDA check failed: {e}")
@@ -82,9 +96,13 @@ def _check_rocm_available() -> Tuple[bool, Optional[str]]:
         # ROCm builds of PyTorch use 'cuda' backend but with AMD GPUs
         if torch.cuda.is_available():
             # Check if this is actually ROCm (not NVIDIA CUDA)
-            gpu_name = torch.cuda.get_device_name(0)
-            if 'AMD' in gpu_name.upper() or 'RADEON' in gpu_name.upper():
-                return True, gpu_name
+            try:
+                gpu_name = torch.cuda.get_device_name(0)
+                if 'AMD' in gpu_name.upper() or 'RADEON' in gpu_name.upper():
+                    return True, gpu_name
+            except RuntimeError:
+                # Driver version mismatch - not ROCm
+                pass
         return False, None
     except Exception as e:
         logger.debug(f"ROCm check failed: {e}")
