@@ -3602,8 +3602,21 @@ const RunControls = {
 // ============================================================
 // About Dialog
 // ============================================================
-function showAbout() {
+async function showAbout() {
     const modal = document.getElementById('aboutModal');
+    const versionEl = document.getElementById('aboutVersion');
+
+    // Fetch version from API and update display
+    try {
+        const result = await pywebview.api.get_version();
+        if (result.success) {
+            versionEl.textContent = `Version ${result.version}`;
+        }
+    } catch (e) {
+        // Keep existing text on error (fallback to HTML default)
+        console.warn('Could not fetch version:', e);
+    }
+
     modal.classList.add('active');
 
     // Close on overlay click

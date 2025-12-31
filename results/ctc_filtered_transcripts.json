@@ -1,0 +1,1037 @@
+[
+  {
+    "gap_index": 0,
+    "start": 2.649,
+    "end": 3.69,
+    "text": "おきいくなっているねす",
+    "confidence": 0.920651912689209,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 1,
+    "start": 4.269,
+    "end": 5.57,
+    "text": null,
+    "confidence": 0.39497971534729004,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 2,
+    "start": 7.849,
+    "end": 8.83,
+    "text": null,
+    "confidence": 0.778187096118927,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 3,
+    "start": 8.83,
+    "end": 11.31,
+    "text": "fcilg",
+    "confidence": 0.7798987627029419,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 4,
+    "start": 13.8,
+    "end": 15.279,
+    "text": "なってよ",
+    "confidence": 0.7843535542488098,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 5,
+    "start": 25.248,
+    "end": 27.268,
+    "text": "fffifificic",
+    "confidence": 0.7869255542755127,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 6,
+    "start": 49.49,
+    "end": 51.829,
+    "text": "こえでしていだってしょう",
+    "confidence": 0.9715474247932434,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 7,
+    "start": 52.77,
+    "end": 53.969,
+    "text": "ffifi",
+    "confidence": 0.7056563496589661,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 8,
+    "start": 55.75,
+    "end": 57.829,
+    "text": "キャ見はって取ラい",
+    "confidence": 0.9562303423881531,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 9,
+    "start": 59.649,
+    "end": 60.429,
+    "text": "fiififigi",
+    "confidence": 0.6072019338607788,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 10,
+    "start": 61.289,
+    "end": 62.25,
+    "text": "ffi",
+    "confidence": 0.6527528762817383,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 11,
+    "start": 84.28,
+    "end": 85.239,
+    "text": "fifiisifisiii",
+    "confidence": 0.6382463574409485,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 12,
+    "start": 87.4,
+    "end": 88.239,
+    "text": "fcenestuecertain",
+    "confidence": 0.7561237215995789,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 13,
+    "start": 88.359,
+    "end": 91.0,
+    "text": "やるはがこ女て回わせです",
+    "confidence": 0.8792989253997803,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 14,
+    "start": 91.0,
+    "end": 93.099,
+    "text": "cgigigg",
+    "confidence": 0.6485563516616821,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 15,
+    "start": 127.867,
+    "end": 129.268,
+    "text": "gg",
+    "confidence": 0.6324641704559326,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 16,
+    "start": 182.349,
+    "end": 183.15,
+    "text": "fii",
+    "confidence": 0.7620121836662292,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 17,
+    "start": 229.349,
+    "end": 231.03,
+    "text": "彼れ逃方いよせ",
+    "confidence": 0.9510862231254578,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 18,
+    "start": 250.449,
+    "end": 252.469,
+    "text": "fiirisici",
+    "confidence": 0.7646997570991516,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 19,
+    "start": 252.469,
+    "end": 253.409,
+    "text": "fi",
+    "confidence": 0.7702761888504028,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 20,
+    "start": 254.15,
+    "end": 255.949,
+    "text": "fgii",
+    "confidence": 0.6916826367378235,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 21,
+    "start": 255.949,
+    "end": 257.43,
+    "text": "fifiisiici",
+    "confidence": 0.7633892893791199,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 22,
+    "start": 257.43,
+    "end": 258.41,
+    "text": "ff",
+    "confidence": 0.7762259244918823,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 23,
+    "start": 297.37,
+    "end": 299.449,
+    "text": "これらすてなんだよう",
+    "confidence": 0.9603576064109802,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 24,
+    "start": 302.069,
+    "end": 302.73,
+    "text": null,
+    "confidence": 0.6914958953857422,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 25,
+    "start": 323.97,
+    "end": 327.43,
+    "text": "きねた",
+    "confidence": 0.8862263560295105,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 26,
+    "start": 356.05,
+    "end": 356.99,
+    "text": null,
+    "confidence": 0.694023609161377,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 27,
+    "start": 402.689,
+    "end": 403.189,
+    "text": null,
+    "confidence": 0.8447453379631042,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 28,
+    "start": 403.189,
+    "end": 403.87,
+    "text": null,
+    "confidence": 0.5450142025947571,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 29,
+    "start": 415.649,
+    "end": 417.43,
+    "text": "gg0g",
+    "confidence": 0.4941008388996124,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 30,
+    "start": 419.629,
+    "end": 421.47,
+    "text": "gと",
+    "confidence": 0.5519448518753052,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 31,
+    "start": 421.47,
+    "end": 423.589,
+    "text": "いなだ",
+    "confidence": 0.781325101852417,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 32,
+    "start": 442.069,
+    "end": 443.91,
+    "text": "もう星しくなっちゃった",
+    "confidence": 0.9537424445152283,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 33,
+    "start": 459.269,
+    "end": 460.709,
+    "text": "sls",
+    "confidence": 0.8754345178604126,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 34,
+    "start": 469.97,
+    "end": 473.089,
+    "text": null,
+    "confidence": 0.8058367967605591,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 35,
+    "start": 474.649,
+    "end": 475.67,
+    "text": "ここれする",
+    "confidence": 0.8915929794311523,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 36,
+    "start": 476.769,
+    "end": 477.61,
+    "text": "ff",
+    "confidence": 0.813592791557312,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 37,
+    "start": 493.129,
+    "end": 495.79,
+    "text": null,
+    "confidence": 0.917213499546051,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 38,
+    "start": 495.79,
+    "end": 497.79,
+    "text": null,
+    "confidence": 0.8771607875823975,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 39,
+    "start": 534.241,
+    "end": 534.741,
+    "text": null,
+    "confidence": 0.784473717212677,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 40,
+    "start": 542.001,
+    "end": 545.621,
+    "text": null,
+    "confidence": 0.8424562215805054,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 41,
+    "start": 555.922,
+    "end": 557.562,
+    "text": "いてた",
+    "confidence": 0.8622400760650635,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 42,
+    "start": 558.802,
+    "end": 560.481,
+    "text": "まればすいこれなじゃな",
+    "confidence": 0.8805222511291504,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 43,
+    "start": 562.782,
+    "end": 564.221,
+    "text": null,
+    "confidence": 0.804774820804596,
+    "was_filtered": true,
+    "filter_reason": "noise_pattern_3"
+  },
+  {
+    "gap_index": 44,
+    "start": 564.75,
+    "end": 565.409,
+    "text": "figiili",
+    "confidence": 0.6501892805099487,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 45,
+    "start": 576.69,
+    "end": 579.45,
+    "text": "ゆっ夜か人ていってやったない",
+    "confidence": 0.9660549163818359,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 46,
+    "start": 579.45,
+    "end": 581.07,
+    "text": "こしと待んだいだ",
+    "confidence": 0.9559305906295776,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 47,
+    "start": 581.809,
+    "end": 584.529,
+    "text": "daベigigg",
+    "confidence": 0.8642697334289551,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 48,
+    "start": 592.409,
+    "end": 593.149,
+    "text": "fii",
+    "confidence": 0.7393656969070435,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 49,
+    "start": 594.75,
+    "end": 596.33,
+    "text": null,
+    "confidence": 0.9211401343345642,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 50,
+    "start": 597.57,
+    "end": 600.11,
+    "text": "dg",
+    "confidence": 0.9457725882530212,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 51,
+    "start": 604.269,
+    "end": 607.029,
+    "text": "そのはないだてってね",
+    "confidence": 0.9775896668434143,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 52,
+    "start": 624.75,
+    "end": 626.99,
+    "text": null,
+    "confidence": 0.6094605326652527,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 53,
+    "start": 629.69,
+    "end": 630.549,
+    "text": "fsili",
+    "confidence": 0.7193554043769836,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 54,
+    "start": 639.961,
+    "end": 641.361,
+    "text": "fiic",
+    "confidence": 0.7567143440246582,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 55,
+    "start": 657.11,
+    "end": 659.23,
+    "text": "たきが歩くのかりたでしょ",
+    "confidence": 0.8923054337501526,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 56,
+    "start": 690.529,
+    "end": 691.429,
+    "text": "feggigiggg",
+    "confidence": 0.36542513966560364,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 57,
+    "start": 771.69,
+    "end": 772.629,
+    "text": "fefii",
+    "confidence": 0.7861104011535645,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 58,
+    "start": 788.97,
+    "end": 790.61,
+    "text": null,
+    "confidence": 0.86524897813797,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 59,
+    "start": 791.158,
+    "end": 791.817,
+    "text": "fi",
+    "confidence": 0.7466132640838623,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 60,
+    "start": 808.677,
+    "end": 810.197,
+    "text": "fisicici",
+    "confidence": 0.7317564487457275,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 61,
+    "start": 815.71,
+    "end": 817.789,
+    "text": null,
+    "confidence": 0.9277893900871277,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 62,
+    "start": 859.509,
+    "end": 861.309,
+    "text": "ggねgg",
+    "confidence": 0.5753450393676758,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 63,
+    "start": 865.61,
+    "end": 866.129,
+    "text": "fifi",
+    "confidence": 0.7267906665802002,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 64,
+    "start": 876.429,
+    "end": 876.87,
+    "text": null,
+    "confidence": 0.8138261437416077,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 65,
+    "start": 877.95,
+    "end": 879.289,
+    "text": "gc",
+    "confidence": 0.6895044445991516,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 66,
+    "start": 880.11,
+    "end": 881.73,
+    "text": null,
+    "confidence": 0.6996623277664185,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 67,
+    "start": 881.73,
+    "end": 883.889,
+    "text": "gcgd",
+    "confidence": 0.5643810629844666,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 68,
+    "start": 883.889,
+    "end": 884.85,
+    "text": "fffic",
+    "confidence": 0.7674524784088135,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 69,
+    "start": 887.789,
+    "end": 888.97,
+    "text": "fefefile",
+    "confidence": 0.7619993686676025,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 70,
+    "start": 904.509,
+    "end": 905.21,
+    "text": "feetis",
+    "confidence": 0.7016085982322693,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 71,
+    "start": 905.429,
+    "end": 905.769,
+    "text": null,
+    "confidence": 0.8191047310829163,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 72,
+    "start": 913.594,
+    "end": 914.994,
+    "text": "fiiifici",
+    "confidence": 0.7801459431648254,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 73,
+    "start": 946.177,
+    "end": 948.357,
+    "text": "mfeseliserlegregrigi",
+    "confidence": 0.7086426615715027,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 74,
+    "start": 1000.549,
+    "end": 1003.11,
+    "text": "sid",
+    "confidence": 0.9030660390853882,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 75,
+    "start": 1006.11,
+    "end": 1007.37,
+    "text": "はご日がたっは",
+    "confidence": 0.8869611024856567,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 76,
+    "start": 1024.289,
+    "end": 1028.509,
+    "text": null,
+    "confidence": 0.9457345604896545,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 77,
+    "start": 1032.809,
+    "end": 1038.97,
+    "text": null,
+    "confidence": 0.9585057497024536,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 78,
+    "start": 1038.97,
+    "end": 1045.089,
+    "text": null,
+    "confidence": 0.8953121304512024,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 79,
+    "start": 1102.385,
+    "end": 1103.425,
+    "text": null,
+    "confidence": 0.8019658923149109,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 80,
+    "start": 1111.465,
+    "end": 1111.986,
+    "text": "fi",
+    "confidence": 0.6268152594566345,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 81,
+    "start": 1117.445,
+    "end": 1118.086,
+    "text": "ffi",
+    "confidence": 0.755075216293335,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 82,
+    "start": 1124.069,
+    "end": 1126.23,
+    "text": "そこにたきだきさま",
+    "confidence": 0.896064281463623,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 83,
+    "start": 1127.289,
+    "end": 1129.089,
+    "text": "sascgs",
+    "confidence": 0.825769305229187,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 84,
+    "start": 1129.089,
+    "end": 1131.529,
+    "text": "otatacilacfacoc演si",
+    "confidence": 0.8319860100746155,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 85,
+    "start": 1135.109,
+    "end": 1136.289,
+    "text": "lig",
+    "confidence": 0.792230486869812,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 86,
+    "start": 1145.21,
+    "end": 1146.849,
+    "text": "flisiili",
+    "confidence": 0.7434628009796143,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 87,
+    "start": 1201.425,
+    "end": 1204.306,
+    "text": "まざこしなしはないでね",
+    "confidence": 0.9596211910247803,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 88,
+    "start": 1238.806,
+    "end": 1240.986,
+    "text": "gcgg",
+    "confidence": 0.6655049920082092,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 89,
+    "start": 1242.026,
+    "end": 1244.625,
+    "text": "こいが関満できねす",
+    "confidence": 0.9524149298667908,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 90,
+    "start": 1246.329,
+    "end": 1248.069,
+    "text": "fcicg",
+    "confidence": 0.7873216271400452,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 91,
+    "start": 1248.93,
+    "end": 1250.17,
+    "text": "fiiii",
+    "confidence": 0.7687802910804749,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 92,
+    "start": 1279.93,
+    "end": 1281.21,
+    "text": "fggggi",
+    "confidence": 0.5765705108642578,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 93,
+    "start": 1293.93,
+    "end": 1297.39,
+    "text": null,
+    "confidence": 0.9703436493873596,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 94,
+    "start": 1297.39,
+    "end": 1297.89,
+    "text": "mepresiti",
+    "confidence": 0.7336751818656921,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 95,
+    "start": 1303.21,
+    "end": 1304.15,
+    "text": "とは遊がいな",
+    "confidence": 0.8432301878929138,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 96,
+    "start": 1305.029,
+    "end": 1306.43,
+    "text": null,
+    "confidence": 0.6443806886672974,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 97,
+    "start": 1316.369,
+    "end": 1317.829,
+    "text": null,
+    "confidence": 0.677870512008667,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 98,
+    "start": 1325.506,
+    "end": 1326.365,
+    "text": null,
+    "confidence": 0.6696819067001343,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 99,
+    "start": 1333.329,
+    "end": 1334.369,
+    "text": null,
+    "confidence": 0.5500361323356628,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 100,
+    "start": 1345.17,
+    "end": 1347.13,
+    "text": null,
+    "confidence": 0.7184727191925049,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 101,
+    "start": 1349.269,
+    "end": 1351.109,
+    "text": null,
+    "confidence": 0.4521399140357971,
+    "was_filtered": true,
+    "filter_reason": "noise_pattern_3"
+  },
+  {
+    "gap_index": 102,
+    "start": 1351.109,
+    "end": 1353.269,
+    "text": "ggiigiy",
+    "confidence": 0.8623624444007874,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 103,
+    "start": 1394.882,
+    "end": 1397.442,
+    "text": "ficiggiggiggigg",
+    "confidence": 0.5331404805183411,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 104,
+    "start": 1397.442,
+    "end": 1399.382,
+    "text": null,
+    "confidence": 0.8051369190216064,
+    "was_filtered": true,
+    "filter_reason": "too_short (0 < 2)"
+  },
+  {
+    "gap_index": 105,
+    "start": 1400.529,
+    "end": 1401.529,
+    "text": "fiifigigig",
+    "confidence": 0.586769700050354,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 106,
+    "start": 1412.93,
+    "end": 1414.39,
+    "text": null,
+    "confidence": 0.7791681289672852,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 107,
+    "start": 1420.69,
+    "end": 1421.19,
+    "text": "fi",
+    "confidence": 0.8269904851913452,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 108,
+    "start": 1421.21,
+    "end": 1423.49,
+    "text": "ggagaggagigegg",
+    "confidence": 0.7977659702301025,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 109,
+    "start": 1430.49,
+    "end": 1433.25,
+    "text": null,
+    "confidence": 0.8918504118919373,
+    "was_filtered": true,
+    "filter_reason": "too_short (1 < 2)"
+  },
+  {
+    "gap_index": 110,
+    "start": 1433.25,
+    "end": 1437.39,
+    "text": "チさって",
+    "confidence": 0.9461623430252075,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 111,
+    "start": 1453.809,
+    "end": 1454.49,
+    "text": "ffiggi",
+    "confidence": 0.584552526473999,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 112,
+    "start": 1482.65,
+    "end": 1483.19,
+    "text": "fepi",
+    "confidence": 0.7996602654457092,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 113,
+    "start": 1492.67,
+    "end": 1495.13,
+    "text": "cgcgggg",
+    "confidence": 0.794899046421051,
+    "was_filtered": false,
+    "filter_reason": null
+  },
+  {
+    "gap_index": 114,
+    "start": 1495.91,
+    "end": 1497.21,
+    "text": "fffi",
+    "confidence": 0.7072163224220276,
+    "was_filtered": false,
+    "filter_reason": null
+  }
+]

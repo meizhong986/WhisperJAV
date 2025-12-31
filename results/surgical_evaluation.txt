@@ -1,0 +1,597 @@
+============================================================
+MANIFOLD SURGICAL CTC - EVALUATION REPORT
+============================================================
+
+CONFIGURATION
+----------------------------------------
+CTC Model: facebook/mms-1b-all
+Enhancer: none
+Filter Settings: {'min_chars': 2, 'max_chars': 100, 'min_confidence': 0.3}
+
+SUMMARY
+----------------------------------------
+Total gaps detected: 115
+Gaps processed: 115
+Gaps with output: 82
+Gaps filtered out: 33
+Total gap duration: 195.44s
+
+Yield rate: 71.3%
+
+DETAILED RESULTS
+----------------------------------------
+
+Gap 1: 2.65s - 3.69s (1.04s)
+  Raw: 'おきいくなっているねす'
+  Status: ACCEPTED -> 'おきいくなっているねす'
+  Confidence: 0.921
+
+Gap 2: 4.27s - 5.57s (1.30s)
+  Raw: 'g'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.395
+
+Gap 3: 7.85s - 8.83s (0.98s)
+  Raw: 'た'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.778
+
+Gap 4: 8.83s - 11.31s (2.48s)
+  Raw: 'fcilg'
+  Status: ACCEPTED -> 'fcilg'
+  Confidence: 0.780
+
+Gap 5: 13.80s - 15.28s (1.48s)
+  Raw: 'なってよ'
+  Status: ACCEPTED -> 'なってよ'
+  Confidence: 0.784
+
+Gap 6: 25.25s - 27.27s (2.02s)
+  Raw: 'fffifificic'
+  Status: ACCEPTED -> 'fffifificic'
+  Confidence: 0.787
+
+Gap 7: 49.49s - 51.83s (2.34s)
+  Raw: 'こえでしていだってしょう'
+  Status: ACCEPTED -> 'こえでしていだってしょう'
+  Confidence: 0.972
+
+Gap 8: 52.77s - 53.97s (1.20s)
+  Raw: 'ffifi'
+  Status: ACCEPTED -> 'ffifi'
+  Confidence: 0.706
+
+Gap 9: 55.75s - 57.83s (2.08s)
+  Raw: 'キャ見はって取ラい'
+  Status: ACCEPTED -> 'キャ見はって取ラい'
+  Confidence: 0.956
+
+Gap 10: 59.65s - 60.43s (0.78s)
+  Raw: 'fiififigi'
+  Status: ACCEPTED -> 'fiififigi'
+  Confidence: 0.607
+
+Gap 11: 61.29s - 62.25s (0.96s)
+  Raw: 'ffi'
+  Status: ACCEPTED -> 'ffi'
+  Confidence: 0.653
+
+Gap 12: 84.28s - 85.24s (0.96s)
+  Raw: 'fifiisifisiii'
+  Status: ACCEPTED -> 'fifiisifisiii'
+  Confidence: 0.638
+
+Gap 13: 87.40s - 88.24s (0.84s)
+  Raw: 'fcenestuecertain'
+  Status: ACCEPTED -> 'fcenestuecertain'
+  Confidence: 0.756
+
+Gap 14: 88.36s - 91.00s (2.64s)
+  Raw: 'やるはがこ女て回わせです'
+  Status: ACCEPTED -> 'やるはがこ女て回わせです'
+  Confidence: 0.879
+
+Gap 15: 91.00s - 93.10s (2.10s)
+  Raw: 'cgigigg'
+  Status: ACCEPTED -> 'cgigigg'
+  Confidence: 0.649
+
+Gap 16: 127.87s - 129.27s (1.40s)
+  Raw: 'gg'
+  Status: ACCEPTED -> 'gg'
+  Confidence: 0.632
+
+Gap 17: 182.35s - 183.15s (0.80s)
+  Raw: 'fii'
+  Status: ACCEPTED -> 'fii'
+  Confidence: 0.762
+
+Gap 18: 229.35s - 231.03s (1.68s)
+  Raw: '彼れ逃方いよせ'
+  Status: ACCEPTED -> '彼れ逃方いよせ'
+  Confidence: 0.951
+
+Gap 19: 250.45s - 252.47s (2.02s)
+  Raw: 'fiirisici'
+  Status: ACCEPTED -> 'fiirisici'
+  Confidence: 0.765
+
+Gap 20: 252.47s - 253.41s (0.94s)
+  Raw: 'fi'
+  Status: ACCEPTED -> 'fi'
+  Confidence: 0.770
+
+Gap 21: 254.15s - 255.95s (1.80s)
+  Raw: 'fgii'
+  Status: ACCEPTED -> 'fgii'
+  Confidence: 0.692
+
+Gap 22: 255.95s - 257.43s (1.48s)
+  Raw: 'fifiisiici'
+  Status: ACCEPTED -> 'fifiisiici'
+  Confidence: 0.763
+
+Gap 23: 257.43s - 258.41s (0.98s)
+  Raw: 'ff'
+  Status: ACCEPTED -> 'ff'
+  Confidence: 0.776
+
+Gap 24: 297.37s - 299.45s (2.08s)
+  Raw: 'これらすてなんだよう'
+  Status: ACCEPTED -> 'これらすてなんだよう'
+  Confidence: 0.960
+
+Gap 25: 302.07s - 302.73s (0.66s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.691
+
+Gap 26: 323.97s - 327.43s (3.46s)
+  Raw: 'きねた'
+  Status: ACCEPTED -> 'きねた'
+  Confidence: 0.886
+
+Gap 27: 356.05s - 356.99s (0.94s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.694
+
+Gap 28: 402.69s - 403.19s (0.50s)
+  Raw: 'f'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.845
+
+Gap 29: 403.19s - 403.87s (0.68s)
+  Raw: 'g'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.545
+
+Gap 30: 415.65s - 417.43s (1.78s)
+  Raw: 'gg0g'
+  Status: ACCEPTED -> 'gg0g'
+  Confidence: 0.494
+
+Gap 31: 419.63s - 421.47s (1.84s)
+  Raw: 'gと'
+  Status: ACCEPTED -> 'gと'
+  Confidence: 0.552
+
+Gap 32: 421.47s - 423.59s (2.12s)
+  Raw: 'いなだ'
+  Status: ACCEPTED -> 'いなだ'
+  Confidence: 0.781
+
+Gap 33: 442.07s - 443.91s (1.84s)
+  Raw: 'もう星しくなっちゃった'
+  Status: ACCEPTED -> 'もう星しくなっちゃった'
+  Confidence: 0.954
+
+Gap 34: 459.27s - 460.71s (1.44s)
+  Raw: 'sls'
+  Status: ACCEPTED -> 'sls'
+  Confidence: 0.875
+
+Gap 35: 469.97s - 473.09s (3.12s)
+  Raw: 'c'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.806
+
+Gap 36: 474.65s - 475.67s (1.02s)
+  Raw: 'ここれする'
+  Status: ACCEPTED -> 'ここれする'
+  Confidence: 0.892
+
+Gap 37: 476.77s - 477.61s (0.84s)
+  Raw: 'ff'
+  Status: ACCEPTED -> 'ff'
+  Confidence: 0.814
+
+Gap 38: 493.13s - 495.79s (2.66s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.917
+
+Gap 39: 495.79s - 497.79s (2.00s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.877
+
+Gap 40: 534.24s - 534.74s (0.50s)
+  Raw: 'f'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.784
+
+Gap 41: 542.00s - 545.62s (3.62s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.842
+
+Gap 42: 555.92s - 557.56s (1.64s)
+  Raw: 'いてた'
+  Status: ACCEPTED -> 'いてた'
+  Confidence: 0.862
+
+Gap 43: 558.80s - 560.48s (1.68s)
+  Raw: 'まればすいこれなじゃな'
+  Status: ACCEPTED -> 'まればすいこれなじゃな'
+  Confidence: 0.881
+
+Gap 44: 562.78s - 564.22s (1.44s)
+  Raw: 'gggg'
+  Status: FILTERED (noise_pattern_3)
+  Confidence: 0.805
+
+Gap 45: 564.75s - 565.41s (0.66s)
+  Raw: 'figiili'
+  Status: ACCEPTED -> 'figiili'
+  Confidence: 0.650
+
+Gap 46: 576.69s - 579.45s (2.76s)
+  Raw: 'ゆっ夜か人ていってやったない'
+  Status: ACCEPTED -> 'ゆっ夜か人ていってやったない'
+  Confidence: 0.966
+
+Gap 47: 579.45s - 581.07s (1.62s)
+  Raw: 'こしと待んだいだ'
+  Status: ACCEPTED -> 'こしと待んだいだ'
+  Confidence: 0.956
+
+Gap 48: 581.81s - 584.53s (2.72s)
+  Raw: 'daベigigg'
+  Status: ACCEPTED -> 'daベigigg'
+  Confidence: 0.864
+
+Gap 49: 592.41s - 593.15s (0.74s)
+  Raw: 'fii'
+  Status: ACCEPTED -> 'fii'
+  Confidence: 0.739
+
+Gap 50: 594.75s - 596.33s (1.58s)
+  Raw: 'g'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.921
+
+Gap 51: 597.57s - 600.11s (2.54s)
+  Raw: 'dg'
+  Status: ACCEPTED -> 'dg'
+  Confidence: 0.946
+
+Gap 52: 604.27s - 607.03s (2.76s)
+  Raw: 'そのはないだてってね'
+  Status: ACCEPTED -> 'そのはないだてってね'
+  Confidence: 0.978
+
+Gap 53: 624.75s - 626.99s (2.24s)
+  Raw: 'f'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.609
+
+Gap 54: 629.69s - 630.55s (0.86s)
+  Raw: 'fsili'
+  Status: ACCEPTED -> 'fsili'
+  Confidence: 0.719
+
+Gap 55: 639.96s - 641.36s (1.40s)
+  Raw: 'fiic'
+  Status: ACCEPTED -> 'fiic'
+  Confidence: 0.757
+
+Gap 56: 657.11s - 659.23s (2.12s)
+  Raw: 'たきが歩くのかりたでしょ'
+  Status: ACCEPTED -> 'たきが歩くのかりたでしょ'
+  Confidence: 0.892
+
+Gap 57: 690.53s - 691.43s (0.90s)
+  Raw: 'feggigiggg'
+  Status: ACCEPTED -> 'feggigiggg'
+  Confidence: 0.365
+
+Gap 58: 771.69s - 772.63s (0.94s)
+  Raw: 'fefii'
+  Status: ACCEPTED -> 'fefii'
+  Confidence: 0.786
+
+Gap 59: 788.97s - 790.61s (1.64s)
+  Raw: 'c'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.865
+
+Gap 60: 791.16s - 791.82s (0.66s)
+  Raw: 'fi'
+  Status: ACCEPTED -> 'fi'
+  Confidence: 0.747
+
+Gap 61: 808.68s - 810.20s (1.52s)
+  Raw: 'fisicici'
+  Status: ACCEPTED -> 'fisicici'
+  Confidence: 0.732
+
+Gap 62: 815.71s - 817.79s (2.08s)
+  Raw: 'g'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.928
+
+Gap 63: 859.51s - 861.31s (1.80s)
+  Raw: 'ggねgg'
+  Status: ACCEPTED -> 'ggねgg'
+  Confidence: 0.575
+
+Gap 64: 865.61s - 866.13s (0.52s)
+  Raw: 'fifi'
+  Status: ACCEPTED -> 'fifi'
+  Confidence: 0.727
+
+Gap 65: 876.43s - 876.87s (0.44s)
+  Raw: 'f'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.814
+
+Gap 66: 877.95s - 879.29s (1.34s)
+  Raw: 'gc'
+  Status: ACCEPTED -> 'gc'
+  Confidence: 0.690
+
+Gap 67: 880.11s - 881.73s (1.62s)
+  Raw: 'g'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.700
+
+Gap 68: 881.73s - 883.89s (2.16s)
+  Raw: 'gcgd'
+  Status: ACCEPTED -> 'gcgd'
+  Confidence: 0.564
+
+Gap 69: 883.89s - 884.85s (0.96s)
+  Raw: 'fffic'
+  Status: ACCEPTED -> 'fffic'
+  Confidence: 0.767
+
+Gap 70: 887.79s - 888.97s (1.18s)
+  Raw: 'fefefile'
+  Status: ACCEPTED -> 'fefefile'
+  Confidence: 0.762
+
+Gap 71: 904.51s - 905.21s (0.70s)
+  Raw: 'feetis'
+  Status: ACCEPTED -> 'feetis'
+  Confidence: 0.702
+
+Gap 72: 905.43s - 905.77s (0.34s)
+  Raw: 'f'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.819
+
+Gap 73: 913.59s - 914.99s (1.40s)
+  Raw: 'fiiifici'
+  Status: ACCEPTED -> 'fiiifici'
+  Confidence: 0.780
+
+Gap 74: 946.18s - 948.36s (2.18s)
+  Raw: 'mfeseliserlegregrigi'
+  Status: ACCEPTED -> 'mfeseliserlegregrigi'
+  Confidence: 0.709
+
+Gap 75: 1000.55s - 1003.11s (2.56s)
+  Raw: 'sid'
+  Status: ACCEPTED -> 'sid'
+  Confidence: 0.903
+
+Gap 76: 1006.11s - 1007.37s (1.26s)
+  Raw: 'はご日がたっは'
+  Status: ACCEPTED -> 'はご日がたっは'
+  Confidence: 0.887
+
+Gap 77: 1024.29s - 1028.51s (4.22s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.946
+
+Gap 78: 1032.81s - 1038.97s (6.16s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.959
+
+Gap 79: 1038.97s - 1045.09s (6.12s)
+  Raw: 'g'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.895
+
+Gap 80: 1102.38s - 1103.42s (1.04s)
+  Raw: 'f'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.802
+
+Gap 81: 1111.46s - 1111.99s (0.52s)
+  Raw: 'fi'
+  Status: ACCEPTED -> 'fi'
+  Confidence: 0.627
+
+Gap 82: 1117.44s - 1118.09s (0.64s)
+  Raw: 'ffi'
+  Status: ACCEPTED -> 'ffi'
+  Confidence: 0.755
+
+Gap 83: 1124.07s - 1126.23s (2.16s)
+  Raw: 'そこにたきだきさま'
+  Status: ACCEPTED -> 'そこにたきだきさま'
+  Confidence: 0.896
+
+Gap 84: 1127.29s - 1129.09s (1.80s)
+  Raw: 'sascgs'
+  Status: ACCEPTED -> 'sascgs'
+  Confidence: 0.826
+
+Gap 85: 1129.09s - 1131.53s (2.44s)
+  Raw: 'otatacilacfacoc演si'
+  Status: ACCEPTED -> 'otatacilacfacoc演si'
+  Confidence: 0.832
+
+Gap 86: 1135.11s - 1136.29s (1.18s)
+  Raw: 'lig'
+  Status: ACCEPTED -> 'lig'
+  Confidence: 0.792
+
+Gap 87: 1145.21s - 1146.85s (1.64s)
+  Raw: 'flisiili'
+  Status: ACCEPTED -> 'flisiili'
+  Confidence: 0.743
+
+Gap 88: 1201.42s - 1204.31s (2.88s)
+  Raw: 'まざこしなしはないでね'
+  Status: ACCEPTED -> 'まざこしなしはないでね'
+  Confidence: 0.960
+
+Gap 89: 1238.81s - 1240.99s (2.18s)
+  Raw: 'gcgg'
+  Status: ACCEPTED -> 'gcgg'
+  Confidence: 0.666
+
+Gap 90: 1242.03s - 1244.62s (2.60s)
+  Raw: 'こいが関満できねす'
+  Status: ACCEPTED -> 'こいが関満できねす'
+  Confidence: 0.952
+
+Gap 91: 1246.33s - 1248.07s (1.74s)
+  Raw: 'fcicg'
+  Status: ACCEPTED -> 'fcicg'
+  Confidence: 0.787
+
+Gap 92: 1248.93s - 1250.17s (1.24s)
+  Raw: 'fiiii'
+  Status: ACCEPTED -> 'fiiii'
+  Confidence: 0.769
+
+Gap 93: 1279.93s - 1281.21s (1.28s)
+  Raw: 'fggggi'
+  Status: ACCEPTED -> 'fggggi'
+  Confidence: 0.577
+
+Gap 94: 1293.93s - 1297.39s (3.46s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.970
+
+Gap 95: 1297.39s - 1297.89s (0.50s)
+  Raw: 'mepresiti'
+  Status: ACCEPTED -> 'mepresiti'
+  Confidence: 0.734
+
+Gap 96: 1303.21s - 1304.15s (0.94s)
+  Raw: 'とは遊がいな'
+  Status: ACCEPTED -> 'とは遊がいな'
+  Confidence: 0.843
+
+Gap 97: 1305.03s - 1306.43s (1.40s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.644
+
+Gap 98: 1316.37s - 1317.83s (1.46s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.678
+
+Gap 99: 1325.51s - 1326.37s (0.86s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.670
+
+Gap 100: 1333.33s - 1334.37s (1.04s)
+  Raw: 'c'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.550
+
+Gap 101: 1345.17s - 1347.13s (1.96s)
+  Raw: 'c'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.718
+
+Gap 102: 1349.27s - 1351.11s (1.84s)
+  Raw: 'ggggg'
+  Status: FILTERED (noise_pattern_3)
+  Confidence: 0.452
+
+Gap 103: 1351.11s - 1353.27s (2.16s)
+  Raw: 'ggiigiy'
+  Status: ACCEPTED -> 'ggiigiy'
+  Confidence: 0.862
+
+Gap 104: 1394.88s - 1397.44s (2.56s)
+  Raw: 'ficiggiggiggigg'
+  Status: ACCEPTED -> 'ficiggiggiggigg'
+  Confidence: 0.533
+
+Gap 105: 1397.44s - 1399.38s (1.94s)
+  Raw: ''
+  Status: FILTERED (too_short (0 < 2))
+  Confidence: 0.805
+
+Gap 106: 1400.53s - 1401.53s (1.00s)
+  Raw: 'fiifigigig'
+  Status: ACCEPTED -> 'fiifigigig'
+  Confidence: 0.587
+
+Gap 107: 1412.93s - 1414.39s (1.46s)
+  Raw: 'g'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.779
+
+Gap 108: 1420.69s - 1421.19s (0.50s)
+  Raw: 'fi'
+  Status: ACCEPTED -> 'fi'
+  Confidence: 0.827
+
+Gap 109: 1421.21s - 1423.49s (2.28s)
+  Raw: 'ggagaggagigegg'
+  Status: ACCEPTED -> 'ggagaggagigegg'
+  Confidence: 0.798
+
+Gap 110: 1430.49s - 1433.25s (2.76s)
+  Raw: 'す'
+  Status: FILTERED (too_short (1 < 2))
+  Confidence: 0.892
+
+Gap 111: 1433.25s - 1437.39s (4.14s)
+  Raw: 'チさって'
+  Status: ACCEPTED -> 'チさって'
+  Confidence: 0.946
+
+Gap 112: 1453.81s - 1454.49s (0.68s)
+  Raw: 'ffiggi'
+  Status: ACCEPTED -> 'ffiggi'
+  Confidence: 0.585
+
+Gap 113: 1482.65s - 1483.19s (0.54s)
+  Raw: 'fepi'
+  Status: ACCEPTED -> 'fepi'
+  Confidence: 0.800
+
+Gap 114: 1492.67s - 1495.13s (2.46s)
+  Raw: 'cgcgggg'
+  Status: ACCEPTED -> 'cgcgggg'
+  Confidence: 0.795
+
+Gap 115: 1495.91s - 1497.21s (1.30s)
+  Raw: 'fffi'
+  Status: ACCEPTED -> 'fffi'
+  Confidence: 0.707

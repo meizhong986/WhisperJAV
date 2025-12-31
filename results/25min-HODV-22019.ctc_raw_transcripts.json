@@ -1,0 +1,807 @@
+[
+  {
+    "gap_index": 0,
+    "start": 2.649,
+    "end": 3.69,
+    "raw_text": "",
+    "confidence": 0.854378879070282
+  },
+  {
+    "gap_index": 1,
+    "start": 4.269,
+    "end": 5.57,
+    "raw_text": "fgggg",
+    "confidence": 0.5382112264633179
+  },
+  {
+    "gap_index": 2,
+    "start": 7.849,
+    "end": 8.83,
+    "raw_text": "figgigg",
+    "confidence": 0.5132576823234558
+  },
+  {
+    "gap_index": 3,
+    "start": 8.83,
+    "end": 11.31,
+    "raw_text": "ficiccgiseres",
+    "confidence": 0.7883467078208923
+  },
+  {
+    "gap_index": 4,
+    "start": 13.8,
+    "end": 15.279,
+    "raw_text": "",
+    "confidence": 0.8898158073425293
+  },
+  {
+    "gap_index": 5,
+    "start": 25.248,
+    "end": 27.268,
+    "raw_text": "",
+    "confidence": 0.9223335385322571
+  },
+  {
+    "gap_index": 6,
+    "start": 49.49,
+    "end": 51.829,
+    "raw_text": "今でしていろんでしょう",
+    "confidence": 0.9710658192634583
+  },
+  {
+    "gap_index": 7,
+    "start": 52.77,
+    "end": 53.969,
+    "raw_text": "fiiiprisili",
+    "confidence": 0.7870540022850037
+  },
+  {
+    "gap_index": 8,
+    "start": 55.75,
+    "end": 57.829,
+    "raw_text": "ジ見はってだらいよ",
+    "confidence": 0.9639569520950317
+  },
+  {
+    "gap_index": 9,
+    "start": 59.649,
+    "end": 60.429,
+    "raw_text": "fiilegegy",
+    "confidence": 0.5359870791435242
+  },
+  {
+    "gap_index": 10,
+    "start": 61.289,
+    "end": 62.25,
+    "raw_text": "fisi",
+    "confidence": 0.7755993008613586
+  },
+  {
+    "gap_index": 11,
+    "start": 84.28,
+    "end": 85.239,
+    "raw_text": "filesi",
+    "confidence": 0.7828131914138794
+  },
+  {
+    "gap_index": 12,
+    "start": 87.4,
+    "end": 88.239,
+    "raw_text": "finegatsepe",
+    "confidence": 0.6169191598892212
+  },
+  {
+    "gap_index": 13,
+    "start": 88.359,
+    "end": 91.0,
+    "raw_text": "そ出帯バ",
+    "confidence": 0.9063284993171692
+  },
+  {
+    "gap_index": 14,
+    "start": 91.0,
+    "end": 93.099,
+    "raw_text": "mtpcalmtis",
+    "confidence": 0.8938987851142883
+  },
+  {
+    "gap_index": 15,
+    "start": 127.867,
+    "end": 129.268,
+    "raw_text": "",
+    "confidence": 0.6773118376731873
+  },
+  {
+    "gap_index": 16,
+    "start": 182.349,
+    "end": 183.15,
+    "raw_text": "",
+    "confidence": 0.5294893980026245
+  },
+  {
+    "gap_index": 17,
+    "start": 229.349,
+    "end": 231.03,
+    "raw_text": "",
+    "confidence": 0.7858887910842896
+  },
+  {
+    "gap_index": 18,
+    "start": 250.449,
+    "end": 252.469,
+    "raw_text": "fisisigiisigisi",
+    "confidence": 0.6660646796226501
+  },
+  {
+    "gap_index": 19,
+    "start": 252.469,
+    "end": 253.409,
+    "raw_text": "fiefisle",
+    "confidence": 0.7888671159744263
+  },
+  {
+    "gap_index": 20,
+    "start": 254.15,
+    "end": 255.949,
+    "raw_text": "feseresigritcegig",
+    "confidence": 0.59447181224823
+  },
+  {
+    "gap_index": 21,
+    "start": 255.949,
+    "end": 257.43,
+    "raw_text": "fisisisii",
+    "confidence": 0.7532401084899902
+  },
+  {
+    "gap_index": 22,
+    "start": 257.43,
+    "end": 258.41,
+    "raw_text": "",
+    "confidence": 0.7781412601470947
+  },
+  {
+    "gap_index": 23,
+    "start": 297.37,
+    "end": 299.449,
+    "raw_text": "giggggg",
+    "confidence": 0.6168026924133301
+  },
+  {
+    "gap_index": 24,
+    "start": 302.069,
+    "end": 302.73,
+    "raw_text": "",
+    "confidence": 0.6657153964042664
+  },
+  {
+    "gap_index": 25,
+    "start": 323.97,
+    "end": 327.43,
+    "raw_text": "買っきねす",
+    "confidence": 0.9048879742622375
+  },
+  {
+    "gap_index": 26,
+    "start": 356.05,
+    "end": 356.99,
+    "raw_text": "cami",
+    "confidence": 0.8781342506408691
+  },
+  {
+    "gap_index": 27,
+    "start": 402.689,
+    "end": 403.189,
+    "raw_text": "",
+    "confidence": 0.544523298740387
+  },
+  {
+    "gap_index": 28,
+    "start": 403.189,
+    "end": 403.87,
+    "raw_text": "gg",
+    "confidence": 0.4257512092590332
+  },
+  {
+    "gap_index": 29,
+    "start": 415.649,
+    "end": 417.43,
+    "raw_text": "愛",
+    "confidence": 0.9376580715179443
+  },
+  {
+    "gap_index": 30,
+    "start": 419.629,
+    "end": 421.47,
+    "raw_text": "fgigg",
+    "confidence": 0.684287965297699
+  },
+  {
+    "gap_index": 31,
+    "start": 421.47,
+    "end": 423.589,
+    "raw_text": "c",
+    "confidence": 0.9571948051452637
+  },
+  {
+    "gap_index": 32,
+    "start": 442.069,
+    "end": 443.91,
+    "raw_text": "星しかなっちゃ",
+    "confidence": 0.9540519118309021
+  },
+  {
+    "gap_index": 33,
+    "start": 459.269,
+    "end": 460.709,
+    "raw_text": "しただして",
+    "confidence": 0.9493711590766907
+  },
+  {
+    "gap_index": 34,
+    "start": 469.97,
+    "end": 473.089,
+    "raw_text": "mtcレcl",
+    "confidence": 0.9345468878746033
+  },
+  {
+    "gap_index": 35,
+    "start": 474.649,
+    "end": 475.67,
+    "raw_text": "feififisii",
+    "confidence": 0.6423875689506531
+  },
+  {
+    "gap_index": 36,
+    "start": 476.769,
+    "end": 477.61,
+    "raw_text": "",
+    "confidence": 0.643206775188446
+  },
+  {
+    "gap_index": 37,
+    "start": 493.129,
+    "end": 495.79,
+    "raw_text": "fgigigiiggggg",
+    "confidence": 0.4376804530620575
+  },
+  {
+    "gap_index": 38,
+    "start": 495.79,
+    "end": 497.79,
+    "raw_text": "cccg",
+    "confidence": 0.6595854759216309
+  },
+  {
+    "gap_index": 39,
+    "start": 534.241,
+    "end": 534.741,
+    "raw_text": "",
+    "confidence": 0.6484044194221497
+  },
+  {
+    "gap_index": 40,
+    "start": 542.001,
+    "end": 545.621,
+    "raw_text": "",
+    "confidence": 0.7716028094291687
+  },
+  {
+    "gap_index": 41,
+    "start": 555.922,
+    "end": 557.562,
+    "raw_text": "管てハかれ",
+    "confidence": 0.8824920654296875
+  },
+  {
+    "gap_index": 42,
+    "start": 558.802,
+    "end": 560.481,
+    "raw_text": "fififiefefeg",
+    "confidence": 0.6910713315010071
+  },
+  {
+    "gap_index": 43,
+    "start": 562.782,
+    "end": 564.221,
+    "raw_text": "iifpsligg",
+    "confidence": 0.7812538743019104
+  },
+  {
+    "gap_index": 44,
+    "start": 564.75,
+    "end": 565.409,
+    "raw_text": "feefi",
+    "confidence": 0.6947975158691406
+  },
+  {
+    "gap_index": 45,
+    "start": 576.69,
+    "end": 579.45,
+    "raw_text": "ゆっくりがか日ててやったない",
+    "confidence": 0.9670093059539795
+  },
+  {
+    "gap_index": 46,
+    "start": 579.45,
+    "end": 581.07,
+    "raw_text": "こしとわんだいだ",
+    "confidence": 0.9620217084884644
+  },
+  {
+    "gap_index": 47,
+    "start": 581.809,
+    "end": 584.529,
+    "raw_text": "dglgesiggggg",
+    "confidence": 0.7963788509368896
+  },
+  {
+    "gap_index": 48,
+    "start": 592.409,
+    "end": 593.149,
+    "raw_text": "f",
+    "confidence": 0.6924730539321899
+  },
+  {
+    "gap_index": 49,
+    "start": 594.75,
+    "end": 596.33,
+    "raw_text": "tcdg",
+    "confidence": 0.9216443300247192
+  },
+  {
+    "gap_index": 50,
+    "start": 597.57,
+    "end": 600.11,
+    "raw_text": "もわったしが",
+    "confidence": 0.9598807096481323
+  },
+  {
+    "gap_index": 51,
+    "start": 604.269,
+    "end": 607.029,
+    "raw_text": "slvdtベ",
+    "confidence": 0.9373016357421875
+  },
+  {
+    "gap_index": 52,
+    "start": 624.75,
+    "end": 626.99,
+    "raw_text": "fffffigigggggg",
+    "confidence": 0.557060182094574
+  },
+  {
+    "gap_index": 53,
+    "start": 629.69,
+    "end": 630.549,
+    "raw_text": "ftitig",
+    "confidence": 0.7571611404418945
+  },
+  {
+    "gap_index": 54,
+    "start": 639.961,
+    "end": 641.361,
+    "raw_text": "fiiii",
+    "confidence": 0.7930190563201904
+  },
+  {
+    "gap_index": 55,
+    "start": 657.11,
+    "end": 659.23,
+    "raw_text": "フだきがッがとにたでしょ",
+    "confidence": 0.9038628339767456
+  },
+  {
+    "gap_index": 56,
+    "start": 690.529,
+    "end": 691.429,
+    "raw_text": "cg",
+    "confidence": 0.6488568782806396
+  },
+  {
+    "gap_index": 57,
+    "start": 771.69,
+    "end": 772.629,
+    "raw_text": "l",
+    "confidence": 0.8370904922485352
+  },
+  {
+    "gap_index": 58,
+    "start": 788.97,
+    "end": 790.61,
+    "raw_text": "cgg",
+    "confidence": 0.6790099143981934
+  },
+  {
+    "gap_index": 59,
+    "start": 791.158,
+    "end": 791.817,
+    "raw_text": "",
+    "confidence": 0.9159873723983765
+  },
+  {
+    "gap_index": 60,
+    "start": 808.677,
+    "end": 810.197,
+    "raw_text": "fngilegi",
+    "confidence": 0.7302932739257812
+  },
+  {
+    "gap_index": 61,
+    "start": 815.71,
+    "end": 817.789,
+    "raw_text": "gimci",
+    "confidence": 0.923555314540863
+  },
+  {
+    "gap_index": 62,
+    "start": 859.509,
+    "end": 861.309,
+    "raw_text": "ggggggg",
+    "confidence": 0.6422292590141296
+  },
+  {
+    "gap_index": 63,
+    "start": 865.61,
+    "end": 866.129,
+    "raw_text": "gggigigg",
+    "confidence": 0.45524248480796814
+  },
+  {
+    "gap_index": 64,
+    "start": 876.429,
+    "end": 876.87,
+    "raw_text": "",
+    "confidence": 0.6324276328086853
+  },
+  {
+    "gap_index": 65,
+    "start": 877.95,
+    "end": 879.289,
+    "raw_text": "gc",
+    "confidence": 0.7990497350692749
+  },
+  {
+    "gap_index": 66,
+    "start": 880.11,
+    "end": 881.73,
+    "raw_text": "cgg",
+    "confidence": 0.8726276755332947
+  },
+  {
+    "gap_index": 67,
+    "start": 881.73,
+    "end": 883.889,
+    "raw_text": "miiseselegresileee",
+    "confidence": 0.6980688571929932
+  },
+  {
+    "gap_index": 68,
+    "start": 883.889,
+    "end": 884.85,
+    "raw_text": "fecrei",
+    "confidence": 0.8226548433303833
+  },
+  {
+    "gap_index": 69,
+    "start": 887.789,
+    "end": 888.97,
+    "raw_text": "felill",
+    "confidence": 0.7621086835861206
+  },
+  {
+    "gap_index": 70,
+    "start": 904.509,
+    "end": 905.21,
+    "raw_text": "fiifi",
+    "confidence": 0.4649656414985657
+  },
+  {
+    "gap_index": 71,
+    "start": 905.429,
+    "end": 905.769,
+    "raw_text": "fei",
+    "confidence": 0.7889391779899597
+  },
+  {
+    "gap_index": 72,
+    "start": 913.594,
+    "end": 914.994,
+    "raw_text": "feiiigiigig",
+    "confidence": 0.7454977035522461
+  },
+  {
+    "gap_index": 73,
+    "start": 946.177,
+    "end": 948.357,
+    "raw_text": "fiifigigigigi",
+    "confidence": 0.6672810912132263
+  },
+  {
+    "gap_index": 74,
+    "start": 1000.549,
+    "end": 1003.11,
+    "raw_text": "そsgとdす",
+    "confidence": 0.9223978519439697
+  },
+  {
+    "gap_index": 75,
+    "start": 1006.11,
+    "end": 1007.37,
+    "raw_text": "ごは",
+    "confidence": 0.9192761778831482
+  },
+  {
+    "gap_index": 76,
+    "start": 1024.289,
+    "end": 1028.509,
+    "raw_text": "",
+    "confidence": 0.9189845323562622
+  },
+  {
+    "gap_index": 77,
+    "start": 1032.809,
+    "end": 1038.97,
+    "raw_text": "",
+    "confidence": 0.9315510988235474
+  },
+  {
+    "gap_index": 78,
+    "start": 1038.97,
+    "end": 1045.089,
+    "raw_text": "",
+    "confidence": 0.9483324289321899
+  },
+  {
+    "gap_index": 79,
+    "start": 1102.385,
+    "end": 1103.425,
+    "raw_text": "figygig",
+    "confidence": 0.45966637134552
+  },
+  {
+    "gap_index": 80,
+    "start": 1111.465,
+    "end": 1111.986,
+    "raw_text": "figi",
+    "confidence": 0.6303228735923767
+  },
+  {
+    "gap_index": 81,
+    "start": 1117.445,
+    "end": 1118.086,
+    "raw_text": "cg",
+    "confidence": 0.7178187370300293
+  },
+  {
+    "gap_index": 82,
+    "start": 1124.069,
+    "end": 1126.23,
+    "raw_text": "cc",
+    "confidence": 0.8885305523872375
+  },
+  {
+    "gap_index": 83,
+    "start": 1127.289,
+    "end": 1129.089,
+    "raw_text": "おさせに上きますよ",
+    "confidence": 0.9639045000076294
+  },
+  {
+    "gap_index": 84,
+    "start": 1129.089,
+    "end": 1131.529,
+    "raw_text": "もったたなフるこっドじよっか",
+    "confidence": 0.9299091696739197
+  },
+  {
+    "gap_index": 85,
+    "start": 1135.109,
+    "end": 1136.289,
+    "raw_text": "scgiリi",
+    "confidence": 0.8029218912124634
+  },
+  {
+    "gap_index": 86,
+    "start": 1145.21,
+    "end": 1146.849,
+    "raw_text": "ffififiici",
+    "confidence": 0.6666709780693054
+  },
+  {
+    "gap_index": 87,
+    "start": 1201.425,
+    "end": 1204.306,
+    "raw_text": "まざかしのかしはないでど",
+    "confidence": 0.962483286857605
+  },
+  {
+    "gap_index": 88,
+    "start": 1238.806,
+    "end": 1240.986,
+    "raw_text": "cjgs",
+    "confidence": 0.9241573214530945
+  },
+  {
+    "gap_index": 89,
+    "start": 1242.026,
+    "end": 1244.625,
+    "raw_text": "tsqcmでn",
+    "confidence": 0.9160491228103638
+  },
+  {
+    "gap_index": 90,
+    "start": 1246.329,
+    "end": 1248.069,
+    "raw_text": "顧的屯難死",
+    "confidence": 0.9627208709716797
+  },
+  {
+    "gap_index": 91,
+    "start": 1248.93,
+    "end": 1250.17,
+    "raw_text": "cigsi",
+    "confidence": 0.8142075538635254
+  },
+  {
+    "gap_index": 92,
+    "start": 1279.93,
+    "end": 1281.21,
+    "raw_text": "slaygiptim",
+    "confidence": 0.8204917311668396
+  },
+  {
+    "gap_index": 93,
+    "start": 1293.93,
+    "end": 1297.39,
+    "raw_text": "ffiiciiicifigifigi",
+    "confidence": 0.6667516231536865
+  },
+  {
+    "gap_index": 94,
+    "start": 1297.39,
+    "end": 1297.89,
+    "raw_text": "fg",
+    "confidence": 0.6059449315071106
+  },
+  {
+    "gap_index": 95,
+    "start": 1303.21,
+    "end": 1304.15,
+    "raw_text": "cy愛c",
+    "confidence": 0.6497002243995667
+  },
+  {
+    "gap_index": 96,
+    "start": 1305.029,
+    "end": 1306.43,
+    "raw_text": "gg",
+    "confidence": 0.7720704674720764
+  },
+  {
+    "gap_index": 97,
+    "start": 1316.369,
+    "end": 1317.829,
+    "raw_text": "",
+    "confidence": 0.8163911700248718
+  },
+  {
+    "gap_index": 98,
+    "start": 1325.506,
+    "end": 1326.365,
+    "raw_text": "",
+    "confidence": 0.7319394946098328
+  },
+  {
+    "gap_index": 99,
+    "start": 1333.329,
+    "end": 1334.369,
+    "raw_text": "gc",
+    "confidence": 0.5721733570098877
+  },
+  {
+    "gap_index": 100,
+    "start": 1345.17,
+    "end": 1347.13,
+    "raw_text": "そgとcラnt",
+    "confidence": 0.9034932255744934
+  },
+  {
+    "gap_index": 101,
+    "start": 1349.269,
+    "end": 1351.109,
+    "raw_text": "フlcジがt",
+    "confidence": 0.9280991554260254
+  },
+  {
+    "gap_index": 102,
+    "start": 1351.109,
+    "end": 1353.269,
+    "raw_text": "pctscti",
+    "confidence": 0.9051886796951294
+  },
+  {
+    "gap_index": 103,
+    "start": 1394.882,
+    "end": 1397.442,
+    "raw_text": "ggg",
+    "confidence": 0.6010233759880066
+  },
+  {
+    "gap_index": 104,
+    "start": 1397.442,
+    "end": 1399.382,
+    "raw_text": "",
+    "confidence": 0.9118229150772095
+  },
+  {
+    "gap_index": 105,
+    "start": 1400.529,
+    "end": 1401.529,
+    "raw_text": "ffifig",
+    "confidence": 0.7123805284500122
+  },
+  {
+    "gap_index": 106,
+    "start": 1412.93,
+    "end": 1414.39,
+    "raw_text": "sgg",
+    "confidence": 0.8448391556739807
+  },
+  {
+    "gap_index": 107,
+    "start": 1420.69,
+    "end": 1421.19,
+    "raw_text": "f",
+    "confidence": 0.6888309717178345
+  },
+  {
+    "gap_index": 108,
+    "start": 1421.21,
+    "end": 1423.49,
+    "raw_text": "gvgc",
+    "confidence": 0.9212144613265991
+  },
+  {
+    "gap_index": 109,
+    "start": 1430.49,
+    "end": 1433.25,
+    "raw_text": "も僕バなチソさ",
+    "confidence": 0.9513523578643799
+  },
+  {
+    "gap_index": 110,
+    "start": 1433.25,
+    "end": 1437.39,
+    "raw_text": "事い",
+    "confidence": 0.9565012454986572
+  },
+  {
+    "gap_index": 111,
+    "start": 1453.809,
+    "end": 1454.49,
+    "raw_text": "fifffgiffigg",
+    "confidence": 0.3429720997810364
+  },
+  {
+    "gap_index": 112,
+    "start": 1482.65,
+    "end": 1483.19,
+    "raw_text": "fi",
+    "confidence": 0.7744622826576233
+  },
+  {
+    "gap_index": 113,
+    "start": 1492.67,
+    "end": 1495.13,
+    "raw_text": "mtsvems",
+    "confidence": 0.8968555331230164
+  },
+  {
+    "gap_index": 114,
+    "start": 1495.91,
+    "end": 1497.21,
+    "raw_text": "filiid",
+    "confidence": 0.7216895818710327
+  }
+]
