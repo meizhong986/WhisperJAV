@@ -379,6 +379,107 @@ Max workers: 4
 
 ---
 
+## Understanding Tabs and Modes
+
+### Tab Architecture
+
+The GUI has **three tabs** that serve different purposes:
+
+| Tab | Name | Purpose |
+|-----|------|---------|
+| Tab 1 | Transcription Mode | Basic settings (mode, sensitivity, language) |
+| Tab 2 | Advanced Options | Extended settings (model, async, temp files) |
+| Tab 3 | Ensemble Mode | Two-pass pipeline with advanced configuration |
+
+### Independence Between Modes
+
+**Transcription Mode (Tab 1+2) and Ensemble Mode (Tab 3) are INDEPENDENT pipelines:**
+
+```
+Tab 1 + Tab 2 Settings  →  [Start]  →  ProcessManager.start()
+         ↓
+    Standard Pipeline (faster/fast/balanced/fidelity)
+
+Tab 3 Settings          →  [Start]  →  EnsembleManager.start()
+         ↓
+    Two-Pass Ensemble Pipeline (Pass 1 + Pass 2 + Merge)
+```
+
+- Clicking **Start** on Tab 1 or Tab 2 runs the **standard pipeline** with those settings
+- Clicking **Start** on Tab 3 runs the **Ensemble pipeline** with Tab 3 settings
+- Settings in Tab 1/2 do NOT affect Ensemble Mode execution (except language - see below)
+
+### Shared Language Settings
+
+**Language settings are shared across all modes:**
+
+The `Source audio language` and `Output language` dropdowns in Tab 1 are used by BOTH:
+- Standard pipeline (Tab 1+2)
+- Ensemble pipeline (Tab 3)
+
+**To transcribe in English when using Ensemble Mode:**
+1. Go to Tab 1 (Transcription Mode)
+2. Set `Source audio language` to your source language
+3. Set `Output language` to `english-direct`
+4. Return to Tab 3 (Ensemble Mode) and click Start
+
+### Model Priority in Ensemble Mode
+
+When using Ensemble Mode (Tab 3), models are configured in two places:
+
+1. **Main Dropdown** (`Pass 1 Model`, `Pass 2 Model`)
+2. **Customize Parameters** (Edit Parameters button)
+
+**Priority Rule:**
+
+```
+If "Customize Parameters" was used → Custom model takes precedence
+Otherwise                          → Main dropdown model is used
+```
+
+Specifically:
+- When you click "Customize Parameters" and modify settings, the `customized` flag becomes `true`
+- Custom parameters (including model) override the main dropdown
+- The indicator "(Customized)" appears next to the pass when custom settings are active
+
+**To reset to main dropdown:**
+- Use the "Reset" option in Customize Parameters dialog
+- Or change the Pipeline dropdown (triggers reset warning)
+
+---
+
+## Settings Persistence
+
+### Current Behavior
+
+**Settings do NOT persist between sessions.** When you restart the GUI:
+- All settings reset to defaults
+- File list is cleared
+- Output directory resets to default
+
+**What DOES persist:**
+- Theme selection (saved in browser localStorage)
+
+### Workaround for Repeatable Settings
+
+For consistent settings across sessions, consider:
+
+1. **Use CLI with saved arguments:**
+   ```bash
+   whisperjav video.mp4 --mode balanced --sensitivity aggressive --language ja
+   ```
+
+2. **Create a batch/shell script with your preferred settings**
+
+3. **Use Ensemble Mode presets** (Tab 3) which have sensible defaults for common scenarios
+
+### Future Improvement
+
+Settings persistence is a planned feature. Track progress at:
+https://github.com/meizhong986/WhisperJAV/issues
+
+---
+
 ## FAQ
 
 ### Q: Can I process folders?
