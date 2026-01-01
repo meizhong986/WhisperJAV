@@ -278,24 +278,30 @@ def create_window():
     # Check for icon file with multiple fallback locations
     icon_path = None
 
-    # Priority 1: Check install root directory (where installer places whisperjav_icon.ico)
-    # This is needed for conda-constructor installations
-    install_root_icon = Path(sys.prefix) / "whisperjav_icon.ico"
-    if install_root_icon.exists():
-        icon_path = install_root_icon
-
-    # Priority 2: Check bundled executable assets (PyInstaller)
-    elif getattr(sys, 'frozen', False):
-        try:
-            icon_path = get_asset_path('icon.ico')
-        except FileNotFoundError:
-            pass  # No icon available
-
-    # Priority 3: Running as script - check assets directory
+    # Allow disabling icon loading for debugging libpng/rendering issues
+    # Set WHISPERJAV_NO_ICON=1 to skip icon loading entirely
+    skip_icon = os.getenv('WHISPERJAV_NO_ICON', '').lower() in ('1', 'true', 'yes')
+    if skip_icon:
+        print("Icon loading disabled via WHISPERJAV_NO_ICON")
     else:
-        icon_file = Path(__file__).parent / "assets" / "icon.ico"
-        if icon_file.exists():
-            icon_path = icon_file
+        # Priority 1: Check install root directory (where installer places whisperjav_icon.ico)
+        # This is needed for conda-constructor installations
+        install_root_icon = Path(sys.prefix) / "whisperjav_icon.ico"
+        if install_root_icon.exists():
+            icon_path = install_root_icon
+
+        # Priority 2: Check bundled executable assets (PyInstaller)
+        elif getattr(sys, 'frozen', False):
+            try:
+                icon_path = get_asset_path('icon.ico')
+            except FileNotFoundError:
+                pass  # No icon available
+
+        # Priority 3: Running as script - check assets directory
+        else:
+            icon_file = Path(__file__).parent / "assets" / "icon.ico"
+            if icon_file.exists():
+                icon_path = icon_file
 
 
     width_s, height_s = int(1920 * 0.63), int(1080 * 0.85)
