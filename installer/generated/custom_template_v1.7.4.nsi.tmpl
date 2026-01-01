@@ -1441,16 +1441,17 @@ Section "Install"
 
         ; Create desktop shortcut
         ; Target: WhisperJAV v1.7.4.lnk on user's desktop
-        ; Executable: WhisperJAV-GUI.exe (copied from Scripts/whisperjav-gui.exe by post_install)
-        ; Parameters: none (exe handles everything)
+        ; Executable: pythonw.exe (no console window)
+        ; Parameters: launcher script that sets up PATH and launches GUI
         ; Icon: whisperjav_icon.ico in installation folder
         ; Icon index: 0 (first icon in file)
         ; Window state: SW_SHOWNORMAL (normal window)
         ; Hotkey: none ("")
         ; Description: shown in tooltip and properties
+        ; Note: Using launcher ensures PATH is set for FFmpeg and other dependencies
         CreateShortCut "$DESKTOP\WhisperJAV v1.7.4.lnk" \
-            "$INSTDIR\WhisperJAV-GUI.exe" \
-            "" \
+            "$INSTDIR\pythonw.exe" \
+            '"$INSTDIR\WhisperJAV_Launcher_v1.7.4.py"' \
             "$INSTDIR\whisperjav_icon.ico" \
             0 \
             SW_SHOWNORMAL \
