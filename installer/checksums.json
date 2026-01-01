@@ -1,0 +1,26 @@
+{
+  "manifest_version": "1.0",
+  "description": "SHA256 checksums for WhisperJAV upgrade verification",
+  "note": "This manifest provides two-channel trust. Checksums are also published in GitHub Release assets.",
+  "packages": {
+    "whisperjav": {
+      "1.7.4": {
+        "wheel": null,
+        "sha256": null,
+        "note": "Wheel checksums will be added when release is published"
+      }
+    }
+  },
+  "upgrade_scripts": {
+    "upgrade_whisperjav.py": {
+      "1.7.4": {
+        "sha256": null,
+        "note": "Script checksum will be added when release is finalized"
+      }
+    }
+  },
+  "instructions": {
+    "verification": "Compare SHA256 hash of downloaded file against this manifest",
+    "manual_check": "sha256sum <filename> (Linux/Mac) or certutil -hashfile <filename> SHA256 (Windows)"
+  }
+}
