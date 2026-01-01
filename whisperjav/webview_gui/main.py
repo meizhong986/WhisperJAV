@@ -45,6 +45,49 @@ def _ensure_utf8_output():
 _ensure_utf8_output()
 
 
+def _setup_conda_path():
+    """
+    Set up PATH for conda environment dependencies (FFmpeg, DLLs).
+
+    When launched directly via pip entry point (WhisperJAV-GUI.exe),
+    the conda environment's Library\bin is not on PATH. This causes
+    FFmpeg and other bundled tools to be inaccessible.
+
+    This function adds the necessary directories to PATH:
+    - Library\bin (FFmpeg, DLLs)
+    - Scripts (other conda tools)
+
+    Safe to call multiple times - directories are only added once.
+    """
+    if platform.system() != 'Windows':
+        return  # Only needed on Windows conda installs
+
+    # Determine installation root
+    # sys.prefix is the conda environment root (e.g., %LOCALAPPDATA%\WhisperJAV)
+    install_root = Path(sys.prefix)
+
+    # Key directories to add to PATH
+    lib_bin_dir = install_root / "Library" / "bin"
+    scripts_dir = install_root / "Scripts"
+
+    # Get current PATH
+    current_path = os.environ.get("PATH", "")
+    path_dirs = current_path.split(os.pathsep)
+
+    # Add directories if not already present
+    dirs_to_add = []
+    for dir_path in [str(lib_bin_dir), str(scripts_dir)]:
+        # Case-insensitive check on Windows
+        if not any(d.lower() == dir_path.lower() for d in path_dirs):
+            if Path(dir_path).exists():
+                dirs_to_add.append(dir_path)
+
+    if dirs_to_add:
+        new_path = os.pathsep.join(dirs_to_add + [current_path])
+        os.environ["PATH"] = new_path
+        print(f"Added to PATH: {', '.join(dirs_to_add)}")
+
+
 def on_drop_event(e):
     """
     Handle file/folder drops from OS into WebView.
@@ -390,6 +433,10 @@ def main():
 
     print(f"WhisperJAV GUI v{version}")
     print("=" * 50)
+
+    # Set up PATH for conda environment (FFmpeg, DLLs)
+    # Must be called BEFORE any code that needs FFmpeg
+    _setup_conda_path()
 
     # Check WebView2 on Windows
     if not check_webview2_windows():
