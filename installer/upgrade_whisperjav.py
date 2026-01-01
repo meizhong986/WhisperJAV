@@ -96,9 +96,14 @@ NEW_DEPENDENCIES = DEPS_V170_V172 + DEPS_V173 + DEPS_V174
 
 # Dependencies that have torch as a requirement - installed with constraints
 # to prevent pip from reinstalling CPU-only torch
-TORCH_DEPENDENT_PACKAGES = [
-    "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
-]
+# NOTE: NeMo removed from upgrade path due to:
+#   - @main branch is unstable, breaks reproducibility
+#   - 500+ MB download with timeout risk
+#   - CUDA version drift could break existing setup
+#   - Pip resolver conflicts can hang or fail upgrades
+# Users who need NeMo should install manually after upgrade:
+#   pip install nemo_toolkit[asr]
+TORCH_DEPENDENT_PACKAGES = []
 
 # Files to preserve during upgrade (user data)
 PRESERVE_PATTERNS = [
