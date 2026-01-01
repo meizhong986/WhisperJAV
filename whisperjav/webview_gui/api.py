@@ -2095,3 +2095,182 @@ class WhisperJAVAPI:
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "api_version": "Phase 2 - Backend Refactor"
         }
+
+    # ========================================================================
+    # Update Checker API
+    # ========================================================================
+
+    def check_for_updates(self, force: bool = False) -> Dict[str, Any]:
+        """
+        Check if a newer version of WhisperJAV is available.
+
+        Args:
+            force: If True, bypass cache and check immediately
+
+        Returns:
+            dict: Update check result with:
+                - update_available: bool
+                - current_version: str
+                - latest_version: str (if available)
+                - notification_level: str (critical/major/minor/patch/none)
+                - release_url: str (if update available)
+                - release_notes: str (if update available)
+                - error: str (if check failed)
+        """
+        try:
+            from whisperjav.version_checker import (
+                check_for_updates,
+                get_update_notification_level,
+            )
+
+            result = check_for_updates(force=force)
+
+            response = {
+                "success": True,
+                "update_available": result.update_available,
+                "current_version": result.current_version,
+                "latest_version": result.latest_version,
+                "from_cache": result.from_cache,
+            }
+
+            if result.error:
+                response["error"] = result.error
+
+            if result.version_info:
+                response["notification_level"] = get_update_notification_level(result)
+                response["release_url"] = result.version_info.release_url
+                response["release_notes"] = result.version_info.release_notes[:500]  # Truncate
+                response["is_prerelease"] = result.version_info.is_prerelease
+
+            return response
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "update_available": False,
+                "current_version": "unknown"
+            }
+
+    def dismiss_update_notification(self, version: str) -> Dict[str, Any]:
+        """
+        Record that the user dismissed the update notification for a version.
+
+        Args:
+            version: The version that was dismissed
+
+        Returns:
+            dict: Success status
+        """
+        try:
+            import json
+            from datetime import datetime
+            from pathlib import Path
+
+            # Store dismissal in cache directory
+            cache_dir = Path(os.environ.get('LOCALAPPDATA', Path.home())) / '.whisperjav_cache'
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            dismissal_file = cache_dir / 'update_dismissed.json'
+
+            data = {
+                "version": version,
+                "dismissed_at": datetime.now().isoformat()
+            }
+
+            with open(dismissal_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f)
+
+            return {"success": True}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_dismissed_update(self) -> Dict[str, Any]:
+        """
+        Get the last dismissed update version and timestamp.
+
+        Returns:
+            dict: Dismissed version info or None
+        """
+        try:
+            import json
+            from pathlib import Path
+
+            cache_dir = Path(os.environ.get('LOCALAPPDATA', Path.home())) / '.whisperjav_cache'
+            dismissal_file = cache_dir / 'update_dismissed.json'
+
+            if dismissal_file.exists():
+                with open(dismissal_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return {"success": True, "dismissed": data}
+
+            return {"success": True, "dismissed": None}
+
+        except Exception as e:
+            return {"success": False, "error": str(e), "dismissed": None}
+
+    def start_update(self, wheel_only: bool = False) -> Dict[str, Any]:
+        """
+        Start the update process by spawning the update wrapper.
+
+        This method:
+        1. Spawns the update_wrapper.py script
+        2. Returns immediately so GUI can exit
+        3. The wrapper will wait for GUI to exit, run update, then relaunch
+
+        Args:
+            wheel_only: If True, only update whisperjav package (hot-patch mode)
+
+        Returns:
+            dict: Success status with instructions for GUI to exit
+        """
+        try:
+            import os
+
+            # Get current process ID for wrapper to wait on
+            gui_pid = os.getpid()
+
+            # Determine python executable
+            install_dir = Path(sys.prefix)
+            pythonw = install_dir / "pythonw.exe"
+            if not pythonw.exists():
+                pythonw = install_dir / "python.exe"
+            if not pythonw.exists():
+                pythonw = Path(sys.executable)
+
+            # Build command
+            cmd = [
+                str(pythonw),
+                "-m", "whisperjav.update_wrapper",
+                "--pid", str(gui_pid)
+            ]
+            if wheel_only:
+                cmd.append("--wheel-only")
+
+            # Spawn update wrapper as detached process
+            if sys.platform == "win32":
+                subprocess.Popen(
+                    cmd,
+                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                    close_fds=True,
+                    cwd=str(install_dir)
+                )
+            else:
+                subprocess.Popen(
+                    cmd,
+                    start_new_session=True,
+                    cwd=str(install_dir)
+                )
+
+            return {
+                "success": True,
+                "message": "Update process started. GUI will exit for update.",
+                "should_exit": True
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "should_exit": False
+            }

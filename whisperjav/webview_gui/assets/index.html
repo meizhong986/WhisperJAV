@@ -29,6 +29,42 @@
             </div>
         </header>
 
+        <!-- Update Notification Banner -->
+        <div id="updateBanner" class="update-banner">
+            <div class="update-banner-content">
+                <span class="update-banner-icon">&#x2B06;</span>
+                <div class="update-banner-text">
+                    <span class="update-banner-title" id="updateTitle">Update Available</span>
+                    <span class="update-banner-version" id="updateVersion">v1.7.5 is now available</span>
+                </div>
+            </div>
+            <div class="update-banner-actions">
+                <button class="update-btn update-btn-secondary" id="updateReleaseNotesBtn" title="View release notes">
+                    Release Notes
+                </button>
+                <button class="update-btn update-btn-primary" id="updateNowBtn">
+                    Update Now
+                </button>
+                <button class="update-dismiss" id="updateDismissBtn" title="Dismiss" aria-label="Dismiss">
+                    &times;
+                </button>
+            </div>
+        </div>
+
+        <!-- Update Progress Overlay -->
+        <div id="updateProgressOverlay" class="update-progress-overlay">
+            <div class="update-progress-dialog">
+                <div class="update-progress-icon">&#x21BB;</div>
+                <div class="update-progress-title">Updating WhisperJAV</div>
+                <div class="update-progress-message">
+                    The application will restart automatically after the update completes.
+                </div>
+                <div class="update-progress-step" id="updateProgressStep">
+                    Preparing update...
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content Area -->
         <main class="app-main">
 
@@ -763,6 +799,41 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" onclick="closeAbout()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Changelog Modal -->
+    <div class="modal-overlay" id="changelogModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 id="changelogTitle">What's New</h2>
+                <button class="modal-close" onclick="ChangelogManager.close()" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" id="changelogBody">
+                <div class="changelog-loading" id="changelogLoading">
+                    <div class="changelog-spinner">&#x21BB;</div>
+                    <p>Loading release notes...</p>
+                </div>
+                <div class="changelog-content" id="changelogContent" style="display: none;">
+                    <div class="changelog-version-header">
+                        <span class="changelog-version" id="changelogVersion">v1.7.5</span>
+                        <span class="changelog-date" id="changelogDate"></span>
+                    </div>
+                    <div class="changelog-notes" id="changelogNotes">
+                        <!-- Release notes will be inserted here -->
+                    </div>
+                </div>
+                <div class="changelog-error" id="changelogError" style="display: none;">
+                    <p>Could not load release notes.</p>
+                    <a href="https://github.com/meizhong986/WhisperJAV/releases" target="_blank" class="about-link">
+                        View releases on GitHub
+                    </a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="ChangelogManager.openGitHub()">View on GitHub</button>
+                <button class="btn btn-primary" onclick="ChangelogManager.close()">Close</button>
             </div>
         </div>
     </div>

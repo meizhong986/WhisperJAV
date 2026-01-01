@@ -2083,3 +2083,325 @@ button:focus-visible,
     font-weight: 500;
     color: var(--primary-color);
 }
+
+/* ============================================================
+   Update Notification Banner
+   ============================================================ */
+
+.update-banner {
+    display: none;
+    background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+    color: white;
+    padding: 8px 16px;
+    font-size: 12px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    animation: updateSlideIn 0.3s ease-out;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.update-banner.visible {
+    display: flex;
+}
+
+@keyframes updateSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.update-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.update-banner-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.update-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.update-banner-title {
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.update-banner-version {
+    font-size: 11px;
+    opacity: 0.9;
+}
+
+.update-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.update-btn {
+    padding: 5px 12px;
+    border-radius: var(--border-radius);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+}
+
+.update-btn-primary {
+    background: white;
+    color: #1a5276;
+}
+
+.update-btn-primary:hover {
+    background: #f0f0f0;
+    transform: translateY(-1px);
+}
+
+.update-btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.update-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.update-dismiss {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.update-dismiss:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Critical update styling */
+.update-banner.critical {
+    background: linear-gradient(135deg, #922b21 0%, #c0392b 100%);
+}
+
+.update-banner.critical .update-btn-primary {
+    color: #922b21;
+}
+
+/* Major update styling */
+.update-banner.major {
+    background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+}
+
+/* Minor update styling */
+.update-banner.minor {
+    background: linear-gradient(135deg, #1e8449 0%, #27ae60 100%);
+}
+
+.update-banner.minor .update-btn-primary {
+    color: #1e8449;
+}
+
+/* Patch update styling */
+.update-banner.patch {
+    background: linear-gradient(135deg, #5d6d7e 0%, #7f8c8d 100%);
+}
+
+.update-banner.patch .update-btn-primary {
+    color: #5d6d7e;
+}
+
+/* Update progress overlay */
+.update-progress-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.update-progress-overlay.visible {
+    display: flex;
+}
+
+.update-progress-dialog {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    padding: 32px 40px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: var(--shadow-lg);
+}
+
+.update-progress-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.update-progress-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.update-progress-message {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.update-progress-step {
+    font-size: 12px;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+/* ============================================================
+   Changelog Modal
+   ============================================================ */
+
+.changelog-loading {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.changelog-spinner {
+    font-size: 36px;
+    animation: spin 1s linear infinite;
+    color: var(--primary-color);
+    margin-bottom: 16px;
+}
+
+.changelog-loading p {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.changelog-version-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.changelog-version {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.changelog-date {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.changelog-notes {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.changelog-notes h1,
+.changelog-notes h2,
+.changelog-notes h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 16px 0 8px;
+    color: var(--text-primary);
+}
+
+.changelog-notes h1:first-child,
+.changelog-notes h2:first-child,
+.changelog-notes h3:first-child {
+    margin-top: 0;
+}
+
+.changelog-notes p {
+    margin: 8px 0;
+}
+
+.changelog-notes ul,
+.changelog-notes ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.changelog-notes li {
+    margin: 4px 0;
+}
+
+.changelog-notes code {
+    background: var(--disabled-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.changelog-notes pre {
+    background: var(--disabled-bg);
+    padding: 12px;
+    border-radius: var(--border-radius);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    margin: 12px 0;
+}
+
+.changelog-notes a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.changelog-notes a:hover {
+    text-decoration: underline;
+}
+
+.changelog-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.changelog-error p {
+    margin-bottom: 16px;
+}

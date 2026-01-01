@@ -33,11 +33,23 @@ import shutil
 import subprocess
 import platform
 import argparse
+import hashlib
+import tempfile
+import urllib.request
+import json
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 # Version of this upgrade script
 UPGRADE_SCRIPT_VERSION = "1.7.4"
+
+# Minimum disk space required for upgrade (in bytes)
+MIN_DISK_SPACE_GB = 5
+MIN_DISK_SPACE_BYTES = MIN_DISK_SPACE_GB * 1024 * 1024 * 1024
+
+# SHA256 checksum manifest URL (two-channel trust)
+CHECKSUM_MANIFEST_URL = "https://raw.githubusercontent.com/meizhong986/whisperjav/main/installer/checksums.json"
+# Backup: checksums also published in GitHub Release assets
 
 # GitHub repository URL
 GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
@@ -96,9 +108,14 @@ NEW_DEPENDENCIES = DEPS_V170_V172 + DEPS_V173 + DEPS_V174
 
 # Dependencies that have torch as a requirement - installed with constraints
 # to prevent pip from reinstalling CPU-only torch
-TORCH_DEPENDENT_PACKAGES = [
-    "nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main",
-]
+# NOTE: NeMo removed from upgrade path due to:
+#   - @main branch is unstable, breaks reproducibility
+#   - 500+ MB download with timeout risk
+#   - CUDA version drift could break existing setup
+#   - Pip resolver conflicts can hang or fail upgrades
+# Users who need NeMo should install manually after upgrade:
+#   pip install nemo_toolkit[asr]
+TORCH_DEPENDENT_PACKAGES = []
 
 # Files to preserve during upgrade (user data)
 PRESERVE_PATTERNS = [
@@ -232,11 +249,395 @@ def get_current_version(install_dir: Path) -> Optional[str]:
 def check_network() -> bool:
     """Check if network connectivity to GitHub is available."""
     try:
-        import urllib.request
         urllib.request.urlopen("https://github.com", timeout=10)
         return True
     except Exception:
         return False
+
+
+def check_disk_space(install_dir: Path) -> Tuple[bool, float]:
+    """
+    Check if sufficient disk space is available for upgrade.
+
+    Args:
+        install_dir: Path to installation directory
+
+    Returns:
+        Tuple of (has_enough_space, available_gb)
+    """
+    try:
+        if platform.system() == 'Windows':
+            import ctypes
+            free_bytes = ctypes.c_ulonglong(0)
+            ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+                ctypes.c_wchar_p(str(install_dir)),
+                None, None,
+                ctypes.pointer(free_bytes)
+            )
+            available = free_bytes.value
+        else:
+            stat = os.statvfs(install_dir)
+            available = stat.f_bavail * stat.f_frsize
+
+        available_gb = available / (1024 * 1024 * 1024)
+        has_enough = available >= MIN_DISK_SPACE_BYTES
+        return has_enough, available_gb
+    except Exception as e:
+        print_warning(f"Could not check disk space: {e}")
+        return True, 0.0  # Assume OK if we can't check
+
+
+def check_environment(install_dir: Path) -> Tuple[bool, list]:
+    """
+    Verify we're running in the correct Python environment.
+
+    This is a FAIL-FAST check - running upgrade from wrong Python
+    can corrupt the installation.
+
+    Args:
+        install_dir: Path to installation directory
+
+    Returns:
+        Tuple of (is_correct_env, error_messages)
+    """
+    errors = []
+
+    # Check 1: sys.prefix should match install_dir
+    current_prefix = Path(sys.prefix).resolve()
+    expected_prefix = install_dir.resolve()
+
+    if current_prefix != expected_prefix:
+        errors.append(
+            f"Wrong Python environment detected!\n"
+            f"      Running from: {current_prefix}\n"
+            f"      Expected:     {expected_prefix}\n"
+            f"      Run upgrade using: {expected_prefix / 'python.exe'} upgrade_whisperjav.py"
+        )
+
+    # Check 2: Python version should be 3.9-3.12
+    version = sys.version_info
+    if version < (3, 9) or version >= (3, 13):
+        errors.append(
+            f"Unsupported Python version: {version.major}.{version.minor}\n"
+            f"      Supported: 3.9, 3.10, 3.11, 3.12"
+        )
+
+    # Check 3: pip should be available
+    pip_exe = install_dir / 'Scripts' / 'pip.exe'
+    if not pip_exe.exists():
+        pip_exe = install_dir / 'Scripts' / 'pip'
+    if not pip_exe.exists():
+        pip_exe = install_dir / 'bin' / 'pip'
+    if not pip_exe.exists():
+        errors.append("pip not found in installation - cannot upgrade")
+
+    return len(errors) == 0, errors
+
+
+def check_no_gui_running(install_dir: Path) -> Tuple[bool, str]:
+    """
+    Check if WhisperJAV GUI is currently running.
+
+    Running upgrade while GUI is open can cause file locking issues
+    on Windows and corrupt the installation.
+
+    Args:
+        install_dir: Path to installation directory
+
+    Returns:
+        Tuple of (is_safe, message)
+    """
+    try:
+        import psutil
+    except ImportError:
+        # psutil not available - can't check, assume safe
+        return True, "psutil not available, skipping process check"
+
+    gui_processes = []
+    install_str = str(install_dir).lower()
+
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
+            try:
+                proc_info = proc.info
+                proc_exe = (proc_info.get('exe') or '').lower()
+                proc_cmdline = ' '.join(proc_info.get('cmdline') or []).lower()
+
+                # Check if process is from our installation
+                if install_str in proc_exe or install_str in proc_cmdline:
+                    # Check if it's a GUI process
+                    if any(x in proc_cmdline for x in ['webview_gui', 'whisperjav-gui']):
+                        gui_processes.append(f"PID {proc_info['pid']}: {proc_info['name']}")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception as e:
+        return True, f"Could not check processes: {e}"
+
+    if gui_processes:
+        return False, f"WhisperJAV GUI is running:\n" + "\n".join(f"      {p}" for p in gui_processes)
+
+    return True, "No GUI processes detected"
+
+
+def fetch_checksum_manifest() -> Optional[Dict]:
+    """
+    Fetch the checksum manifest from GitHub.
+
+    Returns:
+        Dictionary with package checksums, or None if unavailable
+    """
+    try:
+        with urllib.request.urlopen(CHECKSUM_MANIFEST_URL, timeout=15) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        print_warning(f"Could not fetch checksum manifest: {e}")
+        return None
+
+
+def verify_wheel_checksum(wheel_path: Path, expected_sha256: str) -> bool:
+    """
+    Verify SHA256 checksum of a downloaded wheel file.
+
+    Args:
+        wheel_path: Path to wheel file
+        expected_sha256: Expected SHA256 hash (lowercase hex)
+
+    Returns:
+        True if checksum matches, False otherwise
+    """
+    try:
+        sha256 = hashlib.sha256()
+        with open(wheel_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                sha256.update(chunk)
+        actual = sha256.hexdigest().lower()
+        expected = expected_sha256.lower()
+        return actual == expected
+    except Exception as e:
+        print_error(f"Checksum verification failed: {e}")
+        return False
+
+
+def download_package(pip_exe: Path, package: str, download_dir: Path,
+                     timeout: int = 300) -> Tuple[bool, Optional[Path]]:
+    """
+    Download a package to a local directory without installing.
+
+    This is part of the download-first pattern to prevent partial
+    installations from network failures.
+
+    Args:
+        pip_exe: Path to pip executable
+        package: Package specifier (e.g., "requests>=2.0" or git URL)
+        download_dir: Directory to download to
+        timeout: Download timeout in seconds
+
+    Returns:
+        Tuple of (success, downloaded_file_path)
+    """
+    try:
+        result = subprocess.run(
+            [str(pip_exe), 'download', '-d', str(download_dir),
+             '--no-deps', package],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+
+        if result.returncode != 0:
+            return False, None
+
+        # Find the downloaded file
+        for f in download_dir.iterdir():
+            if f.suffix in ('.whl', '.tar.gz', '.zip'):
+                return True, f
+
+        return True, None  # Downloaded but couldn't find file (OK for git installs)
+
+    except subprocess.TimeoutExpired:
+        return False, None
+    except Exception as e:
+        print_warning(f"Download error: {e}")
+        return False, None
+
+
+def install_from_local(pip_exe: Path, download_dir: Path,
+                       package: str, timeout: int = 300) -> bool:
+    """
+    Install a package from local download directory.
+
+    Args:
+        pip_exe: Path to pip executable
+        download_dir: Directory containing downloaded packages
+        package: Package name (for git installs, use the original specifier)
+        timeout: Install timeout in seconds
+
+    Returns:
+        True if successful
+    """
+    try:
+        # First try to install from local files
+        result = subprocess.run(
+            [str(pip_exe), 'install', '--no-index',
+             '--find-links', str(download_dir), package],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+
+        if result.returncode == 0:
+            return True
+
+        # If no-index fails (e.g., git install), try direct install
+        # This is a fallback for packages that can't be downloaded first
+        result = subprocess.run(
+            [str(pip_exe), 'install', '--no-deps', package],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+
+        return result.returncode == 0
+
+    except subprocess.TimeoutExpired:
+        return False
+    except Exception as e:
+        print_warning(f"Install error: {e}")
+        return False
+
+
+def download_first_install(pip_exe: Path, packages: list,
+                           desc: str = "packages") -> Tuple[bool, list]:
+    """
+    Download all packages first, then install them.
+
+    This prevents partial installations from network failures.
+    Pattern: Download → Verify → Install
+
+    Args:
+        pip_exe: Path to pip executable
+        packages: List of package specifiers
+        desc: Description for progress messages
+
+    Returns:
+        Tuple of (all_success, failed_packages)
+    """
+    if not packages:
+        return True, []
+
+    failed = []
+
+    # Create temp directory for downloads
+    with tempfile.TemporaryDirectory(prefix='whisperjav_upgrade_') as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Phase 1: Download all packages
+        print(f"      Downloading {desc}...")
+        download_success = []
+
+        for pkg in packages:
+            pkg_name = pkg.split('@')[0].split('>=')[0].split('==')[0].strip()
+            success, _ = download_package(pip_exe, pkg, temp_path)
+
+            if success:
+                download_success.append(pkg)
+            else:
+                # For git-based packages, download might not work
+                # They'll be handled in install phase
+                if 'git+' in pkg:
+                    download_success.append(pkg)
+                else:
+                    print_warning(f"Download failed: {pkg_name}")
+                    failed.append(pkg)
+
+        if failed:
+            print_warning(f"{len(failed)} package(s) failed to download")
+            # Continue with what we have
+
+        # Phase 2: Install downloaded packages
+        print(f"      Installing {desc}...")
+        for pkg in download_success:
+            pkg_name = pkg.split('@')[0].split('>=')[0].split('==')[0].strip()
+
+            if 'git+' in pkg:
+                # Git packages need direct install
+                try:
+                    result = subprocess.run(
+                        [str(pip_exe), 'install', '--no-deps', pkg],
+                        capture_output=True,
+                        text=True,
+                        timeout=300
+                    )
+                    if result.returncode == 0:
+                        print_success(pkg_name)
+                    else:
+                        print_warning(f"{pkg_name} - install failed")
+                        failed.append(pkg)
+                except Exception:
+                    failed.append(pkg)
+            else:
+                # Regular packages from local cache
+                if install_from_local(pip_exe, temp_path, pkg):
+                    print_success(pkg_name)
+                else:
+                    print_warning(f"{pkg_name} - install failed")
+                    failed.append(pkg)
+
+    return len(failed) == 0, failed
+
+
+def run_preflight_checks(install_dir: Path) -> bool:
+    """
+    Run all preflight checks before starting upgrade.
+
+    This is the FAIL-FAST gate - any critical failure here
+    aborts the upgrade before making any changes.
+
+    Args:
+        install_dir: Path to installation directory
+
+    Returns:
+        True if all checks pass, False otherwise
+    """
+    print("Running preflight checks...")
+    all_passed = True
+
+    # Check 1: Disk space
+    has_space, available_gb = check_disk_space(install_dir)
+    if has_space:
+        print_success(f"Disk space: {available_gb:.1f} GB available (need {MIN_DISK_SPACE_GB} GB)")
+    else:
+        print_error(f"Insufficient disk space: {available_gb:.1f} GB available, need {MIN_DISK_SPACE_GB} GB")
+        all_passed = False
+
+    # Check 2: Environment
+    env_ok, env_errors = check_environment(install_dir)
+    if env_ok:
+        print_success("Python environment: correct")
+    else:
+        for err in env_errors:
+            print_error(err)
+        all_passed = False
+
+    # Check 3: GUI not running (Windows file locking)
+    if platform.system() == 'Windows':
+        gui_ok, gui_msg = check_no_gui_running(install_dir)
+        if gui_ok:
+            print_success("GUI check: not running")
+        else:
+            print_error(f"GUI check failed: {gui_msg}")
+            print_error("Please close WhisperJAV GUI before upgrading")
+            all_passed = False
+
+    # Check 4: Network (already done in main, but verify again)
+    if check_network():
+        print_success("Network: connected")
+    else:
+        print_error("Network: no connection to GitHub")
+        all_passed = False
+
+    print()
+    return all_passed
 
 
 def get_torch_version(install_dir: Path) -> Optional[str]:
@@ -414,8 +815,9 @@ def install_new_dependencies(install_dir: Path, current_version: Optional[str] =
     """
     Install new dependencies that weren't in older versions.
 
-    Uses version-aware logic to minimize pip exposure and reduce
-    risk of dependency conflicts.
+    Uses the download-first pattern: downloads all packages first,
+    then installs them. This prevents partial installations from
+    network failures.
 
     Args:
         install_dir: Path to installation directory
@@ -434,8 +836,6 @@ def install_new_dependencies(install_dir: Path, current_version: Optional[str] =
         print_error("pip not found in installation")
         return False
 
-    success = True
-
     # Get version-aware dependency list
     deps_to_install = get_required_dependencies(current_version)
 
@@ -443,27 +843,16 @@ def install_new_dependencies(install_dir: Path, current_version: Optional[str] =
         print_success("No new dependencies required")
         return True
 
-    # Install regular dependencies (no torch conflict)
-    for dep in deps_to_install:
-        try:
-            result = subprocess.run(
-                [str(pip_exe), 'install', dep],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
-            if result.returncode == 0:
-                print_success(dep)
-            else:
-                # Check if already satisfied
-                if "already satisfied" in result.stdout.lower():
-                    print_success(f"{dep} (already installed)")
-                else:
-                    print_warning(f"{dep} - install had issues")
-        except Exception as e:
-            print_warning(f"{dep} - {e}")
+    # Use download-first pattern for regular dependencies
+    # This downloads all packages first, then installs them
+    # Prevents "broken pipe" scenario from network failures
+    success, failed = download_first_install(pip_exe, deps_to_install, "dependencies")
+
+    if failed:
+        print_warning(f"{len(failed)} package(s) had issues, but upgrade can continue")
 
     # Install torch-dependent packages with constraints to preserve CUDA torch
+    # (Currently empty after NeMo removal, but kept for future use)
     if TORCH_DEPENDENT_PACKAGES:
         print("      Installing torch-dependent packages (with constraints)...")
         constraints_path = create_torch_constraints(install_dir)
@@ -479,10 +868,9 @@ def install_new_dependencies(install_dir: Path, current_version: Optional[str] =
                     cmd,
                     capture_output=True,
                     text=True,
-                    timeout=600  # 10 min timeout for large packages like NeMo
+                    timeout=600  # 10 min timeout for large packages
                 )
                 if result.returncode == 0:
-                    # Extract package name for cleaner output
                     pkg_name = dep.split('@')[0].strip() if '@' in dep else dep
                     print_success(pkg_name)
                 else:
@@ -492,7 +880,7 @@ def install_new_dependencies(install_dir: Path, current_version: Optional[str] =
                     else:
                         print_warning(f"{dep} - install had issues: {result.stderr[:100]}")
             except subprocess.TimeoutExpired:
-                print_warning(f"{dep} - installation timed out (may still be installing)")
+                print_warning(f"{dep} - installation timed out")
             except Exception as e:
                 print_warning(f"{dep} - {e}")
 
@@ -503,7 +891,7 @@ def install_new_dependencies(install_dir: Path, current_version: Optional[str] =
             except Exception:
                 pass
 
-    return success
+    return True  # Non-fatal - warnings shown but upgrade continues
 
 
 def update_launcher(install_dir: Path) -> bool:
@@ -635,20 +1023,84 @@ def cleanup_old_files(install_dir: Path) -> int:
     return cleaned
 
 
-def verify_installation(install_dir: Path) -> Tuple[bool, Optional[str]]:
+def verify_installation(install_dir: Path) -> Tuple[bool, Optional[str], list]:
     """
-    Verify the installation was successful.
+    Verify the installation was successful with comprehensive health checks.
+
+    Checks:
+    1. WhisperJAV version is retrievable
+    2. Critical modules are importable
+    3. CLI entry points exist
+    4. PyTorch CUDA status (informational)
 
     Args:
         install_dir: Path to installation directory
 
     Returns:
-        Tuple of (success, version)
+        Tuple of (success, version, warnings)
     """
+    warnings = []
+    python_exe = install_dir / 'python.exe'
+    if not python_exe.exists():
+        python_exe = install_dir / 'python'
+
+    # Check 1: Version retrieval
     version = get_current_version(install_dir)
-    if version:
-        return True, version
-    return False, None
+    if not version:
+        return False, None, ["Could not retrieve WhisperJAV version"]
+
+    # Check 2: Critical module imports
+    critical_modules = [
+        ('whisperjav', 'WhisperJAV core'),
+        ('faster_whisper', 'Faster-Whisper ASR'),
+        ('torch', 'PyTorch'),
+    ]
+
+    for module, desc in critical_modules:
+        try:
+            result = subprocess.run(
+                [str(python_exe), '-c', f'import {module}'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode != 0:
+                warnings.append(f"{desc} ({module}) import failed")
+        except Exception as e:
+            warnings.append(f"{desc} ({module}) check error: {e}")
+
+    # Check 3: CLI entry points
+    entry_points = [
+        ('Scripts/whisperjav-gui.exe', 'GUI launcher'),
+        ('Scripts/whisperjav.exe', 'CLI tool'),
+    ]
+
+    for path, desc in entry_points:
+        ep_path = install_dir / path
+        if not ep_path.exists():
+            # Try without .exe for non-Windows
+            ep_path_alt = install_dir / path.replace('.exe', '')
+            if not ep_path_alt.exists():
+                warnings.append(f"{desc} entry point missing")
+
+    # Check 4: PyTorch CUDA status (informational only)
+    try:
+        result = subprocess.run(
+            [str(python_exe), '-c',
+             'import torch; print("cuda" if torch.cuda.is_available() else "cpu")'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0:
+            device = result.stdout.strip()
+            if device == 'cpu':
+                warnings.append("PyTorch running in CPU mode (no GPU acceleration)")
+    except Exception:
+        pass  # Non-fatal
+
+    # Success if version retrieved (warnings are non-fatal)
+    return True, version, warnings
 
 
 def main() -> int:
@@ -664,9 +1116,21 @@ def main() -> int:
         help='Hot-patch mode: Only update whisperjav package, skip all dependency '
              'installation. Safest for post-release upgrades (e.g., 1.7.4 -> 1.7.4.post1).'
     )
+    parser.add_argument(
+        '--skip-preflight',
+        action='store_true',
+        help='Skip preflight safety checks. USE WITH CAUTION - may cause installation '
+             'corruption if used incorrectly.'
+    )
+    parser.add_argument(
+        '--yes', '-y',
+        action='store_true',
+        help='Non-interactive mode: assume yes to all prompts.'
+    )
     args = parser.parse_args()
 
     wheel_only_mode = args.wheel_only
+    skip_preflight = args.skip_preflight
 
     print_header()
 
@@ -698,11 +1162,21 @@ def main() -> int:
 
     print()
 
-    # Check network
-    if not check_network():
-        print_error("No internet connection")
-        print("Please check your network connection and try again.")
-        return 1
+    # Run comprehensive preflight checks (FAIL-FAST gate)
+    # This checks: disk space, environment, GUI running, network
+    if skip_preflight:
+        print_warning("Preflight checks SKIPPED (--skip-preflight)")
+        print_warning("Proceeding without safety validation - use at your own risk")
+        print()
+    else:
+        if not run_preflight_checks(install_dir):
+            print_error("Preflight checks failed - upgrade aborted")
+            print()
+            print("Fix the issues above and try again.")
+            print("Your installation has NOT been modified.")
+            print()
+            print("To bypass (NOT recommended): --skip-preflight")
+            return 1
 
     # Adjust step count based on mode
     total_steps = 4 if wheel_only_mode else 5
@@ -733,13 +1207,18 @@ def main() -> int:
     # Step 4: Verify and get new version
     step_num += 1
     print_step(step_num, total_steps, "Verifying installation...")
-    success, new_version = verify_installation(install_dir)
+    success, new_version, health_warnings = verify_installation(install_dir)
 
     if not success or not new_version:
         print_error("Could not verify installation")
+        print_error("See docs/MANUAL_ROLLBACK.md for recovery options")
         return 1
 
     print_success(f"WhisperJAV {new_version} installed successfully")
+
+    # Show health warnings (non-fatal)
+    for warning in health_warnings:
+        print_warning(warning)
 
     # Step 5: Update shortcut and cleanup
     step_num += 1

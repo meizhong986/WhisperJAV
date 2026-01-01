@@ -6,8 +6,11 @@ WhisperJAV Upgrade Script
 Upgrades WhisperJAV installations to the latest version.
 
 Usage:
-    whisperjav-upgrade              # Run from command line (after installation)
-    python upgrade.py               # Run standalone
+    whisperjav-upgrade              # Interactive upgrade
+    whisperjav-upgrade --check      # Check for updates only
+    whisperjav-upgrade --yes        # Non-interactive mode
+    whisperjav-upgrade --wheel-only # Hot-patch mode (package only)
+    whisperjav-upgrade --version    # Show script version
 
 Features:
     - Upgrades whisperjav package from GitHub @main branch with all dependencies
@@ -24,11 +27,12 @@ import glob
 import shutil
 import subprocess
 import platform
+import argparse
 from pathlib import Path
 from typing import Optional, Tuple, List
 
 # Version of this upgrade script
-UPGRADE_SCRIPT_VERSION = "1.7.3"
+UPGRADE_SCRIPT_VERSION = "1.7.5"
 
 # GitHub repository URL
 GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
@@ -390,8 +394,180 @@ def verify_installation(install_dir: Path) -> Tuple[bool, Optional[str]]:
     return False, None
 
 
+def check_for_updates_cli(force: bool = False) -> int:
+    """
+    Check for updates and display result in CLI format.
+
+    Args:
+        force: If True, bypass cache
+
+    Returns:
+        0 if up to date, 1 if update available, 2 on error
+    """
+    try:
+        from whisperjav.version_checker import (
+            check_for_updates,
+            get_update_notification_level,
+            CURRENT_VERSION,
+        )
+
+        print(f"Current version: {CURRENT_VERSION}")
+        print("Checking for updates...")
+
+        result = check_for_updates(force=force)
+
+        if result.error:
+            print(f"Error: {result.error}")
+            return 2
+
+        if result.update_available:
+            level = get_update_notification_level(result)
+            level_labels = {
+                'critical': 'CRITICAL',
+                'major': 'Major',
+                'minor': 'Minor',
+                'patch': 'Patch',
+            }
+            level_label = level_labels.get(level, 'New')
+
+            print()
+            print(f"  {level_label} update available!")
+            print(f"  Latest version: {result.latest_version}")
+            print()
+
+            if result.version_info:
+                print(f"  Release URL: {result.version_info.release_url}")
+                if result.version_info.release_notes:
+                    # Show first 200 chars of release notes
+                    notes = result.version_info.release_notes[:200]
+                    if len(result.version_info.release_notes) > 200:
+                        notes += "..."
+                    print()
+                    print("  Release notes:")
+                    for line in notes.split('\n')[:5]:
+                        print(f"    {line}")
+
+            print()
+            print("  Run 'whisperjav-upgrade' to update.")
+            print()
+            return 1
+        else:
+            print()
+            print("  You have the latest version!")
+            print()
+            return 0
+
+    except ImportError as e:
+        print(f"Error: Could not import version checker: {e}")
+        return 2
+    except Exception as e:
+        print(f"Error checking for updates: {e}")
+        return 2
+
+
+def upgrade_package_wheel_only(install_dir: Path) -> bool:
+    """
+    Hot-patch mode: Only upgrade the whisperjav package, skip dependencies.
+
+    Args:
+        install_dir: Path to installation directory
+
+    Returns:
+        True if successful, False otherwise
+    """
+    pip_exe = install_dir / 'Scripts' / 'pip.exe'
+    if not pip_exe.exists():
+        pip_exe = install_dir / 'Scripts' / 'pip'
+    if not pip_exe.exists():
+        pip_exe = install_dir / 'bin' / 'pip'
+
+    if not pip_exe.exists():
+        print_error("pip not found in installation")
+        return False
+
+    # Upgrade whisperjav WITHOUT dependencies (--no-deps)
+    print("      Installing whisperjav from GitHub (wheel only, no deps)...")
+    try:
+        result = subprocess.run(
+            [str(pip_exe), 'install', '-U', '--no-deps', GITHUB_REPO],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout
+        )
+        if result.returncode != 0:
+            print_error(f"Package upgrade failed: {result.stderr[:500]}")
+            return False
+    except subprocess.TimeoutExpired:
+        print_error("Package upgrade timed out")
+        return False
+    except Exception as e:
+        print_error(f"Package upgrade error: {e}")
+        return False
+
+    print_success("Package upgraded successfully (wheel only)")
+    return True
+
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="WhisperJAV Upgrade Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  whisperjav-upgrade              # Interactive upgrade
+  whisperjav-upgrade --check      # Check for updates only
+  whisperjav-upgrade --yes        # Non-interactive upgrade
+  whisperjav-upgrade --wheel-only # Hot-patch mode (package only)
+"""
+    )
+
+    parser.add_argument(
+        '--check', '-c',
+        action='store_true',
+        help='Check for updates only, do not upgrade'
+    )
+
+    parser.add_argument(
+        '--yes', '-y',
+        action='store_true',
+        help='Non-interactive mode, auto-confirm all prompts'
+    )
+
+    parser.add_argument(
+        '--wheel-only', '-w',
+        action='store_true',
+        help='Hot-patch mode: only update whisperjav package, skip dependencies'
+    )
+
+    parser.add_argument(
+        '--version', '-v',
+        action='store_true',
+        help='Show upgrade script version'
+    )
+
+    parser.add_argument(
+        '--force',
+        action='store_true',
+        help='Force update check (bypass cache)'
+    )
+
+    return parser.parse_args()
+
+
 def main() -> int:
     """Main entry point for the upgrade script."""
+    args = parse_args()
+
+    # Handle --version
+    if args.version:
+        print(f"WhisperJAV Upgrade Script v{UPGRADE_SCRIPT_VERSION}")
+        return 0
+
+    # Handle --check
+    if args.check:
+        return check_for_updates_cli(force=args.force)
+
     print_header()
 
     # Step 1: Detect installation
@@ -402,7 +578,7 @@ def main() -> int:
         print_error("WhisperJAV installation not found")
         print()
         print("Please run this script from within the WhisperJAV environment:")
-        print("  %LOCALAPPDATA%\\WhisperJAV\\python.exe upgrade.py")
+        print("  %LOCALAPPDATA%\\WhisperJAV\\python.exe -m whisperjav.upgrade")
         print()
         return 1
 
@@ -417,12 +593,57 @@ def main() -> int:
 
     print()
 
+    # Interactive confirmation (unless --yes)
+    if not args.yes:
+        print("This will upgrade WhisperJAV to the latest version.")
+        print("Your models and settings will be preserved.")
+        print()
+        try:
+            response = input("Continue? [y/N]: ").strip().lower()
+            if response not in ('y', 'yes'):
+                print("Upgrade cancelled.")
+                return 0
+        except (EOFError, KeyboardInterrupt):
+            print("\nUpgrade cancelled.")
+            return 0
+
     # Check network
     if not check_network():
         print_error("No internet connection")
         print("Please check your network connection and try again.")
         return 1
 
+    # Wheel-only mode (hot-patch)
+    if args.wheel_only:
+        total_steps = 3
+
+        print_step(1, total_steps, "Upgrading WhisperJAV package (wheel only)...")
+        if not upgrade_package_wheel_only(install_dir):
+            print_error("Upgrade failed.")
+            return 1
+
+        print_step(2, total_steps, "Verifying installation...")
+        success, new_version = verify_installation(install_dir)
+
+        if not success or not new_version:
+            print_error("Could not verify installation")
+            return 1
+
+        print_success(f"WhisperJAV {new_version} installed successfully")
+
+        print_step(3, total_steps, "Updating desktop shortcut...")
+        update_desktop_shortcut(install_dir, new_version)
+
+        print()
+        print("=" * 60)
+        print("  Hot-patch complete!")
+        print("=" * 60)
+        print()
+        print(f"  New version: {new_version}")
+        print()
+        return 0
+
+    # Full upgrade mode
     total_steps = 5
 
     # Step 1: Upgrade package

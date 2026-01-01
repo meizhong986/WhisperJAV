@@ -3787,6 +3787,296 @@ const ThemeManager = {
 };
 
 // ============================================================
+// Changelog Manager (release notes display)
+// ============================================================
+const ChangelogManager = {
+    releaseUrl: null,
+    cachedNotes: null,
+
+    async show(version = null) {
+        const modal = document.getElementById('changelogModal');
+        const loading = document.getElementById('changelogLoading');
+        const content = document.getElementById('changelogContent');
+        const error = document.getElementById('changelogError');
+
+        // Show modal with loading state
+        modal.classList.add('active');
+        loading.style.display = 'block';
+        content.style.display = 'none';
+        error.style.display = 'none';
+
+        try {
+            // Get release notes from update check result or fetch fresh
+            let notes = null;
+            let releaseVersion = version;
+            let releaseDate = '';
+            let releaseUrl = 'https://github.com/meizhong986/WhisperJAV/releases';
+
+            if (UpdateManager.updateInfo && UpdateManager.updateInfo.version_info) {
+                notes = UpdateManager.updateInfo.release_notes;
+                releaseVersion = UpdateManager.updateInfo.latest_version;
+                releaseUrl = UpdateManager.updateInfo.release_url || releaseUrl;
+            } else if (window.pywebview && pywebview.api) {
+                // Fetch fresh
+                const result = await pywebview.api.check_for_updates(false);
+                if (result.success && result.release_notes) {
+                    notes = result.release_notes;
+                    releaseVersion = result.latest_version;
+                    releaseUrl = result.release_url || releaseUrl;
+                }
+            }
+
+            this.releaseUrl = releaseUrl;
+
+            if (notes) {
+                // Parse and display notes
+                document.getElementById('changelogVersion').textContent = `v${releaseVersion}`;
+                document.getElementById('changelogDate').textContent = releaseDate;
+                document.getElementById('changelogNotes').innerHTML = this.parseMarkdown(notes);
+
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } else {
+                // Show error state
+                loading.style.display = 'none';
+                error.style.display = 'block';
+            }
+        } catch (err) {
+            console.error('Failed to load changelog:', err);
+            loading.style.display = 'none';
+            error.style.display = 'block';
+        }
+    },
+
+    close() {
+        const modal = document.getElementById('changelogModal');
+        modal.classList.remove('active');
+    },
+
+    openGitHub() {
+        const url = this.releaseUrl || 'https://github.com/meizhong986/WhisperJAV/releases';
+        window.open(url, '_blank');
+    },
+
+    // Simple markdown to HTML converter for release notes
+    parseMarkdown(text) {
+        if (!text) return '';
+
+        // Escape HTML
+        let html = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        // Headers
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+        // Bold and italic
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Code blocks
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Links
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+        // Lists
+        html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>');
+        html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+        // Paragraphs (lines not already wrapped)
+        html = html.replace(/^(?!<[hulo]|<li|<pre)(.+)$/gm, '<p>$1</p>');
+
+        // Clean up empty paragraphs
+        html = html.replace(/<p><\/p>/g, '');
+
+        return html;
+    }
+};
+
+// ============================================================
+// Update Manager (version checking and update notifications)
+// ============================================================
+const UpdateManager = {
+    updateInfo: null,
+    releaseUrl: null,
+
+    async init() {
+        // Bind event handlers
+        document.getElementById('updateNowBtn')?.addEventListener('click', () => this.startUpdate());
+        document.getElementById('updateDismissBtn')?.addEventListener('click', () => this.dismiss());
+        document.getElementById('updateReleaseNotesBtn')?.addEventListener('click', () => this.openReleaseNotes());
+
+        // Check for updates after a short delay (don't block startup)
+        setTimeout(() => this.checkForUpdates(), 3000);
+    },
+
+    async checkForUpdates(force = false) {
+        if (!window.pywebview || !pywebview.api) {
+            console.log('PyWebView API not ready for update check');
+            return;
+        }
+
+        try {
+            const result = await pywebview.api.check_for_updates(force);
+
+            if (!result.success) {
+                console.warn('Update check failed:', result.error);
+                return;
+            }
+
+            this.updateInfo = result;
+
+            if (result.update_available) {
+                // Check if user dismissed this version
+                const dismissed = await this.getDismissedVersion();
+                if (dismissed && dismissed.version === result.latest_version) {
+                    // Check notification level - always show critical
+                    if (result.notification_level !== 'critical') {
+                        console.log(`Update ${result.latest_version} was dismissed`);
+                        return;
+                    }
+                }
+
+                this.showBanner(result);
+            }
+        } catch (error) {
+            console.error('Update check error:', error);
+        }
+    },
+
+    async getDismissedVersion() {
+        try {
+            const result = await pywebview.api.get_dismissed_update();
+            return result.success ? result.dismissed : null;
+        } catch (error) {
+            return null;
+        }
+    },
+
+    showBanner(info) {
+        const banner = document.getElementById('updateBanner');
+        const title = document.getElementById('updateTitle');
+        const version = document.getElementById('updateVersion');
+
+        if (!banner || !title || !version) return;
+
+        // Set content based on notification level
+        const level = info.notification_level || 'minor';
+        let titleText = 'Update Available';
+
+        if (level === 'critical') {
+            titleText = 'Critical Update Available';
+        } else if (level === 'major') {
+            titleText = 'Major Update Available';
+        } else if (level === 'minor') {
+            titleText = 'New Version Available';
+        } else if (level === 'patch') {
+            titleText = 'Patch Available';
+        }
+
+        title.textContent = titleText;
+        version.textContent = `v${info.latest_version} is now available (you have v${info.current_version})`;
+
+        // Store release URL
+        this.releaseUrl = info.release_url;
+
+        // Set banner style based on level
+        banner.className = 'update-banner visible ' + level;
+
+        console.log(`Showing update banner: ${info.current_version} -> ${info.latest_version} (${level})`);
+    },
+
+    hideBanner() {
+        const banner = document.getElementById('updateBanner');
+        if (banner) {
+            banner.classList.remove('visible');
+        }
+    },
+
+    async dismiss() {
+        if (!this.updateInfo) return;
+
+        // Record dismissal
+        try {
+            await pywebview.api.dismiss_update_notification(this.updateInfo.latest_version);
+        } catch (error) {
+            console.error('Failed to record dismissal:', error);
+        }
+
+        this.hideBanner();
+        ConsoleManager.log('Update notification dismissed', 'info');
+    },
+
+    openReleaseNotes() {
+        // Show the changelog modal instead of opening browser
+        ChangelogManager.show();
+    },
+
+    async startUpdate() {
+        // Confirm with user
+        if (!confirm('WhisperJAV will close and update. The application will restart automatically after the update completes.\n\nContinue?')) {
+            return;
+        }
+
+        // Show progress overlay
+        const overlay = document.getElementById('updateProgressOverlay');
+        const stepEl = document.getElementById('updateProgressStep');
+
+        if (overlay) {
+            overlay.classList.add('visible');
+        }
+
+        if (stepEl) {
+            stepEl.textContent = 'Starting update process...';
+        }
+
+        try {
+            // Hide the banner
+            this.hideBanner();
+
+            // Start update via API
+            const result = await pywebview.api.start_update(false);
+
+            if (result.success) {
+                if (stepEl) {
+                    stepEl.textContent = 'Closing application for update...';
+                }
+
+                ConsoleManager.log('Update started, GUI will close...', 'info');
+
+                // Give user a moment to see the message, then close
+                setTimeout(() => {
+                    // Close the window - the update wrapper will handle the rest
+                    if (window.pywebview && window.pywebview.api) {
+                        // Use window close if available
+                        window.close();
+                    }
+                }, 1500);
+            } else {
+                // Update failed to start
+                if (overlay) {
+                    overlay.classList.remove('visible');
+                }
+                ErrorHandler.show('Update Failed', result.error || 'Failed to start update process');
+            }
+        } catch (error) {
+            // Hide overlay on error
+            if (overlay) {
+                overlay.classList.remove('visible');
+            }
+            ErrorHandler.show('Update Error', error.toString());
+        }
+    }
+};
+
+// ============================================================
 // Initialization
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -3807,6 +4097,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     KeyboardShortcuts.init();
     ThemeManager.init();
     EnsembleManager.init();
+    UpdateManager.init();
 
     // Initial validation
     FormManager.validateForm();
