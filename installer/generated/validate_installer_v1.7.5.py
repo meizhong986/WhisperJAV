@@ -49,11 +49,16 @@ REQUIRED_FILES = [
     "post_install_v1.7.5.bat",
     "post_install_v1.7.5.py",
     "requirements_v1.7.5.txt",
-    "constraints_v1.7.5.txt",    # NEW: Version pinning for problematic packages
+    "constraints_v1.7.5.txt",    # Version pinning for problematic packages
     "WhisperJAV_Launcher_v1.7.5.py",
     "README_INSTALLER_v1.7.5.txt",
     "LICENSE.txt",
     "whisperjav_icon.ico",
+]
+
+# Optional files (warnings only, not errors) - built during installer build process
+OPTIONAL_FILES = [
+    ("WhisperJAV.exe", "Frozen launcher (built by PyInstaller in Phase 3)"),
 ]
 
 # Wheel file pattern - matches version with PEP 440 normalization
@@ -265,9 +270,30 @@ def validate_requirements_encoding():
         return False
 
 
+def validate_optional_files():
+    """Check optional files (warnings only, not errors)"""
+    print_header("Phase 5: Optional Files Check")
+
+    # Optional files don't cause validation failure
+    for filename, description in OPTIONAL_FILES:
+        exists = check_file_exists(filename)
+        if exists:
+            size = Path(filename).stat().st_size
+            size_kb = size // 1024
+            print_check(f"{filename}", True, f"{size_kb} KB - {description}")
+        else:
+            # Print as warning (yellow), not error
+            print(f"  [{YELLOW}! WARN{RESET}] {filename}")
+            print(f"          Not found: {description}")
+            print(f"          (Will be created during build)")
+
+    # Always return True - optional files don't fail validation
+    return True
+
+
 def validate_assets():
     """Check that icon and other assets exist and are valid"""
-    print_header("Phase 5: Asset File Validation")
+    print_header("Phase 6: Asset File Validation")
 
     all_passed = True
 
@@ -302,7 +328,7 @@ def validate_assets():
 
 def validate_constraints_file():
     """Check that constraints file contains critical version pins"""
-    print_header("Phase 6: Constraints File Validation")
+    print_header("Phase 7: Constraints File Validation")
 
     filename = "constraints_v1.7.5.txt"
 
@@ -340,7 +366,7 @@ def validate_constraints_file():
 
 def validate_yaml_syntax():
     """Basic YAML syntax validation for construct file"""
-    print_header("Phase 7: YAML Syntax Validation")
+    print_header("Phase 8: YAML Syntax Validation")
 
     filename = "construct_v1.7.5.yaml"
 
@@ -374,8 +400,12 @@ def validate_yaml_syntax():
             )
             return False
 
-        # Check extra_files exist
-        missing_files = [f for f in data['extra_files'] if not check_file_exists(f)]
+        # Check extra_files exist (excluding optional files that are built during build process)
+        optional_filenames = [f for f, _ in OPTIONAL_FILES]
+        missing_files = [
+            f for f in data['extra_files']
+            if not check_file_exists(f) and f not in optional_filenames
+        ]
         if missing_files:
             print_check(
                 f"{filename} syntax",
@@ -383,6 +413,16 @@ def validate_yaml_syntax():
                 f"Extra files missing: {', '.join(missing_files)}"
             )
             return False
+
+        # Warn about optional files listed in extra_files that don't exist yet
+        optional_missing = [
+            f for f in data['extra_files']
+            if not check_file_exists(f) and f in optional_filenames
+        ]
+        if optional_missing:
+            print(f"  [{YELLOW}! NOTE{RESET}] Optional files in extra_files (built during build):")
+            for f in optional_missing:
+                print(f"          - {f}")
 
         print_check(f"{filename} syntax", True, "YAML structure valid")
         return True
@@ -410,6 +450,7 @@ def main():
     results.append(("Version Consistency", validate_version_consistency()))
     results.append(("Module Paths", validate_module_paths()))
     results.append(("Requirements Encoding", validate_requirements_encoding()))
+    results.append(("Optional Files", validate_optional_files()))
     results.append(("Asset Files", validate_assets()))
     results.append(("Constraints File", validate_constraints_file()))
     results.append(("YAML Syntax", validate_yaml_syntax()))
