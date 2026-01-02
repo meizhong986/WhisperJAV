@@ -41,7 +41,8 @@ extra_files:
   - post_install_v1.7.5.py
   - requirements_v1.7.5.txt
   - constraints_v1.7.5.txt    # Version pinning for problematic packages
-  - WhisperJAV_Launcher_v1.7.5.py
+  - WhisperJAV_Launcher_v1.7.5.py  # Script launcher (fallback if frozen exe missing)
+  - WhisperJAV.exe            # Frozen launcher (preferred) - built by PyInstaller
   - README_INSTALLER_v1.7.5.txt
   - LICENSE.txt
   - whisperjav_icon.ico

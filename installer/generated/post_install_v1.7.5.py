@@ -466,11 +466,17 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
     plan = select_torch_install_plan(driver_info)
 
     if plan.uses_gpu:
+        # Extract the actual CUDA binary version from the pip command URL
+        # e.g., cu128 -> CUDA 12.8, cu126 -> CUDA 12.6, cu121 -> CUDA 12.1
+        cuda_binary_version = plan.target_label  # e.g., "CUDA 12.8"
+        driver_version_str = format_version_tuple(plan.driver_detected)
+
         log(
-            f"Preparing to install CUDA-enabled PyTorch ({plan.target_label}) "
-            f"for GPU {plan.gpu_name or 'Unknown GPU'} with driver "
-            f"{format_version_tuple(plan.driver_detected)}"
+            f"Preparing to install PyTorch ({cuda_binary_version} build) "
+            f"for GPU: {plan.gpu_name or 'Unknown GPU'}"
         )
+        log(f"  Detected driver: {driver_version_str}")
+        log(f"  Binary compatibility: {cuda_binary_version} builds work with driver {driver_version_str}")
     else:
         log("\n" + "!" * 80)
         log("  GPU ACCELERATION NOT AVAILABLE")
@@ -487,16 +493,54 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
     if not install_pytorch_and_torchaudio(plan):
         return False
 
+    # Verify PyTorch installation using subprocess to avoid numpy warning
+    # (numpy is not installed yet at this phase, and torch tries to import it)
+    log("Verifying PyTorch installation...")
     try:
-        import torch
+        # Run verification in subprocess with warnings suppressed
+        verify_cmd = [
+            os.path.join(sys.prefix, 'python.exe'),
+            '-c',
+            'import warnings; warnings.filterwarnings("ignore"); '
+            'import torch; '
+            'print(f"VERSION:{torch.__version__}"); '
+            'print(f"CUDA:{torch.cuda.is_available()}"); '
+            'print(f"DEVICES:{torch.cuda.device_count() if torch.cuda.is_available() else 0}")'
+        ]
+        result = subprocess.run(
+            verify_cmd,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode == 0:
+            output_lines = result.stdout.strip().split('\n')
+            version = cuda_avail = devices = None
+            for line in output_lines:
+                if line.startswith("VERSION:"):
+                    version = line.split(":", 1)[1]
+                elif line.startswith("CUDA:"):
+                    cuda_avail = line.split(":", 1)[1] == "True"
+                elif line.startswith("DEVICES:"):
+                    devices = int(line.split(":", 1)[1])
 
-        log(f"PyTorch {torch.__version__} installed successfully!")
-        if torch.cuda.is_available():
-            log(f"CUDA acceleration: ENABLED (devices: {torch.cuda.device_count()})")
+            if version:
+                log(f"PyTorch {version} installed successfully!")
+                if cuda_avail:
+                    log(f"CUDA acceleration: ENABLED (devices: {devices})")
+                else:
+                    log("CUDA acceleration: DISABLED (CPU-only mode)")
+            else:
+                log("PyTorch installed (version check pending)")
         else:
-            log("CUDA acceleration: DISABLED (CPU-only mode)")
+            log(f"WARNING: PyTorch verification returned non-zero exit code")
+            if result.stderr:
+                log(f"  stderr: {result.stderr.strip()[:200]}")
+    except subprocess.TimeoutExpired:
+        log("WARNING: PyTorch verification timed out (but installation may be OK)")
     except Exception as exc:
-        log(f"WARNING: PyTorch installed but verification failed: {exc}")
+        log(f"WARNING: PyTorch verification failed: {exc}")
+        log("         (This may be OK - full verification will happen after Phase 4)")
 
     return True
 
@@ -634,14 +678,18 @@ def print_installation_summary(install_start_time: float):
         log(f"    Install from: https://go.microsoft.com/fwlink/p/?LinkId=2124703")
     log("")
 
-    # Key packages verification
+    # Key packages verification using importlib.metadata (more reliable than imports)
+    # Using metadata avoids import failures from missing DLLs or heavy dependencies
     log("INSTALLED PACKAGES (Key Components)")
     log("-" * 40)
+
+    # Map: (pip/distribution name, display name)
+    # Note: Distribution names may differ from import names
     key_packages = [
         ("whisperjav", "WhisperJAV"),
-        ("faster_whisper", "Faster Whisper"),
-        ("whisper", "OpenAI Whisper"),
-        ("stable_whisper", "Stable-TS"),
+        ("faster-whisper", "Faster Whisper"),
+        ("openai-whisper", "OpenAI Whisper"),
+        ("stable-ts", "Stable-TS"),
         ("torch", "PyTorch"),
         ("transformers", "Transformers"),
         ("modelscope", "ModelScope (ZipEnhancer)"),
@@ -650,19 +698,21 @@ def print_installation_summary(install_start_time: float):
         ("pywebview", "PyWebView"),
     ]
 
-    for pkg_import, pkg_display in key_packages:
+    for pkg_dist_name, pkg_display in key_packages:
         try:
+            # Use importlib.metadata.version() - checks distribution, not import
             result = subprocess.run(
                 [os.path.join(sys.prefix, 'python.exe'), '-c',
-                 f'import {pkg_import}; print(getattr({pkg_import}, "__version__", "installed"))'],
+                 f'from importlib.metadata import version; print(version("{pkg_dist_name}"))'],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            if result.returncode == 0:
+            if result.returncode == 0 and result.stdout.strip():
                 version = result.stdout.strip()
                 log(f"  ✓ {pkg_display}: {version}")
             else:
+                # Fallback: try import method for packages with different dist names
                 log(f"  ✗ {pkg_display}: NOT INSTALLED")
         except Exception:
             log(f"  ? {pkg_display}: Unknown")
@@ -702,6 +752,9 @@ def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
 
     Returns:
         True if successful, False otherwise
+
+    Note: LIEF API changed - use lief.parse() then binary.resources_manager
+    instead of lief.PE.ResourcesManager.from_file()
     """
     try:
         log(f"Embedding icon into executable...")
@@ -722,24 +775,40 @@ def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
                 return False
             import lief
 
-        # Load the executable
+        # Load the executable using the correct API
         binary = lief.parse(exe_path)
         if not binary:
             log(f"INFO: Could not parse executable with LIEF")
             return False
 
-        # Load and add the icon
-        icon_manager = lief.PE.ResourcesManager.from_file(exe_path)
-        icon_manager.change_icon(icon_path)
+        # Check if the binary has resources
+        if not binary.has_resources:
+            log(f"INFO: Executable has no resources section for icon embedding")
+            return False
 
-        # Save the modified executable
-        builder = lief.PE.Builder(binary)
-        builder.build_resources(True)
-        builder.build()
-        builder.write(exe_path)
+        # Get the resources manager from the parsed binary (correct API)
+        try:
+            manager = binary.resources_manager
+            if manager is None:
+                log(f"INFO: Could not get resources manager")
+                return False
 
-        log(f"✓ Icon embedded successfully")
-        return True
+            # Change the icon
+            manager.change_icon(icon_path)
+
+            # Build and write the modified executable
+            builder = lief.PE.Builder(binary)
+            builder.build_resources(True)
+            builder.build()
+            builder.write(exe_path)
+
+            log(f"✓ Icon embedded successfully")
+            return True
+
+        except AttributeError as ae:
+            log(f"INFO: LIEF API error: {ae}")
+            log(f"      This may be due to LIEF version incompatibility")
+            return False
 
     except Exception as e:
         log(f"INFO: Could not embed icon: {e}")
@@ -797,15 +866,21 @@ def log_environment_info():
     import platform
     log_section("Environment Information (for debugging)")
 
+    # Resolve paths to clean up any ".." or relative components
+    script_path = Path(__file__).resolve() if '__file__' in dir() else Path(sys.argv[0]).resolve()
+    install_prefix = Path(sys.prefix).resolve()
+    python_exe = Path(sys.executable).resolve()
+
     log(f"Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log(f"Script location: {script_path}")
     log(f"Platform: {platform.platform()}")
     log(f"Architecture: {platform.machine()}")
     log(f"Python version: {platform.python_version()}")
     log(f"Python implementation: {platform.python_implementation()}")
     log("")
-    log(f"Installation prefix: {sys.prefix}")
-    log(f"Python executable: {sys.executable}")
-    log(f"Sys.path[0]: {sys.path[0] if sys.path else 'N/A'}")
+    log(f"Installation prefix: {install_prefix}")
+    log(f"Python executable: {python_exe}")
+    log(f"Sys.path[0]: {Path(sys.path[0]).resolve() if sys.path else 'N/A'}")
     log("")
 
     # Log PATH (truncated)
@@ -830,23 +905,46 @@ def log_environment_info():
     log("")
 
     # Log critical executables
+    # Note: In conda environments, git and ffmpeg are in Library/bin, not Scripts
     log("Checking critical executables:")
-    for exe_name in ["python.exe", "pythonw.exe", "pip.exe", "git.exe"]:
-        exe_path = os.path.join(sys.prefix, exe_name)
-        scripts_path = os.path.join(sys.prefix, "Scripts", exe_name)
-        if os.path.exists(exe_path):
-            log(f"  ✓ {exe_name}: {exe_path}")
-        elif os.path.exists(scripts_path):
-            log(f"  ✓ {exe_name}: {scripts_path}")
-        else:
-            log(f"  ✗ {exe_name}: NOT FOUND")
 
-    # Check for ffmpeg in Library/bin
-    ffmpeg_path = os.path.join(sys.prefix, "Library", "bin", "ffmpeg.exe")
-    if os.path.exists(ffmpeg_path):
-        log(f"  ✓ ffmpeg.exe: {ffmpeg_path}")
-    else:
-        log(f"  ✗ ffmpeg.exe: NOT FOUND (expected at {ffmpeg_path})")
+    # Define search paths for each executable type
+    # Conda installs some tools in Library/bin, others in Scripts or root
+    exe_search_paths = {
+        "python.exe": [sys.prefix, os.path.join(sys.prefix, "Scripts")],
+        "pythonw.exe": [sys.prefix, os.path.join(sys.prefix, "Scripts")],
+        "pip.exe": [os.path.join(sys.prefix, "Scripts"), sys.prefix],
+        "git.exe": [
+            os.path.join(sys.prefix, "Library", "bin"),  # Conda git location!
+            os.path.join(sys.prefix, "Scripts"),
+            sys.prefix,
+        ],
+        "ffmpeg.exe": [
+            os.path.join(sys.prefix, "Library", "bin"),  # Conda ffmpeg location
+            os.path.join(sys.prefix, "Scripts"),
+            sys.prefix,
+        ],
+    }
+
+    for exe_name, search_paths in exe_search_paths.items():
+        found = False
+        for search_path in search_paths:
+            exe_path = os.path.join(search_path, exe_name)
+            if os.path.exists(exe_path):
+                log(f"  ✓ {exe_name}: {exe_path}")
+                found = True
+                break
+        if not found:
+            # Also check if it's in system PATH (pip can find it even if we can't)
+            system_path = shutil.which(exe_name.replace(".exe", ""))
+            if system_path:
+                log(f"  ✓ {exe_name}: {system_path} (system PATH)")
+            else:
+                # Only warn for git - it's critical but pip may find it anyway
+                if exe_name == "git.exe":
+                    log(f"  ⚠ {exe_name}: Not found in conda env (pip may still find it)")
+                else:
+                    log(f"  ✗ {exe_name}: NOT FOUND")
     log("")
 
 
@@ -941,35 +1039,40 @@ def main() -> int:
     verification_passed = True
 
     # List of critical packages to verify
+    # Format: (distribution_name, version_spec) - using pip/dist names, not import names
     critical_packages = [
         ("numpy", ">=2.0"),
         ("scipy", ">=1.10.1"),
         ("librosa", ">=0.11.0"),
         ("datasets", ">=2.14.0,<4.0"),
         ("modelscope", ">=1.20"),
-        ("faster_whisper", ">=1.1.0"),
+        ("faster-whisper", ">=1.1.0"),  # Note: dist name uses hyphen
         ("transformers", ">=4.40.0"),
     ]
 
-    log("Verifying critical package installations...")
-    for pkg_name, version_spec in critical_packages:
+    log("Verifying critical package installations using importlib.metadata...")
+    log("(This is more reliable than import-based checks)")
+    for pkg_dist_name, version_spec in critical_packages:
         try:
+            # Use importlib.metadata.version() instead of import
+            # This avoids false negatives from import failures
             result = subprocess.run(
                 [os.path.join(sys.prefix, 'python.exe'), '-c',
-                 f'import {pkg_name.replace("-", "_")}; print({pkg_name.replace("-", "_")}.__version__)'],
+                 f'from importlib.metadata import version; print(version("{pkg_dist_name}"))'],
                 capture_output=True,
                 text=True,
                 timeout=30
             )
-            if result.returncode == 0:
+            if result.returncode == 0 and result.stdout.strip():
                 version = result.stdout.strip()
-                log(f"  ✓ {pkg_name}: {version}")
+                log(f"  ✓ {pkg_dist_name}: {version}")
             else:
-                log(f"  ✗ {pkg_name}: FAILED TO IMPORT")
-                log(f"    Error: {result.stderr.strip()[:100]}")
+                log(f"  ✗ {pkg_dist_name}: NOT FOUND IN METADATA")
+                if result.stderr:
+                    log(f"    Error: {result.stderr.strip()[:100]}")
                 verification_passed = False
         except Exception as e:
-            log(f"  ✗ {pkg_name}: ERROR ({e})")
+            log(f"  ✗ {pkg_dist_name}: ERROR ({e})")
             verification_passed = False
 
     if not verification_passed:

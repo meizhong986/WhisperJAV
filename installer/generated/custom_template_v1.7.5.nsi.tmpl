@@ -1433,53 +1433,81 @@ Section "Install"
     ; === WhisperJAV v1.7.5 Custom Desktop Shortcut Creation ===
     ; Create desktop shortcut to WhisperJAV GUI application
     ; This runs after post_install completes and all packages are installed
-    ; NOTE: This shortcut is ALWAYS created (unconditional) because:
-    ;   1. WhisperJAV is a GUI application that NEEDS a launch mechanism
-    ;   2. ENABLE_SHORTCUTS template variable may not be "yes" (depends on menu_packages)
-    ;   3. We want users to have easy access to the application regardless of settings
-    ; Users can delete the shortcut manually if they don't want it
+    ;
+    ; SHORTCUT STRATEGY:
+    ;   Priority 1: Use WhisperJAV.exe (frozen launcher - best user experience)
+    ;   Priority 2: Fallback to pythonw.exe + script (may have "Access Denied" issues)
+    ;
+    ; The frozen launcher (WhisperJAV.exe) is preferred because:
+    ;   1. It's a real Windows executable - no script execution issues
+    ;   2. Better compatibility with antivirus software
+    ;   3. Professional appearance (user sees .exe not .py)
+    ;   4. Icon embedded directly in the executable
 
     ${Print} "Creating WhisperJAV desktop shortcut..."
 
     ; Set working directory to installation folder (required for self-contained app)
     SetOutPath "$INSTDIR"
 
-    ; Create desktop shortcut
-    ; Target: WhisperJAV v1.7.5.lnk on user's desktop
-    ; Executable: pythonw.exe (no console window)
-    ; Parameters: launcher script that sets up PATH and launches GUI
-    ; Icon: whisperjav_icon.ico in installation folder
-    ; Icon index: 0 (first icon in file)
-    ; Window state: SW_SHOWNORMAL (normal window)
-    ; Hotkey: none ("")
-    ; Description: shown in tooltip and properties
-    ; Note: Using launcher ensures PATH is set for FFmpeg and other dependencies
-    CreateShortCut "$DESKTOP\WhisperJAV v1.7.5.lnk" \
-        "$INSTDIR\pythonw.exe" \
-        '"$INSTDIR\WhisperJAV_Launcher_v1.7.5.py"' \
-        "$INSTDIR\whisperjav_icon.ico" \
-        0 \
-        SW_SHOWNORMAL \
-        "" \
-        "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
+    ; Check if frozen launcher exists (preferred)
+    ${If} ${FileExists} "$INSTDIR\WhisperJAV.exe"
+        ${Print} "Using frozen launcher: WhisperJAV.exe"
 
-    ${Print} "Desktop shortcut created successfully"
+        ; Create desktop shortcut pointing to frozen exe
+        CreateShortCut "$DESKTOP\WhisperJAV v1.7.5.lnk" \
+            "$INSTDIR\WhisperJAV.exe" \
+            "" \
+            "$INSTDIR\whisperjav_icon.ico" \
+            0 \
+            SW_SHOWNORMAL \
+            "" \
+            "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
 
-    ; Also create Start Menu shortcut for easier access
-    CreateDirectory "$SMPROGRAMS\WhisperJAV"
-    CreateShortCut "$SMPROGRAMS\WhisperJAV\WhisperJAV v1.7.5.lnk" \
-        "$INSTDIR\pythonw.exe" \
-        '"$INSTDIR\WhisperJAV_Launcher_v1.7.5.py"' \
-        "$INSTDIR\whisperjav_icon.ico" \
-        0 \
-        SW_SHOWNORMAL \
-        "" \
-        "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
+        ; Also create Start Menu shortcut
+        CreateDirectory "$SMPROGRAMS\WhisperJAV"
+        CreateShortCut "$SMPROGRAMS\WhisperJAV\WhisperJAV v1.7.5.lnk" \
+            "$INSTDIR\WhisperJAV.exe" \
+            "" \
+            "$INSTDIR\whisperjav_icon.ico" \
+            0 \
+            SW_SHOWNORMAL \
+            "" \
+            "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
+
+    ${Else}
+        ${Print} "Frozen launcher not found, using script fallback"
+
+        ; Fallback: Create shortcut using pythonw.exe + script
+        ; Note: This may have "Access Denied" issues on some systems
+        CreateShortCut "$DESKTOP\WhisperJAV v1.7.5.lnk" \
+            "$INSTDIR\pythonw.exe" \
+            '"$INSTDIR\WhisperJAV_Launcher_v1.7.5.py"' \
+            "$INSTDIR\whisperjav_icon.ico" \
+            0 \
+            SW_SHOWNORMAL \
+            "" \
+            "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
+
+        ; Also create Start Menu shortcut
+        CreateDirectory "$SMPROGRAMS\WhisperJAV"
+        CreateShortCut "$SMPROGRAMS\WhisperJAV\WhisperJAV v1.7.5.lnk" \
+            "$INSTDIR\pythonw.exe" \
+            '"$INSTDIR\WhisperJAV_Launcher_v1.7.5.py"' \
+            "$INSTDIR\whisperjav_icon.ico" \
+            0 \
+            SW_SHOWNORMAL \
+            "" \
+            "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
+    ${EndIf}
+
+    ; Create uninstaller shortcut in Start Menu
     CreateShortCut "$SMPROGRAMS\WhisperJAV\Uninstall WhisperJAV.lnk" \
         "$INSTDIR\Uninstall-${NAME}.exe" \
         "" \
         "$INSTDIR\Uninstall-${NAME}.exe" \
         0
+
+    ${Print} "Desktop shortcut created successfully"
     ${Print} "Start Menu shortcuts created successfully"
 
     ${If} $Ana_ClearPkgCache_State = ${BST_CHECKED}
