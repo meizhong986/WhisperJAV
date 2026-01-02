@@ -42,6 +42,9 @@ transformers>=4.40.0
 accelerate>=0.26.0
 huggingface-hub>=0.25.0
 
+# fsspec for filesystem operations (prevent unnecessary downgrade)
+fsspec>=2025.3.0
+
 # =============================================================================
 # System Utilities
 # =============================================================================
