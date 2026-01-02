@@ -97,6 +97,184 @@ TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
 )
 
 
+# =============================================================================
+# TeeLogger: Capture ALL console output to log file
+# =============================================================================
+# This ensures that even crashes, pip output, and library warnings are logged.
+
+class TeeLogger:
+    """
+    Duplicates all output to both the terminal and a log file simultaneously.
+
+    This captures EVERYTHING written to stdout/stderr including:
+    - print() statements
+    - Library warnings (e.g., PyTorch's NumPy warning)
+    - Subprocess output when piped through
+    - Crash tracebacks
+
+    Uses line buffering so output is saved even if the script crashes.
+    """
+
+    def __init__(self, log_path: str, original_stream):
+        self.terminal = original_stream
+        self.log_path = log_path
+        self._log_file = None
+        self._open_log()
+
+    def _open_log(self):
+        """Open or reopen the log file"""
+        try:
+            self._log_file = open(
+                self.log_path, "a",
+                encoding="utf-8",
+                buffering=1,  # Line buffering for immediate writes
+                errors="replace"  # Don't crash on encoding errors
+            )
+        except Exception:
+            self._log_file = None
+
+    def write(self, message: str):
+        """Write to both terminal and log file"""
+        # Always write to terminal
+        if self.terminal:
+            try:
+                self.terminal.write(message)
+            except Exception:
+                pass  # Terminal write failed, continue anyway
+
+        # Write to log file
+        if self._log_file:
+            try:
+                self._log_file.write(message)
+                self._log_file.flush()  # Flush immediately for crash safety
+            except Exception:
+                # Try to reopen if file was closed
+                self._open_log()
+                if self._log_file:
+                    try:
+                        self._log_file.write(message)
+                        self._log_file.flush()
+                    except Exception:
+                        pass
+
+    def flush(self):
+        """Flush both streams"""
+        if self.terminal:
+            try:
+                self.terminal.flush()
+            except Exception:
+                pass
+        if self._log_file:
+            try:
+                self._log_file.flush()
+            except Exception:
+                pass
+
+    def close(self):
+        """Close the log file (terminal stays open)"""
+        if self._log_file:
+            try:
+                self._log_file.close()
+            except Exception:
+                pass
+            self._log_file = None
+
+    # Support fileno() for subprocess compatibility
+    def fileno(self):
+        if self.terminal:
+            return self.terminal.fileno()
+        return -1
+
+    # Support isatty() for color detection
+    def isatty(self):
+        if self.terminal:
+            try:
+                return self.terminal.isatty()
+            except Exception:
+                pass
+        return False
+
+
+# Global TeeLogger instance (set by setup_tee_logging)
+_tee_logger: Optional[TeeLogger] = None
+
+
+def setup_tee_logging(install_dir: str) -> bool:
+    """
+    Setup TeeLogger to capture ALL console output to a comprehensive log file.
+
+    This should be called at the very start of main() before any other code runs.
+
+    Args:
+        install_dir: Directory to store the log file (usually sys.prefix)
+
+    Returns:
+        True if setup successful, False otherwise
+    """
+    global _tee_logger
+
+    log_path = os.path.join(install_dir, "install_log_full_v1.7.5.txt")
+
+    try:
+        # Create TeeLogger for stdout
+        _tee_logger = TeeLogger(log_path, sys.stdout)
+
+        # Redirect both stdout and stderr through TeeLogger
+        sys.stdout = _tee_logger
+        sys.stderr = _tee_logger
+
+        # Write initial header
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"\n{'='*80}")
+        print(f"  WhisperJAV v1.7.5 Installation Log (Full Console Capture)")
+        print(f"  Started: {ts}")
+        print(f"  Log file: {log_path}")
+        print(f"{'='*80}\n")
+
+        return True
+
+    except Exception as e:
+        # If TeeLogger setup fails, continue anyway with normal logging
+        print(f"WARNING: Could not setup TeeLogger: {e}")
+        return False
+
+
+def setup_crash_handler():
+    """
+    Setup exception hook to log crashes before the console window closes.
+
+    This ensures that even unexpected crashes are captured in the log file.
+    """
+    original_excepthook = sys.excepthook
+
+    def crash_handler(exc_type, exc_value, exc_tb):
+        """Log the crash, then call the original exception handler"""
+        try:
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"\n{'='*80}")
+            print(f"  FATAL CRASH at {ts}")
+            print(f"{'='*80}")
+            print(f"Exception Type: {exc_type.__name__}")
+            print(f"Exception Value: {exc_value}")
+            print("\nFull Traceback:")
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+            print(f"{'='*80}\n")
+
+            # Flush to ensure it's written
+            if hasattr(sys.stdout, 'flush'):
+                sys.stdout.flush()
+            if hasattr(sys.stderr, 'flush'):
+                sys.stderr.flush()
+
+        except Exception:
+            pass  # Don't let the crash handler crash
+
+        # Call original handler
+        original_excepthook(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = crash_handler
+
+
 def log(message: str):
     """Log message to console and file with timestamp"""
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -545,14 +723,15 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
     return True
 
 
-def run_pip(args: list, description: str, retries: int = 3) -> bool:
+def run_pip(args: list, description: str, retries: int = 3, stream_output: bool = True) -> bool:
     """
-    Run pip command with retries
+    Run pip command with retries and real-time output streaming.
 
     Args:
         args: Pip arguments (e.g., ["install", "package"])
         description: Human-readable description for logging
         retries: Number of retry attempts (default 3)
+        stream_output: If True, stream output in real-time through TeeLogger (default True)
 
     Returns:
         True if successful, False otherwise
@@ -562,48 +741,101 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
 
     for attempt in range(retries):
         log(f"Attempt {attempt+1}/{retries}: {' '.join(pip_cmd)}")
-        try:
-            result = subprocess.run(
-                pip_cmd,
-                capture_output=True,
-                text=True,
-                check=True,
-                encoding='utf-8',
-                timeout=1800  # 30 minute timeout for large downloads
-            )
-            if result.stdout:
-                # Only log last 20 lines to avoid clutter
-                lines = result.stdout.strip().split('\n')
-                for line in lines[-20:]:
-                    log(f"  {line}")
-            log(f"SUCCESS: {description}")
-            return True
 
-        except subprocess.TimeoutExpired:
-            log(f"ERROR: {description} timed out (30 minutes)")
-            if attempt < retries - 1:
-                log("Retrying in 10 seconds...")
-                time.sleep(10)
+        if stream_output:
+            # Stream output in real-time through TeeLogger
+            # This ensures ALL pip output (including warnings, errors) is captured
+            process = None
+            try:
+                process = subprocess.Popen(
+                    pip_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    bufsize=1  # Line buffered
+                )
 
-        except subprocess.CalledProcessError as e:
-            log(f"ERROR: {description} failed (rc={e.returncode})")
-            if e.stdout:
-                lines = e.stdout.strip().split('\n')
-                for line in lines[-20:]:
-                    log(f"  {line}")
-            if e.stderr:
-                lines = e.stderr.strip().split('\n')
-                for line in lines[-20:]:
-                    log(f"  {line}")
-            if attempt < retries - 1:
-                log("Retrying in 10 seconds...")
-                time.sleep(10)
+                # Stream output line by line
+                if process.stdout:
+                    for line in process.stdout:
+                        line = line.rstrip('\n\r')
+                        if line:
+                            print(f"  [pip] {line}")  # Goes through TeeLogger
+                            sys.stdout.flush()
 
-        except Exception as e:
-            log(f"ERROR: Unexpected error during pip execution: {e}")
-            if attempt < retries - 1:
-                log("Retrying in 10 seconds...")
-                time.sleep(10)
+                # Wait for process to complete
+                return_code = process.wait(timeout=1800)  # 30 minute timeout
+
+                if return_code == 0:
+                    log(f"SUCCESS: {description}")
+                    return True
+                else:
+                    log(f"ERROR: {description} failed (rc={return_code})")
+                    if attempt < retries - 1:
+                        log("Retrying in 10 seconds...")
+                        time.sleep(10)
+
+            except subprocess.TimeoutExpired:
+                log(f"ERROR: {description} timed out (30 minutes)")
+                if process:
+                    process.kill()
+                    process.wait()
+                if attempt < retries - 1:
+                    log("Retrying in 10 seconds...")
+                    time.sleep(10)
+
+            except Exception as e:
+                log(f"ERROR: Unexpected error during pip execution: {e}")
+                traceback.print_exc()  # Full traceback goes through TeeLogger
+                if attempt < retries - 1:
+                    log("Retrying in 10 seconds...")
+                    time.sleep(10)
+
+        else:
+            # Original behavior: capture output (for quick commands)
+            try:
+                result = subprocess.run(
+                    pip_cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    encoding='utf-8',
+                    timeout=1800
+                )
+                if result.stdout:
+                    lines = result.stdout.strip().split('\n')
+                    for line in lines[-20:]:
+                        log(f"  {line}")
+                log(f"SUCCESS: {description}")
+                return True
+
+            except subprocess.TimeoutExpired:
+                log(f"ERROR: {description} timed out (30 minutes)")
+                if attempt < retries - 1:
+                    log("Retrying in 10 seconds...")
+                    time.sleep(10)
+
+            except subprocess.CalledProcessError as e:
+                log(f"ERROR: {description} failed (rc={e.returncode})")
+                if e.stdout:
+                    lines = e.stdout.strip().split('\n')
+                    for line in lines[-20:]:
+                        log(f"  {line}")
+                if e.stderr:
+                    lines = e.stderr.strip().split('\n')
+                    for line in lines[-20:]:
+                        log(f"  {line}")
+                if attempt < retries - 1:
+                    log("Retrying in 10 seconds...")
+                    time.sleep(10)
+
+            except Exception as e:
+                log(f"ERROR: Unexpected error during pip execution: {e}")
+                if attempt < retries - 1:
+                    log("Retrying in 10 seconds...")
+                    time.sleep(10)
 
     log(f"FATAL: {description} failed after {retries} attempts")
     return False
@@ -950,12 +1182,18 @@ def log_environment_info():
 
 def main() -> int:
     """Main installation workflow"""
+    # === CRITICAL: Setup TeeLogger FIRST to capture ALL output ===
+    # This must be before ANY other code to ensure crashes are logged
+    setup_tee_logging(sys.prefix)
+    setup_crash_handler()
+
     install_start_time = time.time()
 
     log_section("WhisperJAV v1.7.5 Post-Install Started")
     log(f"Installation prefix: {sys.prefix}")
     log(f"Python executable: {sys.executable}")
     log(f"Python version: {sys.version}")
+    log(f"Full log: {os.path.join(sys.prefix, 'install_log_full_v1.7.5.txt')}")
 
     # Log detailed environment info for debugging
     log_environment_info()
