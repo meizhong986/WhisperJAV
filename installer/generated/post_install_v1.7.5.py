@@ -978,6 +978,9 @@ def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
     """
     Embed icon into executable file using LIEF library.
 
+    This is a best-effort operation - the desktop shortcut will display
+    the correct icon regardless of whether this succeeds.
+
     Args:
         exe_path: Path to the .exe file
         icon_path: Path to the .ico file
@@ -985,17 +988,18 @@ def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
     Returns:
         True if successful, False otherwise
 
-    Note: LIEF API changed - use lief.parse() then binary.resources_manager
-    instead of lief.PE.ResourcesManager.from_file()
+    Note: LIEF API varies between versions. This function tries multiple approaches.
     """
-    try:
-        log(f"Embedding icon into executable...")
+    log(f"Attempting to embed icon into executable (optional)...")
+    log(f"  Executable: {exe_path}")
+    log(f"  Icon: {icon_path}")
 
+    try:
         # Try to import lief, install if not available
         try:
             import lief
         except ImportError:
-            log(f"Installing LIEF library for icon embedding...")
+            log(f"  Installing LIEF library...")
             result = subprocess.run(
                 [sys.executable, "-m", "pip", "install", "lief"],
                 capture_output=True,
@@ -1003,49 +1007,79 @@ def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
                 timeout=60
             )
             if result.returncode != 0:
-                log(f"INFO: Could not install LIEF library")
+                log(f"  INFO: Could not install LIEF library - skipping icon embedding")
                 return False
             import lief
 
-        # Load the executable using the correct API
+        # Load the executable
         binary = lief.parse(exe_path)
         if not binary:
-            log(f"INFO: Could not parse executable with LIEF")
+            log(f"  INFO: Could not parse executable - skipping icon embedding")
             return False
 
-        # Check if the binary has resources
+        # Check for resources section
         if not binary.has_resources:
-            log(f"INFO: Executable has no resources section for icon embedding")
+            log(f"  INFO: Executable has no resources section - skipping icon embedding")
             return False
 
-        # Get the resources manager from the parsed binary (correct API)
+        # Get resources manager
+        manager = binary.resources_manager
+        if manager is None:
+            log(f"  INFO: Could not get resources manager - skipping icon embedding")
+            return False
+
+        # Try different LIEF API approaches for icon changing
+        icon_changed = False
+
+        # Approach 1: Try change_icon with file path (older LIEF versions)
         try:
-            manager = binary.resources_manager
-            if manager is None:
-                log(f"INFO: Could not get resources manager")
-                return False
-
-            # Change the icon
             manager.change_icon(icon_path)
+            icon_changed = True
+            log(f"  Icon changed using path method")
+        except (TypeError, AttributeError) as e:
+            log(f"  Path method failed: {e}")
 
-            # Build and write the modified executable
+        # Approach 2: Try loading icon as PE and extracting resources (newer LIEF)
+        if not icon_changed:
+            try:
+                # Load icon file as binary (some .ico files can be parsed as PE)
+                icon_binary = lief.parse(icon_path)
+                if icon_binary and hasattr(icon_binary, 'resources_manager'):
+                    icon_manager = icon_binary.resources_manager
+                    if icon_manager:
+                        # Try to get icons from icon binary and add to exe
+                        if hasattr(icon_manager, 'icons') and icon_manager.icons:
+                            for icon in icon_manager.icons:
+                                try:
+                                    manager.add_icon(icon)
+                                    icon_changed = True
+                                except Exception:
+                                    pass
+                            if icon_changed:
+                                log(f"  Icon changed using PE parse method")
+            except Exception as e:
+                log(f"  PE parse method failed: {e}")
+
+        if not icon_changed:
+            log(f"  INFO: Icon embedding not supported by this LIEF version")
+            log(f"        The desktop shortcut will still display the correct icon")
+            return False
+
+        # Build and write the modified executable
+        try:
             builder = lief.PE.Builder(binary)
             builder.build_resources(True)
             builder.build()
             builder.write(exe_path)
-
-            log(f"✓ Icon embedded successfully")
+            log(f"  ✓ Icon embedded successfully")
             return True
-
-        except AttributeError as ae:
-            log(f"INFO: LIEF API error: {ae}")
-            log(f"      This may be due to LIEF version incompatibility")
+        except Exception as e:
+            log(f"  INFO: Could not write modified executable: {e}")
             return False
 
     except Exception as e:
-        log(f"INFO: Could not embed icon: {e}")
-        log(f"      The executable will use default Python icon")
-        log(f"      The desktop shortcut will still display the correct icon")
+        log(f"  INFO: Icon embedding failed: {e}")
+        log(f"        This is optional - the desktop shortcut will display the correct icon")
         return False
 
 
@@ -1091,6 +1125,158 @@ def copy_launcher_to_root() -> str:
         log(f"INFO: Could not copy launcher: {e}")
         log(f"      The shortcut will use pythonw.exe fallback instead")
         return None
+
+
+def create_desktop_shortcut() -> bool:
+    """
+    Create or update the desktop shortcut to point to WhisperJAV-GUI.exe.
+
+    The NSIS installer creates a shortcut before post-install runs, but it may
+    point to the wrong executable. This function creates/updates the shortcut
+    to point to the correct target.
+
+    Priority:
+    1. WhisperJAV-GUI.exe (created by post-install from Scripts/whisperjav-gui.exe)
+    2. pythonw.exe -m whisperjav.webview_gui.main (fallback)
+
+    Returns:
+        True if shortcut created/updated successfully, False otherwise
+    """
+    import os
+
+    # Paths
+    desktop = os.path.join(os.environ.get('USERPROFILE', ''), 'Desktop')
+    shortcut_path = os.path.join(desktop, 'WhisperJAV v1.7.5.lnk')
+    gui_exe = os.path.join(sys.prefix, 'WhisperJAV-GUI.exe')
+    pythonw_exe = os.path.join(sys.prefix, 'pythonw.exe')
+    icon_file = os.path.join(sys.prefix, 'whisperjav_icon.ico')
+    working_dir = sys.prefix
+
+    # Determine target executable
+    if os.path.exists(gui_exe):
+        target_path = gui_exe
+        arguments = ""
+        log(f"Using launcher: WhisperJAV-GUI.exe")
+    elif os.path.exists(pythonw_exe):
+        target_path = pythonw_exe
+        arguments = "-m whisperjav.webview_gui.main"
+        log(f"Using fallback: pythonw.exe -m whisperjav.webview_gui.main")
+    else:
+        log(f"ERROR: No suitable launcher found!")
+        log(f"  Checked: {gui_exe}")
+        log(f"  Checked: {pythonw_exe}")
+        return False
+
+    # Use icon if available
+    icon_location = icon_file if os.path.exists(icon_file) else target_path
+
+    log(f"Creating desktop shortcut...")
+    log(f"  Shortcut: {shortcut_path}")
+    log(f"  Target: {target_path}")
+    if arguments:
+        log(f"  Arguments: {arguments}")
+    log(f"  Working Dir: {working_dir}")
+    log(f"  Icon: {icon_location}")
+
+    # Create shortcut using PowerShell (more reliable than VBScript on modern Windows)
+    # PowerShell WScript.Shell COM object approach
+    ps_script = f'''
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("{shortcut_path}")
+$Shortcut.TargetPath = "{target_path}"
+$Shortcut.Arguments = "{arguments}"
+$Shortcut.WorkingDirectory = "{working_dir}"
+$Shortcut.IconLocation = "{icon_location},0"
+$Shortcut.Description = "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
+$Shortcut.Save()
+Write-Output "Shortcut created successfully"
+'''
+
+    try:
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps_script],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode == 0:
+            log(f"✓ Desktop shortcut created successfully")
+            if os.path.exists(shortcut_path):
+                log(f"  Verified: Shortcut exists at {shortcut_path}")
+            return True
+        else:
+            log(f"ERROR: PowerShell shortcut creation failed (rc={result.returncode})")
+            if result.stderr:
+                log(f"  Error: {result.stderr.strip()}")
+
+            # Fallback: try using VBScript
+            return create_shortcut_vbscript(shortcut_path, target_path, arguments, working_dir, icon_location)
+
+    except subprocess.TimeoutExpired:
+        log(f"ERROR: Shortcut creation timed out")
+        return False
+    except Exception as e:
+        log(f"ERROR: Shortcut creation failed: {e}")
+        return False
+
+
+def create_shortcut_vbscript(shortcut_path: str, target_path: str, arguments: str,
+                              working_dir: str, icon_location: str) -> bool:
+    """
+    Fallback shortcut creation using VBScript (for older Windows or restricted environments).
+    """
+    log(f"Trying VBScript fallback for shortcut creation...")
+
+    vbs_script = f'''
+Set WshShell = WScript.CreateObject("WScript.Shell")
+Set Shortcut = WshShell.CreateShortcut("{shortcut_path}")
+Shortcut.TargetPath = "{target_path}"
+Shortcut.Arguments = "{arguments}"
+Shortcut.WorkingDirectory = "{working_dir}"
+Shortcut.IconLocation = "{icon_location},0"
+Shortcut.Description = "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
+Shortcut.Save()
+WScript.Echo "Shortcut created"
+'''
+
+    # Write VBScript to temp file
+    vbs_path = os.path.join(sys.prefix, "create_shortcut_temp.vbs")
+
+    try:
+        with open(vbs_path, 'w', encoding='utf-8') as f:
+            f.write(vbs_script)
+
+        result = subprocess.run(
+            ['cscript', '//Nologo', vbs_path],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        # Clean up temp file
+        try:
+            os.remove(vbs_path)
+        except Exception:
+            pass
+
+        if result.returncode == 0:
+            log(f"✓ Desktop shortcut created via VBScript")
+            return True
+        else:
+            log(f"ERROR: VBScript shortcut creation failed (rc={result.returncode})")
+            if result.stderr:
+                log(f"  Error: {result.stderr.strip()}")
+            return False
+
+    except Exception as e:
+        log(f"ERROR: VBScript fallback failed: {e}")
+        # Clean up temp file
+        try:
+            os.remove(vbs_path)
+        except Exception:
+            pass
+        return False
 
 
 def log_environment_info():
@@ -1372,11 +1558,12 @@ def main() -> int:
         else:
             log(f"  Icon not found in package either")
 
-    # === Installation Complete ===
-    # Note: Desktop shortcut is now created by NSIS installer during installation
-    # The shortcut launches: pythonw.exe -m whisperjav.webview_gui.main
-    # Working directory is set to the installation folder ($INSTDIR)
-    # Icon: whisperjav_icon.ico in installation folder
+    # === Phase 6: Create/Update Desktop Shortcut ===
+    # NSIS creates a shortcut before post-install runs, but it points to the wrong exe.
+    # We need to update/create it to point to WhisperJAV-GUI.exe
+    log_section("Phase 6: Desktop Shortcut Configuration")
+    create_desktop_shortcut()
+
     print_installation_summary(install_start_time)
 
     log("\nInstallation completed successfully!")
