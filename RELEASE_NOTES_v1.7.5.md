@@ -87,55 +87,80 @@ New standalone scripts for source builds with automatic CUDA detection:
 
 ## Installation
 
-> **Note for v1.7.4 users:** Version 1.7.4 had incomplete dependencies. Please follow the instructions below for your platform to ensure a clean upgrade.
+> **Note for v1.7.4 users:** Version 1.7.4 had incomplete dependencies. Please follow the instructions below to ensure a clean upgrade.
+
+Choose your platform below:
 
 ---
 
-### I'm a Windows User (GUI)
+### I'm a Windows User
 
-**If you installed WhisperJAV using the Windows installer (.exe):**
+1. Download: **[WhisperJAV-1.7.5-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/tag/v1.7.5)**
+2. Run the installer
+3. If upgrading, it will guide you to uninstall the old version first
 
-1. Download the new installer: **[WhisperJAV-1.7.5-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/tag/v1.7.5)**
-2. Run it - it will install fresh to `%LOCALAPPDATA%\WhisperJAV`
-3. Your AI models are preserved (no re-download needed)
+> **What gets preserved during upgrade:** AI models (~3GB), downloaded packages (pip cache), and settings. Reinstalls are much faster than first-time installs.
 
----
-
-### I'm a Mac or Linux User
-
-**First time installing:**
-```bash
-pip install whisperjav
-```
-
-**Upgrading from any previous version:**
-```bash
-pip uninstall whisperjav -y
-pip install whisperjav
-```
-
-> We recommend uninstall + reinstall to ensure all dependencies are correct.
+No Python knowledge required. The installer includes everything.
 
 ---
 
-### I'm a Developer / Power User
+### I'm on Mac or Linux
 
-**Windows - from source:**
+Use the install script (recommended over pip):
+
 ```bash
-install_windows.bat
+# Install system dependencies first (see README for details)
+# macOS: brew install python@3.11 ffmpeg git
+# Linux: apt-get install python3-dev ffmpeg libsndfile1 git
+
+# Clone and install
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+chmod +x installer/install_linux.sh
+./installer/install_linux.sh
 ```
 
-**Linux - from source:**
+> **Why use the script instead of pip?** The script auto-detects your GPU, selects the correct CUDA/MPS version, and installs dependencies in the right order to avoid conflicts.
+
+**Upgrading from v1.7.4 or earlier:**
 ```bash
-./install_linux.sh
+cd whisperjav
+git pull
+./installer/install_linux.sh
 ```
 
-**Manual pip with GPU auto-detection:**
+---
+
+### I'm a Python Developer
+
+<details>
+<summary><b>Manual pip install</b> (only if you know what you're doing)</summary>
+
+⚠️ **Warning:** Manual pip often fails due to dependency conflicts. Use the install scripts unless you have a specific reason not to.
+
 ```bash
-pip install -U --force-reinstall whisperjav
+# Install PyTorch first (choose your platform)
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124  # NVIDIA
+pip install torch torchaudio  # Apple Silicon
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu  # CPU only
+
+# Then install WhisperJAV
+pip install git+https://github.com/meizhong986/whisperjav.git@main
 ```
 
-These scripts auto-detect your GPU and install the appropriate CUDA version (11.8, 12.1, 12.4, 12.6, or 12.8).
+</details>
+
+<details>
+<summary><b>Windows source install</b></summary>
+
+```batch
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+installer\install_windows.bat
+```
+
+</details>
 
 ---
 

@@ -1009,7 +1009,11 @@ Function OnDirectoryLeave
             MessageBox MB_YESNO|MB_ICONQUESTION \
                 "WhisperJAV is already installed in this location.$\n$\n\
                 To upgrade, you need to uninstall the previous version first.$\n$\n\
-                Your AI models and settings will be preserved.$\n$\n\
+                The following will be PRESERVED:$\n\
+                  - AI models (~3GB in user cache)$\n\
+                  - Downloaded packages (pip cache)$\n\
+                  - Your settings$\n$\n\
+                Reinstall will be much faster than first install.$\n$\n\
                 Would you like to run the uninstaller now?" \
                 /SD IDNO \
                 IDYES RunUninstaller IDNO AbortInstall

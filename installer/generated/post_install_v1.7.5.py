@@ -1312,12 +1312,17 @@ def main() -> int:
 
     # === Phase 3: PyTorch Installation ===
     log_section("Phase 3: PyTorch Installation")
+    log("Note: Previously downloaded packages are cached and will be reused.")
+    log("      (Reinstalls are much faster than first-time installs)")
+    log("")
     if not install_pytorch(driver_info):
         create_failure_file("PyTorch installation failed")
         return 1
 
     # === Phase 4: Python Dependencies ===
     log_section("Phase 4: Python Dependencies Installation")
+    log("Note: Using pip cache for previously downloaded packages.")
+    log("")
 
     req_path = os.path.join(sys.prefix, "requirements_v1.7.5.txt")
     constraints_path = os.path.join(sys.prefix, "constraints_v1.7.5.txt")
