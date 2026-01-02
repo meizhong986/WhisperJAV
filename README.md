@@ -231,105 +231,149 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Installation
 
-### Windows Installer (Easiest)
+Choose your platform below:
 
-Download and run: **WhisperJAV-1.7.4-Windows-x86_64.exe**
+---
 
-This installs everything you need including Python and dependencies.
+### I'm a Windows User
 
-### Upgrading from Previous Installer Versions
+**Fresh Install or Upgrade:**
 
-If you installed v1.5.x or v1.6.x via the Windows installer:
+1. Download: **[WhisperJAV-1.7.5-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/latest)**
+2. Run the installer
+3. If upgrading, it will guide you to uninstall the old version first
 
-1. Download [upgrade_whisperjav.bat](https://github.com/meizhong986/whisperjav/raw/main/installer/upgrade_whisperjav.bat)
-2. Double-click to run
-3. Wait 1-2 minutes
+> **What gets preserved during upgrade:** AI models, downloaded packages (pip cache), and settings. Reinstalls are much faster than first-time installs.
 
-This updates WhisperJAV without re-downloading PyTorch (~2.5GB) or your AI models (~3GB).
+No Python knowledge required. The installer includes everything.
 
-### Install from Source
+---
 
-Requires Python 3.9-3.12, FFmpeg, and Git.
+### I'm on a New Mac (Apple Silicon M1/M2/M3/M4)
 
-**Recommended: Use the install scripts** (handles dependency conflicts automatically, auto-detects GPU):
-
-<details>
-<summary><b>Windows</b></summary>
-
-```batch
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-installer\install_windows.bat              # Auto-detects GPU and CUDA version
-installer\install_windows.bat --cpu-only   # Force CPU only
-installer\install_windows.bat --cuda118    # Force CUDA 11.8
-installer\install_windows.bat --cuda124    # Force CUDA 12.4
-installer\install_windows.bat --minimal    # Minimal install (no speech enhancement)
-installer\install_windows.bat --dev        # Development/editable install
-```
-
-The script automatically:
-- Detects your NVIDIA GPU and selects optimal CUDA version
-- Falls back to CPU-only if no GPU found
-- Checks for WebView2 runtime (required for GUI)
-- Logs installation to `install_log_windows.txt`
-- Retries failed downloads up to 3 times
-
-</details>
-
-<details>
-<summary><b>Linux / macOS</b></summary>
+Use the install script (handles dependencies correctly):
 
 ```bash
-# Install system dependencies first (Linux only)
+# Install Homebrew if you don't have it
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install system dependencies
+brew install python@3.11 ffmpeg git
+
+# Clone and install WhisperJAV
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+chmod +x installer/install_linux.sh
+./installer/install_linux.sh
+```
+
+> **Why use the script instead of pip?** pip often fails with dependency conflicts. The script handles PyTorch + dependencies in the correct order and auto-detects Apple MPS acceleration.
+
+---
+
+### I'm on Linux
+
+Use the install script (recommended over pip):
+
+```bash
+# Install system dependencies first
 # Debian/Ubuntu:
-sudo apt-get install -y python3-dev build-essential ffmpeg libsndfile1
+sudo apt-get install -y python3-dev python3-pip build-essential ffmpeg libsndfile1 git
 
 # Fedora/RHEL:
-sudo dnf install python3-devel gcc ffmpeg libsndfile
+sudo dnf install python3-devel gcc ffmpeg libsndfile git
+
+# Clone and install WhisperJAV
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+chmod +x installer/install_linux.sh
+./installer/install_linux.sh               # Auto-detects NVIDIA GPU
+./installer/install_linux.sh --cpu-only    # Force CPU only
+```
+
+> **Why use the script instead of pip?** The script auto-detects your GPU, selects the correct CUDA version, and installs dependencies in the right order to avoid conflicts.
+
+---
+
+### I'm on an Older Mac (Intel) or Have No GPU
+
+```bash
+# Install dependencies (macOS)
+brew install python@3.11 ffmpeg git
+
+# Or Linux (see above for apt/dnf commands)
 
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh
-./installer/install_linux.sh               # Auto-detects GPU
-./installer/install_linux.sh --cpu-only    # Force CPU only
-./installer/install_linux.sh --minimal     # Minimal install
+./installer/install_linux.sh --cpu-only
 ```
 
-</details>
+> **Note:** CPU-only mode works but is slower. Use `--accept-cpu-mode` flag when running to skip GPU warnings.
+
+---
+
+### I'm a Python Developer / Expert
 
 <details>
-<summary><b>Cross-Platform Python Script</b></summary>
+<summary><b>Manual pip install</b> (only if you know what you're doing)</summary>
+
+⚠️ **Warning:** Manual pip install often fails due to dependency conflicts with numpy, torch, and speech enhancement packages. Use the install scripts above unless you have a specific reason not to.
 
 ```bash
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-python install.py              # Auto-detects GPU, defaults to CUDA 12.1
-python install.py --cpu-only   # CPU only
-python install.py --cuda118    # CUDA 11.8
-python install.py --cuda121    # CUDA 12.1
-python install.py --cuda124    # CUDA 12.4
-python install.py --minimal    # Minimal install (no speech enhancement)
-python install.py --dev        # Development/editable install
-```
+# Create virtual environment (recommended)
+python -m venv whisperjav-env
+source whisperjav-env/bin/activate  # Linux/Mac
+# or: whisperjav-env\Scripts\activate  # Windows
 
-</details>
-
-**Alternative: Manual pip install** (may encounter dependency conflicts):
-
-```bash
-# Install PyTorch with GPU support first (NVIDIA example)
+# Install PyTorch first (choose your platform)
+# NVIDIA GPU:
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Apple Silicon:
+pip install torch torchaudio
+
+# CPU only:
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Then install WhisperJAV
 pip install git+https://github.com/meizhong986/whisperjav.git@main
 ```
 
-**Platform Notes:**
-- **Apple Silicon (M1/M2/M3/M4)**: Just `pip install torch torchaudio` - MPS acceleration works automatically
-- **AMD GPU (ROCm)**: Experimental. Use `--mode balanced` for best compatibility
-- **CPU only**: Works but slow. Use `--accept-cpu-mode` to skip the GPU warning
-- **Linux server (no GPU)**: The install scripts auto-detect and switch to CPU-only
-- **Linux (Debian/Ubuntu)**: Install system dependencies first: `sudo apt-get install -y python3-dev build-essential ffmpeg libsndfile1`
+</details>
+
+<details>
+<summary><b>Development / Editable install</b></summary>
+
+```bash
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+
+# Windows
+installer\install_windows.bat --dev
+
+# Linux/Mac
+./installer/install_linux.sh --dev
+
+# Or manual:
+pip install -e ".[dev]"
+```
+
+</details>
+
+<details>
+<summary><b>Windows source install</b></summary>
+
+```batch
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+installer\install_windows.bat              # Auto-detects GPU
+installer\install_windows.bat --cpu-only   # Force CPU only
+installer\install_windows.bat --cuda118    # Force CUDA 11.8
+installer\install_windows.bat --cuda124    # Force CUDA 12.4
+```
+
+</details>
 
 ### Prerequisites
 
