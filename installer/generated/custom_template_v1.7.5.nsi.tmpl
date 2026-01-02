@@ -1003,12 +1003,55 @@ Pop $0
 Function OnDirectoryLeave
     ${LogSet} on
     ${If} ${IsNonEmptyDirectory} "$InstDir"
-        ${Print} "::error:: Directory '$INSTDIR' is not empty, please choose a different location."
-        MessageBox MB_OK|MB_ICONEXCLAMATION \
-            "Directory '$INSTDIR' is not empty,$\n\
-             please choose a different location." \
-            /SD IDOK
-        Abort
+        ; Check if this is an existing WhisperJAV installation (look for uninstaller)
+        ${If} ${FileExists} "$INSTDIR\Uninstall-WhisperJAV.exe"
+            ${Print} "::info:: Existing WhisperJAV installation detected at '$INSTDIR'"
+            MessageBox MB_YESNO|MB_ICONQUESTION \
+                "WhisperJAV is already installed in this location.$\n$\n\
+                To upgrade, you need to uninstall the previous version first.$\n$\n\
+                Your AI models and settings will be preserved.$\n$\n\
+                Would you like to run the uninstaller now?" \
+                /SD IDNO \
+                IDYES RunUninstaller IDNO AbortInstall
+
+            RunUninstaller:
+                ${Print} "::info:: Launching uninstaller..."
+                ; Use ExecWait to run uninstaller and wait for completion
+                ExecWait '"$INSTDIR\Uninstall-WhisperJAV.exe"'
+                ; After uninstall, check if directory is now empty/gone
+                ${If} ${IsNonEmptyDirectory} "$InstDir"
+                    ${Print} "::warning:: Directory still not empty after uninstall"
+                    MessageBox MB_OK|MB_ICONINFORMATION \
+                        "Please restart the installer after the uninstallation completes.$\n$\n\
+                        If files remain, you may need to manually delete the folder:$\n\
+                        $INSTDIR" \
+                        /SD IDOK
+                    Abort
+                ${EndIf}
+                ; Directory is now empty, continue with installation
+                ${Print} "::info:: Previous installation removed, continuing with fresh install"
+                Goto ContinueInstall
+
+            AbortInstall:
+                ${Print} "::info:: User chose not to uninstall, aborting"
+                MessageBox MB_OK|MB_ICONINFORMATION \
+                    "Please uninstall the previous version manually:$\n$\n\
+                    $INSTDIR\Uninstall-WhisperJAV.exe$\n$\n\
+                    Then run this installer again." \
+                    /SD IDOK
+                Abort
+
+        ${Else}
+            ; Directory is not empty and NOT a WhisperJAV installation - block for safety
+            ${Print} "::error:: Directory '$INSTDIR' is not empty, please choose a different location."
+            MessageBox MB_OK|MB_ICONEXCLAMATION \
+                "Directory '$INSTDIR' is not empty,$\n\
+                 please choose a different location." \
+                /SD IDOK
+            Abort
+        ${EndIf}
+
+        ContinueInstall:
     ${EndIf}
 
     ReadRegStr $LongPathsEnabled HKLM "SYSTEM\CurrentControlSet\Control\FileSystem" "LongPathsEnabled"
