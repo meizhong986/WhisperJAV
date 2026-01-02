@@ -177,9 +177,14 @@ def validate_module_paths():
     print_header("Phase 3: Module Path Validation")
 
     all_passed = True
+    # Files that contain GUI module references:
+    # - WhisperJAV_Launcher_v1.7.5.py: Script launcher
+    # - custom_template_v1.7.5.nsi.tmpl: NSIS shortcut creation (pythonw fallback)
+    # NOTE: post_install_v1.7.5.py removed - it only handles pip installation,
+    #       shortcuts are now handled by NSIS
     files_to_check = [
         "WhisperJAV_Launcher_v1.7.5.py",
-        "post_install_v1.7.5.py",
+        "custom_template_v1.7.5.nsi.tmpl",
     ]
 
     for filename in files_to_check:
