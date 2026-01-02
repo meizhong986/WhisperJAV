@@ -737,6 +737,11 @@ def run_pip(args: list, description: str, retries: int = 3, stream_output: bool 
         True if successful, False otherwise
     """
     log(f"Starting: {description}")
+
+    # Add progress bar flag to install commands for better UX
+    if 'install' in args and '--progress-bar' not in args:
+        args = args + ['--progress-bar', 'on']
+
     pip_cmd = [os.path.join(sys.prefix, 'python.exe'), '-m', 'pip'] + args
 
     for attempt in range(retries):
@@ -757,22 +762,76 @@ def run_pip(args: list, description: str, retries: int = 3, stream_output: bool 
                     bufsize=1  # Line buffered
                 )
 
-                # Stream output line by line
+                # Track progress for user feedback
+                start_time = time.time()
+                last_status_time = start_time
+                packages_downloaded = 0
+                packages_installed = 0
+                current_package = ""
+
+                # Stream output line by line with progress tracking
                 if process.stdout:
                     for line in process.stdout:
                         line = line.rstrip('\n\r')
-                        if line:
-                            print(f"  [pip] {line}")  # Goes through TeeLogger
-                            sys.stdout.flush()
+                        if not line:
+                            continue
+
+                        # Parse pip output for progress information
+                        line_lower = line.lower()
+
+                        # Detect package downloads
+                        if 'downloading' in line_lower:
+                            packages_downloaded += 1
+                            # Extract package name if present
+                            if ' ' in line:
+                                parts = line.split()
+                                for part in parts:
+                                    if '-' in part and not part.startswith('-'):
+                                        current_package = part.split('-')[0][:30]
+                                        break
+
+                        # Detect package installations
+                        if 'installing collected packages' in line_lower:
+                            # Count packages being installed
+                            if ':' in line:
+                                pkg_list = line.split(':')[1] if ':' in line else ''
+                                packages_installed = len([p for p in pkg_list.split(',') if p.strip()])
+
+                        # Detect successful install
+                        if 'successfully installed' in line_lower:
+                            packages_installed = line.count(',') + 1
+
+                        # Print line to log
+                        print(f"  [pip] {line}")
+                        sys.stdout.flush()
+
+                        # Show periodic status update every 30 seconds during long operations
+                        current_time = time.time()
+                        if current_time - last_status_time > 30:
+                            elapsed = int(current_time - start_time)
+                            status_parts = [f"  ... still working ({elapsed}s elapsed)"]
+                            if packages_downloaded > 0:
+                                status_parts.append(f"{packages_downloaded} packages downloaded")
+                            if current_package:
+                                status_parts.append(f"current: {current_package}")
+                            log(" | ".join(status_parts))
+                            last_status_time = current_time
 
                 # Wait for process to complete
                 return_code = process.wait(timeout=1800)  # 30 minute timeout
 
+                # Show final summary
+                elapsed = int(time.time() - start_time)
                 if return_code == 0:
-                    log(f"SUCCESS: {description}")
+                    summary_parts = [f"SUCCESS: {description}"]
+                    if elapsed > 10:
+                        summary_parts.append(f"({elapsed}s)")
+                    if packages_installed > 0:
+                        summary_parts.append(f"({packages_installed} packages)")
+                    log(" ".join(summary_parts))
                     return True
                 else:
-                    log(f"ERROR: {description} failed (rc={return_code})")
+                    log(f"ERROR: {description} failed (rc={return_code}) after {elapsed}s")
                     if attempt < retries - 1:
                         log("Retrying in 10 seconds...")
                         time.sleep(10)
