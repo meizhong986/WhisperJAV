@@ -599,36 +599,95 @@ def print_installation_summary(install_start_time: float):
     log(" " * 20 + "WhisperJAV v1.7.5 Installation Complete!")
     log("=" * 80)
     log("")
-    log(f"Installation Summary:")
-    log(f"  ✓ Installation directory: {sys.prefix}")
-    log(f"  ✓ Python version: {sys.version.split()[0]}")
+    log("INSTALLATION SUMMARY")
+    log("-" * 40)
+    log(f"  Installation directory: {sys.prefix}")
+    log(f"  Python version: {sys.version.split()[0]}")
+    log(f"  Installation time: {minutes}m {seconds}s")
+    log("")
 
+    # PyTorch and CUDA status
+    log("GPU/CUDA STATUS")
+    log("-" * 40)
     try:
         import torch
         if torch.cuda.is_available():
-            log(f"  ✓ PyTorch: {torch.__version__} with CUDA {torch.version.cuda}")
-            log(f"  ✓ GPU acceleration: ENABLED ({torch.cuda.get_device_name(0)})")
+            log(f"  ✓ PyTorch: {torch.__version__}")
+            log(f"  ✓ CUDA version: {torch.version.cuda}")
+            log(f"  ✓ GPU: {torch.cuda.get_device_name(0)}")
+            log(f"  ✓ GPU Memory: {torch.cuda.get_device_properties(0).total_memory / (1024**3):.1f} GB")
+            log(f"  ✓ Status: GPU ACCELERATION ENABLED")
         else:
-            log(f"  ✓ PyTorch: {torch.__version__} (CPU-only mode)")
-            log(f"  ⚠ GPU acceleration: DISABLED (processing will be slower)")
-    except Exception:
-        log(f"  ? PyTorch: Status unknown")
+            log(f"  ⚠ PyTorch: {torch.__version__} (CPU-only)")
+            log(f"  ⚠ Status: CPU MODE (processing will be slower)")
+    except Exception as e:
+        log(f"  ? PyTorch: Could not determine status ({e})")
+    log("")
 
+    # GUI status
+    log("GUI STATUS")
+    log("-" * 40)
     if check_webview2_windows():
         log(f"  ✓ WebView2 runtime: Detected")
     else:
-        log(f"  ⚠ WebView2 runtime: NOT DETECTED (GUI will not work)")
+        log(f"  ✗ WebView2 runtime: NOT DETECTED")
         log(f"    Install from: https://go.microsoft.com/fwlink/p/?LinkId=2124703")
-
-    log(f"  ✓ Desktop shortcut: Created")
-    log(f"  ✓ Installation time: {minutes}m {seconds}s")
     log("")
-    log("Next Steps:")
+
+    # Key packages verification
+    log("INSTALLED PACKAGES (Key Components)")
+    log("-" * 40)
+    key_packages = [
+        ("whisperjav", "WhisperJAV"),
+        ("faster_whisper", "Faster Whisper"),
+        ("whisper", "OpenAI Whisper"),
+        ("stable_whisper", "Stable-TS"),
+        ("torch", "PyTorch"),
+        ("transformers", "Transformers"),
+        ("modelscope", "ModelScope (ZipEnhancer)"),
+        ("numpy", "NumPy"),
+        ("librosa", "Librosa"),
+        ("pywebview", "PyWebView"),
+    ]
+
+    for pkg_import, pkg_display in key_packages:
+        try:
+            result = subprocess.run(
+                [os.path.join(sys.prefix, 'python.exe'), '-c',
+                 f'import {pkg_import}; print(getattr({pkg_import}, "__version__", "installed"))'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                log(f"  ✓ {pkg_display}: {version}")
+            else:
+                log(f"  ✗ {pkg_display}: NOT INSTALLED")
+        except Exception:
+            log(f"  ? {pkg_display}: Unknown")
+    log("")
+
+    # Shortcuts status
+    log("SHORTCUTS")
+    log("-" * 40)
+    log("  ✓ Desktop shortcut: WhisperJAV v1.7.5.lnk")
+    log("  ✓ Start Menu: WhisperJAV folder")
+    log("  Note: Shortcuts are created by the NSIS installer")
+    log("")
+
+    # Next steps
+    log("NEXT STEPS")
+    log("-" * 40)
     log("  1. Launch WhisperJAV from the desktop shortcut")
-    log("  2. On first run, AI models will download (~3GB, 5-10 minutes)")
+    log("  2. On first run, AI models will download (~3GB)")
     log("  3. Select your video files and start processing!")
     log("")
-    log(f"Logs saved to: {LOG_FILE}")
+    log("TROUBLESHOOTING")
+    log("-" * 40)
+    log(f"  Log file: {LOG_FILE}")
+    log("  Support: https://github.com/meizhong986/WhisperJAV/issues")
+    log("")
     log("=" * 80)
     log("")
 
@@ -733,6 +792,64 @@ def copy_launcher_to_root() -> str:
         return None
 
 
+def log_environment_info():
+    """Log detailed environment information for debugging"""
+    import platform
+    log_section("Environment Information (for debugging)")
+
+    log(f"Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log(f"Platform: {platform.platform()}")
+    log(f"Architecture: {platform.machine()}")
+    log(f"Python version: {platform.python_version()}")
+    log(f"Python implementation: {platform.python_implementation()}")
+    log("")
+    log(f"Installation prefix: {sys.prefix}")
+    log(f"Python executable: {sys.executable}")
+    log(f"Sys.path[0]: {sys.path[0] if sys.path else 'N/A'}")
+    log("")
+
+    # Log PATH (truncated)
+    path_env = os.environ.get("PATH", "")
+    path_entries = path_env.split(os.pathsep)[:10]  # First 10 entries
+    log(f"PATH (first {len(path_entries)} entries):")
+    for p in path_entries:
+        log(f"  - {p}")
+    if len(path_env.split(os.pathsep)) > 10:
+        log(f"  ... and {len(path_env.split(os.pathsep)) - 10} more entries")
+    log("")
+
+    # Log disk space
+    try:
+        total, used, free = shutil.disk_usage(sys.prefix)
+        log(f"Disk space at {sys.prefix}:")
+        log(f"  Total: {total / (1024**3):.1f} GB")
+        log(f"  Used:  {used / (1024**3):.1f} GB")
+        log(f"  Free:  {free / (1024**3):.1f} GB")
+    except Exception as e:
+        log(f"Could not determine disk space: {e}")
+    log("")
+
+    # Log critical executables
+    log("Checking critical executables:")
+    for exe_name in ["python.exe", "pythonw.exe", "pip.exe", "git.exe"]:
+        exe_path = os.path.join(sys.prefix, exe_name)
+        scripts_path = os.path.join(sys.prefix, "Scripts", exe_name)
+        if os.path.exists(exe_path):
+            log(f"  ✓ {exe_name}: {exe_path}")
+        elif os.path.exists(scripts_path):
+            log(f"  ✓ {exe_name}: {scripts_path}")
+        else:
+            log(f"  ✗ {exe_name}: NOT FOUND")
+
+    # Check for ffmpeg in Library/bin
+    ffmpeg_path = os.path.join(sys.prefix, "Library", "bin", "ffmpeg.exe")
+    if os.path.exists(ffmpeg_path):
+        log(f"  ✓ ffmpeg.exe: {ffmpeg_path}")
+    else:
+        log(f"  ✗ ffmpeg.exe: NOT FOUND (expected at {ffmpeg_path})")
+    log("")
+
+
 def main() -> int:
     """Main installation workflow"""
     install_start_time = time.time()
@@ -741,6 +858,9 @@ def main() -> int:
     log(f"Installation prefix: {sys.prefix}")
     log(f"Python executable: {sys.executable}")
     log(f"Python version: {sys.version}")
+
+    # Log detailed environment info for debugging
+    log_environment_info()
 
     # === Phase 1: Preflight Checks ===
     log_section("Phase 1: Preflight Checks")
@@ -771,20 +891,92 @@ def main() -> int:
     log_section("Phase 4: Python Dependencies Installation")
 
     req_path = os.path.join(sys.prefix, "requirements_v1.7.5.txt")
+    constraints_path = os.path.join(sys.prefix, "constraints_v1.7.5.txt")
+
     if not os.path.exists(req_path):
         log(f"ERROR: requirements_v1.7.5.txt not found at {req_path}")
         create_failure_file(f"Missing requirements file: {req_path}")
         return 1
 
-    log(f"Installing dependencies from: {req_path}")
-    log("This will download ~500MB of packages. Please wait...")
+    # Check for constraints file (optional but recommended)
+    use_constraints = os.path.exists(constraints_path)
+    if use_constraints:
+        log(f"✓ Constraints file found: {constraints_path}")
+        log("  Using constraints to prevent version conflicts with speech enhancement packages")
+    else:
+        log(f"⚠ Constraints file not found: {constraints_path}")
+        log("  Proceeding without constraints (may cause version conflicts)")
 
-    if not run_pip(
-        ["install", "-r", req_path, "--progress-bar", "on"],
-        "Install Python dependencies"
-    ):
+    log(f"Installing dependencies from: {req_path}")
+    log("This will download ~800MB of packages including speech enhancement backends.")
+    log("Please wait... (this may take 10-20 minutes depending on network speed)")
+    log("")
+
+    # Build pip install command with constraints if available
+    pip_args = ["install", "-r", req_path, "--progress-bar", "on"]
+    if use_constraints:
+        pip_args.extend(["-c", constraints_path])
+
+    # Log the exact command for debugging
+    pip_cmd_str = f"pip {' '.join(pip_args)}"
+    log(f"DEBUG: Pip command: {pip_cmd_str}")
+
+    if not run_pip(pip_args, "Install Python dependencies"):
+        log("")
+        log("=" * 80)
+        log("  DEPENDENCY INSTALLATION TROUBLESHOOTING")
+        log("=" * 80)
+        log("Common issues and solutions:")
+        log("1. Network timeout: Check internet connection, retry installation")
+        log("2. Version conflict: modelscope/clearvoice may conflict with numpy>=2.0")
+        log("   Solution: Try running: pip install numpy>=2.0 --force-reinstall")
+        log("3. Git not in PATH: Ensure git is installed and accessible")
+        log(f"4. Check detailed errors in: {LOG_FILE}")
+        log("=" * 80)
         create_failure_file("Dependencies installation failed")
         return 1
+
+    # === Phase 4.5: Verify Critical Dependencies ===
+    log_section("Phase 4.5: Verifying Critical Dependencies")
+    verification_passed = True
+
+    # List of critical packages to verify
+    critical_packages = [
+        ("numpy", ">=2.0"),
+        ("scipy", ">=1.10.1"),
+        ("librosa", ">=0.11.0"),
+        ("datasets", ">=2.14.0,<4.0"),
+        ("modelscope", ">=1.20"),
+        ("faster_whisper", ">=1.1.0"),
+        ("transformers", ">=4.40.0"),
+    ]
+
+    log("Verifying critical package installations...")
+    for pkg_name, version_spec in critical_packages:
+        try:
+            result = subprocess.run(
+                [os.path.join(sys.prefix, 'python.exe'), '-c',
+                 f'import {pkg_name.replace("-", "_")}; print({pkg_name.replace("-", "_")}.__version__)'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                log(f"  ✓ {pkg_name}: {version}")
+            else:
+                log(f"  ✗ {pkg_name}: FAILED TO IMPORT")
+                log(f"    Error: {result.stderr.strip()[:100]}")
+                verification_passed = False
+        except Exception as e:
+            log(f"  ✗ {pkg_name}: ERROR ({e})")
+            verification_passed = False
+
+    if not verification_passed:
+        log("")
+        log("WARNING: Some critical packages failed verification.")
+        log("The application may not function correctly.")
+        log("Consider reinstalling or checking the log for errors.")
 
     # === Phase 5: WhisperJAV Application ===
     log_section("Phase 5: WhisperJAV Application Installation")

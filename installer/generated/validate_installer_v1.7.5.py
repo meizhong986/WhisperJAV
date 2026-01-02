@@ -49,6 +49,7 @@ REQUIRED_FILES = [
     "post_install_v1.7.5.bat",
     "post_install_v1.7.5.py",
     "requirements_v1.7.5.txt",
+    "constraints_v1.7.5.txt",    # NEW: Version pinning for problematic packages
     "WhisperJAV_Launcher_v1.7.5.py",
     "README_INSTALLER_v1.7.5.txt",
     "LICENSE.txt",
@@ -299,9 +300,47 @@ def validate_assets():
     return all_passed
 
 
+def validate_constraints_file():
+    """Check that constraints file contains critical version pins"""
+    print_header("Phase 6: Constraints File Validation")
+
+    filename = "constraints_v1.7.5.txt"
+
+    if not check_file_exists(filename):
+        print_check(f"{filename}", False, "File not found")
+        return False
+
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Check for critical version constraints
+        critical_constraints = [
+            ("numpy>=2.0", "NumPy 2.x for librosa compatibility"),
+            ("scipy>=1.10.1", "SciPy for audio processing"),
+            ("librosa>=0.11.0", "Librosa NumPy 2.x support"),
+            ("datasets>=2.14.0,<4.0", "Datasets cap for modelscope"),
+            ("pydantic>=2.0,<3.0", "Pydantic version cap"),
+        ]
+
+        all_found = True
+        for constraint, description in critical_constraints:
+            if constraint in content:
+                print_check(f"{constraint}", True, description)
+            else:
+                print_check(f"{constraint}", False, f"Missing: {description}")
+                all_found = False
+
+        return all_found
+
+    except Exception as e:
+        print_check(f"{filename}", False, f"Error: {e}")
+        return False
+
+
 def validate_yaml_syntax():
     """Basic YAML syntax validation for construct file"""
-    print_header("Phase 6: YAML Syntax Validation")
+    print_header("Phase 7: YAML Syntax Validation")
 
     filename = "construct_v1.7.5.yaml"
 
@@ -372,6 +411,7 @@ def main():
     results.append(("Module Paths", validate_module_paths()))
     results.append(("Requirements Encoding", validate_requirements_encoding()))
     results.append(("Asset Files", validate_assets()))
+    results.append(("Constraints File", validate_constraints_file()))
     results.append(("YAML Syntax", validate_yaml_syntax()))
 
     # Print summary
