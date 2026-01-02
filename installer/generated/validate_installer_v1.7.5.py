@@ -56,10 +56,9 @@ REQUIRED_FILES = [
     "whisperjav_icon.ico",
 ]
 
-# Optional files (warnings only, not errors) - built during installer build process
-OPTIONAL_FILES = [
-    ("WhisperJAV.exe", "Frozen launcher (built by PyInstaller in Phase 3)"),
-]
+# Optional files (warnings only, not errors)
+# NOTE: WhisperJAV-GUI.exe is created by post_install from Scripts/whisperjav-gui.exe
+OPTIONAL_FILES = []
 
 # Wheel file pattern - matches version with PEP 440 normalization
 # e.g., "1.7.0-beta" becomes "1.7.0b0" in wheel filename

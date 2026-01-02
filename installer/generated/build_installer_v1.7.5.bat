@@ -40,8 +40,8 @@ echo Build started: %DATE% %TIME% >> "%BUILD_LOG%"
 echo. >> "%BUILD_LOG%"
 
 REM ===== Phase 1: Check Prerequisites =====
-echo [Phase 1/5] Checking prerequisites...
-echo [Phase 1/5] Checking prerequisites... >> "%BUILD_LOG%"
+echo [Phase 1/6] Checking prerequisites...
+echo [Phase 1/6] Checking prerequisites... >> "%BUILD_LOG%"
 
 REM Check if constructor is installed
 constructor --version >nul 2>nul
@@ -136,80 +136,11 @@ if !errorlevel!==0 (
 )
 echo.
 
-REM ===== Phase 3: Build Frozen Launcher with PyInstaller =====
-echo [Phase 3/7] Building frozen launcher (WhisperJAV.exe)...
-echo [Phase 3/7] Building frozen launcher... >> "%BUILD_LOG%"
-
-REM Check if PyInstaller is available
-pyinstaller --version >nul 2>nul
-if errorlevel 1 (
-    echo   - PyInstaller not found, installing...
-    pip install pyinstaller >nul 2>nul
-    if errorlevel 1 (
-        echo.
-        echo WARNING: Could not install PyInstaller!
-        echo WARNING: PyInstaller install failed >> "%BUILD_LOG%"
-        echo          Will use script-based shortcut instead of frozen exe.
-        echo          This may cause "Access Denied" issues for some users.
-        echo.
-        goto :skip_pyinstaller
-    )
-)
-
-REM Check if launcher source exists
-if not exist "WhisperJAV_Launcher_v1.7.5.py" (
-    echo   - Launcher source not found: WhisperJAV_Launcher_v1.7.5.py
-    echo WARNING: Launcher source missing >> "%BUILD_LOG%"
-    goto :skip_pyinstaller
-)
-
-REM Check if icon exists
-set ICON_ARG=
-if exist "whisperjav_icon.ico" (
-    set ICON_ARG=--icon=whisperjav_icon.ico
-    echo   - Using icon: whisperjav_icon.ico
-)
-
-REM Remove previous frozen exe if exists
-if exist "WhisperJAV.exe" (
-    del "WhisperJAV.exe" >nul 2>nul
-)
-
-REM Build frozen launcher
-echo   - Compiling WhisperJAV_Launcher_v1.7.5.py to WhisperJAV.exe...
-pyinstaller --noconsole --onefile %ICON_ARG% --name=WhisperJAV --distpath=. --workpath=build_pyinstaller --specpath=build_pyinstaller WhisperJAV_Launcher_v1.7.5.py >nul 2>nul
-
-if errorlevel 1 (
-    echo   - PyInstaller build failed
-    echo WARNING: PyInstaller build failed >> "%BUILD_LOG%"
-    echo          Will use script-based shortcut instead.
-    goto :skip_pyinstaller
-)
-
-if exist "WhisperJAV.exe" (
-    for %%A in ("WhisperJAV.exe") do set EXE_SIZE=%%~zA
-    set /a EXE_SIZE_KB=!EXE_SIZE! / 1024
-    echo   - SUCCESS: WhisperJAV.exe created (!EXE_SIZE_KB! KB)
-    echo   - Frozen launcher: WhisperJAV.exe (!EXE_SIZE_KB! KB) >> "%BUILD_LOG%"
-
-    REM Clean up PyInstaller build artifacts
-    if exist "build_pyinstaller" rmdir /s /q "build_pyinstaller" >nul 2>nul
-) else (
-    echo   - WhisperJAV.exe not found after build
-    echo WARNING: Frozen exe missing after build >> "%BUILD_LOG%"
-)
-goto :after_pyinstaller
-
-:skip_pyinstaller
-echo   - Skipping frozen launcher build
-echo   - Frozen launcher: SKIPPED >> "%BUILD_LOG%"
-
-:after_pyinstaller
-echo.
-
-REM ===== Phase 4: Validate Configuration =====
-echo [Phase 4/7] Validating installer configuration...
-echo [Phase 4/7] Validating configuration... >> "%BUILD_LOG%"
+REM ===== Phase 3: Validate Configuration =====
+REM NOTE: PyInstaller build removed - WhisperJAV-GUI.exe is created by post_install
+REM       from Scripts/whisperjav-gui.exe (pip entry_points)
+echo [Phase 3/6] Validating installer configuration...
+echo [Phase 3/6] Validating configuration... >> "%BUILD_LOG%"
 
 if exist "%VALIDATOR%" (
     python "%VALIDATOR%"
@@ -229,9 +160,9 @@ if exist "%VALIDATOR%" (
 )
 echo.
 
-REM ===== Phase 5: Clean Previous Builds =====
-echo [Phase 5/7] Cleaning previous v1.7.5 builds...
-echo [Phase 5/7] Cleaning previous builds... >> "%BUILD_LOG%"
+REM ===== Phase 4: Clean Previous Builds =====
+echo [Phase 4/6] Cleaning previous v1.7.5 builds...
+echo [Phase 4/6] Cleaning previous builds... >> "%BUILD_LOG%"
 
 REM Only clean v1.7.5 builds, preserve other versions
 if exist build (
@@ -255,9 +186,9 @@ if exist WhisperJAV-%VERSION%-Windows-x86_64.exe (
 echo   - Cleanup complete
 echo.
 
-REM ===== Phase 6: Build Installer =====
-echo [Phase 6/7] Building installer with constructor...
-echo [Phase 6/7] Building installer... >> "%BUILD_LOG%"
+REM ===== Phase 5: Build Installer =====
+echo [Phase 5/6] Building installer with constructor...
+echo [Phase 5/6] Building installer... >> "%BUILD_LOG%"
 echo.
 echo This will take 2-5 minutes. Please wait...
 echo.
@@ -291,9 +222,9 @@ if errorlevel 1 (
 
 echo.
 
-REM ===== Phase 7: Verify Output and Generate Report =====
-echo [Phase 7/7] Verifying build output...
-echo [Phase 7/7] Verifying output... >> "%BUILD_LOG%"
+REM ===== Phase 6: Verify Output and Generate Report =====
+echo [Phase 6/6] Verifying build output...
+echo [Phase 6/6] Verifying output... >> "%BUILD_LOG%"
 
 set INSTALLER_NAME=WhisperJAV-%VERSION%-Windows-x86_64.exe
 

@@ -1434,28 +1434,22 @@ Section "Install"
     ; Create desktop shortcut to WhisperJAV GUI application
     ; This runs after post_install completes and all packages are installed
     ;
-    ; SHORTCUT STRATEGY:
-    ;   Priority 1: Use WhisperJAV.exe (frozen launcher - best user experience)
-    ;   Priority 2: Fallback to pythonw.exe + script (may have "Access Denied" issues)
-    ;
-    ; The frozen launcher (WhisperJAV.exe) is preferred because:
-    ;   1. It's a real Windows executable - no script execution issues
-    ;   2. Better compatibility with antivirus software
-    ;   3. Professional appearance (user sees .exe not .py)
-    ;   4. Icon embedded directly in the executable
+    ; SHORTCUT TARGET:
+    ;   WhisperJAV-GUI.exe - Created by post_install from Scripts/whisperjav-gui.exe
+    ;   Fallback: pythonw.exe -m whisperjav.webview_gui.main
 
     ${Print} "Creating WhisperJAV desktop shortcut..."
 
     ; Set working directory to installation folder (required for self-contained app)
     SetOutPath "$INSTDIR"
 
-    ; Check if frozen launcher exists (preferred)
-    ${If} ${FileExists} "$INSTDIR\WhisperJAV.exe"
-        ${Print} "Using frozen launcher: WhisperJAV.exe"
+    ; Check if GUI launcher exists (created by post_install from Scripts/whisperjav-gui.exe)
+    ${If} ${FileExists} "$INSTDIR\WhisperJAV-GUI.exe"
+        ${Print} "Using launcher: WhisperJAV-GUI.exe"
 
-        ; Create desktop shortcut pointing to frozen exe
+        ; Create desktop shortcut
         CreateShortCut "$DESKTOP\WhisperJAV v1.7.5.lnk" \
-            "$INSTDIR\WhisperJAV.exe" \
+            "$INSTDIR\WhisperJAV-GUI.exe" \
             "" \
             "$INSTDIR\whisperjav_icon.ico" \
             0 \
@@ -1466,7 +1460,7 @@ Section "Install"
         ; Also create Start Menu shortcut
         CreateDirectory "$SMPROGRAMS\WhisperJAV"
         CreateShortCut "$SMPROGRAMS\WhisperJAV\WhisperJAV v1.7.5.lnk" \
-            "$INSTDIR\WhisperJAV.exe" \
+            "$INSTDIR\WhisperJAV-GUI.exe" \
             "" \
             "$INSTDIR\whisperjav_icon.ico" \
             0 \
@@ -1475,13 +1469,12 @@ Section "Install"
             "WhisperJAV v1.7.5 - Japanese AV Subtitle Generator"
 
     ${Else}
-        ${Print} "Frozen launcher not found, using script fallback"
+        ${Print} "WhisperJAV-GUI.exe not found, using pythonw fallback"
 
-        ; Fallback: Create shortcut using pythonw.exe + script
-        ; Note: This may have "Access Denied" issues on some systems
+        ; Fallback: Create shortcut using pythonw.exe + module
         CreateShortCut "$DESKTOP\WhisperJAV v1.7.5.lnk" \
             "$INSTDIR\pythonw.exe" \
-            '"$INSTDIR\WhisperJAV_Launcher_v1.7.5.py"' \
+            "-m whisperjav.webview_gui.main" \
             "$INSTDIR\whisperjav_icon.ico" \
             0 \
             SW_SHOWNORMAL \
@@ -1492,7 +1485,7 @@ Section "Install"
         CreateDirectory "$SMPROGRAMS\WhisperJAV"
         CreateShortCut "$SMPROGRAMS\WhisperJAV\WhisperJAV v1.7.5.lnk" \
             "$INSTDIR\pythonw.exe" \
-            '"$INSTDIR\WhisperJAV_Launcher_v1.7.5.py"' \
+            "-m whisperjav.webview_gui.main" \
             "$INSTDIR\whisperjav_icon.ico" \
             0 \
             SW_SHOWNORMAL \
