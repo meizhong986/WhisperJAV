@@ -23,14 +23,37 @@ try:
 except ImportError:
     CURRENT_VERSION = "0.0.0"
 
+# =============================================================================
+# Configurable Endpoints (for testing)
+# =============================================================================
+# These can be overridden via environment variables to point at test stubs:
+#
+#   WHISPERJAV_UPDATE_API_URL - GitHub API endpoint for release info
+#   WHISPERJAV_RELEASES_URL   - Human-readable releases page URL
+#
+# Example (pointing at test stub repo):
+#   set WHISPERJAV_UPDATE_API_URL=https://api.github.com/repos/meizhong986/whisperjav-test/releases/latest
+#   set WHISPERJAV_RELEASES_URL=https://github.com/meizhong986/whisperjav-test/releases
+#
+# Example (local mock server):
+#   set WHISPERJAV_UPDATE_API_URL=http://localhost:8000/api/releases/latest
+#   set WHISPERJAV_RELEASES_URL=http://localhost:8000/releases
+# =============================================================================
+
 # GitHub API endpoint
-GITHUB_API_URL = "https://api.github.com/repos/meizhong986/whisperjav/releases/latest"
-GITHUB_RELEASES_URL = "https://github.com/meizhong986/WhisperJAV/releases"
+GITHUB_API_URL = os.environ.get(
+    'WHISPERJAV_UPDATE_API_URL',
+    'https://api.github.com/repos/meizhong986/whisperjav/releases/latest'
+)
+GITHUB_RELEASES_URL = os.environ.get(
+    'WHISPERJAV_RELEASES_URL',
+    'https://github.com/meizhong986/WhisperJAV/releases'
+)
 
 # Cache settings
 CACHE_DIR = Path(os.environ.get('LOCALAPPDATA', Path.home())) / '.whisperjav_cache'
 VERSION_CACHE_FILE = CACHE_DIR / 'version_check.json'
-CACHE_DURATION_HOURS = 6  # Check at most every 6 hours
+CACHE_DURATION_HOURS = int(os.environ.get('WHISPERJAV_CACHE_HOURS', '6'))
 
 
 @dataclass
