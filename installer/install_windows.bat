@@ -350,7 +350,7 @@ if errorlevel 1 (
 echo.
 
 REM ============================================================
-REM Phase 4: Core Dependencies
+REM Phase 4: Core Dependencies (with constraints)
 REM ============================================================
 call :log ""
 call :log "============================================================"
@@ -361,23 +361,31 @@ echo ============================================================
 echo   [Step 3/7] Installing core dependencies
 echo ============================================================
 
+REM Phase 4.1: Core scientific stack (MUST install first to establish versions)
+call :log "Phase 4.1: Installing core scientific stack..."
 call :run_pip_with_retry "install numpy>=2.0 scipy>=1.10.1 librosa>=0.11.0" "Install scientific packages"
 if errorlevel 1 goto :install_failed
 
-call :run_pip_with_retry "install soundfile pydub tqdm colorama requests regex" "Install audio/utility packages"
+REM Phase 4.2: Audio and utility packages
+call :log "Phase 4.2: Installing audio/utility packages..."
+call :run_pip_with_retry "install soundfile pydub tqdm colorama requests regex psutil>=5.9.0" "Install audio/utility packages"
 if errorlevel 1 goto :install_failed
 
+REM Phase 4.3: Subtitle and async packages
+call :log "Phase 4.3: Installing subtitle/async packages..."
 call :run_pip_with_retry "install pysrt srt aiofiles jsonschema pyloudnorm" "Install subtitle/async packages"
 if errorlevel 1 goto :install_failed
 
+REM Phase 4.4: Config and optimization packages
+call :log "Phase 4.4: Installing config packages..."
 call :run_pip_with_retry "install pydantic>=2.0,<3.0 PyYAML>=6.0 numba" "Install config packages"
 if errorlevel 1 goto :install_failed
 
-REM Additional packages from requirements_v1.7.4.txt
-call :run_pip_with_retry "install Pillow matplotlib" "Install image/plotting packages"
+REM Phase 4.5: Image/plotting packages (non-fatal)
+call :run_pip_with_retry "install Pillow" "Install image packages"
 if errorlevel 1 (
-    echo WARNING: Pillow/matplotlib installation failed (non-fatal)
-    call :log "WARNING: Pillow/matplotlib installation failed"
+    echo WARNING: Pillow installation failed (non-fatal)
+    call :log "WARNING: Pillow installation failed"
 )
 echo.
 
@@ -405,10 +413,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call :run_pip_with_retry "install git+https://github.com/kkroening/ffmpeg-python.git" "Install ffmpeg-python"
+REM ffmpeg-python: PyPI tarball fails, use git URL
+call :run_pip_with_retry "install git+https://github.com/kkroening/ffmpeg-python.git" "Install ffmpeg-python (git)"
 if errorlevel 1 (
     echo WARNING: ffmpeg-python from git failed, trying PyPI version...
-    call :run_pip_with_retry "install ffmpeg-python" "Install ffmpeg-python (PyPI)"
+    call :log "WARNING: ffmpeg-python git failed, trying PyPI..."
+    call :run_pip_with_retry "install ffmpeg-python" "Install ffmpeg-python (PyPI fallback)"
 )
 
 call :run_pip_with_retry "install faster-whisper>=1.1.0" "Install faster-whisper"
@@ -436,6 +446,12 @@ call :run_pip_with_retry "install huggingface-hub>=0.25.0 transformers>=4.40.0 a
 if errorlevel 1 (
     echo WARNING: HuggingFace packages failed (non-fatal)
     call :log "WARNING: HuggingFace packages failed"
+)
+
+REM hf_xet for faster HuggingFace downloads (optional)
+python -m pip install hf_xet 2>nul
+if errorlevel 1 (
+    call :log "Note: hf_xet not installed (optional, faster HF downloads)"
 )
 
 REM Translation
@@ -471,40 +487,58 @@ if "%MINIMAL%"=="0" (
 )
 echo.
 
-REM Speech Enhancement (optional)
+REM Speech Enhancement (optional but recommended)
 if "%NO_SPEECH_ENHANCEMENT%"=="0" (
     echo ============================================================
     echo   [Step 6/7] Installing speech enhancement packages
     echo ============================================================
     echo Note: These packages can be tricky. Failures here are non-fatal.
+    echo       Speech enhancement improves transcription quality in noisy audio.
     echo.
     call :log "Installing speech enhancement packages..."
 
+    REM Install ModelScope dependencies first (CRITICAL: datasets must be <4.0)
+    call :log "Installing ModelScope dependencies..."
     python -m pip install addict simplejson sortedcontainers packaging 2>nul
     python -m pip install "datasets>=2.14.0,<4.0" 2>nul
+    if errorlevel 1 (
+        echo WARNING: datasets installation failed - modelscope may not work
+        call :log "WARNING: datasets installation failed"
+    )
 
-    echo Installing ModelScope...
+    REM Install ModelScope (ZipEnhancer SOTA speech enhancement)
+    echo Installing ModelScope ^(ZipEnhancer^)...
+    call :log "Installing ModelScope..."
     python -m pip install "modelscope>=1.20" 2>nul
     if errorlevel 1 (
         echo WARNING: modelscope installation failed ^(optional^)
         call :log "WARNING: modelscope installation failed"
     )
 
-    echo Installing ClearVoice...
+    REM Install ClearVoice from NumPy 2.x compatible fork
+    echo Installing ClearVoice ^(48kHz denoising^)...
+    call :log "Installing ClearVoice..."
     python -m pip install "git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice" 2>nul
     if errorlevel 1 (
         echo WARNING: clearvoice installation failed ^(optional^)
         call :log "WARNING: clearvoice installation failed"
     )
 
-    echo Installing BS-RoFormer...
+    REM Install BS-RoFormer (vocal isolation)
+    echo Installing BS-RoFormer ^(vocal isolation^)...
+    call :log "Installing BS-RoFormer..."
     python -m pip install bs-roformer-infer 2>nul
     if errorlevel 1 (
         echo WARNING: bs-roformer-infer installation failed ^(optional^)
         call :log "WARNING: bs-roformer-infer installation failed"
     )
 
+    REM ONNX Runtime for ZipEnhancer ONNX mode
+    echo Installing ONNX Runtime...
     python -m pip install "onnxruntime>=1.16.0" 2>nul
+    if errorlevel 1 (
+        call :log "Note: onnxruntime installation failed (optional)"
+    )
     echo.
 ) else (
     echo ============================================================
@@ -546,7 +580,7 @@ if errorlevel 1 (
 echo.
 
 REM ============================================================
-REM Verification and Summary
+REM Verification Phase: Check Critical Dependencies
 REM ============================================================
 call :log ""
 call :log "============================================================"
@@ -556,9 +590,11 @@ call :log "============================================================"
 echo ============================================================
 echo   Verifying Installation
 echo ============================================================
+
+REM Verify WhisperJAV
 python -c "import whisperjav; print(f'WhisperJAV {whisperjav.__version__} installed successfully!')"
 if errorlevel 1 (
-    echo WARNING: Could not verify installation
+    echo WARNING: Could not verify WhisperJAV installation
     call :log "WARNING: WhisperJAV verification failed"
 ) else (
     call :log "WhisperJAV verified successfully"
@@ -566,6 +602,24 @@ if errorlevel 1 (
 
 REM Verify PyTorch CUDA status
 python -c "import torch; cuda_status = 'ENABLED' if torch.cuda.is_available() else 'DISABLED'; print(f'CUDA acceleration: {cuda_status}')" 2>nul
+
+REM Verify critical packages
+echo.
+echo Verifying critical packages:
+call :log "Verifying critical packages..."
+
+python -c "import numpy; print(f'  numpy: {numpy.__version__}')" 2>nul || echo   numpy: FAILED
+python -c "import scipy; print(f'  scipy: {scipy.__version__}')" 2>nul || echo   scipy: FAILED
+python -c "import librosa; print(f'  librosa: {librosa.__version__}')" 2>nul || echo   librosa: FAILED
+python -c "import faster_whisper; print(f'  faster-whisper: {faster_whisper.__version__}')" 2>nul || echo   faster-whisper: FAILED
+python -c "import transformers; print(f'  transformers: {transformers.__version__}')" 2>nul || echo   transformers: FAILED
+
+if "%NO_SPEECH_ENHANCEMENT%"=="0" (
+    echo.
+    echo Speech enhancement packages:
+    python -c "import modelscope; print(f'  modelscope: {modelscope.__version__}')" 2>nul || echo   modelscope: NOT INSTALLED
+    python -c "import clearvoice; print('  clearvoice: installed')" 2>nul || echo   clearvoice: NOT INSTALLED
+)
 
 echo.
 
