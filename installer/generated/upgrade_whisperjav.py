@@ -41,18 +41,41 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict
 
 # Version of this upgrade script
-UPGRADE_SCRIPT_VERSION = "1.7.4"
+UPGRADE_SCRIPT_VERSION = "1.7.5"
 
 # Minimum disk space required for upgrade (in bytes)
 MIN_DISK_SPACE_GB = 5
 MIN_DISK_SPACE_BYTES = MIN_DISK_SPACE_GB * 1024 * 1024 * 1024
 
+# =============================================================================
+# Configurable Endpoints (for testing)
+# =============================================================================
+# These can be overridden via environment variables to point at test stubs:
+#
+#   WHISPERJAV_UPGRADE_REPO   - pip-installable URL for the package
+#   WHISPERJAV_CHECKSUM_URL   - URL for SHA256 checksum manifest
+#
+# Example (pointing at test stub repo):
+#   set WHISPERJAV_UPGRADE_REPO=git+https://github.com/meizhong986/whisperjav-test.git@v1.7.5
+#   set WHISPERJAV_CHECKSUM_URL=https://raw.githubusercontent.com/meizhong986/whisperjav-test/main/installer/checksums.json
+#
+# Example (local files):
+#   set WHISPERJAV_UPGRADE_REPO=git+file:///c:/repos/whisperjav-test@main
+#   set WHISPERJAV_CHECKSUM_URL=file:///c:/repos/whisperjav-test/installer/checksums.json
+# =============================================================================
+
 # SHA256 checksum manifest URL (two-channel trust)
-CHECKSUM_MANIFEST_URL = "https://raw.githubusercontent.com/meizhong986/whisperjav/main/installer/checksums.json"
+CHECKSUM_MANIFEST_URL = os.environ.get(
+    'WHISPERJAV_CHECKSUM_URL',
+    'https://raw.githubusercontent.com/meizhong986/whisperjav/main/installer/checksums.json'
+)
 # Backup: checksums also published in GitHub Release assets
 
 # GitHub repository URL
-GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
+GITHUB_REPO = os.environ.get(
+    'WHISPERJAV_UPGRADE_REPO',
+    'git+https://github.com/meizhong986/whisperjav.git@main'
+)
 
 # New dependencies added in v1.7.x that older versions don't have
 # Note: Dependencies that require torch (like nemo_toolkit) are handled separately

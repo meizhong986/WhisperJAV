@@ -34,8 +34,28 @@ from typing import Optional, Tuple, List
 # Version of this upgrade script
 UPGRADE_SCRIPT_VERSION = "1.7.5"
 
+# =============================================================================
+# Configurable Endpoints (for testing)
+# =============================================================================
+# These can be overridden via environment variables to point at test stubs:
+#
+#   WHISPERJAV_UPGRADE_REPO - pip-installable URL for the package
+#
+# Example (pointing at test stub repo):
+#   set WHISPERJAV_UPGRADE_REPO=git+https://github.com/meizhong986/whisperjav-test.git@v1.7.5
+#
+# Example (local wheel file):
+#   set WHISPERJAV_UPGRADE_REPO=/path/to/whisperjav-1.7.5-py3-none-any.whl
+#
+# Example (local git repo):
+#   set WHISPERJAV_UPGRADE_REPO=git+file:///c:/repos/whisperjav-test@main
+# =============================================================================
+
 # GitHub repository URL
-GITHUB_REPO = "git+https://github.com/meizhong986/whisperjav.git@main"
+GITHUB_REPO = os.environ.get(
+    'WHISPERJAV_UPGRADE_REPO',
+    'git+https://github.com/meizhong986/whisperjav.git@main'
+)
 
 # Packages to fix AFTER main installation (clearvoice pulls older versions)
 FIX_PACKAGES = [
