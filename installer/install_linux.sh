@@ -12,6 +12,10 @@
 #
 # Options:
 #   --cpu-only              Install CPU-only PyTorch (no CUDA)
+#   --cuda121               Install PyTorch for CUDA 12.1
+#   --cuda124               Install PyTorch for CUDA 12.4
+#   --cuda126               Install PyTorch for CUDA 12.6
+#   --cuda128               Install PyTorch for CUDA 12.8 (default for driver 570+)
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Install minimal version (no speech enhancement, no TEN VAD)
 #   --dev                   Install in development/editable mode
@@ -92,6 +96,7 @@ log "Git found"
 
 # Parse arguments
 CPU_ONLY=false
+CUDA_VERSION="auto"
 NO_SPEECH_ENHANCEMENT=false
 MINIMAL=false
 DEV_MODE=false
@@ -100,6 +105,19 @@ for arg in "$@"; do
     case $arg in
         --cpu-only)
             CPU_ONLY=true
+            CUDA_VERSION="cpu"
+            ;;
+        --cuda121)
+            CUDA_VERSION="cuda121"
+            ;;
+        --cuda124)
+            CUDA_VERSION="cuda124"
+            ;;
+        --cuda126)
+            CUDA_VERSION="cuda126"
+            ;;
+        --cuda128)
+            CUDA_VERSION="cuda128"
             ;;
         --no-speech-enhancement)
             NO_SPEECH_ENHANCEMENT=true
@@ -119,10 +137,17 @@ for arg in "$@"; do
             echo ""
             echo "Options:"
             echo "  --cpu-only              Install CPU-only PyTorch (no CUDA)"
+            echo "  --cuda121               Install PyTorch for CUDA 12.1"
+            echo "  --cuda124               Install PyTorch for CUDA 12.4"
+            echo "  --cuda126               Install PyTorch for CUDA 12.6"
+            echo "  --cuda128               Install PyTorch for CUDA 12.8 (default for driver 570+)"
             echo "  --no-speech-enhancement Skip speech enhancement packages"
             echo "  --minimal               Minimal install (no speech enhancement)"
             echo "  --dev                   Install in development/editable mode"
             echo "  --help, -h              Show this help message"
+            echo ""
+            echo "The script will auto-detect your GPU and select the appropriate"
+            echo "CUDA version. Use --cuda*** flags to override."
             echo ""
             exit 0
             ;;
@@ -151,28 +176,58 @@ echo -e "${GREEN}Python $PYTHON_VERSION detected${NC}"
 log "Python $PYTHON_VERSION detected"
 echo ""
 
-# Auto-detect NVIDIA GPU
+# Auto-detect NVIDIA GPU and driver version
 if [ "$CPU_ONLY" = false ]; then
     echo -e "${YELLOW}Checking for NVIDIA GPU...${NC}"
     log "Checking for NVIDIA GPU..."
     if command -v nvidia-smi &> /dev/null; then
         GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1)
+        DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n1)
         if [ -n "$GPU_NAME" ]; then
             echo -e "${GREEN}NVIDIA GPU detected: $GPU_NAME${NC}"
+            echo -e "${GREEN}Driver version: $DRIVER_VERSION${NC}"
             log "NVIDIA GPU detected: $GPU_NAME"
+            log "Driver version: $DRIVER_VERSION"
+
+            # Auto-select CUDA version based on driver if not specified
+            if [ "$CUDA_VERSION" = "auto" ]; then
+                DRIVER_MAJOR=$(echo "$DRIVER_VERSION" | cut -d. -f1)
+                if [ "$DRIVER_MAJOR" -ge 570 ] 2>/dev/null; then
+                    CUDA_VERSION="cuda128"
+                    echo -e "${GREEN}Auto-selecting CUDA 12.8 based on driver $DRIVER_VERSION${NC}"
+                    log "Auto-selecting CUDA 12.8"
+                elif [ "$DRIVER_MAJOR" -ge 560 ] 2>/dev/null; then
+                    CUDA_VERSION="cuda126"
+                    echo -e "${GREEN}Auto-selecting CUDA 12.6 based on driver $DRIVER_VERSION${NC}"
+                    log "Auto-selecting CUDA 12.6"
+                elif [ "$DRIVER_MAJOR" -ge 551 ] 2>/dev/null; then
+                    CUDA_VERSION="cuda124"
+                    echo -e "${GREEN}Auto-selecting CUDA 12.4 based on driver $DRIVER_VERSION${NC}"
+                    log "Auto-selecting CUDA 12.4"
+                else
+                    CUDA_VERSION="cuda121"
+                    echo -e "${GREEN}Using CUDA 12.1 for driver $DRIVER_VERSION${NC}"
+                    log "Using CUDA 12.1"
+                fi
+            fi
         else
             echo -e "${RED}nvidia-smi found but no GPU detected${NC}"
             log "WARNING: nvidia-smi found but no GPU detected"
             CPU_ONLY=true
+            CUDA_VERSION="cpu"
         fi
     elif [ -f "/proc/driver/nvidia/version" ]; then
         echo -e "${GREEN}NVIDIA driver detected${NC}"
         log "NVIDIA driver detected"
+        if [ "$CUDA_VERSION" = "auto" ]; then
+            CUDA_VERSION="cuda121"
+        fi
     else
         echo -e "${RED}No NVIDIA GPU detected!${NC}"
         echo -e "${YELLOW}Switching to CPU-only installation automatically.${NC}"
         log "No NVIDIA GPU - switching to CPU-only"
         CPU_ONLY=true
+        CUDA_VERSION="cpu"
     fi
     echo ""
 fi
@@ -185,8 +240,8 @@ if [ "$CPU_ONLY" = true ]; then
     echo "  PyTorch: CPU-only"
     log "Configuration: PyTorch=CPU-only"
 else
-    echo "  PyTorch: CUDA 12.1"
-    log "Configuration: PyTorch=CUDA 12.1"
+    echo "  PyTorch: $CUDA_VERSION"
+    log "Configuration: PyTorch=$CUDA_VERSION"
 fi
 if [ "$NO_SPEECH_ENHANCEMENT" = true ]; then
     echo "  Speech Enhancement: Disabled"
@@ -227,15 +282,32 @@ log "  Phase 2: PyTorch Installation"
 log "============================================================"
 
 echo -e "${YELLOW}Step 2/7: Installing PyTorch...${NC}"
-if [ "$CPU_ONLY" = true ]; then
-    echo "Installing CPU-only PyTorch..."
-    log "Installing PyTorch (CPU-only)..."
-    pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-else
-    echo "Installing PyTorch with CUDA support..."
-    log "Installing PyTorch (CUDA 12.1)..."
-    pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
-fi
+
+# Select PyTorch URL based on CUDA version
+case $CUDA_VERSION in
+    cpu)
+        TORCH_URL="https://download.pytorch.org/whl/cpu"
+        ;;
+    cuda121)
+        TORCH_URL="https://download.pytorch.org/whl/cu121"
+        ;;
+    cuda124)
+        TORCH_URL="https://download.pytorch.org/whl/cu124"
+        ;;
+    cuda126)
+        TORCH_URL="https://download.pytorch.org/whl/cu126"
+        ;;
+    cuda128)
+        TORCH_URL="https://download.pytorch.org/whl/cu128"
+        ;;
+    *)
+        TORCH_URL="https://download.pytorch.org/whl/cu121"
+        ;;
+esac
+
+echo "Installing PyTorch ($CUDA_VERSION)..."
+log "Installing PyTorch ($CUDA_VERSION) from $TORCH_URL..."
+pip3 install --progress-bar on torch torchaudio --index-url "$TORCH_URL"
 log "PyTorch installed"
 echo ""
 
@@ -253,9 +325,9 @@ echo -e "${YELLOW}Step 3/7: Installing core dependencies...${NC}"
 log "Phase 3.1: Installing scientific stack..."
 pip3 install "numpy>=2.0" "scipy>=1.10.1" "librosa>=0.11.0"
 
-# Phase 3.2: Audio and utility packages
+# Phase 3.2: Audio and utility packages (including fsspec constraint)
 log "Phase 3.2: Installing audio/utility packages..."
-pip3 install soundfile pydub tqdm colorama requests regex "psutil>=5.9.0"
+pip3 install --progress-bar on soundfile pydub tqdm colorama requests regex "psutil>=5.9.0" "fsspec>=2025.3.0"
 
 # Phase 3.3: Subtitle and async packages
 log "Phase 3.3: Installing subtitle/async packages..."

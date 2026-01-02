@@ -17,9 +17,10 @@ REM
 REM Options:
 REM   --cpu-only              Install CPU-only PyTorch (no CUDA)
 REM   --cuda118               Install PyTorch for CUDA 11.8
-REM   --cuda121               Install PyTorch for CUDA 12.1 (default)
+REM   --cuda121               Install PyTorch for CUDA 12.1
 REM   --cuda124               Install PyTorch for CUDA 12.4
 REM   --cuda126               Install PyTorch for CUDA 12.6
+REM   --cuda128               Install PyTorch for CUDA 12.8 (default for driver 570+)
 REM   --no-speech-enhancement Skip speech enhancement packages
 REM   --minimal               Minimal install (transcription only)
 REM   --dev                   Install in development/editable mode
@@ -58,6 +59,7 @@ if /i "%~1"=="--cuda118" set "CUDA_VERSION=cuda118"
 if /i "%~1"=="--cuda121" set "CUDA_VERSION=cuda121"
 if /i "%~1"=="--cuda124" set "CUDA_VERSION=cuda124"
 if /i "%~1"=="--cuda126" set "CUDA_VERSION=cuda126"
+if /i "%~1"=="--cuda128" set "CUDA_VERSION=cuda128"
 if /i "%~1"=="--no-speech-enhancement" set "NO_SPEECH_ENHANCEMENT=1"
 if /i "%~1"=="--minimal" (
     set "MINIMAL=1"
@@ -220,12 +222,17 @@ if "%CPU_ONLY%"=="0" (
         REM Auto-select CUDA version based on driver if user didn't specify
         if "%CUDA_VERSION%"=="cuda121" (
             REM Check if driver supports newer CUDA
+            REM Driver 570+ supports CUDA 12.8
             REM Driver 560+ supports CUDA 12.6
             REM Driver 551+ supports CUDA 12.4
             REM Driver 531+ supports CUDA 12.1
             for /f "tokens=1 delims=." %%d in ("!DRIVER_VERSION!") do set "DRIVER_MAJOR=%%d"
             if defined DRIVER_MAJOR (
-                if !DRIVER_MAJOR! GEQ 560 (
+                if !DRIVER_MAJOR! GEQ 570 (
+                    echo Auto-selecting CUDA 12.8 based on driver !DRIVER_VERSION!
+                    call :log "Auto-selecting CUDA 12.8 based on driver"
+                    set "CUDA_VERSION=cuda128"
+                ) else if !DRIVER_MAJOR! GEQ 560 (
                     echo Auto-selecting CUDA 12.6 based on driver !DRIVER_VERSION!
                     call :log "Auto-selecting CUDA 12.6 based on driver"
                     set "CUDA_VERSION=cuda126"
@@ -284,6 +291,10 @@ if "%CUDA_VERSION%"=="cuda124" (
 )
 if "%CUDA_VERSION%"=="cuda126" (
     set "TORCH_URL=https://download.pytorch.org/whl/cu126"
+    set "TORCH_PACKAGES=torch torchaudio"
+)
+if "%CUDA_VERSION%"=="cuda128" (
+    set "TORCH_URL=https://download.pytorch.org/whl/cu128"
     set "TORCH_PACKAGES=torch torchaudio"
 )
 
@@ -368,7 +379,7 @@ if errorlevel 1 goto :install_failed
 
 REM Phase 4.2: Audio and utility packages
 call :log "Phase 4.2: Installing audio/utility packages..."
-call :run_pip_with_retry "install soundfile pydub tqdm colorama requests regex psutil>=5.9.0" "Install audio/utility packages"
+call :run_pip_with_retry "install --progress-bar on soundfile pydub tqdm colorama requests regex psutil>=5.9.0 fsspec>=2025.3.0" "Install audio/utility packages"
 if errorlevel 1 goto :install_failed
 
 REM Phase 4.3: Subtitle and async packages
@@ -728,9 +739,10 @@ echo.
 echo Options:
 echo   --cpu-only              Install CPU-only PyTorch ^(no CUDA^)
 echo   --cuda118               Install PyTorch for CUDA 11.8
-echo   --cuda121               Install PyTorch for CUDA 12.1 ^(default^)
+echo   --cuda121               Install PyTorch for CUDA 12.1
 echo   --cuda124               Install PyTorch for CUDA 12.4
 echo   --cuda126               Install PyTorch for CUDA 12.6
+echo   --cuda128               Install PyTorch for CUDA 12.8 ^(default for driver 570+^)
 echo   --no-speech-enhancement Skip speech enhancement packages
 echo   --minimal               Minimal install ^(transcription only^)
 echo   --dev                   Install in development/editable mode
@@ -739,9 +751,11 @@ echo.
 echo Examples:
 echo   install_windows.bat                    # Standard install with auto CUDA detection
 echo   install_windows.bat --cpu-only         # CPU-only install
+echo   install_windows.bat --cuda128          # Force CUDA 12.8
 echo   install_windows.bat --minimal --dev    # Minimal dev install
 echo.
 echo The script will auto-detect your GPU and select the appropriate
-echo CUDA version. Use --cuda*** flags to override.
+echo CUDA version ^(12.8 for driver 570+, 12.6 for 560+, etc.^).
+echo Use --cuda*** flags to override.
 echo.
 exit /b 0
