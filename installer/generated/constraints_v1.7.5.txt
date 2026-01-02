@@ -1,0 +1,106 @@
+# WhisperJAV v1.7.5 Dependency Constraints
+# ==========================================
+#
+# This file pins critical dependency versions to prevent conflicts caused by
+# speech enhancement packages (modelscope, clearvoice, bs-roformer, zipenhancer).
+#
+# These packages have aggressive dependency specifications that can break:
+# - numpy (modelscope wants <2.0, but we need >=2.0 for librosa 0.11+)
+# - datasets (modelscope breaks with datasets 4.x)
+# - huggingface-hub version compatibility
+# - librosa audio processing
+#
+# Usage: pip install -c constraints_v1.7.5.txt -r requirements_v1.7.5.txt
+#
+# IMPORTANT: This file is used during installation to prevent pip from
+# downgrading critical packages when installing speech enhancement backends.
+
+# =============================================================================
+# Core Scientific Stack (STRICT - Do NOT allow downgrades)
+# =============================================================================
+# numpy 2.x is required for librosa 0.11+ compatibility
+# modelscope/zipenhancer may try to install numpy<2.0 - BLOCK THIS
+numpy>=2.0
+
+# scipy 1.10.1+ required for audio processing compatibility
+scipy>=1.10.1
+
+# librosa 0.11+ supports numpy 2.x
+librosa>=0.11.0
+
+# =============================================================================
+# ML Ecosystem Stability (CRITICAL for modelscope compatibility)
+# =============================================================================
+# datasets 4.x breaks modelscope - MUST cap at <4.0
+datasets>=2.14.0,<4.0
+
+# pydantic 3.x has breaking API changes
+pydantic>=2.0,<3.0
+
+# HuggingFace ecosystem version alignment
+transformers>=4.40.0
+accelerate>=0.26.0
+huggingface-hub>=0.25.0
+
+# =============================================================================
+# System Utilities
+# =============================================================================
+# psutil for process management (clean subprocess termination)
+psutil>=5.9.0
+
+# pywebview for GUI framework
+pywebview>=5.0.0
+
+# =============================================================================
+# Audio/Video Processing
+# =============================================================================
+# Faster Whisper for efficient transcription
+faster-whisper>=1.1.0
+
+# silero-vad for voice activity detection
+silero-vad>=6.0
+
+# PySubtrans for subtitle translation
+PySubtrans>=0.7.0
+
+# OpenAI API for translation providers
+openai>=1.35.0
+
+# Google Gemini API for translation providers
+google-genai>=1.39.0
+
+# scikit-learn for semantic scene detection
+scikit-learn>=1.3.0
+
+# ONNX runtime for ZipEnhancer inference
+onnxruntime>=1.16.0
+
+# modelscope for ZipEnhancer speech enhancement
+modelscope>=1.20
+
+# =============================================================================
+# Package Conflict Notes
+# =============================================================================
+#
+# Known conflicts and mitigations:
+#
+# 1. modelscope + numpy:
+#    - modelscope may request numpy<2.0
+#    - We REQUIRE numpy>=2.0 for librosa 0.11+
+#    - Solution: Install numpy first, then modelscope with --no-deps flag
+#
+# 2. modelscope + datasets:
+#    - modelscope breaks with datasets>=4.0
+#    - Solution: Cap datasets<4.0 in constraints
+#
+# 3. clearvoice + numpy:
+#    - Original clearvoice requires numpy<2.0
+#    - Solution: Use forked version with numpy 2.x support
+#
+# 4. bs-roformer-infer:
+#    - Generally compatible but may pull old torchaudio
+#    - Solution: Install PyTorch/torchaudio first
+#
+# 5. zipenhancer (via modelscope):
+#    - Part of modelscope ecosystem
+#    - Solution: Install modelscope with constraints

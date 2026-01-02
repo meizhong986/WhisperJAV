@@ -40,6 +40,7 @@ extra_files:
   - post_install_v1.7.5.bat
   - post_install_v1.7.5.py
   - requirements_v1.7.5.txt
+  - constraints_v1.7.5.txt    # Version pinning for problematic packages
   - WhisperJAV_Launcher_v1.7.5.py
   - README_INSTALLER_v1.7.5.txt
   - LICENSE.txt
