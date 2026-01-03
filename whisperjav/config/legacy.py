@@ -135,6 +135,8 @@ def resolve_legacy_pipeline(
     sensitivity: str = "balanced",
     task: str = "transcribe",
     overrides: Optional[Dict[str, Any]] = None,
+    device: Optional[str] = None,
+    compute_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Resolve configuration from legacy pipeline name.
@@ -146,12 +148,16 @@ def resolve_legacy_pipeline(
         sensitivity: Sensitivity level
         task: Task type
         overrides: Parameter overrides
+        device: Device override (None/'auto' = auto-detect, 'cuda'/'cpu' = explicit)
+        compute_type: Compute type override (None/'auto' = provider-specific default)
 
     Returns:
         Resolved configuration dictionary.
 
     Example:
         >>> config = resolve_legacy_pipeline('balanced', 'aggressive')
+        >>> # With explicit hardware:
+        >>> config = resolve_legacy_pipeline('balanced', device='cuda', compute_type='int8_float16')
     """
     if pipeline_name not in LEGACY_PIPELINES:
         available = list(LEGACY_PIPELINES.keys())
@@ -167,6 +173,8 @@ def resolve_legacy_pipeline(
         task=task,
         features=pipeline_def["features"],
         overrides=overrides,
+        device=device,
+        compute_type=compute_type,
     )
 
     # Add legacy compatibility fields
@@ -346,6 +354,8 @@ def resolve_ensemble_config(
     task: str = "transcribe",
     features: Optional[List[str]] = None,
     overrides: Optional[Dict[str, Any]] = None,
+    device: Optional[str] = None,
+    compute_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Resolve configuration for ensemble mode (direct component specification).
@@ -360,6 +370,8 @@ def resolve_ensemble_config(
         features: List of feature names (e.g., ['auditok_scene_detection'])
         overrides: Parameter overrides in flat dot notation
                    (e.g., {'asr.beam_size': 10, 'vad.threshold': 0.25})
+        device: Device override (None/'auto' = auto-detect, 'cuda'/'cpu' = explicit)
+        compute_type: Compute type override (None/'auto' = provider-specific default)
 
     Returns:
         Resolved configuration in legacy structure for pipeline compatibility.
@@ -395,6 +407,8 @@ def resolve_ensemble_config(
         task=task,
         features=features or [],
         overrides=nested_overrides,
+        device=device,
+        compute_type=compute_type,
     )
 
     # Add ensemble-specific metadata

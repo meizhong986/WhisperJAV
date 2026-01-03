@@ -742,6 +742,8 @@ def _build_pipeline(
         sensitivity=pass_config.get("sensitivity", "balanced"),
         task=asr_task,  # Derived from subs_language above
         overrides=pass_config.get("overrides"),
+        device=pass_config.get("device"),  # None = auto-detect
+        compute_type=pass_config.get("compute_type"),  # None = auto
     )
 
     # Apply source language from pass_config (fixes Issue #104)

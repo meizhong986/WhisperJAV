@@ -71,6 +71,8 @@ def resolve_config_v3(
     task: str = "transcribe",
     features: Optional[List[str]] = None,
     overrides: Optional[Dict[str, Any]] = None,
+    device: Optional[str] = None,
+    compute_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Resolve configuration from component selections.
@@ -82,6 +84,9 @@ def resolve_config_v3(
         task: Task type ('transcribe', 'translate')
         features: List of feature names (e.g., ['auditok_scene_detection'])
         overrides: Parameter overrides (e.g., {'asr.beam_size': 10})
+        device: Device override (None/'auto' = auto-detect, 'cuda'/'cpu' = explicit)
+        compute_type: Compute type override (None/'auto' = provider-specific default,
+                      'float16'/'float32'/'int8'/'int8_float16'/'int8_float32' = explicit)
 
     Returns:
         Resolved configuration dictionary.
@@ -94,6 +99,12 @@ def resolve_config_v3(
         ...     task='transcribe',
         ...     features=['auditok_scene_detection'],
         ...     overrides={'asr.beam_size': 10}
+        ... )
+        >>> # With explicit hardware configuration:
+        >>> config = resolve_config_v3(
+        ...     asr='faster_whisper',
+        ...     device='cuda',
+        ...     compute_type='int8_float16'
         ... )
     """
     if features is None:
@@ -162,21 +173,38 @@ def resolve_config_v3(
     for feature_type, feature_config in feature_configs.items():
         _apply_overrides(feature_config, overrides, feature_type)
 
-    # Build model configuration with runtime device detection
-    # This ensures CPU-only systems don't fail with CUDA errors
-    device = get_best_device()
-    compute_type = _get_compute_type_for_device(device, asr_component.provider)
+    # Build model configuration with device/compute_type selection
+    # Priority: 1) User-provided value, 2) Auto-detection
+    #
+    # Device selection:
+    # - None or "auto" → auto-detect using get_best_device()
+    # - "cuda"/"cpu" → use explicit value (MPS fallback handled by ASR modules)
+    #
+    # Compute type selection:
+    # - None or "auto" → provider-specific default (CTranslate2 "auto" or PyTorch float16/32)
+    # - Explicit value → pass through to ASR module
+    if device and device != "auto":
+        selected_device = device
+        logger.debug(f"v3.0 resolver: Using user-specified device='{selected_device}'")
+    else:
+        selected_device = get_best_device()
+        logger.debug(f"v3.0 resolver: Auto-detected device='{selected_device}'")
 
-    logger.debug(
-        f"v3.0 resolver: Auto-detected device='{device}', compute_type='{compute_type}' "
-        f"for provider='{asr_component.provider}'"
-    )
+    if compute_type and compute_type != "auto":
+        selected_compute_type = compute_type
+        logger.debug(f"v3.0 resolver: Using user-specified compute_type='{selected_compute_type}'")
+    else:
+        selected_compute_type = _get_compute_type_for_device(selected_device, asr_component.provider)
+        logger.debug(
+            f"v3.0 resolver: Selected compute_type='{selected_compute_type}' "
+            f"for provider='{asr_component.provider}'"
+        )
 
     model_config = {
         'provider': asr_component.provider,
         'model_name': asr_component.model_id,
-        'device': device,
-        'compute_type': compute_type,
+        'device': selected_device,
+        'compute_type': selected_compute_type,
         'supported_tasks': asr_component.supported_tasks,
     }
 
