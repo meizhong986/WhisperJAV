@@ -23,8 +23,40 @@ from .components import (
     get_vad_registry,
     get_feature_registry,
 )
+from whisperjav.utils.device_detector import get_best_device
 
 logger = logging.getLogger("whisperjav")
+
+# CTranslate2-based providers need int8 on CPU (float16 not supported on CPU)
+CTRANSLATE2_PROVIDERS = {"faster_whisper", "kotoba_faster_whisper"}
+
+
+def _get_compute_type_for_device(device: str, provider: str) -> str:
+    """
+    Select optimal compute_type based on device and provider.
+
+    CTranslate2 providers (faster_whisper, kotoba_faster_whisper):
+    - CUDA: int8_float16 (quantized weights + FP16 tensor cores = fastest)
+    - CPU: int8 (quantized weights + FP32 compute = only fast option)
+
+    PyTorch providers (openai_whisper, stable_ts):
+    - CUDA/MPS: float16
+    - CPU: float32
+
+    Args:
+        device: Detected device ("cuda", "mps", "cpu")
+        provider: ASR provider name
+
+    Returns:
+        Optimal compute_type for the device/provider combination
+    """
+    if provider in CTRANSLATE2_PROVIDERS:
+        # CTranslate2: int8_float16 is fastest on CUDA (quantized weights + FP16 compute)
+        # On CPU, only int8 or float32 are supported; int8 is faster
+        return "int8_float16" if device == "cuda" else "int8"
+    else:
+        # PyTorch-based providers can use float16 on GPU/MPS, float32 on CPU
+        return "float16" if device in ("cuda", "mps") else "float32"
 
 
 def resolve_config_v3(
@@ -125,12 +157,21 @@ def resolve_config_v3(
     for feature_type, feature_config in feature_configs.items():
         _apply_overrides(feature_config, overrides, feature_type)
 
-    # Build model configuration
+    # Build model configuration with runtime device detection
+    # This ensures CPU-only systems don't fail with CUDA errors
+    device = get_best_device()
+    compute_type = _get_compute_type_for_device(device, asr_component.provider)
+
+    logger.debug(
+        f"v3.0 resolver: Auto-detected device='{device}', compute_type='{compute_type}' "
+        f"for provider='{asr_component.provider}'"
+    )
+
     model_config = {
         'provider': asr_component.provider,
         'model_name': asr_component.model_id,
-        'device': asr_component.default_device,
-        'compute_type': asr_component.default_compute_type,
+        'device': device,
+        'compute_type': compute_type,
         'supported_tasks': asr_component.supported_tasks,
     }
 
