@@ -3,6 +3,7 @@
 WhisperJAV Version Checker
 
 Checks for new versions on GitHub and provides update notifications.
+Supports both stable releases and development (latest commit) updates.
 Uses GitHub API with caching and retry logic.
 """
 
@@ -10,11 +11,12 @@ import os
 import sys
 import json
 import time
+import subprocess
 import urllib.request
 import urllib.error
 from pathlib import Path
-from typing import Optional, Tuple, Dict
-from dataclasses import dataclass
+from typing import Optional, Tuple, Dict, List
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 # Import version - handle both installed and dev scenarios
@@ -40,14 +42,23 @@ except ImportError:
 #   set WHISPERJAV_RELEASES_URL=http://localhost:8000/releases
 # =============================================================================
 
-# GitHub API endpoint
+# GitHub API endpoints
+GITHUB_REPO = os.environ.get('WHISPERJAV_REPO', 'meizhong986/whisperjav')
 GITHUB_API_URL = os.environ.get(
     'WHISPERJAV_UPDATE_API_URL',
-    'https://api.github.com/repos/meizhong986/whisperjav/releases/latest'
+    f'https://api.github.com/repos/{GITHUB_REPO}/releases/latest'
+)
+GITHUB_COMMITS_API_URL = os.environ.get(
+    'WHISPERJAV_COMMITS_API_URL',
+    f'https://api.github.com/repos/{GITHUB_REPO}/commits/main'
+)
+GITHUB_COMPARE_API_URL = os.environ.get(
+    'WHISPERJAV_COMPARE_API_URL',
+    f'https://api.github.com/repos/{GITHUB_REPO}/compare'
 )
 GITHUB_RELEASES_URL = os.environ.get(
     'WHISPERJAV_RELEASES_URL',
-    'https://github.com/meizhong986/WhisperJAV/releases'
+    f'https://github.com/{GITHUB_REPO}/releases'
 )
 
 # Cache settings
@@ -68,12 +79,43 @@ class VersionInfo:
 
 
 @dataclass
+class CommitInfo:
+    """Information about a single commit."""
+    sha: str
+    short_sha: str
+    message: str
+    author: str
+    date: str
+    url: str
+
+
+@dataclass
+class DevUpdateInfo:
+    """Information about development (latest commit) updates."""
+    commits_ahead: int
+    latest_commit: Optional[CommitInfo] = None
+    recent_commits: List[CommitInfo] = field(default_factory=list)
+    base_tag: Optional[str] = None  # The release tag we're comparing against
+
+
+@dataclass
 class UpdateCheckResult:
     """Result of an update check."""
-    update_available: bool
+    # Current installation info
     current_version: str
+    current_commit: Optional[str] = None  # Short SHA if known
+    installation_type: str = "release"  # "release" or "dev"
+
+    # Stable release track
+    update_available: bool = False
     latest_version: Optional[str] = None
     version_info: Optional[VersionInfo] = None
+
+    # Development track
+    dev_update_available: bool = False
+    dev_info: Optional[DevUpdateInfo] = None
+
+    # Meta
     error: Optional[str] = None
     from_cache: bool = False
 
@@ -207,17 +249,160 @@ def _fetch_latest_release(timeout: int = 10, retries: int = 2) -> Optional[Dict]
     return None
 
 
-def check_for_updates(force: bool = False) -> UpdateCheckResult:
+def _fetch_github_api(url: str, timeout: int = 10) -> Optional[Dict]:
+    """
+    Fetch data from GitHub API.
+
+    Args:
+        url: GitHub API URL
+        timeout: Request timeout in seconds
+
+    Returns:
+        JSON response dict or None on failure
+    """
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': f'WhisperJAV/{CURRENT_VERSION}'
+            }
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception:
+        return None
+
+
+def _get_current_commit() -> Optional[str]:
+    """
+    Get the current installation's commit hash.
+
+    Tries multiple methods:
+    1. Check if running from git repo (development)
+    2. Check stored commit hash from pip install
+
+    Returns:
+        Short commit hash (7 chars) or None
+    """
+    # Method 1: Running from git repo (development)
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=Path(__file__).parent.parent  # whisperjav package root
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()[:7]
+    except Exception:
+        pass
+
+    # Method 2: Check for stored commit hash (from pip install git+...)
+    try:
+        commit_file = CACHE_DIR / 'installed_commit.txt'
+        if commit_file.exists():
+            return commit_file.read_text().strip()[:7]
+    except Exception:
+        pass
+
+    return None
+
+
+def _fetch_latest_commit(timeout: int = 10) -> Optional[CommitInfo]:
+    """
+    Fetch the latest commit from the main branch.
+
+    Returns:
+        CommitInfo or None on failure
+    """
+    data = _fetch_github_api(GITHUB_COMMITS_API_URL, timeout)
+    if not data:
+        return None
+
+    try:
+        commit = data.get('commit', {})
+        return CommitInfo(
+            sha=data.get('sha', ''),
+            short_sha=data.get('sha', '')[:7],
+            message=commit.get('message', '').split('\n')[0][:100],  # First line, truncated
+            author=commit.get('author', {}).get('name', 'Unknown'),
+            date=commit.get('author', {}).get('date', ''),
+            url=data.get('html_url', '')
+        )
+    except Exception:
+        return None
+
+
+def _fetch_commits_since_tag(tag: str, timeout: int = 10) -> Optional[DevUpdateInfo]:
+    """
+    Fetch commits between a release tag and the main branch.
+
+    Args:
+        tag: Release tag to compare from (e.g., 'v1.7.5')
+
+    Returns:
+        DevUpdateInfo with commit list, or None on failure
+    """
+    # Use GitHub compare API: /repos/{owner}/{repo}/compare/{base}...{head}
+    compare_url = f"{GITHUB_COMPARE_API_URL}/{tag}...main"
+    data = _fetch_github_api(compare_url, timeout)
+
+    if not data:
+        return None
+
+    try:
+        commits_data = data.get('commits', [])
+        ahead_by = data.get('ahead_by', len(commits_data))
+
+        # Parse recent commits (up to 10)
+        recent_commits = []
+        for commit_data in commits_data[-10:]:  # Last 10 commits
+            commit = commit_data.get('commit', {})
+            recent_commits.append(CommitInfo(
+                sha=commit_data.get('sha', ''),
+                short_sha=commit_data.get('sha', '')[:7],
+                message=commit.get('message', '').split('\n')[0][:80],
+                author=commit.get('author', {}).get('name', 'Unknown'),
+                date=commit.get('author', {}).get('date', ''),
+                url=commit_data.get('html_url', '')
+            ))
+
+        # Reverse to show newest first
+        recent_commits.reverse()
+
+        return DevUpdateInfo(
+            commits_ahead=ahead_by,
+            latest_commit=recent_commits[0] if recent_commits else None,
+            recent_commits=recent_commits,
+            base_tag=tag
+        )
+    except Exception:
+        return None
+
+
+def check_for_updates(force: bool = False, include_dev: bool = True) -> UpdateCheckResult:
     """
     Check if a newer version of WhisperJAV is available.
 
+    Checks both:
+    1. Stable releases (tagged versions on GitHub)
+    2. Development updates (commits on main branch since last release)
+
     Args:
         force: If True, bypass cache and check immediately
+        include_dev: If True, also check for dev updates (commits since release)
 
     Returns:
-        UpdateCheckResult with update information
+        UpdateCheckResult with both release and dev update information
     """
     current = CURRENT_VERSION
+    current_commit = _get_current_commit()
+
+    # Determine installation type
+    # If we can get a commit hash, likely installed from git
+    installation_type = "dev" if current_commit else "release"
 
     # Check cache first (unless forced)
     if not force:
@@ -239,31 +424,76 @@ def check_for_updates(force: bool = False) -> UpdateCheckResult:
                         download_url=vi.get('download_url')
                     )
 
+                # Reconstruct dev_info from cache if available
+                dev_info = None
+                dev_update_available = False
+                if cached.get('dev_info'):
+                    di = cached['dev_info']
+                    commits_ahead = di.get('commits_ahead', 0)
+                    dev_update_available = commits_ahead > 0
+
+                    recent_commits = []
+                    for c in di.get('recent_commits', []):
+                        recent_commits.append(CommitInfo(
+                            sha=c.get('sha', ''),
+                            short_sha=c.get('short_sha', ''),
+                            message=c.get('message', ''),
+                            author=c.get('author', ''),
+                            date=c.get('date', ''),
+                            url=c.get('url', '')
+                        ))
+
+                    latest_commit = None
+                    if di.get('latest_commit'):
+                        lc = di['latest_commit']
+                        latest_commit = CommitInfo(
+                            sha=lc.get('sha', ''),
+                            short_sha=lc.get('short_sha', ''),
+                            message=lc.get('message', ''),
+                            author=lc.get('author', ''),
+                            date=lc.get('date', ''),
+                            url=lc.get('url', '')
+                        )
+
+                    dev_info = DevUpdateInfo(
+                        commits_ahead=commits_ahead,
+                        latest_commit=latest_commit,
+                        recent_commits=recent_commits,
+                        base_tag=di.get('base_tag')
+                    )
+
                 return UpdateCheckResult(
-                    update_available=update_available,
                     current_version=current,
+                    current_commit=current_commit,
+                    installation_type=installation_type,
+                    update_available=update_available,
                     latest_version=latest,
                     version_info=version_info,
+                    dev_update_available=dev_update_available,
+                    dev_info=dev_info,
                     from_cache=True
                 )
 
-    # Fetch from GitHub
+    # Fetch latest release from GitHub
     release_data = _fetch_latest_release()
 
     if not release_data:
         return UpdateCheckResult(
-            update_available=False,
             current_version=current,
+            current_commit=current_commit,
+            installation_type=installation_type,
             error="Could not check for updates"
         )
 
     # Parse release data
     latest = release_data.get('tag_name', '').lstrip('v')
+    release_tag = release_data.get('tag_name', f'v{latest}')
 
     if not latest:
         return UpdateCheckResult(
-            update_available=False,
             current_version=current,
+            current_commit=current_commit,
+            installation_type=installation_type,
             error="Invalid release data"
         )
 
@@ -283,6 +513,26 @@ def check_for_updates(force: bool = False) -> UpdateCheckResult:
             version_info.download_url = asset.get('browser_download_url')
             break
 
+    # Compare versions for stable track
+    update_available = compare_versions(current, latest) < 0
+
+    # Fetch dev track info (commits since release)
+    dev_info = None
+    dev_update_available = False
+
+    if include_dev:
+        dev_info = _fetch_commits_since_tag(release_tag)
+        if dev_info:
+            # Dev update available if there are commits ahead
+            # AND user doesn't already have the latest commit
+            if dev_info.commits_ahead > 0:
+                if current_commit and dev_info.latest_commit:
+                    # User has a commit hash - check if it matches latest
+                    dev_update_available = current_commit != dev_info.latest_commit.short_sha
+                else:
+                    # Can't compare commits, assume update available
+                    dev_update_available = True
+
     # Save to cache
     cache_data = {
         'latest_version': latest,
@@ -295,16 +545,44 @@ def check_for_updates(force: bool = False) -> UpdateCheckResult:
             'download_url': version_info.download_url
         }
     }
+
+    # Cache dev info if available
+    if dev_info:
+        cache_data['dev_info'] = {
+            'commits_ahead': dev_info.commits_ahead,
+            'base_tag': dev_info.base_tag,
+            'latest_commit': {
+                'sha': dev_info.latest_commit.sha,
+                'short_sha': dev_info.latest_commit.short_sha,
+                'message': dev_info.latest_commit.message,
+                'author': dev_info.latest_commit.author,
+                'date': dev_info.latest_commit.date,
+                'url': dev_info.latest_commit.url
+            } if dev_info.latest_commit else None,
+            'recent_commits': [
+                {
+                    'sha': c.sha,
+                    'short_sha': c.short_sha,
+                    'message': c.message,
+                    'author': c.author,
+                    'date': c.date,
+                    'url': c.url
+                }
+                for c in dev_info.recent_commits[:5]  # Cache up to 5 commits
+            ]
+        }
+
     _save_cache(cache_data)
 
-    # Compare versions
-    update_available = compare_versions(current, latest) < 0
-
     return UpdateCheckResult(
-        update_available=update_available,
         current_version=current,
+        current_commit=current_commit,
+        installation_type=installation_type,
+        update_available=update_available,
         latest_version=latest,
         version_info=version_info,
+        dev_update_available=dev_update_available,
+        dev_info=dev_info,
         from_cache=False
     )
 
@@ -385,16 +663,52 @@ def should_show_notification(level: str, last_dismissed: Optional[str] = None) -
 # CLI interface
 if __name__ == "__main__":
     print(f"Current version: {CURRENT_VERSION}")
-    print("Checking for updates...")
+    if _get_current_commit():
+        print(f"Current commit: {_get_current_commit()}")
+    print("Checking for updates...\n")
 
     result = check_for_updates(force=True)
 
     if result.error:
         print(f"Error: {result.error}")
-    elif result.update_available:
-        print(f"Update available: {result.latest_version}")
-        print(f"Release URL: {result.version_info.release_url}")
+        sys.exit(1)
+
+    # Stable release track
+    print("=" * 50)
+    print("[STABLE RELEASE]")
+    print("=" * 50)
+    if result.update_available:
+        print(f"  Update available: v{result.latest_version}")
+        print(f"  Release URL: {result.version_info.release_url}")
         if result.version_info.download_url:
-            print(f"Download: {result.version_info.download_url}")
+            print(f"  Download: {result.version_info.download_url}")
     else:
-        print("You have the latest version!")
+        print(f"  [OK] You have the latest stable release (v{result.latest_version})")
+
+    # Development track
+    print("\n" + "=" * 50)
+    print("[DEVELOPMENT] (main branch)")
+    print("=" * 50)
+    if result.dev_info:
+        if result.dev_info.commits_ahead > 0:
+            print(f"  {result.dev_info.commits_ahead} commit(s) ahead of {result.dev_info.base_tag}")
+            if result.dev_update_available:
+                print("  -> Updates available!")
+            else:
+                print("  [OK] You have the latest development version")
+
+            if result.dev_info.recent_commits:
+                print("\n  Recent commits:")
+                for commit in result.dev_info.recent_commits[:5]:
+                    # Encode safely for Windows console
+                    msg = commit.message[:60].encode('ascii', 'replace').decode('ascii')
+                    print(f"    * [{commit.short_sha}] {msg}")
+        else:
+            print("  [OK] Release is up to date with main branch")
+    else:
+        print("  Could not fetch development info")
+
+    print("\n" + "=" * 50)
+    print("To update:")
+    print("  Stable:  pip install -U whisperjav")
+    print("  Dev:     pip install -U git+https://github.com/meizhong986/whisperjav.git")
