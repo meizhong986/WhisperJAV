@@ -211,6 +211,19 @@ def parse_arguments():
     parser.add_argument("--accept-cpu-mode", action="store_true",
                        help="Accept CPU-only mode without GPU warning (skip GPU performance check)")
 
+    # Hardware configuration (device and compute type override)
+    hardware_group = parser.add_argument_group("Hardware Configuration")
+    hardware_group.add_argument("--device", type=str, default=None,
+                               choices=["auto", "cuda", "cpu"],
+                               help="Device to use for ASR processing (default: auto-detect). "
+                                    "Note: MPS (Apple Silicon) is auto-detected but CTranslate2 backends "
+                                    "will fall back to CPU with Accelerate optimization.")
+    hardware_group.add_argument("--compute-type", type=str, default=None,
+                               choices=["auto", "float16", "float32", "int8", "int8_float16", "int8_float32"],
+                               help="Compute type for ASR processing (default: auto). "
+                                    "CTranslate2 backends (faster_whisper, kotoba) use 'auto' to optimize "
+                                    "based on GPU capability. PyTorch backends use float16 (GPU) or float32 (CPU).")
+
     # Path and logging
     path_group = parser.add_argument_group("Path and Logging Options")
     path_group.add_argument("--output-dir", default="./output", help="Output directory")
@@ -1100,6 +1113,8 @@ def main():
                 task=task,
                 features=features,
                 overrides=overrides,
+                device=args.device,
+                compute_type=args.compute_type,
             )
 
         elif args.mode == "transformers":
@@ -1114,6 +1129,8 @@ def main():
                 pipeline_name=args.mode,
                 sensitivity=args.sensitivity,
                 task=task,
+                device=args.device,
+                compute_type=args.compute_type,
             )
 
         if args.scene_detection_method:
@@ -1128,16 +1145,20 @@ def main():
     # Apply model override if specified via CLI (not for ensemble mode)
     if args.model and resolved_config is not None:
         logger.info(f"Overriding model with CLI argument: {args.model}")
+        # Determine device and compute_type for model override
+        # Priority: CLI args > auto-detection
+        override_device = args.device if args.device and args.device != "auto" else get_best_device()
+        override_compute_type = args.compute_type if args.compute_type and args.compute_type != "auto" else "int8"
         # Create a model configuration for the CLI-specified model
         override_model_config = {
             "provider": "openai_whisper",  # Default provider
             "model_name": args.model,
-            "device": get_best_device(),  # Auto-detect: CUDA -> MPS -> CPU
-            "compute_type": "int8",  # Default to int8 for quantized models (CTranslate2)
+            "device": override_device,
+            "compute_type": override_compute_type,
             "supported_tasks": ["transcribe", "translate"]
         }
         resolved_config["model"] = override_model_config
-        logger.debug(f"Model override applied: {args.model}")
+        logger.debug(f"Model override applied: {args.model} (device={override_device}, compute_type={override_compute_type})")
 
     # Apply language override to decoder params (not for ensemble mode)
     if resolved_config is not None and "params" in resolved_config and "decoder" in resolved_config["params"]:
@@ -1297,7 +1318,9 @@ def main():
                 'model': args.pass1_model,
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params,  # For transformers pipeline
-                'language': language_code  # Source language code (e.g., 'en', 'ja')
+                'language': language_code,  # Source language code (e.g., 'en', 'ja')
+                'device': args.device,  # Hardware override (None = auto-detect)
+                'compute_type': args.compute_type,  # Compute type override (None = auto)
             }
 
             pass2_config = None
@@ -1311,7 +1334,9 @@ def main():
                     'model': args.pass2_model,
                     'params': pass2_params,
                     'hf_params': pass2_hf_params,  # For transformers pipeline
-                    'language': language_code  # Source language code (e.g., 'en', 'ja')
+                    'language': language_code,  # Source language code (e.g., 'en', 'ja')
+                    'device': args.device,  # Hardware override (None = auto-detect)
+                    'compute_type': args.compute_type,  # Compute type override (None = auto)
                 }
 
             # Create orchestrator
