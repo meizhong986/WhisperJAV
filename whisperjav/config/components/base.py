@@ -102,7 +102,13 @@ class ASRComponent(ComponentBase):
     supported_tasks: List[str] = ["transcribe"]  # "transcribe", "translate"
     compatible_vad: List[str] = []  # List of compatible VAD component names
 
-    # === Compute ===
+    # === Compute (Preferred Defaults) ===
+    # NOTE: These are "preferred" defaults for optimal performance.
+    # The resolver applies runtime device detection via get_best_device()
+    # and auto-selects compute_type based on device and provider:
+    #   - CUDA → int8_float16 for CTranslate2, float16 for PyTorch
+    #   - CPU  → int8 for CTranslate2, float32 for PyTorch
+    #   - MPS  → float16 for PyTorch, falls back to CPU+int8 for CTranslate2
     default_device: str = "cuda"
     default_compute_type: str = "float16"
 
