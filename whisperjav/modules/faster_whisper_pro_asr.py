@@ -59,18 +59,12 @@ class FasterWhisperProASR:
             )
             self.device = "cpu"
 
-        # Smart compute_type default based on device (ctranslate2 backend)
-        # - CUDA: int8_float16 (quantized weights + FP16 tensor cores = fastest)
-        # - CPU:  int8 (quantized weights + FP32 compute = only fast option)
-        requested_compute_type = model_config.get("compute_type")
-        if requested_compute_type is None or requested_compute_type == "auto":
-            if self.device == "cuda":
-                self.compute_type = "int8_float16"
-            else:  # cpu (includes Apple Silicon via Accelerate)
-                self.compute_type = "int8"
-            logger.debug(f"Auto-selected compute_type='{self.compute_type}' for device='{self.device}'")
-        else:
-            self.compute_type = requested_compute_type
+        # Use compute_type from resolver (defaults to "auto" for CTranslate2 providers)
+        # CTranslate2's "auto" handles device-specific optimization internally:
+        # - GPU capability detection (int8_float16 for RTX 20/30/40, float16 for RTX 50 Blackwell)
+        # - CPU instruction sets (AVX2, AVX512 → int8)
+        # See: https://github.com/OpenNMT/CTranslate2/issues/1865
+        self.compute_type = model_config.get("compute_type", "auto")
 
         decoder_params = params["decoder"]
         vad_params = params["vad"]
@@ -182,25 +176,7 @@ class FasterWhisperProASR:
     def _initialize_models(self):
         """Initialize Faster-Whisper model (direct API)."""
         # Note: Speech segmentation is handled by external Speech Segmenter (set in __init__)
-
-        # CPU COMPATIBILITY: float16/bfloat16 are NOT supported on CPU by ctranslate2
-        # Only float32 and int8 work on CPU. This check is ONLY for CPU - GPU paths unchanged.
-        # Note: Apple Silicon MPS (device="mps") DOES support float16/bfloat16 - this only affects CPU mode.
-        if self.device == "cpu" and self.compute_type in ("float16", "bfloat16", "int8_float16", "int8_bfloat16"):
-            import platform
-            original_compute_type = self.compute_type
-            self.compute_type = "int8"  # int8 is faster than float32 on CPU
-
-            # Tailor message based on platform
-            if platform.system() == "Darwin":
-                hint = "For GPU acceleration on Mac, ensure MPS is available (Apple Silicon required)."
-            else:
-                hint = "For GPU acceleration, use a CUDA-compatible GPU."
-
-            logger.warning(
-                f"Compute type '{original_compute_type}' is not supported on CPU. "
-                f"Automatically switching to 'int8' (best CPU performance). {hint}"
-            )
+        # Note: compute_type="auto" (default) lets CTranslate2 handle device-specific selection
 
         # Faster-Whisper direct API initialization
         logger.debug(

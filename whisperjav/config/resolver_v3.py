@@ -27,7 +27,7 @@ from whisperjav.utils.device_detector import get_best_device
 
 logger = logging.getLogger("whisperjav")
 
-# CTranslate2-based providers need int8 on CPU (float16 not supported on CPU)
+# CTranslate2-based providers support "auto" compute_type selection
 CTRANSLATE2_PROVIDERS = {"faster_whisper", "kotoba_faster_whisper"}
 
 
@@ -36,8 +36,10 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
     Select optimal compute_type based on device and provider.
 
     CTranslate2 providers (faster_whisper, kotoba_faster_whisper):
-    - CUDA: int8_float16 (quantized weights + FP16 tensor cores = fastest)
-    - CPU: int8 (quantized weights + FP32 compute = only fast option)
+    - Returns "auto" to delegate selection to CTranslate2's internal logic
+    - CTranslate2 auto-selects based on GPU capability and CPU instruction sets
+    - Benefits: Automatic support for new GPUs (e.g., RTX 50XX Blackwell sm120)
+    - See: https://github.com/OpenNMT/CTranslate2/issues/1865
 
     PyTorch providers (openai_whisper, stable_ts):
     - CUDA/MPS: float16
@@ -51,9 +53,12 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
         Optimal compute_type for the device/provider combination
     """
     if provider in CTRANSLATE2_PROVIDERS:
-        # CTranslate2: int8_float16 is fastest on CUDA (quantized weights + FP16 compute)
-        # On CPU, only int8 or float32 are supported; int8 is faster
-        return "int8_float16" if device == "cuda" else "int8"
+        # Delegate to CTranslate2's internal "auto" selection logic
+        # This automatically handles:
+        # - GPU capability detection (int8_float16 for RTX 20/30/40, float16 for RTX 50)
+        # - CPU instruction sets (AVX2, AVX512)
+        # - Blackwell sm120 workaround (PR #1937)
+        return "auto"
     else:
         # PyTorch-based providers can use float16 on GPU/MPS, float32 on CPU
         return "float16" if device in ("cuda", "mps") else "float32"

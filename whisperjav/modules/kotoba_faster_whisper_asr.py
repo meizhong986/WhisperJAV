@@ -64,7 +64,10 @@ class KotobaFasterWhisperASR:
             )
             self.device = "cpu"
 
-        self.compute_type = model_config.get("compute_type", "float16")
+        # Use compute_type from resolver (defaults to "auto" for CTranslate2 providers)
+        # CTranslate2's "auto" handles device-specific optimization internally
+        # See: https://github.com/OpenNMT/CTranslate2/issues/1865
+        self.compute_type = model_config.get("compute_type", "auto")
 
         # Task
         self.task = task
@@ -134,31 +137,22 @@ class KotobaFasterWhisperASR:
         logger.info(f"Loading Kotoba model: {self.model_name}")
         logger.info(f"Device: {self.device}, Compute type: {self.compute_type}")
 
-        # Determine compute type based on device capabilities
-        # On CPU, float16 is generally not supported by CTranslate2, so we fallback to int8
-        # unless float32 is explicitly requested.
-        if self.device == "cuda":
-            actual_compute_type = self.compute_type
-        else:
-            if self.compute_type == "float16":
-                logger.warning("float16 compute type is not supported on CPU. Falling back to int8.")
-                actual_compute_type = "int8"
-            else:
-                actual_compute_type = self.compute_type
+        # Note: compute_type="auto" (default) lets CTranslate2 handle device-specific selection
+        # See: https://github.com/OpenNMT/CTranslate2/issues/1865
 
         try:
             self.model = WhisperModel(
                 model_size_or_path=self.model_name,
                 device=self.device,
-                compute_type=actual_compute_type,
+                compute_type=self.compute_type,
                 download_root=None,  # Use default HuggingFace cache
                 cpu_threads=0,  # Use default
                 num_workers=1,
             )
             logger.info("Kotoba model loaded successfully")
         except Exception as e:
-            # C4: VRAM exhaustion fallback - try int8 if float16 fails on CUDA
-            if self.device == "cuda" and actual_compute_type == "float16":
+            # VRAM exhaustion fallback - try int8 if auto/float16 fails on CUDA
+            if self.device == "cuda" and self.compute_type != "int8":
                 vram_error_indicators = [
                     "out of memory",
                     "cuda out of memory",
@@ -170,7 +164,7 @@ class KotobaFasterWhisperASR:
                 error_str = str(e).lower()
                 if any(indicator in error_str for indicator in vram_error_indicators):
                     logger.warning(
-                        f"CUDA float16 failed (likely VRAM exhaustion): {e}. "
+                        f"CUDA {self.compute_type} failed (likely VRAM exhaustion): {e}. "
                         "Falling back to int8 compute type."
                     )
                     try:

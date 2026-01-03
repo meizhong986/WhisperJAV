@@ -83,7 +83,7 @@ class WhisperVadSpeechSegmenter:
         no_speech_threshold: float = 0.6,
         logprob_threshold: float = -1.0,
         language: str = "ja",
-        compute_type: str = "float16",
+        compute_type: str = "auto",
         device: str = "auto",
         cache_results: bool = True,
         cache_dir: Optional[Path] = None,
@@ -265,16 +265,12 @@ class WhisperVadSpeechSegmenter:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             logger.info(f"[WhisperVAD] Auto-detected device: {device}")
 
-        # Adjust compute_type for CPU
-        compute_type = self.compute_type
-        if device == "cpu" and compute_type in ("float16", "int8_float16"):
-            compute_type = "int8"
-            logger.info(f"[WhisperVAD] Adjusted compute_type for CPU: {compute_type}")
-
+        # Note: compute_type="auto" (default) lets CTranslate2 handle device-specific selection
+        # See: https://github.com/OpenNMT/CTranslate2/issues/1865
         self._model = WhisperModel(
             self._model_size,
             device=device,
-            compute_type=compute_type,
+            compute_type=self.compute_type,
         )
         logger.info(f"[WhisperVAD] Model loaded successfully on {device}")
 
