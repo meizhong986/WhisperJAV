@@ -844,7 +844,7 @@
 
     <!-- Update Check Modal -->
     <div class="modal-overlay" id="updateCheckModal">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-update-check">
             <div class="modal-header">
                 <h2>Check for Updates</h2>
                 <button class="modal-close" id="updateCheckModalClose" aria-label="Close">&times;</button>
@@ -855,32 +855,71 @@
                     <div class="spinner"></div>
                     <p>Checking for updates...</p>
                 </div>
+
                 <!-- Result State -->
                 <div id="updateCheckResult" class="update-check-result" style="display: none;">
-                    <div class="version-info">
-                        <div class="version-row version-current">
-                            <span class="version-label">Current:</span>
-                            <span class="version-value" id="updateCurrentVersion">v1.7.5</span>
+                    <!-- Current Version Info -->
+                    <div class="current-version-info">
+                        <span class="version-label">Installed:</span>
+                        <span class="version-value" id="updateCurrentVersion">v1.7.5</span>
+                        <span class="commit-hash" id="updateCurrentCommit"></span>
+                    </div>
+
+                    <!-- Stable Release Track -->
+                    <div class="update-track update-track-stable" id="stableTrack">
+                        <div class="track-header">
+                            <span class="track-icon">&#x1F4E6;</span>
+                            <span class="track-title">Stable Release</span>
                         </div>
-                        <div class="version-row version-latest">
-                            <span class="version-label">Latest:</span>
-                            <span class="version-value" id="updateLatestVersion">v1.7.6</span>
-                            <span class="update-badge patch" id="updateTypeBadge">PATCH</span>
+                        <div class="track-content">
+                            <div id="stableUpToDate" class="track-status track-status-ok" style="display: none;">
+                                <span class="status-icon">&#x2713;</span>
+                                <span>v<span id="stableLatestVersion">1.7.5</span> - You're up to date</span>
+                            </div>
+                            <div id="stableUpdateAvailable" class="track-status track-status-update" style="display: none;">
+                                <span class="status-icon">&#x2191;</span>
+                                <span>v<span id="stableNewVersion">1.7.6</span> available</span>
+                                <span class="update-badge" id="stableUpdateBadge">PATCH</span>
+                            </div>
+                            <div id="stableReleaseNotes" class="release-notes-section" style="display: none;">
+                                <details class="release-notes-details">
+                                    <summary>Release Notes</summary>
+                                    <div id="stableReleaseNotesContent" class="release-notes-content"></div>
+                                </details>
+                            </div>
+                            <div id="stableActions" class="track-actions" style="display: none;">
+                                <button id="updateToStable" class="btn btn-primary btn-sm">Update to Stable</button>
+                            </div>
                         </div>
                     </div>
-                    <!-- Up to Date Message -->
-                    <div id="updateUpToDate" class="update-up-to-date" style="display: none;">
-                        <span class="checkmark">&#x2713;</span>
-                        <span>You're up to date!</span>
-                    </div>
-                    <!-- Update Available Section -->
-                    <div id="updateAvailableSection" style="display: none;">
-                        <details class="release-notes-details">
-                            <summary>Release Notes</summary>
-                            <div id="updateReleaseNotes" class="release-notes-content"></div>
-                        </details>
+
+                    <!-- Development Track -->
+                    <div class="update-track update-track-dev" id="devTrack">
+                        <div class="track-header">
+                            <span class="track-icon">&#x26A1;</span>
+                            <span class="track-title">Development</span>
+                            <span class="track-subtitle">(main branch)</span>
+                        </div>
+                        <div class="track-content">
+                            <div id="devUpToDate" class="track-status track-status-ok" style="display: none;">
+                                <span class="status-icon">&#x2713;</span>
+                                <span>Up to date with main branch</span>
+                            </div>
+                            <div id="devUpdateAvailable" class="track-status track-status-update" style="display: none;">
+                                <span class="status-icon">&#x2191;</span>
+                                <span><span id="devCommitsAhead">0</span> commit(s) ahead</span>
+                            </div>
+                            <div id="devCommitsList" class="dev-commits-list" style="display: none;">
+                                <div class="commits-header">Recent commits:</div>
+                                <ul id="devRecentCommits" class="commits-list"></ul>
+                            </div>
+                            <div id="devActions" class="track-actions" style="display: none;">
+                                <button id="updateToDev" class="btn btn-secondary btn-sm">Update to Latest Dev</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
                 <!-- Error State -->
                 <div id="updateCheckError" class="update-check-error" style="display: none;">
                     <p>Failed to check for updates. Please check your internet connection and try again.</p>
@@ -888,8 +927,6 @@
             </div>
             <div class="modal-footer" id="updateCheckFooter">
                 <button id="updateCheckLater" class="btn btn-secondary">Close</button>
-                <button id="updateCheckNow" class="btn btn-primary" style="display: none;">Update Now</button>
-                <button id="updateCheckDownload" class="btn btn-primary" style="display: none;">Download</button>
             </div>
         </div>
     </div>

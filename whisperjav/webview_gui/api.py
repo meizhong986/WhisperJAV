@@ -2105,17 +2105,30 @@ class WhisperJAVAPI:
         """
         Check if a newer version of WhisperJAV is available.
 
+        Checks both stable releases and development (latest commit) updates.
+
         Args:
             force: If True, bypass cache and check immediately
 
         Returns:
             dict: Update check result with:
-                - update_available: bool
+                - success: bool
                 - current_version: str
+                - current_commit: str or None (short SHA)
+                - installation_type: "release" or "dev"
+
+                Stable track:
+                - update_available: bool
                 - latest_version: str (if available)
                 - notification_level: str (critical/major/minor/patch/none)
                 - release_url: str (if update available)
                 - release_notes: str (if update available)
+
+                Development track:
+                - dev_update_available: bool
+                - dev_commits_ahead: int
+                - dev_recent_commits: list of {sha, message, author, date}
+
                 - error: str (if check failed)
         """
         try:
@@ -2124,24 +2137,54 @@ class WhisperJAVAPI:
                 get_update_notification_level,
             )
 
-            result = check_for_updates(force=force)
+            result = check_for_updates(force=force, include_dev=True)
 
             response = {
                 "success": True,
-                "update_available": result.update_available,
+                # Current installation info
                 "current_version": result.current_version,
+                "current_commit": result.current_commit,
+                "installation_type": result.installation_type,
+                # Stable release track
+                "update_available": result.update_available,
                 "latest_version": result.latest_version,
                 "from_cache": result.from_cache,
+                # Development track
+                "dev_update_available": result.dev_update_available,
             }
 
             if result.error:
                 response["error"] = result.error
 
+            # Stable release info
             if result.version_info:
                 response["notification_level"] = get_update_notification_level(result)
                 response["release_url"] = result.version_info.release_url
                 response["release_notes"] = result.version_info.release_notes[:500]  # Truncate
                 response["is_prerelease"] = result.version_info.is_prerelease
+
+            # Development track info
+            if result.dev_info:
+                response["dev_commits_ahead"] = result.dev_info.commits_ahead
+                response["dev_base_tag"] = result.dev_info.base_tag
+                response["dev_recent_commits"] = [
+                    {
+                        "sha": c.short_sha,
+                        "message": c.message,
+                        "author": c.author,
+                        "date": c.date,
+                        "url": c.url
+                    }
+                    for c in result.dev_info.recent_commits[:5]
+                ]
+                if result.dev_info.latest_commit:
+                    response["dev_latest_commit"] = {
+                        "sha": result.dev_info.latest_commit.short_sha,
+                        "message": result.dev_info.latest_commit.message,
+                        "author": result.dev_info.latest_commit.author,
+                        "date": result.dev_info.latest_commit.date,
+                        "url": result.dev_info.latest_commit.url
+                    }
 
             return response
 
@@ -2150,6 +2193,7 @@ class WhisperJAVAPI:
                 "success": False,
                 "error": str(e),
                 "update_available": False,
+                "dev_update_available": False,
                 "current_version": "unknown"
             }
 

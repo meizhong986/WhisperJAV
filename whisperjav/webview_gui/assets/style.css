@@ -2589,3 +2589,195 @@ button:focus-visible,
 .update-check-error p {
     margin: 0;
 }
+
+/* ============================================================
+   Dual-Track Update Modal Styles
+   ============================================================ */
+
+/* Modal sizing */
+.modal-update-check {
+    max-width: 520px;
+    width: 90%;
+}
+
+/* Current version info at top */
+.current-version-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--inactive-tab-bg);
+    border-radius: var(--border-radius);
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.current-version-info .version-label {
+    color: var(--text-secondary);
+}
+
+.current-version-info .version-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.current-version-info .commit-hash {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Update track containers */
+.update-track {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.update-track:last-child {
+    margin-bottom: 0;
+}
+
+/* Track header */
+.track-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--inactive-tab-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.track-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.track-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.track-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: normal;
+}
+
+/* Stable track specific colors */
+.update-track-stable .track-header {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.08) 0%, rgba(40, 167, 69, 0.04) 100%);
+}
+
+.update-track-stable .track-icon {
+    color: #28a745;
+}
+
+/* Dev track specific colors */
+.update-track-dev .track-header {
+    background: linear-gradient(135deg, rgba(253, 126, 20, 0.08) 0%, rgba(253, 126, 20, 0.04) 100%);
+}
+
+.update-track-dev .track-icon {
+    color: #fd7e14;
+}
+
+/* Track content */
+.track-content {
+    padding: 12px 14px;
+}
+
+/* Track status line */
+.track-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.track-status .status-icon {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.track-status-ok {
+    color: #28a745;
+}
+
+.track-status-ok .status-icon {
+    color: #28a745;
+}
+
+.track-status-update {
+    color: var(--text-primary);
+}
+
+.track-status-update .status-icon {
+    color: #fd7e14;
+}
+
+/* Release notes section */
+.release-notes-section {
+    margin-top: 10px;
+}
+
+/* Track actions */
+.track-actions {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Dev commits list */
+.dev-commits-list {
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--inactive-tab-bg);
+    border-radius: var(--border-radius);
+}
+
+.commits-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 8px;
+}
+
+.commits-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.commits-list li {
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+    line-height: 1.4;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.commits-list li:last-child {
+    border-bottom: none;
+}
+
+.commits-list code {
+    background: var(--disabled-bg);
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+/* Ensure spinner shows properly in loading state */
+.update-check-loading .spinner {
+    display: block;
+}

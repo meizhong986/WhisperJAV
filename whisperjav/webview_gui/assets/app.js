@@ -4133,61 +4133,126 @@ const UpdateCheckManager = {
         }
     },
 
+    // Store the last result for update actions
+    lastResult: null,
+
     showLoading() {
         document.getElementById('updateCheckLoading').style.display = 'block';
         document.getElementById('updateCheckResult').style.display = 'none';
         document.getElementById('updateCheckError').style.display = 'none';
-        document.getElementById('updateCheckNow').style.display = 'none';
-        document.getElementById('updateCheckDownload').style.display = 'none';
     },
 
     showResult(result) {
+        this.lastResult = result;
         document.getElementById('updateCheckLoading').style.display = 'none';
         document.getElementById('updateCheckResult').style.display = 'block';
 
-        // Set version info
+        // Set current version info
         document.getElementById('updateCurrentVersion').textContent = 'v' + result.current_version;
 
+        // Show commit hash if available
+        const commitEl = document.getElementById('updateCurrentCommit');
+        if (commitEl && result.current_commit) {
+            commitEl.textContent = '(' + result.current_commit.substring(0, 7) + ')';
+            commitEl.style.display = 'inline';
+        } else if (commitEl) {
+            commitEl.style.display = 'none';
+        }
+
+        // === Stable Release Track ===
+        this.updateStableTrack(result);
+
+        // === Development Track ===
+        this.updateDevTrack(result);
+    },
+
+    updateStableTrack(result) {
+        const stableUpToDate = document.getElementById('stableUpToDate');
+        const stableUpdateAvailable = document.getElementById('stableUpdateAvailable');
+        const stableReleaseNotes = document.getElementById('stableReleaseNotes');
+        const stableActions = document.getElementById('stableActions');
+        const stableLatestVersion = document.getElementById('stableLatestVersion');
+        const stableNewVersion = document.getElementById('stableNewVersion');
+        const stableBadge = document.getElementById('stableUpdateBadge');
+
         if (result.update_available && result.latest_version) {
-            document.getElementById('updateLatestVersion').textContent = 'v' + result.latest_version;
-            document.getElementById('updateUpToDate').style.display = 'none';
-            document.getElementById('updateAvailableSection').style.display = 'block';
+            // Stable update available
+            stableUpToDate.style.display = 'none';
+            stableUpdateAvailable.style.display = 'flex';
+            stableNewVersion.textContent = result.latest_version;
 
-            // Show version row
-            const latestRow = document.querySelector('.version-latest');
-            if (latestRow) latestRow.style.display = 'flex';
-
-            // Set badge
-            const badge = document.getElementById('updateTypeBadge');
+            // Set badge color based on notification level
             const level = result.notification_level || 'patch';
-            badge.textContent = level.toUpperCase();
-            badge.className = 'update-badge ' + level;
+            stableBadge.textContent = level.toUpperCase();
+            stableBadge.className = 'update-badge ' + level;
 
-            // Release notes
+            // Show release notes if available
             if (result.release_notes) {
-                const notesEl = document.getElementById('updateReleaseNotes');
-                notesEl.innerHTML = this.parseMarkdown(result.release_notes);
-            }
-
-            // Show appropriate button based on update level
-            if (level === 'major') {
-                document.getElementById('updateCheckNow').style.display = 'none';
-                document.getElementById('updateCheckDownload').style.display = 'inline-block';
+                const notesContent = document.getElementById('stableReleaseNotesContent');
+                notesContent.innerHTML = this.parseMarkdown(result.release_notes);
+                stableReleaseNotes.style.display = 'block';
             } else {
-                document.getElementById('updateCheckNow').style.display = 'inline-block';
-                document.getElementById('updateCheckDownload').style.display = 'none';
+                stableReleaseNotes.style.display = 'none';
             }
+
+            // Show action button (Download for major, Update for others)
+            if (level === 'major') {
+                stableActions.innerHTML = '<button id="updateToStable" class="btn btn-primary btn-sm">Download from GitHub</button>';
+                document.getElementById('updateToStable').addEventListener('click', () => this.openDownloadPage());
+            } else {
+                stableActions.innerHTML = '<button id="updateToStable" class="btn btn-primary btn-sm">Update to Stable</button>';
+                document.getElementById('updateToStable').addEventListener('click', () => this.startUpdate('stable'));
+            }
+            stableActions.style.display = 'block';
         } else {
-            // Up to date
-            document.getElementById('updateUpToDate').style.display = 'flex';
-            document.getElementById('updateAvailableSection').style.display = 'none';
+            // Up to date with stable
+            stableUpToDate.style.display = 'flex';
+            stableLatestVersion.textContent = result.current_version;
+            stableUpdateAvailable.style.display = 'none';
+            stableReleaseNotes.style.display = 'none';
+            stableActions.style.display = 'none';
+        }
+    },
 
-            // Hide version latest row and badge
-            const latestRow = document.querySelector('.version-latest');
-            if (latestRow) latestRow.style.display = 'none';
+    updateDevTrack(result) {
+        const devUpToDate = document.getElementById('devUpToDate');
+        const devUpdateAvailable = document.getElementById('devUpdateAvailable');
+        const devCommitsList = document.getElementById('devCommitsList');
+        const devActions = document.getElementById('devActions');
+        const devCommitsAhead = document.getElementById('devCommitsAhead');
+        const devRecentCommits = document.getElementById('devRecentCommits');
 
-            document.getElementById('updateCheckNow').style.display = 'none';
-            document.getElementById('updateCheckDownload').style.display = 'none';
+        if (result.dev_update_available && result.dev_commits_ahead > 0) {
+            // Dev updates available
+            devUpToDate.style.display = 'none';
+            devUpdateAvailable.style.display = 'flex';
+            devCommitsAhead.textContent = result.dev_commits_ahead;
+
+            // Show recent commits list
+            if (result.dev_recent_commits && result.dev_recent_commits.length > 0) {
+                devRecentCommits.innerHTML = result.dev_recent_commits
+                    .slice(0, 5) // Show max 5 recent commits
+                    .map(commit => {
+                        const shortSha = commit.short_sha || commit.sha.substring(0, 7);
+                        const message = this.escapeHtml(commit.message.split('\n')[0]); // First line only
+                        return `<li><code>${shortSha}</code> ${message}</li>`;
+                    })
+                    .join('');
+                devCommitsList.style.display = 'block';
+            } else {
+                devCommitsList.style.display = 'none';
+            }
+
+            // Show action button
+            devActions.innerHTML = '<button id="updateToDev" class="btn btn-secondary btn-sm">Update to Latest Dev</button>';
+            document.getElementById('updateToDev').addEventListener('click', () => this.startUpdate('dev'));
+            devActions.style.display = 'block';
+        } else {
+            // Up to date with dev
+            devUpToDate.style.display = 'flex';
+            devUpdateAvailable.style.display = 'none';
+            devCommitsList.style.display = 'none';
+            devActions.style.display = 'none';
         }
     },
 
@@ -4195,17 +4260,16 @@ const UpdateCheckManager = {
         document.getElementById('updateCheckLoading').style.display = 'none';
         document.getElementById('updateCheckResult').style.display = 'none';
         document.getElementById('updateCheckError').style.display = 'block';
-        document.getElementById('updateCheckNow').style.display = 'none';
-        document.getElementById('updateCheckDownload').style.display = 'none';
     },
 
-    async startUpdate() {
+    async startUpdate(track = 'stable') {
         // Close modal
         this.close();
 
         // Use existing UpdateManager to show progress and start update
-        // This calls api.start_update() which spawns update_wrapper.py
-        // update_wrapper runs: pip install -U --no-deps git+https://github.com/meizhong986/whisperjav.git
+        // Both tracks use the same update mechanism (pip install from GitHub)
+        // The difference is just which version was chosen
+        console.log('Starting update from track:', track);
         UpdateManager.startUpdate();
     },
 
@@ -4222,6 +4286,12 @@ const UpdateCheckManager = {
 
     close() {
         this.modal.classList.remove('active');
+    },
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     },
 
     parseMarkdown(text) {
