@@ -52,6 +52,18 @@ class KotobaFasterWhisperASR:
         # Model configuration
         self.model_name = model_config.get("model_name", self.DEFAULT_MODEL)
         self.device = model_config.get("device", get_best_device())
+
+        # CTRANSLATE2 COMPATIBILITY: MPS is not supported by ctranslate2/faster-whisper
+        # CTranslate2 only supports "cuda" or "cpu" devices.
+        # See: https://github.com/OpenNMT/CTranslate2/issues/1562
+        if self.device == "mps":
+            logger.warning(
+                "Apple Silicon MPS detected, but faster-whisper/ctranslate2 doesn't support MPS. "
+                "Using CPU mode with Apple Accelerate optimization. "
+                "For GPU acceleration on Mac, use --mode transformers instead."
+            )
+            self.device = "cpu"
+
         self.compute_type = model_config.get("compute_type", "float16")
 
         # Task

@@ -231,119 +231,129 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Installation
 
-Choose your platform below:
+### Windows (Recommended)
+
+*Best for: Most users, beginners, and those who want a GUI.*
+
+1. **Download the Installer:**
+   **[Download WhisperJAV-1.7.5-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/latest)**
+2. **Run the File:** Double-click the downloaded `.exe`.
+3. **Follow the Prompts:** The installer handles all dependencies (Python, FFmpeg, Git) automatically.
+4. **Launch:** Open "WhisperJAV" from your Desktop shortcut.
+
+> **Note:** The first launch may take a few minutes as it initializes the engine. GPU is auto-detected; CPU-only mode is used if no compatible GPU is found.
+
+**Upgrading?** Just run the new installer. Your AI models (~3GB), settings, and cached downloads will be preserved.
 
 ---
 
-### I'm a Windows User
+### macOS (Apple Silicon & Intel)
 
-**Fresh Install or Upgrade:**
+*Best for: M1/M2/M3/M4 users and Intel Mac users.*
 
-1. Download: **[WhisperJAV-1.7.5-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/latest)**
-2. Run the installer
-3. If upgrading, it will guide you to uninstall the old version first
+The install script auto-detects your Mac architecture and handles PyTorch dependencies automatically.
 
-> **What gets preserved during upgrade:** AI models, downloaded packages (pip cache), and settings. Reinstalls are much faster than first-time installs.
-
-No Python knowledge required. The installer includes everything.
-
----
-
-### I'm on a New Mac (Apple Silicon M1/M2/M3/M4)
-
-Use the install script (handles dependencies correctly):
+**1. Install Prerequisites**
 
 ```bash
-# Install Homebrew if you don't have it
+# Install Xcode Command Line Tools (required for GUI)
+xcode-select --install
+
+# Install Homebrew (if not installed)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Install system dependencies
+# Install system tools
 brew install python@3.11 ffmpeg git
+```
 
-# Clone and install WhisperJAV
+> **GUI Requirement:** The Xcode Command Line Tools are required to compile `pyobjc`, which enables the GUI. Without it, only CLI mode will work.
+
+**2. Install WhisperJAV**
+
+```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh
+
+# Run the installer (auto-detects Mac architecture)
 ./installer/install_linux.sh
 ```
 
-> **Why use the script instead of pip?** pip often fails with dependency conflicts. The script handles PyTorch + dependencies in the correct order and auto-detects Apple MPS acceleration.
+> **Intel Macs:** The script automatically uses CPU-only mode. Expect slower processing (5-10x) compared to Apple Silicon with MPS acceleration.
 
 ---
 
-### I'm on Linux
+### Linux (Ubuntu/Debian/Fedora)
 
-Use the install script (recommended over pip):
+*Best for: Servers, desktops with NVIDIA GPUs.*
+
+The install script auto-detects NVIDIA GPUs and installs the matching CUDA version.
+
+**1. Install System Dependencies**
 
 ```bash
-# Install system dependencies first
-# Debian/Ubuntu:
-sudo apt-get install -y python3-dev python3-pip build-essential ffmpeg libsndfile1 git
+# Debian / Ubuntu
+sudo apt-get update && sudo apt-get install -y python3-dev python3-pip build-essential ffmpeg libsndfile1 git
 
-# Fedora/RHEL:
+# Fedora / RHEL
 sudo dnf install python3-devel gcc ffmpeg libsndfile git
-
-# Clone and install WhisperJAV
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-chmod +x installer/install_linux.sh
-./installer/install_linux.sh               # Auto-detects NVIDIA GPU
-./installer/install_linux.sh --cpu-only    # Force CPU only
 ```
 
-> **Why use the script instead of pip?** The script auto-detects your GPU, selects the correct CUDA version, and installs dependencies in the right order to avoid conflicts.
-
----
-
-### I'm on an Older Mac (Intel) or Have No GPU
+**2. Install WhisperJAV**
 
 ```bash
-# Install dependencies (macOS)
-brew install python@3.11 ffmpeg git
-
-# Or Linux (see above for apt/dnf commands)
-
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh
+
+# Standard Install (auto-detects GPU)
+./installer/install_linux.sh
+
+# Or force CPU-only (for servers without GPU)
 ./installer/install_linux.sh --cpu-only
 ```
 
-> **Note:** CPU-only mode works but is slower. Use `--accept-cpu-mode` flag when running to skip GPU warnings.
+> **Performance:** A 2-hour video takes ~5-10 minutes on GPU vs ~30-60 minutes on CPU.
 
 ---
 
-### I'm a Python Developer / Expert
+### Advanced / Developer
+
+*Best for: Contributors and Python experts.*
 
 <details>
-<summary><b>Manual pip install</b> (only if you know what you're doing)</summary>
+<summary><b>Manual pip install</b></summary>
 
-⚠️ **Warning:** Manual pip install often fails due to dependency conflicts with numpy, torch, and speech enhancement packages. Use the install scripts above unless you have a specific reason not to.
+> **Warning:** Manual `pip install` is risky due to dependency conflicts (NumPy 2.x vs SciPy). We strongly recommend using the scripts above.
+
+**1. Create Environment**
 
 ```bash
-# Create virtual environment (recommended)
 python -m venv whisperjav-env
-source whisperjav-env/bin/activate  # Linux/Mac
-# or: whisperjav-env\Scripts\activate  # Windows
+source whisperjav-env/bin/activate   # Linux/Mac
+# whisperjav-env\Scripts\activate    # Windows
+```
 
-# Install PyTorch first (choose your platform)
-# NVIDIA GPU:
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+**2. Install PyTorch First (Critical)**
 
-# Apple Silicon:
-pip install torch torchaudio
+You must install PyTorch *before* the main package to ensure hardware acceleration works.
 
-# CPU only:
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+- **NVIDIA GPU:** `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124`
+- **Apple Silicon:** `pip install torch torchaudio`
+- **CPU only:** `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`
 
-# Then install WhisperJAV
+**3. Install WhisperJAV**
+
+```bash
 pip install git+https://github.com/meizhong986/whisperjav.git@main
 ```
 
 </details>
 
 <details>
-<summary><b>Development / Editable install</b></summary>
+<summary><b>Editable / Dev install</b></summary>
+
+Use this if you plan to modify the code.
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
@@ -352,10 +362,10 @@ cd whisperjav
 # Windows
 installer\install_windows.bat --dev
 
-# Linux/Mac
+# Mac/Linux
 ./installer/install_linux.sh --dev
 
-# Or manual:
+# Or manual
 pip install -e ".[dev]"
 ```
 
