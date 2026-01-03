@@ -47,17 +47,26 @@ class FasterWhisperProASR:
         # Use smart device detection: CUDA -> MPS -> CPU
         self.device = model_config.get("device", get_best_device())
 
+        # CTRANSLATE2 COMPATIBILITY: MPS is not supported by ctranslate2/faster-whisper
+        # CTranslate2 only supports "cuda" or "cpu" devices.
+        # See: https://github.com/OpenNMT/CTranslate2/issues/1562
+        # See: https://github.com/SYSTRAN/faster-whisper/issues/911
+        if self.device == "mps":
+            logger.warning(
+                "Apple Silicon MPS detected, but faster-whisper/ctranslate2 doesn't support MPS. "
+                "Using CPU mode with Apple Accelerate optimization. "
+                "For GPU acceleration on Mac, use --mode transformers instead."
+            )
+            self.device = "cpu"
+
         # Smart compute_type default based on device (ctranslate2 backend)
         # - CUDA: int8_float16 (quantized weights + FP16 tensor cores = fastest)
-        # - MPS:  float16 (safe for Apple Silicon)
         # - CPU:  int8 (quantized weights + FP32 compute = only fast option)
         requested_compute_type = model_config.get("compute_type")
         if requested_compute_type is None or requested_compute_type == "auto":
             if self.device == "cuda":
                 self.compute_type = "int8_float16"
-            elif self.device == "mps":
-                self.compute_type = "float16"
-            else:  # cpu
+            else:  # cpu (includes Apple Silicon via Accelerate)
                 self.compute_type = "int8"
             logger.debug(f"Auto-selected compute_type='{self.compute_type}' for device='{self.device}'")
         else:

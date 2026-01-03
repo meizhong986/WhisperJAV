@@ -148,9 +148,22 @@ class StableTSASR:
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA -> MPS -> CPU
         self.device = model_config.get("device", get_best_device())
+        self.turbo_mode = turbo_mode
+
+        # CTRANSLATE2 COMPATIBILITY: MPS is not supported by ctranslate2/faster-whisper
+        # In turbo_mode, stable-ts uses faster-whisper which uses ctranslate2.
+        # CTranslate2 only supports "cuda" or "cpu" devices.
+        # See: https://github.com/OpenNMT/CTranslate2/issues/1562
+        if self.device == "mps" and self.turbo_mode:
+            logger.warning(
+                "Apple Silicon MPS detected, but faster-whisper/ctranslate2 doesn't support MPS. "
+                "Using CPU mode with Apple Accelerate optimization. "
+                "For GPU acceleration on Mac, use --mode transformers instead."
+            )
+            self.device = "cpu"
+
         # Default to int8 for quantized models (faster-whisper uses CTranslate2 quantized models)
         self.compute_type = model_config.get("compute_type", "int8")
-        self.turbo_mode = turbo_mode
         self.model_repo = model_config.get("hf_repo")
         if not self.model_repo:
             self.model_repo = self._derive_model_repo(self.model_name)
