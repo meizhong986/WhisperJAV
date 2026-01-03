@@ -79,10 +79,11 @@ whisperjav/output/
 #old docs in any subdirectory of are ignored
 **.docs_archive/
 
-#wheels and build extras
-installer/generated/*.whl
+# Installer generated files (regenerated per release via build_release.py)
+installer/generated/
+
+# Installer wheels and logs (in case generated/ is not ignored)
 installer/*.whl
-installer/generated/build_log_*.txt
 installer/build_log_*.txt
 
 # Reference scripts (local development only)

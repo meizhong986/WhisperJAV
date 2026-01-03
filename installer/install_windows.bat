@@ -581,8 +581,8 @@ if "%DEV_MODE%"=="1" (
     call :log "Installing WhisperJAV in development mode..."
     call :run_pip_with_retry "install --no-deps -e ." "Install WhisperJAV (editable)"
 ) else (
-    call :log "Installing WhisperJAV..."
-    call :run_pip_with_retry "install --no-deps ." "Install WhisperJAV"
+    call :log "Installing WhisperJAV from GitHub (latest)..."
+    call :run_pip_with_retry "install --no-deps git+https://github.com/meizhong986/whisperjav.git" "Install WhisperJAV"
 )
 if errorlevel 1 (
     call :create_failure_file "Failed to install WhisperJAV"
