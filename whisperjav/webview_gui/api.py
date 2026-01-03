@@ -12,6 +12,7 @@ import time
 import queue
 import threading
 import subprocess
+import webbrowser
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import webview
@@ -2274,3 +2275,19 @@ class WhisperJAVAPI:
                 "error": str(e),
                 "should_exit": False
             }
+
+    def open_url(self, url: str) -> Dict[str, Any]:
+        """
+        Open a URL in the system's default web browser.
+
+        Args:
+            url: The URL to open
+
+        Returns:
+            dict: Success status
+        """
+        try:
+            webbrowser.open(url)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
