@@ -4077,6 +4077,170 @@ const UpdateManager = {
 };
 
 // ============================================================
+// Update Check Manager (manual update check from menu)
+// ============================================================
+const UpdateCheckManager = {
+    modal: null,
+
+    init() {
+        this.modal = document.getElementById('updateCheckModal');
+        if (!this.modal) {
+            console.warn('UpdateCheckManager: modal not found');
+            return;
+        }
+
+        // Menu item click
+        const checkBtn = document.getElementById('checkUpdatesBtn');
+        if (checkBtn) {
+            checkBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('themeMenu')?.classList.remove('active');
+                this.show();
+            });
+        }
+
+        // Modal close handlers
+        document.getElementById('updateCheckModalClose')?.addEventListener('click', () => this.close());
+        document.getElementById('updateCheckLater')?.addEventListener('click', () => this.close());
+        document.getElementById('updateCheckNow')?.addEventListener('click', () => this.startUpdate());
+        document.getElementById('updateCheckDownload')?.addEventListener('click', () => this.openDownloadPage());
+
+        // Close on overlay click
+        this.modal.addEventListener('click', (e) => {
+            if (e.target === this.modal) this.close();
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.modal.classList.contains('active')) {
+                this.close();
+            }
+        });
+    },
+
+    async show() {
+        // Reset and show loading state
+        this.showLoading();
+        this.modal.classList.add('active');
+
+        try {
+            // Force fresh check (bypass cache)
+            const result = await pywebview.api.check_for_updates(true);
+            this.showResult(result);
+        } catch (err) {
+            console.error('Update check error:', err);
+            this.showError(err);
+        }
+    },
+
+    showLoading() {
+        document.getElementById('updateCheckLoading').style.display = 'block';
+        document.getElementById('updateCheckResult').style.display = 'none';
+        document.getElementById('updateCheckError').style.display = 'none';
+        document.getElementById('updateCheckNow').style.display = 'none';
+        document.getElementById('updateCheckDownload').style.display = 'none';
+    },
+
+    showResult(result) {
+        document.getElementById('updateCheckLoading').style.display = 'none';
+        document.getElementById('updateCheckResult').style.display = 'block';
+
+        // Set version info
+        document.getElementById('updateCurrentVersion').textContent = 'v' + result.current_version;
+
+        if (result.update_available && result.latest_version) {
+            document.getElementById('updateLatestVersion').textContent = 'v' + result.latest_version;
+            document.getElementById('updateUpToDate').style.display = 'none';
+            document.getElementById('updateAvailableSection').style.display = 'block';
+
+            // Show version row
+            const latestRow = document.querySelector('.version-latest');
+            if (latestRow) latestRow.style.display = 'flex';
+
+            // Set badge
+            const badge = document.getElementById('updateTypeBadge');
+            const level = result.notification_level || 'patch';
+            badge.textContent = level.toUpperCase();
+            badge.className = 'update-badge ' + level;
+
+            // Release notes
+            if (result.release_notes) {
+                const notesEl = document.getElementById('updateReleaseNotes');
+                notesEl.innerHTML = this.parseMarkdown(result.release_notes);
+            }
+
+            // Show appropriate button based on update level
+            if (level === 'major') {
+                document.getElementById('updateCheckNow').style.display = 'none';
+                document.getElementById('updateCheckDownload').style.display = 'inline-block';
+            } else {
+                document.getElementById('updateCheckNow').style.display = 'inline-block';
+                document.getElementById('updateCheckDownload').style.display = 'none';
+            }
+        } else {
+            // Up to date
+            document.getElementById('updateUpToDate').style.display = 'flex';
+            document.getElementById('updateAvailableSection').style.display = 'none';
+
+            // Hide version latest row and badge
+            const latestRow = document.querySelector('.version-latest');
+            if (latestRow) latestRow.style.display = 'none';
+
+            document.getElementById('updateCheckNow').style.display = 'none';
+            document.getElementById('updateCheckDownload').style.display = 'none';
+        }
+    },
+
+    showError(error) {
+        document.getElementById('updateCheckLoading').style.display = 'none';
+        document.getElementById('updateCheckResult').style.display = 'none';
+        document.getElementById('updateCheckError').style.display = 'block';
+        document.getElementById('updateCheckNow').style.display = 'none';
+        document.getElementById('updateCheckDownload').style.display = 'none';
+    },
+
+    async startUpdate() {
+        // Close modal
+        this.close();
+
+        // Use existing UpdateManager to show progress and start update
+        // This calls api.start_update() which spawns update_wrapper.py
+        // update_wrapper runs: pip install -U --no-deps git+https://github.com/meizhong986/whisperjav.git
+        UpdateManager.startUpdate();
+    },
+
+    async openDownloadPage() {
+        // Open GitHub releases in browser
+        try {
+            await pywebview.api.open_url('https://github.com/meizhong986/WhisperJAV/releases');
+        } catch (err) {
+            // Fallback: open in new window
+            window.open('https://github.com/meizhong986/WhisperJAV/releases', '_blank');
+        }
+        this.close();
+    },
+
+    close() {
+        this.modal.classList.remove('active');
+    },
+
+    parseMarkdown(text) {
+        // Simple markdown to HTML conversion
+        if (!text) return '';
+        return text
+            .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+            .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+            .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/^\* (.+)$/gm, '<li>$1</li>')
+            .replace(/^- (.+)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+            .replace(/\n\n/g, '<br><br>');
+    }
+};
+
+// ============================================================
 // Initialization
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -4098,6 +4262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ThemeManager.init();
     EnsembleManager.init();
     UpdateManager.init();
+    UpdateCheckManager.init();
 
     // Initial validation
     FormManager.validateForm();

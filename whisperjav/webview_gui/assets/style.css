@@ -2405,3 +2405,182 @@ button:focus-visible,
 .changelog-error p {
     margin-bottom: 16px;
 }
+
+/* ============================================================
+   Update Check Modal
+   ============================================================ */
+
+/* Theme menu divider */
+.theme-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
+
+/* Check for Updates menu item */
+.update-check-option {
+    font-weight: 600;
+}
+
+.update-check-icon {
+    margin-right: 6px;
+}
+
+/* Update check loading state */
+.update-check-loading {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.update-check-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+.update-check-loading p {
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Version info display */
+.version-info {
+    margin-bottom: 16px;
+}
+
+.version-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    margin: 8px 0;
+}
+
+.version-label {
+    color: var(--text-secondary);
+    min-width: 70px;
+}
+
+.version-value {
+    font-weight: 500;
+}
+
+.version-current .version-value {
+    color: var(--text-secondary);
+}
+
+.version-latest .version-value {
+    color: var(--text-primary);
+}
+
+/* Update type badges */
+.update-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+    text-transform: uppercase;
+}
+
+.update-badge.patch {
+    background: #28a745;
+    color: white;
+}
+
+.update-badge.minor {
+    background: #17a2b8;
+    color: white;
+}
+
+.update-badge.major {
+    background: #fd7e14;
+    color: white;
+}
+
+.update-badge.critical {
+    background: #dc3545;
+    color: white;
+}
+
+/* Up to date message */
+.update-up-to-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 20px;
+    color: #28a745;
+    font-size: 18px;
+}
+
+.update-up-to-date .checkmark {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+/* Release notes */
+.release-notes-details {
+    margin-top: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.release-notes-details summary {
+    padding: 12px;
+    cursor: pointer;
+    background: var(--hover-tab-bg);
+    font-weight: 500;
+}
+
+.release-notes-details summary:hover {
+    background: var(--disabled-bg);
+}
+
+.release-notes-content {
+    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.release-notes-content h3,
+.release-notes-content h4 {
+    margin: 12px 0 8px;
+    font-size: 14px;
+}
+
+.release-notes-content h3:first-child,
+.release-notes-content h4:first-child {
+    margin-top: 0;
+}
+
+.release-notes-content li {
+    margin: 4px 0;
+    padding-left: 4px;
+}
+
+.release-notes-content code {
+    background: var(--disabled-bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* Error state */
+.update-check-error {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-secondary);
+}
+
+.update-check-error p {
+    margin: 0;
+}

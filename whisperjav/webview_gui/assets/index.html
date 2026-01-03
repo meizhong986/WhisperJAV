@@ -25,6 +25,10 @@
                     <button class="theme-option" data-theme="google" role="menuitem">Google Theme</button>
                     <button class="theme-option" data-theme="carbon" role="menuitem">IBM Carbon Theme</button>
                     <button class="theme-option" data-theme="primer" role="menuitem">GitHub Primer Theme</button>
+                    <div class="theme-menu-divider"></div>
+                    <button class="theme-option update-check-option" id="checkUpdatesBtn" role="menuitem">
+                        <span class="update-check-icon">&#x2B06;</span> Check for Updates
+                    </button>
                 </div>
             </div>
         </header>
@@ -834,6 +838,58 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="ChangelogManager.openGitHub()">View on GitHub</button>
                 <button class="btn btn-primary" onclick="ChangelogManager.close()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Check Modal -->
+    <div class="modal-overlay" id="updateCheckModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2>Check for Updates</h2>
+                <button class="modal-close" id="updateCheckModalClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading State -->
+                <div id="updateCheckLoading" class="update-check-loading">
+                    <div class="spinner"></div>
+                    <p>Checking for updates...</p>
+                </div>
+                <!-- Result State -->
+                <div id="updateCheckResult" class="update-check-result" style="display: none;">
+                    <div class="version-info">
+                        <div class="version-row version-current">
+                            <span class="version-label">Current:</span>
+                            <span class="version-value" id="updateCurrentVersion">v1.7.5</span>
+                        </div>
+                        <div class="version-row version-latest">
+                            <span class="version-label">Latest:</span>
+                            <span class="version-value" id="updateLatestVersion">v1.7.6</span>
+                            <span class="update-badge patch" id="updateTypeBadge">PATCH</span>
+                        </div>
+                    </div>
+                    <!-- Up to Date Message -->
+                    <div id="updateUpToDate" class="update-up-to-date" style="display: none;">
+                        <span class="checkmark">&#x2713;</span>
+                        <span>You're up to date!</span>
+                    </div>
+                    <!-- Update Available Section -->
+                    <div id="updateAvailableSection" style="display: none;">
+                        <details class="release-notes-details">
+                            <summary>Release Notes</summary>
+                            <div id="updateReleaseNotes" class="release-notes-content"></div>
+                        </details>
+                    </div>
+                </div>
+                <!-- Error State -->
+                <div id="updateCheckError" class="update-check-error" style="display: none;">
+                    <p>Failed to check for updates. Please check your internet connection and try again.</p>
+                </div>
+            </div>
+            <div class="modal-footer" id="updateCheckFooter">
+                <button id="updateCheckLater" class="btn btn-secondary">Close</button>
+                <button id="updateCheckNow" class="btn btn-primary" style="display: none;">Update Now</button>
+                <button id="updateCheckDownload" class="btn btn-primary" style="display: none;">Download</button>
             </div>
         </div>
     </div>
