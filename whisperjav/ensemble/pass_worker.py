@@ -696,6 +696,11 @@ def _build_pipeline(
             logger.debug("Pass %s: Override hf_scene = %s", pass_number, pass_config["scene_detector"])
         elif pass_config.get("scene_detector") == "none":
             hf_defaults["hf_scene"] = "none"
+        # Apply source language override for transformers pipeline (fixes Issue #104)
+        # The language code (e.g., 'en', 'ja') is set in main.py from --language argument
+        if pass_config.get("language"):
+            hf_defaults["hf_language"] = pass_config["language"]
+            logger.debug("Pass %s: Override hf_language = %s", pass_number, pass_config["language"])
         # Apply speech enhancer override for transformers pipeline
         if pass_config.get("speech_enhancer"):
             enhancer_backend, enhancer_model = _parse_speech_enhancer(pass_config["speech_enhancer"])
@@ -738,6 +743,15 @@ def _build_pipeline(
         task=asr_task,  # Derived from subs_language above
         overrides=pass_config.get("overrides"),
     )
+
+    # Apply source language from pass_config (fixes Issue #104)
+    # The language code (e.g., 'en', 'ja') is set in main.py from --language argument
+    if pass_config.get("language"):
+        resolved_config["language"] = pass_config["language"]
+        # Also update decoder params so ASR uses correct language
+        if "params" in resolved_config and "decoder" in resolved_config["params"]:
+            resolved_config["params"]["decoder"]["language"] = pass_config["language"]
+        logger.debug("Pass %s: Applied source language = %s", pass_number, pass_config["language"])
 
     # Apply GUI-specified overrides for legacy pipelines
     _apply_gui_overrides(resolved_config, pass_config, pass_number)

@@ -1296,7 +1296,8 @@ def main():
                 'speech_enhancer': args.pass1_speech_enhancer,
                 'model': args.pass1_model,
                 'params': pass1_params,  # None = use defaults, object = custom
-                'hf_params': pass1_hf_params  # For transformers pipeline
+                'hf_params': pass1_hf_params,  # For transformers pipeline
+                'language': language_code  # Source language code (e.g., 'en', 'ja')
             }
 
             pass2_config = None
@@ -1309,7 +1310,8 @@ def main():
                     'speech_enhancer': args.pass2_speech_enhancer,
                     'model': args.pass2_model,
                     'params': pass2_params,
-                    'hf_params': pass2_hf_params  # For transformers pipeline
+                    'hf_params': pass2_hf_params,  # For transformers pipeline
+                    'language': language_code  # Source language code (e.g., 'en', 'ja')
                 }
 
             # Create orchestrator
