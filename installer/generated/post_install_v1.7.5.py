@@ -1420,30 +1420,55 @@ def main() -> int:
     # === Phase 5: WhisperJAV Application ===
     log_section("Phase 5: WhisperJAV Application Installation")
 
-    # Find WhisperJAV wheel in installation directory
+    # Strategy: Try GitHub first (gets latest bug fixes), fallback to bundled wheel
+    GITHUB_URL = "git+https://github.com/meizhong986/whisperjav.git"
+
+    # Find local wheel as fallback
     import glob
     wheel_pattern = os.path.join(sys.prefix, "whisperjav-*.whl")
     wheels = glob.glob(wheel_pattern)
-
-    if not wheels:
-        log(f"ERROR: No WhisperJAV wheel found matching: {wheel_pattern}")
-        log("ERROR: The installer package may be corrupted or incomplete")
-        create_failure_file(f"Missing local wheel (pattern: {wheel_pattern})")
-        return 1
+    local_wheel = wheels[0] if wheels else None
 
     if len(wheels) > 1:
-        log(f"WARNING: Multiple wheels found, using first: {wheels[0]}")
+        log(f"NOTE: Multiple wheels found, will use first as fallback: {wheels[0]}")
 
-    local_wheel = wheels[0]
-    log(f"Installing WhisperJAV from local wheel: {local_wheel}")
-    log("Using --no-deps to avoid reinstalling dependencies...")
+    # Try GitHub install first (users get latest fixes)
+    github_success = False
+    log("Attempting to install WhisperJAV from GitHub (latest version)...")
+    log(f"  Source: {GITHUB_URL}")
+    log("  This ensures you get the latest bug fixes and improvements.")
 
-    if not run_pip(
-        ["install", "--no-deps", local_wheel, "--progress-bar", "on"],
-        "Install WhisperJAV application"
+    if run_pip(
+        ["install", "--no-deps", GITHUB_URL, "--progress-bar", "on"],
+        "Install WhisperJAV from GitHub"
     ):
-        create_failure_file("WhisperJAV application installation failed")
-        return 1
+        github_success = True
+        log("✓ Successfully installed WhisperJAV from GitHub (latest)")
+    else:
+        log("")
+        log("GitHub installation failed. This can happen due to:")
+        log("  - Network issues or firewall restrictions")
+        log("  - GitHub rate limiting")
+        log("  - Temporary server issues")
+
+        # Fallback to local wheel
+        if local_wheel:
+            log("")
+            log(f"Falling back to bundled wheel: {os.path.basename(local_wheel)}")
+            log("NOTE: Bundled version may not include latest bug fixes.")
+            log("      You can update later with: pip install -U git+https://github.com/meizhong986/whisperjav.git")
+
+            if not run_pip(
+                ["install", "--no-deps", local_wheel, "--progress-bar", "on"],
+                "Install WhisperJAV from bundled wheel (fallback)"
+            ):
+                create_failure_file("WhisperJAV application installation failed (both GitHub and local wheel)")
+                return 1
+            log("✓ Successfully installed WhisperJAV from bundled wheel (fallback)")
+        else:
+            log("ERROR: No fallback wheel available and GitHub install failed")
+            create_failure_file("WhisperJAV installation failed - no GitHub access and no local wheel")
+            return 1
 
     # === Phase 5.5: Copy Launcher to Root ===
     log_section("Phase 5.5: User-Friendly Launcher Setup")
