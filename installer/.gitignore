@@ -1,20 +1,23 @@
-# Ignore built installers
+# Build outputs (do NOT commit)
 *.exe
-*.sh
 *.pkg
-
-# Ignore constructor work directory
 build/
 _build/
 work/
-
-# Ignore downloaded packages cache
 pkgs/
 
-# But keep the icon file
+# Generated files (regenerated via build_release.py)
+generated/
+
+# Build logs
+build_log_*.txt
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Keep essential files
+!LICENSE.txt
 !whisperjav_icon.ico
-
-# Keep the Linux install script
 !install_linux.sh
-
-# Note: generated/ folder is now tracked for v1.7.3 installer documentation
+!install_windows.bat
