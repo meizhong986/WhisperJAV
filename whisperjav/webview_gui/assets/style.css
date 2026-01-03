@@ -2447,6 +2447,11 @@ button:focus-visible,
     margin: 0;
 }
 
+/* Result container */
+.update-check-result {
+    padding: 20px;
+}
+
 /* Version info display */
 .version-info {
     margin-bottom: 16px;
