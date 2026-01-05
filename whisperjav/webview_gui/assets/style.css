@@ -1590,6 +1590,87 @@ button:focus-visible,
 }
 
 /* ============================================================
+   Translate After Transcription Integration
+   ============================================================ */
+.translate-integration-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.04) 100%);
+    border: 1px solid rgba(76, 175, 80, 0.2);
+    border-radius: var(--border-radius);
+}
+
+.translate-checkbox-group {
+    flex-shrink: 0;
+}
+
+.translate-quick-settings {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.translate-quick-settings .form-select {
+    min-width: 100px;
+    font-size: 11px;
+    padding: 4px 8px;
+}
+
+.ensemble-translate-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.04) 100%);
+    border: 1px solid rgba(76, 175, 80, 0.2);
+    border-radius: var(--border-radius);
+}
+
+/* API Key Warning Indicator */
+.translate-api-warning {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--error-color, #e53935);
+    padding: 2px 6px;
+    background: rgba(229, 57, 53, 0.1);
+    border-radius: 4px;
+}
+
+.translate-api-warning::before {
+    content: "⚠";
+}
+
+/* Translate status badge */
+.translate-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+}
+
+.translate-status.translating {
+    background: rgba(33, 150, 243, 0.2);
+    color: var(--primary-color);
+}
+
+.translate-status.success {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.translate-status.error {
+    background: rgba(229, 57, 53, 0.2);
+    color: var(--error-color, #e53935);
+}
+
+/* ============================================================
    DSP Effects Panel - FFmpeg Audio Filters UI
    ============================================================ */
 .dsp-effects-panel {
