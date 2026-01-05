@@ -121,6 +121,15 @@ def build_provider_options(args, settings_model_params: dict, effective_tone: st
         provider_opts['temperature'] = temperature
     if top_p is not None:
         provider_opts['top_p'] = top_p
+
+    # Add rate limiting options from CLI
+    if hasattr(args, 'rate_limit') and args.rate_limit is not None:
+        provider_opts['rate_limit'] = args.rate_limit
+    if hasattr(args, 'max_retries') and args.max_retries is not None:
+        provider_opts['max_retries'] = args.max_retries
+    if hasattr(args, 'backoff_time') and args.backoff_time is not None:
+        provider_opts['backoff_time'] = args.backoff_time
+
     return provider_opts
 
 
@@ -183,7 +192,8 @@ def main():
     )
 
     # Required arguments
-    parser.add_argument('-i', '--input', required=True, help="Input subtitle file (.srt)")
+    parser.add_argument('-i', '--input', nargs='+', required=True,
+                        help="Input subtitle file(s) or directory (.srt). Supports: -i file.srt, -i dir/, -i a.srt b.srt")
 
     # Core translation options
     translation_group = parser.add_argument_group("Translation Options")
@@ -235,6 +245,23 @@ def main():
         '--top-p',
         type=float,
         help="Model top_p (0.0-1.0)"
+    )
+    api_group.add_argument(
+        '--rate-limit',
+        type=float,
+        help="Max API requests per minute (e.g., 10 = 6 sec between requests)"
+    )
+    api_group.add_argument(
+        '--max-retries',
+        type=int,
+        default=3,
+        help="Max retries on API failure (default: 3)"
+    )
+    api_group.add_argument(
+        '--backoff-time',
+        type=float,
+        default=5.0,
+        help="Backoff time in seconds after failure (default: 5.0)"
     )
 
     # Processing options
@@ -323,21 +350,29 @@ def main():
             print(f"Default settings created at: {get_settings_path()}")
         return
 
-    # Validate input file/directory
-    input_arg = Path(args.input)
-    if not input_arg.exists():
-        print(f"Error: Input not found: {input_arg}", file=sys.stderr)
-        sys.exit(1)
-
-    # Determine files to process
-    if input_arg.is_dir():
-        files_to_process = sorted(list(input_arg.glob("*.srt")))
-        if not files_to_process:
-            print(f"Error: No .srt files found in directory: {input_arg}", file=sys.stderr)
+    # Validate and collect input files (supports multiple inputs, directories, and mixed)
+    files_to_process = []
+    for input_item in args.input:
+        input_arg = Path(input_item)
+        if not input_arg.exists():
+            print(f"Error: Input not found: {input_arg}", file=sys.stderr)
             sys.exit(1)
-        print(f"Found {len(files_to_process)} SRT files in {input_arg}", file=sys.stderr)
-    else:
-        files_to_process = [input_arg]
+
+        if input_arg.is_dir():
+            # Directory: glob for .srt files
+            srt_files = sorted(list(input_arg.glob("*.srt")))
+            if not srt_files:
+                print(f"Warning: No .srt files found in directory: {input_arg}", file=sys.stderr)
+            else:
+                files_to_process.extend(srt_files)
+                print(f"Found {len(srt_files)} SRT files in {input_arg}", file=sys.stderr)
+        else:
+            # Single file
+            files_to_process.append(input_arg)
+
+    if not files_to_process:
+        print("Error: No valid .srt files to process", file=sys.stderr)
+        sys.exit(1)
 
     # Merge configuration
     merged = resolve_config(args, settings)
