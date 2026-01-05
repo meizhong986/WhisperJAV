@@ -1671,6 +1671,313 @@ button:focus-visible,
 }
 
 /* ============================================================
+   Translator Tab (Tab 4)
+   ============================================================ */
+.translator-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px;
+}
+
+.translator-section {
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 10px 12px;
+}
+
+.translator-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.translator-section-header h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* File List Section */
+.translator-files-section {
+    min-height: 120px;
+}
+
+.translator-file-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.translator-file-list {
+    min-height: 80px;
+    max-height: 150px;
+    overflow-y: auto;
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 8px;
+}
+
+.translator-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 80px;
+    color: var(--text-tertiary);
+    text-align: center;
+}
+
+.translator-empty-state .empty-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.translator-empty-state p {
+    margin: 2px 0;
+    font-size: 11px;
+}
+
+.translator-empty-state .empty-hint {
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+.translator-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.translator-file-item:hover {
+    background: var(--background-hover);
+}
+
+.translator-file-item.selected {
+    background: rgba(33, 150, 243, 0.15);
+}
+
+.translator-file-item input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.translator-file-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.translator-file-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.translator-file-status.pending {
+    background: var(--background-tertiary);
+    color: var(--text-tertiary);
+}
+
+.translator-file-status.translating {
+    background: rgba(33, 150, 243, 0.2);
+    color: var(--primary-color);
+}
+
+.translator-file-status.completed {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.translator-file-status.error {
+    background: rgba(229, 57, 53, 0.2);
+    color: var(--error-color, #e53935);
+}
+
+/* Provider Settings Grid */
+.translator-provider-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    align-items: end;
+}
+
+.translator-api-key-group {
+    grid-column: span 2;
+}
+
+.translator-test-btn-group {
+    justify-self: start;
+    align-self: end;
+}
+
+.input-with-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.input-with-status .form-input {
+    flex: 1;
+}
+
+.api-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.api-status.configured {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.api-status.missing {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+}
+
+.api-status.error {
+    background: rgba(229, 57, 53, 0.2);
+    color: var(--error-color, #e53935);
+}
+
+/* Translation Settings Grid */
+.translator-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+/* Collapsible Sections */
+.translator-section.translator-context-section,
+.translator-section.translator-advanced-section {
+    padding: 0;
+}
+
+.collapsible-header {
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.collapsible-header:hover {
+    background: var(--background-hover);
+}
+
+.collapse-icon {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
+details[open] .collapse-icon {
+    transform: rotate(90deg);
+}
+
+.translator-context-grid,
+.translator-advanced-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 12px 12px;
+}
+
+.form-textarea {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--background-primary);
+    color: var(--text-primary);
+    resize: vertical;
+    min-height: 40px;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Progress Section */
+.translator-progress-section {
+    padding: 8px 12px;
+}
+
+.translator-progress-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.translator-progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--background-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.translator-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.translator-status-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    min-width: 80px;
+    text-align: right;
+}
+
+/* Control Buttons */
+.translator-controls-section {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+}
+
+.translator-button-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* Responsive adjustments for Translator tab */
+@media (max-width: 768px) {
+    .translator-provider-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .translator-api-key-group {
+        grid-column: span 1;
+    }
+
+    .translator-settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .translator-context-grid,
+    .translator-advanced-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
    DSP Effects Panel - FFmpeg Audio Filters UI
    ============================================================ */
 .dsp-effects-panel {
