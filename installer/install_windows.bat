@@ -680,32 +680,76 @@ goto :eof
 
 :run_pip_with_retry
 REM Run pip command with up to 3 retries
+REM Enhanced with Git timeout detection for GFW/VPN users (Issue #111)
 REM Usage: call :run_pip_with_retry "pip args" "description"
 set "PIP_ARGS=%~1"
 set "PIP_DESC=%~2"
 set "RETRY_COUNT=0"
+set "PIP_OUTPUT_FILE=%TEMP%\pip_output_%RANDOM%.txt"
 
 :retry_loop
 set /a RETRY_COUNT+=1
 call :log "Attempt %RETRY_COUNT%/3: %PIP_DESC%"
 echo   [%RETRY_COUNT%/3] %PIP_DESC%...
 
-python -m pip %PIP_ARGS% 2>&1
-if errorlevel 1 (
+REM Run pip and capture output for timeout detection
+python -m pip %PIP_ARGS% > "%PIP_OUTPUT_FILE%" 2>&1
+type "%PIP_OUTPUT_FILE%"
+set "PIP_RESULT=!ERRORLEVEL!"
+
+if !PIP_RESULT! NEQ 0 (
+    REM Check if this looks like a Git timeout error (common with GFW/VPN)
+    REM Pattern: "Failed to connect to github.com port 443 after 21" or similar
+    findstr /C:"after 21" /C:"Connection timed out" /C:"Could not connect" "%PIP_OUTPUT_FILE%" >nul 2>&1
+    if !ERRORLEVEL! EQU 0 (
+        if "!GIT_TIMEOUTS_CONFIGURED!"=="" (
+            echo.
+            echo   ============================================================
+            echo   Git connection timeout detected!
+            echo   This is common for users behind GFW or slow VPN connections.
+            echo   Configuring Git with extended timeouts...
+            echo   ============================================================
+            call :log "Git timeout detected - configuring extended timeouts"
+            call :configure_git_timeouts
+        )
+    )
+    
     if %RETRY_COUNT% LSS 3 (
         echo   Retrying in 5 seconds...
         call :log "Failed, retrying in 5 seconds..."
         timeout /t 5 /nobreak >nul
+        del "%PIP_OUTPUT_FILE%" 2>nul
         goto :retry_loop
     ) else (
         echo   ERROR: %PIP_DESC% failed after 3 attempts
         call :log "ERROR: %PIP_DESC% failed after 3 attempts"
+        del "%PIP_OUTPUT_FILE%" 2>nul
         exit /b 1
     )
 ) else (
     call :log "SUCCESS: %PIP_DESC%"
 )
+del "%PIP_OUTPUT_FILE%" 2>nul
 exit /b 0
+
+:configure_git_timeouts
+REM Configure Git with extended timeouts for slow/unstable connections (Issue #111)
+REM This helps users behind GFW or using slow VPN connections
+call :log "Configuring Git timeouts for slow connections..."
+echo   Applying Git timeout configuration:
+git config --global http.connectTimeout 120 2>nul && echo     + http.connectTimeout = 120 seconds
+git config --global http.timeout 300 2>nul && echo     + http.timeout = 300 seconds
+git config --global http.lowSpeedLimit 0 2>nul && echo     + http.lowSpeedLimit = 0 (disabled)
+git config --global http.lowSpeedTime 999999 2>nul && echo     + http.lowSpeedTime = 999999
+git config --global http.postBuffer 524288000 2>nul && echo     + http.postBuffer = 500MB
+git config --global http.maxRetries 5 2>nul && echo     + http.maxRetries = 5
+REM Set environment variables for current session
+set "GIT_HTTP_CONNECT_TIMEOUT=120"
+set "GIT_HTTP_TIMEOUT=300"
+set "GIT_TIMEOUTS_CONFIGURED=1"
+call :log "Git timeout configuration complete"
+echo.
+goto :eof
 
 :create_failure_file
 REM Create a failure marker file with error details
