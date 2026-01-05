@@ -223,6 +223,10 @@ def main():
         help="API key (or set via environment variable)"
     )
     api_group.add_argument(
+        '--endpoint',
+        help="Custom API endpoint URL (for OpenAI-compatible APIs)"
+    )
+    api_group.add_argument(
         '--temperature',
         type=float,
         help="Model temperature (0.0-2.0)"
@@ -319,11 +323,21 @@ def main():
             print(f"Default settings created at: {get_settings_path()}")
         return
 
-    # Validate input file
-    input_path = Path(args.input)
-    if not input_path.exists():
-        print(f"Error: Input file not found: {input_path}", file=sys.stderr)
+    # Validate input file/directory
+    input_arg = Path(args.input)
+    if not input_arg.exists():
+        print(f"Error: Input not found: {input_arg}", file=sys.stderr)
         sys.exit(1)
+
+    # Determine files to process
+    if input_arg.is_dir():
+        files_to_process = sorted(list(input_arg.glob("*.srt")))
+        if not files_to_process:
+            print(f"Error: No .srt files found in directory: {input_arg}", file=sys.stderr)
+            sys.exit(1)
+        print(f"Found {len(files_to_process)} SRT files in {input_arg}", file=sys.stderr)
+    else:
+        files_to_process = [input_arg]
 
     # Merge configuration
     merged = resolve_config(args, settings)
@@ -334,6 +348,14 @@ def main():
     if not provider_config:
         print(f"Error: Unknown provider: {provider_name}", file=sys.stderr)
         sys.exit(1)
+
+    # Override api_base if --endpoint provided (create copy to avoid modifying original)
+    if hasattr(args, 'endpoint') and args.endpoint:
+        provider_config = dict(provider_config)  # Make a copy
+        provider_config['api_base'] = args.endpoint
+        # When using custom endpoint, use OpenAI-compatible backend
+        if provider_config.get('pysubtrans_name') not in ('OpenAI', 'DeepSeek'):
+            provider_config['pysubtrans_name'] = 'OpenAI'
 
     # Get API key
     api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else os.getenv(provider_config['env_var'])
@@ -348,9 +370,6 @@ def main():
     source_lang = merged.get('source', 'japanese')
     target_lang = merged.get('target_language', 'english')
 
-    # Get output path
-    output_path = Path(args.output) if hasattr(args, 'output') and args.output else Path(generate_output_path(str(input_path), target_lang))
-
     # Resolve instruction file
     instruction_file = resolve_instruction_file_or_content(args, merged)
 
@@ -361,48 +380,79 @@ def main():
     # Build extra context
     extra_context = build_extra_context(args)
 
-    # Translate
-    try:
-        if not args.no_progress:
-            print(f"Translating {input_path.name} from {source_lang} to {target_lang}...", file=sys.stderr)
-            print(f"Provider: {provider_name} ({model})", file=sys.stderr)
+    # Batch translation loop
+    success_count = 0
+    fail_count = 0
 
-        result_path = translate_subtitle(
-            input_path=str(input_path),
-            output_path=output_path,
-            provider_config=provider_config,
-            model=model,
-            api_key=api_key,
-            source_lang=source_lang,
-            target_lang=target_lang,
-            instruction_file=instruction_file,
-            scene_threshold=merged.get('scene_threshold', 60.0),
-            max_batch_size=merged.get('max_batch_size', 30),
-            stream=args.stream if hasattr(args, 'stream') else False,
-            debug=args.debug,
-            provider_options=provider_options,
-            extra_context=extra_context if extra_context else None,
-            emit_raw_output=not getattr(args, 'no_progress', False)
-        )
-
-        if result_path:
-            # Print output path to stdout (for capture by calling process)
-            print(str(result_path))
-            if not args.no_progress:
-                print(f"Translation complete: {result_path.name}", file=sys.stderr)
+    for i, input_path in enumerate(files_to_process):
+        # Determine output path for this file
+        if hasattr(args, 'output') and args.output:
+            # If explicit output provided:
+            # - If processing multiple files, treat args.output as directory
+            # - If processing single file, treat args.output as file (legacy behavior)
+            out_arg = Path(args.output)
+            if len(files_to_process) > 1:
+                if not out_arg.exists():
+                    out_arg.mkdir(parents=True, exist_ok=True)
+                # Output filename is same as generated one but in the specified dir
+                default_name = Path(generate_output_path(str(input_path), target_lang)).name
+                output_path = out_arg / default_name
+            else:
+                # Single file mode - use exactly what user gave
+                output_path = out_arg
         else:
-            print("Translation failed", file=sys.stderr)
-            sys.exit(1)
+            # Auto-generate
+            output_path = Path(generate_output_path(str(input_path), target_lang))
 
-    except KeyboardInterrupt:
-        print("\nTranslation interrupted", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        if args.debug:
-            import traceback
-            traceback.print_exc()
-        sys.exit(1)
+        try:
+            if not args.no_progress:
+                print(f"[{i+1}/{len(files_to_process)}] Translating {input_path.name} from {source_lang} to {target_lang}...", file=sys.stderr)
+                if i == 0:  # Only print provider info once
+                    print(f"Provider: {provider_name} ({model})", file=sys.stderr)
+
+            result_path = translate_subtitle(
+                input_path=str(input_path),
+                output_path=output_path,
+                provider_config=provider_config,
+                model=model,
+                api_key=api_key,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                instruction_file=instruction_file,
+                scene_threshold=merged.get('scene_threshold', 60.0),
+                max_batch_size=merged.get('max_batch_size', 30),
+                stream=args.stream if hasattr(args, 'stream') else False,
+                debug=args.debug,
+                provider_options=provider_options,
+                extra_context=extra_context if extra_context else None,
+                emit_raw_output=not getattr(args, 'no_progress', False)
+            )
+
+            if result_path:
+                # Print output path to stdout (for capture by calling process)
+                print(str(result_path))
+                if not args.no_progress:
+                    print(f"Complete: {result_path.name}", file=sys.stderr)
+                success_count += 1
+            else:
+                print(f"Failed: {input_path.name}", file=sys.stderr)
+                fail_count += 1
+
+        except KeyboardInterrupt:
+            print("\nBatch translation interrupted", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error translating {input_path.name}: {e}", file=sys.stderr)
+            fail_count += 1
+            if args.debug:
+                import traceback
+                traceback.print_exc()
+            # Continue to next file for batch robustness
+            continue
+
+    if fail_count > 0:
+        print(f"\nBatch processing finished with {fail_count} errors.", file=sys.stderr)
+        sys.exit(1 if success_count == 0 else 0)
 
 
 if __name__ == '__main__':
