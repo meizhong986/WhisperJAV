@@ -29,6 +29,18 @@ PROVIDER_CONFIGS = {
         'pysubtrans_name': 'OpenAI',
         'model': 'gpt-4o-mini',
         'env_var': 'OPENAI_API_KEY'
+    },
+    'glm': {
+        'pysubtrans_name': 'OpenAI',  # GLM uses OpenAI-compatible API
+        'model': 'glm-4-flash',
+        'env_var': 'GLM_API_KEY',
+        'api_base': 'https://open.bigmodel.cn/api/paas/v4'  # Zhipu AI endpoint
+    },
+    'groq': {
+        'pysubtrans_name': 'OpenAI',  # Groq uses OpenAI-compatible API
+        'model': 'llama-3.3-70b-versatile',
+        'env_var': 'GROQ_API_KEY',
+        'api_base': 'https://api.groq.com/openai/v1'
     }
 }
 
