@@ -17,7 +17,7 @@ PROVIDER_CONFIGS = {
     },
     'gemini': {
         'pysubtrans_name': 'Gemini',
-        'model': 'gemini-2.0-flash-exp',
+        'model': 'gemini-2.0-flash',
         'env_var': 'GEMINI_API_KEY'
     },
     'claude': {
