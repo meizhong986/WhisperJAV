@@ -2335,3 +2335,362 @@ class WhisperJAVAPI:
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    # ========================================================================
+    # Translation API (Phase 2 - Translator Tab Support)
+    # ========================================================================
+
+    def _init_translation_state(self):
+        """Initialize translation-specific state if not already done."""
+        if not hasattr(self, '_translate_process'):
+            self._translate_process: Optional[subprocess.Popen] = None
+            self._translate_status = "idle"
+            self._translate_log_queue: queue.Queue = queue.Queue()
+            self._translate_thread: Optional[threading.Thread] = None
+
+    def get_translation_providers(self) -> Dict[str, Any]:
+        """
+        Get available translation providers and their configurations.
+
+        Returns:
+            dict: Provider information including models and settings
+        """
+        try:
+            from whisperjav.translate.providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
+
+            providers = []
+            for key, config in PROVIDER_CONFIGS.items():
+                providers.append({
+                    "id": key,
+                    "name": key.upper() if key in ('glm', 'gpt') else key.title(),
+                    "model": config.get('model'),
+                    "env_var": config.get('env_var'),
+                    "has_api_key": bool(os.getenv(config.get('env_var', '')))
+                })
+
+            return {
+                "success": True,
+                "providers": providers,
+                "target_languages": list(SUPPORTED_TARGETS)
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_translation_settings(self) -> Dict[str, Any]:
+        """
+        Get saved translation settings.
+
+        Returns:
+            dict: Current translation settings
+        """
+        try:
+            from whisperjav.translate.settings import load_settings
+            settings = load_settings()
+            return {
+                "success": True,
+                "settings": dict(settings) if settings else {}
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def save_translation_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Save translation settings.
+
+        Args:
+            settings: Settings dictionary to save
+
+        Returns:
+            dict: Success status
+        """
+        try:
+            from whisperjav.translate.settings import get_settings_path
+            import json
+
+            settings_path = get_settings_path()
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(settings_path, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, indent=2, ensure_ascii=False)
+
+            return {"success": True, "path": str(settings_path)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def test_provider_connection(self, provider: str, api_key: str = None) -> Dict[str, Any]:
+        """
+        Test connection to a translation provider.
+
+        Args:
+            provider: Provider ID (deepseek, glm, groq, etc.)
+            api_key: Optional API key to test (uses env var if not provided)
+
+        Returns:
+            dict: Connection test result
+        """
+        try:
+            from whisperjav.translate.providers import PROVIDER_CONFIGS
+            import urllib.request
+            import urllib.error
+            import json
+
+            config = PROVIDER_CONFIGS.get(provider)
+            if not config:
+                return {"success": False, "error": f"Unknown provider: {provider}"}
+
+            # Get API key
+            key = api_key or os.getenv(config.get('env_var', ''))
+            if not key:
+                return {
+                    "success": False,
+                    "error": f"No API key. Set {config.get('env_var')} or provide key."
+                }
+
+            # Test with a minimal request
+            api_base = config.get('api_base', 'https://api.openai.com/v1')
+            test_url = f"{api_base.rstrip('/')}/models"
+
+            req = urllib.request.Request(
+                test_url,
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json"
+                }
+            )
+
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    return {
+                        "success": True,
+                        "message": f"Connected to {provider}",
+                        "status_code": response.status
+                    }
+            except urllib.error.HTTPError as e:
+                if e.code == 401:
+                    return {"success": False, "error": "Invalid API key"}
+                elif e.code == 403:
+                    return {"success": False, "error": "API key lacks permissions"}
+                else:
+                    # Many APIs return 404 for /models but still work
+                    return {
+                        "success": True,
+                        "message": f"API key accepted by {provider}",
+                        "warning": f"Models endpoint returned {e.code}"
+                    }
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def select_srt_files(self) -> Dict[str, Any]:
+        """
+        Open file dialog to select SRT files for translation.
+
+        Returns:
+            dict: Selected file paths
+        """
+        windows = webview.windows
+        if not windows:
+            return {"success": False, "message": "No active window"}
+
+        window = windows[0]
+
+        file_types = [
+            'Subtitle Files (*.srt)',
+            'All Files (*.*)'
+        ]
+
+        result = window.create_file_dialog(
+            FileDialog.OPEN,
+            allow_multiple=True,
+            file_types=file_types
+        )
+
+        if result and len(result) > 0:
+            return {"success": True, "paths": list(result)}
+        return {"success": False, "message": "No files selected"}
+
+    def start_translation(self, options: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Start translation process.
+
+        Args:
+            options: Translation options:
+                - inputs: List[str] - Input SRT file paths
+                - provider: str - Provider ID
+                - target: str - Target language
+                - model: str - Model override (optional)
+                - api_key: str - API key (optional, uses env var)
+                - tone: str - Translation tone (standard/pornify)
+                - movie_title: str - Movie title context (optional)
+                - actress: str - Actress name context (optional)
+                - movie_plot: str - Plot summary context (optional)
+                - output_dir: str - Output directory (optional)
+
+        Returns:
+            dict: Process start result
+        """
+        self._init_translation_state()
+
+        if self._translate_process is not None:
+            return {"success": False, "error": "Translation already in progress"}
+
+        try:
+            # Build CLI arguments
+            args = [sys.executable, "-m", "whisperjav.translate.cli"]
+
+            # Input files
+            inputs = options.get('inputs', [])
+            if not inputs:
+                return {"success": False, "error": "No input files specified"}
+
+            for inp in inputs:
+                args.extend(["-i", inp])
+
+            # Provider
+            provider = options.get('provider', 'deepseek')
+            args.extend(["--provider", provider])
+
+            # Target language
+            target = options.get('target', 'english')
+            args.extend(["--target", target])
+
+            # Optional arguments
+            if options.get('model'):
+                args.extend(["--model", options['model']])
+            if options.get('api_key'):
+                args.extend(["--api-key", options['api_key']])
+            if options.get('tone'):
+                args.extend(["--tone", options['tone']])
+            if options.get('movie_title'):
+                args.extend(["--movie-title", options['movie_title']])
+            if options.get('actress'):
+                args.extend(["--actress", options['actress']])
+            if options.get('movie_plot'):
+                args.extend(["--movie-plot", options['movie_plot']])
+            if options.get('endpoint'):
+                args.extend(["--endpoint", options['endpoint']])
+            if options.get('rate_limit'):
+                args.extend(["--rate-limit", str(options['rate_limit'])])
+            if options.get('output_dir'):
+                # Note: CLI uses -o for output, but for batch mode it's a directory
+                args.extend(["-o", options['output_dir']])
+
+            # Start process
+            self._translate_process = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                cwd=str(REPO_ROOT)
+            )
+
+            self._translate_status = "running"
+
+            # Start output streaming thread
+            self._translate_thread = threading.Thread(
+                target=self._stream_translation_output,
+                daemon=True
+            )
+            self._translate_thread.start()
+
+            return {
+                "success": True,
+                "message": f"Translation started with {len(inputs)} file(s)",
+                "pid": self._translate_process.pid
+            }
+
+        except Exception as e:
+            self._translate_status = "error"
+            return {"success": False, "error": str(e)}
+
+    def _stream_translation_output(self):
+        """Background thread to stream translation output."""
+        try:
+            if self._translate_process and self._translate_process.stdout:
+                for line in self._translate_process.stdout:
+                    self._translate_log_queue.put(line)
+        except Exception as e:
+            self._translate_log_queue.put(f"\n[ERROR] {e}\n")
+        finally:
+            if self._translate_process:
+                self._translate_process.wait()
+
+    def cancel_translation(self) -> Dict[str, Any]:
+        """
+        Cancel running translation process.
+
+        Returns:
+            dict: Cancellation result
+        """
+        self._init_translation_state()
+
+        if self._translate_process is None:
+            return {"success": False, "error": "No translation in progress"}
+
+        try:
+            self._translate_status = "cancelled"
+
+            if PSUTIL_AVAILABLE:
+                result = terminate_process_tree(self._translate_process.pid)
+                if not result["success"]:
+                    self._translate_process.terminate()
+            else:
+                self._translate_process.terminate()
+                try:
+                    self._translate_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self._translate_process.kill()
+
+            self._translate_log_queue.put("\n[CANCELLED] Translation cancelled.\n")
+            self._translate_process = None
+
+            return {"success": True, "message": "Translation cancelled"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_translation_status(self) -> Dict[str, Any]:
+        """
+        Get current translation status.
+
+        Returns:
+            dict: Translation status information
+        """
+        self._init_translation_state()
+
+        # Check if process finished
+        if self._translate_process is not None:
+            poll = self._translate_process.poll()
+            if poll is not None:
+                exit_code = poll
+                self._translate_process = None
+
+                if self._translate_status != "cancelled":
+                    if exit_code == 0:
+                        self._translate_status = "completed"
+                        self._translate_log_queue.put("\n[SUCCESS] Translation completed.\n")
+                    else:
+                        self._translate_status = "error"
+                        self._translate_log_queue.put(f"\n[ERROR] Exit code: {exit_code}\n")
+
+        return {
+            "status": self._translate_status,
+            "has_logs": not self._translate_log_queue.empty()
+        }
+
+    def get_translation_logs(self) -> List[str]:
+        """
+        Get new translation log lines.
+
+        Returns:
+            List of log lines
+        """
+        self._init_translation_state()
+
+        logs = []
+        while not self._translate_log_queue.empty():
+            try:
+                logs.append(self._translate_log_queue.get_nowait())
+            except queue.Empty:
+                break
+        return logs
