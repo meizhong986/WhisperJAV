@@ -103,7 +103,7 @@ echo [Phase 2/6] Checking wheel... >> "%BUILD_LOG%"
 REM Check if wheel already exists (built by build_release.py)
 REM Use dir command for reliable wildcard detection
 dir /b whisperjav-*.whl >nul 2>nul
-if !errorlevel!==0 (
+if !errorlevel! equ 0 (
     REM Wheel found - get the filename
     for /f "delims=" %%f in ('dir /b whisperjav-*.whl 2^>nul') do set WHEEL_FILE=%%f
     echo   - Found existing wheel: !WHEEL_FILE!
