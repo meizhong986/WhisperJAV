@@ -4329,6 +4329,425 @@ const UpdateCheckManager = {
 };
 
 // ============================================================
+// Translator Manager (Tab 4 - Standalone Translation)
+// ============================================================
+const TranslatorManager = {
+    // State
+    state: {
+        files: [],           // {path, name, status: pending|translating|completed|error}
+        isRunning: false,
+        progress: 0,
+        currentFile: null
+    },
+
+    // Provider model options
+    providerModels: {
+        deepseek: ['deepseek-chat', 'deepseek-coder'],
+        gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+        claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
+        gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
+        openrouter: ['deepseek/deepseek-chat', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
+        glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
+        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768']
+    },
+
+    init() {
+        // Bind file action buttons
+        document.getElementById('translatorAddFiles')?.addEventListener('click', () => this.addFiles());
+        document.getElementById('translatorRemoveSelected')?.addEventListener('click', () => this.removeSelected());
+        document.getElementById('translatorClearFiles')?.addEventListener('click', () => this.clearFiles());
+
+        // Bind provider change
+        document.getElementById('translatorProvider')?.addEventListener('change', (e) => {
+            this.updateModelOptions(e.target.value);
+            this.updateApiKeyStatus(e.target.value);
+        });
+
+        // Bind test connection
+        document.getElementById('translatorTestConnection')?.addEventListener('click', () => this.testConnection());
+
+        // Bind control buttons
+        document.getElementById('translatorStartBtn')?.addEventListener('click', () => this.startTranslation());
+        document.getElementById('translatorCancelBtn')?.addEventListener('click', () => this.cancelTranslation());
+
+        // Initialize model options for default provider
+        this.updateModelOptions('deepseek');
+        this.updateApiKeyStatus('deepseek');
+
+        console.log('TranslatorManager initialized');
+    },
+
+    /**
+     * Open file dialog to add SRT files
+     */
+    async addFiles() {
+        try {
+            const result = await pywebview.api.select_srt_files();
+            if (result.success && result.files && result.files.length > 0) {
+                // Add files that aren't already in the list
+                result.files.forEach(filePath => {
+                    if (!this.state.files.some(f => f.path === filePath)) {
+                        const name = filePath.split(/[\\/]/).pop();
+                        this.state.files.push({
+                            path: filePath,
+                            name: name,
+                            status: 'pending'
+                        });
+                    }
+                });
+                this.renderFileList();
+                this.updateButtonStates();
+            }
+        } catch (error) {
+            console.error('Error selecting files:', error);
+            ConsoleManager.log(`Error selecting files: ${error.message}`, 'error');
+        }
+    },
+
+    /**
+     * Remove selected files from the list
+     */
+    removeSelected() {
+        const checkboxes = document.querySelectorAll('#translatorFileList input[type="checkbox"]:checked');
+        const pathsToRemove = new Set();
+        checkboxes.forEach(cb => pathsToRemove.add(cb.dataset.path));
+        this.state.files = this.state.files.filter(f => !pathsToRemove.has(f.path));
+        this.renderFileList();
+        this.updateButtonStates();
+    },
+
+    /**
+     * Clear all files from the list
+     */
+    clearFiles() {
+        this.state.files = [];
+        this.renderFileList();
+        this.updateButtonStates();
+    },
+
+    /**
+     * Render the file list
+     */
+    renderFileList() {
+        const container = document.getElementById('translatorFileList');
+        if (!container) return;
+
+        if (this.state.files.length === 0) {
+            container.innerHTML = `
+                <div class="translator-empty-state">
+                    <span class="empty-icon">📄</span>
+                    <p>No SRT files selected</p>
+                    <p class="empty-hint">Click "Add Files" to select subtitle files for translation</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = this.state.files.map((file, index) => `
+            <div class="translator-file-item" data-index="${index}">
+                <input type="checkbox" data-path="${file.path}">
+                <span class="translator-file-name" title="${file.path}">${file.name}</span>
+                <span class="translator-file-status ${file.status}">${this.formatStatus(file.status)}</span>
+            </div>
+        `).join('');
+
+        // Bind click handlers for selection
+        container.querySelectorAll('.translator-file-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.tagName !== 'INPUT') {
+                    const checkbox = item.querySelector('input[type="checkbox"]');
+                    checkbox.checked = !checkbox.checked;
+                    this.updateButtonStates();
+                }
+            });
+        });
+
+        // Bind checkbox change handlers
+        container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', () => this.updateButtonStates());
+        });
+    },
+
+    /**
+     * Format status for display
+     */
+    formatStatus(status) {
+        const map = {
+            pending: 'Pending',
+            translating: 'Translating...',
+            completed: 'Done',
+            error: 'Error'
+        };
+        return map[status] || status;
+    },
+
+    /**
+     * Update button states based on current state
+     */
+    updateButtonStates() {
+        const hasFiles = this.state.files.length > 0;
+        const hasSelected = document.querySelectorAll('#translatorFileList input[type="checkbox"]:checked').length > 0;
+
+        document.getElementById('translatorRemoveSelected').disabled = !hasSelected || this.state.isRunning;
+        document.getElementById('translatorClearFiles').disabled = !hasFiles || this.state.isRunning;
+        document.getElementById('translatorStartBtn').disabled = !hasFiles || this.state.isRunning;
+        document.getElementById('translatorCancelBtn').disabled = !this.state.isRunning;
+
+        // Disable add files during translation
+        document.getElementById('translatorAddFiles').disabled = this.state.isRunning;
+    },
+
+    /**
+     * Update model dropdown options based on provider
+     */
+    updateModelOptions(provider) {
+        const modelSelect = document.getElementById('translatorModel');
+        if (!modelSelect) return;
+
+        const models = this.providerModels[provider] || [];
+        modelSelect.innerHTML = '<option value="">Default</option>' +
+            models.map(m => `<option value="${m}">${m}</option>`).join('');
+    },
+
+    /**
+     * Update API key status indicator
+     */
+    async updateApiKeyStatus(provider) {
+        const statusEl = document.getElementById('translatorApiStatus');
+        if (!statusEl) return;
+
+        try {
+            const result = await pywebview.api.get_translation_providers();
+            if (result.success) {
+                const providerInfo = result.providers.find(p => p.name === provider);
+                if (providerInfo) {
+                    if (providerInfo.has_api_key) {
+                        statusEl.textContent = 'Configured';
+                        statusEl.className = 'api-status configured';
+                    } else {
+                        statusEl.textContent = 'Not Set';
+                        statusEl.className = 'api-status missing';
+                    }
+                }
+            }
+        } catch (error) {
+            statusEl.textContent = 'Unknown';
+            statusEl.className = 'api-status';
+        }
+    },
+
+    /**
+     * Test provider connection
+     */
+    async testConnection() {
+        const provider = document.getElementById('translatorProvider')?.value;
+        const apiKey = document.getElementById('translatorApiKey')?.value || null;
+
+        const testBtn = document.getElementById('translatorTestConnection');
+        const originalText = testBtn.textContent;
+        testBtn.textContent = 'Testing...';
+        testBtn.disabled = true;
+
+        try {
+            const result = await pywebview.api.test_provider_connection(provider, apiKey);
+            const statusEl = document.getElementById('translatorApiStatus');
+
+            if (result.success) {
+                ConsoleManager.log(`Connection to ${provider} successful`, 'success');
+                if (statusEl) {
+                    statusEl.textContent = 'Connected';
+                    statusEl.className = 'api-status configured';
+                }
+            } else {
+                ConsoleManager.log(`Connection to ${provider} failed: ${result.error}`, 'error');
+                if (statusEl) {
+                    statusEl.textContent = 'Failed';
+                    statusEl.className = 'api-status error';
+                }
+            }
+        } catch (error) {
+            ConsoleManager.log(`Connection test error: ${error.message}`, 'error');
+        } finally {
+            testBtn.textContent = originalText;
+            testBtn.disabled = false;
+        }
+    },
+
+    /**
+     * Collect translation options from form
+     */
+    collectOptions() {
+        return {
+            input_files: this.state.files.map(f => f.path),
+            provider: document.getElementById('translatorProvider')?.value || 'deepseek',
+            model: document.getElementById('translatorModel')?.value ||
+                   document.getElementById('translatorCustomModel')?.value || null,
+            source_language: document.getElementById('translatorSourceLang')?.value || 'japanese',
+            target_language: document.getElementById('translatorTargetLang')?.value || 'english',
+            tone: document.getElementById('translatorTone')?.value || 'standard',
+            movie_title: document.getElementById('translatorMovieTitle')?.value || null,
+            actress: document.getElementById('translatorActress')?.value || null,
+            plot: document.getElementById('translatorPlot')?.value || null,
+            scene_threshold: parseFloat(document.getElementById('translatorSceneThreshold')?.value) || 60,
+            max_batch_size: parseInt(document.getElementById('translatorMaxBatchSize')?.value) || 30,
+            rate_limit: document.getElementById('translatorRateLimit')?.value ?
+                       parseInt(document.getElementById('translatorRateLimit').value) : null,
+            max_retries: parseInt(document.getElementById('translatorMaxRetries')?.value) || 3,
+            endpoint: document.getElementById('translatorCustomEndpoint')?.value || null,
+            api_key: document.getElementById('translatorApiKey')?.value || null
+        };
+    },
+
+    /**
+     * Start translation
+     */
+    async startTranslation() {
+        if (this.state.files.length === 0) {
+            ErrorHandler.show('No Files', 'Please add SRT files to translate.');
+            return;
+        }
+
+        const options = this.collectOptions();
+
+        try {
+            this.state.isRunning = true;
+            this.updateButtonStates();
+            this.setProgress(0);
+            this.setStatus('Starting...');
+
+            // Mark all files as pending
+            this.state.files.forEach(f => f.status = 'pending');
+            this.renderFileList();
+
+            const result = await pywebview.api.start_translation(options);
+
+            if (result.success) {
+                ConsoleManager.log('Translation started', 'info');
+                this.startStatusPolling();
+            } else {
+                throw new Error(result.error || 'Failed to start translation');
+            }
+        } catch (error) {
+            ConsoleManager.log(`Translation error: ${error.message}`, 'error');
+            ErrorHandler.show('Translation Error', error.message);
+            this.state.isRunning = false;
+            this.updateButtonStates();
+            this.setStatus('Error');
+        }
+    },
+
+    /**
+     * Cancel translation
+     */
+    async cancelTranslation() {
+        try {
+            await pywebview.api.cancel_translation();
+            ConsoleManager.log('Translation cancelled', 'warning');
+            this.stopStatusPolling();
+            this.state.isRunning = false;
+            this.updateButtonStates();
+            this.setStatus('Cancelled');
+        } catch (error) {
+            console.error('Error cancelling translation:', error);
+        }
+    },
+
+    /**
+     * Start polling for translation status
+     */
+    startStatusPolling() {
+        this.statusInterval = setInterval(async () => {
+            try {
+                const status = await pywebview.api.get_translation_status();
+
+                // Update progress
+                if (status.progress !== undefined) {
+                    this.setProgress(status.progress);
+                }
+
+                // Fetch logs
+                this.fetchLogs();
+
+                if (status.status === 'completed') {
+                    this.stopStatusPolling();
+                    this.state.isRunning = false;
+                    this.state.files.forEach(f => f.status = 'completed');
+                    this.renderFileList();
+                    this.updateButtonStates();
+                    this.setProgress(100);
+                    this.setStatus('Completed');
+                    ConsoleManager.log('Translation completed successfully', 'success');
+                    ErrorHandler.showSuccess('Translation Complete', 'All files have been translated.');
+                } else if (status.status === 'error') {
+                    this.stopStatusPolling();
+                    this.state.isRunning = false;
+                    this.updateButtonStates();
+                    this.setStatus(`Error: ${status.error || 'Unknown'}`);
+                    ConsoleManager.log(`Translation error: ${status.error}`, 'error');
+                } else if (status.status === 'cancelled') {
+                    this.stopStatusPolling();
+                    this.state.isRunning = false;
+                    this.updateButtonStates();
+                    this.setStatus('Cancelled');
+                }
+            } catch (error) {
+                console.error('Status poll error:', error);
+            }
+        }, 1000);
+    },
+
+    /**
+     * Stop status polling
+     */
+    stopStatusPolling() {
+        if (this.statusInterval) {
+            clearInterval(this.statusInterval);
+            this.statusInterval = null;
+        }
+    },
+
+    /**
+     * Fetch and display translation logs
+     */
+    async fetchLogs() {
+        try {
+            const logs = await pywebview.api.get_translation_logs();
+            if (logs && logs.length > 0) {
+                logs.forEach(line => {
+                    const cleanLine = line.replace(/\n$/, '');
+                    if (cleanLine) {
+                        ConsoleManager.appendRaw(cleanLine);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching logs:', error);
+        }
+    },
+
+    /**
+     * Set progress bar value
+     */
+    setProgress(percent) {
+        this.state.progress = percent;
+        const fill = document.getElementById('translatorProgressFill');
+        if (fill) {
+            fill.style.width = `${percent}%`;
+        }
+    },
+
+    /**
+     * Set status label
+     */
+    setStatus(text) {
+        const label = document.getElementById('translatorStatusLabel');
+        if (label) {
+            label.textContent = text;
+        }
+    }
+};
+
+// ============================================================
 // Translate Integration Manager
 // ============================================================
 const TranslateIntegrationManager = {
@@ -4591,6 +5010,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     EnsembleManager.init();
     UpdateManager.init();
     UpdateCheckManager.init();
+    TranslatorManager.init();
     TranslateIntegrationManager.init();
 
     // Initial validation
