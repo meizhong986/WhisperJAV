@@ -23,8 +23,8 @@ REM
 
 SETLOCAL EnableDelayedExpansion
 
-REM Change to script directory (ensures correct paths regardless of where called from)
-cd /d %~dp0
+REM Change to script directory
+cd /d "%~dp0"
 
 REM ===== Configuration =====
 set CONFIG_FILE=construct_v{{VERSION}}.yaml
@@ -104,38 +104,40 @@ echo [Phase 2/6] Checking for WhisperJAV wheel...
 echo [Phase 2/6] Checking wheel... >> "%BUILD_LOG%"
 
 REM Check if wheel already exists (built by build_release.py)
-REM Use for loop - more reliable than errorlevel check
+REM Use goto instead of if-else blocks for reliable batch behavior
 set "WHEEL_FILE="
-for /f "delims=" %%f in ('dir /b whisperjav-*.whl 2^>nul') do set "WHEEL_FILE=%%f"
-if defined WHEEL_FILE (
-    echo   - Found existing wheel: !WHEEL_FILE!
-    echo   - Wheel: !WHEEL_FILE! (pre-built) >> "%BUILD_LOG%"
-) else (
-    echo   - No wheel found, building from source...
-    REM Call parent directory script (uses %~dp0 so works from any location)
-    call ..\build_whisperjav_wheel.bat
-    if errorlevel 1 (
-        echo.
-        echo ERROR: Failed to build WhisperJAV wheel!
-        echo ERROR: Wheel build failed >> "%BUILD_LOG%"
-        echo.
-        pause
-        exit /b 1
-    )
-    REM Verify wheel now exists
-    set "WHEEL_FILE="
-    for /f "delims=" %%f in ('dir /b whisperjav-*.whl 2^>nul') do set "WHEEL_FILE=%%f"
-    if not defined WHEEL_FILE (
-        echo.
-        echo ERROR: Wheel still not found after build!
-        echo ERROR: Wheel missing after build >> "%BUILD_LOG%"
-        echo.
-        pause
-        exit /b 1
-    )
-    echo   - WhisperJAV wheel built: !WHEEL_FILE!
-    echo   - Wheel: !WHEEL_FILE! (local build) >> "%BUILD_LOG%"
+for %%f in (whisperjav-*.whl) do set "WHEEL_FILE=%%f"
+if not defined WHEEL_FILE goto :BuildWheel
+echo   - Found existing wheel: !WHEEL_FILE!
+echo   - Wheel: !WHEEL_FILE! (pre-built) >> "%BUILD_LOG%"
+goto :WheelReady
+
+:BuildWheel
+echo   - No wheel found, building from source...
+call ..\build_whisperjav_wheel.bat
+if errorlevel 1 (
+    echo.
+    echo ERROR: Failed to build WhisperJAV wheel!
+    echo ERROR: Wheel build failed >> "%BUILD_LOG%"
+    echo.
+    pause
+    exit /b 1
 )
+REM Verify wheel now exists
+set "WHEEL_FILE="
+for %%f in (whisperjav-*.whl) do set "WHEEL_FILE=%%f"
+if not defined WHEEL_FILE (
+    echo.
+    echo ERROR: Wheel still not found after build!
+    echo ERROR: Wheel missing after build >> "%BUILD_LOG%"
+    echo.
+    pause
+    exit /b 1
+)
+echo   - WhisperJAV wheel built: !WHEEL_FILE!
+echo   - Wheel: !WHEEL_FILE! (local build) >> "%BUILD_LOG%"
+
+:WheelReady
 echo.
 
 REM ===== Phase 3: Validate Configuration =====
