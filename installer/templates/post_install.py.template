@@ -501,9 +501,134 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
     return True
 
 
+# Track if Git timeouts have been configured (only do it once)
+_git_timeouts_configured = False
+
+
+def is_git_timeout_error(error_output: str) -> bool:
+    """
+    Detect if error was caused by Git connection timeout (common with GFW/VPN).
+
+    The 21-second timeout is Windows TCP retransmission default - when GitHub
+    connections are blocked or slow (GFW), Windows gives up after 21 seconds.
+
+    See: https://github.com/meizhong986/WhisperJAV/issues/111
+    """
+    timeout_patterns = [
+        "Failed to connect to github.com port 443 after 21",
+        "Connection timed out after",
+        "Could not connect to server",
+        "Connection reset by peer",
+        "Connection refused",
+    ]
+    error_lower = error_output.lower()
+    return any(pattern.lower() in error_lower for pattern in timeout_patterns)
+
+
+def configure_git_for_slow_connections() -> bool:
+    """
+    Configure Git with extended timeouts for users behind GFW or slow VPN.
+
+    This addresses the 21-second TCP timeout issue where Windows gives up
+    on connections before they can be established through VPN/proxy.
+
+    See: https://github.com/meizhong986/WhisperJAV/issues/111
+
+    Returns:
+        True if configuration succeeded, False otherwise
+    """
+    global _git_timeouts_configured
+
+    if _git_timeouts_configured:
+        return True
+
+    log("")
+    log("=" * 60)
+    log("  Configuring Git for slow/unstable connections (GFW mode)")
+    log("=" * 60)
+    log("Detected connection timeout. This often happens with VPN or")
+    log("behind the Great Firewall. Configuring extended timeouts...")
+    log("")
+
+    # Find Git executable
+    git_exe = shutil.which("git")
+    if not git_exe:
+        # Try common locations
+        for path in [
+            os.path.join(sys.prefix, "Library", "bin", "git.exe"),
+            r"C:\Program Files\Git\bin\git.exe",
+            r"C:\Program Files (x86)\Git\bin\git.exe",
+        ]:
+            if os.path.exists(path):
+                git_exe = path
+                break
+
+    if not git_exe:
+        log("WARNING: Git executable not found. Cannot configure timeouts.")
+        return False
+
+    log(f"Using Git: {git_exe}")
+
+    # Git timeout configurations
+    # See: https://git-scm.com/docs/git-config
+    git_configs = [
+        # Connection timeout: 120 seconds (was 21 seconds default)
+        ("http.connectTimeout", "120"),
+        # Overall operation timeout: 300 seconds (5 minutes)
+        ("http.timeout", "300"),
+        # Disable speed-based abortion for slow connections
+        ("http.lowSpeedLimit", "0"),
+        ("http.lowSpeedTime", "999999"),
+        # Larger buffer for slow connections (512MB)
+        ("http.postBuffer", "524288000"),
+        # More retries on failure
+        ("http.maxRetries", "5"),
+    ]
+
+    success = True
+    for key, value in git_configs:
+        try:
+            result = subprocess.run(
+                [git_exe, "config", "--global", key, value],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                log(f"  + {key} = {value}")
+            else:
+                log(f"  x Failed to set {key}: {result.stderr}")
+                success = False
+        except Exception as e:
+            log(f"  x Error setting {key}: {e}")
+            success = False
+
+    # Also set environment variables for the current process
+    os.environ["GIT_HTTP_CONNECT_TIMEOUT"] = "120"
+    os.environ["GIT_HTTP_TIMEOUT"] = "300"
+    log("")
+    log("Environment variables set:")
+    log("  GIT_HTTP_CONNECT_TIMEOUT=120")
+    log("  GIT_HTTP_TIMEOUT=300")
+    log("")
+
+    if success:
+        log("+ Git configured for slow connections. Retrying installation...")
+        _git_timeouts_configured = True
+    else:
+        log("! Some Git configurations failed, but will attempt to continue.")
+        _git_timeouts_configured = True  # Don't retry configuration
+
+    log("")
+    return success
+
+
 def run_pip(args: list, description: str, retries: int = 3) -> bool:
     """
-    Run pip command with retries
+    Run pip command with retries and smart Git timeout handling.
+
+    If a Git timeout is detected (common with GFW/VPN), this function will
+    automatically configure Git with extended timeouts and retry.
 
     Args:
         args: Pip arguments (e.g., ["install", "package"])
@@ -513,8 +638,23 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
     Returns:
         True if successful, False otherwise
     """
+    global _git_timeouts_configured
+
     log(f"Starting: {description}")
     pip_cmd = [os.path.join(sys.prefix, 'python.exe'), '-m', 'pip'] + args
+
+    # Check if this is a git+https install (more timeout-sensitive)
+    is_git_install = any("git+" in str(arg) for arg in args)
+
+    # Use longer pip timeout for git installs (Issue #111)
+    if is_git_install and "--timeout" not in str(args):
+        # Insert timeout after 'install' command
+        try:
+            install_idx = args.index("install") + 1
+            args = args[:install_idx] + ["--timeout=120"] + args[install_idx:]
+            pip_cmd = [os.path.join(sys.prefix, 'python.exe'), '-m', 'pip'] + args
+        except ValueError:
+            pass  # Not an install command
 
     for attempt in range(retries):
         log(f"Attempt {attempt+1}/{retries}: {' '.join(pip_cmd)}")
@@ -543,14 +683,29 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
 
         except subprocess.CalledProcessError as e:
             log(f"ERROR: {description} failed (rc={e.returncode})")
+            error_output = ""
             if e.stdout:
                 lines = e.stdout.strip().split('\n')
                 for line in lines[-20:]:
                     log(f"  {line}")
+                error_output += e.stdout
             if e.stderr:
                 lines = e.stderr.strip().split('\n')
                 for line in lines[-20:]:
                     log(f"  {line}")
+                error_output += e.stderr
+
+            # Check for Git timeout pattern (Issue #111 - GFW users)
+            if is_git_install and is_git_timeout_error(error_output):
+                if not _git_timeouts_configured:
+                    log("")
+                    log("Detected Git connection timeout (common with VPN/GFW).")
+                    configure_git_for_slow_connections()
+                    # Don't count this as a failed attempt
+                    log("Retrying with extended Git timeouts...")
+                    time.sleep(5)
+                    continue
+
             if attempt < retries - 1:
                 log("Retrying in 10 seconds...")
                 time.sleep(10)
