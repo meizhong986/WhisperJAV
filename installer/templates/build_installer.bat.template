@@ -23,6 +23,9 @@ REM
 
 SETLOCAL EnableDelayedExpansion
 
+REM Change to script directory (ensures correct paths regardless of where called from)
+cd /d %~dp0
+
 REM ===== Configuration =====
 set CONFIG_FILE=construct_v{{VERSION}}.yaml
 set VALIDATOR=validate_installer_v{{VERSION}}.py
