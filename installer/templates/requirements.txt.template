@@ -72,6 +72,9 @@ jsonschema            # Config validation
 Pillow                # Image processing
 colorama              # Colored console output
 requests              # HTTP requests
+pydub                 # Audio processing (scene detection)
+regex                 # Advanced regex for Japanese text processing
+psutil>=5.9.0         # Process management and cleanup
 
 # ----------------------------------------
 # Configuration System
