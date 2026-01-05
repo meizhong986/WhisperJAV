@@ -31,14 +31,55 @@ logger = logging.getLogger("whisperjav")
 CTRANSLATE2_PROVIDERS = {"faster_whisper", "kotoba_faster_whisper"}
 
 
+
+
+def _is_blackwell_gpu() -> bool:
+    """
+    Detect if GPU is NVIDIA Blackwell architecture (RTX 50 series).
+
+    Blackwell GPUs (sm_120, compute capability 12.x) have a bug in CTranslate2
+    where 'auto' compute_type incorrectly selects int8_float16, which then fails
+    with "target device or backend do not support efficient int8_float16 computation".
+
+    See: https://github.com/meizhong986/WhisperJAV/issues/113
+    See: https://github.com/OpenNMT/CTranslate2/issues/1865
+
+    Returns:
+        True if Blackwell GPU detected, False otherwise
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return False
+
+        # Get compute capability (major.minor)
+        capability = torch.cuda.get_device_capability(0)
+        major, minor = capability
+
+        # Blackwell is compute capability 12.x (sm_120)
+        if major >= 12:
+            gpu_name = torch.cuda.get_device_name(0)
+            logger.debug(f"Blackwell GPU detected: {gpu_name} (sm_{major}{minor})")
+            return True
+
+        # Also check by name for RTX 50 series
+        gpu_name = torch.cuda.get_device_name(0)
+        if any(x in gpu_name.upper() for x in ["5090", "5080", "5070", "5060", "5050"]):
+            logger.debug(f"RTX 50 series detected by name: {gpu_name}")
+            return True
+
+        return False
+    except Exception as e:
+        logger.debug(f"Blackwell detection failed: {e}")
+        return False
+
 def _get_compute_type_for_device(device: str, provider: str) -> str:
     """
     Select optimal compute_type based on device and provider.
 
     CTranslate2 providers (faster_whisper, kotoba_faster_whisper):
-    - Returns "auto" to delegate selection to CTranslate2's internal logic
-    - CTranslate2 auto-selects based on GPU capability and CPU instruction sets
-    - Benefits: Automatic support for new GPUs (e.g., RTX 50XX Blackwell sm120)
+    - RTX 50 Blackwell (sm_120): Force "float16" (int8_float16 buggy in CTranslate2)
+    - Other GPUs: Returns "auto" to delegate selection to CTranslate2
     - See: https://github.com/OpenNMT/CTranslate2/issues/1865
 
     PyTorch providers (openai_whisper, stable_ts):
@@ -53,11 +94,21 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
         Optimal compute_type for the device/provider combination
     """
     if provider in CTRANSLATE2_PROVIDERS:
+        # Blackwell workaround: CTranslate2's "auto" incorrectly selects int8_float16
+        # which fails with "target device or backend do not support efficient int8_float16"
+        # Force float16 for Blackwell until CTranslate2 properly supports sm_120
+        # See: https://github.com/meizhong986/WhisperJAV/issues/113
+        if device == "cuda" and _is_blackwell_gpu():
+            logger.info(
+                "Blackwell GPU detected (RTX 50 series). Using float16 compute_type "
+                "due to CTranslate2 int8_float16 compatibility issue."
+            )
+            return "float16"
+
         # Delegate to CTranslate2's internal "auto" selection logic
         # This automatically handles:
-        # - GPU capability detection (int8_float16 for RTX 20/30/40, float16 for RTX 50)
+        # - GPU capability detection (int8_float16 for RTX 20/30/40)
         # - CPU instruction sets (AVX2, AVX512)
-        # - Blackwell sm120 workaround (PR #1937)
         return "auto"
     else:
         # PyTorch-based providers can use float16 on GPU/MPS, float32 on CPU
