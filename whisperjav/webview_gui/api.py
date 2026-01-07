@@ -86,6 +86,9 @@ class WhisperJAVAPI:
         # Default output directory (ensure it exists and is normalized)
         self.default_output = str(_compute_default_output_dir())
 
+        # Output file tracking - computed when process starts, returned on completion
+        self._expected_output_files: List[str] = []
+
     # ========================================================================
     # Process Management
     # ========================================================================
@@ -278,6 +281,51 @@ class WhisperJAVAPI:
 
         return args
 
+    def _compute_expected_outputs(self, options: Dict[str, Any]) -> List[str]:
+        """
+        Compute expected output SRT file paths based on mode and inputs.
+
+        This is used to track what files will be created, allowing
+        post-completion operations (like translation) to find the outputs.
+
+        Args:
+            options: Same options dict passed to build_args
+
+        Returns:
+            List of expected output SRT file paths
+        """
+        inputs = options.get('inputs', [])
+        output_dir = options.get('output_dir', self.default_output)
+        mode = options.get('mode', 'balanced')
+        source_language = options.get('source_language', 'japanese')
+
+        # Map source language to ISO 639-1 code for filename
+        lang_codes = {
+            'japanese': 'ja',
+            'english': 'en',
+            'chinese': 'zh',
+            'korean': 'ko',
+        }
+        lang_code = lang_codes.get(source_language, 'ja')
+
+        expected_files = []
+        for input_path in inputs:
+            # Get base name without extension
+            input_name = Path(input_path).stem
+
+            # Determine output filename based on mode
+            # Ensemble mode: {basename}.{lang}.merged.whisperjav.srt
+            # Other modes: {basename}.srt (standard naming)
+            if mode == 'ensemble':
+                output_name = f"{input_name}.{lang_code}.merged.whisperjav.srt"
+            else:
+                output_name = f"{input_name}.srt"
+
+            output_path = Path(output_dir) / output_name
+            expected_files.append(str(output_path))
+
+        return expected_files
+
     def start_process(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Start WhisperJAV subprocess with given options.
@@ -303,6 +351,9 @@ class WhisperJAVAPI:
         try:
             # Build arguments
             args = self.build_args(options)
+
+            # Compute expected output files for post-completion use (e.g., translation)
+            self._expected_output_files = self._compute_expected_outputs(options)
 
             # Construct command
             cmd = [sys.executable, "-X", "utf8", "-m", "whisperjav.main", *args]
@@ -440,7 +491,8 @@ class WhisperJAVAPI:
                 {
                     "status": str,  # idle, running, completed, cancelled, error
                     "exit_code": int or None,
-                    "has_logs": bool
+                    "has_logs": bool,
+                    "output_files": List[str] or None  # Only when completed
                 }
         """
         # Check if process has exited
@@ -457,11 +509,17 @@ class WhisperJAVAPI:
                 self.status = "error"
                 self.log_queue.put(f"\n[ERROR] Process exited with code {self.exit_code}.\n")
 
-        return {
+        result = {
             "status": self.status,
             "exit_code": self.exit_code,
             "has_logs": not self.log_queue.empty()
         }
+
+        # Include output files when completed (for post-processing like translation)
+        if self.status == "completed" and self._expected_output_files:
+            result["output_files"] = self._expected_output_files
+
+        return result
 
     def _stream_output(self):
         """

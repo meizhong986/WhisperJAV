@@ -913,13 +913,13 @@ const ProcessManager = {
 
                         // Trigger post-transcription translation if enabled (uses captured settings)
                         if (TranslateIntegrationManager.wasEnabledOnStart()) {
-                            const outputDir = document.getElementById('outputDir').value;
-                            const outputFiles = AppState.selectedFiles.map(inputPath => {
-                                // Derive SRT filename from input filename
-                                const baseName = inputPath.split(/[\\/]/).pop().replace(/\.[^/.]+$/, '');
-                                return outputDir + (outputDir.endsWith('\\') || outputDir.endsWith('/') ? '' : '\\') + baseName + '.srt';
-                            });
-                            TranslateIntegrationManager.onTranscriptionComplete(outputFiles);
+                            // Use output_files from API (computed based on mode/language)
+                            const outputFiles = status.output_files || [];
+                            if (outputFiles.length > 0) {
+                                TranslateIntegrationManager.onTranscriptionComplete(outputFiles);
+                            } else {
+                                console.warn('Translation enabled but no output files returned from API');
+                            }
                         }
                     } else if (status.status === 'error') {
                         ProgressManager.reset();
@@ -4918,12 +4918,18 @@ const TranslateIntegrationManager = {
         this.state.outputFiles = outputFiles;
 
         try {
-            // Start translation via API
+            // Start translation via API - use correct key names matching api.py
             const result = await pywebview.api.start_translation({
-                input_files: outputFiles,
+                inputs: outputFiles,              // API expects 'inputs' not 'input_files'
                 provider: settings.provider,
-                source_language: settings.sourceLanguage,
-                target_language: settings.target
+                target: settings.target,          // API expects 'target' not 'target_language'
+                model: settings.model || '',
+                api_key: settings.apiKey || '',
+                tone: settings.tone || 'standard',
+                movie_title: settings.movieTitle || '',
+                actress: settings.actress || '',
+                movie_plot: settings.plot || '',
+                endpoint: settings.customEndpoint || ''
             });
 
             if (result.success) {
