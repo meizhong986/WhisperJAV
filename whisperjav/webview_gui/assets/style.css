@@ -1622,27 +1622,39 @@ button:focus-visible,
 
 .ensemble-translate-row {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     padding: 8px 12px;
     margin-top: 8px;
     background: linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.04) 100%);
     border: 1px solid rgba(76, 175, 80, 0.2);
     border-radius: var(--border-radius);
+    flex-wrap: nowrap;
 }
 
 /* Translation inline settings (provider, model, settings button) */
 .translate-inline-settings {
     display: flex;
+    flex-direction: row;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex: 1;
 }
 
 .translate-inline-settings .form-select {
-    min-width: 100px;
+    min-width: 90px;
+    max-width: 120px;
     font-size: 11px;
-    padding: 4px 8px;
+    padding: 4px 6px;
+}
+
+/* Translation Settings button - compact style */
+.translate-inline-settings .btn-secondary.btn-compact {
+    white-space: nowrap;
+    font-size: 11px;
+    padding: 4px 10px;
 }
 
 /* Icon button for settings gear */
