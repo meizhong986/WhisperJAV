@@ -83,6 +83,22 @@ LANGUAGE_CODE_MAP = {
 }
 
 
+def build_translation_context(args) -> str:
+    """Build extra_context string for translation from CLI arguments."""
+    context_parts = []
+
+    if getattr(args, 'translate_title', None):
+        context_parts.append(f"Movie title: {args.translate_title}")
+
+    if getattr(args, 'translate_actress', None):
+        context_parts.append(f"Actress: {args.translate_actress}")
+
+    if getattr(args, 'translate_plot', None):
+        context_parts.append(f"Plot: {args.translate_plot}")
+
+    return '\n'.join(context_parts) if context_parts else None
+
+
 # --- UNCONDITIONAL CUDA CHECK ---
 # This code runs the moment the module is loaded,
 # ensuring the check is never bypassed.
@@ -319,7 +335,7 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-provider",
-        choices=["deepseek", "openrouter", "gemini", "claude", "gpt"],
+        choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq"],
         default="deepseek",
         help="Translation AI provider (default: deepseek)"
     )
@@ -347,6 +363,18 @@ def parse_arguments():
         "--translate-quiet",
         action="store_true",
         help="Hide translation progress messages (default: show progress)"
+    )
+    translation_group.add_argument(
+        "--translate-title",
+        help="Movie title for translation context"
+    )
+    translation_group.add_argument(
+        "--translate-actress",
+        help="Actress name for translation context"
+    )
+    translation_group.add_argument(
+        "--translate-plot",
+        help="Plot summary for translation context"
     )
 
     # HuggingFace Transformers mode arguments
@@ -747,7 +775,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
                             stream=stream_mode,
-                            debug=getattr(args, 'debug', False)
+                            debug=getattr(args, 'debug', False),
+                            extra_context=build_translation_context(args)
                         )
 
                         if translated_path:
@@ -946,7 +975,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     api_key=getattr(args, 'translate_api_key', None),
                                     model=getattr(args, 'translate_model', None),
                                     stream=stream_mode,
-                                    debug=getattr(args, 'debug', False)
+                                    debug=getattr(args, 'debug', False),
+                                    extra_context=build_translation_context(args)
                                 )
 
                                 if translated_path:
