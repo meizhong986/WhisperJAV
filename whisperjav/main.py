@@ -1422,6 +1422,68 @@ def main():
                     print(f"  - {f}")
             print("="*50)
 
+            # ============================================================
+            # TRANSLATION: Translate successful ensemble outputs if requested
+            # ============================================================
+            if args.translate and successful_count > 0:
+                print("\n" + "="*50)
+                print("STARTING TRANSLATION")
+                print("="*50)
+
+                translation_success = 0
+                translation_failed = 0
+                extra_context = build_translation_context(args)
+
+                for result in results:
+                    if result.get('error') or result.get('status') == 'failed':
+                        continue  # Skip failed transcriptions
+
+                    output_path = result.get('summary', {}).get('final_output')
+                    if not output_path:
+                        continue
+
+                    basename = result.get('input', {}).get('basename', 'unknown')
+
+                    try:
+                        logger.info(f"Translating: {basename}")
+                        if not args.translate_quiet:
+                            print(f"Translating: {basename}")
+
+                        translated_path = translate_with_config(
+                            srt_path=output_path,
+                            provider=args.translate_provider,
+                            target_lang=args.translate_target,
+                            tone=args.translate_tone,
+                            api_key=args.translate_api_key,
+                            model=args.translate_model,
+                            extra_context=extra_context,
+                            quiet=args.translate_quiet
+                        )
+
+                        if translated_path:
+                            logger.info(f"Translation saved: {translated_path}")
+                            if not args.translate_quiet:
+                                print(f"  -> {translated_path}")
+                            translation_success += 1
+                        else:
+                            logger.warning(f"Translation returned no output for {basename}")
+                            translation_failed += 1
+
+                    except (TranslationError, ConfigurationError) as e:
+                        logger.error(f"Translation failed for {basename}: {e}")
+                        translation_failed += 1
+                    except Exception as e:
+                        logger.error(f"Unexpected translation error for {basename}: {e}")
+                        translation_failed += 1
+
+                # Print translation summary
+                print("\n" + "-"*50)
+                print("TRANSLATION SUMMARY")
+                print("-"*50)
+                print(f"Translated: {translation_success}")
+                print(f"Failed: {translation_failed}")
+                print("="*50)
+
             # Close parameter tracer for ensemble mode
             if tracer:
                 tracer.close()
