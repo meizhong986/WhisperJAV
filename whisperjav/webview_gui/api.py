@@ -281,7 +281,7 @@ class WhisperJAVAPI:
 
         return args
 
-    def _compute_expected_outputs(self, options: Dict[str, Any]) -> List[str]:
+    def _compute_expected_outputs(self, options: Dict[str, Any], is_ensemble: bool = False) -> List[str]:
         """
         Compute expected output SRT file paths based on mode and inputs.
 
@@ -289,15 +289,19 @@ class WhisperJAVAPI:
         post-completion operations (like translation) to find the outputs.
 
         Args:
-            options: Same options dict passed to build_args
+            options: Options dict from start_process or start_ensemble_twopass
+            is_ensemble: True if this is ensemble mode (uses different filename pattern)
 
         Returns:
             List of expected output SRT file paths
         """
         inputs = options.get('inputs', [])
         output_dir = options.get('output_dir', self.default_output)
-        mode = options.get('mode', 'balanced')
         source_language = options.get('source_language', 'japanese')
+
+        # Also check 'mode' key for backward compatibility with start_process
+        mode = options.get('mode', '')
+        use_ensemble_naming = is_ensemble or mode == 'ensemble'
 
         # Map source language to ISO 639-1 code for filename
         lang_codes = {
@@ -316,7 +320,7 @@ class WhisperJAVAPI:
             # Determine output filename based on mode
             # Ensemble mode: {basename}.{lang}.merged.whisperjav.srt
             # Other modes: {basename}.srt (standard naming)
-            if mode == 'ensemble':
+            if use_ensemble_naming:
                 output_name = f"{input_name}.{lang_code}.merged.whisperjav.srt"
             else:
                 output_name = f"{input_name}.srt"
@@ -1932,6 +1936,9 @@ class WhisperJAVAPI:
         try:
             # Build CLI arguments for two-pass ensemble
             args = self._build_twopass_args(config)
+
+            # Compute expected output files for post-completion use (e.g., translation)
+            self._expected_output_files = self._compute_expected_outputs(config, is_ensemble=True)
 
             # Construct command
             cmd = [sys.executable, "-X", "utf8", "-m", "whisperjav.main", *args]
