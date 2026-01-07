@@ -4872,10 +4872,22 @@ const TranslateIntegrationManager = {
         const tabId = activeTab ? activeTab.dataset.tab : 'tab1';
 
         if (tabId === 'tab3') {
-            // Ensemble Mode settings
+            // Ensemble Mode settings - use TranslationSettingsModal
+            const fullSettings = TranslationSettingsModal.getFullSettings();
             return {
-                provider: document.getElementById('ensembleTranslateProvider')?.value || 'deepseek',
-                target: document.getElementById('ensembleTranslateTarget')?.value || 'english'
+                provider: fullSettings.provider,
+                model: fullSettings.model,
+                target: fullSettings.targetLang,
+                tone: fullSettings.tone,
+                apiKey: fullSettings.apiKey,
+                movieTitle: fullSettings.movieTitle,
+                actress: fullSettings.actress,
+                plot: fullSettings.plot,
+                sceneThreshold: fullSettings.sceneThreshold,
+                maxBatchSize: fullSettings.maxBatchSize,
+                temperature: fullSettings.temperature,
+                topP: fullSettings.topP,
+                customEndpoint: fullSettings.customEndpoint
             };
         } else {
             // Transcription Mode settings
@@ -4988,6 +5000,225 @@ const TranslateIntegrationManager = {
 };
 
 // ============================================================
+// Translation Settings Modal Manager
+// ============================================================
+const TranslationSettingsModal = {
+    // Provider model options (shared with inline dropdown)
+    providerModels: {
+        deepseek: ['deepseek-chat', 'deepseek-coder'],
+        gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+        claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
+        gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
+        openrouter: ['deepseek/deepseek-chat', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
+        glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
+        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768']
+    },
+
+    // Settings state
+    settings: {
+        apiKey: '',
+        targetLang: 'english',
+        tone: 'standard',
+        movieTitle: '',
+        actress: '',
+        plot: '',
+        sceneThreshold: 60,
+        maxBatchSize: 30,
+        temperature: 0.5,
+        topP: 0.9,
+        customEndpoint: ''
+    },
+
+    init() {
+        // Modal open/close handlers
+        document.getElementById('ensembleTranslateSettingsBtn')?.addEventListener('click', () => this.open());
+        document.getElementById('translationSettingsClose')?.addEventListener('click', () => this.close());
+        document.getElementById('translationSettingsCancel')?.addEventListener('click', () => this.close());
+        document.getElementById('translationSettingsSave')?.addEventListener('click', () => this.save());
+
+        // Close on overlay click
+        document.getElementById('translationSettingsModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'translationSettingsModal') this.close();
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isOpen()) this.close();
+        });
+
+        // Test connection button
+        document.getElementById('translationTestConnection')?.addEventListener('click', () => this.testConnection());
+
+        // Provider change handler for inline dropdown
+        document.getElementById('ensembleTranslateProvider')?.addEventListener('change', (e) => {
+            this.updateModelOptions(e.target.value);
+        });
+
+        // Initialize model options for default provider
+        this.updateModelOptions('deepseek');
+
+        // Load saved settings
+        this.loadSettings();
+
+        console.log('TranslationSettingsModal initialized');
+    },
+
+    isOpen() {
+        const modal = document.getElementById('translationSettingsModal');
+        return modal && modal.classList.contains('active');
+    },
+
+    open() {
+        const modal = document.getElementById('translationSettingsModal');
+        if (modal) {
+            // Populate form with current settings
+            this.populateForm();
+
+            // Show multi-file warning if applicable
+            this.updateMultiFileWarning();
+
+            modal.classList.add('active');
+        }
+    },
+
+    close() {
+        const modal = document.getElementById('translationSettingsModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    },
+
+    save() {
+        // Save settings from form
+        this.settings.apiKey = document.getElementById('translationApiKey')?.value || '';
+        this.settings.targetLang = document.getElementById('translationTargetLang')?.value || 'english';
+        this.settings.tone = document.getElementById('translationTone')?.value || 'standard';
+        this.settings.movieTitle = document.getElementById('translationMovieTitle')?.value || '';
+        this.settings.actress = document.getElementById('translationActress')?.value || '';
+        this.settings.plot = document.getElementById('translationPlot')?.value || '';
+        this.settings.sceneThreshold = parseInt(document.getElementById('translationSceneThreshold')?.value) || 60;
+        this.settings.maxBatchSize = parseInt(document.getElementById('translationMaxBatchSize')?.value) || 30;
+        this.settings.temperature = parseFloat(document.getElementById('translationTemperature')?.value) || 0.5;
+        this.settings.topP = parseFloat(document.getElementById('translationTopP')?.value) || 0.9;
+        this.settings.customEndpoint = document.getElementById('translationCustomEndpoint')?.value || '';
+
+        // Persist to local storage
+        try {
+            localStorage.setItem('whisperjav_translation_settings', JSON.stringify(this.settings));
+        } catch (e) {
+            console.warn('Could not save translation settings to localStorage:', e);
+        }
+
+        this.close();
+        ConsoleManager.log('Translation settings saved', 'success');
+    },
+
+    loadSettings() {
+        try {
+            const saved = localStorage.getItem('whisperjav_translation_settings');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                this.settings = { ...this.settings, ...parsed };
+            }
+        } catch (e) {
+            console.warn('Could not load translation settings from localStorage:', e);
+        }
+    },
+
+    populateForm() {
+        document.getElementById('translationApiKey').value = this.settings.apiKey;
+        document.getElementById('translationTargetLang').value = this.settings.targetLang;
+        document.getElementById('translationTone').value = this.settings.tone;
+        document.getElementById('translationMovieTitle').value = this.settings.movieTitle;
+        document.getElementById('translationActress').value = this.settings.actress;
+        document.getElementById('translationPlot').value = this.settings.plot;
+        document.getElementById('translationSceneThreshold').value = this.settings.sceneThreshold;
+        document.getElementById('translationMaxBatchSize').value = this.settings.maxBatchSize;
+        document.getElementById('translationTemperature').value = this.settings.temperature;
+        document.getElementById('translationTopP').value = this.settings.topP;
+        document.getElementById('translationCustomEndpoint').value = this.settings.customEndpoint;
+    },
+
+    updateMultiFileWarning() {
+        const warning = document.getElementById('multiFileWarning');
+        if (warning) {
+            // Show warning if more than 1 file is selected
+            const fileCount = AppState.selectedFiles?.length || 0;
+            warning.style.display = fileCount > 1 ? 'flex' : 'none';
+        }
+    },
+
+    updateModelOptions(provider) {
+        const modelSelect = document.getElementById('ensembleTranslateModel');
+        if (!modelSelect) return;
+
+        const models = this.providerModels[provider] || [];
+        modelSelect.innerHTML = '<option value="">Default</option>' +
+            models.map(m => `<option value="${m}">${m}</option>`).join('');
+    },
+
+    async testConnection() {
+        const btn = document.getElementById('translationTestConnection');
+        const statusEl = document.getElementById('translationApiStatus');
+        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'deepseek';
+        const apiKey = document.getElementById('translationApiKey')?.value || '';
+
+        if (btn) btn.disabled = true;
+        if (statusEl) {
+            statusEl.textContent = 'Testing...';
+            statusEl.className = 'api-status testing';
+        }
+
+        try {
+            const result = await pywebview.api.test_provider_connection(provider, apiKey);
+            if (statusEl) {
+                if (result.success) {
+                    statusEl.textContent = 'Connected';
+                    statusEl.className = 'api-status connected';
+                    ConsoleManager.log(`API connection successful: ${provider}`, 'success');
+                } else {
+                    statusEl.textContent = 'Failed';
+                    statusEl.className = 'api-status error';
+                    ConsoleManager.log(`API connection failed: ${result.error || 'Unknown error'}`, 'error');
+                }
+            }
+        } catch (error) {
+            if (statusEl) {
+                statusEl.textContent = 'Error';
+                statusEl.className = 'api-status error';
+            }
+            ConsoleManager.log(`API connection error: ${error.message}`, 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    },
+
+    /**
+     * Get all translation settings for processing
+     */
+    getFullSettings() {
+        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'deepseek';
+        const model = document.getElementById('ensembleTranslateModel')?.value || '';
+
+        return {
+            provider: provider,
+            model: model,
+            apiKey: this.settings.apiKey,
+            targetLang: this.settings.targetLang,
+            tone: this.settings.tone,
+            movieTitle: this.settings.movieTitle,
+            actress: this.settings.actress,
+            plot: this.settings.plot,
+            sceneThreshold: this.settings.sceneThreshold,
+            maxBatchSize: this.settings.maxBatchSize,
+            temperature: this.settings.temperature,
+            topP: this.settings.topP,
+            customEndpoint: this.settings.customEndpoint
+        };
+    }
+};
+
+// ============================================================
 // Initialization
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -5012,6 +5243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     UpdateCheckManager.init();
     TranslatorManager.init();
     TranslateIntegrationManager.init();
+    TranslationSettingsModal.init();
 
     // Initial validation
     FormManager.validateForm();

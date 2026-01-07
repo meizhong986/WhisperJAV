@@ -1631,6 +1631,42 @@ button:focus-visible,
     border-radius: var(--border-radius);
 }
 
+/* Translation inline settings (provider, model, settings button) */
+.translate-inline-settings {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.translate-inline-settings .form-select {
+    min-width: 100px;
+    font-size: 11px;
+    padding: 4px 8px;
+}
+
+/* Icon button for settings gear */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 14px;
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-icon:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
 /* API Key Warning Indicator */
 .translate-api-warning {
     display: inline-flex;
@@ -1974,6 +2010,160 @@ details[open] .collapse-icon {
     .translator-context-grid,
     .translator-advanced-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   Translation Settings Modal
+   ============================================================ */
+.modal-translation-settings {
+    max-width: 520px;
+    width: 95%;
+}
+
+.translation-settings-section {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.translation-settings-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.form-row .form-group {
+    flex: 1;
+    min-width: 120px;
+}
+
+.form-row .form-group.flex-grow {
+    flex: 2;
+}
+
+.form-row .form-group.full-width {
+    flex-basis: 100%;
+    min-width: 100%;
+}
+
+.section-header-inline {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.section-header-inline .section-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.section-header-inline .section-note {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.context-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    background: rgba(33, 150, 243, 0.08);
+    border: 1px solid rgba(33, 150, 243, 0.2);
+    border-radius: var(--border-radius);
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.context-note .note-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* Collapsible Advanced Settings in Modal */
+.translation-advanced-section {
+    padding: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+.section-header-collapsible {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.section-header-collapsible:hover {
+    color: var(--primary-color);
+}
+
+.section-header-collapsible .section-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: inherit;
+}
+
+.section-header-collapsible .collapse-icon {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
+details.translation-advanced-section[open] .collapse-icon {
+    transform: rotate(90deg);
+}
+
+.advanced-content {
+    padding: 12px 0 0;
+}
+
+.advanced-content .form-row {
+    margin-bottom: 12px;
+}
+
+.advanced-content .form-row:last-child {
+    margin-bottom: 0;
+}
+
+/* API Status in Modal */
+.api-status.testing {
+    background: rgba(33, 150, 243, 0.2);
+    color: var(--primary-color);
+}
+
+.api-status.connected {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+/* Responsive Modal */
+@media (max-width: 480px) {
+    .modal-translation-settings {
+        max-width: 100%;
+        width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+
+    .form-row {
+        flex-direction: column;
+    }
+
+    .form-row .form-group {
+        min-width: 100%;
     }
 }
 
