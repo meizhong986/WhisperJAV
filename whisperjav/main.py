@@ -1446,24 +1446,22 @@ def main():
 
                     try:
                         logger.info(f"Translating: {basename}")
-                        if not args.translate_quiet:
-                            print(f"Translating: {basename}")
+                        print(f"Translating: {basename}")
 
                         translated_path = translate_with_config(
-                            srt_path=output_path,
+                            input_path=output_path,
                             provider=args.translate_provider,
                             target_lang=args.translate_target,
                             tone=args.translate_tone,
-                            api_key=args.translate_api_key,
-                            model=args.translate_model,
-                            extra_context=extra_context,
-                            quiet=args.translate_quiet
+                            api_key=getattr(args, 'translate_api_key', None),
+                            model=getattr(args, 'translate_model', None),
+                            debug=getattr(args, 'debug', False),
+                            extra_context=extra_context
                         )
 
                         if translated_path:
                             logger.info(f"Translation saved: {translated_path}")
-                            if not args.translate_quiet:
-                                print(f"  -> {translated_path}")
+                            print(f"  -> {translated_path}")
                             translation_success += 1
                         else:
                             logger.warning(f"Translation returned no output for {basename}")
