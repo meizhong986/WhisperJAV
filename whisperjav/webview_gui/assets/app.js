@@ -909,16 +909,29 @@ const ProcessManager = {
                     if (status.status === 'completed') {
                         ProgressManager.setProgress(100);
                         ProgressManager.setStatus('Completed');
-                        ErrorHandler.showSuccess('Process Completed', 'Transcription finished successfully');
 
-                        // Trigger post-transcription translation if enabled (uses captured settings)
-                        if (TranslateIntegrationManager.wasEnabledOnStart()) {
-                            // Use output_files from API (computed based on mode/language)
-                            const outputFiles = status.output_files || [];
-                            if (outputFiles.length > 0) {
-                                TranslateIntegrationManager.onTranscriptionComplete(outputFiles);
-                            } else {
-                                console.warn('Translation enabled but no output files returned from API');
+                        // For Ensemble Mode (tab3), translation is handled by CLI --translate flag
+                        // For other modes, trigger separate translation subprocess if enabled
+                        const isEnsembleMode = AppState.activeTab === 'tab3';
+
+                        if (isEnsembleMode) {
+                            // CLI handled everything including translation (if enabled)
+                            ErrorHandler.showSuccess('Process Completed',
+                                TranslateIntegrationManager.wasEnabledOnStart()
+                                    ? 'Transcription and translation finished successfully'
+                                    : 'Transcription finished successfully');
+                        } else {
+                            // Transcription Mode - translation needs separate subprocess (legacy)
+                            ErrorHandler.showSuccess('Process Completed', 'Transcription finished successfully');
+
+                            if (TranslateIntegrationManager.wasEnabledOnStart()) {
+                                // Use output_files from API (computed based on mode/language)
+                                const outputFiles = status.output_files || [];
+                                if (outputFiles.length > 0) {
+                                    TranslateIntegrationManager.onTranscriptionComplete(outputFiles);
+                                } else {
+                                    console.warn('Translation enabled but no output files returned from API');
+                                }
                             }
                         }
                     } else if (status.status === 'error') {
@@ -3436,6 +3449,20 @@ const EnsembleManager = {
             keep_temp: document.getElementById('keepTemp').checked,
             temp_dir: document.getElementById('tempDir').value.trim()
         };
+
+        // Add translation settings if enabled (single CLI command approach)
+        if (TranslateIntegrationManager.isEnabled()) {
+            const translateSettings = TranslateIntegrationManager.getSettings();
+            config.translate = true;
+            config.translate_provider = translateSettings.provider || 'deepseek';
+            config.translate_target = translateSettings.target || 'english';
+            config.translate_tone = translateSettings.tone || 'standard';
+            config.translate_model = translateSettings.model || null;
+            config.translate_api_key = translateSettings.apiKey || null;
+            config.translate_title = translateSettings.movieTitle || null;
+            config.translate_actress = translateSettings.actress || null;
+            config.translate_plot = translateSettings.plot || null;
+        }
 
         return config;
     },

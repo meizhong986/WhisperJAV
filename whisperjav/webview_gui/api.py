@@ -2142,6 +2142,34 @@ class WhisperJAVAPI:
         if config.get('debug', False):
             args += ["--debug"]
 
+        # Translation options (single CLI command approach)
+        if config.get('translate', False):
+            args += ["--translate"]
+
+            if config.get('translate_provider'):
+                args += ["--translate-provider", config['translate_provider']]
+
+            if config.get('translate_target'):
+                args += ["--translate-target", config['translate_target']]
+
+            if config.get('translate_tone'):
+                args += ["--translate-tone", config['translate_tone']]
+
+            if config.get('translate_model'):
+                args += ["--translate-model", config['translate_model']]
+
+            if config.get('translate_api_key'):
+                args += ["--translate-api-key", config['translate_api_key']]
+
+            if config.get('translate_title'):
+                args += ["--translate-title", config['translate_title']]
+
+            if config.get('translate_actress'):
+                args += ["--translate-actress", config['translate_actress']]
+
+            if config.get('translate_plot'):
+                args += ["--translate-plot", config['translate_plot']]
+
         return args
 
     # ========================================================================
