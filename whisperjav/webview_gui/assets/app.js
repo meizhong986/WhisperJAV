@@ -647,9 +647,6 @@ const FormManager = {
             ...baseOptions,
             sensitivity: document.getElementById('sensitivity').value,
 
-            // Scene detection method (optional)
-            scene_detection_method: document.getElementById('sceneDetectionMethod').value,
-
             // Model override (conditional)
             model_override: modelOverrideEnabled
                 ? document.getElementById('modelSelection').value
@@ -658,16 +655,6 @@ const FormManager = {
             // Async processing (conditional)
             async_processing: asyncProcessingEnabled,
 
-            // Speech segmenter selection (replaces no_vad checkbox)
-            speech_segmenter: document.getElementById('speechSegmenter').value,
-
-            // Other options
-            credit: document.getElementById('openingCredit').value.trim(),
-
-            // WIP features (currently disabled, but include for future)
-            adaptive_classification: document.getElementById('adaptiveClassification').checked,
-            adaptive_audio_enhancement: document.getElementById('adaptiveEnhancement').checked,
-            smart_postprocessing: document.getElementById('smartPostprocessing').checked
         };
     }
 };
