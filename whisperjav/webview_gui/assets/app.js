@@ -4971,6 +4971,9 @@ const TranslateIntegrationManager = {
             try {
                 const status = await pywebview.api.get_translation_status();
 
+                // Fetch and display translation logs
+                this.fetchLogs();
+
                 if (status.status === 'completed') {
                     this.stopStatusPolling();
                     ConsoleManager.log('Translation completed successfully', 'success');
