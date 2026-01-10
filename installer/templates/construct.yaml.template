@@ -55,3 +55,9 @@ nsis_template: custom_template_v{{VERSION}}.nsi.tmpl  # Custom NSIS template wit
 # Installation options
 # keep_pkgs: false  # Delete package cache after install (saves space)
 # attempt_hardlinks: true  # Use hardlinks to save disk space
+
+# PATH Configuration (IMPORTANT for future updates)
+# Enable "Add to PATH" by default so users can run:
+#   pip install -U git+https://github.com/meizhong986/whisperjav.git
+# This adds: Library\bin (git, ffmpeg), Scripts (pip, whisperjav) to user PATH
+initialize_by_default: true
