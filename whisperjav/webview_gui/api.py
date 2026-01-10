@@ -2629,7 +2629,8 @@ class WhisperJAVAPI:
 
         try:
             # Build CLI arguments
-            args = [sys.executable, "-m", "whisperjav.translate.cli"]
+            # Use -u flag for unbuffered stdout/stderr - critical for real-time streaming
+            args = [sys.executable, "-u", "-m", "whisperjav.translate.cli"]
 
             # Input files
             inputs = options.get('inputs', [])
@@ -2668,14 +2669,19 @@ class WhisperJAVAPI:
                 # Note: CLI uses -o for output, but for batch mode it's a directory
                 args.extend(["-o", options['output_dir']])
 
-            # Start process
+            # Start process with unbuffered output for real-time streaming
+            # PYTHONUNBUFFERED=1 ensures child process doesn't buffer stdout/stderr
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+
             self._translate_process = subprocess.Popen(
                 args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                cwd=str(REPO_ROOT)
+                cwd=str(REPO_ROOT),
+                env=env
             )
 
             self._translate_status = "running"

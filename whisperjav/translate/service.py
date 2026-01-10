@@ -323,7 +323,7 @@ def translate_with_config(
             debug=debug,
             provider_options=provider_options,
             extra_context=extra_context,
-            emit_raw_output=stream  # Only emit raw output if streaming
+            emit_raw_output=True  # Always emit progress to stderr (CLI parity)
         )
 
         if result_path:
