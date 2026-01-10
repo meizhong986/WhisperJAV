@@ -153,8 +153,71 @@ class TestBackendApiMethods:
 
 
 # =============================================================================
-# Test: Console output consistency
+# Test: Core translation connects event wrappers to signals
 # =============================================================================
+
+class TestCoreTranslationEventWiring:
+    """
+    Tests that core.py properly wires PySubTrans event handlers.
+
+    This is the CRITICAL backend test - the root cause of the bug was that
+    the event wrappers were replaced but never connected to the Blinker signals.
+    Without connect_default_loggers(), the wrappers sit idle and never receive
+    any events, so translation output never reaches stderr.
+    """
+
+    @pytest.fixture
+    def core_py(self):
+        """Load the core.py content."""
+        repo_root = Path(__file__).parent.parent
+        core_path = repo_root / "whisperjav" / "translate" / "core.py"
+        assert core_path.exists(), f"core.py not found at {core_path}"
+        return core_path.read_text(encoding="utf-8")
+
+    def test_core_connects_event_wrappers(self, core_py):
+        """
+        Test that core.py calls connect_default_loggers() after setting wrappers.
+
+        The PySubTrans TranslationEvents class has:
+        1. _default_*_wrapper attributes that hold wrapper functions
+        2. connect_default_loggers() method that connects them to Blinker signals
+
+        If we replace the wrappers but don't call connect_default_loggers(),
+        the new wrappers are never connected and events go nowhere.
+        """
+        # Find the emit_raw_output block
+        assert "if emit_raw_output:" in core_py, \
+            "core.py should have emit_raw_output conditional block"
+
+        # Check that wrapper assignments exist
+        assert "_default_error_wrapper = _make_wrapper()" in core_py, \
+            "core.py should set _default_error_wrapper"
+        assert "_default_warning_wrapper = _make_wrapper()" in core_py, \
+            "core.py should set _default_warning_wrapper"
+        assert "_default_info_wrapper = _make_wrapper()" in core_py, \
+            "core.py should set _default_info_wrapper"
+
+        # CRITICAL: Check that connect_default_loggers() is called
+        # This was the missing piece that caused the bug!
+        assert "connect_default_loggers()" in core_py, \
+            "core.py MUST call translator.events.connect_default_loggers() " \
+            "to connect the wrappers to the Blinker signals. Without this, " \
+            "event wrappers are replaced but never receive any events."
+
+    def test_wrapper_connects_after_assignment(self, core_py):
+        """
+        Test that connect_default_loggers() is called AFTER wrapper assignments.
+
+        The order matters: first replace the wrappers, then connect them.
+        """
+        wrapper_pos = core_py.find("_default_info_wrapper = _make_wrapper()")
+        connect_pos = core_py.find("connect_default_loggers()")
+
+        assert wrapper_pos > 0, "Wrapper assignment not found"
+        assert connect_pos > 0, "connect_default_loggers() not found"
+        assert connect_pos > wrapper_pos, \
+            "connect_default_loggers() should be called AFTER wrapper assignments"
+
 
 class TestConsoleOutputConsistency:
     """Tests for consistent console output handling across translation managers."""

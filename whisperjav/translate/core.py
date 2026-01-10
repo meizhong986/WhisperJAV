@@ -134,6 +134,10 @@ def translate_subtitle(
             translator.events._default_warning_wrapper = _make_wrapper()
             translator.events._default_info_wrapper = _make_wrapper()
 
+            # Connect the wrappers to the Blinker signals - this was missing!
+            # Without this, the wrappers are replaced but never actually receive events
+            translator.events.connect_default_loggers()
+
         # Translate subtitles
         project.TranslateSubtitles(translator)
 
