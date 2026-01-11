@@ -1,5 +1,17 @@
 # AI Coding Guide for WhisperJAV
 
+## MASTER INSTRUCTIONS :
+
+### Evidence-First Debugging (Mandatory)
+- If the user says they already tried a fix, do **not** repeat the same root-cause claim; ask for (or create) a minimal check and update the diagnosis from its output.
+- For runtime/library errors, do **not** assert a root cause without either (a) the exact error line/stack trace, or (b) direct verification via workspace logs/tools.
+- When suggesting installs, always include a verification command; any non-zero exit is a hard stop (surface stdout/stderr tail and propose the next action).
+- Before concluding, restate the key user-provided facts you’re relying on, then state what new evidence you need.
+- Debug-output contract: request exactly **one** artifact (error line, log excerpt, or specific command output) and base the next step only on that artifact.
+
+
+
+
 ## 🧭 Architecture Map
 - CLI orchestrator `whisperjav/main.py` (also `cli.py`) wires argument parsing, preflight checks, pipeline invocation, and translation toggles.
 - PyWebView GUI lives in `whisperjav/webview_gui/` (`main.py`, `api.py`, `assets/`); GUI launches pipelines via the same CLI APIs and requires WebView2 on Windows.
