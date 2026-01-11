@@ -33,6 +33,64 @@ CTRANSLATE2_PROVIDERS = {"faster_whisper", "kotoba_faster_whisper"}
 
 
 
+def _is_pascal_gpu() -> bool:
+    """
+    Detect if GPU is NVIDIA Pascal architecture (GTX 10xx, Quadro Pxxx).
+
+    Pascal GPUs (sm_60, sm_61, sm_62) don't support efficient float16 computation.
+    When CTranslate2's "auto" compute_type selects float16, it fails with:
+    "target device or backend do not support efficient float16 computation"
+
+    Pascal GPUs require cu118 (the last PyTorch build to support them), but if
+    the user has a newer CUDA version installed (cu121+), we need to fallback
+    to float32 compute_type to avoid the error.
+
+    See: https://github.com/meizhong986/WhisperJAV/issues/123
+
+    Returns:
+        True if Pascal GPU detected, False otherwise
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return False
+
+        # Get compute capability (major.minor)
+        capability = torch.cuda.get_device_capability(0)
+        major, minor = capability
+
+        # Pascal is compute capability 6.x (sm_60, sm_61, sm_62)
+        # - sm_60: GP100 (Tesla P100, Quadro GP100)
+        # - sm_61: GP102, GP104, GP106, GP107 (GTX 1080 Ti, 1080, 1070, 1060, Quadro Pxxx)
+        # - sm_62: GP10B (Jetson TX2, DRIVE PX2)
+        if major == 6:
+            gpu_name = torch.cuda.get_device_name(0)
+            logger.debug(f"Pascal GPU detected: {gpu_name} (sm_{major}{minor})")
+            return True
+
+        # Also check by name for known Pascal GPUs (fallback)
+        gpu_name = torch.cuda.get_device_name(0)
+        pascal_names = [
+            # GeForce GTX 10xx series
+            "GTX 1080", "GTX 1070", "GTX 1060", "GTX 1050",
+            # GeForce TITAN X Pascal
+            "TITAN X", "TITAN XP",
+            # Quadro Pascal series
+            "QUADRO P", "QUADRO GP100",
+            # Tesla Pascal
+            "TESLA P",
+        ]
+        gpu_upper = gpu_name.upper()
+        if any(x in gpu_upper for x in pascal_names):
+            logger.debug(f"Pascal GPU detected by name: {gpu_name}")
+            return True
+
+        return False
+    except Exception as e:
+        logger.debug(f"Pascal detection failed: {e}")
+        return False
+
+
 def _is_blackwell_gpu() -> bool:
     """
     Detect if GPU is NVIDIA Blackwell architecture (RTX 50 series).
@@ -78,6 +136,7 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
     Select optimal compute_type based on device and provider.
 
     CTranslate2 providers (faster_whisper, kotoba_faster_whisper):
+    - Pascal GPUs (sm_6x): Force "float32" (float16 not efficiently supported)
     - RTX 50 Blackwell (sm_120): Force "float16" (int8_float16 buggy in CTranslate2)
     - Other GPUs: Returns "auto" to delegate selection to CTranslate2
     - See: https://github.com/OpenNMT/CTranslate2/issues/1865
@@ -94,6 +153,18 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
         Optimal compute_type for the device/provider combination
     """
     if provider in CTRANSLATE2_PROVIDERS:
+        # Pascal workaround: Pascal GPUs (GTX 10xx, Quadro Pxxx) don't support
+        # efficient float16 computation. CTranslate2's "auto" may select float16
+        # which fails with "target device or backend do not support efficient float16"
+        # Force float32 for Pascal GPUs as the safe fallback.
+        # See: https://github.com/meizhong986/WhisperJAV/issues/123
+        if device == "cuda" and _is_pascal_gpu():
+            logger.info(
+                "Pascal GPU detected (GTX 10xx/Quadro Pxxx). Using float32 compute_type "
+                "because Pascal GPUs don't support efficient float16 computation."
+            )
+            return "float32"
+
         # Blackwell workaround: CTranslate2's "auto" incorrectly selects int8_float16
         # which fails with "target device or backend do not support efficient int8_float16"
         # Force float16 for Blackwell until CTranslate2 properly supports sm_120
