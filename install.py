@@ -30,15 +30,15 @@ Usage:
 Options:
     --cpu-only              Install CPU-only PyTorch (no CUDA)
     --cuda118               Install PyTorch for CUDA 11.8
-    --cuda121               Install PyTorch for CUDA 12.1 (default)
-    --cuda124               Install PyTorch for CUDA 12.4
+    --cuda121               Install PyTorch for CUDA 12.1
+    --cuda124               Install PyTorch for CUDA 12.4 (default)
     --no-speech-enhancement Skip speech enhancement packages
     --minimal               Minimal install (transcription only)
     --dev                   Install in development/editable mode
     --help                  Show this help message
 
 Examples:
-    python install.py                    # Standard install with CUDA 12.1
+    python install.py                    # Standard install with CUDA 12.4
     python install.py --cpu-only         # CPU-only install
     python install.py --minimal --dev    # Minimal dev install
 """
@@ -147,6 +147,204 @@ def get_torch_index_url(cuda_version):
     return urls.get(cuda_version, urls["cuda121"])
 
 
+def get_system_cuda_version():
+    """Detect CUDA version from nvcc or nvidia-smi."""
+    import re
+
+    # Try nvcc first
+    try:
+        result = subprocess.run(
+            ["nvcc", "--version"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            match = re.search(r"release (\d+)\.(\d+)", result.stdout)
+            if match:
+                return int(match.group(1)), int(match.group(2))
+    except Exception:
+        pass
+
+    # Try nvidia-smi
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            # nvidia-smi doesn't directly give CUDA version, but presence means CUDA capable
+            # Try to get CUDA version from nvidia-smi output
+            result2 = subprocess.run(
+                ["nvidia-smi"],
+                capture_output=True, text=True, timeout=10
+            )
+            match = re.search(r"CUDA Version:\s*(\d+)\.(\d+)", result2.stdout)
+            if match:
+                return int(match.group(1)), int(match.group(2))
+    except Exception:
+        pass
+
+    return None, None
+
+
+def get_llama_cpp_prebuilt_wheel(cuda_version: str = "cuda121"):
+    """
+    Try to find a prebuilt wheel from JamePeng's releases.
+
+    Args:
+        cuda_version: CUDA version string from install args (e.g., "cuda121", "cuda124", "cpu")
+
+    Returns:
+        tuple: (wheel_url, cuda_tag) or (None, None) if no suitable wheel found
+    """
+    import json
+    import urllib.request
+    import urllib.error
+
+    # Map install script cuda versions to llama-cpp release tags
+    # Available in JamePeng releases: cu124, cu126, cu128, cu130
+    # CUDA is forward-compatible: cu124 wheel works on CUDA 12.4+ only
+    CUDA_MAP = {
+        "cuda118": None,  # No compatible wheel, build from source
+        "cuda121": None,  # No compatible wheel, build from source
+        "cuda124": 124,   # Exact match
+        "cpu": None,      # CPU mode, build from source
+    }
+
+    if cuda_version == "cpu":
+        print("    CPU mode - will build from source")
+        return None, None
+
+    # macOS - no prebuilt wheels available (could request from author)
+    if sys.platform == "darwin":
+        print("    macOS - no prebuilt wheels, will build from source")
+        return None, None
+
+    target_cuda = CUDA_MAP.get(cuda_version)
+    if target_cuda is None:
+        # Check if it's explicitly mapped to None (incompatible) vs unknown
+        if cuda_version in CUDA_MAP:
+            print(f"    {cuda_version} - no compatible prebuilt wheel, will build from source")
+            return None, None
+        # Try to auto-detect if unknown cuda version string
+        cuda_major, cuda_minor = get_system_cuda_version()
+        if cuda_major is None:
+            print("    No CUDA detected, will build from source")
+            return None, None
+        # Map detected version to available wheels (must be equal or lower)
+        system_cuda = cuda_major * 10 + (cuda_minor if cuda_minor < 10 else cuda_minor // 10)
+        print(f"    Detected CUDA {cuda_major}.{cuda_minor}")
+        for cu in [130, 128, 126, 124]:
+            if cu <= system_cuda:
+                target_cuda = cu
+                break
+        if target_cuda is None:
+            print(f"    CUDA {cuda_major}.{cuda_minor} < 12.4 - no compatible wheel, will build from source")
+            return None, None
+
+    print(f"    Looking for prebuilt wheel with cu{target_cuda}")
+
+    # Determine platform
+    if sys.platform == "win32":
+        os_tag = "win"
+        wheel_platform = "win_amd64"
+    elif sys.platform == "linux":
+        os_tag = "linux"
+        wheel_platform = "linux_x86_64"
+    else:
+        print(f"    No prebuilt wheels for {sys.platform}, will build from source")
+        return None, None
+
+    # Python version
+    py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+
+    print(f"    Looking for prebuilt wheel: cu{target_cuda}, {os_tag}, {py_ver}")
+
+    # Query GitHub API for releases
+    try:
+        api_url = "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=50"
+        req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.v3+json"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            releases = json.loads(response.read().decode())
+    except Exception as e:
+        print(f"    Could not fetch releases: {e}")
+        return None, None
+
+    # Find matching release
+    cuda_tag = f"cu{target_cuda}"
+    for release in releases:
+        tag = release.get("tag_name", "")
+        # Match pattern: v{VERSION}-cu{CUDA}-Basic-{OS}-{DATE}
+        if f"-{cuda_tag}-" in tag and f"-{os_tag}-" in tag:
+            # Look for matching wheel in assets
+            for asset in release.get("assets", []):
+                name = asset.get("name", "")
+                # Match pattern: llama_cpp_python-{VER}-{PYVER}-{PYVER}-{PLATFORM}.whl
+                if name.endswith(".whl") and py_ver in name and wheel_platform in name:
+                    wheel_url = asset.get("browser_download_url")
+                    print(f"    Found prebuilt wheel: {name}")
+                    return wheel_url, cuda_tag
+
+    print(f"    No matching prebuilt wheel found for {py_ver}/{os_tag}/cu{target_cuda}")
+    return None, None
+
+
+def get_llama_cpp_info(cuda_version: str = "cuda121"):
+    """
+    Get llama-cpp-python install info based on platform.
+
+    Uses JamePeng's fork which has active maintenance and supports:
+    - CUDA (Windows/Linux with NVIDIA GPU)
+    - Metal (macOS Apple Silicon)
+    - CPU fallback (all platforms)
+
+    Strategy:
+    1. Try to find prebuilt wheel from GitHub releases (fast, ~5 min)
+    2. Fall back to source build if no wheel available (~30+ min)
+
+    Args:
+        cuda_version: CUDA version from install args (e.g., "cuda121", "cuda124", "cpu")
+
+    See: https://github.com/JamePeng/llama-cpp-python
+    """
+    import platform
+
+    # Try prebuilt wheel first (Windows/Linux with CUDA only)
+    wheel_url, cuda_tag = get_llama_cpp_prebuilt_wheel(cuda_version)
+
+    if wheel_url:
+        backend = f"CUDA ({cuda_tag} prebuilt)"
+        return wheel_url, backend, True, None  # True = is_prebuilt, no cmake_args needed
+
+    # Fall back to source build
+    git_url = "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git"
+    cmake_args = None
+
+    if sys.platform == "darwin":
+        chip = platform.processor() or platform.machine()
+        if "arm" in chip.lower() or "apple" in chip.lower():
+            backend = "Metal (Apple Silicon) - building from source"
+            cmake_args = "-DGGML_METAL=on"
+        else:
+            backend = "CPU (Intel Mac) - building from source"
+    elif sys.platform == "win32":
+        cuda_major, _ = get_system_cuda_version()
+        if cuda_major:
+            backend = "CUDA - building from source (~30 min)"
+            cmake_args = "-DGGML_CUDA=on"
+        else:
+            backend = "CPU - building from source"
+    else:
+        # Linux
+        cuda_major, _ = get_system_cuda_version()
+        if cuda_major:
+            backend = "CUDA - building from source (~30 min)"
+            cmake_args = "-DGGML_CUDA=on"
+        else:
+            backend = "CPU - building from source"
+
+    return git_url, backend, False, cmake_args  # False = not prebuilt
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="WhisperJAV Source Installation Script",
@@ -158,9 +356,9 @@ def main():
     parser.add_argument("--cuda118", action="store_true",
                         help="Install PyTorch for CUDA 11.8")
     parser.add_argument("--cuda121", action="store_true",
-                        help="Install PyTorch for CUDA 12.1 (default)")
+                        help="Install PyTorch for CUDA 12.1")
     parser.add_argument("--cuda124", action="store_true",
-                        help="Install PyTorch for CUDA 12.4")
+                        help="Install PyTorch for CUDA 12.4 (default)")
     parser.add_argument("--no-speech-enhancement", action="store_true",
                         help="Skip speech enhancement packages")
     parser.add_argument("--minimal", action="store_true",
@@ -175,10 +373,10 @@ def main():
         cuda_version = "cpu"
     elif args.cuda118:
         cuda_version = "cuda118"
-    elif args.cuda124:
-        cuda_version = "cuda124"
+    elif args.cuda121:
+        cuda_version = "cuda121"
     else:
-        cuda_version = "cuda121"  # default
+        cuda_version = "cuda124"  # default (enables prebuilt llama-cpp wheels)
 
     # Auto-detect GPU and warn if installing CUDA version without GPU
     if cuda_version != "cpu":
@@ -275,6 +473,37 @@ def main():
         "Install translation packages"
     )
 
+    # Local LLM translation (llama-cpp-python)
+    # Uses JamePeng's fork with active maintenance and multi-platform support
+    # Strategy: try prebuilt wheel first (fast), fall back to source build (slow)
+    llama_url, llama_backend, is_prebuilt, cmake_args = get_llama_cpp_info(cuda_version)
+    print(f"\n    Installing llama-cpp-python for local LLM translation...")
+    print(f"    Backend: {llama_backend}")
+
+    if is_prebuilt:
+        # Prebuilt wheel - install wheel first, then add [server] extras
+        run_pip(
+            ["install", llama_url],
+            f"Install llama-cpp-python ({llama_backend})",
+            allow_fail=True
+        )
+        # Install [server] extras - pip will see package is installed and just add extras
+        run_pip(
+            ["install", "llama-cpp-python[server]"],
+            "Install llama-cpp-python server extras",
+            allow_fail=True
+        )
+    else:
+        # Source build - need to set CMAKE_ARGS for GPU support
+        if cmake_args:
+            print(f"    Setting CMAKE_ARGS={cmake_args}")
+            os.environ["CMAKE_ARGS"] = cmake_args
+        run_pip(
+            ["install", llama_url],
+            f"Install llama-cpp-python ({llama_backend})",
+            allow_fail=True  # Non-fatal: users can still use cloud translation
+        )
+
     # VAD
     run_pip(["install", "silero-vad>=6.0", "auditok"], "Install VAD packages")
 
@@ -358,6 +587,9 @@ def main():
 
   To run with GUI:
     whisperjav-gui
+
+  To translate with local LLM (no API key needed):
+    whisperjav video.mp4 --translate --translate-provider local
 
   For help:
     whisperjav --help

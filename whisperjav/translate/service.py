@@ -200,7 +200,8 @@ def translate_with_config(
     stream: bool = False,
     debug: bool = False,
     extra_context: Optional[str] = None,
-    progress_callback: Optional[Callable[[str], None]] = None
+    progress_callback: Optional[Callable[[str], None]] = None,
+    n_gpu_layers: int = -1
 ) -> Optional[Path]:
     """
     Translate subtitle file with full configuration resolution.
@@ -259,8 +260,11 @@ def translate_with_config(
     # Load user settings
     settings = load_settings()
 
-    # Resolve API key
-    resolved_api_key = _resolve_api_key(provider_config, api_key)
+    # Resolve API key (not needed for local provider)
+    if provider == 'local':
+        resolved_api_key = None
+    else:
+        resolved_api_key = _resolve_api_key(provider_config, api_key)
 
     # Resolve model
     resolved_model = _resolve_model(provider_config, model, settings)
@@ -308,23 +312,68 @@ def translate_with_config(
 
     # Execute translation
     try:
-        result_path = translate_subtitle(
-            input_path=str(input_file),
-            output_path=resolved_output_path,
-            provider_config=provider_config,
-            model=resolved_model,
-            api_key=resolved_api_key,
-            source_lang=source_lang,
-            target_lang=target_lang,
-            instruction_file=resolved_instruction_file,
-            scene_threshold=resolved_scene_threshold,
-            max_batch_size=resolved_max_batch_size,
-            stream=stream,
-            debug=debug,
-            provider_options=provider_options,
-            extra_context=extra_context,
-            emit_raw_output=True  # Always emit progress to stderr (CLI parity)
-        )
+        # For local provider: start server and use PySubtrans with OpenAI-compatible API
+        if provider == 'local':
+            from .local_backend import start_local_server, stop_local_server
+
+            # Start local LLM server
+            try:
+                api_base, _ = start_local_server(
+                    model=resolved_model,
+                    n_gpu_layers=n_gpu_layers
+                )
+            except Exception as e:
+                raise TranslationError(f"Failed to start local server: {e}")
+
+            # Use Custom Server provider - designed for local OpenAI-compatible servers
+            # This uses /v1/chat/completions endpoint which llama-cpp-python supports
+            local_provider_config = {
+                'pysubtrans_name': 'Custom Server',
+                'server_address': api_base.replace('/v1', ''),  # Custom Server adds endpoint itself
+                'endpoint': '/v1/chat/completions',
+                'supports_conversation': True,
+                'supports_system_messages': True,
+            }
+
+            try:
+                result_path = translate_subtitle(
+                    input_path=str(input_file),
+                    output_path=resolved_output_path,
+                    provider_config=local_provider_config,
+                    model='local',
+                    api_key='',  # Local server doesn't require API key
+                    source_lang=source_lang,
+                    target_lang=target_lang,
+                    instruction_file=resolved_instruction_file,
+                    scene_threshold=resolved_scene_threshold,
+                    max_batch_size=resolved_max_batch_size,
+                    stream=stream,
+                    debug=debug,
+                    provider_options=provider_options,
+                    extra_context=extra_context,
+                    emit_raw_output=True
+                )
+            finally:
+                # Always stop server when done
+                stop_local_server()
+        else:
+            result_path = translate_subtitle(
+                input_path=str(input_file),
+                output_path=resolved_output_path,
+                provider_config=provider_config,
+                model=resolved_model,
+                api_key=resolved_api_key,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                instruction_file=resolved_instruction_file,
+                scene_threshold=resolved_scene_threshold,
+                max_batch_size=resolved_max_batch_size,
+                stream=stream,
+                debug=debug,
+                provider_options=provider_options,
+                extra_context=extra_context,
+                emit_raw_output=True  # Always emit progress to stderr (CLI parity)
+            )
 
         if result_path:
             logger.info(f"Translation complete: {result_path}")
