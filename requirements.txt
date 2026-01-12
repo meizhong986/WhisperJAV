@@ -38,6 +38,7 @@ scipy>=1.10.1
 tqdm
 pysrt
 srt
+pysrt
 aiofiles
 jsonschema
 colorama
