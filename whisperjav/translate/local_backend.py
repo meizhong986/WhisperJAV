@@ -9,6 +9,23 @@ Features:
 - Pre-quantized GGUF models (no license acceptance required)
 - OpenAI-compatible API server for seamless PySubtrans integration
 - Server lifecycle management (start/stop)
+
+Available Models:
+- llama-8b:  Llama 3.1 8B (Q4) - 6GB+ VRAM (default)
+- gemma-9b:  Gemma 2 9B (Q4_K_M) - 8GB+ VRAM (alternative)
+- llama-3b:  Llama 3.2 3B (Q4_K_M) - 3GB+ VRAM (basic, low VRAM only)
+- auto:      Auto-select based on available VRAM
+
+Usage:
+    # CLI
+    whisperjav-translate -i input.srt --provider local --model auto
+    whisperjav-translate -i input.srt --provider local --model llama-3b
+
+    # Programmatic
+    from whisperjav.translate.local_backend import start_local_server, stop_local_server
+    api_base, port = start_local_server(model="auto")
+    # ... use api_base with OpenAI-compatible client ...
+    stop_local_server()
 """
 
 import gc
@@ -28,24 +45,25 @@ _server_port: Optional[int] = None
 
 # Model registry - uncensored GGUF models for translation
 # These models have content filters removed for unrestricted translation
+# VRAM estimates include model + 8K context KV cache
 MODEL_REGISTRY = {
     'llama-3b': {
         'repo': 'mradermacher/Llama-3.2-3B-Instruct-uncensored-GGUF',
         'file': 'Llama-3.2-3B-Instruct-uncensored.Q4_K_M.gguf',
-        'vram': 2.5,
-        'desc': 'Llama 3.2 3B Uncensored - Good for most users'
+        'vram': 3.0,
+        'desc': 'Llama 3.2 3B - Basic quality, for low VRAM systems only'
     },
     'llama-8b': {
         'repo': 'Orenguteng/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF',
         'file': 'Llama-3.1-8B-Lexi-Uncensored_V2_Q4.gguf',
-        'vram': 5.5,
-        'desc': 'Llama 3.1 8B Uncensored - Better quality, needs 6GB+ VRAM'
+        'vram': 6.0,
+        'desc': 'Llama 3.1 8B - Default, requires 6GB+ VRAM'
     },
     'gemma-9b': {
         'repo': 'bartowski/gemma-2-9b-it-abliterated-GGUF',
         'file': 'gemma-2-9b-it-abliterated-Q4_K_M.gguf',
-        'vram': 6.5,
-        'desc': 'Gemma 2 9B Abliterated - High quality, needs 8GB+ VRAM'
+        'vram': 8.0,
+        'desc': 'Gemma 2 9B - Alternative model, requires 8GB+ VRAM'
     },
 }
 
@@ -63,11 +81,17 @@ def get_available_vram_gb() -> float:
 
 
 def get_best_model_for_vram(vram_gb: float) -> str:
-    """Select best model based on available VRAM."""
+    """Select best model based on available VRAM.
+
+    Priority: gemma-9b (best) > llama-8b (good) > llama-3b (basic)
+    """
     if vram_gb >= 8:
         return 'gemma-9b'
     if vram_gb >= 6:
         return 'llama-8b'
+    if vram_gb >= 3:
+        return 'llama-3b'
+    # Very low VRAM - still try llama-3b, may use CPU offload
     return 'llama-3b'
 
 

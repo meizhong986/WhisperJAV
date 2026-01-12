@@ -44,7 +44,7 @@ PROVIDER_CONFIGS = {
     },
     'local': {
         'pysubtrans_name': 'Local',  # Marker for local LLM bypass
-        'model': 'auto',              # Auto-select based on VRAM
+        'model': 'llama-8b',          # Default: good quality, 6GB VRAM
         'env_var': None               # No API key needed
     }
 }

@@ -205,7 +205,8 @@ def main():
     )
     translation_group.add_argument(
         '--model',
-        help="Model override (uses provider default if not specified)"
+        help="Model override. For --provider local: llama-8b (6GB VRAM, default), "
+             "gemma-9b (8GB VRAM, best), llama-3b (3GB VRAM), auto"
     )
     translation_group.add_argument(
         '-t', '--target',
