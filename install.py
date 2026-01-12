@@ -7,7 +7,7 @@ This script handles staged installation of WhisperJAV from source,
 working around pip dependency resolution conflicts (Issue #90).
 
 Prerequisites:
-    - Python 3.9-3.12
+    - Python 3.10-3.12 (3.9 dropped due to pysubtrans dependency)
     - FFmpeg in system PATH
     - Git
 
@@ -72,8 +72,9 @@ def run_pip(args, description, allow_fail=False):
 def check_python_version():
     """Verify Python version is compatible."""
     major, minor = sys.version_info[:2]
-    if major < 3 or (major == 3 and minor < 9):
-        print(f"ERROR: Python 3.9+ required. Found: {major}.{minor}")
+    if major < 3 or (major == 3 and minor < 10):
+        print(f"ERROR: Python 3.10+ required. Found: {major}.{minor}")
+        print("       Python 3.9 is no longer supported due to pysubtrans dependency.")
         sys.exit(1)
     if minor > 12:
         print(f"WARNING: Python 3.13+ may have compatibility issues with openai-whisper")
@@ -268,9 +269,9 @@ def main():
         "Install HuggingFace packages"
     )
 
-    # Translation
+    # Translation (pysubtrans requires Python 3.10+)
     run_pip(
-        ["install", "PySubtrans>=0.7.0", "openai>=1.35.0", "google-genai>=1.39.0"],
+        ["install", "pysubtrans>=1.5.0", "openai>=1.35.0", "google-genai>=1.39.0"],
         "Install translation packages"
     )
 
