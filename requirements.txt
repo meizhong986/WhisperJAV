@@ -34,7 +34,7 @@ onnxruntime>=1.16.0             # ONNX inference for ZipEnhancer ONNX mode
 
 # Utilities
 numpy>=2.0                      # NumPy 2.x (modelscope/zipenhancer compatible)
-scipy>=1.10.1
+scipy>=1.14.0                   # Required for NumPy 2.0 compatibility
 tqdm
 pysrt
 srt

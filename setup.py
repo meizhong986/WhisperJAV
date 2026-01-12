@@ -26,7 +26,7 @@ install_requires = [
     "auditok",
     "pydub",
     "numpy>=2.0",          # NumPy 2.x (modelscope/zipenhancer compatible)
-    "scipy>=1.10.1",
+    "scipy>=1.14.0",       # Required for NumPy 2.0 compatibility (ABI change)
     "tqdm",
     "pysrt",
     "srt",
