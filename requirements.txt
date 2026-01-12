@@ -59,8 +59,8 @@ pywebview>=5.0.0
 pythonnet>=3.0; platform_system=="Windows"
 pywin32>=305; platform_system=="Windows"
 
-# Translation dependencies
-PySubtrans>=0.7.0
+# Translation dependencies (requires Python 3.10+)
+pysubtrans>=1.5.0
 openai>=1.35.0
 google-genai>=1.39.0
 huggingface-hub>=0.25.0

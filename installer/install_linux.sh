@@ -161,9 +161,10 @@ PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
 
-if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 9 ]); then
-    echo -e "${RED}Error: Python 3.9 or higher is required. Found: $PYTHON_VERSION${NC}"
-    log "ERROR: Python 3.9+ required. Found: $PYTHON_VERSION"
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]); then
+    echo -e "${RED}Error: Python 3.10 or higher is required. Found: $PYTHON_VERSION${NC}"
+    echo -e "${RED}       Python 3.9 is no longer supported due to pysubtrans dependency.${NC}"
+    log "ERROR: Python 3.10+ required. Found: $PYTHON_VERSION"
     exit 1
 fi
 
@@ -389,9 +390,9 @@ pip3 install "huggingface-hub>=0.25.0" "transformers>=4.40.0" "accelerate>=0.26.
 # hf_xet for faster HuggingFace downloads (optional)
 pip3 install hf_xet 2>/dev/null || log "Note: hf_xet not installed (optional)"
 
-# Translation
+# Translation (pysubtrans requires Python 3.10+)
 log "Installing translation packages..."
-pip3 install "PySubtrans>=0.7.0" "openai>=1.35.0" "google-genai>=1.39.0"
+pip3 install "pysubtrans>=1.5.0" "openai>=1.35.0" "google-genai>=1.39.0"
 
 # VAD
 log "Installing VAD packages..."

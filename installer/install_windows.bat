@@ -7,7 +7,7 @@ REM This script handles the staged installation of WhisperJAV on Windows,
 REM working around pip dependency resolution conflicts (Issue #90).
 REM
 REM Prerequisites:
-REM   - Python 3.9-3.12 in PATH
+REM   - Python 3.10-3.12 in PATH (3.9 no longer supported due to pysubtrans)
 REM   - FFmpeg in PATH (download from https://www.gyan.dev/ffmpeg/builds/)
 REM   - Git in PATH
 REM
@@ -107,7 +107,7 @@ call :log "Checking Python..."
 where python >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python not found in PATH
-    echo Please install Python 3.9-3.12 and add it to PATH
+    echo Please install Python 3.10-3.12 and add it to PATH
     call :log "ERROR: Python not found in PATH"
     call :create_failure_file "Python not found in PATH"
     exit /b 1
@@ -124,15 +124,17 @@ for /f "tokens=1,2 delims=." %%a in ("%PYTHON_VERSION%") do (
 )
 
 if %PY_MAJOR% LSS 3 (
-    echo ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%
-    call :log "ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%"
-    call :create_failure_file "Python 3.9+ required"
+    echo ERROR: Python 3.10+ required. Found: %PYTHON_VERSION%
+    echo        Python 3.9 is no longer supported due to pysubtrans dependency.
+    call :log "ERROR: Python 3.10+ required. Found: %PYTHON_VERSION%"
+    call :create_failure_file "Python 3.10+ required"
     exit /b 1
 )
-if %PY_MAJOR%==3 if %PY_MINOR% LSS 9 (
-    echo ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%
-    call :log "ERROR: Python 3.9+ required. Found: %PYTHON_VERSION%"
-    call :create_failure_file "Python 3.9+ required"
+if %PY_MAJOR%==3 if %PY_MINOR% LSS 10 (
+    echo ERROR: Python 3.10+ required. Found: %PYTHON_VERSION%
+    echo        Python 3.9 is no longer supported due to pysubtrans dependency.
+    call :log "ERROR: Python 3.10+ required. Found: %PYTHON_VERSION%"
+    call :create_failure_file "Python 3.10+ required"
     exit /b 1
 )
 if %PY_MAJOR%==3 if %PY_MINOR% GTR 12 (
@@ -465,9 +467,9 @@ if errorlevel 1 (
     call :log "Note: hf_xet not installed (optional, faster HF downloads)"
 )
 
-REM Translation
+REM Translation (pysubtrans requires Python 3.10+)
 call :log "Installing translation packages..."
-call :run_pip_with_retry "install PySubtrans>=0.7.0 openai>=1.35.0 google-genai>=1.39.0" "Install translation packages"
+call :run_pip_with_retry "install pysubtrans>=1.5.0 openai>=1.35.0 google-genai>=1.39.0" "Install translation packages"
 if errorlevel 1 (
     echo WARNING: Translation packages failed (non-fatal)
     call :log "WARNING: Translation packages failed"
@@ -762,7 +764,7 @@ echo Time: %DATE% %TIME% >> "%FAILURE_FILE%"
 echo. >> "%FAILURE_FILE%"
 echo Troubleshooting: >> "%FAILURE_FILE%"
 echo - Check install_log_windows.txt for details >> "%FAILURE_FILE%"
-echo - Ensure Python 3.9-3.12, FFmpeg, and Git are in PATH >> "%FAILURE_FILE%"
+echo - Ensure Python 3.10-3.12, FFmpeg, and Git are in PATH >> "%FAILURE_FILE%"
 echo - Try: pip cache purge ^&^& pip install --upgrade pip >> "%FAILURE_FILE%"
 echo - For network issues, check firewall/proxy settings >> "%FAILURE_FILE%"
 echo. >> "%FAILURE_FILE%"

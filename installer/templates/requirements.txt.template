@@ -50,11 +50,11 @@ pysrt                 # SRT file parsing
 srt                   # SRT utilities
 
 # ----------------------------------------
-# Translation
+# Translation (requires Python 3.10+)
 # ----------------------------------------
-PySubtrans>=0.7.0     # AI-powered subtitle translation
-openai>=1.35.0        # Required for GPT provider in PySubtrans
-google-genai>=1.39.0  # Required for Gemini provider in PySubtrans
+pysubtrans>=1.5.0     # AI-powered subtitle translation (lowercase PyPI name)
+openai>=1.35.0        # Required for GPT provider in pysubtrans
+google-genai>=1.39.0  # Required for Gemini provider in pysubtrans
 
 # ----------------------------------------
 # HuggingFace Transformers Pipeline

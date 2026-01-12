@@ -9,8 +9,9 @@ __version__ = version_file['__version__']
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-# Relaxed Python version requirement (allow 3.9 to 3.12)
-python_requires = ">=3.9,<3.13"
+# Python version requirement (3.10+ required for pysubtrans translation dependency)
+# See: https://github.com/meizhong986/WhisperJAV/issues/127
+python_requires = ">=3.10,<3.13"
 
 # ALL dependencies merged into a single flat list
 # Note: Platform-specific markers (win32) are preserved so this setup.py 
@@ -36,7 +37,7 @@ install_requires = [
     "pyloudnorm",
     "requests",
     "regex",
-    "PySubtrans>=0.7.0",
+    "pysubtrans>=1.5.0",  # Lowercase package name (PyPI), requires Python 3.10+
     "openai>=1.35.0",
     "google-genai>=1.39.0",
     "huggingface-hub>=0.25.0",
@@ -79,10 +80,9 @@ install_requires = [
     "scikit-learn>=1.3.0",  # Agglomerative clustering for texture-based scene detection
 ]
 
-# Classifiers for supported Python versions
+# Classifiers for supported Python versions (3.10+ only)
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

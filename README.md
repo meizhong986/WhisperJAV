@@ -394,7 +394,7 @@ installer\install_windows.bat --cuda124    # Force CUDA 12.4
 
 ### Prerequisites
 
-- **Python 3.9-3.12** (3.13+ not compatible with openai-whisper)
+- **Python 3.10-3.12** (3.9 not supported due to pysubtrans dependency, 3.13+ incompatible with openai-whisper)
 - **FFmpeg** in your system PATH
 - **GPU recommended**: NVIDIA CUDA, Apple MPS, or AMD ROCm
 - **8GB+ disk space** for installation
