@@ -8,7 +8,7 @@
     <img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"/>
   </a>
   <br>
-  <img src="https://img.shields.io/badge/version-1.7.4-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.8.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.9--3.12-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
@@ -193,15 +193,17 @@ whisperjav video.mp4 --translate
 whisperjav-translate -i subtitles.srt --provider deepseek
 ```
 
-Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, OpenRouter, and local LLMs.
+Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, OpenRouter, GLM, Groq, and local LLMs.
 
-#### Local LLM Translation (No API Key Required)
+#### Local LLM Translation (New in v1.8)
 
-Run translation entirely on your GPU - no cloud API needed:
+Run translation entirely on your GPU - no cloud API, no API key required:
 
 ```bash
 whisperjav-translate -i subtitles.srt --provider local
 ```
+
+**Zero-Config Setup**: On first use, WhisperJAV automatically downloads and installs `llama-cpp-python` (~700MB). No manual installation needed.
 
 Available models:
 | Model | VRAM | Notes |
@@ -214,6 +216,9 @@ Available models:
 ```bash
 # Use specific model
 whisperjav-translate -i subtitles.srt --provider local --model gemma-9b
+
+# Control GPU offloading
+whisperjav-translate -i subtitles.srt --provider local --translate-gpu-layers 32
 ```
 
 **Resume Support**: If translation is interrupted, just run the same command again. It automatically resumes from where it left off using the `.subtrans` project file.
@@ -264,7 +269,7 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 *Best for: Most users, beginners, and those who want a GUI.*
 
 1. **Download the Installer:**
-   **[Download WhisperJAV-1.7.5-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/latest)**
+   **[Download WhisperJAV-1.8.0-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/latest)**
 2. **Run the File:** Double-click the downloaded `.exe`.
 3. **Follow the Prompts:** The installer handles all dependencies (Python, FFmpeg, Git) automatically.
 4. **Launch:** Open "WhisperJAV" from your Desktop shortcut.
