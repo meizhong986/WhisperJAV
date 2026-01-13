@@ -19,6 +19,8 @@
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Install minimal version (no speech enhancement, no TEN VAD)
 #   --dev                   Install in development/editable mode
+#   --local-llm             Install local LLM (fast - prebuilt wheel only)
+#   --local-llm-build       Install local LLM (slow - builds from source if needed)
 #
 # ==============================================================================
 
@@ -100,6 +102,8 @@ CUDA_VERSION="auto"
 NO_SPEECH_ENHANCEMENT=false
 MINIMAL=false
 DEV_MODE=false
+LOCAL_LLM=false
+LOCAL_LLM_BUILD=false
 
 for arg in "$@"; do
     case $arg in
@@ -129,6 +133,13 @@ for arg in "$@"; do
         --dev)
             DEV_MODE=true
             ;;
+        --local-llm)
+            LOCAL_LLM=true
+            ;;
+        --local-llm-build)
+            LOCAL_LLM=true
+            LOCAL_LLM_BUILD=true
+            ;;
         --help|-h)
             echo ""
             echo "WhisperJAV Linux Installation Script"
@@ -144,6 +155,8 @@ for arg in "$@"; do
             echo "  --no-speech-enhancement Skip speech enhancement packages"
             echo "  --minimal               Minimal install (no speech enhancement)"
             echo "  --dev                   Install in development/editable mode"
+            echo "  --local-llm             Install local LLM (fast - prebuilt wheel only)"
+            echo "  --local-llm-build       Install local LLM (slow - builds from source if needed)"
             echo "  --help, -h              Show this help message"
             echo ""
             echo "The script will auto-detect your GPU and select the appropriate"
@@ -394,45 +407,55 @@ pip3 install hf_xet 2>/dev/null || log "Note: hf_xet not installed (optional)"
 log "Installing translation packages..."
 pip3 install "pysubtrans>=1.5.0" "openai>=1.35.0" "google-genai>=1.39.0"
 
-# Local LLM Translation (llama-cpp-python from JamePeng fork)
-# Uses install.py logic to detect prebuilt wheels vs source build
-log "Installing llama-cpp-python for local LLM translation..."
-echo "Installing llama-cpp-python for local LLM translation..."
+# Local LLM Translation (llama-cpp-python from JamePeng fork) - OPTIONAL
+# Only installed if --local-llm or --local-llm-build is specified
+if [ "$LOCAL_LLM" = true ]; then
+    log "Installing llama-cpp-python for local LLM translation..."
+    echo "Installing llama-cpp-python for local LLM translation..."
 
-LLAMA_INFO=$(python3 -c "from install import get_llama_cpp_info; url,backend,prebuilt,cmake=get_llama_cpp_info('$CUDA_VERSION'); print(f'{url}|{backend}|{prebuilt}|{cmake or \"\"}')" 2>/dev/null)
-if [ -n "$LLAMA_INFO" ]; then
-    LLAMA_URL=$(echo "$LLAMA_INFO" | cut -d'|' -f1)
-    LLAMA_BACKEND=$(echo "$LLAMA_INFO" | cut -d'|' -f2)
-    LLAMA_PREBUILT=$(echo "$LLAMA_INFO" | cut -d'|' -f3)
-    LLAMA_CMAKE=$(echo "$LLAMA_INFO" | cut -d'|' -f4)
+    # Try prebuilt wheel first
+    WHEEL_INFO=$(python3 -c "from install import get_llama_cpp_prebuilt_wheel; result=get_llama_cpp_prebuilt_wheel(); print(f'{result[0] or \"\"}|{result[1] or \"\"}')" 2>/dev/null)
+    WHEEL_URL=$(echo "$WHEEL_INFO" | cut -d'|' -f1)
+    WHEEL_BACKEND=$(echo "$WHEEL_INFO" | cut -d'|' -f2)
 
-    echo "  Backend: $LLAMA_BACKEND"
-    log "llama-cpp-python backend: $LLAMA_BACKEND"
-
-    if [ "$LLAMA_PREBUILT" = "True" ]; then
-        # Prebuilt wheel available
-        pip3 install "$LLAMA_URL" && {
-            # Add server extras (JamePeng version >= PyPI, so pip won't replace it)
+    if [ -n "$WHEEL_URL" ]; then
+        # Prebuilt wheel available - use it
+        echo "  Backend: $WHEEL_BACKEND"
+        log "llama-cpp-python backend: $WHEEL_BACKEND"
+        pip3 install "$WHEEL_URL" && {
             pip3 install "llama-cpp-python[server]"
             log "llama-cpp-python installed from prebuilt wheel"
         } || {
             echo -e "${YELLOW}Warning: Prebuilt wheel failed, local LLM translation may not work${NC}"
             log "WARNING: llama-cpp-python prebuilt wheel failed"
         }
-    else
-        # Source build required
-        if [ -n "$LLAMA_CMAKE" ]; then
-            echo "  Setting CMAKE_ARGS=$LLAMA_CMAKE"
-            export CMAKE_ARGS="$LLAMA_CMAKE"
+    elif [ "$LOCAL_LLM_BUILD" = true ]; then
+        # No prebuilt wheel, but user opted for source build
+        SOURCE_INFO=$(python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
+        SOURCE_URL=$(echo "$SOURCE_INFO" | cut -d'|' -f1)
+        SOURCE_BACKEND=$(echo "$SOURCE_INFO" | cut -d'|' -f2)
+        SOURCE_CMAKE=$(echo "$SOURCE_INFO" | cut -d'|' -f3)
+
+        echo "  Backend: $SOURCE_BACKEND"
+        log "llama-cpp-python backend: $SOURCE_BACKEND"
+        if [ -n "$SOURCE_CMAKE" ]; then
+            echo "  Setting CMAKE_ARGS=$SOURCE_CMAKE"
+            export CMAKE_ARGS="$SOURCE_CMAKE"
         fi
-        pip3 install "$LLAMA_URL" || {
+        pip3 install "$SOURCE_URL" || {
             echo -e "${YELLOW}Warning: llama-cpp-python build failed (local LLM translation will not work)${NC}"
             log "WARNING: llama-cpp-python source build failed"
         }
+    else
+        # --local-llm specified but no prebuilt wheel available
+        echo "  No prebuilt wheel available for your platform."
+        echo "  To build from source, use --local-llm-build instead."
+        echo "  Skipping local LLM installation."
+        log "No prebuilt wheel available, skipping (use --local-llm-build to build)"
     fi
 else
-    echo -e "${YELLOW}Warning: Could not get llama-cpp-python info from install.py${NC}"
-    log "WARNING: Could not get llama-cpp-python info"
+    echo "Skipping local LLM (use --local-llm or --local-llm-build to install)"
+    log "Skipping local LLM (not requested)"
 fi
 
 # VAD
@@ -580,10 +603,21 @@ echo "============================================================"
 echo ""
 echo "  CPU-only mode: $CPU_ONLY"
 echo "  Speech enhancement: $([ "$NO_SPEECH_ENHANCEMENT" = true ] && echo 'Disabled' || echo 'Enabled')"
+echo "  Local LLM: $([ "$LOCAL_LLM" = true ] && echo 'Installed' || echo 'Not installed')"
 echo ""
 echo "  To run WhisperJAV:"
 echo "    whisperjav video.mp4 --mode balanced"
 echo ""
+if [ "$LOCAL_LLM" = true ]; then
+    echo "  To translate with local LLM:"
+    echo "    whisperjav video.mp4 --translate --translate-provider local"
+    echo ""
+else
+    echo "  To enable local LLM translation, re-install with:"
+    echo "    ./install_linux.sh --local-llm          (fast - prebuilt wheel)"
+    echo "    ./install_linux.sh --local-llm-build    (slow - builds if needed)"
+    echo ""
+fi
 echo "  For help:"
 echo "    whisperjav --help"
 echo ""
