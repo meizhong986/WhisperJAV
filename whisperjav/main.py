@@ -357,7 +357,7 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-model",
-        help="Translation model override. For local provider: qwen2.5-1.5b-q4, qwen2.5-3b-q4, qwen2.5-7b-q4, qwen2.5-7b-q8, or 'auto'"
+        help="Translation model override. For local provider: llama-8b (default, 6GB VRAM), gemma-9b (best, 8GB VRAM), llama-3b (basic, 3GB VRAM), or 'auto'"
     )
     translation_group.add_argument(
         "--translate-gpu-layers",

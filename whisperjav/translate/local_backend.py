@@ -28,6 +28,7 @@ Usage:
     stop_local_server()
 """
 
+import atexit
 import gc
 import logging
 import socket
@@ -42,6 +43,8 @@ logger = logging.getLogger(__name__)
 # Global server process reference
 _server_process: Optional[subprocess.Popen] = None
 _server_port: Optional[int] = None
+
+# Note: atexit handler registered after stop_local_server is defined (see end of module)
 
 # Model registry - uncensored GGUF models for translation
 # These models have content filters removed for unrestricted translation
@@ -259,3 +262,7 @@ def get_server_info() -> Optional[Tuple[str, int]]:
 def list_models() -> dict:
     """List available models with descriptions."""
     return {k: v['desc'] for k, v in MODEL_REGISTRY.items()}
+
+
+# Register atexit handler to prevent orphan llama-cpp server processes if Python crashes
+atexit.register(stop_local_server)
