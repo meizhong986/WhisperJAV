@@ -114,6 +114,7 @@ var /global ARGV_NoScripts
 var /global ARGV_NoShortcuts
 var /global ARGV_CheckPathLength
 var /global ARGV_QuietMode
+var /global ARGV_InstallLocalLLM
 {%- if uninstall_with_conda_exe %}
 var /global ARGV_Uninst_RemoveConfigFiles
 var /global ARGV_Uninst_RemoveUserData
@@ -129,6 +130,9 @@ var /global InstModePage_RadioButton_JustMe
 var /global InstModePage_RadioButton_AllUsers
 
 var /global InstMode # 0 = Just Me, 1 = All Users.
+
+# WhisperJAV: Local LLM checkbox state
+var /global Ana_InstallLocalLLM_State
 !define JUST_ME 0
 !define ALL_USERS 1
 
@@ -287,6 +291,7 @@ FunctionEnd
                 /NoScripts=[0|1] [default: 0]$\n\
                 /NoShortcuts=[0|1] [default: 0]$\n\
                 /CheckPathLength=[0|1] [default: 1]$\n\
+                /InstallLocalLLM=[0|1] [default: prompt during install]$\n\
                 /? (show this help message)$\n\
                 /S (run in CLI/headless mode)$\n\
                 /Q (quiet mode, do not print output to console)$\n\
@@ -386,6 +391,17 @@ FunctionEnd
     ${GetOptions} $ARGV "/Q" $ARGV_QuietMode
     ${IfNot} ${Errors}
         StrCpy $QuietMode "1"
+    ${EndIf}
+
+    # WhisperJAV: Parse /InstallLocalLLM argument
+    ClearErrors
+    ${GetOptions} $ARGV "/InstallLocalLLM=" $ARGV_InstallLocalLLM
+    ${IfNot} ${Errors}
+        ${If} $ARGV_InstallLocalLLM = "1"
+            StrCpy $Ana_InstallLocalLLM_State "1"
+        ${ElseIf} $ARGV_InstallLocalLLM = "0"
+            StrCpy $Ana_InstallLocalLLM_State "0"
+        ${EndIf}
     ${EndIf}
 
 !macroend
@@ -1421,6 +1437,20 @@ Section "Install"
     push 'WithLog'
     call AbortRetryNSExecWait
 {%- endif %}
+
+    # WhisperJAV: Set local LLM installation preference for post_install.py
+    # If $Ana_InstallLocalLLM_State is set (via /InstallLocalLLM=0 or 1), pass to post_install
+    # Otherwise, post_install.py will prompt interactively
+    ${If} $Ana_InstallLocalLLM_State == "1"
+        System::Call 'kernel32::SetEnvironmentVariable(t,t)i("WHISPERJAV_INSTALL_LOCAL_LLM", "1").r0'
+        ${Print} "Local LLM installation: enabled via command line"
+    ${ElseIf} $Ana_InstallLocalLLM_State == "0"
+        System::Call 'kernel32::SetEnvironmentVariable(t,t)i("WHISPERJAV_INSTALL_LOCAL_LLM", "0").r0'
+        ${Print} "Local LLM installation: disabled via command line"
+    ${Else}
+        # Not set - post_install.py will prompt interactively (or skip after timeout)
+        ${Print} "Local LLM installation: will prompt during post-install"
+    ${EndIf}
 
     ${If} $Ana_PostInstall_State = ${BST_CHECKED}
         ${Print} "Running post install..."

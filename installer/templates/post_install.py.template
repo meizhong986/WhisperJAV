@@ -1184,10 +1184,58 @@ def main() -> int:
         create_failure_file("WhisperJAV application installation failed")
         return 1
 
-    # === Phase 5.3: Local LLM Translation ===
+    # === Phase 5.3: Local LLM Translation (Optional) ===
     # Non-fatal: users can still use cloud translation if this fails
-    # Note: For opt-in behavior, discuss with project author about adding installer options
-    install_llama_cpp_python()
+    # User choice: environment variable or interactive prompt
+
+    # Check if installation preference is set via environment variable
+    # (can be set by NSIS checkbox or command line)
+    install_local_llm_env = os.environ.get("WHISPERJAV_INSTALL_LOCAL_LLM", "").lower()
+
+    if install_local_llm_env == "1" or install_local_llm_env == "yes":
+        # Explicitly requested
+        log_section("Phase 5.3: Local LLM Translation (Requested)")
+        install_llama_cpp_python()
+    elif install_local_llm_env == "0" or install_local_llm_env == "no":
+        # Explicitly skipped
+        log_section("Phase 5.3: Local LLM Translation (Skipped)")
+        log("Local LLM translation skipped (WHISPERJAV_INSTALL_LOCAL_LLM=0)")
+        log("You can install it later with: pip install llama-cpp-python[server]")
+    else:
+        # Interactive prompt for GUI users
+        log_section("Phase 5.3: Local LLM Translation (Optional)")
+        log("")
+        log("=" * 60)
+        log("  LOCAL LLM TRANSLATION (Optional)")
+        log("=" * 60)
+        log("")
+        log("WhisperJAV can translate subtitles using local AI models,")
+        log("allowing offline translation without API keys.")
+        log("")
+        log("Requirements:")
+        log("  - NVIDIA GPU with CUDA 12.4+ (fast, ~1 min download)")
+        log("  - OR builds from source (~45 min, requires VS Build Tools)")
+        log("")
+        log("If you skip this, you can still use cloud translation providers")
+        log("(DeepSeek, Gemini, Claude, etc.) with API keys.")
+        log("")
+
+        # Default to 'n' (skip) for unattended installs
+        # 30-second timeout for interactive installs
+        response = timed_input(
+            "Install local LLM translation? (y/N): ",
+            30,
+            "n"
+        ).strip().lower()
+
+        if response == 'y' or response == 'yes':
+            install_llama_cpp_python()
+        else:
+            log("")
+            log("Skipping local LLM translation.")
+            log("You can install it later with:")
+            log("  pip install llama-cpp-python[server]")
+            log("Or re-run: python install.py --local-llm")
 
     # === Phase 5.5: Copy Launcher to Root ===
     log_section("Phase 5.5: User-Friendly Launcher Setup")
