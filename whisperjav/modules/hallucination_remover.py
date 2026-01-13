@@ -20,7 +20,16 @@ DOWNLOAD_TIMEOUT = 10  # Seconds to wait for download
 
 class HallucinationRemover:
     """Handles exact, regex, and fuzzy hallucination detection with improved debugging"""
-    
+
+    # Map ISO language codes to JSON filter list keys
+    # The filter_list_v08.json uses full language names as keys
+    LANGUAGE_CODE_MAP: Dict[str, str] = {
+        'ja': 'japanese', 'jp': 'japanese', 'japanese': 'japanese',
+        'ko': 'korean', 'korean': 'korean',
+        'zh': 'chinese', 'zh-cn': 'chinese', 'zh-tw': 'chinese', 'chinese': 'chinese',
+        'en': 'english', 'english': 'english',
+    }
+
     BRACKET_PAIRS: Tuple[Tuple[str, str], ...] = (
         ("(", ")"),
         ("[", "]"),
@@ -310,15 +319,23 @@ class HallucinationRemover:
         """
         if not text or not text.strip() or not self._exact_lists:
             return text, []
-        
+
         effective_language = language or self.primary_language
-        
+
+        # Map ISO code to JSON key (e.g., 'ko' -> 'korean', 'zh' -> 'chinese')
+        mapped_language = self.LANGUAGE_CODE_MAP.get(effective_language, effective_language)
+
         # Get the correct list for the language, with fallbacks
-        lang_list = self._exact_lists.get(effective_language)
+        lang_list = self._exact_lists.get(mapped_language)
         if not lang_list:
-            for fallback in ['ja', 'japanese', 'jp']:
+            # Try the original language code as fallback
+            lang_list = self._exact_lists.get(effective_language)
+        if not lang_list:
+            # Final fallback to Japanese
+            for fallback in ['japanese', 'ja']:
                 if fallback in self._exact_lists:
                     lang_list = self._exact_lists[fallback]
+                    logger.debug(f"No hallucination list for '{effective_language}', falling back to Japanese")
                     break
         if not lang_list:
             return text, []
@@ -446,19 +463,24 @@ class HallucinationRemover:
             })
             return '', modifications
         
+        # Map ISO code to JSON key (e.g., 'ko' -> 'korean', 'zh' -> 'chinese')
+        mapped_language = self.LANGUAGE_CODE_MAP.get(language, language)
+
         # Check external database patterns (from JSON files)
-        lang_list = self._exact_lists.get(language, set())
+        lang_list = self._exact_lists.get(mapped_language, set())
         if not lang_list:
-            # Try fallback languages
-            fallback_langs = ['ja', 'japanese', 'jp'] if language not in ['ja', 'japanese', 'jp'] else []
-            for fallback in fallback_langs:
+            # Try original language code
+            lang_list = self._exact_lists.get(language, set())
+        if not lang_list:
+            # Final fallback to Japanese
+            for fallback in ['japanese', 'ja']:
                 if fallback in self._exact_lists:
                     lang_list = self._exact_lists[fallback]
-                    logger.debug(f"Using fallback language '{fallback}' for exact matching")
+                    logger.debug(f"Using fallback language 'japanese' for exact matching (original: {language})")
                     break
-                    
+
         if not lang_list:
-            logger.debug(f"No exact match list available for language '{language}'")
+            logger.debug(f"No exact match list available for language '{language}' (mapped: {mapped_language})")
             return text, []
             
         # Normalize COMPLETE text for comparison

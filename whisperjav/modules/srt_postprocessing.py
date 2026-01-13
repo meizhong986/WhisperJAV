@@ -21,21 +21,24 @@ class SRTPostProcessor:
         """
         self.language = language
         self.config = kwargs
-        
-        # For Japanese, create sanitizer once
-        if language == 'ja':
+
+        # For CJK languages (Japanese, Korean, Chinese), create sanitizer once
+        # Korean and Chinese use the same sanitizer - Japanese-specific patterns
+        # simply won't match Hangul/Han characters and pass through unchanged
+        if language in ('ja', 'ko', 'zh'):
             config = SanitizationConfig(
                 enable_exact_matching=kwargs.get('remove_hallucinations', True),
                 enable_repetition_cleaning=kwargs.get('remove_repetitions', True),
                 repetition_threshold=kwargs.get('repetition_threshold', 2),
                 min_subtitle_duration=kwargs.get('min_subtitle_duration', 0.5),
-                max_subtitle_duration=kwargs.get('max_subtitle_duration', 7.0)
+                max_subtitle_duration=kwargs.get('max_subtitle_duration', 7.0),
+                primary_language=language  # Pass language for hallucination filter
             )
-            self.japanese_sanitizer = SubtitleSanitizer(config)
-            logger.debug("Initialized Japanese subtitle sanitizer")
+            self.cjk_sanitizer = SubtitleSanitizer(config)
+            logger.debug(f"Initialized CJK subtitle sanitizer for language: {language}")
         else:
-            # For English, we'll create cleaner per file
-            logger.debug("Configured for English subtitle cleaning")
+            # For English and other languages, we'll create cleaner per file
+            logger.debug(f"Configured for English subtitle cleaning (language: {language})")
             
     def process(self, srt_path: Union[str, Path], output_path: Optional[Union[str, Path]] = None) -> Tuple[Path, Dict]:
         """
@@ -49,25 +52,25 @@ class SRTPostProcessor:
             Tuple of (processed_file_path, statistics_dict)
         """
         srt_path = Path(srt_path)
-        
-        if self.language == 'ja':
-            return self._process_japanese(srt_path, output_path)
+
+        if self.language in ('ja', 'ko', 'zh'):
+            return self._process_cjk(srt_path, output_path)
         elif self.language == 'en':
             return self._process_english(srt_path, output_path)
         else:
-            logger.warning(f"Unknown language '{self.language}', defaulting to Japanese")
-            return self._process_japanese(srt_path, output_path)
+            logger.warning(f"Unknown language '{self.language}', defaulting to English sanitizer")
+            return self._process_english(srt_path, output_path)
     
     
-    def _process_japanese(self, srt_path: Path, output_path: Optional[Path]) -> Tuple[Path, Dict]:
-        """Process using Japanese sanitizer"""
+    def _process_cjk(self, srt_path: Path, output_path: Optional[Path]) -> Tuple[Path, Dict]:
+        """Process using CJK sanitizer (Japanese, Korean, Chinese)"""
         # Configure to match old behavior
-        self.japanese_sanitizer.config.preserve_original_file = output_path is not None
-        self.japanese_sanitizer.config.save_original = True
-        self.japanese_sanitizer.config.save_artifacts = True
-        
+        self.cjk_sanitizer.config.preserve_original_file = output_path is not None
+        self.cjk_sanitizer.config.save_original = True
+        self.cjk_sanitizer.config.save_artifacts = True
+
         # Process
-        result = self.japanese_sanitizer.process(srt_path)
+        result = self.cjk_sanitizer.process(srt_path)
         
         # Return in expected format
         stats = result.statistics
