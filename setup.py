@@ -70,14 +70,14 @@ install_requires = [
     "pywin32>=305; sys_platform=='win32'",   # Only installs on Windows
 
     # Speedup Dependencies (Previously in 'speedup' extra)
-    "numba",
+    "numba>=0.60.0",  # NumPy 2.0 compatible
     "hf_xet",  # Faster HuggingFace downloads (Xet Storage)
 
     # Process Management (v1.7.4)
     "psutil>=5.9.0",  # Process tree termination for clean subprocess cleanup
 
     # Semantic Audio Clustering (v1.7.4)
-    "scikit-learn>=1.3.0",  # Agglomerative clustering for texture-based scene detection
+    "scikit-learn>=1.5.0",  # Agglomerative clustering for texture-based scene detection (NumPy 2.0 compatible)
 ]
 
 # Classifiers for supported Python versions (3.10+ only)
