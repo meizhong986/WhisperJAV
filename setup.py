@@ -45,6 +45,12 @@ install_requires = [
     "accelerate>=0.26.0",    # Efficient model loading for Transformers
     "silero-vad>=6.0",
 
+    # Local LLM translation (v1.8.0)
+    # Using JamePeng's fork for better CUDA support and active maintenance
+    # [server] extra includes uvicorn for local LLM server
+    # See: https://github.com/JamePeng/llama-cpp-python
+    "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git",
+
     # Speech segmentation backends (v1.7.2)
     "ten-vad",
     # NOTE: nemo_toolkit removed - causes resolution-too-deep errors, only 10% usage

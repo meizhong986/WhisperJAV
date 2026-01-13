@@ -60,6 +60,16 @@ def translate_subtitle(
         if stream:
             opt_kwargs['stream_responses'] = True
 
+        # Custom Server provider settings (for local LLM)
+        if 'server_address' in provider_config:
+            opt_kwargs['server_address'] = provider_config['server_address']
+        if 'endpoint' in provider_config:
+            opt_kwargs['endpoint'] = provider_config['endpoint']
+        if 'supports_conversation' in provider_config:
+            opt_kwargs['supports_conversation'] = provider_config['supports_conversation']
+        if 'supports_system_messages' in provider_config:
+            opt_kwargs['supports_system_messages'] = provider_config['supports_system_messages']
+
         # Merge provider-specific options
         if provider_options:
             opt_kwargs.update(provider_options)

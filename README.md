@@ -193,7 +193,28 @@ whisperjav video.mp4 --translate
 whisperjav-translate -i subtitles.srt --provider deepseek
 ```
 
-Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, and OpenRouter.
+Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, OpenRouter, and local LLMs.
+
+#### Local LLM Translation (No API Key Required)
+
+Run translation entirely on your GPU - no cloud API needed:
+
+```bash
+whisperjav-translate -i subtitles.srt --provider local
+```
+
+Available models:
+| Model | VRAM | Notes |
+|-------|------|-------|
+| `llama-8b` | 6GB+ | **Default** - Llama 3.1 8B |
+| `gemma-9b` | 8GB+ | Gemma 2 9B (alternative) |
+| `llama-3b` | 3GB+ | Llama 3.2 3B (low VRAM only) |
+| `auto` | varies | Auto-selects based on available VRAM |
+
+```bash
+# Use specific model
+whisperjav-translate -i subtitles.srt --provider local --model gemma-9b
+```
 
 **Resume Support**: If translation is interrupted, just run the same command again. It automatically resumes from where it left off using the `.subtrans` project file.
 

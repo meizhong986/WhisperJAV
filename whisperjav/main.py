@@ -335,9 +335,9 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-provider",
-        choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq"],
+        choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq", "local"],
         default="deepseek",
-        help="Translation AI provider (default: deepseek)"
+        help="Translation AI provider (default: deepseek). Use 'local' for offline LLM translation."
     )
     translation_group.add_argument(
         "--translate-target",
@@ -357,7 +357,13 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-model",
-        help="Translation model override"
+        help="Translation model override. For local provider: llama-8b (default, 6GB VRAM), gemma-9b (best, 8GB VRAM), llama-3b (basic, 3GB VRAM), or 'auto'"
+    )
+    translation_group.add_argument(
+        "--translate-gpu-layers",
+        type=int,
+        default=-1,
+        help="GPU layers for local LLM (-1=all to GPU, 0=CPU only). Only used with --translate-provider local"
     )
     translation_group.add_argument(
         "--translate-quiet",
@@ -776,7 +782,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             model=getattr(args, 'translate_model', None),
                             stream=stream_mode,
                             debug=getattr(args, 'debug', False),
-                            extra_context=build_translation_context(args)
+                            extra_context=build_translation_context(args),
+                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1)
                         )
 
                         if translated_path:
@@ -976,7 +983,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     model=getattr(args, 'translate_model', None),
                                     stream=stream_mode,
                                     debug=getattr(args, 'debug', False),
-                                    extra_context=build_translation_context(args)
+                                    extra_context=build_translation_context(args),
+                                    n_gpu_layers=getattr(args, 'translate_gpu_layers', -1)
                                 )
 
                                 if translated_path:
@@ -1456,7 +1464,8 @@ def main():
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
                             debug=getattr(args, 'debug', False),
-                            extra_context=extra_context
+                            extra_context=extra_context,
+                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1)
                         )
 
                         if translated_path:

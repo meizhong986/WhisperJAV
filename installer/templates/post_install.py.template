@@ -788,6 +788,221 @@ def print_installation_summary(install_start_time: float):
     log("")
 
 
+# ==============================================================================
+# llama-cpp-python Installation (Local LLM Translation)
+# ==============================================================================
+
+
+def get_llama_cpp_prebuilt_wheel() -> Tuple[Optional[str], Optional[str]]:
+    """
+    Try to find a prebuilt wheel from JamePeng's releases.
+
+    Auto-detects platform, Python version, and CUDA version.
+    Queries GitHub API to find matching wheel dynamically.
+
+    Release naming conventions (from JamePeng/llama-cpp-python):
+    - CUDA: v{ver}-cu{cuda}-Basic-{os}-{date} (e.g., v0.3.21-cu130-Basic-win-20260111)
+    - Metal: v{ver}-metal-{date} (when available)
+    - Wheel: llama_cpp_python-{ver}-cp{py}-cp{py}-{platform}.whl
+
+    Returns:
+        tuple: (wheel_url, backend_desc) or (None, None) if no suitable wheel found
+    """
+    import json
+    import platform as platform_module
+    import urllib.request
+    import urllib.error
+
+    # Determine platform identifiers
+    if sys.platform == "win32":
+        os_tag = "win"
+        wheel_platform = "win_amd64"
+    elif sys.platform == "linux":
+        os_tag = "linux"
+        wheel_platform = "linux_x86_64"
+    elif sys.platform == "darwin":
+        os_tag = "metal"  # JamePeng uses -metal- tag for macOS
+        if platform_module.machine() == "arm64":
+            wheel_platform = "arm64"  # Matches macosx_*_arm64
+        else:
+            wheel_platform = "x86_64"
+    else:
+        log(f"    Unknown platform: {sys.platform}")
+        return None, None
+
+    # Python version
+    py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+
+    # Detect CUDA version for Windows/Linux
+    target_cudas = []
+    if sys.platform in ("win32", "linux"):
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            # Map driver version to compatible CUDA versions
+            # Using the same logic as TORCH_DRIVER_MATRIX
+            driver_ver = driver_info.driver_version
+            if driver_ver >= (570, 65, 0):
+                target_cudas = ["cu130", "cu128", "cu126", "cu124"]
+            elif driver_ver >= (560, 76, 0):
+                target_cudas = ["cu126", "cu124"]
+            elif driver_ver >= (551, 61, 0):
+                target_cudas = ["cu124"]
+            log(f"    Detected driver {format_version_tuple(driver_ver)}, compatible CUDA: {target_cudas}")
+        else:
+            log("    No CUDA detected")
+
+    log(f"    Searching for prebuilt wheel: {os_tag}, {py_ver}, platform={wheel_platform}")
+
+    # Query GitHub API for releases
+    try:
+        api_url = "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=50"
+        req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.v3+json"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            releases = json.loads(response.read().decode())
+    except Exception as e:
+        log(f"    Could not fetch releases: {e}")
+        return None, None
+
+    # Search strategy:
+    # 1. For Windows/Linux with CUDA: find cu{version} release matching OS
+    # 2. For macOS: find metal release
+    # 3. Match wheel file by Python version and platform
+
+    if os_tag == "metal":
+        # macOS: look for -metal- releases
+        for release in releases:
+            tag = release.get("tag_name", "")
+            if "-metal-" not in tag.lower():
+                continue
+            for asset in release.get("assets", []):
+                name = asset.get("name", "")
+                if not name.endswith(".whl"):
+                    continue
+                if py_ver not in name:
+                    continue
+                if wheel_platform in name:
+                    wheel_url = asset.get("browser_download_url")
+                    log(f"    Found prebuilt wheel: {name}")
+                    return wheel_url, "Metal (prebuilt wheel)"
+    else:
+        # Windows/Linux: look for CUDA releases
+        for cuda_tag in target_cudas:
+            for release in releases:
+                tag = release.get("tag_name", "")
+                # Match: v{ver}-cu{cuda}-Basic-{os}-{date}
+                if f"-{cuda_tag}-" not in tag:
+                    continue
+                if f"-{os_tag}-" not in tag:
+                    continue
+                for asset in release.get("assets", []):
+                    name = asset.get("name", "")
+                    if not name.endswith(".whl"):
+                        continue
+                    if py_ver not in name:
+                        continue
+                    if wheel_platform in name:
+                        wheel_url = asset.get("browser_download_url")
+                        log(f"    Found prebuilt wheel: {name}")
+                        return wheel_url, f"CUDA ({cuda_tag} prebuilt wheel)"
+
+    log(f"    No matching prebuilt wheel found for {py_ver}/{os_tag}/{wheel_platform}")
+    return None, None
+
+
+def get_llama_cpp_source_info() -> Tuple[str, str, Optional[str]]:
+    """
+    Get llama-cpp-python source build info based on platform.
+
+    Auto-detects GPU/Metal/CPU and returns appropriate build configuration.
+
+    Returns:
+        tuple: (git_url, backend_desc, cmake_args)
+    """
+    import platform as platform_module
+
+    git_url = "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git"
+    cmake_args = None
+
+    if sys.platform == "darwin":
+        chip = platform_module.processor() or platform_module.machine()
+        if "arm" in chip.lower() or "apple" in chip.lower():
+            backend = "Metal (Apple Silicon) - building from source"
+            cmake_args = "-DGGML_METAL=on"
+        else:
+            backend = "CPU (Intel Mac) - building from source"
+    elif sys.platform == "win32":
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            backend = "CUDA - building from source (~45 min)"
+            cmake_args = "-DGGML_CUDA=on"
+        else:
+            backend = "CPU - building from source"
+    else:
+        # Linux
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            backend = "CUDA - building from source (~45 min)"
+            cmake_args = "-DGGML_CUDA=on"
+        else:
+            backend = "CPU - building from source"
+
+    return git_url, backend, cmake_args
+
+
+def install_llama_cpp_python() -> bool:
+    """
+    Install llama-cpp-python for local LLM translation.
+
+    Strategy:
+    1. Try prebuilt wheel first (fast install)
+    2. Fall back to source build if no wheel available
+
+    Note: This always attempts to install. For opt-in behavior,
+    discuss with the project author about adding installer options.
+    """
+    log_section("Phase 5.3: Local LLM Translation (llama-cpp-python)")
+
+    log("Installing llama-cpp-python for local LLM translation...")
+    log("This enables translation without cloud API keys.")
+
+    # Try prebuilt wheel first
+    wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel()
+
+    if wheel_url:
+        log(f"Backend: {wheel_backend}")
+
+        if run_pip(
+            ["install", wheel_url, "--progress-bar", "on"],
+            f"Install llama-cpp-python ({wheel_backend})"
+        ):
+            # Add server extras
+            run_pip(
+                ["install", "llama-cpp-python[server]", "--progress-bar", "on"],
+                "Install llama-cpp-python server extras"
+            )
+            return True
+        else:
+            log("WARNING: Prebuilt wheel failed, trying source build...")
+
+    # Fall back to source build
+    git_url, backend, cmake_args = get_llama_cpp_source_info()
+
+    log(f"Backend: {backend}")
+    if cmake_args:
+        log(f"Setting CMAKE_ARGS={cmake_args}")
+        os.environ["CMAKE_ARGS"] = cmake_args
+
+    if run_pip(
+        ["install", git_url, "--progress-bar", "on"],
+        f"Install llama-cpp-python ({backend})"
+    ):
+        return True
+
+    log("WARNING: llama-cpp-python failed (local LLM translation will not work)")
+    log("         Cloud translation providers still available.")
+    return False
+
+
 def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
     """
     Embed icon into executable file using LIEF library.
@@ -968,6 +1183,11 @@ def main() -> int:
     ):
         create_failure_file("WhisperJAV application installation failed")
         return 1
+
+    # === Phase 5.3: Local LLM Translation ===
+    # Non-fatal: users can still use cloud translation if this fails
+    # Note: For opt-in behavior, discuss with project author about adding installer options
+    install_llama_cpp_python()
 
     # === Phase 5.5: Copy Launcher to Root ===
     log_section("Phase 5.5: User-Friendly Launcher Setup")

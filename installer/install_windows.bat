@@ -24,6 +24,8 @@ REM   --cuda128               Install PyTorch for CUDA 12.8 (default for driver 
 REM   --no-speech-enhancement Skip speech enhancement packages
 REM   --minimal               Minimal install (transcription only)
 REM   --dev                   Install in development/editable mode
+REM   --local-llm             Install local LLM (fast - prebuilt wheel only)
+REM   --local-llm-build       Install local LLM (slow - builds from source if needed)
 REM
 REM ==============================================================================
 
@@ -48,6 +50,8 @@ set "CUDA_VERSION=cuda121"
 set "NO_SPEECH_ENHANCEMENT=0"
 set "MINIMAL=0"
 set "DEV_MODE=0"
+set "LOCAL_LLM=0"
+set "LOCAL_LLM_BUILD=0"
 
 :parse_args
 if "%~1"=="" goto :done_parsing
@@ -66,6 +70,11 @@ if /i "%~1"=="--minimal" (
     set "NO_SPEECH_ENHANCEMENT=1"
 )
 if /i "%~1"=="--dev" set "DEV_MODE=1"
+if /i "%~1"=="--local-llm" set "LOCAL_LLM=1"
+if /i "%~1"=="--local-llm-build" (
+    set "LOCAL_LLM=1"
+    set "LOCAL_LLM_BUILD=1"
+)
 if /i "%~1"=="--help" goto :show_help
 if /i "%~1"=="-h" goto :show_help
 shift
@@ -92,9 +101,9 @@ if defined FREE_BYTES (
     call :log "WARNING: Could not determine disk space"
 )
 
-REM Check network connectivity
+REM Check network connectivity (use curl instead of ping - PyPI blocks ICMP)
 call :log "Checking network connectivity to PyPI..."
-ping -n 1 pypi.org >nul 2>&1
+curl -s --head --max-time 5 https://pypi.org >nul 2>&1
 if errorlevel 1 (
     echo WARNING: Cannot reach pypi.org. Network connection may be required.
     call :log "WARNING: Network check failed (pypi.org unreachable)"
@@ -208,12 +217,15 @@ if "%CPU_ONLY%"=="0" (
     call :log "Checking for NVIDIA GPU..."
 
     REM Try to get driver version for smarter CUDA selection
+    REM Note: Using temp file because for /f mangles comma in --format=csv,noheader
     set "DRIVER_VERSION="
     set "GPU_NAME="
-    for /f "tokens=1,2 delims=," %%a in ('nvidia-smi --query-gpu=driver_version,name --format=csv,noheader 2^>nul') do (
+    nvidia-smi --query-gpu=driver_version,name --format=csv,noheader > "%TEMP%\whisperjav_gpu.txt" 2>nul
+    for /f "tokens=1,2 delims=," %%a in (%TEMP%\whisperjav_gpu.txt) do (
         set "DRIVER_VERSION=%%a"
         set "GPU_NAME=%%b"
     )
+    del "%TEMP%\whisperjav_gpu.txt" 2>nul
 
     if defined GPU_NAME (
         echo NVIDIA GPU detected: !GPU_NAME!
@@ -477,6 +489,65 @@ if errorlevel 1 (
     call :log "WARNING: Translation packages failed"
 )
 
+REM Local LLM Translation (llama-cpp-python from JamePeng fork) - OPTIONAL
+REM Only installed if --local-llm or --local-llm-build is specified
+if "%LOCAL_LLM%"=="1" (
+    call :log "Installing llama-cpp-python for local LLM translation..."
+    echo Installing llama-cpp-python for local LLM translation...
+
+    REM Try prebuilt wheel first
+    python -c "from install import get_llama_cpp_prebuilt_wheel; result=get_llama_cpp_prebuilt_wheel(); print(f'WHEEL_URL={result[0] or \"\"}'); print(f'WHEEL_BACKEND={result[1] or \"\"}')" > "%TEMP%\llama_wheel.txt" 2>nul
+    set "WHEEL_URL="
+    set "WHEEL_BACKEND="
+    for /f "tokens=1,* delims==" %%a in (%TEMP%\llama_wheel.txt) do set "%%a=%%b"
+    del "%TEMP%\llama_wheel.txt" 2>nul
+
+    if not "!WHEEL_URL!"=="" (
+        REM Prebuilt wheel available - use it
+        echo   Backend: !WHEEL_BACKEND!
+        call :log "llama-cpp-python backend: !WHEEL_BACKEND!"
+        python -m pip install "!WHEEL_URL!" 2>nul
+        if errorlevel 1 (
+            echo WARNING: Prebuilt wheel failed, local LLM translation may not work
+            call :log "WARNING: llama-cpp-python prebuilt wheel failed"
+        ) else (
+            python -m pip install "llama-cpp-python[server]" 2>nul
+            call :log "llama-cpp-python installed from prebuilt wheel"
+        )
+    ) else if "%LOCAL_LLM_BUILD%"=="1" (
+        REM No prebuilt wheel, but user opted for source build
+        python -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'SOURCE_URL={url}'); print(f'SOURCE_BACKEND={backend}'); print(f'SOURCE_CMAKE={cmake or \"\"}')" > "%TEMP%\llama_source.txt" 2>nul
+        set "SOURCE_URL="
+        set "SOURCE_BACKEND="
+        set "SOURCE_CMAKE="
+        for /f "tokens=1,* delims==" %%a in (%TEMP%\llama_source.txt) do set "%%a=%%b"
+        del "%TEMP%\llama_source.txt" 2>nul
+
+        echo   Backend: !SOURCE_BACKEND!
+        call :log "llama-cpp-python backend: !SOURCE_BACKEND!"
+        if not "!SOURCE_CMAKE!"=="" (
+            echo   Setting CMAKE_ARGS=!SOURCE_CMAKE!
+            set "CMAKE_ARGS=!SOURCE_CMAKE!"
+        )
+        python -m pip install "!SOURCE_URL!" 2>nul
+        if errorlevel 1 (
+            echo WARNING: llama-cpp-python build failed ^(local LLM translation will not work^)
+            call :log "WARNING: llama-cpp-python source build failed"
+        ) else (
+            call :log "llama-cpp-python built from source"
+        )
+    ) else (
+        REM --local-llm specified but no prebuilt wheel available
+        echo   No prebuilt wheel available for your platform.
+        echo   To build from source, use --local-llm-build instead.
+        echo   Skipping local LLM installation.
+        call :log "No prebuilt wheel available, skipping (use --local-llm-build to build)"
+    )
+) else (
+    echo Skipping local LLM ^(use --local-llm or --local-llm-build to install^)
+    call :log "Skipping local LLM (not requested)"
+)
+
 REM VAD
 call :log "Installing VAD packages..."
 call :run_pip_with_retry "install silero-vad>=6.0 auditok" "Install VAD packages"
@@ -655,6 +726,11 @@ if "%NO_SPEECH_ENHANCEMENT%"=="1" (
 ) else (
     echo   Speech Enhancement: Enabled
 )
+if "%LOCAL_LLM%"=="1" (
+    echo   Local LLM: Installed
+) else (
+    echo   Local LLM: Not installed
+)
 echo.
 echo   To run WhisperJAV:
 echo     whisperjav video.mp4 --mode balanced
@@ -662,6 +738,16 @@ echo.
 echo   To run with GUI:
 echo     whisperjav-gui
 echo.
+if "%LOCAL_LLM%"=="1" (
+    echo   To translate with local LLM:
+    echo     whisperjav video.mp4 --translate --translate-provider local
+    echo.
+) else (
+    echo   To enable local LLM translation, re-install with:
+    echo     installer\install_windows.bat --local-llm          ^(fast - prebuilt wheel^)
+    echo     installer\install_windows.bat --local-llm-build    ^(slow - builds if needed^)
+    echo.
+)
 echo   For help:
 echo     whisperjav --help
 echo.
@@ -795,6 +881,8 @@ echo   --cuda128               Install PyTorch for CUDA 12.8 ^(default for drive
 echo   --no-speech-enhancement Skip speech enhancement packages
 echo   --minimal               Minimal install ^(transcription only^)
 echo   --dev                   Install in development/editable mode
+echo   --local-llm             Install local LLM ^(fast - prebuilt wheel only^)
+echo   --local-llm-build       Install local LLM ^(slow - builds from source if needed^)
 echo   --help, -h              Show this help message
 echo.
 echo Examples:
@@ -802,6 +890,8 @@ echo   install_windows.bat                    # Standard install with auto CUDA 
 echo   install_windows.bat --cpu-only         # CPU-only install
 echo   install_windows.bat --cuda128          # Force CUDA 12.8
 echo   install_windows.bat --minimal --dev    # Minimal dev install
+echo   install_windows.bat --local-llm        # Include local LLM ^(prebuilt wheel^)
+echo   install_windows.bat --local-llm-build  # Include local LLM ^(build if no wheel^)
 echo.
 echo The script will auto-detect your GPU and select the appropriate
 echo CUDA version ^(12.8 for driver 570+, 12.6 for 560+, etc.^).

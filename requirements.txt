@@ -63,3 +63,7 @@ pysubtrans>=1.5.0
 openai>=1.35.0
 google-genai>=1.39.0
 huggingface-hub>=0.25.0
+
+# Local LLM translation (JamePeng's fork with CUDA support)
+# [server] extra includes uvicorn for local LLM server
+llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git

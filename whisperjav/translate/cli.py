@@ -205,7 +205,8 @@ def main():
     )
     translation_group.add_argument(
         '--model',
-        help="Model override (uses provider default if not specified)"
+        help="Model override. For --provider local: llama-8b (6GB VRAM, default), "
+             "gemma-9b (8GB VRAM, best), llama-3b (3GB VRAM), auto"
     )
     translation_group.add_argument(
         '-t', '--target',
@@ -392,11 +393,14 @@ def main():
         if provider_config.get('pysubtrans_name') not in ('OpenAI', 'DeepSeek'):
             provider_config['pysubtrans_name'] = 'OpenAI'
 
-    # Get API key
-    api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else os.getenv(provider_config['env_var'])
-    if not api_key:
-        print(f"Error: API key not found. Set {provider_config['env_var']} or use --api-key", file=sys.stderr)
-        sys.exit(1)
+    # Get API key (not needed for local provider)
+    if provider_name == 'local':
+        api_key = None
+    else:
+        api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else os.getenv(provider_config['env_var'])
+        if not api_key:
+            print(f"Error: API key not found. Set {provider_config['env_var']} or use --api-key", file=sys.stderr)
+            sys.exit(1)
 
     # Get model
     model = merged.get('model') or provider_config['model']
@@ -445,23 +449,68 @@ def main():
                 if i == 0:  # Only print provider info once
                     print(f"Provider: {provider_name} ({model})", file=sys.stderr)
 
-            result_path = translate_subtitle(
-                input_path=str(input_path),
-                output_path=output_path,
-                provider_config=provider_config,
-                model=model,
-                api_key=api_key,
-                source_lang=source_lang,
-                target_lang=target_lang,
-                instruction_file=instruction_file,
-                scene_threshold=merged.get('scene_threshold', 60.0),
-                max_batch_size=merged.get('max_batch_size', 30),
-                stream=args.stream if hasattr(args, 'stream') else False,
-                debug=args.debug,
-                provider_options=provider_options,
-                extra_context=extra_context if extra_context else None,
-                emit_raw_output=not getattr(args, 'no_progress', False)
-            )
+            # Dispatch to local backend (via server) or PySubtrans
+            if provider_name == 'local':
+                from .local_backend import start_local_server, stop_local_server
+
+                # Start local LLM server (only once for batch)
+                if i == 0:
+                    try:
+                        api_base, _ = start_local_server(model=model)
+                    except Exception as e:
+                        print(f"Error: Failed to start local server: {e}", file=sys.stderr)
+                        sys.exit(1)
+
+                # Use Custom Server provider - designed for local OpenAI-compatible servers
+                # This uses /v1/chat/completions endpoint which llama-cpp-python supports
+                local_provider_config = {
+                    'pysubtrans_name': 'Custom Server',
+                    'server_address': api_base.replace('/v1', ''),  # Custom Server adds endpoint itself
+                    'endpoint': '/v1/chat/completions',
+                    'supports_conversation': True,
+                    'supports_system_messages': True,
+                }
+
+                try:
+                    result_path = translate_subtitle(
+                        input_path=str(input_path),
+                        output_path=output_path,
+                        provider_config=local_provider_config,
+                        model='local',
+                        api_key='',
+                        source_lang=source_lang,
+                        target_lang=target_lang,
+                        instruction_file=instruction_file,
+                        scene_threshold=merged.get('scene_threshold', 60.0),
+                        max_batch_size=merged.get('max_batch_size', 30),
+                        stream=args.stream if hasattr(args, 'stream') else False,
+                        debug=args.debug,
+                        provider_options=provider_options,
+                        extra_context=extra_context if extra_context else None,
+                        emit_raw_output=not getattr(args, 'no_progress', False)
+                    )
+                finally:
+                    # Stop server after last file
+                    if i == len(files_to_process) - 1:
+                        stop_local_server()
+            else:
+                result_path = translate_subtitle(
+                    input_path=str(input_path),
+                    output_path=output_path,
+                    provider_config=provider_config,
+                    model=model,
+                    api_key=api_key,
+                    source_lang=source_lang,
+                    target_lang=target_lang,
+                    instruction_file=instruction_file,
+                    scene_threshold=merged.get('scene_threshold', 60.0),
+                    max_batch_size=merged.get('max_batch_size', 30),
+                    stream=args.stream if hasattr(args, 'stream') else False,
+                    debug=args.debug,
+                    provider_options=provider_options,
+                    extra_context=extra_context if extra_context else None,
+                    emit_raw_output=not getattr(args, 'no_progress', False)
+                )
 
             if result_path:
                 # Print output path to stdout (for capture by calling process)

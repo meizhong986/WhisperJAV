@@ -41,6 +41,11 @@ PROVIDER_CONFIGS = {
         'model': 'llama-3.3-70b-versatile',
         'env_var': 'GROQ_API_KEY',
         'api_base': 'https://api.groq.com/openai/v1'
+    },
+    'local': {
+        'pysubtrans_name': 'Local',  # Marker for local LLM bypass
+        'model': 'llama-8b',          # Default: good quality, 6GB VRAM
+        'env_var': None               # No API key needed
     }
 }
 
