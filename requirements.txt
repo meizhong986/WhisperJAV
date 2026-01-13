@@ -38,7 +38,6 @@ scipy>=1.14.0                   # Required for NumPy 2.0 compatibility
 tqdm
 pysrt
 srt
-pysrt
 aiofiles
 jsonschema
 colorama
@@ -51,7 +50,7 @@ regex
 pydantic>=2.0,<3.0
 
 # Optional: speed-up
-numba
+numba>=0.60.0                   # NumPy 2.0 compatible
 hf_xet                          # Faster HuggingFace downloads (Xet Storage)
 
 # GUI Framework (PyWebView)

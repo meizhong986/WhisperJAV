@@ -323,8 +323,9 @@ log "============================================================"
 echo -e "${YELLOW}Step 3/7: Installing core dependencies...${NC}"
 
 # Phase 3.1: Core scientific stack (MUST install first)
+# scipy>=1.14.0 required for NumPy 2.0 ABI compatibility
 log "Phase 3.1: Installing scientific stack..."
-pip3 install "numpy>=2.0" "scipy>=1.10.1" "librosa>=0.11.0"
+pip3 install "numpy>=2.0" "scipy>=1.14.0" "librosa>=0.11.0"
 
 # Phase 3.2: Audio and utility packages (including fsspec constraint)
 log "Phase 3.2: Installing audio/utility packages..."
@@ -335,8 +336,9 @@ log "Phase 3.3: Installing subtitle/async packages..."
 pip3 install pysrt srt aiofiles jsonschema pyloudnorm
 
 # Phase 3.4: Config and optimization packages
+# numba>=0.60.0 required for NumPy 2.0 compatibility
 log "Phase 3.4: Installing config packages..."
-pip3 install "pydantic>=2.0,<3.0" "PyYAML>=6.0" numba
+pip3 install "pydantic>=2.0,<3.0" "PyYAML>=6.0" "numba>=0.60.0"
 
 # Phase 3.5: Image packages (non-fatal)
 pip3 install Pillow || echo -e "${YELLOW}Warning: Pillow installation failed (non-fatal)${NC}"
@@ -400,7 +402,7 @@ pip3 install "silero-vad>=6.0" auditok
 
 if [ "$MINIMAL" = false ]; then
     pip3 install ten-vad || echo -e "${YELLOW}Warning: ten-vad installation failed (optional)${NC}"
-    pip3 install "scikit-learn>=1.3.0"
+    pip3 install "scikit-learn>=1.5.0"  # 1.5.0+ for NumPy 2.0 compatibility
 fi
 log "Optional packages installed"
 echo ""

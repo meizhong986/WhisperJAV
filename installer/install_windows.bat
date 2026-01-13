@@ -375,8 +375,9 @@ echo   [Step 3/7] Installing core dependencies
 echo ============================================================
 
 REM Phase 4.1: Core scientific stack (MUST install first to establish versions)
+REM scipy>=1.14.0 required for NumPy 2.0 ABI compatibility
 call :log "Phase 4.1: Installing core scientific stack..."
-call :run_pip_with_retry "install numpy>=2.0 scipy>=1.10.1 librosa>=0.11.0" "Install scientific packages"
+call :run_pip_with_retry "install numpy>=2.0 scipy>=1.14.0 librosa>=0.11.0" "Install scientific packages"
 if errorlevel 1 goto :install_failed
 
 REM Phase 4.2: Audio and utility packages
@@ -390,8 +391,9 @@ call :run_pip_with_retry "install pysrt srt aiofiles jsonschema pyloudnorm" "Ins
 if errorlevel 1 goto :install_failed
 
 REM Phase 4.4: Config and optimization packages
+REM numba>=0.60.0 required for NumPy 2.0 compatibility
 call :log "Phase 4.4: Installing config packages..."
-call :run_pip_with_retry "install pydantic>=2.0,<3.0 PyYAML>=6.0 numba" "Install config packages"
+call :run_pip_with_retry "install pydantic>=2.0,<3.0 PyYAML>=6.0 numba>=0.60.0" "Install config packages"
 if errorlevel 1 goto :install_failed
 
 REM Phase 4.5: Image/plotting packages (non-fatal)
@@ -492,7 +494,8 @@ if "%MINIMAL%"=="0" (
         call :log "WARNING: ten-vad installation failed"
     )
 
-    call :run_pip_with_retry "install scikit-learn>=1.3.0" "Install scikit-learn"
+    REM scikit-learn>=1.5.0 required for NumPy 2.0 compatibility
+    call :run_pip_with_retry "install scikit-learn>=1.5.0" "Install scikit-learn"
     if errorlevel 1 (
         echo WARNING: scikit-learn failed (non-fatal)
         call :log "WARNING: scikit-learn failed"
