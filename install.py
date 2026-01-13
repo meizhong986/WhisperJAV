@@ -485,28 +485,19 @@ def main():
     # Local LLM translation (llama-cpp-python) - OPTIONAL
     # Uses JamePeng's fork with active maintenance and multi-platform support
     # Only installed if --local-llm or --local-llm-build is specified
+    # Note: Apple Silicon builds from source with Metal (~10min, fast)
+    #       Intel Mac uses CPU build (no Metal/GPU acceleration)
+    #       Windows/Linux uses prebuilt wheels (requires CUDA 12.4+)
     if args.local_llm or args.local_llm_build:
         print(f"\n    Installing llama-cpp-python for local LLM translation...")
 
-        # Try prebuilt wheel first
-        wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel()
+        import platform as platform_module
+        is_apple_silicon = (sys.platform == "darwin" and platform_module.machine() == "arm64")
+        is_intel_mac = (sys.platform == "darwin" and platform_module.machine() != "arm64")
 
-        if wheel_url:
-            # Prebuilt wheel available - use it (fast install)
-            print(f"    Backend: {wheel_backend}")
-            run_pip(
-                ["install", wheel_url],
-                f"Install llama-cpp-python ({wheel_backend})",
-                allow_fail=True
-            )
-            # Install [server] extras
-            run_pip(
-                ["install", "llama-cpp-python[server]"],
-                "Install llama-cpp-python server extras",
-                allow_fail=True
-            )
-        elif args.local_llm_build:
-            # No prebuilt wheel, but user opted for source build
+        if is_apple_silicon:
+            # Apple Silicon: build from source with Metal (fast ~10min)
+            print("    Apple Silicon detected - building from source with Metal support.")
             git_url, backend, cmake_args = get_llama_cpp_source_info()
             print(f"    Backend: {backend}")
             if cmake_args:
@@ -517,11 +508,57 @@ def main():
                 f"Install llama-cpp-python ({backend})",
                 allow_fail=True
             )
+        elif is_intel_mac:
+            # Intel Mac: CPU-only build (no Metal support)
+            if args.local_llm_build:
+                print("    Intel Mac detected - building CPU-only version.")
+                git_url, backend, cmake_args = get_llama_cpp_source_info()
+                print(f"    Backend: {backend}")
+                # cmake_args will be None for Intel Mac (CPU build)
+                run_pip(
+                    ["install", git_url],
+                    f"Install llama-cpp-python ({backend})",
+                    allow_fail=True
+                )
+            else:
+                print("    Intel Mac detected - no prebuilt wheels available.")
+                print("    To build CPU-only version, use --local-llm-build.")
+                print("    Skipping local LLM installation.")
         else:
-            # --local-llm specified but no prebuilt wheel available
-            print("    No prebuilt wheel available for your platform.")
-            print("    To build from source, use --local-llm-build instead.")
-            print("    Skipping local LLM installation.")
+            # Windows/Linux: try prebuilt wheel first (requires CUDA 12.4+)
+            wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel()
+
+            if wheel_url:
+                # Prebuilt wheel available - use it (fast install)
+                print(f"    Backend: {wheel_backend}")
+                run_pip(
+                    ["install", wheel_url],
+                    f"Install llama-cpp-python ({wheel_backend})",
+                    allow_fail=True
+                )
+                # Install [server] extras
+                run_pip(
+                    ["install", "llama-cpp-python[server]"],
+                    "Install llama-cpp-python server extras",
+                    allow_fail=True
+                )
+            elif args.local_llm_build:
+                # No prebuilt wheel, but user opted for source build
+                git_url, backend, cmake_args = get_llama_cpp_source_info()
+                print(f"    Backend: {backend}")
+                if cmake_args:
+                    print(f"    Setting CMAKE_ARGS={cmake_args}")
+                    os.environ["CMAKE_ARGS"] = cmake_args
+                run_pip(
+                    ["install", git_url],
+                    f"Install llama-cpp-python ({backend})",
+                    allow_fail=True
+                )
+            else:
+                # --local-llm specified but no prebuilt wheel available
+                print("    No prebuilt wheel available for your platform.")
+                print("    Prebuilt wheels require CUDA 12.4+. To build from source, use --local-llm-build.")
+                print("    Skipping local LLM installation.")
     else:
         print("\n    Skipping local LLM (use --local-llm or --local-llm-build to install)")
 
