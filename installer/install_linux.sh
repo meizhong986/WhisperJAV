@@ -394,6 +394,47 @@ pip3 install hf_xet 2>/dev/null || log "Note: hf_xet not installed (optional)"
 log "Installing translation packages..."
 pip3 install "pysubtrans>=1.5.0" "openai>=1.35.0" "google-genai>=1.39.0"
 
+# Local LLM Translation (llama-cpp-python from JamePeng fork)
+# Uses install.py logic to detect prebuilt wheels vs source build
+log "Installing llama-cpp-python for local LLM translation..."
+echo "Installing llama-cpp-python for local LLM translation..."
+
+LLAMA_INFO=$(python3 -c "from install import get_llama_cpp_info; url,backend,prebuilt,cmake=get_llama_cpp_info('$CUDA_VERSION'); print(f'{url}|{backend}|{prebuilt}|{cmake or \"\"}')" 2>/dev/null)
+if [ -n "$LLAMA_INFO" ]; then
+    LLAMA_URL=$(echo "$LLAMA_INFO" | cut -d'|' -f1)
+    LLAMA_BACKEND=$(echo "$LLAMA_INFO" | cut -d'|' -f2)
+    LLAMA_PREBUILT=$(echo "$LLAMA_INFO" | cut -d'|' -f3)
+    LLAMA_CMAKE=$(echo "$LLAMA_INFO" | cut -d'|' -f4)
+
+    echo "  Backend: $LLAMA_BACKEND"
+    log "llama-cpp-python backend: $LLAMA_BACKEND"
+
+    if [ "$LLAMA_PREBUILT" = "True" ]; then
+        # Prebuilt wheel available
+        pip3 install "$LLAMA_URL" && {
+            # Add server extras (JamePeng version >= PyPI, so pip won't replace it)
+            pip3 install "llama-cpp-python[server]"
+            log "llama-cpp-python installed from prebuilt wheel"
+        } || {
+            echo -e "${YELLOW}Warning: Prebuilt wheel failed, local LLM translation may not work${NC}"
+            log "WARNING: llama-cpp-python prebuilt wheel failed"
+        }
+    else
+        # Source build required
+        if [ -n "$LLAMA_CMAKE" ]; then
+            echo "  Setting CMAKE_ARGS=$LLAMA_CMAKE"
+            export CMAKE_ARGS="$LLAMA_CMAKE"
+        fi
+        pip3 install "$LLAMA_URL" || {
+            echo -e "${YELLOW}Warning: llama-cpp-python build failed (local LLM translation will not work)${NC}"
+            log "WARNING: llama-cpp-python source build failed"
+        }
+    fi
+else
+    echo -e "${YELLOW}Warning: Could not get llama-cpp-python info from install.py${NC}"
+    log "WARNING: Could not get llama-cpp-python info"
+fi
+
 # VAD
 log "Installing VAD packages..."
 pip3 install "silero-vad>=6.0" auditok

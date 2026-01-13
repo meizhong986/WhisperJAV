@@ -92,9 +92,9 @@ if defined FREE_BYTES (
     call :log "WARNING: Could not determine disk space"
 )
 
-REM Check network connectivity
+REM Check network connectivity (use curl instead of ping - PyPI blocks ICMP)
 call :log "Checking network connectivity to PyPI..."
-ping -n 1 pypi.org >nul 2>&1
+curl -s --head --max-time 5 https://pypi.org >nul 2>&1
 if errorlevel 1 (
     echo WARNING: Cannot reach pypi.org. Network connection may be required.
     call :log "WARNING: Network check failed (pypi.org unreachable)"
@@ -208,12 +208,15 @@ if "%CPU_ONLY%"=="0" (
     call :log "Checking for NVIDIA GPU..."
 
     REM Try to get driver version for smarter CUDA selection
+    REM Note: Using temp file because for /f mangles comma in --format=csv,noheader
     set "DRIVER_VERSION="
     set "GPU_NAME="
-    for /f "tokens=1,2 delims=," %%a in ('nvidia-smi --query-gpu=driver_version,name --format=csv,noheader 2^>nul') do (
+    nvidia-smi --query-gpu=driver_version,name --format=csv,noheader > "%TEMP%\whisperjav_gpu.txt" 2>nul
+    for /f "tokens=1,2 delims=," %%a in (%TEMP%\whisperjav_gpu.txt) do (
         set "DRIVER_VERSION=%%a"
         set "GPU_NAME=%%b"
     )
+    del "%TEMP%\whisperjav_gpu.txt" 2>nul
 
     if defined GPU_NAME (
         echo NVIDIA GPU detected: !GPU_NAME!
@@ -474,6 +477,49 @@ if errorlevel 1 (
     echo WARNING: Translation packages failed (non-fatal)
     call :log "WARNING: Translation packages failed"
 )
+
+REM Local LLM Translation (llama-cpp-python from JamePeng fork)
+REM Uses install.py logic to detect prebuilt wheels vs source build
+call :log "Installing llama-cpp-python for local LLM translation..."
+echo Installing llama-cpp-python for local LLM translation...
+python -c "from install import get_llama_cpp_info; url,backend,prebuilt,cmake=get_llama_cpp_info('%CUDA_VERSION%'); print(f'LLAMA_URL={url}'); print(f'LLAMA_BACKEND={backend}'); print(f'LLAMA_PREBUILT={prebuilt}'); print(f'LLAMA_CMAKE={cmake or \"\"}')" > "%TEMP%\llama_info.txt" 2>nul
+if errorlevel 1 (
+    echo WARNING: Could not get llama-cpp-python info from install.py
+    call :log "WARNING: Could not get llama-cpp-python info"
+    goto :skip_llama
+)
+for /f "tokens=1,* delims==" %%a in (%TEMP%\llama_info.txt) do set "%%a=%%b"
+del "%TEMP%\llama_info.txt" 2>nul
+
+echo   Backend: %LLAMA_BACKEND%
+call :log "llama-cpp-python backend: %LLAMA_BACKEND%"
+
+if "%LLAMA_PREBUILT%"=="True" (
+    REM Prebuilt wheel available
+    python -m pip install "%LLAMA_URL%" 2>nul
+    if errorlevel 1 (
+        echo WARNING: Prebuilt wheel failed, local LLM translation may not work
+        call :log "WARNING: llama-cpp-python prebuilt wheel failed"
+    ) else (
+        REM Add server extras (JamePeng version >= PyPI, so pip won't replace it)
+        python -m pip install "llama-cpp-python[server]" 2>nul
+        call :log "llama-cpp-python installed from prebuilt wheel"
+    )
+) else (
+    REM Source build required
+    if not "%LLAMA_CMAKE%"=="" (
+        echo   Setting CMAKE_ARGS=%LLAMA_CMAKE%
+        set "CMAKE_ARGS=%LLAMA_CMAKE%"
+    )
+    python -m pip install "%LLAMA_URL%" 2>nul
+    if errorlevel 1 (
+        echo WARNING: llama-cpp-python build failed ^(local LLM translation will not work^)
+        call :log "WARNING: llama-cpp-python source build failed"
+    ) else (
+        call :log "llama-cpp-python built from source"
+    )
+)
+:skip_llama
 
 REM VAD
 call :log "Installing VAD packages..."
