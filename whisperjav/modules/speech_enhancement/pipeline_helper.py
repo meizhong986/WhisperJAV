@@ -9,6 +9,34 @@ without extensive code changes. Handles:
 - Graceful degradation on failure
 - Resource cleanup
 
+==============================================================================
+AUDIO SAMPLE RATE CONTRACT (v1.8.0+)
+==============================================================================
+
+EXTRACTION:
+  - If speech enhancement enabled AND enhancer needs 48kHz → extract at 48kHz
+  - Otherwise → extract at 16kHz (direct ASR path)
+  - FFmpeg handles all extraction sample rate conversion
+
+SCENE DETECTION (Auditok):
+  - Receives audio at extraction SR (NO resampling needed)
+  - auditok handles any sample rate natively via sampling_rate parameter
+  - Scene files saved at extraction SR
+  - Note: v1.8.0 removed unnecessary 48kHz→16kHz resample that caused
+    10-30 minute "hangs" on 2+ hour files (Issue #129)
+
+SCENE DETECTION (Silero Pass 2):
+  - Silero VAD requires 16kHz internally
+  - _detect_pass2_silero() handles its own resampling per-region
+  - Only small region chunks (~30-90s) are resampled, not full file
+
+VAD/ASR:
+  - If input is not 16kHz → resample to 16kHz (ONLY resample point)
+  - Silero VAD requires 16kHz
+  - Whisper ASR requires 16kHz
+
+==============================================================================
+
 CONTRACTS (v1.7.4+):
     Input:  Scene files are ALWAYS 48kHz mono (SCENE_EXTRACTION_SR)
     Output: Enhanced files are ALWAYS 16kHz mono (TARGET_SAMPLE_RATE)

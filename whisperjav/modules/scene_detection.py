@@ -3,6 +3,91 @@
 Audio scene detection module using a multi-feature, adaptive approach.
 This version incorporates a two-pass strategy, Auditok coarse, STFT, DRC, onset-based
 recovery, and metadata output.
+
+==============================================================================
+CLASS AND FUNCTION STATUS (for external reviewers)
+==============================================================================
+
+CLASSES:
+┌─────────────────────────┬──────────┬─────────────────────────────────────────┐
+│ Class                   │ Status   │ Notes                                   │
+├─────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ DynamicSceneDetector    │ ACTIVE   │ Used by ALL pipelines (balanced, fast,  │
+│ (line ~685)             │          │ fidelity, kotoba, transformers).        │
+│                         │          │ Supports methods: auditok, silero,      │
+│                         │          │ semantic. This is the PRIMARY class.    │
+├─────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ SceneDetector           │ LEGACY   │ Original implementation. Imported but   │
+│ (line ~77)              │          │ NOT instantiated by any active pipeline.│
+│                         │          │ Only used in legacy tests. DO NOT USE.  │
+├─────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ AdaptiveSceneDetector   │ LEGACY   │ Second-gen implementation. NOT used by  │
+│ (line ~306)             │          │ any active pipeline. DO NOT USE.        │
+├─────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ SileroRegion            │ INTERNAL │ Helper dataclass for Silero VAD output. │
+│ (line ~946)             │          │ Used internally by DynamicSceneDetector.│
+└─────────────────────────┴──────────┴─────────────────────────────────────────┘
+
+TOP-LEVEL FUNCTIONS:
+┌─────────────────────────┬──────────┬─────────────────────────────────────────┐
+│ Function                │ Status   │ Notes                                   │
+├─────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ load_audio_unified()    │ INTERNAL │ Used only within this module by         │
+│ (line ~29)              │          │ DynamicSceneDetector.detect_scenes().   │
+├─────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ analyze_scene_metadata()│ UNUSED   │ Utility function with no upstream usage.│
+│ (line ~1357)            │          │ Candidate for removal.                  │
+└─────────────────────────┴──────────┴─────────────────────────────────────────┘
+
+DynamicSceneDetector METHODS (the active class):
+┌─────────────────────────────┬──────────┬─────────────────────────────────────┐
+│ Method                      │ Status   │ Notes                               │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ __init__()                  │ ACTIVE   │ Entry point. Accepts method param:  │
+│                             │          │ "auditok" (default), "silero",      │
+│                             │          │ "semantic"                          │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ detect_scenes()             │ ACTIVE   │ Main entry point called by all      │
+│                             │          │ pipelines. Routes to appropriate    │
+│                             │          │ backend based on method.            │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ get_detection_metadata()    │ ACTIVE   │ Called by pipelines for metadata    │
+│                             │          │ (scene boundaries, VAD segments).   │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ _init_silero_vad()          │ ACTIVE   │ Called when method="silero"         │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ _init_semantic_adapter()    │ ACTIVE   │ Called when method="semantic"       │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ _detect_pass2_silero()      │ ACTIVE   │ Silero VAD for fine scene splitting │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ _apply_assistive_processing()│ ACTIVE  │ Audio preprocessing for auditok     │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ _save_scene()               │ ACTIVE   │ Writes scene audio to disk          │
+├─────────────────────────────┼──────────┼─────────────────────────────────────┤
+│ _record_scene_metadata()    │ ACTIVE   │ Data contract: records scene info   │
+└─────────────────────────────┴──────────┴─────────────────────────────────────┘
+
+DEPRECATED PARAMETERS (v1.8.0+, Issue #129):
+┌─────────────────────────┬─────────────────────────────────────────────────────┐
+│ Parameter               │ Notes                                               │
+├─────────────────────────┼─────────────────────────────────────────────────────┤
+│ target_sr               │ No longer used. Auditok handles any sample rate     │
+│                         │ natively. Kept for backward compatibility.          │
+├─────────────────────────┼─────────────────────────────────────────────────────┤
+│ preserve_original_sr    │ No longer used. Native SR always preserved.         │
+│                         │ Kept for backward compatibility.                    │
+└─────────────────────────┴─────────────────────────────────────────────────────┘
+
+UPSTREAM USAGE (which pipelines use this module):
+- balanced_pipeline.py  → DynamicSceneDetector (method from config, default: auditok)
+- fast_pipeline.py      → DynamicSceneDetector (method from config, default: auditok)
+- fidelity_pipeline.py  → DynamicSceneDetector (method from config, default: auditok)
+- kotoba_faster_whisper_pipeline.py → DynamicSceneDetector (method from CLI arg)
+- transformers_pipeline.py → DynamicSceneDetector (method from CLI arg)
+- ensemble/pass_worker.py → DynamicSceneDetector (via pipeline instantiation)
+
+Last updated: 2026-01-14 (Issue #129 fix)
+==============================================================================
 """
 import argparse
 import json
@@ -703,10 +788,11 @@ class DynamicSceneDetector:
                  # Assistive detection flags
                  assist_processing: bool = True,
                  verbose_summary: bool = True,
-                 # New: detection audio handling
-                 target_sr: int = 16000,
+                 # DEPRECATED (v1.8.0+, Issue #129): These parameters have no effect.
+                 # Auditok handles any sample rate natively. Kept for backward compatibility.
+                 target_sr: int = 16000,  # DEPRECATED - no longer used
                  force_mono: bool = True,
-                 preserve_original_sr: bool = True,
+                 preserve_original_sr: bool = True,  # DEPRECATED - no longer used
                  # New: pass-1 controls
                  pass1_min_duration_s: Optional[float] = None,
                  pass1_max_duration_s: Optional[float] = None,
@@ -753,6 +839,14 @@ class DynamicSceneDetector:
         self.target_sr = int(kwargs.get("target_sr", target_sr))
         self.force_mono = bool(kwargs.get("force_mono", force_mono))
         self.preserve_original_sr = bool(kwargs.get("preserve_original_sr", preserve_original_sr))
+
+        # DEPRECATED (v1.8.0+, Issue #129): target_sr and preserve_original_sr are no longer used.
+        # Auditok handles any sample rate natively; Silero Pass 2 resamples internally.
+        # These parameters are kept for backward compatibility but have no effect.
+        if "target_sr" in kwargs or target_sr != 16000:
+            logger.debug("Note: target_sr parameter is deprecated (v1.8.0+). Auditok uses native sample rate.")
+        if "preserve_original_sr" in kwargs:
+            logger.debug("Note: preserve_original_sr parameter is deprecated (v1.8.0+). Native SR always preserved.")
 
         # --- Pass 1 Parameters (Coarse Splitting) ---
         # Defaults map to legacy args if explicit *_s not provided
@@ -806,8 +900,7 @@ class DynamicSceneDetector:
 
         logger.debug(
             "DynamicSceneDetector cfg: "
-            f"method={self.method}, "
-            f"target_sr={self.target_sr}, preserve_original_sr={self.preserve_original_sr}, "
+            f"method={self.method}, force_mono={self.force_mono}, "
             f"max_dur={self.max_duration}s, min_dur={self.min_duration}s, "
             f"pass1(max_dur={self.pass1_max_duration}, max_sil={self.pass1_max_silence}, thr={self.pass1_energy_threshold}), "
             f"pass2(max_dur={self.pass2_max_duration}, max_sil={self.pass2_max_silence}, thr={self.pass2_energy_threshold}), "
@@ -1096,29 +1189,38 @@ class DynamicSceneDetector:
 
         # --- Auditok/Silero: Original two-pass approach ---
 
-        # Load audio once from disk, then resample in-memory for detection
+        # Load audio once from disk - NO resampling needed for scene detection
+        # Auditok handles any sample rate natively. Silero Pass 2 resamples internally.
+        # This eliminates the 10-30 minute resample bottleneck for 2+ hour files (Issue #129).
         try:
             original_audio, orig_sr = load_audio_unified(audio_path, target_sr=None, force_mono=self.force_mono)
-            # Resample in-memory for detection (avoid second disk read)
-            if orig_sr != self.target_sr:
-                detection_audio = librosa.resample(original_audio, orig_sr=orig_sr, target_sr=self.target_sr)
-                det_sr = self.target_sr
-            else:
-                detection_audio = original_audio
-                det_sr = orig_sr
+            # Use native sample rate - auditok is SR-agnostic, silero handles its own resampling
+            detection_audio = original_audio
+            det_sr = orig_sr
             det_duration = len(detection_audio) / det_sr
-            logger.info(f"Detection stream: {det_duration:.1f}s @ {det_sr}Hz; Original stream: {len(original_audio)/orig_sr:.1f}s @ {orig_sr}Hz")
+            logger.info(f"Audio loaded: {det_duration:.1f}s @ {det_sr}Hz (native SR, no resample needed)")
+
+            # Warn user about long files (Issue #129 hardening)
+            duration_hours = det_duration / 3600
+            if duration_hours > 1.5:
+                # Estimate memory usage: samples * 4 bytes (float32)
+                estimated_gb = (len(detection_audio) * 4) / (1024 ** 3)
+                logger.warning(
+                    f"Large file detected: {duration_hours:.1f} hours (~{estimated_gb:.1f} GB memory). "
+                    f"Processing may take several minutes. This is normal."
+                )
         except Exception as e:
             logger.error(f"Failed to load audio file {audio_path}: {e}")
             return []
 
-        # Choose saving stream
-        save_audio = original_audio if self.preserve_original_sr else detection_audio
-        save_sr = orig_sr if self.preserve_original_sr else det_sr
+        # Single audio stream for both detection and saving (no dual storage)
+        # After Issue #129 fix, detection_audio IS original_audio at native SR
+        save_audio = detection_audio
+        save_sr = det_sr
         total_duration_s = len(save_audio) / save_sr  # seconds baseline
 
         # Pass 1 on detection audio
-        logger.info("Pass 1: Finding coarse story lines on detection audio...")
+        logger.info(f"Pass 1: Starting auditok scene detection on {det_duration:.1f}s audio @ {det_sr}Hz...")
         det_bytes = (detection_audio * 32767).astype(np.int16).tobytes()
         pass1_params = {
             "sampling_rate": det_sr,
@@ -1131,7 +1233,9 @@ class DynamicSceneDetector:
             "drop_trailing_silence": True
         }
         story_lines = list(auditok.split(det_bytes, **pass1_params))
-        logger.info(f"Pass 1: Found {len(story_lines)} story line region(s).")
+        logger.info(f"Pass 1: Found {len(story_lines)} coarse story line(s).")
+        if len(story_lines) > 50:
+            logger.info(f"Pass 2: Processing {len(story_lines)} story lines (this may take a moment for long files)...")
 
         # Data contract: Capture coarse boundaries BEFORE any splitting (for visualization)
         for idx, region in enumerate(story_lines):
@@ -1158,9 +1262,18 @@ class DynamicSceneDetector:
                 e_pad = s_pad
             return s_pad, e_pad
 
+        # Progress tracking for long file processing
+        total_storylines = len(story_lines)
+        last_logged_pct = -1
+
         for region_idx, region in enumerate(story_lines):
-            if region_idx % 15 == 0 or region_idx == len(story_lines) - 1:
-                logger.debug(f"Processing story line {region_idx + 1}/{len(story_lines)}")
+            # Log progress at 0%, 25%, 50%, 75%, 100% (or every 15 for small batches)
+            current_pct = int((region_idx / max(total_storylines, 1)) * 100)
+            if total_storylines > 20 and current_pct >= last_logged_pct + 25:
+                logger.info(f"Pass 2: Processing story line {region_idx + 1}/{total_storylines} ({current_pct}%)")
+                last_logged_pct = current_pct
+            elif total_storylines <= 20 and (region_idx % 5 == 0 or region_idx == total_storylines - 1):
+                logger.debug(f"Processing story line {region_idx + 1}/{total_storylines}")
 
             region_start_sec = region.start
             region_end_sec = region.end
