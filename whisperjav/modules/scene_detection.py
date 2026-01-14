@@ -142,9 +142,30 @@ def load_audio_unified(audio_path: Path, target_sr: Optional[int] = None, force_
         logger.debug(f"Audio loaded: {len(audio_data)/sample_rate:.1f}s @ {sample_rate}Hz, {'mono' if audio_data.ndim == 1 else 'stereo'}")
         return audio_data, sample_rate
         
-    except Exception as e:
-        logger.error(f"Failed to load audio {audio_path}: {e}")
+    # H2: Specific exception handling with actionable guidance
+    except sf.SoundFileError as e:
+        file_size_mb = audio_path.stat().st_size / 1024 / 1024 if audio_path.exists() else 0
+        logger.error(
+            f"SoundFile cannot read {audio_path}: {e}\n"
+            f"  File size: {file_size_mb:.1f} MB\n"
+            f"  Suggestion: Verify file integrity, try converting with ffmpeg:\n"
+            f"    ffmpeg -i \"{audio_path}\" -acodec pcm_s16le output.wav"
+        )
         raise
+    except MemoryError as e:
+        file_size_mb = audio_path.stat().st_size / 1024 / 1024 if audio_path.exists() else 0
+        logger.error(
+            f"Out of memory loading {audio_path} ({file_size_mb:.1f} MB): {e}\n"
+            f"  Suggestion: Close other applications or use smaller files"
+        )
+        raise
+    except FileNotFoundError as e:
+        logger.error(f"Audio file not found: {audio_path}")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to load audio {audio_path}: {type(e).__name__}: {e}")
+        raise
+
 
 # Try to import auditok for the coarse-splitting pass
 AUDITOK_AVAILABLE = False
@@ -995,13 +1016,21 @@ class DynamicSceneDetector:
         """
         Use Silero VAD for Pass 2 fine scene splitting.
 
+        Per-region resampling is the correct approach for memory efficiency:
+        - Most regions don't hit Silero (only regions > max_duration go through Pass 2)
+        - Region audio is small (30-60 seconds bounded by pass1_max_duration)
+        - Memory is the bigger constraint for long files on consumer hardware
+
         Returns: List of timestamp tuples compatible with Auditok format
         """
         import torch
         import librosa
 
         # Resample to 16kHz for Silero VAD (if needed)
+        # Per-region resampling trades CPU for memory - correct for large file handling
         if sr != 16000:
+            region_duration = len(region_audio) / sr
+            logger.debug(f"Resampling {region_duration:.1f}s region from {sr}Hz to 16kHz for Silero")
             audio_16k = librosa.resample(region_audio, orig_sr=sr, target_sr=16000)
         else:
             audio_16k = region_audio
@@ -1009,20 +1038,24 @@ class DynamicSceneDetector:
         # Convert to torch tensor
         audio_tensor = torch.FloatTensor(audio_16k)
 
-        # Get speech timestamps from Silero VAD
-        speech_timestamps = self.get_speech_timestamps(
-            audio_tensor,
-            self.vad_model,
-            sampling_rate=16000,
-            threshold=self.silero_threshold,
-            neg_threshold=self.silero_neg_threshold,
-            min_silence_duration_ms=self.silero_min_silence_ms,
-            min_speech_duration_ms=self.silero_min_speech_ms,
-            max_speech_duration_s=self.silero_max_speech_s,
-            min_silence_at_max_speech=self.silero_min_silence_at_max,
-            speech_pad_ms=self.silero_speech_pad_ms,
-            return_seconds=True
-        )
+        # M3: Wrap Silero VAD call in error handling for graceful degradation
+        try:
+            speech_timestamps = self.get_speech_timestamps(
+                audio_tensor,
+                self.vad_model,
+                sampling_rate=16000,
+                threshold=self.silero_threshold,
+                neg_threshold=self.silero_neg_threshold,
+                min_silence_duration_ms=self.silero_min_silence_ms,
+                min_speech_duration_ms=self.silero_min_speech_ms,
+                max_speech_duration_s=self.silero_max_speech_s,
+                min_silence_at_max_speech=self.silero_min_silence_at_max,
+                speech_pad_ms=self.silero_speech_pad_ms,
+                return_seconds=True
+            )
+        except Exception as e:
+            logger.error(f"Silero VAD failed at region starting {region_start_sec:.2f}s: {e}")
+            return []  # Graceful degradation - empty region list triggers brute-force fallback
 
         # Convert Silero format to Auditok-compatible format
         # Silero returns: [{'start': 0.5, 'end': 3.2}, {'start': 5.0, 'end': 8.5}, ...]
@@ -1097,11 +1130,27 @@ class DynamicSceneDetector:
                     media_basename: str) -> Path:
         """
         Save scene as PCM16 WAV.
+
+        H1: Added validation to catch empty/corrupt scenes before writing.
         """
+        # H1: Validate audio data before saving
+        if audio_data is None or len(audio_data) == 0:
+            logger.error(f"Scene {scene_idx}: Cannot save empty or None audio data")
+            raise ValueError(f"Empty audio data for scene {scene_idx}")
+
         scene_filename = f"{media_basename}_scene_{scene_idx:04d}.wav"
         scene_path = output_dir / scene_filename
-        output_dir.mkdir(parents=True, exist_ok=True)
-        sf.write(str(scene_path), audio_data, sample_rate, subtype='PCM_16')
+
+        try:
+            # M2: mkdir moved to detect_scenes() before the loop (not per-scene)
+            sf.write(str(scene_path), audio_data, sample_rate, subtype='PCM_16')
+        except PermissionError as e:
+            logger.error(f"Scene {scene_idx}: Permission denied writing to {scene_path}: {e}")
+            raise
+        except OSError as e:
+            logger.error(f"Scene {scene_idx}: OS error writing {scene_path} (disk full?): {e}")
+            raise
+
         return scene_path
 
     def _record_scene_metadata(
@@ -1203,12 +1252,13 @@ class DynamicSceneDetector:
             # Warn user about long files (Issue #129 hardening)
             duration_hours = det_duration / 3600
             if duration_hours > 1.5:
-                # Estimate memory usage: samples * 4 bytes (float32)
-                estimated_gb = (len(detection_audio) * 4) / (1024 ** 3)
+                # M1: Use .nbytes for accurate memory estimation (accounts for actual dtype)
+                estimated_gb = detection_audio.nbytes / (1024 ** 3)
                 logger.warning(
                     f"Large file detected: {duration_hours:.1f} hours (~{estimated_gb:.1f} GB memory). "
                     f"Processing may take several minutes. This is normal."
                 )
+
         except Exception as e:
             logger.error(f"Failed to load audio file {audio_path}: {e}")
             return []
@@ -1234,6 +1284,23 @@ class DynamicSceneDetector:
         }
         story_lines = list(auditok.split(det_bytes, **pass1_params))
         logger.info(f"Pass 1: Found {len(story_lines)} coarse story line(s).")
+
+        # C3: Diagnostic logging for empty results (helps users understand why detection failed)
+        if len(story_lines) == 0:
+            peak = float(np.max(np.abs(detection_audio)))
+            rms = float(np.sqrt(np.mean(detection_audio ** 2)))
+            logger.warning(
+                f"Pass 1 found NO story lines!\n"
+                f"  Audio stats: duration={det_duration:.1f}s, peak={peak:.4f}, rms={rms:.6f}\n"
+                f"  Params: energy_threshold={pass1_params['energy_threshold']}, "
+                f"min_dur={pass1_params['min_dur']:.1f}s, max_silence={pass1_params['max_silence']:.1f}s\n"
+                f"  Suggestions:\n"
+                f"    - If peak/rms are very low, audio may be silent or nearly silent\n"
+                f"    - Try lowering energy_threshold (current: {pass1_params['energy_threshold']})\n"
+                f"    - Check if audio extraction succeeded (verify source file)"
+            )
+            return []
+
         if len(story_lines) > 50:
             logger.info(f"Pass 2: Processing {len(story_lines)} story lines (this may take a moment for long files)...")
 
@@ -1265,6 +1332,9 @@ class DynamicSceneDetector:
         # Progress tracking for long file processing
         total_storylines = len(story_lines)
         last_logged_pct = -1
+
+        # M2: Create output directory once before the loop (not per-scene)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         for region_idx, region in enumerate(story_lines):
             # Log progress at 0%, 25%, 50%, 75%, 100% (or every 15 for small batches)
