@@ -507,16 +507,11 @@ class TestEnsembleModeSceneDetection:
         srt_files = find_srt_files(clean_output_dir)
         assert len(srt_files) >= 1, "No SRT file created"
 
-    @pytest.mark.xfail(
-        reason="Known bug: --pass1-scene-detector none causes TypeError in ensemble mode. "
-               "DynamicSceneDetector receives None instead of empty dict for scene_opts."
-    )
     def test_ensemble_none_scene_detector(self, clean_output_dir):
         """Test ensemble mode with scene detection disabled.
 
-        NOTE: This test documents a known bug where using 'none' scene detector
-        in ensemble mode causes a TypeError because scene_opts is set to None
-        instead of an empty dict.
+        Verifies that --pass1-scene-detector none and --pass2-scene-detector none
+        work correctly without causing TypeError (fixed in pass_worker.py).
         """
         skip_if_no_test_file(TEST_AUDIO_SHORT)
 

@@ -1001,7 +1001,9 @@ def _apply_gui_overrides(
 
         if scene_detector == "none":
             # Disable scene detection
-            resolved_config["features"]["scene_detection"] = None
+            # Use empty dict with enabled=False instead of None to avoid TypeError
+            # when balanced_pipeline.py does DynamicSceneDetector(**scene_opts)
+            resolved_config["features"]["scene_detection"] = {"enabled": False}
             if "workflow" in resolved_config and "features" in resolved_config["workflow"]:
                 resolved_config["workflow"]["features"]["scene_detection"] = False
             logger.debug("Pass %s: Disabled scene detection", pass_number)
