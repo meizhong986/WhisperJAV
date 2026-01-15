@@ -243,11 +243,12 @@ def _download_wheel_from_github(cuda_version: Optional[str] = None) -> Optional[
     py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
 
     # Build search criteria
+    # Note: CUDA 13.x (cu130) is NOT supported - no PyTorch/llama-cpp wheels available
     target_cudas = []
     if cuda_version and sys.platform in ("win32", "linux"):
-        # Search compatible CUDA versions in order
+        # Search compatible CUDA versions in order (highest supported first)
         if cuda_version >= "cu128":
-            target_cudas = ["cu130", "cu128", "cu126", "cu124"]
+            target_cudas = ["cu128", "cu126", "cu124"]
         elif cuda_version >= "cu126":
             target_cudas = ["cu126", "cu124"]
         elif cuda_version >= "cu124":

@@ -4,6 +4,36 @@
 
 ---
 
+## Upgrading from v1.7.x
+
+**v1.8.0 requires a fresh installation.** This is not an in-place upgrade due to significant dependency changes (NumPy 2.0, new PyTorch versions, new speech enhancement backends).
+
+### Windows (.exe Installer)
+
+1. **Uninstall v1.7.x first:**
+   - Open **Settings** → **Apps** → Search "WhisperJAV" → **Uninstall**
+   - Or run: `%LOCALAPPDATA%\WhisperJAV\Uninstall-WhisperJAV.exe`
+2. **Install v1.8.0:** Run the new installer to the same location.
+
+### macOS / Linux
+
+```bash
+# Remove old virtual environment
+rm -rf whisperjav-env  # or your venv name
+
+# Fresh install
+./installer/install_linux.sh
+```
+
+### What's Preserved
+
+Your data is stored **outside** the installation directory:
+- **AI Models:** `~/.cache/huggingface/` (no re-download needed)
+- **Transcription outputs:** Wherever you saved them
+- **Custom instruction files:** Your documents folder
+
+---
+
 ## Headline Feature: Local LLM Translation
 
 Translate subtitles entirely on your GPU - no cloud API, no API key required.

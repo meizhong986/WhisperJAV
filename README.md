@@ -276,7 +276,22 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 > **Note:** The first launch may take a few minutes as it initializes the engine. GPU is auto-detected; CPU-only mode is used if no compatible GPU is found.
 
-**Upgrading?** Just run the new installer. Your AI models (~3GB), settings, and cached downloads will be preserved.
+<details>
+<summary><strong>Upgrading from v1.7.x?</strong> (Click to expand)</summary>
+
+For major version upgrades (v1.7.x → v1.8.0), a fresh installation is required:
+
+1. **Uninstall v1.7.x first:**
+   - Open **Settings** → **Apps** → Search "WhisperJAV" → **Uninstall**
+   - Or run: `%LOCALAPPDATA%\WhisperJAV\Uninstall-WhisperJAV.exe`
+
+2. **Install v1.8.0:** Run the new installer to the same location.
+
+**What's preserved:** Your AI models (`%USERPROFILE%\.cache\huggingface\`), transcription outputs, and custom files are stored outside the installation directory and will not be deleted.
+
+**Why?** v1.8.0 includes significant dependency changes (NumPy 2.0, new PyTorch, speech enhancement backends) that require a clean environment.
+
+</details>
 
 ---
 
@@ -314,6 +329,8 @@ chmod +x installer/install_linux.sh
 
 > **Intel Macs:** The script automatically uses CPU-only mode. Expect slower processing (5-10x) compared to Apple Silicon with MPS acceleration.
 
+> **Upgrading from v1.7.x?** Remove your old virtual environment first: `rm -rf whisperjav-env` (or your venv name), then run the installer again.
+
 ---
 
 ### Linux (Ubuntu/Debian/Fedora)
@@ -347,6 +364,8 @@ chmod +x installer/install_linux.sh
 ```
 
 > **Performance:** A 2-hour video takes ~5-10 minutes on GPU vs ~30-60 minutes on CPU.
+
+> **Upgrading from v1.7.x?** Remove your old virtual environment first: `rm -rf whisperjav-env` (or your venv name), then run the installer again.
 
 ---
 

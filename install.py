@@ -198,7 +198,7 @@ def get_llama_cpp_prebuilt_wheel():
     Queries GitHub API to find matching wheel dynamically.
 
     Release naming conventions (from JamePeng/llama-cpp-python):
-    - CUDA: v{ver}-cu{cuda}-Basic-{os}-{date} (e.g., v0.3.21-cu130-Basic-win-20260111)
+    - CUDA: v{ver}-cu{cuda}-Basic-{os}-{date} (e.g., v0.3.21-cu128-Basic-win-20260111)
     - Metal: v{ver}-metal-{date} (when available)
     - Wheel: llama_cpp_python-{ver}-cp{py}-cp{py}-{platform}.whl
 
