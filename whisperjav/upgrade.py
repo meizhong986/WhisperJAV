@@ -57,10 +57,10 @@ GITHUB_REPO = os.environ.get(
     'git+https://github.com/meizhong986/whisperjav.git@main'
 )
 
-# Packages to fix AFTER main installation (clearvoice pulls older versions)
+# Packages to fix AFTER main installation (ensure consistent versions)
 FIX_PACKAGES = [
-    "numpy>=2.0",
-    "librosa",
+    "numpy>=1.26.0,<2.0",  # NumPy 1.26.x for pyvideotrans compatibility
+    "librosa>=0.10.0",
 ]
 
 # Files to preserve during upgrade (user data)
@@ -231,8 +231,8 @@ def fix_package_versions(install_dir: Path) -> bool:
     """
     Fix package versions after main installation.
 
-    clearvoice declares numpy<2.0 in its metadata but works with numpy 2.x.
-    This step upgrades numpy and librosa to latest versions.
+    Ensures numpy and librosa are at the correct versions for pyvideotrans
+    compatibility (NumPy 1.26.x).
 
     Args:
         install_dir: Path to installation directory

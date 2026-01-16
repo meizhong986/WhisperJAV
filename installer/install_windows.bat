@@ -16,16 +16,15 @@ REM   install_windows.bat [options]
 REM
 REM Options:
 REM   --cpu-only              Install CPU-only PyTorch (no CUDA)
-REM   --cuda118               Install PyTorch for CUDA 11.8
-REM   --cuda121               Install PyTorch for CUDA 12.1
-REM   --cuda124               Install PyTorch for CUDA 12.4
-REM   --cuda126               Install PyTorch for CUDA 12.6
+REM   --cuda118               Install PyTorch for CUDA 11.8 (universal fallback for older drivers)
 REM   --cuda128               Install PyTorch for CUDA 12.8 (default for driver 570+)
 REM   --no-speech-enhancement Skip speech enhancement packages
 REM   --minimal               Minimal install (transcription only)
 REM   --dev                   Install in development/editable mode
 REM   --local-llm             Install local LLM (fast - prebuilt wheel only)
 REM   --local-llm-build       Install local LLM (slow - builds from source if needed)
+REM
+REM Note: CUDA 12.1/12.4/12.6 support removed in v1.8.0 (PyTorch 2.7.x dropped these)
 REM
 REM ==============================================================================
 
@@ -46,7 +45,7 @@ echo.
 
 REM Parse arguments
 set "CPU_ONLY=0"
-set "CUDA_VERSION=cuda121"
+set "CUDA_VERSION=auto"
 set "NO_SPEECH_ENHANCEMENT=0"
 set "MINIMAL=0"
 set "DEV_MODE=0"
@@ -60,10 +59,23 @@ if /i "%~1"=="--cpu-only" (
     set "CUDA_VERSION=cpu"
 )
 if /i "%~1"=="--cuda118" set "CUDA_VERSION=cuda118"
-if /i "%~1"=="--cuda121" set "CUDA_VERSION=cuda121"
-if /i "%~1"=="--cuda124" set "CUDA_VERSION=cuda124"
-if /i "%~1"=="--cuda126" set "CUDA_VERSION=cuda126"
 if /i "%~1"=="--cuda128" set "CUDA_VERSION=cuda128"
+REM Legacy options for backward compatibility (map to supported versions)
+if /i "%~1"=="--cuda121" (
+    echo WARNING: --cuda121 is deprecated. Using CUDA 11.8 instead.
+    echo          PyTorch 2.7.x dropped CUDA 12.1 support.
+    set "CUDA_VERSION=cuda118"
+)
+if /i "%~1"=="--cuda124" (
+    echo WARNING: --cuda124 is deprecated. Using CUDA 11.8 instead.
+    echo          PyTorch 2.7.x dropped CUDA 12.4 support.
+    set "CUDA_VERSION=cuda118"
+)
+if /i "%~1"=="--cuda126" (
+    echo WARNING: --cuda126 is deprecated. Using CUDA 11.8 instead.
+    echo          Use --cuda128 for CUDA 12.8 or --cuda118 for CUDA 11.8.
+    set "CUDA_VERSION=cuda118"
+)
 if /i "%~1"=="--no-speech-enhancement" set "NO_SPEECH_ENHANCEMENT=1"
 if /i "%~1"=="--minimal" (
     set "MINIMAL=1"
@@ -234,30 +246,31 @@ if "%CPU_ONLY%"=="0" (
         call :log "Driver version: !DRIVER_VERSION!"
 
         REM Auto-select CUDA version based on driver if user didn't specify
-        if "%CUDA_VERSION%"=="cuda121" (
-            REM Check if driver supports newer CUDA
-            REM Driver 570+ supports CUDA 12.8
-            REM Driver 560+ supports CUDA 12.6
-            REM Driver 551+ supports CUDA 12.4
-            REM Driver 531+ supports CUDA 12.1
+        REM Simplified matrix for v1.8.0: CUDA 12.8 (modern) or 11.8 (universal fallback)
+        if "%CUDA_VERSION%"=="auto" (
             for /f "tokens=1 delims=." %%d in ("!DRIVER_VERSION!") do set "DRIVER_MAJOR=%%d"
             if defined DRIVER_MAJOR (
                 if !DRIVER_MAJOR! GEQ 570 (
                     echo Auto-selecting CUDA 12.8 based on driver !DRIVER_VERSION!
                     call :log "Auto-selecting CUDA 12.8 based on driver"
                     set "CUDA_VERSION=cuda128"
-                ) else if !DRIVER_MAJOR! GEQ 560 (
-                    echo Auto-selecting CUDA 12.6 based on driver !DRIVER_VERSION!
-                    call :log "Auto-selecting CUDA 12.6 based on driver"
-                    set "CUDA_VERSION=cuda126"
-                ) else if !DRIVER_MAJOR! GEQ 551 (
-                    echo Auto-selecting CUDA 12.4 based on driver !DRIVER_VERSION!
-                    call :log "Auto-selecting CUDA 12.4 based on driver"
-                    set "CUDA_VERSION=cuda124"
+                ) else if !DRIVER_MAJOR! GEQ 450 (
+                    echo Auto-selecting CUDA 11.8 ^(universal fallback^) for driver !DRIVER_VERSION!
+                    echo Tip: Update driver to 570+ for CUDA 12.8 performance benefits
+                    call :log "Auto-selecting CUDA 11.8 for driver"
+                    set "CUDA_VERSION=cuda118"
                 ) else (
-                    echo Using CUDA 12.1 for driver !DRIVER_VERSION!
-                    call :log "Using CUDA 12.1 for driver"
+                    echo Driver !DRIVER_VERSION! is too old for CUDA
+                    echo Switching to CPU-only installation
+                    call :log "Driver too old - switching to CPU-only"
+                    set "CUDA_VERSION=cpu"
+                    set "CPU_ONLY=1"
                 )
+            ) else (
+                REM Couldn't determine driver version, use safe fallback
+                echo Could not determine driver version, using CUDA 11.8 ^(safe fallback^)
+                call :log "Using CUDA 11.8 (fallback)"
+                set "CUDA_VERSION=cuda118"
             )
         )
     ) else (
@@ -286,7 +299,8 @@ if not exist "setup.py" (
     exit /b 1
 )
 
-REM Set PyTorch index URL with version pinning for stability
+REM Set PyTorch index URL
+REM v1.8.0: Simplified to CUDA 12.8 + 11.8 only (aligned with PyTorch 2.7.x)
 if "%CUDA_VERSION%"=="cpu" (
     set "TORCH_URL=https://download.pytorch.org/whl/cpu"
     set "TORCH_PACKAGES=torch torchaudio"
@@ -295,20 +309,13 @@ if "%CUDA_VERSION%"=="cuda118" (
     set "TORCH_URL=https://download.pytorch.org/whl/cu118"
     set "TORCH_PACKAGES=torch torchaudio"
 )
-if "%CUDA_VERSION%"=="cuda121" (
-    set "TORCH_URL=https://download.pytorch.org/whl/cu121"
-    set "TORCH_PACKAGES=torch torchaudio"
-)
-if "%CUDA_VERSION%"=="cuda124" (
-    set "TORCH_URL=https://download.pytorch.org/whl/cu124"
-    set "TORCH_PACKAGES=torch torchaudio"
-)
-if "%CUDA_VERSION%"=="cuda126" (
-    set "TORCH_URL=https://download.pytorch.org/whl/cu126"
-    set "TORCH_PACKAGES=torch torchaudio"
-)
 if "%CUDA_VERSION%"=="cuda128" (
     set "TORCH_URL=https://download.pytorch.org/whl/cu128"
+    set "TORCH_PACKAGES=torch torchaudio"
+)
+REM Fallback if CUDA_VERSION somehow wasn't set
+if not defined TORCH_URL (
+    set "TORCH_URL=https://download.pytorch.org/whl/cu118"
     set "TORCH_PACKAGES=torch torchaudio"
 )
 
@@ -387,9 +394,9 @@ echo   [Step 3/7] Installing core dependencies
 echo ============================================================
 
 REM Phase 4.1: Core scientific stack (MUST install first to establish versions)
-REM scipy>=1.14.0 required for NumPy 2.0 ABI compatibility
+REM NumPy 1.26.x for pyvideotrans compatibility (v1.8.0)
 call :log "Phase 4.1: Installing core scientific stack..."
-call :run_pip_with_retry "install numpy>=2.0 scipy>=1.14.0 librosa>=0.11.0" "Install scientific packages"
+call :run_pip_with_retry "install numpy>=1.26.0,<2.0 scipy>=1.10.1 librosa>=0.10.0" "Install scientific packages"
 if errorlevel 1 goto :install_failed
 
 REM Phase 4.2: Audio and utility packages
@@ -403,12 +410,20 @@ call :run_pip_with_retry "install pysrt srt aiofiles jsonschema pyloudnorm" "Ins
 if errorlevel 1 goto :install_failed
 
 REM Phase 4.4: Config and optimization packages
-REM numba>=0.60.0 required for NumPy 2.0 compatibility
+REM numba>=0.58.0 supports NumPy 1.22-2.0
 call :log "Phase 4.4: Installing config packages..."
-call :run_pip_with_retry "install pydantic>=2.0,<3.0 PyYAML>=6.0 numba>=0.60.0" "Install config packages"
+call :run_pip_with_retry "install pydantic>=2.0,<3.0 PyYAML>=6.0 numba>=0.58.0" "Install config packages"
 if errorlevel 1 goto :install_failed
 
-REM Phase 4.5: Image/plotting packages (non-fatal)
+REM Phase 4.5: pyvideotrans compatibility packages (Phase 1 prep)
+call :log "Phase 4.5: Installing pyvideotrans compatibility packages..."
+call :run_pip_with_retry "install av>=13.0.0 imageio>=2.31.0 imageio-ffmpeg>=0.4.9 httpx>=0.27.0 websockets>=13.0 soxr>=0.3.0" "Install pyvideotrans Phase 1 packages"
+if errorlevel 1 (
+    echo WARNING: pyvideotrans prep packages failed (non-fatal)
+    call :log "WARNING: pyvideotrans prep packages failed"
+)
+
+REM Phase 4.6: Image/plotting packages (non-fatal)
 call :run_pip_with_retry "install Pillow" "Install image packages"
 if errorlevel 1 (
     echo WARNING: Pillow installation failed (non-fatal)
@@ -565,8 +580,8 @@ if "%MINIMAL%"=="0" (
         call :log "WARNING: ten-vad installation failed"
     )
 
-    REM scikit-learn>=1.5.0 required for NumPy 2.0 compatibility
-    call :run_pip_with_retry "install scikit-learn>=1.5.0" "Install scikit-learn"
+    REM scikit-learn for semantic scene detection
+    call :run_pip_with_retry "install scikit-learn>=1.3.0" "Install scikit-learn"
     if errorlevel 1 (
         echo WARNING: scikit-learn failed (non-fatal)
         call :log "WARNING: scikit-learn failed"
@@ -602,7 +617,7 @@ if "%NO_SPEECH_ENHANCEMENT%"=="0" (
         call :log "WARNING: modelscope installation failed"
     )
 
-    REM Install ClearVoice from NumPy 2.x compatible fork
+    REM Install ClearVoice from fork with relaxed librosa constraint
     echo Installing ClearVoice ^(48kHz denoising^)...
     call :log "Installing ClearVoice..."
     python -m pip install "git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice" 2>nul
@@ -867,16 +882,13 @@ exit /b 1
 
 :show_help
 echo.
-echo WhisperJAV Windows Installation Script
+echo WhisperJAV Windows Installation Script (v1.8.0)
 echo.
 echo Usage: install_windows.bat [options]
 echo.
 echo Options:
 echo   --cpu-only              Install CPU-only PyTorch ^(no CUDA^)
-echo   --cuda118               Install PyTorch for CUDA 11.8
-echo   --cuda121               Install PyTorch for CUDA 12.1
-echo   --cuda124               Install PyTorch for CUDA 12.4
-echo   --cuda126               Install PyTorch for CUDA 12.6
+echo   --cuda118               Install PyTorch for CUDA 11.8 ^(universal fallback^)
 echo   --cuda128               Install PyTorch for CUDA 12.8 ^(default for driver 570+^)
 echo   --no-speech-enhancement Skip speech enhancement packages
 echo   --minimal               Minimal install ^(transcription only^)
@@ -885,16 +897,20 @@ echo   --local-llm             Install local LLM ^(fast - prebuilt wheel only^)
 echo   --local-llm-build       Install local LLM ^(slow - builds from source if needed^)
 echo   --help, -h              Show this help message
 echo.
+echo CUDA version selection:
+echo   Driver 570+ -^> CUDA 12.8 ^(auto-selected^)
+echo   Driver 450+ -^> CUDA 11.8 ^(fallback^)
+echo.
 echo Examples:
-echo   install_windows.bat                    # Standard install with auto CUDA detection
+echo   install_windows.bat                    # Auto-detect GPU and select CUDA version
 echo   install_windows.bat --cpu-only         # CPU-only install
 echo   install_windows.bat --cuda128          # Force CUDA 12.8
+echo   install_windows.bat --cuda118          # Force CUDA 11.8
 echo   install_windows.bat --minimal --dev    # Minimal dev install
 echo   install_windows.bat --local-llm        # Include local LLM ^(prebuilt wheel^)
 echo   install_windows.bat --local-llm-build  # Include local LLM ^(build if no wheel^)
 echo.
 echo The script will auto-detect your GPU and select the appropriate
-echo CUDA version ^(12.8 for driver 570+, 12.6 for 560+, etc.^).
-echo Use --cuda*** flags to override.
+echo CUDA version. Use --cuda118 or --cuda128 to override.
 echo.
 exit /b 0

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# WhisperJAV Linux Installation Script (v1.7.5 Compatible)
+# WhisperJAV Linux Installation Script (v1.8.0)
 # ==============================================================================
 #
 # This script handles the staged installation of WhisperJAV on Linux systems,
@@ -12,9 +12,7 @@
 #
 # Options:
 #   --cpu-only              Install CPU-only PyTorch (no CUDA)
-#   --cuda121               Install PyTorch for CUDA 12.1
-#   --cuda124               Install PyTorch for CUDA 12.4
-#   --cuda126               Install PyTorch for CUDA 12.6
+#   --cuda118               Install PyTorch for CUDA 11.8 (universal fallback for older drivers)
 #   --cuda128               Install PyTorch for CUDA 12.8 (default for driver 570+)
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Install minimal version (no speech enhancement, no TEN VAD)
@@ -22,12 +20,16 @@
 #   --local-llm             Install local LLM (fast - prebuilt wheel only)
 #   --local-llm-build       Install local LLM (slow - builds from source if needed)
 #
+# Note: CUDA 12.1/12.4/12.6 support removed in v1.8.0 (PyTorch 2.7.x dropped these)
+#
 # ==============================================================================
 
 set -e  # Exit on error
 
-# Initialize log file
-INSTALL_LOG="$(dirname "$0")/install_log_linux.txt"
+# Initialize paths
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+INSTALL_LOG="$SCRIPT_DIR/install_log_linux.txt"
 echo "" > "$INSTALL_LOG"
 
 # Logging function
@@ -71,7 +73,7 @@ echo ""
 # ==============================================================================
 
 # Check for FFmpeg
-if ! command -v ffmpeg &> /dev/null; then
+if ! command -v ffmpeg >/dev/null 2>&1; then
     echo -e "${RED}Error: FFmpeg is not installed.${NC}"
     echo "Please install FFmpeg first:"
     echo "  Debian/Ubuntu: sudo apt-get install ffmpeg"
@@ -84,7 +86,7 @@ echo -e "${GREEN}FFmpeg found: $(ffmpeg -version | head -n1)${NC}"
 log "FFmpeg found"
 
 # Check for Git
-if ! command -v git &> /dev/null; then
+if ! command -v git >/dev/null 2>&1; then
     echo -e "${RED}Error: Git is not installed.${NC}"
     echo "Please install Git first:"
     echo "  Debian/Ubuntu: sudo apt-get install git"
@@ -111,17 +113,18 @@ for arg in "$@"; do
             CPU_ONLY=true
             CUDA_VERSION="cpu"
             ;;
-        --cuda121)
-            CUDA_VERSION="cuda121"
-            ;;
-        --cuda124)
-            CUDA_VERSION="cuda124"
-            ;;
-        --cuda126)
-            CUDA_VERSION="cuda126"
+        --cuda118)
+            CUDA_VERSION="cuda118"
             ;;
         --cuda128)
             CUDA_VERSION="cuda128"
+            ;;
+        # Legacy options for backward compatibility (map to supported versions)
+        --cuda121|--cuda124|--cuda126)
+            echo -e "${YELLOW}Warning: $arg is deprecated. Using CUDA 11.8 instead.${NC}"
+            echo "         PyTorch 2.7.x dropped CUDA 12.1/12.4 support."
+            echo "         Use --cuda128 for CUDA 12.8 or --cuda118 for CUDA 11.8."
+            CUDA_VERSION="cuda118"
             ;;
         --no-speech-enhancement)
             NO_SPEECH_ENHANCEMENT=true
@@ -142,15 +145,13 @@ for arg in "$@"; do
             ;;
         --help|-h)
             echo ""
-            echo "WhisperJAV Linux Installation Script"
+            echo "WhisperJAV Linux Installation Script (v1.8.0)"
             echo ""
             echo "Usage: ./install_linux.sh [options]"
             echo ""
             echo "Options:"
             echo "  --cpu-only              Install CPU-only PyTorch (no CUDA)"
-            echo "  --cuda121               Install PyTorch for CUDA 12.1"
-            echo "  --cuda124               Install PyTorch for CUDA 12.4"
-            echo "  --cuda126               Install PyTorch for CUDA 12.6"
+            echo "  --cuda118               Install PyTorch for CUDA 11.8 (universal fallback)"
             echo "  --cuda128               Install PyTorch for CUDA 12.8 (default for driver 570+)"
             echo "  --no-speech-enhancement Skip speech enhancement packages"
             echo "  --minimal               Minimal install (no speech enhancement)"
@@ -159,8 +160,12 @@ for arg in "$@"; do
             echo "  --local-llm-build       Install local LLM (slow - builds from source if needed)"
             echo "  --help, -h              Show this help message"
             echo ""
+            echo "CUDA version selection:"
+            echo "  Driver 570+ → CUDA 12.8 (auto-selected)"
+            echo "  Driver 450+ → CUDA 11.8 (fallback)"
+            echo ""
             echo "The script will auto-detect your GPU and select the appropriate"
-            echo "CUDA version. Use --cuda*** flags to override."
+            echo "CUDA version. Use --cuda118 or --cuda128 to override."
             echo ""
             exit 0
             ;;
@@ -194,7 +199,7 @@ echo ""
 if [ "$CPU_ONLY" = false ]; then
     echo -e "${YELLOW}Checking for NVIDIA GPU...${NC}"
     log "Checking for NVIDIA GPU..."
-    if command -v nvidia-smi &> /dev/null; then
+    if command -v nvidia-smi >/dev/null 2>&1; then
         GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1)
         DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n1)
         if [ -n "$GPU_NAME" ]; then
@@ -204,24 +209,24 @@ if [ "$CPU_ONLY" = false ]; then
             log "Driver version: $DRIVER_VERSION"
 
             # Auto-select CUDA version based on driver if not specified
+            # Simplified matrix for v1.8.0: CUDA 12.8 (modern) or 11.8 (universal fallback)
             if [ "$CUDA_VERSION" = "auto" ]; then
                 DRIVER_MAJOR=$(echo "$DRIVER_VERSION" | cut -d. -f1)
                 if [ "$DRIVER_MAJOR" -ge 570 ] 2>/dev/null; then
                     CUDA_VERSION="cuda128"
                     echo -e "${GREEN}Auto-selecting CUDA 12.8 based on driver $DRIVER_VERSION${NC}"
                     log "Auto-selecting CUDA 12.8"
-                elif [ "$DRIVER_MAJOR" -ge 560 ] 2>/dev/null; then
-                    CUDA_VERSION="cuda126"
-                    echo -e "${GREEN}Auto-selecting CUDA 12.6 based on driver $DRIVER_VERSION${NC}"
-                    log "Auto-selecting CUDA 12.6"
-                elif [ "$DRIVER_MAJOR" -ge 551 ] 2>/dev/null; then
-                    CUDA_VERSION="cuda124"
-                    echo -e "${GREEN}Auto-selecting CUDA 12.4 based on driver $DRIVER_VERSION${NC}"
-                    log "Auto-selecting CUDA 12.4"
+                elif [ "$DRIVER_MAJOR" -ge 450 ] 2>/dev/null; then
+                    CUDA_VERSION="cuda118"
+                    echo -e "${GREEN}Auto-selecting CUDA 11.8 (universal fallback) for driver $DRIVER_VERSION${NC}"
+                    echo -e "${YELLOW}Tip: Update driver to 570+ for CUDA 12.8 performance benefits${NC}"
+                    log "Auto-selecting CUDA 11.8"
                 else
-                    CUDA_VERSION="cuda121"
-                    echo -e "${GREEN}Using CUDA 12.1 for driver $DRIVER_VERSION${NC}"
-                    log "Using CUDA 12.1"
+                    echo -e "${RED}Driver $DRIVER_VERSION is too old for CUDA${NC}"
+                    echo -e "${YELLOW}Switching to CPU-only installation${NC}"
+                    log "Driver too old - switching to CPU-only"
+                    CPU_ONLY=true
+                    CUDA_VERSION="cpu"
                 fi
             fi
         else
@@ -234,7 +239,10 @@ if [ "$CPU_ONLY" = false ]; then
         echo -e "${GREEN}NVIDIA driver detected${NC}"
         log "NVIDIA driver detected"
         if [ "$CUDA_VERSION" = "auto" ]; then
-            CUDA_VERSION="cuda121"
+            # Conservative fallback when we can't determine driver version
+            CUDA_VERSION="cuda118"
+            echo -e "${YELLOW}Using CUDA 11.8 (universal fallback)${NC}"
+            log "Using CUDA 11.8 (fallback)"
         fi
     else
         echo -e "${RED}No NVIDIA GPU detected!${NC}"
@@ -298,24 +306,20 @@ log "============================================================"
 echo -e "${YELLOW}Step 2/7: Installing PyTorch...${NC}"
 
 # Select PyTorch URL based on CUDA version
+# v1.8.0: Simplified to CUDA 12.8 + 11.8 only (aligned with PyTorch 2.7.x)
 case $CUDA_VERSION in
     cpu)
         TORCH_URL="https://download.pytorch.org/whl/cpu"
         ;;
-    cuda121)
-        TORCH_URL="https://download.pytorch.org/whl/cu121"
-        ;;
-    cuda124)
-        TORCH_URL="https://download.pytorch.org/whl/cu124"
-        ;;
-    cuda126)
-        TORCH_URL="https://download.pytorch.org/whl/cu126"
+    cuda118)
+        TORCH_URL="https://download.pytorch.org/whl/cu118"
         ;;
     cuda128)
         TORCH_URL="https://download.pytorch.org/whl/cu128"
         ;;
     *)
-        TORCH_URL="https://download.pytorch.org/whl/cu121"
+        # Fallback to CUDA 11.8 (universal compatibility)
+        TORCH_URL="https://download.pytorch.org/whl/cu118"
         ;;
 esac
 
@@ -336,9 +340,9 @@ log "============================================================"
 echo -e "${YELLOW}Step 3/7: Installing core dependencies...${NC}"
 
 # Phase 3.1: Core scientific stack (MUST install first)
-# scipy>=1.14.0 required for NumPy 2.0 ABI compatibility
+# NumPy 1.26.x for pyvideotrans compatibility (v1.8.0)
 log "Phase 3.1: Installing scientific stack..."
-pip3 install "numpy>=2.0" "scipy>=1.14.0" "librosa>=0.11.0"
+pip3 install "numpy>=1.26.0,<2.0" "scipy>=1.10.1" "librosa>=0.10.0"
 
 # Phase 3.2: Audio and utility packages (including fsspec constraint)
 log "Phase 3.2: Installing audio/utility packages..."
@@ -349,11 +353,18 @@ log "Phase 3.3: Installing subtitle/async packages..."
 pip3 install pysrt srt aiofiles jsonschema pyloudnorm
 
 # Phase 3.4: Config and optimization packages
-# numba>=0.60.0 required for NumPy 2.0 compatibility
+# numba>=0.58.0 supports NumPy 1.22-2.0
 log "Phase 3.4: Installing config packages..."
-pip3 install "pydantic>=2.0,<3.0" "PyYAML>=6.0" "numba>=0.60.0"
+pip3 install "pydantic>=2.0,<3.0" "PyYAML>=6.0" "numba>=0.58.0"
 
-# Phase 3.5: Image packages (non-fatal)
+# Phase 3.5: pyvideotrans compatibility packages (Phase 1 prep)
+log "Phase 3.5: Installing pyvideotrans compatibility packages..."
+pip3 install "av>=13.0.0" "imageio>=2.31.0" "imageio-ffmpeg>=0.4.9" "httpx>=0.27.0" "websockets>=13.0" "soxr>=0.3.0" || {
+    echo -e "${YELLOW}Warning: pyvideotrans prep packages failed (non-fatal)${NC}"
+    log "WARNING: pyvideotrans prep packages failed"
+}
+
+# Phase 3.6: Image packages (non-fatal)
 pip3 install Pillow || echo -e "${YELLOW}Warning: Pillow installation failed (non-fatal)${NC}"
 
 log "Core dependencies installed"
@@ -433,7 +444,7 @@ if [ "$LOCAL_LLM" = true ]; then
         # Apple Silicon: build from source with Metal (fast ~10min)
         echo "  Apple Silicon detected - building from source with Metal support."
         log "Apple Silicon detected - building with Metal"
-        SOURCE_INFO=$(python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
+        SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
         SOURCE_URL=$(echo "$SOURCE_INFO" | cut -d'|' -f1)
         SOURCE_BACKEND=$(echo "$SOURCE_INFO" | cut -d'|' -f2)
         SOURCE_CMAKE=$(echo "$SOURCE_INFO" | cut -d'|' -f3)
@@ -453,7 +464,7 @@ if [ "$LOCAL_LLM" = true ]; then
         if [ "$LOCAL_LLM_BUILD" = true ]; then
             echo "  Intel Mac detected - building CPU-only version."
             log "Intel Mac detected - building CPU-only"
-            SOURCE_INFO=$(python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
+            SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
             SOURCE_URL=$(echo "$SOURCE_INFO" | cut -d'|' -f1)
             SOURCE_BACKEND=$(echo "$SOURCE_INFO" | cut -d'|' -f2)
 
@@ -471,7 +482,7 @@ if [ "$LOCAL_LLM" = true ]; then
         fi
     else
         # Linux: try prebuilt wheel first (requires CUDA 12.4+)
-        WHEEL_INFO=$(python3 -c "from install import get_llama_cpp_prebuilt_wheel; result=get_llama_cpp_prebuilt_wheel(); print(f'{result[0] or \"\"}|{result[1] or \"\"}')" 2>/dev/null)
+        WHEEL_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_prebuilt_wheel; result=get_llama_cpp_prebuilt_wheel(); print(f'{result[0] or \"\"}|{result[1] or \"\"}')" 2>/dev/null)
         WHEEL_URL=$(echo "$WHEEL_INFO" | cut -d'|' -f1)
         WHEEL_BACKEND=$(echo "$WHEEL_INFO" | cut -d'|' -f2)
 
@@ -488,7 +499,7 @@ if [ "$LOCAL_LLM" = true ]; then
             }
         elif [ "$LOCAL_LLM_BUILD" = true ]; then
             # No prebuilt wheel, but user opted for source build
-            SOURCE_INFO=$(python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
+            SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
             SOURCE_URL=$(echo "$SOURCE_INFO" | cut -d'|' -f1)
             SOURCE_BACKEND=$(echo "$SOURCE_INFO" | cut -d'|' -f2)
             SOURCE_CMAKE=$(echo "$SOURCE_INFO" | cut -d'|' -f3)
@@ -522,7 +533,7 @@ pip3 install "silero-vad>=6.0" auditok
 
 if [ "$MINIMAL" = false ]; then
     pip3 install ten-vad || echo -e "${YELLOW}Warning: ten-vad installation failed (optional)${NC}"
-    pip3 install "scikit-learn>=1.5.0"  # 1.5.0+ for NumPy 2.0 compatibility
+    pip3 install "scikit-learn>=1.3.0"  # Semantic scene detection
 fi
 log "Optional packages installed"
 echo ""
@@ -558,7 +569,7 @@ if [ "$NO_SPEECH_ENHANCEMENT" = false ]; then
         log "WARNING: modelscope installation failed"
     }
 
-    # Install ClearVoice from NumPy 2.x compatible fork
+    # Install ClearVoice from fork with relaxed librosa constraint
     echo "Installing ClearVoice (48kHz denoising)..."
     log "Installing ClearVoice..."
     pip3 install "git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice" || {

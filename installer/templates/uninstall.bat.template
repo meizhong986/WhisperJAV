@@ -56,8 +56,8 @@ echo Installation directory: %INSTALL_DIR% >> "%UNINSTALL_LOG%"
 echo. >> "%UNINSTALL_LOG%"
 
 REM ===== Step 1: Remove Desktop Shortcut =====
-echo [Step 1/5] Removing desktop shortcut...
-echo [Step 1/5] Desktop shortcut >> "%UNINSTALL_LOG%"
+echo [Step 1/6] Removing desktop shortcut...
+echo [Step 1/6] Desktop shortcut >> "%UNINSTALL_LOG%"
 
 set SHORTCUT_PATH=%USERPROFILE%\Desktop\WhisperJAV v{{VERSION}}.lnk
 
@@ -76,36 +76,85 @@ if exist "%SHORTCUT_PATH%" (
 )
 echo.
 
-REM ===== Step 2: Optional - Remove User Configuration =====
-echo [Step 2/5] User configuration...
-echo [Step 2/5] User configuration >> "%UNINSTALL_LOG%"
+REM ===== Step 1.5: Remove Start Menu Shortcut =====
+echo [Step 1.5/6] Removing Start Menu shortcut...
+echo [Step 1.5/6] Start Menu shortcut >> "%UNINSTALL_LOG%"
 
-set CONFIG_FILE=%INSTALL_DIR%\whisperjav_config.json
+set START_MENU_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\WhisperJAV
 
-if exist "%CONFIG_FILE%" (
-    echo.
-    echo   Found user configuration file: whisperjav_config.json
-    echo   This contains your settings and preferences.
-    echo.
-    set /p DEL_CONFIG="   Delete configuration file? (y/N): "
-
-    if /i "!DEL_CONFIG!"=="y" (
-        del "%CONFIG_FILE%"
-        echo   - Configuration file deleted
-        echo   - Configuration file deleted >> "%UNINSTALL_LOG%"
+if exist "%START_MENU_DIR%" (
+    rmdir /s /q "%START_MENU_DIR%"
+    if exist "%START_MENU_DIR%" (
+        echo   WARNING: Could not delete Start Menu folder
+        echo   WARNING: Start Menu deletion failed >> "%UNINSTALL_LOG%"
     ) else (
-        echo   - Configuration file kept
-        echo   - Configuration file kept (user choice) >> "%UNINSTALL_LOG%"
+        echo   - Start Menu shortcut removed
+        echo   - Start Menu shortcut removed >> "%UNINSTALL_LOG%"
     )
 ) else (
-    echo   - No configuration file found
-    echo   - No configuration file >> "%UNINSTALL_LOG%"
+    echo   - Start Menu shortcut not found (already removed)
+    echo   - Start Menu shortcut not found >> "%UNINSTALL_LOG%"
+)
+echo.
+
+REM ===== Step 2: Optional - Remove User Configuration =====
+echo [Step 2/6] User configuration...
+echo [Step 2/6] User configuration >> "%UNINSTALL_LOG%"
+
+REM Config is stored in %APPDATA%\WhisperJAV (standard user config location)
+set CONFIG_DIR=%APPDATA%\WhisperJAV
+set CONFIG_FILE=%CONFIG_DIR%\whisperjav_config.json
+
+REM Also check legacy location in installation directory
+set LEGACY_CONFIG=%INSTALL_DIR%\whisperjav_config.json
+
+set CONFIG_FOUND=0
+if exist "%CONFIG_FILE%" set CONFIG_FOUND=1
+if exist "%LEGACY_CONFIG%" set CONFIG_FOUND=1
+
+if "%CONFIG_FOUND%"=="1" (
+    echo.
+    echo   Found user configuration:
+    if exist "%CONFIG_FILE%" echo     - %CONFIG_FILE%
+    if exist "%LEGACY_CONFIG%" echo     - %LEGACY_CONFIG% (legacy location)
+    echo   This contains your settings and preferences.
+    echo.
+    set /p DEL_CONFIG="   Delete configuration files? (y/N): "
+
+    if /i "!DEL_CONFIG!"=="y" (
+        REM Delete config in %APPDATA%
+        if exist "%CONFIG_FILE%" (
+            del "%CONFIG_FILE%"
+            echo   - Deleted: %CONFIG_FILE%
+            echo   - Configuration file deleted (APPDATA) >> "%UNINSTALL_LOG%"
+        )
+        REM Delete config directory if empty
+        if exist "%CONFIG_DIR%" (
+            rmdir "%CONFIG_DIR%" 2>nul
+            if not exist "%CONFIG_DIR%" (
+                echo   - Removed empty config directory
+                echo   - Config directory removed >> "%UNINSTALL_LOG%"
+            )
+        )
+        REM Delete legacy config
+        if exist "%LEGACY_CONFIG%" (
+            del "%LEGACY_CONFIG%"
+            echo   - Deleted: %LEGACY_CONFIG%
+            echo   - Legacy configuration file deleted >> "%UNINSTALL_LOG%"
+        )
+    ) else (
+        echo   - Configuration files kept
+        echo   - Configuration files kept (user choice) >> "%UNINSTALL_LOG%"
+    )
+) else (
+    echo   - No configuration files found
+    echo   - No configuration files >> "%UNINSTALL_LOG%"
 )
 echo.
 
 REM ===== Step 3: Optional - Remove Cached Models =====
-echo [Step 3/5] Cached AI models...
-echo [Step 3/5] Cached AI models >> "%UNINSTALL_LOG%"
+echo [Step 3/6] Cached AI models...
+echo [Step 3/6] Cached AI models >> "%UNINSTALL_LOG%"
 
 set MODEL_CACHE=%USERPROFILE%\.cache\whisper
 
@@ -144,8 +193,8 @@ if exist "%MODEL_CACHE%" (
 echo.
 
 REM ===== Step 4: Remove Installation Directory =====
-echo [Step 4/5] Removing installation directory...
-echo [Step 4/5] Installation directory >> "%UNINSTALL_LOG%"
+echo [Step 4/6] Removing installation directory...
+echo [Step 4/6] Installation directory >> "%UNINSTALL_LOG%"
 
 REM We need to delete the installation directory, but this script is running from it!
 REM Strategy: Create a temporary cleanup script that runs after this script exits
@@ -176,8 +225,8 @@ echo   - Cleanup script created >> "%UNINSTALL_LOG%"
 echo.
 
 REM ===== Step 5: Final Summary =====
-echo [Step 5/5] Uninstallation summary
-echo [Step 5/5] Uninstallation summary >> "%UNINSTALL_LOG%"
+echo [Step 6/6] Uninstallation summary
+echo [Step 6/6] Uninstallation summary >> "%UNINSTALL_LOG%"
 
 echo.
 echo ===============================================================================
@@ -186,7 +235,8 @@ echo ===========================================================================
 echo.
 echo The following items have been removed:
 echo   - Desktop shortcut: WhisperJAV v{{VERSION}}.lnk
-if /i "%DEL_CONFIG%"=="y" echo   - User configuration file
+echo   - Start Menu shortcut folder
+if /i "%DEL_CONFIG%"=="y" echo   - User configuration files (APPDATA and legacy)
 if /i "%DEL_MODELS%"=="y" echo   - Cached AI models (~!MODEL_SIZE_MB! MB)
 echo.
 echo The installation directory will be deleted when you close this window:

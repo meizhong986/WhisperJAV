@@ -45,6 +45,7 @@ extra_files:
   - LICENSE.txt
   - whisperjav_icon.ico
   - whisperjav-{{VERSION}}-py3-none-any.whl
+  - uv.exe  # Fast package installer (10-30x faster than pip, ~30MB)
 
 # Installer metadata
 license_file: LICENSE.txt

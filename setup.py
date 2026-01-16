@@ -25,15 +25,15 @@ install_requires = [
     "soundfile",
     "auditok",
     "pydub",
-    "numpy>=2.0",          # NumPy 2.x (modelscope/zipenhancer compatible)
-    "scipy>=1.14.0",       # Required for NumPy 2.0 compatibility (ABI change)
+    "numpy>=1.26.0,<2.0",  # NumPy 1.26.x for pyvideotrans compatibility (v1.8.0)
+    "scipy>=1.10.1",       # Compatible with NumPy 1.26.x
     "tqdm",
     "pysrt",
     "srt",
     "aiofiles",
     "jsonschema",
     "colorama",
-    "librosa>=0.11.0",        # v0.11.0+ supports NumPy 2.0
+    "librosa>=0.10.0",        # v0.10.0+ works with NumPy 1.26; ClearVoice fork supports >=0.11.0
     "pyloudnorm",
     "requests",
     "regex",
@@ -62,7 +62,7 @@ install_requires = [
     "simplejson",             # ModelScope dependency (JSON parsing)
     "sortedcontainers",       # ModelScope dependency (sorted collections)
     "packaging",              # ModelScope dependency (version parsing)
-    "clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",  # Fork with NumPy 2.x support
+    "clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",  # Fork with relaxed librosa constraint (>=0.11.0)
     "bs-roformer-infer",      # BS-RoFormer vocal isolation (44.1kHz)
     "onnxruntime>=1.16.0",    # ONNX inference for ZipEnhancer ONNX mode
 
@@ -76,14 +76,23 @@ install_requires = [
     "pywin32>=305; sys_platform=='win32'",   # Only installs on Windows
 
     # Speedup Dependencies (Previously in 'speedup' extra)
-    "numba>=0.60.0",  # NumPy 2.0 compatible
+    "numba>=0.58.0",  # Supports NumPy 1.22-2.0
     "hf_xet",  # Faster HuggingFace downloads (Xet Storage)
 
     # Process Management (v1.7.4)
     "psutil>=5.9.0",  # Process tree termination for clean subprocess cleanup
 
     # Semantic Audio Clustering (v1.7.4)
-    "scikit-learn>=1.5.0",  # Agglomerative clustering for texture-based scene detection (NumPy 2.0 compatible)
+    "scikit-learn>=1.3.0",  # Agglomerative clustering for texture-based scene detection
+
+    # pyvideotrans compatibility prep (v1.8.0 Phase 1)
+    # Pre-loading non-conflicting deps for future pyvideotrans integration
+    "av>=13.0.0",             # Video container handling (PyAV)
+    "imageio>=2.31.0",        # Image/video I/O
+    "imageio-ffmpeg>=0.4.9",  # FFmpeg backend for imageio
+    "httpx>=0.27.0",          # Modern async HTTP client
+    "websockets>=13.0",       # WebSocket support for streaming APIs
+    "soxr>=0.3.0",            # High-quality audio resampling (libsoxr bindings)
 ]
 
 # Classifiers for supported Python versions (3.10+ only)

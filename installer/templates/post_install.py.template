@@ -35,6 +35,14 @@ except ImportError:  # pragma: no cover - optional dependency
 
 LOG_FILE = os.path.join(sys.prefix, "install_log_v{{VERSION}}.txt")
 
+# ==============================================================================
+# Package Manager Detection (uv preferred, pip fallback)
+# ==============================================================================
+# uv is a fast Rust-based package installer (10-30x faster than pip)
+# It's bundled with the installer similar to how git is bundled via conda
+UV_EXE = os.path.join(sys.prefix, "uv.exe")
+USE_UV = os.path.exists(UV_EXE)
+
 MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (11, 8, 0)
 CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio"
 
@@ -64,32 +72,25 @@ class TorchInstallPlan(NamedTuple):
 
 
 TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
-    # Driver 570+ (RTX 50xx Blackwell, RTX 40xx with latest drivers) -> CUDA 12.8
-    # Note: CUDA 13.x is NOT supported - no PyTorch wheels available
+    # Simplified CUDA matrix for v1.8.0+ (aligned with pyvideotrans requirements)
+    # - CUDA 12.8: Optimal for modern drivers (570+), supports all RTX 20xx/30xx/40xx/50xx
+    # - CUDA 11.8: Universal fallback for older drivers, supports all CUDA-capable GPUs
+    #
+    # Note: CUDA 12.1/12.4/12.6 removed - PyTorch 2.7.x dropped 12.1/12.4 support
+    #       Users with drivers 530-569 will use CUDA 11.8 (works perfectly)
+    #       To get CUDA 12.8, update driver to 570+ (free from nvidia.com)
+
+    # Driver 570+ → CUDA 12.8 (RTX 20xx/30xx/40xx/50xx with modern drivers)
     DriverMatrixEntry(
-        (570, 65, 0),
+        (570, 0, 0),
         "CUDA 12.8",
         "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu128"
     ),
+    # Driver 450+ → CUDA 11.8 (Universal fallback for all older drivers)
     DriverMatrixEntry(
-        (560, 76, 0),
-        "CUDA 12.6",
-        "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu126"
-    ),
-    DriverMatrixEntry(
-        (551, 61, 0),
-        "CUDA 12.4",
-        "pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124"
-    ),
-    DriverMatrixEntry(
-        (531, 14, 0),
-        "CUDA 12.1",
-        "pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121"
-    ),
-    DriverMatrixEntry(
-        (520, 6, 0),
+        (450, 0, 0),
         "CUDA 11.8",
-        "pip install torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu118"
+        "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu118"
     ),
 )
 
@@ -128,6 +129,55 @@ def parse_version_string(version_str: str) -> Optional[Tuple[int, int, int]]:
     while len(digits) < 3:
         digits.append(0)
     return tuple(digits[:3])  # type: ignore[return-value]
+
+
+def get_uv_version() -> Optional[str]:
+    """Get uv version string if available."""
+    if not USE_UV:
+        return None
+    try:
+        result = subprocess.run(
+            [UV_EXE, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def log_installer_info():
+    """Log which package installer will be used."""
+    if USE_UV:
+        uv_version = get_uv_version()
+        if uv_version:
+            log(f"Package installer: {uv_version} (10-30x faster than pip)")
+        else:
+            log("Package installer: uv (version unknown)")
+    else:
+        log("Package installer: pip (uv not bundled - using standard installer)")
+        log("  Note: Installation will be slower but fully functional")
+
+
+def get_package_installer_cmd() -> Tuple[list, str]:
+    """
+    Get the appropriate package installer command prefix.
+
+    Returns:
+        tuple: (command_prefix_list, installer_name)
+
+    uv is preferred (10-30x faster) with pip as fallback.
+    """
+    python_exe = os.path.join(sys.prefix, 'python.exe')
+
+    if USE_UV:
+        # uv pip install --python <path> ensures we install to the right env
+        return ([UV_EXE, "pip", "install", "--python", python_exe], "uv")
+    else:
+        return ([python_exe, "-m", "pip", "install"], "pip")
 
 
 def ensure_pynvml_loaded() -> bool:
@@ -373,6 +423,90 @@ def check_network(timeout: int = 10) -> bool:
         log(f"ERROR: Network check failed: {e}")
         log("       Internet connection is required for downloading dependencies.")
         return False
+
+
+def check_vc_redist() -> bool:
+    """Check if Visual C++ 2015-2022 Redistributable (x64) is installed."""
+    log("Checking for Visual C++ Redistributable...")
+    try:
+        import winreg
+        # VC++ 2015-2022 (v14.x) x64 - check multiple possible locations
+        key_paths = [
+            r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+            r"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+        ]
+        for key_path in key_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path)
+                winreg.CloseKey(key)
+                log("  VC++ Redistributable: Installed")
+                return True
+            except FileNotFoundError:
+                continue
+        log("  VC++ Redistributable: NOT FOUND")
+        return False
+    except Exception as e:
+        log(f"  VC++ check error: {e}")
+        return True  # Assume OK if can't check
+
+
+def ensure_vc_redist() -> bool:
+    """Ensure VC++ Redistributable is installed, download and install if missing."""
+    if check_vc_redist():
+        return True
+
+    log("")
+    log("Visual C++ 2015-2022 Redistributable is required for PyTorch and other native libraries.")
+    log("Downloading and installing VC++ Redistributable...")
+
+    vc_url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    vc_path = os.path.join(os.environ.get("TEMP", sys.prefix), "vc_redist.x64.exe")
+
+    try:
+        # Download VC++ Redistributable
+        log(f"  Downloading from: {vc_url}")
+        import urllib.request
+        urllib.request.urlretrieve(vc_url, vc_path)
+        log(f"  Downloaded to: {vc_path}")
+
+        # Install silently
+        log("  Installing VC++ Redistributable (this may take a minute)...")
+        result = subprocess.run(
+            [vc_path, "/install", "/quiet", "/norestart"],
+            capture_output=True,
+            timeout=300  # 5 minute timeout
+        )
+
+        # Clean up installer
+        try:
+            os.remove(vc_path)
+        except Exception:
+            pass
+
+        if result.returncode == 0:
+            log("  VC++ Redistributable: Installed successfully")
+            return True
+        elif result.returncode == 1638:
+            # 1638 = Another version is already installed
+            log("  VC++ Redistributable: A compatible version is already installed")
+            return True
+        elif result.returncode == 3010:
+            # 3010 = Reboot required (but install succeeded)
+            log("  VC++ Redistributable: Installed (reboot may be required later)")
+            return True
+        else:
+            log(f"  WARNING: VC++ install returned code {result.returncode}")
+            log("  The installation may still work. Continuing...")
+            return True  # Non-fatal, proceed
+
+    except subprocess.TimeoutExpired:
+        log("  WARNING: VC++ installation timed out")
+        log("  You may need to install it manually from: https://aka.ms/vs/17/release/vc_redist.x64.exe")
+        return True  # Non-fatal
+    except Exception as e:
+        log(f"  WARNING: Failed to install VC++ Redistributable: {e}")
+        log("  You may need to install it manually from: https://aka.ms/vs/17/release/vc_redist.x64.exe")
+        return True  # Non-fatal, proceed
 
 
 def check_webview2_windows() -> bool:
@@ -622,13 +756,14 @@ def configure_git_for_slow_connections() -> bool:
 
 def run_pip(args: list, description: str, retries: int = 3) -> bool:
     """
-    Run pip command with retries and smart Git timeout handling.
+    Run package install command with retries and smart Git timeout handling.
 
+    Uses uv (if available) for 10-30x faster installation, with pip fallback.
     If a Git timeout is detected (common with GFW/VPN), this function will
     automatically configure Git with extended timeouts and retry.
 
     Args:
-        args: Pip arguments (e.g., ["install", "package"])
+        args: Pip-style arguments (e.g., ["install", "package"])
         description: Human-readable description for logging
         retries: Number of retry attempts (default 3)
 
@@ -638,26 +773,32 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
     global _git_timeouts_configured
 
     log(f"Starting: {description}")
-    pip_cmd = [os.path.join(sys.prefix, 'python.exe'), '-m', 'pip'] + args
+
+    # Get installer command prefix (uv or pip)
+    installer_prefix, installer_name = get_package_installer_cmd()
+
+    # Normalize args: if first arg is "install", skip it (already in prefix)
+    normalized_args = args[1:] if args and args[0] == "install" else args
+
+    # Build the command
+    cmd = installer_prefix + normalized_args
 
     # Check if this is a git+https install (more timeout-sensitive)
     is_git_install = any("git+" in str(arg) for arg in args)
 
-    # Use longer pip timeout for git installs (Issue #111)
-    if is_git_install and "--timeout" not in str(args):
-        # Insert timeout after 'install' command
-        try:
-            install_idx = args.index("install") + 1
-            args = args[:install_idx] + ["--timeout=120"] + args[install_idx:]
-            pip_cmd = [os.path.join(sys.prefix, 'python.exe'), '-m', 'pip'] + args
-        except ValueError:
-            pass  # Not an install command
+    # For pip only: add timeout flag for git installs (uv handles this better automatically)
+    if installer_name == "pip" and is_git_install and "--timeout" not in str(args):
+        cmd = installer_prefix + ["--timeout=120"] + normalized_args
 
     for attempt in range(retries):
-        log(f"Attempt {attempt+1}/{retries}: {' '.join(pip_cmd)}")
+        # Log command (truncate if too long)
+        cmd_str = ' '.join(cmd)
+        display_cmd = cmd_str[:120] + '...' if len(cmd_str) > 120 else cmd_str
+        log(f"[{installer_name}] Attempt {attempt+1}/{retries}: {display_cmd}")
+
         try:
             result = subprocess.run(
-                pip_cmd,
+                cmd,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -708,13 +849,111 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
                 time.sleep(10)
 
         except Exception as e:
-            log(f"ERROR: Unexpected error during pip execution: {e}")
+            log(f"ERROR: Unexpected error during package installation: {e}")
             if attempt < retries - 1:
                 log("Retrying in 10 seconds...")
                 time.sleep(10)
 
     log(f"FATAL: {description} failed after {retries} attempts")
     return False
+
+
+def get_config_directory() -> str:
+    """
+    Get the WhisperJAV configuration directory.
+
+    Config location: %APPDATA%\\WhisperJAV (e.g., C:\\Users\\Name\\AppData\\Roaming\\WhisperJAV)
+    This is the standard location for user configuration on Windows.
+
+    Returns:
+        Path to the config directory
+    """
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        # Fallback for edge cases
+        appdata = os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+    return os.path.join(appdata, "WhisperJAV")
+
+
+def setup_config_directory() -> bool:
+    """
+    Create the WhisperJAV configuration directory if it doesn't exist.
+
+    Returns:
+        True if successful, False otherwise
+    """
+    config_dir = get_config_directory()
+    log(f"Setting up config directory: {config_dir}")
+
+    try:
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir, exist_ok=True)
+            log(f"  Created config directory: {config_dir}")
+        else:
+            log(f"  Config directory already exists")
+        return True
+    except Exception as e:
+        log(f"  WARNING: Could not create config directory: {e}")
+        return False
+
+
+def migrate_config() -> bool:
+    """
+    Migrate configuration from old locations to new %APPDATA% location.
+
+    Migration sources (in priority order):
+    1. %LOCALAPPDATA%\\WhisperJAV\\whisperjav_config.json (old installer location)
+    2. Installation directory\\whisperjav_config.json (legacy location)
+
+    This function is idempotent - if config already exists in new location,
+    it will not overwrite it.
+
+    Returns:
+        True if migration was successful or not needed, False on error
+    """
+    config_dir = get_config_directory()
+    new_config_path = os.path.join(config_dir, "whisperjav_config.json")
+
+    # If config already exists in new location, skip migration
+    if os.path.exists(new_config_path):
+        log(f"  Config already exists in new location, skipping migration")
+        return True
+
+    # Potential old config locations
+    old_locations = []
+
+    # 1. Old %LOCALAPPDATA% location (from previous installer versions)
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        old_locations.append(os.path.join(localappdata, "WhisperJAV", "whisperjav_config.json"))
+
+    # 2. Installation directory (legacy location)
+    old_locations.append(os.path.join(sys.prefix, "whisperjav_config.json"))
+
+    # Try to find and migrate config from old locations
+    for old_path in old_locations:
+        if os.path.exists(old_path):
+            try:
+                log(f"  Found config at old location: {old_path}")
+                log(f"  Migrating to: {new_config_path}")
+
+                # Ensure config directory exists
+                os.makedirs(config_dir, exist_ok=True)
+
+                # Copy config to new location
+                shutil.copy2(old_path, new_config_path)
+                log(f"  ✓ Config migrated successfully")
+
+                # Note: We don't delete the old config - user may have other installations
+                return True
+
+            except Exception as e:
+                log(f"  WARNING: Could not migrate config: {e}")
+                # Non-fatal - user can reconfigure
+                return True
+
+    log(f"  No existing config found - fresh installation")
+    return True
 
 
 def create_failure_file(error_message: str):
@@ -754,6 +993,16 @@ def print_installation_summary(install_start_time: float):
     log(f"Installation Summary:")
     log(f"  ✓ Installation directory: {sys.prefix}")
     log(f"  ✓ Python version: {sys.version.split()[0]}")
+
+    # Show which package installer was used
+    if USE_UV:
+        uv_version = get_uv_version()
+        if uv_version:
+            log(f"  ✓ Package installer: {uv_version} (fast mode)")
+        else:
+            log(f"  ✓ Package installer: uv (fast mode)")
+    else:
+        log(f"  ✓ Package installer: pip (standard mode)")
 
     try:
         import torch
@@ -1109,9 +1358,27 @@ def main() -> int:
     log(f"Installation prefix: {sys.prefix}")
     log(f"Python executable: {sys.executable}")
     log(f"Python version: {sys.version}")
+    log_installer_info()  # Log which package installer (uv or pip) will be used
 
     # === Phase 1: Preflight Checks ===
     log_section("Phase 1: Preflight Checks")
+
+    # Check write permission to installation directory
+    log("Checking write permission to installation directory...")
+    try:
+        test_file = os.path.join(sys.prefix, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        log("  Write permission: OK")
+    except PermissionError:
+        log("  FATAL: No write permission to installation directory!")
+        log(f"  Directory: {sys.prefix}")
+        create_failure_file("No write permission to installation directory")
+        return 1
+    except Exception as e:
+        log(f"  Write permission check warning: {e}")
+        # Non-fatal, proceed
 
     if not check_disk_space(8):
         create_failure_file("Insufficient disk space (8GB required)")
@@ -1120,6 +1387,15 @@ def main() -> int:
     if not check_network():
         create_failure_file("Network connectivity required")
         return 1
+
+    # Ensure VC++ Redistributable is installed (required for PyTorch, native libs)
+    ensure_vc_redist()
+
+    # Setup config directory in %APPDATA% and migrate from old location if needed
+    log("")
+    log("Setting up configuration directory...")
+    setup_config_directory()
+    migrate_config()
 
     # Check WebView2 (non-fatal, but prompt user)
     if not check_webview2_windows():

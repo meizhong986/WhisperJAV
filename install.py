@@ -440,10 +440,13 @@ def main():
     print("  Step 3/6: Installing core dependencies")
     print("=" * 60)
     core_deps = [
-        "numpy>=2.0", "scipy>=1.14.0", "librosa>=0.11.0",  # scipy 1.14.0+ for NumPy 2.0 ABI
+        "numpy>=1.26.0,<2.0", "scipy>=1.10.1", "librosa>=0.10.0",  # NumPy 1.26.x for pyvideotrans compatibility
         "soundfile", "pydub", "tqdm", "colorama", "requests", "regex",
         "pysrt", "srt", "aiofiles", "jsonschema", "pyloudnorm",
-        "pydantic>=2.0,<3.0", "PyYAML>=6.0", "numba>=0.60.0",  # numba 0.60.0+ for NumPy 2.0
+        "pydantic>=2.0,<3.0", "PyYAML>=6.0", "numba>=0.58.0",  # numba 0.58.0+ supports NumPy 1.22-2.0
+        # pyvideotrans Phase 1 prep
+        "av>=13.0.0", "imageio>=2.31.0", "imageio-ffmpeg>=0.4.9",
+        "httpx>=0.27.0", "websockets>=13.0", "soxr>=0.3.0",
     ]
     run_pip(["install"] + core_deps, "Install core dependencies")
 
@@ -567,7 +570,7 @@ def main():
 
     if not args.minimal:
         run_pip(["install", "ten-vad"], "Install TEN VAD", allow_fail=True)
-        run_pip(["install", "scikit-learn>=1.5.0"], "Install scikit-learn")  # 1.5.0+ for NumPy 2.0
+        run_pip(["install", "scikit-learn>=1.3.0"], "Install scikit-learn")
 
     # Speech Enhancement
     if not args.no_speech_enhancement and not args.minimal:

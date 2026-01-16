@@ -335,8 +335,13 @@ def validate_yaml_syntax():
             )
             return False
 
-        # Check extra_files exist
-        missing_files = [f for f in data['extra_files'] if not check_file_exists(f)]
+        # Check extra_files exist (except deferred downloads)
+        # uv.exe is downloaded during build_installer.bat Phase 3, not during generation
+        deferred_files = {'uv.exe'}
+        missing_files = [
+            f for f in data['extra_files']
+            if not check_file_exists(f) and f not in deferred_files
+        ]
         if missing_files:
             print_check(
                 f"{filename} syntax",
@@ -344,6 +349,11 @@ def validate_yaml_syntax():
                 f"Extra files missing: {', '.join(missing_files)}"
             )
             return False
+
+        # Note deferred files that will be downloaded during build
+        deferred_present = [f for f in data['extra_files'] if f in deferred_files]
+        if deferred_present:
+            print(f"          Note: {', '.join(deferred_present)} will be downloaded during build")
 
         print_check(f"{filename} syntax", True, "YAML structure valid")
         return True
