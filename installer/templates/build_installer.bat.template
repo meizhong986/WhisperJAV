@@ -147,103 +147,171 @@ echo [Phase 3/7] Obtaining uv package manager...
 echo [Phase 3/7] Obtaining uv... >> "%BUILD_LOG%"
 
 REM uv is a fast package installer (10-30x faster than pip)
-REM It's bundled with the installer similar to how git is bundled via conda
-REM Strategy: 1) Use existing local copy, 2) Copy from system PATH, 3) Download
+REM It MUST be bundled with the installer - no pip fallback allowed
+REM Strategy: 1) Local copy, 2) Common install locations, 3) PATH, 4) Download, 5) FAIL
 
-REM Check if uv.exe already exists in current directory
+set "UV_FOUND=0"
+
+REM === Step 1: Check if uv.exe already exists in current directory ===
 if exist "uv.exe" (
-    for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
-    echo   - Found existing uv.exe: !UV_VER!
-    echo   - uv: !UV_VER! (existing local) >> "%BUILD_LOG%"
-    goto :UvReady
-)
-
-REM Check if uv is installed system-wide (in PATH)
-echo   - Checking for system-installed uv...
-where uv >nul 2>nul
-if not errorlevel 1 (
-    REM uv found in PATH, copy it to current directory
-    for /f "tokens=*" %%a in ('where uv') do (
-        set "SYSTEM_UV=%%a"
-        goto :CopySystemUv
+    uv.exe --version >nul 2>nul
+    if not errorlevel 1 (
+        for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
+        echo   - Found existing uv.exe: !UV_VER!
+        echo   - uv: !UV_VER! (existing local) >> "%BUILD_LOG%"
+        set "UV_FOUND=1"
+        goto :UvVerify
+    ) else (
+        echo   - Local uv.exe exists but is not functional, removing...
+        del uv.exe 2>nul
     )
 )
-goto :DownloadUv
 
-:CopySystemUv
-echo   - Found system uv: !SYSTEM_UV!
-echo   - uv: found in system PATH >> "%BUILD_LOG%"
-copy "!SYSTEM_UV!" "uv.exe" >nul 2>nul
-if exist "uv.exe" (
-    for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
-    echo   - Copied to local: !UV_VER!
-    echo   - uv: !UV_VER! (copied from system) >> "%BUILD_LOG%"
-    goto :UvReady
-) else (
-    echo   - Failed to copy system uv, will download instead
-    echo   - uv: copy failed, downloading >> "%BUILD_LOG%"
+REM === Step 2: Check common installation locations (not just PATH) ===
+echo   - Checking common installation locations...
+set "UV_LOCATIONS="
+set "UV_LOCATIONS=!UV_LOCATIONS! %USERPROFILE%\.local\bin\uv.exe"
+set "UV_LOCATIONS=!UV_LOCATIONS! %USERPROFILE%\.cargo\bin\uv.exe"
+set "UV_LOCATIONS=!UV_LOCATIONS! %LOCALAPPDATA%\uv\uv.exe"
+set "UV_LOCATIONS=!UV_LOCATIONS! %APPDATA%\uv\uv.exe"
+set "UV_LOCATIONS=!UV_LOCATIONS! %LOCALAPPDATA%\Programs\uv\uv.exe"
+
+for %%p in (!UV_LOCATIONS!) do (
+    if exist "%%p" (
+        echo   - Found uv at: %%p
+        echo   - uv: found at %%p >> "%BUILD_LOG%"
+        copy "%%p" "uv.exe" >nul
+        if exist "uv.exe" (
+            uv.exe --version >nul 2>nul
+            if not errorlevel 1 (
+                for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
+                echo   - Copied to local: !UV_VER!
+                echo   - uv: !UV_VER! (copied from %%p) >> "%BUILD_LOG%"
+                set "UV_FOUND=1"
+                goto :UvVerify
+            )
+        )
+    )
 )
 
-:DownloadUv
-echo   - Downloading uv.exe from GitHub...
+REM === Step 3: Check system PATH with 'where uv' ===
+echo   - Checking system PATH...
+where uv >nul 2>nul
+if not errorlevel 1 (
+    for /f "tokens=*" %%a in ('where uv') do (
+        set "SYSTEM_UV=%%a"
+        echo   - Found in PATH: !SYSTEM_UV!
+        echo   - uv: found in PATH at !SYSTEM_UV! >> "%BUILD_LOG%"
+        copy "!SYSTEM_UV!" "uv.exe" >nul
+        if exist "uv.exe" (
+            uv.exe --version >nul 2>nul
+            if not errorlevel 1 (
+                for /f "tokens=*" %%b in ('uv.exe --version 2^>^&1') do set UV_VER=%%b
+                echo   - Copied to local: !UV_VER!
+                echo   - uv: !UV_VER! (copied from PATH) >> "%BUILD_LOG%"
+                set "UV_FOUND=1"
+                goto :UvVerify
+            )
+        )
+        goto :UvTryDownload
+    )
+)
+
+REM === Step 4: Download from GitHub ===
+:UvTryDownload
+echo   - uv not found locally, downloading from GitHub...
 echo   - uv: downloading from GitHub... >> "%BUILD_LOG%"
 
 REM Download latest uv release for Windows x64
 REM Using PowerShell for reliable HTTPS download
+REM Note: The zip structure may vary between versions, so we search for uv.exe
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "Write-Host '    Downloading from github.com/astral-sh/uv...' ; " ^
     "$ProgressPreference = 'SilentlyContinue'; " ^
     "$url = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'; " ^
     "$zip = 'uv-temp.zip'; " ^
     "try { " ^
-    "    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 60; " ^
+    "    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 120; " ^
     "    Expand-Archive -Path $zip -DestinationPath 'uv-temp' -Force; " ^
-    "    Move-Item -Path 'uv-temp\\uv.exe' -Destination 'uv.exe' -Force; " ^
+    "    $uvExe = Get-ChildItem -Path 'uv-temp' -Filter 'uv.exe' -Recurse | Select-Object -First 1; " ^
+    "    if ($uvExe) { " ^
+    "        Copy-Item -Path $uvExe.FullName -Destination 'uv.exe' -Force; " ^
+    "        Write-Host ('    Found and copied: ' + $uvExe.FullName) " ^
+    "    } else { " ^
+    "        Write-Host '    ERROR: uv.exe not found in downloaded archive'; " ^
+    "        exit 1 " ^
+    "    }; " ^
     "    Remove-Item -Path $zip -Force -ErrorAction SilentlyContinue; " ^
     "    Remove-Item -Path 'uv-temp' -Recurse -Force -ErrorAction SilentlyContinue; " ^
     "    Write-Host '    Download complete.' " ^
     "} catch { " ^
-    "    Write-Host \"    Download failed: $_\" ; " ^
+    "    Write-Host ('    Download failed: ' + $_.Exception.Message); " ^
     "    exit 1 " ^
     "}"
 
+if exist "uv.exe" (
+    uv.exe --version >nul 2>nul
+    if not errorlevel 1 (
+        for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
+        echo   - Downloaded and verified: !UV_VER!
+        echo   - uv: !UV_VER! (downloaded) >> "%BUILD_LOG%"
+        set "UV_FOUND=1"
+        goto :UvVerify
+    ) else (
+        echo   - Downloaded uv.exe but it's not functional
+        echo   - uv: download failed (not functional) >> "%BUILD_LOG%"
+        del uv.exe 2>nul
+    )
+)
+
+REM === Step 5: FAIL - uv.exe could not be obtained ===
+echo.
+echo ===============================================================================
+echo   FATAL ERROR: Failed to obtain uv.exe!
+echo ===============================================================================
+echo.
+echo   uv.exe is REQUIRED for building the installer. Without uv, users would
+echo   experience 10-30x slower installation times with pip.
+echo.
+echo   Attempted locations:
+echo     - Current directory: NOT FOUND
+echo     - %%USERPROFILE%%\.local\bin\uv.exe: NOT FOUND
+echo     - %%USERPROFILE%%\.cargo\bin\uv.exe: NOT FOUND
+echo     - %%LOCALAPPDATA%%\uv\uv.exe: NOT FOUND
+echo     - System PATH (where uv): NOT FOUND
+echo     - GitHub download: FAILED
+echo.
+echo   Solutions:
+echo     1. Install uv: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+echo     2. Check internet connection and firewall settings
+echo     3. Manually download uv.exe and place it in: %CD%
+echo        Download from: https://github.com/astral-sh/uv/releases
+echo.
+echo ERROR: uv.exe could not be obtained >> "%BUILD_LOG%"
+pause
+exit /b 1
+
+REM === Final verification that uv.exe exists and works ===
+:UvVerify
 if not exist "uv.exe" (
     echo.
-    echo ERROR: Failed to obtain uv.exe!
-    echo ERROR: uv.exe is required for the installer >> "%BUILD_LOG%"
-    echo.
-    echo uv.exe is required to build the installer.
-    echo.
-    echo Solutions:
-    echo   1. Install uv system-wide: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-    echo   2. Check your internet connection and firewall settings
-    echo   3. Manually download uv.exe and place it in this directory
-    echo.
+    echo FATAL ERROR: uv.exe does not exist after obtain phase!
+    echo ERROR: uv.exe missing after obtain phase >> "%BUILD_LOG%"
     pause
     exit /b 1
 )
 
-REM Verify uv works
 uv.exe --version >nul 2>nul
 if errorlevel 1 (
     echo.
-    echo ERROR: uv.exe downloaded but not functional!
-    echo ERROR: uv.exe verification failed >> "%BUILD_LOG%"
+    echo FATAL ERROR: uv.exe exists but is not functional!
+    echo ERROR: uv.exe not functional >> "%BUILD_LOG%"
     del uv.exe 2>nul
-    echo.
-    echo The downloaded uv.exe is not working properly.
-    echo Try installing uv system-wide instead:
-    echo   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-    echo.
     pause
     exit /b 1
 )
 
-for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
-echo   - Downloaded and verified: !UV_VER!
-echo   - uv: !UV_VER! (downloaded) >> "%BUILD_LOG%"
-
-:UvReady
+echo   - uv.exe verified and ready
 echo.
 
 REM ===== Phase 4: Validate Configuration =====

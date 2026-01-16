@@ -215,6 +215,34 @@ if errorlevel 1 (
     call :log "WebView2 runtime: Detected"
 )
 
+REM Check Visual C++ Redistributable (required for PyTorch and native libraries)
+call :log "Checking Visual C++ Redistributable..."
+set "VCREDIST_FOUND=0"
+reg query "HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" >nul 2>&1
+if not errorlevel 1 set "VCREDIST_FOUND=1"
+reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" >nul 2>&1
+if not errorlevel 1 set "VCREDIST_FOUND=1"
+
+if "%VCREDIST_FOUND%"=="0" (
+    echo.
+    echo ============================================================
+    echo   WARNING: Visual C++ Redistributable Not Detected
+    echo ============================================================
+    echo   PyTorch and other native libraries require the Visual C++
+    echo   2015-2022 Redistributable ^(x64^).
+    echo.
+    echo   Download from: https://aka.ms/vs/17/release/vc_redist.x64.exe
+    echo   Install it before continuing, or the installation may fail.
+    echo ============================================================
+    echo.
+    call :log "WARNING: Visual C++ Redistributable NOT DETECTED"
+    echo Press any key to continue anyway, or Ctrl+C to cancel...
+    pause >nul
+) else (
+    echo Visual C++ Redistributable: Detected
+    call :log "Visual C++ Redistributable: Detected"
+)
+
 REM ============================================================
 REM Phase 2: GPU and CUDA Detection
 REM ============================================================

@@ -98,6 +98,65 @@ fi
 echo -e "${GREEN}Git found${NC}"
 log "Git found"
 
+# ==============================================================================
+# PEP 668 / Virtual Environment Check (Debian 12+, Ubuntu 24.04+)
+# ==============================================================================
+# Modern Linux distributions mark system Python as "externally-managed" which
+# prevents pip from installing packages system-wide. This is a safety feature.
+# Users should run this script inside a virtual environment.
+
+check_venv_requirement() {
+    # Check if we're in a virtual environment
+    if [[ -n "$VIRTUAL_ENV" ]]; then
+        echo -e "${GREEN}Virtual environment detected: $VIRTUAL_ENV${NC}"
+        log "Virtual environment detected: $VIRTUAL_ENV"
+        return 0
+    fi
+
+    # Check if system has PEP 668 marker (externally-managed-environment)
+    PYTHON_STDLIB=$(python3 -c "import sysconfig; print(sysconfig.get_path('stdlib'))" 2>/dev/null)
+    if [[ -f "$PYTHON_STDLIB/EXTERNALLY-MANAGED" ]]; then
+        echo ""
+        echo -e "${YELLOW}============================================================${NC}"
+        echo -e "${YELLOW}  WARNING: System Python is Externally Managed (PEP 668)${NC}"
+        echo -e "${YELLOW}============================================================${NC}"
+        echo ""
+        echo "Your system (likely Debian 12+ or Ubuntu 24.04+) prevents pip from"
+        echo "installing packages system-wide. You have two options:"
+        echo ""
+        echo -e "${GREEN}Option 1 (Recommended): Create and activate a virtual environment${NC}"
+        echo "  python3 -m venv ~/.venv/whisperjav"
+        echo "  source ~/.venv/whisperjav/bin/activate"
+        echo "  ./install_linux.sh"
+        echo ""
+        echo -e "${YELLOW}Option 2: Use --break-system-packages (not recommended)${NC}"
+        echo "  pip3 install --break-system-packages <package>"
+        echo ""
+        echo "Or install via pipx for isolated installation:"
+        echo "  pipx install whisperjav"
+        echo ""
+        log "WARNING: PEP 668 externally-managed environment detected, no venv active"
+
+        # Ask user if they want to continue anyway
+        echo -e "${YELLOW}Do you want to continue anyway? Installation will likely fail.${NC}"
+        read -t 30 -p "Continue? (y/N): " CONTINUE_ANYWAY || CONTINUE_ANYWAY="n"
+        if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
+            echo ""
+            echo "Installation cancelled. Please create a virtual environment first."
+            exit 1
+        fi
+        echo ""
+        echo -e "${YELLOW}Continuing at your own risk...${NC}"
+        log "User chose to continue without venv"
+    else
+        # No PEP 668, but still recommend venv
+        echo -e "${YELLOW}Note: Running outside a virtual environment. Consider using one.${NC}"
+        log "No venv detected, but system allows global pip installs"
+    fi
+}
+
+check_venv_requirement
+
 # Parse arguments
 CPU_ONLY=false
 CUDA_VERSION="auto"
@@ -694,6 +753,55 @@ echo "  Log file: $INSTALL_LOG"
 echo ""
 echo "  If you encounter issues with speech enhancement, re-run with:"
 echo "    ./install_linux.sh --no-speech-enhancement"
+echo ""
+
+# ==============================================================================
+# Optional: Create Desktop Entry
+# ==============================================================================
+create_desktop_entry() {
+    DESKTOP_DIR="$HOME/.local/share/applications"
+    DESKTOP_FILE="$DESKTOP_DIR/whisperjav.desktop"
+
+    # Find whisperjav-gui executable
+    WHISPERJAV_GUI=$(which whisperjav-gui 2>/dev/null || echo "")
+    if [[ -z "$WHISPERJAV_GUI" ]]; then
+        echo -e "${YELLOW}Could not find whisperjav-gui in PATH. Desktop entry skipped.${NC}"
+        return
+    fi
+
+    mkdir -p "$DESKTOP_DIR"
+
+    cat > "$DESKTOP_FILE" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=WhisperJAV
+Comment=Japanese AV Subtitle Generator with AI-powered transcription
+Exec=$WHISPERJAV_GUI
+Icon=whisperjav
+Terminal=false
+Categories=AudioVideo;Audio;Video;
+Keywords=whisper;subtitle;transcription;japanese;
+EOF
+
+    chmod +x "$DESKTOP_FILE"
+    echo -e "${GREEN}Desktop entry created: $DESKTOP_FILE${NC}"
+    log "Desktop entry created: $DESKTOP_FILE"
+
+    # Update desktop database if available
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+    fi
+}
+
+echo -e "${YELLOW}Would you like to create a desktop launcher entry?${NC}"
+read -t 15 -p "Create desktop entry? (y/N): " CREATE_DESKTOP || CREATE_DESKTOP="n"
+if [[ "$CREATE_DESKTOP" =~ ^[Yy]$ ]]; then
+    create_desktop_entry
+else
+    echo "Skipping desktop entry creation."
+    echo "You can launch WhisperJAV from the terminal with: whisperjav-gui"
+fi
 echo ""
 
 log "Installation completed successfully at $(date)"
