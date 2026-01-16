@@ -1087,9 +1087,27 @@ Function OnDirectoryLeave
     ${LogSet} on
 
     # ========================================================================
+    # Normalize Installation Path
+    # ========================================================================
+    # Normalize $INSTDIR to ensure consistent path format regardless of how
+    # it was set. This fixes the bug where upgrade detection fails when the
+    # installation folder is pre-selected (vs browsed via file dialog).
+    #
+    # When the user browses, the file dialog returns a normalized full path.
+    # When pre-selected, $INSTDIR may have different format (e.g., different
+    # case, environment variable remnants, or subtle path differences).
+    # GetFullPathName ensures the path is canonical before IfFileExists checks.
+    Push $0
+    GetFullPathName $0 "$INSTDIR"
+    ${If} $0 != ""
+        StrCpy $INSTDIR $0
+    ${EndIf}
+    Pop $0
+
+    # ========================================================================
     # Non-Empty Directory Check with WhisperJAV Upgrade Support
     # ========================================================================
-    ${If} ${IsNonEmptyDirectory} "$InstDir"
+    ${If} ${IsNonEmptyDirectory} "$INSTDIR"
         # Check if this is a previous WhisperJAV installation
         Call IsWhisperJAVInstallation
         Pop $R0
