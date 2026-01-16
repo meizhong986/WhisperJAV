@@ -21,12 +21,12 @@ ECHO ========================================
 ECHO.
 
 REM Verify Python executable exists in parent directory
+REM NOTE: Do NOT use 'pause' - nsExec cannot handle interactive input
 if not exist "%~dp0..\python.exe" (
     ECHO ERROR: Cannot find python.exe
     ECHO Expected location: %~dp0..\python.exe
     ECHO Installation may be corrupted.
     ECHO.
-    pause
     exit /b 1
 )
 
@@ -36,7 +36,6 @@ if not exist "%~dp0..\post_install_v{{VERSION}}.py" (
     ECHO Expected location: %~dp0..\post_install_v{{VERSION}}.py
     ECHO Installation files may be missing.
     ECHO.
-    pause
     exit /b 1
 )
 
@@ -48,7 +47,9 @@ REM Run the Python post-install script
 REM Both python.exe and the .py script are in the parent directory (../)
 "%~dp0..\python.exe" "%~dp0..\post_install_v{{VERSION}}.py"
 
-REM Check exit code
+REM Check exit code and propagate to NSIS
+REM IMPORTANT: Do NOT use 'pause' here - nsExec cannot handle interactive commands
+REM The Python script already handles error messaging and waits for user to read
 if %errorlevel% neq 0 (
     ECHO.
     ECHO ========================================
@@ -57,7 +58,7 @@ if %errorlevel% neq 0 (
     ECHO Exit code: %errorlevel%
     ECHO Check install_log_v{{VERSION}}.txt for details
     ECHO.
-    pause
+    REM Return error code to NSIS - NSIS will show abort/retry dialog
     exit /b %errorlevel%
 )
 

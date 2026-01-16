@@ -1016,16 +1016,134 @@ Pop $0
 !define IsNonEmptyDirectory `"" IsNonEmptyDirectory`
 
 
+# ============================================================================
+# WhisperJAV Upgrade Detection and Removal Functions
+# ============================================================================
+# These functions detect existing WhisperJAV installations and handle
+# upgrade scenarios where the user wants to replace a previous version.
+
+Function IsWhisperJAVInstallation
+    # Checks if $INSTDIR contains a previous WhisperJAV installation
+    # Detection: Look for Uninstall-WhisperJAV.exe (created by NSIS installer)
+    #
+    # Input: $INSTDIR (global)
+    # Output: Pushes "1" if WhisperJAV detected, "0" otherwise
+
+    ${LogSet} on
+    IfFileExists "$INSTDIR\Uninstall-WhisperJAV.exe" 0 not_whisperjav
+        ${Print} "Detected previous WhisperJAV installation in $INSTDIR"
+        Push "1"
+        Return
+
+    not_whisperjav:
+        Push "0"
+        Return
+FunctionEnd
+
+
+Function RemoveExistingWhisperJAV
+    # Removes an existing WhisperJAV installation from $INSTDIR
+    #
+    # Strategy:
+    # 1. Run uninstaller silently if it exists
+    # 2. ALWAYS run RMDir /r to ensure clean slate (major install)
+    # 3. Verify folder is empty
+    #
+    # Input: $INSTDIR (global)
+    # Output: Pushes "0" on success, "1" on failure
+
+    ${LogSet} on
+    Push $0
+
+    # Step 1: Run uninstaller if it exists
+    IfFileExists "$INSTDIR\Uninstall-WhisperJAV.exe" 0 skip_uninstaller
+        ${Print} "Running existing WhisperJAV uninstaller..."
+        # Run uninstaller silently with _?= to run in-place (wait for completion)
+        # The _?= parameter prevents the uninstaller from copying itself to temp
+        ExecWait '"$INSTDIR\Uninstall-WhisperJAV.exe" /S _?=$INSTDIR' $0
+        ${Print} "Uninstaller completed with exit code: $0"
+    skip_uninstaller:
+
+    # Step 2: Always clean the folder completely (major install)
+    ${Print} "Cleaning installation folder..."
+    RMDir /r "$INSTDIR"
+
+    # Step 3: Verify folder is empty or deleted
+    ${If} ${IsNonEmptyDirectory} "$INSTDIR"
+        ${Print} "::error:: Failed to remove all files from $INSTDIR"
+        Pop $0
+        Push "1"
+        Return
+    ${EndIf}
+
+    ${Print} "Previous installation removed successfully"
+    Pop $0
+    Push "0"
+    Return
+FunctionEnd
+
+
 Function OnDirectoryLeave
     ${LogSet} on
+
+    # ========================================================================
+    # Non-Empty Directory Check with WhisperJAV Upgrade Support
+    # ========================================================================
     ${If} ${IsNonEmptyDirectory} "$InstDir"
-        ${Print} "::error:: Directory '$INSTDIR' is not empty, please choose a different location."
-        MessageBox MB_OK|MB_ICONEXCLAMATION \
-            "Directory '$INSTDIR' is not empty,$\n\
-             please choose a different location." \
-            /SD IDOK
-        Abort
+        # Check if this is a previous WhisperJAV installation
+        Call IsWhisperJAVInstallation
+        Pop $R0
+
+        ${If} $R0 == "1"
+            # Previous WhisperJAV detected - offer upgrade/replace option
+            ${Print} "Previous WhisperJAV installation detected at $INSTDIR"
+
+            MessageBox MB_YESNO|MB_ICONQUESTION \
+                "A previous WhisperJAV installation was found in:$\n$\n\
+                $INSTDIR$\n$\n\
+                This is a major installation that will completely replace$\n\
+                your previous WhisperJAV version.$\n$\n\
+                If you have personal content in this folder, it will be removed.$\n$\n\
+                Do you want to continue?$\n$\n\
+                Click [Yes] to replace, or [No] to choose a different location." \
+                /SD IDNO \
+                IDYES whisperjav_do_replace IDNO whisperjav_abort
+
+            whisperjav_do_replace:
+                ${Print} "User confirmed replacement of existing installation"
+                Call RemoveExistingWhisperJAV
+                Pop $R1
+                ${If} $R1 != "0"
+                    ${Print} "::error:: Failed to remove previous WhisperJAV installation"
+                    MessageBox MB_OK|MB_ICONEXCLAMATION \
+                        "Failed to remove the previous installation.$\n$\n\
+                        Some files may be in use or protected.$\n\
+                        Please close any WhisperJAV windows and try again,$\n\
+                        or manually uninstall the previous version first." \
+                        /SD IDOK
+                    Abort
+                ${EndIf}
+                # Successfully removed - continue with installation
+                Goto whisperjav_continue
+
+            whisperjav_abort:
+                ${Print} "User chose to select a different location"
+                Abort
+        ${Else}
+            # Not a WhisperJAV installation - show standard message
+            ${Print} "::error:: Directory '$INSTDIR' is not empty, please choose a different location."
+            MessageBox MB_OK|MB_ICONEXCLAMATION \
+                "Directory '$INSTDIR' is not empty,$\n\
+                 please choose a different location." \
+                /SD IDOK
+            Abort
+        ${EndIf}
     ${EndIf}
+
+    whisperjav_continue:
+    # ========================================================================
+    # Continue with standard path validation checks
+    # ========================================================================
 
     ReadRegStr $LongPathsEnabled HKLM "SYSTEM\CurrentControlSet\Control\FileSystem" "LongPathsEnabled"
     StrLen $InstDirLen "$InstDir"

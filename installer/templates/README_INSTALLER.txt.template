@@ -67,7 +67,14 @@ This installer sets up a complete, self-contained WhisperJAV environment:
    - Python dependencies (Whisper, audio processing, translation)
    - WhisperJAV application from GitHub
 
-3. Setup and Configuration
+3. Optional: Local LLM Installation (Requires User Acceptance)
+   - You will be prompted to optionally install a local Large Language Model
+   - This enables offline AI-powered features without requiring API keys
+   - Requires additional ~4-8 GB disk space
+   - You can skip this step and install later if needed
+   - NOTE: This step requires user interaction (Yes/No prompt)
+
+4. Setup and Configuration
    - WhisperJAV-GUI.exe launcher created in installation folder
    - Desktop shortcut creation (points to WhisperJAV-GUI.exe)
    - Environment configuration

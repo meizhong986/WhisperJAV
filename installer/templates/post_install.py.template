@@ -43,6 +43,11 @@ LOG_FILE = os.path.join(sys.prefix, "install_log_v{{VERSION}}.txt")
 UV_EXE = os.path.join(sys.prefix, "uv.exe")
 USE_UV = os.path.exists(UV_EXE)
 
+# Configure uv timeout for slow connections (default is 30s, we use 5 minutes)
+# This is set via environment variable, not CLI flag (unlike pip's --timeout)
+if USE_UV:
+    os.environ["UV_HTTP_TIMEOUT"] = "300"  # 5 minutes for large downloads
+
 MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (11, 8, 0)
 CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio"
 
@@ -754,6 +759,53 @@ def configure_git_for_slow_connections() -> bool:
     return success
 
 
+def filter_pip_specific_args(args: list, installer_name: str) -> list:
+    """
+    Filter out pip-specific arguments that uv doesn't support.
+
+    uv and pip have different CLI interfaces. This function removes
+    pip-specific arguments when using uv.
+
+    Incompatible arguments:
+    - --progress-bar: uv shows progress by default, no flag needed
+    - --timeout: uv uses UV_HTTP_TIMEOUT env var instead
+
+    Args:
+        args: List of arguments
+        installer_name: "uv" or "pip"
+
+    Returns:
+        Filtered list of arguments
+    """
+    if installer_name == "pip":
+        return args  # pip supports all these arguments
+
+    # Filter out pip-specific arguments for uv
+    filtered = []
+    skip_next = False
+    for i, arg in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+
+        # --progress-bar on/off OR --progress-bar=on/off - uv doesn't support this
+        # Handle both space-separated (--progress-bar on) and joined (--progress-bar=on)
+        if arg.startswith("--progress-bar"):
+            if "=" not in arg:
+                skip_next = True  # Skip the next argument (on/off) for space-separated
+            continue  # Skip this argument in both cases
+
+        # --timeout=X or --timeout X - uv uses UV_HTTP_TIMEOUT env var
+        if arg.startswith("--timeout"):
+            if "=" not in arg:
+                skip_next = True  # Skip the next argument (timeout value)
+            continue
+
+        filtered.append(arg)
+
+    return filtered
+
+
 def run_pip(args: list, description: str, retries: int = 3) -> bool:
     """
     Run package install command with retries and smart Git timeout handling.
@@ -761,6 +813,9 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
     Uses uv (if available) for 10-30x faster installation, with pip fallback.
     If a Git timeout is detected (common with GFW/VPN), this function will
     automatically configure Git with extended timeouts and retry.
+
+    Note: pip-specific arguments (--progress-bar, --timeout) are automatically
+    filtered out when using uv. uv uses UV_HTTP_TIMEOUT env var for timeouts.
 
     Args:
         args: Pip-style arguments (e.g., ["install", "package"])
@@ -780,13 +835,16 @@ def run_pip(args: list, description: str, retries: int = 3) -> bool:
     # Normalize args: if first arg is "install", skip it (already in prefix)
     normalized_args = args[1:] if args and args[0] == "install" else args
 
+    # Filter out pip-specific arguments when using uv
+    normalized_args = filter_pip_specific_args(normalized_args, installer_name)
+
     # Build the command
     cmd = installer_prefix + normalized_args
 
     # Check if this is a git+https install (more timeout-sensitive)
     is_git_install = any("git+" in str(arg) for arg in args)
 
-    # For pip only: add timeout flag for git installs (uv handles this better automatically)
+    # For pip only: add timeout flag for git installs (uv uses UV_HTTP_TIMEOUT env var)
     if installer_name == "pip" and is_git_install and "--timeout" not in str(args):
         cmd = installer_prefix + ["--timeout=120"] + normalized_args
 

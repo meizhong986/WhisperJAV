@@ -6,14 +6,18 @@
 
 ## Upgrading from v1.7.x
 
-**v1.8.0 requires a fresh installation.** This is not an in-place upgrade due to significant dependency changes (NumPy 2.0, new PyTorch versions, new speech enhancement backends).
+v1.8.0 includes significant dependency changes. The standalone installer now detects previous installations and offers to replace them.
 
 ### Windows (.exe Installer)
 
-1. **Uninstall v1.7.x first:**
-   - Open **Settings** → **Apps** → Search "WhisperJAV" → **Uninstall**
-   - Or run: `%LOCALAPPDATA%\WhisperJAV\Uninstall-WhisperJAV.exe`
-2. **Install v1.8.0:** Run the new installer to the same location.
+1. **Run the v1.8.0 installer** on your existing installation folder
+2. **If previous version detected**, you'll see:
+   ```
+   A previous WhisperJAV installation was found.
+   This is a major installation that will completely replace
+   your previous WhisperJAV version.
+   ```
+3. **Click Yes** to replace, or **No** to choose a different folder
 
 ### macOS / Linux
 
@@ -34,17 +38,17 @@ Your data is stored **outside** the installation directory:
 
 ---
 
-## Headline Feature: Local LLM Translation
+## New Feature: Local LLM Translation
 
-Translate subtitles entirely on your GPU - no cloud API, no API key required.
+Translate subtitles on your GPU without cloud APIs or API keys.
 
 ```bash
 whisperjav-translate -i subtitles.srt --provider local
 ```
 
-### Zero-Config Setup
+### How It Works
 
-On first use, WhisperJAV automatically downloads and installs `llama-cpp-python` (~700MB). No manual installation needed.
+On first use, WhisperJAV downloads `llama-cpp-python` (~700MB). This is a one-time setup.
 
 ```
 ============================================================
@@ -57,18 +61,16 @@ This is a one-time download (~700MB).
 Detected CUDA: cu124
 Downloading llama-cpp-python from HuggingFace...
   Successfully installed!
-
-Future runs will start immediately.
 ```
 
 ### Available Models
 
-| Model | VRAM | Notes |
-|-------|------|-------|
-| `llama-8b` | 6GB+ | **Default** - Llama 3.1 8B |
-| `gemma-9b` | 8GB+ | Gemma 2 9B (alternative) |
-| `llama-3b` | 3GB+ | Llama 3.2 3B (low VRAM only) |
-| `auto` | varies | Auto-selects based on available VRAM |
+| Model | VRAM Required | Notes |
+|-------|---------------|-------|
+| `llama-8b` | 6GB+ | Default - Llama 3.1 8B |
+| `gemma-9b` | 8GB+ | Gemma 2 9B |
+| `llama-3b` | 3GB+ | Llama 3.2 3B (for low VRAM) |
+| `auto` | varies | Selects based on available VRAM |
 
 ### CLI Examples
 
@@ -79,7 +81,7 @@ whisperjav-translate -i subtitles.srt --provider local
 # Use specific model
 whisperjav-translate -i subtitles.srt --provider local --model gemma-9b
 
-# Control GPU offloading
+# Control GPU layer offloading
 whisperjav-translate -i subtitles.srt --provider local --translate-gpu-layers 32
 ```
 
@@ -101,21 +103,50 @@ whisperjav-translate -i subtitles.srt --provider groq
 
 ## Installer Improvements
 
+### Upgrade Detection
+
+The installer now detects previous WhisperJAV installations and offers to replace them instead of showing a generic "folder not empty" error.
+
 ### Optional Local LLM During Installation
 
-The GUI installer now prompts for local LLM installation:
+During installation, you'll be prompted:
 
 ```
 Install local LLM translation? (y/N):
 ```
 
-- **Default: No** - Skip for faster installation
+- **Default: No** - Faster installation, can install later
 - **Yes** - Downloads prebuilt wheel (~700MB) if CUDA 12.4+ detected
-- Can also be set via silent install: `/InstallLocalLLM=1`
+- **Silent install flag:** `/InstallLocalLLM=1`
 
-### Lazy Download Alternative
+If you skip this step, the local LLM is automatically downloaded on first use of `--provider local`.
 
-Even if you skip during installation, local LLM is automatically downloaded on first use of `--provider local`. No need to reinstall.
+### Faster Package Installation (uv)
+
+The installer now uses `uv` instead of `pip` for package installation:
+- 10-30x faster package downloads
+- Better timeout handling for slow connections
+- Automatic fallback to pip if uv unavailable
+
+### Simplified CUDA Support
+
+PyTorch installation now targets two CUDA versions:
+
+| Driver Version | CUDA Build |
+|----------------|------------|
+| 570+ | CUDA 12.8 |
+| 450+ | CUDA 11.8 |
+
+This simplifies the matrix while maintaining broad compatibility. Users with drivers 530-569 use CUDA 11.8, which works well. To get CUDA 12.8, update your driver to 570+.
+
+### Manual Install Script Improvements
+
+**Windows (`install_windows.bat`):**
+- Added VC++ Redistributable detection with download link if missing
+
+**Linux (`install_linux.sh`):**
+- Added PEP 668 / externally-managed environment detection
+- Added optional `.desktop` file creation for application menu integration
 
 ---
 
@@ -123,12 +154,36 @@ Even if you skip during installation, local LLM is automatically downloaded on f
 
 | Issue | Description |
 |-------|-------------|
+| - | Fixed uv package manager `--progress-bar` compatibility |
+| - | Fixed installer error propagation to NSIS (removed blocking `pause` commands) |
+| - | Fixed `--pass1-scene-detector none` TypeError |
+| - | Fixed SciPy/NumPy 2.0 version conflicts |
+| - | Fixed scene detection memory usage for large files |
 | - | Fixed hardcoded English references in translation instruction files |
 | - | Improved error handling in local LLM server lifecycle |
 
 ---
 
-## Technical Details
+## Technical Changes
+
+### Python Version Support
+
+- **Supported:** Python 3.10, 3.11, 3.12
+- **Dropped:** Python 3.9 (due to pysubtrans dependency)
+- **Not yet supported:** Python 3.13+ (openai-whisper incompatibility)
+
+### Dependency Updates
+
+- NumPy 2.0 compatibility
+- SciPy >= 1.14.0
+- Added `fsspec>=2025.3.0` constraint
+
+### Scene Detection Optimizations
+
+- Reduced memory usage for files with 100+ scenes
+- Added diagnostic logging for empty auditok results
+- Improved exception handling in audio loading
+- Graceful degradation when Silero VAD fails
 
 ### New/Modified Files
 
@@ -136,43 +191,112 @@ Even if you skip during installation, local LLM is automatically downloaded on f
 |------|--------|
 | `whisperjav/translate/local_backend.py` | Local LLM server + lazy download |
 | `whisperjav/translate/providers.py` | Added GLM, Groq providers |
-| `whisperjav/translate/cli.py` | `--translate-gpu-layers` flag |
-| `installer/templates/post_install.py.template` | Optional local LLM prompt |
-| `installer/templates/custom_template.nsi.tmpl.template` | `/InstallLocalLLM` argument |
-
-### Download Sources (Priority Order)
-
-1. HuggingFace (`mei986/whisperjav-wheels`) - Primary
-2. JamePeng GitHub releases - Fallback
-3. Manual install instructions - Last resort
+| `whisperjav/translate/cli.py` | Added `--translate-gpu-layers` flag |
+| `installer/templates/post_install.py.template` | uv support, optional LLM prompt |
+| `installer/templates/custom_template.nsi.tmpl.template` | Upgrade detection, `/InstallLocalLLM` |
+| `installer/install_windows.bat` | VC++ check |
+| `installer/install_linux.sh` | PEP 668 check, desktop entry |
 
 ---
 
 ## Installation
 
-### Upgrading from v1.7.x?
-
-Simply run the new installer. Your AI models, settings, and cached downloads will be preserved.
-
 ### Windows (Recommended)
 
 **[Download WhisperJAV-1.8.0-Windows-x86_64.exe](https://github.com/meizhong986/WhisperJAV/releases/tag/v1.8.0)**
 
-### macOS / Linux
+1. Run the installer
+2. If upgrading, confirm replacement when prompted
+3. Wait for post-installation (8-15 minutes)
+4. Optional: Accept local LLM installation when prompted
+5. Launch from desktop shortcut
+
+### macOS (Apple Silicon & Intel)
+
+```bash
+# Install prerequisites
+xcode-select --install
+brew install python@3.11 ffmpeg git
+
+# Clone and install
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+chmod +x installer/install_linux.sh
+./installer/install_linux.sh
+```
+
+### Linux
+
+```bash
+# Debian/Ubuntu
+sudo apt-get update && sudo apt-get install -y python3-dev python3-pip build-essential ffmpeg libsndfile1 git
+
+# Clone and install
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+chmod +x installer/install_linux.sh
+./installer/install_linux.sh
+```
+
+### Advanced / Developer
+
+<details>
+<summary><b>Manual pip install</b></summary>
+
+```bash
+# Create environment
+python -m venv whisperjav-env
+source whisperjav-env/bin/activate
+
+# Install PyTorch first
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Install WhisperJAV
+pip install git+https://github.com/meizhong986/whisperjav.git@main
+```
+
+</details>
+
+<details>
+<summary><b>Editable / Dev install</b></summary>
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
-./installer/install_linux.sh
+
+# Windows
+installer\install_windows.bat --dev
+
+# Mac/Linux
+./installer/install_linux.sh --dev
 ```
+
+</details>
+
+---
+
+## Known Issues
+
+- Local LLM requires CUDA 11.8+ for GPU acceleration; CPU-only is slow but functional
+- First local LLM translation takes longer due to model loading (~30 seconds)
+- Self-upgrade on Windows may require Administrator privileges if installed in Program Files
 
 ---
 
 ## Contributors
 
-- @hyiip - Local LLM translation implementation (PR #128)
-- MeiZhong - Development and testing
-- Claude (Anthropic) - Code assistance and documentation
+- **@hyiip** - Local LLM translation implementation (PR #128)
+- **MeiZhong** - Development, testing, and installer improvements
+- **Claude (Anthropic)** - Code assistance, documentation, and installer hardening
+
+---
+
+## Acknowledgments
+
+This release incorporates feedback from users who reported installation issues, particularly around:
+- Chinese network environments (GFW timeout handling)
+- Upgrade scenarios from v1.7.x
+- CUDA version compatibility
 
 ---
 
