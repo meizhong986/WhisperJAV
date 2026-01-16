@@ -4358,7 +4358,7 @@ const TranslatorManager = {
 
     // Provider model options
     providerModels: {
-        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],  // Local LLM models (gemma-9b default for 8GB VRAM)
+        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
@@ -4521,9 +4521,20 @@ const TranslatorManager = {
         const modelSelect = document.getElementById('translatorModel');
         if (!modelSelect) return;
 
+        // Display labels for local models (show VRAM requirements)
+        const localModelLabels = {
+            'gemma-9b': 'gemma-9b (8GB)',
+            'llama-8b': 'llama-8b (6GB)',
+            'llama-3b': 'llama-3b (3GB)',
+            'auto': 'auto'
+        };
+
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
-            models.map(m => `<option value="${m}">${m}</option>`).join('');
+            models.map(m => {
+                const label = (provider === 'local') ? (localModelLabels[m] || m) : m;
+                return `<option value="${m}">${label}</option>`;
+            }).join('');
     },
 
     /**
@@ -5032,7 +5043,7 @@ const TranslateIntegrationManager = {
 const TranslationSettingsModal = {
     // Provider model options (shared with inline dropdown)
     providerModels: {
-        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],  // Local LLM models (gemma-9b default for 8GB VRAM)
+        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
@@ -5191,11 +5202,22 @@ const TranslationSettingsModal = {
         const modelSelect = document.getElementById('ensembleTranslateModel');
         if (!modelSelect) return;
 
+        // Display labels for local models (show VRAM requirements)
+        const localModelLabels = {
+            'gemma-9b': 'gemma-9b (8GB)',
+            'llama-8b': 'llama-8b (6GB)',
+            'llama-3b': 'llama-3b (3GB)',
+            'auto': 'auto'
+        };
+
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
-            models.map(m => `<option value="${m}">${m}</option>`).join('');
+            models.map(m => {
+                const label = (provider === 'local') ? (localModelLabels[m] || m) : m;
+                return `<option value="${m}">${label}</option>`;
+            }).join('');
 
-        // Set default model for local provider to gemma-9b (8GB VRAM)
+        // Set default model for local provider to gemma-9b
         if (provider === 'local' && models.includes('gemma-9b')) {
             modelSelect.value = 'gemma-9b';
         }

@@ -104,5 +104,10 @@ whisperjav/config/*.backup*.json
 # AI model checkpoints (downloaded at runtime from HuggingFace)
 checkpoints/
 
+# llama-cpp-python wheels (downloaded from HuggingFace at runtime)
+# These are large binary files (~700MB each) hosted on mei986/whisperjav-wheels
+.wheels/
+*.whl
+
 
 
