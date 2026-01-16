@@ -1650,6 +1650,30 @@ button:focus-visible,
     padding: 4px 6px;
 }
 
+/* Model override input - compact style for inline layout */
+.model-override-input {
+    min-width: 140px;
+    max-width: 180px;
+    font-size: 11px;
+    padding: 4px 8px;
+    height: auto;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+}
+
+.model-override-input::placeholder {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.model-override-input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
 /* Translation Settings button - compact style */
 .translate-inline-settings .btn-secondary.btn-compact {
     white-space: nowrap;

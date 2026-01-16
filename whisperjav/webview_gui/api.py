@@ -2515,7 +2515,7 @@ class WhisperJAVAPI:
         Test connection to a translation provider.
 
         Args:
-            provider: Provider ID (deepseek, glm, groq, etc.)
+            provider: Provider ID (deepseek, glm, groq, local, etc.)
             api_key: Optional API key to test (uses env var if not provided)
 
         Returns:
@@ -2530,6 +2530,14 @@ class WhisperJAVAPI:
             config = PROVIDER_CONFIGS.get(provider)
             if not config:
                 return {"success": False, "error": f"Unknown provider: {provider}"}
+
+            # Local LLM provider doesn't need API key testing
+            if provider == 'local':
+                return {
+                    "success": True,
+                    "message": "Local LLM provider - no API key required",
+                    "local": True
+                }
 
             # Get API key
             key = api_key or os.getenv(config.get('env_var', ''))

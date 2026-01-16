@@ -1059,9 +1059,9 @@ const EnsembleManager = {
         pass1: {
             pipeline: 'balanced',
             sensitivity: 'aggressive',
-            sceneDetector: 'auditok',
+            sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'silero-v4.0',  // Explicit Silero V4.0 default
+            speechSegmenter: 'ten',  // TEN VAD default
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1070,15 +1070,15 @@ const EnsembleManager = {
         },
         pass2: {
             enabled: false,
-            pipeline: 'transformers',
+            pipeline: 'fidelity',
             sensitivity: 'aggressive',
-            sceneDetector: 'none',
+            sceneDetector: 'auditok',
             speechEnhancer: 'none',
-            speechSegmenter: 'none',
-            model: 'kotoba-tech/kotoba-whisper-bilingual-v1.0',  // Kotoba Bilingual for mixed ja/en
+            speechSegmenter: 'silero',  // Silero v4.0
+            model: 'turbo',
             customized: false,
             params: null,
-            isTransformers: true,  // Default Pass 2 is Transformers
+            isTransformers: false,  // Fidelity is a legacy pipeline
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'smart_merge',
@@ -3441,11 +3441,13 @@ const EnsembleManager = {
         if (TranslateIntegrationManager.isEnabled()) {
             const translateSettings = TranslateIntegrationManager.getSettings();
             config.translate = true;
-            config.translate_provider = translateSettings.provider || 'deepseek';
+            config.translate_provider = translateSettings.provider || 'local';
             config.translate_target = translateSettings.target || 'english';
             config.translate_tone = translateSettings.tone || 'standard';
-            config.translate_model = translateSettings.model || null;
-            config.translate_api_key = translateSettings.apiKey || null;
+            // Use model override if provided, otherwise use selected model
+            config.translate_model = translateSettings.modelOverride || translateSettings.model || null;
+            // Local provider doesn't need API key
+            config.translate_api_key = (translateSettings.provider === 'local') ? null : (translateSettings.apiKey || null);
             config.translate_title = translateSettings.movieTitle || null;
             config.translate_actress = translateSettings.actress || null;
             config.translate_plot = translateSettings.plot || null;
@@ -4356,6 +4358,7 @@ const TranslatorManager = {
 
     // Provider model options
     providerModels: {
+        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],  // Local LLM models (gemma-9b default for 8GB VRAM)
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
@@ -4384,9 +4387,9 @@ const TranslatorManager = {
         document.getElementById('translatorStartBtn')?.addEventListener('click', () => this.startTranslation());
         document.getElementById('translatorCancelBtn')?.addEventListener('click', () => this.cancelTranslation());
 
-        // Initialize model options for default provider
-        this.updateModelOptions('deepseek');
-        this.updateApiKeyStatus('deepseek');
+        // Initialize model options for default provider (Local LLM)
+        this.updateModelOptions('local');
+        this.updateApiKeyStatus('local');
 
         console.log('TranslatorManager initialized');
     },
@@ -4891,6 +4894,7 @@ const TranslateIntegrationManager = {
             return {
                 provider: fullSettings.provider,
                 model: fullSettings.model,
+                modelOverride: fullSettings.modelOverride,  // Custom model path/name override
                 target: fullSettings.targetLang,
                 tone: fullSettings.tone,
                 apiKey: fullSettings.apiKey,
@@ -4906,7 +4910,7 @@ const TranslateIntegrationManager = {
         } else {
             // Transcription Mode settings
             return {
-                provider: document.getElementById('quickTranslateProvider')?.value || 'deepseek',
+                provider: document.getElementById('quickTranslateProvider')?.value || 'local',
                 target: document.getElementById('quickTranslateTarget')?.value || 'english'
             };
         }
@@ -5028,6 +5032,7 @@ const TranslateIntegrationManager = {
 const TranslationSettingsModal = {
     // Provider model options (shared with inline dropdown)
     providerModels: {
+        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],  // Local LLM models (gemma-9b default for 8GB VRAM)
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
@@ -5077,8 +5082,19 @@ const TranslationSettingsModal = {
             this.updateModelOptions(e.target.value);
         });
 
-        // Initialize model options for default provider
-        this.updateModelOptions('deepseek');
+        // Initialize model options for default provider (Local LLM)
+        this.updateModelOptions('local');
+
+        // Set default model selection to gemma-9b (8GB VRAM)
+        const modelSelect = document.getElementById('ensembleTranslateModel');
+        if (modelSelect) {
+            // Will be populated by updateModelOptions, then set default
+            setTimeout(() => {
+                if (modelSelect.querySelector('option[value="gemma-9b"]')) {
+                    modelSelect.value = 'gemma-9b';
+                }
+            }, 0);
+        }
 
         // Load saved settings
         this.loadSettings();
@@ -5178,13 +5194,28 @@ const TranslationSettingsModal = {
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => `<option value="${m}">${m}</option>`).join('');
+
+        // Set default model for local provider to gemma-9b (8GB VRAM)
+        if (provider === 'local' && models.includes('gemma-9b')) {
+            modelSelect.value = 'gemma-9b';
+        }
     },
 
     async testConnection() {
         const btn = document.getElementById('translationTestConnection');
         const statusEl = document.getElementById('translationApiStatus');
-        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'deepseek';
+        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
         const apiKey = document.getElementById('translationApiKey')?.value || '';
+
+        // Local LLM doesn't need API key testing
+        if (provider === 'local') {
+            if (statusEl) {
+                statusEl.textContent = 'Local (No API)';
+                statusEl.className = 'api-status connected';
+            }
+            ConsoleManager.log('Local LLM provider selected - no API key required', 'info');
+            return;
+        }
 
         if (btn) btn.disabled = true;
         if (statusEl) {
@@ -5220,12 +5251,14 @@ const TranslationSettingsModal = {
      * Get all translation settings for processing
      */
     getFullSettings() {
-        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'deepseek';
+        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
         const model = document.getElementById('ensembleTranslateModel')?.value || '';
+        const modelOverride = document.getElementById('ensembleTranslateModelOverride')?.value?.trim() || '';
 
         return {
             provider: provider,
             model: model,
+            modelOverride: modelOverride,  // Custom model path/name override
             apiKey: this.settings.apiKey,
             targetLang: this.settings.targetLang,
             tone: this.settings.tone,

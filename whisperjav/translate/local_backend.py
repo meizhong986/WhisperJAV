@@ -453,20 +453,54 @@ def get_best_model_for_vram(vram_gb: float) -> str:
 
 
 def ensure_model_downloaded(model_id: str) -> Path:
-    """Download GGUF model if not already cached."""
+    """Download GGUF model if not already cached.
+
+    Provides user feedback about download progress since models are large (2-6GB).
+    """
     if model_id not in MODEL_REGISTRY:
         valid = list(MODEL_REGISTRY.keys())
         raise ValueError(f"Unknown model: {model_id}. Valid: {valid}")
 
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import hf_hub_download, try_to_load_from_cache
 
     info = MODEL_REGISTRY[model_id]
-    logger.info(f"Ensuring model downloaded: {info['file']}")
+    repo_id = info['repo']
+    filename = info['file']
 
+    # Check if model is already cached
+    cached_path = try_to_load_from_cache(repo_id=repo_id, filename=filename)
+    if cached_path is not None:
+        logger.info(f"Model already cached: {filename}")
+        return Path(cached_path)
+
+    # Model needs to be downloaded - inform user
+    # Estimate sizes based on quantization (Q4_K_M ≈ 0.5 bytes/param)
+    size_estimates = {
+        'llama-3b': '~2.0 GB',
+        'llama-8b': '~4.7 GB',
+        'gemma-9b': '~5.5 GB',
+    }
+    size_str = size_estimates.get(model_id, 'several GB')
+
+    print(f"\n{'='*60}")
+    print(f"  DOWNLOADING MODEL: {model_id}")
+    print(f"{'='*60}")
+    print(f"  File: {filename}")
+    print(f"  Size: {size_str}")
+    print(f"  This is a one-time download.")
+    print(f"{'='*60}\n")
+
+    logger.info(f"Downloading model: {filename} ({size_str})")
+
+    # Download with progress bar (tqdm will show in console)
     path = hf_hub_download(
-        repo_id=info['repo'],
-        filename=info['file']
+        repo_id=repo_id,
+        filename=filename
     )
+
+    print(f"\nModel downloaded successfully: {filename}\n")
+    logger.info(f"Model downloaded: {path}")
+
     return Path(path)
 
 
@@ -477,17 +511,40 @@ def _find_free_port() -> int:
         return s.getsockname()[1]
 
 
-def _wait_for_server(port: int) -> bool:
-    """Wait for server to be ready (no timeout - models can take a while to load)."""
+def _wait_for_server(port: int, max_wait: int = 300) -> bool:
+    """Wait for server to be ready.
+
+    Args:
+        port: Server port to check
+        max_wait: Maximum wait time in seconds (default 5 minutes for large models)
+
+    Returns:
+        True if server is ready, False if server died or timeout
+    """
     import urllib.request
     import urllib.error
 
     url = f"http://localhost:{port}/v1/models"
+    start_time = time.time()
+    last_log_time = start_time
 
     while True:
+        elapsed = time.time() - start_time
+
+        # Check timeout
+        if elapsed > max_wait:
+            logger.warning(f"Server startup timed out after {max_wait}s")
+            return False
+
         # Check if process died
         if _server_process is not None and _server_process.poll() is not None:
             return False
+
+        # Periodic progress logging (every 30s)
+        if time.time() - last_log_time > 30:
+            logger.info(f"Still waiting for server... ({int(elapsed)}s elapsed, loading model)")
+            last_log_time = time.time()
+
         try:
             with urllib.request.urlopen(url, timeout=2) as response:
                 if response.status == 200:
@@ -495,6 +552,74 @@ def _wait_for_server(port: int) -> bool:
         except (urllib.error.URLError, ConnectionRefusedError, TimeoutError):
             pass
         time.sleep(0.5)
+
+
+def _release_gpu_memory():
+    """Release GPU memory before starting local LLM server.
+
+    This is critical when running after Whisper transcription, which may
+    still hold GPU memory. Without cleanup, llama-cpp-python may fail
+    to initialize with cryptic errors.
+    """
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            logger.debug("Released GPU memory (torch.cuda.empty_cache)")
+    except ImportError:
+        pass  # torch not available, skip CUDA cleanup
+
+
+def _check_existing_llama_servers() -> list:
+    """Check for existing llama-cpp server processes.
+
+    Returns list of (pid, cmdline) tuples for any found servers.
+    """
+    found = []
+    try:
+        if platform.system() == 'Windows':
+            # Use tasklist to find python processes, then filter
+            result = subprocess.run(
+                ['tasklist', '/fi', 'imagename eq python.exe', '/fo', 'csv', '/nh'],
+                capture_output=True, text=True, timeout=5
+            )
+            # This gives us PIDs but not cmdlines on Windows
+            # Just check if llama_cpp.server might be running via wmic
+            result = subprocess.run(
+                ['wmic', 'process', 'where', "name='python.exe'", 'get', 'processid,commandline'],
+                capture_output=True, text=True, timeout=10
+            )
+            for line in result.stdout.split('\n'):
+                if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
+                    # Extract PID (last number on the line)
+                    parts = line.strip().split()
+                    if parts:
+                        try:
+                            pid = int(parts[-1])
+                            found.append((pid, line.strip()[:100]))
+                        except ValueError:
+                            pass
+        else:
+            # Unix: use ps
+            result = subprocess.run(
+                ['ps', 'aux'],
+                capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.split('\n'):
+                if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
+                    parts = line.split()
+                    if len(parts) > 1:
+                        try:
+                            pid = int(parts[1])
+                            found.append((pid, line[:100]))
+                        except ValueError:
+                            pass
+    except Exception as e:
+        logger.debug(f"Could not check for existing servers: {e}")
+
+    return found
 
 
 def start_local_server(
@@ -518,6 +643,10 @@ def start_local_server(
     """
     global _server_process, _server_port
 
+    # Release GPU memory from previous operations (e.g., Whisper transcription)
+    # This helps prevent llama-cpp-python initialization failures
+    _release_gpu_memory()
+
     # Ensure llama-cpp-python is installed (lazy download on first use)
     if not ensure_llama_cpp_installed():
         raise RuntimeError(
@@ -526,8 +655,21 @@ def start_local_server(
             "Or use cloud providers: whisperjav-translate -i file.srt --provider deepseek"
         )
 
-    # Stop existing server if running
+    # Stop existing server if running (in THIS process)
     stop_local_server()
+
+    # Check for other llama-cpp servers (in OTHER processes)
+    existing_servers = _check_existing_llama_servers()
+    if existing_servers:
+        logger.warning(f"Found {len(existing_servers)} existing llama-cpp server(s) running!")
+        for pid, cmdline in existing_servers:
+            logger.warning(f"  PID {pid}: {cmdline}")
+        logger.warning("These may be using GPU memory. If startup fails, close them first.")
+        print(f"\n{'!'*60}")
+        print(f"  WARNING: Found {len(existing_servers)} existing llama-cpp server(s)")
+        print(f"  These may be using GPU memory and cause startup failure.")
+        print(f"  If this fails, close other terminals running translations.")
+        print(f"{'!'*60}\n")
 
     # Model selection
     if model == "auto":
@@ -556,22 +698,86 @@ def start_local_server(
         "--n_ctx", str(n_ctx),
     ]
 
+    # Use temp file for stderr to avoid blocking (pipes can fill up and block the server)
+    import tempfile
+    stderr_file = tempfile.NamedTemporaryFile(mode='w+', suffix='_llm_server.log', delete=False)
+    stderr_path = stderr_file.name
+
     try:
         _server_process = subprocess.Popen(
             cmd,
-            # Don't capture output - let user see server logs (model loading progress, errors)
+            stderr=stderr_file,  # Write stderr to temp file (non-blocking)
         )
         _server_port = port
     except Exception as e:
+        stderr_file.close()
         raise RuntimeError(f"Failed to start server: {e}")
 
-    # Wait for server to be ready (no timeout - large models can take minutes)
-    logger.info(f"Waiting for server on port {port}...")
+    # Wait for server to be ready (5 min timeout for large models)
+    logger.info(f"Waiting for server on port {port} (this may take 1-2 minutes for large models)...")
     if not _wait_for_server(port):
-        # Get exit code if process died
+        # Get exit code and stderr if process died
         exit_code = _server_process.poll() if _server_process else None
+        stderr_output = ""
+        try:
+            stderr_file.close()
+            with open(stderr_path, 'r', encoding='utf-8', errors='replace') as f:
+                stderr_output = f.read()
+        except Exception:
+            pass
+
         stop_local_server()
-        raise RuntimeError(f"Server process exited unexpectedly (code: {exit_code})")
+
+        # Provide specific guidance for common errors
+        error_msg = f"Failed to start local server: Server process exited (code: {exit_code})"
+
+        # Always show stderr content first for debugging
+        if stderr_output:
+            stderr_lines = stderr_output.strip().split('\n')[-15:]
+            error_msg += f"\n\nServer stderr:\n" + "\n".join(stderr_lines)
+
+        # Add specific guidance based on error type
+        stderr_lower = stderr_output.lower()
+        if "0xc000001d" in stderr_output or "illegal instruction" in stderr_lower:
+            error_msg += (
+                "\n\n[Diagnosis: Binary compatibility issue]"
+                "\nThis error can be caused by:"
+                "\n  1. CUDA version mismatch - llama-cpp-python was built for a different CUDA version"
+                "\n  2. CPU instruction issue - binary requires AVX2/AVX512 instructions"
+                "\n"
+                "\nFixes to try:"
+                "\n  - Reinstall llama-cpp-python matching your CUDA version:"
+                "\n      pip uninstall llama-cpp-python"
+                "\n      pip install llama-cpp-python  # Let lazy download get correct wheel"
+                "\n  - Use CPU-only mode: --translate-gpu-layers 0"
+                "\n  - Build from source for your CUDA version:"
+                "\n      CMAKE_ARGS=\"-DGGML_CUDA=on\" pip install llama-cpp-python --no-binary llama-cpp-python"
+            )
+        elif "out of memory" in stderr_lower or ("cuda" in stderr_lower and "memory" in stderr_lower):
+            error_msg += (
+                "\n\n[Diagnosis: GPU memory issue]"
+                "\nNot enough GPU memory to load the model."
+                "\nCheck if another llama-cpp server is already running (e.g., from another terminal)."
+                "\nTry: taskkill /f /im python.exe (WARNING: kills ALL Python processes)"
+                "\nOr use a smaller model: --translate-model llama-3b"
+            )
+        elif not stderr_output:
+            # No stderr captured - check for common issues
+            error_msg += (
+                "\n\n[No error details captured]"
+                "\nPossible causes:"
+                "\n- CUDA version mismatch (llama-cpp-python built for different CUDA)"
+                "\n- Another llama-cpp server is using GPU memory"
+                "\n- GPU driver issue"
+                "\n- Model file corrupted"
+                "\n"
+                "\nTry:"
+                "\n- Close other terminals running llama-cpp servers"
+                "\n- Reinstall: pip uninstall llama-cpp-python && pip install llama-cpp-python"
+                "\n- CPU-only mode: --translate-gpu-layers 0"
+            )
+
+        raise RuntimeError(error_msg)
 
     api_base = f"http://127.0.0.1:{port}/v1"
     logger.info(f"Local server ready at {api_base}")

@@ -377,9 +377,9 @@
                                     <div class="col-separator"></div>
                                     <div class="col-scene">
                                         <select id="pass1-scene" class="form-select compact">
-                                            <option value="auditok" selected>Auditok</option>
+                                            <option value="auditok">Auditok</option>
                                             <option value="silero">Silero</option>
-                                            <option value="semantic">Semantic</option>
+                                            <option value="semantic" selected>Semantic</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -406,13 +406,13 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass1-segmenter" class="form-select compact">
-                                            <option value="silero" selected>Silero v4.0</option>
+                                            <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
                                             <option value="whisper-vad">Whisper VAD (small)</option>
                                             <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
                                             <option value="whisper-vad-medium">Whisper VAD (medium)</option>
-                                            <option value="ten">TEN VAD</option>
+                                            <option value="ten" selected>TEN VAD</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -496,8 +496,8 @@
                                             <option value="balanced">Balanced</option>
                                             <option value="fast">Fast</option>
                                             <option value="faster">Faster</option>
-                                            <option value="fidelity">Fidelity</option>
-                                            <option value="transformers" selected>Transformers (HF)</option>
+                                            <option value="fidelity" selected>Fidelity</option>
+                                            <option value="transformers">Transformers (HF)</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -511,10 +511,10 @@
                                     <div class="col-separator"></div>
                                     <div class="col-scene">
                                         <select id="pass2-scene" class="form-select compact" disabled>
-                                            <option value="auditok">Auditok</option>
+                                            <option value="auditok" selected>Auditok</option>
                                             <option value="silero">Silero</option>
                                             <option value="semantic">Semantic</option>
-                                            <option value="none" selected>None</option>
+                                            <option value="none">None</option>
                                         </select>
                                     </div>
                                     <div class="col-enhancer">
@@ -540,25 +540,22 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
-                                            <option value="silero">Silero v4.0</option>
+                                            <option value="silero" selected>Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
                                             <option value="whisper-vad">Whisper VAD (small)</option>
                                             <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
                                             <option value="whisper-vad-medium">Whisper VAD (medium)</option>
                                             <option value="ten">TEN VAD</option>
-                                            <option value="none" selected>None</option>
+                                            <option value="none">None</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
                                     <div class="col-model">
                                         <select id="pass2-model" class="form-select compact" disabled>
-                                            <option value="kotoba-tech/kotoba-whisper-bilingual-v1.0" selected>Kotoba Bilingual v1.0</option>
-                                            <option value="kotoba-tech/kotoba-whisper-v2.2">Kotoba v2.2 (Latest)</option>
-                                            <option value="kotoba-tech/kotoba-whisper-v2.1">Kotoba v2.1</option>
-                                            <option value="kotoba-tech/kotoba-whisper-v2.0">Kotoba v2.0</option>
-                                            <option value="openai/whisper-large-v3-turbo">Whisper Large v3 Turbo</option>
-                                            <option value="openai/whisper-large-v2">Whisper Large v2</option>
+                                            <option value="large-v2">Large V2</option>
+                                            <option value="large-v3">Large V3</option>
+                                            <option value="turbo" selected>Turbo</option>
                                         </select>
                                     </div>
                                     <div class="col-actions">
@@ -645,6 +642,7 @@
                                     </div>
                                     <div class="translate-inline-settings" id="ensembleTranslateSettings">
                                         <select id="ensembleTranslateProvider" class="form-select compact" title="Translation provider">
+                                            <option value="local">Local LLM</option>
                                             <option value="deepseek">DeepSeek</option>
                                             <option value="gemini">Gemini</option>
                                             <option value="claude">Claude</option>
@@ -656,6 +654,9 @@
                                         <select id="ensembleTranslateModel" class="form-select compact" title="Model">
                                             <option value="">Default</option>
                                         </select>
+                                        <input type="text" id="ensembleTranslateModelOverride" class="form-input model-override-input"
+                                               placeholder="Model override (optional)"
+                                               title="Custom model path or name. Leave empty to use selected model.">
                                         <button type="button" class="btn btn-secondary btn-compact" id="ensembleTranslateSettingsBtn" title="Translation Settings">
                                             Translation Settings
                                         </button>
