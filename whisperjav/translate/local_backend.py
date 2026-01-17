@@ -785,7 +785,7 @@ def start_local_server(
 
         raise RuntimeError(error_msg)
 
-    api_base = f"http://127.0.0.1:{port}/v1"
+    api_base = f"http://localhost:{port}/v1"
     logger.info(f"Local server ready at {api_base}")
 
     return api_base, port
@@ -829,7 +829,7 @@ def get_server_info() -> Optional[Tuple[str, int]]:
     """Get info about the running server."""
     global _server_port
     if is_server_running() and _server_port:
-        return f"http://127.0.0.1:{_server_port}/v1", _server_port
+        return f"http://localhost:{_server_port}/v1", _server_port
     return None
 
 
