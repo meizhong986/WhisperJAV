@@ -201,7 +201,8 @@ def translate_with_config(
     debug: bool = False,
     extra_context: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
-    n_gpu_layers: int = -1
+    n_gpu_layers: int = -1,
+    expose_server: bool = False
 ) -> Optional[Path]:
     """
     Translate subtitle file with full configuration resolution.
@@ -232,6 +233,8 @@ def translate_with_config(
         debug: Enable debug output
         extra_context: Additional context for translation (movie title, etc.)
         progress_callback: Optional callback for progress updates
+        n_gpu_layers: GPU layers to offload for local provider (-1 = all, 0 = CPU only)
+        expose_server: If True, bind local server to 0.0.0.0 (for Colab/containers)
 
     Returns:
         Path to translated file, or None on failure
@@ -320,7 +323,8 @@ def translate_with_config(
             try:
                 api_base, _ = start_local_server(
                     model=resolved_model,
-                    n_gpu_layers=n_gpu_layers
+                    n_gpu_layers=n_gpu_layers,
+                    expose_server=expose_server
                 )
             except Exception as e:
                 raise TranslationError(f"Failed to start local server: {e}")

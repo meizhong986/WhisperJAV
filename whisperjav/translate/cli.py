@@ -265,6 +265,15 @@ def main():
         help="Backoff time in seconds after failure (default: 5.0)"
     )
 
+    # Local LLM options
+    local_group = parser.add_argument_group("Local LLM Options (--provider local)")
+    local_group.add_argument(
+        '--expose-server',
+        action='store_true',
+        help="Bind local LLM server to 0.0.0.0 instead of 127.0.0.1. "
+             "Required for Google Colab and containerized environments."
+    )
+
     # Processing options
     process_group = parser.add_argument_group("Processing Options")
     process_group.add_argument(
@@ -456,7 +465,10 @@ def main():
                 # Start local LLM server (only once for batch)
                 if i == 0:
                     try:
-                        api_base, _ = start_local_server(model=model)
+                        api_base, _ = start_local_server(
+                            model=model,
+                            expose_server=getattr(args, 'expose_server', False)
+                        )
                     except Exception as e:
                         print(f"Error: Failed to start local server: {e}", file=sys.stderr)
                         sys.exit(1)

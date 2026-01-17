@@ -625,7 +625,8 @@ def _check_existing_llama_servers() -> list:
 def start_local_server(
     model: str = "auto",
     n_gpu_layers: int = -1,
-    n_ctx: int = 8192
+    n_ctx: int = 8192,
+    expose_server: bool = False
 ) -> Tuple[str, int]:
     """
     Start the local LLM server.
@@ -634,6 +635,8 @@ def start_local_server(
         model: Model ID from MODEL_REGISTRY or 'auto'
         n_gpu_layers: GPU layers to offload (-1 = all, 0 = CPU only)
         n_ctx: Context window size
+        expose_server: If True, bind to 0.0.0.0 (all interfaces) instead of 127.0.0.1.
+                       Required for Google Colab and similar containerized environments.
 
     Returns:
         Tuple of (api_base_url, port)
@@ -688,11 +691,14 @@ def start_local_server(
     # Find free port
     port = _find_free_port()
 
+    # Determine host binding
+    host = "0.0.0.0" if expose_server else "127.0.0.1"
+
     # Start server using llama-cpp-python's built-in server
     cmd = [
         sys.executable, "-m", "llama_cpp.server",
         "--model", str(model_path),
-        "--host", "127.0.0.1",
+        "--host", host,
         "--port", str(port),
         "--n_gpu_layers", str(n_gpu_layers),
         "--n_ctx", str(n_ctx),
