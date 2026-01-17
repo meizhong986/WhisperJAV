@@ -17,8 +17,8 @@
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Install minimal version (no speech enhancement, no TEN VAD)
 #   --dev                   Install in development/editable mode
-#   --local-llm             Install local LLM (fast - prebuilt wheel only)
-#   --local-llm-build       Install local LLM (slow - builds from source if needed)
+#   --local-llm             Install local LLM (tries prebuilt wheel first)
+#   --local-llm-build       Install local LLM (builds from source)
 #
 # Note: CUDA 12.1/12.4/12.6 support removed in v1.8.0 (PyTorch 2.7.x dropped these)
 #
@@ -215,8 +215,8 @@ for arg in "$@"; do
             echo "  --no-speech-enhancement Skip speech enhancement packages"
             echo "  --minimal               Minimal install (no speech enhancement)"
             echo "  --dev                   Install in development/editable mode"
-            echo "  --local-llm             Install local LLM (fast - prebuilt wheel only)"
-            echo "  --local-llm-build       Install local LLM (slow - builds from source if needed)"
+            echo "  --local-llm             Install local LLM (tries prebuilt wheel first)"
+            echo "  --local-llm-build       Install local LLM (builds from source)"
             echo "  --help, -h              Show this help message"
             echo ""
             echo "CUDA version selection:"
@@ -483,7 +483,7 @@ pip3 install "pysubtrans>=1.5.0" "openai>=1.35.0" "google-genai>=1.39.0"
 # Only installed if --local-llm or --local-llm-build is specified
 # Note: Apple Silicon builds from source with Metal (~10min, fast)
 #       Intel Mac uses CPU build (no Metal/GPU acceleration)
-#       Linux uses prebuilt wheels (requires CUDA 12.4+)
+#       Linux uses prebuilt wheels or builds from source
 if [ "$LOCAL_LLM" = true ]; then
     log "Installing llama-cpp-python for local LLM translation..."
     echo "Installing llama-cpp-python for local LLM translation..."
@@ -503,13 +503,18 @@ if [ "$LOCAL_LLM" = true ]; then
         # Apple Silicon: build from source with Metal (fast ~10min)
         echo "  Apple Silicon detected - building from source with Metal support."
         log "Apple Silicon detected - building with Metal"
-        SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
+        SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake,env=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}|{env.get(\"CMAKE_BUILD_PARALLEL_LEVEL\", \"\")}')" 2>/dev/null)
         SOURCE_URL=$(echo "$SOURCE_INFO" | cut -d'|' -f1)
         SOURCE_BACKEND=$(echo "$SOURCE_INFO" | cut -d'|' -f2)
         SOURCE_CMAKE=$(echo "$SOURCE_INFO" | cut -d'|' -f3)
+        SOURCE_PARALLEL=$(echo "$SOURCE_INFO" | cut -d'|' -f4)
 
         echo "  Backend: $SOURCE_BACKEND"
         log "llama-cpp-python backend: $SOURCE_BACKEND"
+        if [ -n "$SOURCE_PARALLEL" ]; then
+            echo "  Setting CMAKE_BUILD_PARALLEL_LEVEL=$SOURCE_PARALLEL"
+            export CMAKE_BUILD_PARALLEL_LEVEL="$SOURCE_PARALLEL"
+        fi
         if [ -n "$SOURCE_CMAKE" ]; then
             echo "  Setting CMAKE_ARGS=$SOURCE_CMAKE"
             export CMAKE_ARGS="$SOURCE_CMAKE"
@@ -523,12 +528,17 @@ if [ "$LOCAL_LLM" = true ]; then
         if [ "$LOCAL_LLM_BUILD" = true ]; then
             echo "  Intel Mac detected - building CPU-only version."
             log "Intel Mac detected - building CPU-only"
-            SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
+            SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake,env=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}|{env.get(\"CMAKE_BUILD_PARALLEL_LEVEL\", \"\")}')" 2>/dev/null)
             SOURCE_URL=$(echo "$SOURCE_INFO" | cut -d'|' -f1)
             SOURCE_BACKEND=$(echo "$SOURCE_INFO" | cut -d'|' -f2)
+            SOURCE_PARALLEL=$(echo "$SOURCE_INFO" | cut -d'|' -f4)
 
             echo "  Backend: $SOURCE_BACKEND"
             log "llama-cpp-python backend: $SOURCE_BACKEND"
+            if [ -n "$SOURCE_PARALLEL" ]; then
+                echo "  Setting CMAKE_BUILD_PARALLEL_LEVEL=$SOURCE_PARALLEL"
+                export CMAKE_BUILD_PARALLEL_LEVEL="$SOURCE_PARALLEL"
+            fi
             pip3 install "$SOURCE_URL" || {
                 echo -e "${YELLOW}Warning: llama-cpp-python build failed (local LLM translation will not work)${NC}"
                 log "WARNING: llama-cpp-python source build failed"
@@ -540,7 +550,7 @@ if [ "$LOCAL_LLM" = true ]; then
             log "Intel Mac - skipping (use --local-llm-build to build)"
         fi
     else
-        # Linux: try prebuilt wheel first (requires CUDA 12.4+)
+        # Linux: try prebuilt wheel first, fall back to source build
         WHEEL_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_prebuilt_wheel; result=get_llama_cpp_prebuilt_wheel(); print(f'{result[0] or \"\"}|{result[1] or \"\"}')" 2>/dev/null)
         WHEEL_URL=$(echo "$WHEEL_INFO" | cut -d'|' -f1)
         WHEEL_BACKEND=$(echo "$WHEEL_INFO" | cut -d'|' -f2)
@@ -558,13 +568,18 @@ if [ "$LOCAL_LLM" = true ]; then
             }
         elif [ "$LOCAL_LLM_BUILD" = true ]; then
             # No prebuilt wheel, but user opted for source build
-            SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}')" 2>/dev/null)
+            SOURCE_INFO=$(PYTHONPATH="$REPO_ROOT" python3 -c "from install import get_llama_cpp_source_info; url,backend,cmake,env=get_llama_cpp_source_info(); print(f'{url}|{backend}|{cmake or \"\"}|{env.get(\"CMAKE_BUILD_PARALLEL_LEVEL\", \"\")}')" 2>/dev/null)
             SOURCE_URL=$(echo "$SOURCE_INFO" | cut -d'|' -f1)
             SOURCE_BACKEND=$(echo "$SOURCE_INFO" | cut -d'|' -f2)
             SOURCE_CMAKE=$(echo "$SOURCE_INFO" | cut -d'|' -f3)
+            SOURCE_PARALLEL=$(echo "$SOURCE_INFO" | cut -d'|' -f4)
 
             echo "  Backend: $SOURCE_BACKEND"
             log "llama-cpp-python backend: $SOURCE_BACKEND"
+            if [ -n "$SOURCE_PARALLEL" ]; then
+                echo "  Setting CMAKE_BUILD_PARALLEL_LEVEL=$SOURCE_PARALLEL"
+                export CMAKE_BUILD_PARALLEL_LEVEL="$SOURCE_PARALLEL"
+            fi
             if [ -n "$SOURCE_CMAKE" ]; then
                 echo "  Setting CMAKE_ARGS=$SOURCE_CMAKE"
                 export CMAKE_ARGS="$SOURCE_CMAKE"
@@ -576,7 +591,7 @@ if [ "$LOCAL_LLM" = true ]; then
         else
             # --local-llm specified but no prebuilt wheel available
             echo "  No prebuilt wheel available for your platform."
-            echo "  Prebuilt wheels require CUDA 12.4+. To build from source, use --local-llm-build."
+            echo "  To build from source, use --local-llm-build."
             echo "  Skipping local LLM installation."
             log "No prebuilt wheel available, skipping (use --local-llm-build to build)"
         fi
@@ -742,8 +757,8 @@ if [ "$LOCAL_LLM" = true ]; then
     echo ""
 else
     echo "  To enable local LLM translation, re-install with:"
-    echo "    ./install_linux.sh --local-llm          (fast - prebuilt wheel)"
-    echo "    ./install_linux.sh --local-llm-build    (slow - builds if needed)"
+    echo "    ./install_linux.sh --local-llm-build    (builds from source)"
+    echo "    ./install_linux.sh --local-llm          (tries prebuilt wheel first)"
     echo ""
 fi
 echo "  For help:"

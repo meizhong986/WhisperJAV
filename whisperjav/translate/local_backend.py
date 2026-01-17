@@ -120,18 +120,12 @@ def _detect_cuda_version() -> Optional[str]:
         )
         if result.returncode == 0:
             driver_ver = result.stdout.strip().split("\n")[0]
-            # Map driver version to CUDA version
+            # Map driver version to CUDA version (simplified: cu128 or cu118)
             # Reference: https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/
             major = int(driver_ver.split(".")[0])
             if major >= 570:
                 return "cu128"
-            elif major >= 560:
-                return "cu126"
-            elif major >= 551:
-                return "cu124"
-            elif major >= 531:
-                return "cu121"
-            elif major >= 520:
+            elif major >= 450:
                 return "cu118"
     except Exception:
         pass
@@ -367,6 +361,10 @@ def _install_wheel(wheel_path: Path) -> bool:
         return False
 
 
+# Import shared build utilities
+from .llama_build_utils import build_from_source as _build_from_source
+
+
 def ensure_llama_cpp_installed() -> bool:
     """
     Ensure llama-cpp-python is installed, downloading if necessary.
@@ -407,6 +405,16 @@ def ensure_llama_cpp_installed() -> bool:
         # Verify installation
         if _is_llama_cpp_installed():
             print("\n✓ llama-cpp-python installed successfully!")
+            print("  Future runs will start immediately.\n")
+            return True
+
+    # Fall back to building from source
+    print("\nPrebuilt wheel not available, building from source...")
+    print("This may take ~10 minutes.\n")
+
+    if _build_from_source():
+        if _is_llama_cpp_installed():
+            print("\n✓ llama-cpp-python built and installed successfully!")
             print("  Future runs will start immediately.\n")
             return True
 
