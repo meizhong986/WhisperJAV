@@ -58,7 +58,7 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
-from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
+from whisperjav.pipelines.balanced_pipeline import BalancedPipeline, safe_cleanup_immortal_asr
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
 from whisperjav.__version__ import __version__
@@ -824,6 +824,15 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 pipeline.cleanup()
             except Exception as cleanup_error:
                 logger.error(f"Error during pipeline cleanup: {cleanup_error}")
+
+        # For balanced pipeline: attempt controlled cleanup of immortal ASR reference
+        # This triggers ctranslate2 destructor NOW (in controlled context) rather than
+        # during Python shutdown (where it crashes with 0xC0000409)
+        try:
+            safe_cleanup_immortal_asr()
+        except Exception as e:
+            logger.debug(f"safe_cleanup_immortal_asr raised exception (non-fatal): {e}")
+
         progress.close()
     
     successful_metadata = [
@@ -1500,7 +1509,31 @@ def main():
             process_files_async(media_files, args, resolved_config)
         else:
             process_files_sync(media_files, args, resolved_config)
-            
+
+        # =============================================================================
+        # NUCLEAR EXIT FOR CTRANSLATE2 MODES
+        # =============================================================================
+        # ctranslate2 (used by faster-whisper) has a known bug where its C++ destructor
+        # crashes with 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN) during Python shutdown
+        # on Windows. This is an upstream issue with no official fix.
+        #
+        # Solution: Use os._exit(0) to skip Python's shutdown sequence entirely.
+        # The OS kernel reclaims all memory when the process dies.
+        #
+        # This only affects modes that use ctranslate2: balanced, fast, faster
+        # Ensemble mode already handles this via pass_worker.py's nuclear exit.
+        #
+        # References:
+        # - https://github.com/SYSTRAN/faster-whisper/issues/1293
+        # - https://github.com/SYSTRAN/faster-whisper/issues/71
+        # - https://github.com/OpenNMT/CTranslate2/issues/1782
+        # =============================================================================
+        ctranslate2_modes = {'balanced', 'fast', 'faster'}
+        if args.mode in ctranslate2_modes and not args.ensemble:
+            logger.debug(f"Using nuclear exit for {args.mode} mode (ctranslate2 crash prevention)")
+            import os as _os
+            _os._exit(0)
+
     except KeyboardInterrupt:
         logger.warning("\nProcessing interrupted by user")
         if not args.keep_temp:
