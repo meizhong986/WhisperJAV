@@ -106,11 +106,16 @@ def detect_cuda_version() -> Optional[str]:
         )
         if result.returncode == 0:
             driver_ver = result.stdout.strip().split("\n")[0]
-            # Map driver version to CUDA version (simplified: cu128 or cu118)
+            # Map driver version to CUDA version
+            # Reference: https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/
             major = int(driver_ver.split(".")[0])
             if major >= 570:
                 return "cu128"
-            elif major >= 450:
+            elif major >= 560:
+                return "cu126"
+            elif major >= 550:
+                return "cu124"
+            elif major >= 520:
                 return "cu118"
     except Exception:
         pass
@@ -154,12 +159,15 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
     # Python version
     py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
 
-    # Build search criteria for CUDA versions
+    # Build search criteria for CUDA versions (try newer first, fallback to older)
     target_cudas = []
     if cuda_version and sys.platform in ("win32", "linux"):
-        # Simplified: only cu128 or cu118
         if cuda_version >= "cu128":
-            target_cudas = ["cu128", "cu118"]
+            target_cudas = ["cu128", "cu126", "cu124", "cu118"]
+        elif cuda_version >= "cu126":
+            target_cudas = ["cu126", "cu124", "cu118"]
+        elif cuda_version >= "cu124":
+            target_cudas = ["cu124", "cu118"]
         elif cuda_version >= "cu118":
             target_cudas = ["cu118"]
 
