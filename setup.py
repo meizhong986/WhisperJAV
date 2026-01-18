@@ -46,10 +46,10 @@ install_requires = [
     "silero-vad>=6.0",
 
     # Local LLM translation (v1.8.0)
-    # Using JamePeng's fork for better CUDA support and active maintenance
-    # [server] extra includes uvicorn for local LLM server
+    # NOTE: llama-cpp-python is NOT included here - it requires platform-specific
+    # CUDA builds. Instead, it's lazy-installed at runtime when user runs
+    # --provider local. Server deps are in extras_require['local'].
     # See: https://github.com/JamePeng/llama-cpp-python
-    "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git",
 
     # Speech segmentation backends (v1.7.2)
     "ten-vad",
@@ -104,6 +104,20 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+# Optional dependencies for local LLM translation
+# These are the server deps from llama-cpp-python[server], platform-agnostic
+# llama-cpp-python itself is lazy-installed at runtime with correct CUDA flags
+extras_require = {
+    'local': [
+        "uvicorn>=0.22.0",
+        "fastapi>=0.100.0",
+        "pydantic-settings>=2.0.1",
+        "sse-starlette>=1.6.1",
+        "starlette-context>=0.3.6,<0.4",
+        # PyYAML already in install_requires
+    ],
+}
+
 setup(
     name="whisperjav",
     version=__version__,
@@ -117,6 +131,7 @@ setup(
     classifiers=classifiers,
     python_requires=python_requires,
     install_requires=install_requires,
+    extras_require=extras_require,
     entry_points={
         "console_scripts": [
             "whisperjav=whisperjav.main:main",

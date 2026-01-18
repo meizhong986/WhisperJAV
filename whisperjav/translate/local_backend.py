@@ -39,6 +39,15 @@ import time
 from pathlib import Path
 from typing import Optional, Tuple
 
+# Import shared build utilities
+from .llama_build_utils import (
+    build_from_source as _build_from_source,
+    detect_cuda_version,
+    get_prebuilt_wheel_url,
+    download_wheel,
+    install_wheel,
+)
+
 logger = logging.getLogger(__name__)
 
 # HuggingFace wheel repository for lazy download
@@ -87,6 +96,77 @@ def _is_llama_cpp_installed() -> bool:
         import llama_cpp  # noqa: F401
         return True
     except ImportError:
+        return False
+
+
+def _are_server_deps_installed() -> bool:
+    """Check if server dependencies (uvicorn, fastapi, etc.) are installed."""
+    try:
+        import uvicorn  # noqa: F401
+        import fastapi  # noqa: F401
+        import pydantic_settings  # noqa: F401
+        import sse_starlette  # noqa: F401
+        import starlette_context  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _install_server_deps() -> bool:
+    """
+    Install whisperjav[local] server dependencies.
+
+    These are platform-agnostic deps (uvicorn, fastapi, etc.) that must be
+    installed before llama-cpp-python.
+
+    Returns:
+        True if installation succeeded or deps already installed, False otherwise
+    """
+    if _are_server_deps_installed():
+        logger.debug("Server dependencies already installed")
+        return True
+
+    print("Installing server dependencies (uvicorn, fastapi, etc.)...")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "whisperjav[local]"],
+            capture_output=True,
+            text=True,
+            timeout=120  # 2 minute timeout
+        )
+
+        if result.returncode == 0:
+            print("  Server dependencies installed successfully!")
+            return True
+        else:
+            logger.warning(f"Failed to install server deps: {result.stderr[:200]}")
+            return False
+    except Exception as e:
+        logger.warning(f"Failed to install server deps: {e}")
+        return False
+
+
+def _wait_with_cancel_option(seconds: int = 10) -> bool:
+    """
+    Wait for specified seconds, allowing user to cancel with Ctrl+C.
+
+    Args:
+        seconds: Number of seconds to wait (default 10)
+
+    Returns:
+        True if user waited (proceed with build), False if user cancelled
+    """
+    print(f"\nPress Ctrl+C within {seconds}s to cancel, or wait to continue automatically...")
+
+    try:
+        for i in range(seconds, 0, -1):
+            print(f"  Starting in {i}s...", end='\r')
+            time.sleep(1)
+        print("  Starting build...       ")  # Extra spaces to clear countdown
+        return True
+    except KeyboardInterrupt:
+        print("\n  Build cancelled by user.")
         return False
 
 
@@ -163,15 +243,6 @@ def _download_wheel_from_huggingface(cuda_version: Optional[str] = None) -> Opti
         return None
 
 
-# Import shared build utilities
-from .llama_build_utils import (
-    build_from_source as _build_from_source,
-    detect_cuda_version,
-    get_prebuilt_wheel_url,
-    download_wheel,
-    install_wheel,
-)
-
 
 def ensure_llama_cpp_installed() -> bool:
     """
@@ -179,6 +250,12 @@ def ensure_llama_cpp_installed() -> bool:
 
     This implements lazy download: on first use of `--provider local`,
     the wheel is automatically downloaded and installed.
+
+    Installation flow:
+    1. Install server deps first (whisperjav[local]) - platform agnostic
+    2. Detect CUDA version
+    3. Try prebuilt wheel (HuggingFace, then GitHub)
+    4. Fall back to source build (with 10s user cancel window)
 
     Returns:
         True if llama-cpp-python is available, False otherwise
@@ -193,22 +270,31 @@ def ensure_llama_cpp_installed() -> bool:
     print("\nllama-cpp-python is required for local LLM translation.")
     print("This is a one-time download (~700MB).\n")
 
-    # Detect CUDA version
+    # Step 1: Install server dependencies first (uvicorn, fastapi, etc.)
+    # These are platform-agnostic and declared in setup.py extras_require['local']
+    if not _install_server_deps():
+        print("WARNING: Could not install server dependencies.")
+        print("         Server may not start correctly.\n")
+
+    # Step 2: Detect CUDA version
     cuda_version = detect_cuda_version()
     if cuda_version:
         print(f"Detected CUDA: {cuda_version}")
     else:
         print("CUDA not detected (will use CPU or Metal)")
 
-    # Try HuggingFace first
+    # Step 3: Try HuggingFace first
     wheel_path = _download_wheel_from_huggingface(cuda_version)
 
     # Fall back to JamePeng GitHub (using shared utility)
     if not wheel_path:
         print("\nHuggingFace wheel not found, trying JamePeng GitHub...")
-        wheel_url, backend_desc = get_prebuilt_wheel_url(cuda_version)
+        wheel_url, backend_desc = get_prebuilt_wheel_url(
+            cuda_version, verbose=True, version=WHEEL_VERSION
+        )
         if wheel_url:
-            print(f"  Found: {backend_desc}")
+            print(f"  Backend: {backend_desc}")
+            print(f"  URL: {wheel_url}")
             wheel_path = download_wheel(wheel_url)
 
     # Install if we got a wheel
@@ -219,9 +305,16 @@ def ensure_llama_cpp_installed() -> bool:
             print("  Future runs will start immediately.\n")
             return True
 
-    # Fall back to building from source
-    print("\nPrebuilt wheel not available, building from source...")
-    print("This may take ~10 minutes.\n")
+    # Step 4: Fall back to building from source (with 10s cancel window)
+    print("\nNo prebuilt wheel found. Building from source... (~10 min)")
+
+    # Give user 10 seconds to cancel before starting long build
+    if not _wait_with_cancel_option(seconds=10):
+        print("\nYou can manually install later with:")
+        print("  python install.py --local-llm-build")
+        print("\nOr use cloud translation providers:")
+        print("  whisperjav-translate -i file.srt --provider deepseek")
+        return False
 
     if _build_from_source():
         if _is_llama_cpp_installed():
@@ -235,7 +328,7 @@ def ensure_llama_cpp_installed() -> bool:
     print("!" * 60)
     print("\nCould not install llama-cpp-python automatically.")
     print("\nManual installation options:")
-    print("  1. pip install llama-cpp-python[server]")
+    print("  1. pip install whisperjav[local]  # Install server deps")
     print("  2. python install.py --local-llm-build")
     print("\nAlternatively, use cloud translation providers:")
     print("  whisperjav-translate -i file.srt --provider deepseek")

@@ -123,7 +123,11 @@ def detect_cuda_version() -> Optional[str]:
     return None
 
 
-def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+def get_prebuilt_wheel_url(
+    cuda_version: Optional[str] = None,
+    verbose: bool = False,
+    version: Optional[str] = None
+) -> Tuple[Optional[str], Optional[str]]:
     """
     Try to find a prebuilt wheel URL from JamePeng's GitHub releases.
 
@@ -132,6 +136,8 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
 
     Args:
         cuda_version: CUDA version like "cu128" or None to auto-detect
+        verbose: If True, print progress messages
+        version: llama-cpp-python version to match (e.g., "0.3.21") or None for latest
 
     Returns:
         tuple: (wheel_url, backend_desc) or (None, None) if no suitable wheel found
@@ -139,6 +145,9 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
     # Auto-detect CUDA if not provided
     if cuda_version is None and sys.platform in ("win32", "linux"):
         cuda_version = detect_cuda_version()
+        if verbose:
+            if cuda_version:
+                print(f"    Detected CUDA: {cuda_version}")
 
     # Determine platform identifiers
     if sys.platform == "win32":
@@ -154,6 +163,8 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
         else:
             wheel_platform = "x86_64"
     else:
+        if verbose:
+            print(f"    Unknown platform: {sys.platform}")
         return None, None
 
     # Python version
@@ -171,13 +182,18 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
         elif cuda_version >= "cu118":
             target_cudas = ["cu118"]
 
+    if verbose:
+        print(f"    Searching for prebuilt wheel: {os_tag}, {py_ver}, platform={wheel_platform}")
+
     # Query GitHub API for releases
     try:
         api_url = "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=50"
         req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.v3+json"})
         with urllib.request.urlopen(req, timeout=15) as response:
             releases = json.loads(response.read().decode())
-    except Exception:
+    except Exception as e:
+        if verbose:
+            print(f"    Could not fetch releases: {e}")
         return None, None
 
     # Search for matching wheel
@@ -187,6 +203,9 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
             tag = release.get("tag_name", "")
             if "-metal-" not in tag.lower():
                 continue
+            # Filter by version if specified (tag format: v0.3.21-metal-...)
+            if version and not tag.startswith(f"v{version}-"):
+                continue
             for asset in release.get("assets", []):
                 name = asset.get("name", "")
                 if not name.endswith(".whl"):
@@ -195,6 +214,8 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
                     continue
                 if wheel_platform in name:
                     wheel_url = asset.get("browser_download_url")
+                    if verbose:
+                        print(f"    Found prebuilt wheel: {name}")
                     return wheel_url, "Metal (prebuilt wheel)"
     else:
         # Windows/Linux: look for CUDA releases
@@ -205,6 +226,9 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
                     continue
                 if f"-{os_tag}-" not in tag:
                     continue
+                # Filter by version if specified (tag format: v0.3.21-cu128-Basic-win-...)
+                if version and not tag.startswith(f"v{version}-"):
+                    continue
                 for asset in release.get("assets", []):
                     name = asset.get("name", "")
                     if not name.endswith(".whl"):
@@ -213,8 +237,12 @@ def get_prebuilt_wheel_url(cuda_version: Optional[str] = None) -> Tuple[Optional
                         continue
                     if wheel_platform in name:
                         wheel_url = asset.get("browser_download_url")
+                        if verbose:
+                            print(f"    Found prebuilt wheel: {name}")
                         return wheel_url, f"CUDA ({cuda_tag} prebuilt wheel)"
 
+    if verbose:
+        print(f"    No matching prebuilt wheel found for {py_ver}/{os_tag}/{wheel_platform}")
     return None, None
 
 

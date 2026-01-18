@@ -61,6 +61,7 @@ _spec = importlib.util.spec_from_file_location("llama_build_utils", _llama_utils
 _llama_build_utils = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_llama_build_utils)
 get_llama_cpp_source_info = _llama_build_utils.get_llama_cpp_source_info
+get_prebuilt_wheel_url = _llama_build_utils.get_prebuilt_wheel_url
 
 def run_pip(args, description, allow_fail=False):
     """Run pip command with error handling."""
@@ -195,121 +196,6 @@ def get_system_cuda_version():
         pass
 
     return None, None
-
-
-def get_llama_cpp_prebuilt_wheel():
-    """
-    Try to find a prebuilt wheel from JamePeng's releases.
-
-    Auto-detects platform, Python version, and CUDA version.
-    Queries GitHub API to find matching wheel dynamically.
-
-    Release naming conventions (from JamePeng/llama-cpp-python):
-    - CUDA: v{ver}-cu{cuda}-Basic-{os}-{date} (e.g., v0.3.21-cu128-Basic-win-20260111)
-    - Metal: v{ver}-metal-{date} (when available)
-    - Wheel: llama_cpp_python-{ver}-cp{py}-cp{py}-{platform}.whl
-
-    Returns:
-        tuple: (wheel_url, backend_desc) or (None, None) if no suitable wheel found
-    """
-    import json
-    import platform as platform_module
-    import urllib.request
-    import urllib.error
-
-    # Determine platform identifiers
-    if sys.platform == "win32":
-        os_tag = "win"
-        wheel_platform = "win_amd64"
-    elif sys.platform == "linux":
-        os_tag = "linux"
-        wheel_platform = "linux_x86_64"
-    elif sys.platform == "darwin":
-        os_tag = "metal"  # JamePeng uses -metal- tag for macOS
-        if platform_module.machine() == "arm64":
-            wheel_platform = "arm64"  # Matches macosx_*_arm64
-        else:
-            wheel_platform = "x86_64"
-    else:
-        print(f"    Unknown platform: {sys.platform}")
-        return None, None
-
-    # Python version
-    py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
-
-    # Detect CUDA version for Windows/Linux
-    target_cudas = []
-    if sys.platform in ("win32", "linux"):
-        cuda_major, cuda_minor = get_system_cuda_version()
-        if cuda_major:
-            system_cuda = cuda_major * 10 + (cuda_minor if cuda_minor < 10 else cuda_minor // 10)
-            # Build list of compatible CUDA versions (highest first)
-            # Simplified: CUDA 12.8 (driver 570+) or CUDA 11.8 (driver 450+)
-            for cu in [128, 118]:
-                if cu <= system_cuda:
-                    target_cudas.append(f"cu{cu}")
-            print(f"    Detected CUDA {cuda_major}.{cuda_minor}, compatible: {target_cudas}")
-        else:
-            print("    No CUDA detected")
-
-    print(f"    Searching for prebuilt wheel: {os_tag}, {py_ver}, platform={wheel_platform}")
-
-    # Query GitHub API for releases
-    try:
-        api_url = "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=50"
-        req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.v3+json"})
-        with urllib.request.urlopen(req, timeout=15) as response:
-            releases = json.loads(response.read().decode())
-    except Exception as e:
-        print(f"    Could not fetch releases: {e}")
-        return None, None
-
-    # Search strategy:
-    # 1. For Windows/Linux with CUDA: find cu{version} release matching OS
-    # 2. For macOS: find metal release
-    # 3. Match wheel file by Python version and platform
-
-    if os_tag == "metal":
-        # macOS: look for -metal- releases
-        for release in releases:
-            tag = release.get("tag_name", "")
-            if "-metal-" not in tag.lower():
-                continue
-            for asset in release.get("assets", []):
-                name = asset.get("name", "")
-                if not name.endswith(".whl"):
-                    continue
-                if py_ver not in name:
-                    continue
-                if wheel_platform in name:
-                    wheel_url = asset.get("browser_download_url")
-                    print(f"    Found prebuilt wheel: {name}")
-                    return wheel_url, "Metal (prebuilt wheel)"
-    else:
-        # Windows/Linux: look for CUDA releases
-        for cuda_tag in target_cudas:
-            for release in releases:
-                tag = release.get("tag_name", "")
-                # Match: v{ver}-cu{cuda}-Basic-{os}-{date}
-                if f"-{cuda_tag}-" not in tag:
-                    continue
-                if f"-{os_tag}-" not in tag:
-                    continue
-                for asset in release.get("assets", []):
-                    name = asset.get("name", "")
-                    if not name.endswith(".whl"):
-                        continue
-                    if py_ver not in name:
-                        continue
-                    if wheel_platform in name:
-                        wheel_url = asset.get("browser_download_url")
-                        print(f"    Found prebuilt wheel: {name}")
-                        return wheel_url, f"CUDA ({cuda_tag} prebuilt wheel)"
-
-    print(f"    No matching prebuilt wheel found for {py_ver}/{os_tag}/{wheel_platform}")
-    return None, None
-
-
 
 
 def main():
@@ -496,7 +382,7 @@ def main():
                 print("    Skipping local LLM installation.")
         else:
             # Windows/Linux: try prebuilt wheel first, fall back to source build
-            wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel()
+            wheel_url, wheel_backend = get_prebuilt_wheel_url(verbose=True)
 
             if wheel_url:
                 # Prebuilt wheel available - use it (fast install)
