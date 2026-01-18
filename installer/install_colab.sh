@@ -11,16 +11,14 @@
 #   - Configures PyTorch for cu126 (Colab's CUDA version)
 #   - Handles llama-cpp-python installation (prebuilt wheel or source build)
 #
-# Usage (in Colab notebook):
-#   !curl -LsSf https://raw.githubusercontent.com/meizhong986/WhisperJAV/main/installer/install_colab.sh | bash
-#
-# Or clone and run:
+# Usage:
 #   !git clone https://github.com/meizhong986/WhisperJAV.git
 #   !bash WhisperJAV/installer/install_colab.sh
 #
+# Debug mode (verbose output):
+#   !bash WhisperJAV/installer/install_colab.sh --debug
+#
 # ==============================================================================
-
-set -e  # Exit on error
 
 # Configuration
 VENV_PATH="/content/whisperjav_env"
@@ -30,6 +28,17 @@ WHISPERJAV_BRANCH="main"
 HF_WHEEL_REPO="mei986/whisperjav-wheels"
 LLAMA_CPP_VERSION="0.3.21"
 
+# Debug mode
+DEBUG=false
+if [[ "$1" == "--debug" ]] || [[ "$1" == "-d" ]]; then
+    DEBUG=true
+    set -x  # Print commands as they execute
+fi
+
+# Error handling - trap errors and show what failed
+set -e
+trap 'echo ""; echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND"; echo "Exit code: $?"; exit 1' ERR
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -37,7 +46,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging functions
+# Logging functions - always flush output immediately
 info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -78,8 +87,8 @@ info "Detected Google Colab environment"
 
 # Check GPU
 if command -v nvidia-smi &> /dev/null; then
-    GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
-    DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1)
+    GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>&1 | head -1)
+    DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>&1 | head -1)
     info "GPU: $GPU_NAME"
     info "Driver: $DRIVER_VERSION"
 else
@@ -107,13 +116,18 @@ if command -v uv &> /dev/null; then
     info "uv already installed: $(uv --version)"
 else
     info "Downloading uv (fast Python package manager)..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # Don't use -s (silent) so we can see progress/errors
+    if ! curl -LfS https://astral.sh/uv/install.sh | sh; then
+        error "Failed to download/install uv"
+        exit 1
+    fi
     export PATH="$HOME/.local/bin:$PATH"
 
     if command -v uv &> /dev/null; then
         success "uv installed: $(uv --version)"
     else
-        error "Failed to install uv"
+        error "uv installation completed but uv command not found"
+        error "PATH: $PATH"
         exit 1
     fi
 fi
@@ -136,19 +150,28 @@ if [[ -d "$VENV_PATH" ]]; then
     rm -rf "$VENV_PATH"
 fi
 
-# Create venv with uv (80x faster than python -m venv)
-uv venv "$VENV_PATH" --python "python$PYTHON_MAJOR.$PYTHON_MINOR"
-
-if [[ -f "$VENV_PATH/bin/python" ]]; then
-    success "Virtual environment created"
-else
+# Create venv with uv
+info "Running: uv venv $VENV_PATH --python python$PYTHON_MAJOR.$PYTHON_MINOR"
+if ! uv venv "$VENV_PATH" --python "python$PYTHON_MAJOR.$PYTHON_MINOR"; then
     error "Failed to create virtual environment"
     exit 1
 fi
 
-# Helper function to run pip in venv
+if [[ -f "$VENV_PATH/bin/python" ]]; then
+    success "Virtual environment created"
+else
+    error "Virtual environment created but python not found at $VENV_PATH/bin/python"
+    exit 1
+fi
+
+# Helper function to run pip in venv with progress
 venv_pip() {
-    uv pip install --python "$VENV_PATH/bin/python" "$@"
+    info "Installing: $@"
+    if ! uv pip install --python "$VENV_PATH/bin/python" "$@"; then
+        error "pip install failed for: $@"
+        return 1
+    fi
+    return 0
 }
 
 # ==============================================================================
@@ -159,23 +182,49 @@ section "Step 3/5: Installing PyTorch (cu126)"
 
 info "Installing PyTorch with CUDA 12.6 support..."
 info "Index URL: $PYTORCH_INDEX"
+info "This may take 1-3 minutes for large packages..."
 
-venv_pip torch torchvision torchaudio --index-url "$PYTORCH_INDEX"
+if ! venv_pip torch torchvision torchaudio --index-url "$PYTORCH_INDEX"; then
+    error "PyTorch installation failed"
+    error ""
+    error "Possible causes:"
+    error "  - cu126 wheels may not be available for Python $PYTHON_VERSION"
+    error "  - Network issues downloading large packages"
+    error ""
+    error "Try checking: https://download.pytorch.org/whl/cu126/"
+    exit 1
+fi
 
 # Verify PyTorch installation
-TORCH_VERSION=$("$VENV_PATH/bin/python" -c "import torch; print(torch.__version__)" 2>/dev/null)
-CUDA_AVAILABLE=$("$VENV_PATH/bin/python" -c "import torch; print(torch.cuda.is_available())" 2>/dev/null)
+info "Verifying PyTorch installation..."
+TORCH_CHECK=$("$VENV_PATH/bin/python" -c "
+import sys
+try:
+    import torch
+    print(f'VERSION:{torch.__version__}')
+    print(f'CUDA:{torch.cuda.is_available()}')
+    if torch.cuda.is_available():
+        print(f'GPU:{torch.cuda.get_device_name(0)}')
+except Exception as e:
+    print(f'ERROR:{e}')
+    sys.exit(1)
+" 2>&1)
 
-if [[ -n "$TORCH_VERSION" ]]; then
-    success "PyTorch installed: $TORCH_VERSION"
-    if [[ "$CUDA_AVAILABLE" == "True" ]]; then
-        success "CUDA is available"
-    else
-        warn "CUDA not available (CPU mode)"
-    fi
-else
-    error "PyTorch installation verification failed"
+if echo "$TORCH_CHECK" | grep -q "^ERROR:"; then
+    error "PyTorch verification failed:"
+    error "$TORCH_CHECK"
     exit 1
+fi
+
+TORCH_VERSION=$(echo "$TORCH_CHECK" | grep "^VERSION:" | cut -d: -f2)
+CUDA_AVAILABLE=$(echo "$TORCH_CHECK" | grep "^CUDA:" | cut -d: -f2)
+
+success "PyTorch installed: $TORCH_VERSION"
+if [[ "$CUDA_AVAILABLE" == "True" ]]; then
+    GPU_DETECTED=$(echo "$TORCH_CHECK" | grep "^GPU:" | cut -d: -f2)
+    success "CUDA available: $GPU_DETECTED"
+else
+    warn "CUDA not available (CPU mode)"
 fi
 
 # ==============================================================================
@@ -185,14 +234,38 @@ fi
 section "Step 4/5: Installing WhisperJAV"
 
 info "Installing from $WHISPERJAV_REPO@$WHISPERJAV_BRANCH"
+info "This includes all dependencies (whisper, stable-ts, faster-whisper, etc.)..."
 
-venv_pip "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}"
+if ! venv_pip "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}"; then
+    error "WhisperJAV installation failed"
+    exit 1
+fi
 
 # Verify WhisperJAV installation
-if "$VENV_PATH/bin/python" -c "import whisperjav" 2>/dev/null; then
-    success "WhisperJAV installed successfully"
+info "Verifying WhisperJAV installation..."
+WJ_CHECK=$("$VENV_PATH/bin/python" -c "
+import sys
+try:
+    import whisperjav
+    print('OK')
+except Exception as e:
+    print(f'ERROR:{e}')
+    sys.exit(1)
+" 2>&1)
+
+if [[ "$WJ_CHECK" != "OK" ]]; then
+    error "WhisperJAV verification failed:"
+    error "$WJ_CHECK"
+    exit 1
+fi
+
+success "WhisperJAV installed successfully"
+
+# Verify CLI is available
+if [[ -f "$VENV_PATH/bin/whisperjav" ]]; then
+    success "CLI available: $VENV_PATH/bin/whisperjav"
 else
-    error "WhisperJAV installation verification failed"
+    error "WhisperJAV CLI not found at $VENV_PATH/bin/whisperjav"
     exit 1
 fi
 
@@ -208,6 +281,8 @@ LLAMA_INSTALLED=false
 PY_TAG="cp${PYTHON_MAJOR}${PYTHON_MINOR}"
 WHEEL_NAME="llama_cpp_python-${LLAMA_CPP_VERSION}-${PY_TAG}-${PY_TAG}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
 
+info "Looking for prebuilt wheel: $WHEEL_NAME"
+
 # --- Attempt 1: HuggingFace (mei986/whisperjav-wheels) ---
 info "Checking HuggingFace for prebuilt cu126 wheel..."
 
@@ -216,15 +291,18 @@ HF_WHEEL_URL="https://huggingface.co/datasets/${HF_WHEEL_REPO}/resolve/main/llam
 if curl --output /dev/null --silent --head --fail "$HF_WHEEL_URL"; then
     info "Found wheel on HuggingFace, downloading..."
     WHEEL_PATH="/tmp/${WHEEL_NAME}"
-    curl -L -o "$WHEEL_PATH" "$HF_WHEEL_URL"
 
-    if venv_pip "$WHEEL_PATH" 2>/dev/null; then
-        success "llama-cpp-python installed from HuggingFace (cu126)"
-        LLAMA_INSTALLED=true
-        rm -f "$WHEEL_PATH"
+    if curl -L --progress-bar -o "$WHEEL_PATH" "$HF_WHEEL_URL"; then
+        if venv_pip "$WHEEL_PATH"; then
+            success "llama-cpp-python installed from HuggingFace (cu126)"
+            LLAMA_INSTALLED=true
+            rm -f "$WHEEL_PATH"
+        else
+            warn "HuggingFace wheel installation failed"
+            rm -f "$WHEEL_PATH"
+        fi
     else
-        warn "HuggingFace wheel installation failed"
-        rm -f "$WHEEL_PATH"
+        warn "Failed to download wheel from HuggingFace"
     fi
 else
     info "No cu126 wheel on HuggingFace (not yet uploaded)"
@@ -235,7 +313,7 @@ if [[ "$LLAMA_INSTALLED" == "false" ]]; then
     info "Checking JamePeng GitHub releases..."
 
     # Query GitHub API for cu126 releases
-    GITHUB_RELEASES=$(curl -s "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=20" 2>/dev/null)
+    GITHUB_RELEASES=$(curl -s "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=20" 2>&1)
 
     # Look for cu126-linux release with matching Python version
     GITHUB_WHEEL_URL=$(echo "$GITHUB_RELEASES" | python3 -c "
@@ -250,22 +328,25 @@ try:
                 if name.endswith('.whl') and '${PY_TAG}' in name and 'linux' in name:
                     print(asset.get('browser_download_url', ''))
                     sys.exit(0)
-except:
-    pass
-" 2>/dev/null)
+except Exception as e:
+    print(f'# Error: {e}', file=sys.stderr)
+" 2>&1)
 
-    if [[ -n "$GITHUB_WHEEL_URL" ]]; then
+    if [[ -n "$GITHUB_WHEEL_URL" ]] && [[ ! "$GITHUB_WHEEL_URL" =~ ^# ]]; then
         info "Found wheel on JamePeng GitHub, downloading..."
         WHEEL_PATH="/tmp/llama_cpp_python_github.whl"
-        curl -L -o "$WHEEL_PATH" "$GITHUB_WHEEL_URL"
 
-        if venv_pip "$WHEEL_PATH" 2>/dev/null; then
-            success "llama-cpp-python installed from JamePeng GitHub (cu126)"
-            LLAMA_INSTALLED=true
-            rm -f "$WHEEL_PATH"
+        if curl -L --progress-bar -o "$WHEEL_PATH" "$GITHUB_WHEEL_URL"; then
+            if venv_pip "$WHEEL_PATH"; then
+                success "llama-cpp-python installed from JamePeng GitHub (cu126)"
+                LLAMA_INSTALLED=true
+                rm -f "$WHEEL_PATH"
+            else
+                warn "GitHub wheel installation failed"
+                rm -f "$WHEEL_PATH"
+            fi
         else
-            warn "GitHub wheel installation failed"
-            rm -f "$WHEEL_PATH"
+            warn "Failed to download wheel from GitHub"
         fi
     else
         info "No matching cu126 wheel found on JamePeng GitHub"
@@ -277,43 +358,14 @@ if [[ "$LLAMA_INSTALLED" == "false" ]]; then
     echo ""
     warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     warn "  No prebuilt cu126 wheel available"
-    warn "  Building llama-cpp-python from source..."
-    warn "  This may take ~10 minutes"
+    warn "  Skipping llama-cpp-python (source build takes too long)"
     warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-
-    # Detect compute capability for optimized build
-    COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.')
-    if [[ -z "$COMPUTE_CAP" ]]; then
-        # Fallback: T4 is compute capability 7.5
-        COMPUTE_CAP="75"
-    fi
-    info "Building for compute capability: sm_$COMPUTE_CAP"
-
-    # Set build optimization environment variables
-    CPU_CORES=$(nproc)
-    PARALLEL_JOBS=$((CPU_CORES * 3 / 4))  # Use 75% of cores
-    [[ $PARALLEL_JOBS -lt 2 ]] && PARALLEL_JOBS=2
-    [[ $PARALLEL_JOBS -gt 16 ]] && PARALLEL_JOBS=16
-
-    export CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=${COMPUTE_CAP}"
-    export CMAKE_BUILD_PARALLEL_LEVEL="$PARALLEL_JOBS"
-
-    info "Build config: $PARALLEL_JOBS parallel jobs, CUDA arch sm_$COMPUTE_CAP"
-
-    # Build from JamePeng fork (better maintained)
-    if venv_pip "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git"; then
-        success "llama-cpp-python built and installed from source"
-        LLAMA_INSTALLED=true
-    else
-        warn "Source build failed. Local LLM translation will not be available."
-        warn "You can still use cloud translation providers (deepseek, gemini, etc.)"
-    fi
-fi
-
-# Install server extras if llama-cpp is installed
-if [[ "$LLAMA_INSTALLED" == "true" ]]; then
-    venv_pip "llama-cpp-python[server]" 2>/dev/null || true
+    info "Local LLM translation will not be available."
+    info "You can still use cloud translation providers (deepseek, gemini, etc.)"
+    info ""
+    info "To install llama-cpp-python manually later:"
+    info "  CMAKE_ARGS=\"-DGGML_CUDA=on\" uv pip install --python $VENV_PATH/bin/python llama-cpp-python"
 fi
 
 # ==============================================================================
@@ -335,12 +387,16 @@ echo ""
 echo "Transcribe with options:"
 echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav /content/drive/MyDrive/video.mp4 --mode balanced --sensitivity aggressive${NC}"
 echo ""
-echo "Translate subtitles (local LLM):"
-echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav-translate -i /content/drive/MyDrive/video.srt --provider local${NC}"
-echo ""
 echo "Translate subtitles (cloud API):"
 echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav-translate -i /content/drive/MyDrive/video.srt --provider deepseek${NC}"
 echo ""
+
+if [[ "$LLAMA_INSTALLED" == "true" ]]; then
+    echo "Translate subtitles (local LLM):"
+    echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav-translate -i /content/drive/MyDrive/video.srt --provider local${NC}"
+    echo ""
+fi
+
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -354,6 +410,5 @@ EOF
 echo "Optional: Run this to enable short commands in your session:"
 echo -e "  ${GREEN}source /content/whisperjav_aliases.sh${NC}"
 echo ""
-echo "Then you can use:"
-echo -e "  ${GREEN}whisperjav /content/drive/MyDrive/video.mp4${NC}"
-echo ""
+
+success "Installation complete!"
