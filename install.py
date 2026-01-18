@@ -53,10 +53,14 @@ import subprocess
 import argparse
 from pathlib import Path
 
-# Import shared llama-cpp build utilities
-from whisperjav.translate.llama_build_utils import (
-    get_llama_cpp_source_info,
-)
+# Import shared llama-cpp build utilities directly (avoid triggering full package import)
+# This is necessary because install.py runs before dependencies are installed
+import importlib.util
+_llama_utils_path = Path(__file__).parent / "whisperjav" / "translate" / "llama_build_utils.py"
+_spec = importlib.util.spec_from_file_location("llama_build_utils", _llama_utils_path)
+_llama_build_utils = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_llama_build_utils)
+get_llama_cpp_source_info = _llama_build_utils.get_llama_cpp_source_info
 
 def run_pip(args, description, allow_fail=False):
     """Run pip command with error handling."""
