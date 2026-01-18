@@ -45,11 +45,9 @@ install_requires = [
     "accelerate>=0.26.0",    # Efficient model loading for Transformers
     "silero-vad>=6.0",
 
-    # Local LLM translation (v1.8.0)
-    # NOTE: llama-cpp-python is NOT included here - it requires platform-specific
-    # CUDA builds. Instead, it's lazy-installed at runtime when user runs
-    # --provider local. Server deps are in extras_require['local'].
-    # See: https://github.com/JamePeng/llama-cpp-python
+    # NOTE: llama-cpp-python moved to [local-llm] extra (v1.8.0)
+    # Building from source takes 7+ minutes on Colab/Linux
+    # Install separately: pip install whisperjav[local-llm]
 
     # Speech segmentation backends (v1.7.2)
     "ten-vad",
@@ -108,7 +106,7 @@ classifiers = [
 # These are the server deps from llama-cpp-python[server], platform-agnostic
 # llama-cpp-python itself is lazy-installed at runtime with correct CUDA flags
 extras_require = {
-    'local': [
+    'local-llm': [
         "uvicorn>=0.22.0",
         "fastapi>=0.100.0",
         "pydantic-settings>=2.0.1",

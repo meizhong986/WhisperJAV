@@ -36,18 +36,83 @@ from whisperjav.modules.speech_enhancement import (
 # =============================================================================
 # IMMORTAL OBJECT PATTERN - Prevents ctranslate2 Destructor Crash
 # =============================================================================
-# The ctranslate2 C++ destructor crashes with Access Violation (0xC0000005) on
-# Windows when explicitly deleted or garbage collected. This is a known issue
-# with the ctranslate2 library's CUDA resource cleanup during Python shutdown.
+# The ctranslate2 C++ destructor crashes with Access Violation (0xC0000005) or
+# Stack Buffer Overrun (0xC0000409) on Windows when garbage collected during
+# Python shutdown. This is a known upstream issue in ctranslate2/faster-whisper.
 #
-# Solution: Store ASR reference here to prevent garbage collection. The Nuclear
-# Exit (os._exit(0)) in pass_worker.py skips Python's cleanup sequence entirely,
-# so the destructor never runs. The OS kernel reclaims all memory on process exit.
+# Solution: Store ASR reference here to prevent garbage collection during normal
+# execution. Before process exit, call safe_cleanup_immortal_asr() to attempt
+# controlled cleanup, then use os._exit(0) to skip Python's shutdown sequence.
 #
-# This variable is intentionally module-level (not class-level) to ensure the
-# reference persists even after the pipeline instance is garbage collected.
+# References:
+# - https://github.com/SYSTRAN/faster-whisper/issues/1293
+# - https://github.com/SYSTRAN/faster-whisper/issues/71
+# - https://github.com/OpenNMT/CTranslate2/issues/1782
 # =============================================================================
 _IMMORTAL_ASR_REFERENCE = None
+
+
+def safe_cleanup_immortal_asr() -> bool:
+    """
+    Attempt controlled cleanup of the immortal ASR reference before process exit.
+
+    This function tries to properly release GPU memory by calling the ASR's cleanup
+    method during controlled execution (where we can catch exceptions), rather than
+    letting the destructor run during Python's unsafe shutdown sequence.
+
+    Returns:
+        True if cleanup was attempted (regardless of success), False if no cleanup needed.
+
+    Note:
+        Even if this function raises an exception internally, it catches and logs it.
+        The caller should still call os._exit(0) afterward to prevent the destructor
+        from running during Python shutdown.
+    """
+    global _IMMORTAL_ASR_REFERENCE
+
+    if _IMMORTAL_ASR_REFERENCE is None:
+        return False
+
+    try:
+        logger.debug("Attempting controlled cleanup of immortal ASR reference...")
+
+        # Step 1: Call the ASR's cleanup method if it exists
+        if hasattr(_IMMORTAL_ASR_REFERENCE, 'cleanup'):
+            try:
+                _IMMORTAL_ASR_REFERENCE.cleanup()
+                logger.debug("ASR cleanup() called successfully")
+            except Exception as e:
+                logger.warning(f"ASR cleanup() raised exception (continuing): {e}")
+
+        # Step 2: Clear the reference
+        _IMMORTAL_ASR_REFERENCE = None
+
+        # Step 3: CUDA synchronization and cache clear
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+                logger.debug("CUDA synchronized and cache cleared")
+        except Exception as e:
+            logger.warning(f"CUDA cleanup raised exception (continuing): {e}")
+
+        # Step 4: Force garbage collection to trigger any remaining destructors
+        # in a controlled context where we can catch exceptions
+        try:
+            import gc
+            gc.collect()
+        except Exception as e:
+            logger.warning(f"gc.collect() raised exception (continuing): {e}")
+
+        logger.debug("Immortal ASR cleanup completed")
+        return True
+
+    except Exception as e:
+        logger.warning(f"safe_cleanup_immortal_asr() failed (non-fatal): {e}")
+        # Clear reference anyway to prevent double-cleanup attempts
+        _IMMORTAL_ASR_REFERENCE = None
+        return True
 
 
 class BalancedPipeline(BasePipeline):
