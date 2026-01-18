@@ -9,6 +9,7 @@
 #   - Uses uv for 10-100x faster package installation
 #   - Creates isolated venv to avoid numpy 2.x conflicts with Colab's ecosystem
 #   - Configures PyTorch for cu126 (Colab's CUDA version)
+#   - Installs system dependencies (portaudio19-dev for pyaudio/auditok)
 #   - Handles llama-cpp-python installation (prebuilt wheel or source build)
 #
 # Usage:
@@ -232,6 +233,16 @@ fi
 # ==============================================================================
 
 section "Step 4/5: Installing WhisperJAV"
+
+# Install system dependencies required for building Python packages
+# - portaudio19-dev: Required for pyaudio (used by auditok for scene detection)
+info "Installing system dependencies (portaudio for pyaudio)..."
+if apt-get update -qq > /dev/null 2>&1 && apt-get install -y -qq portaudio19-dev > /dev/null 2>&1; then
+    success "System dependencies installed"
+else
+    warn "Could not install portaudio19-dev (pyaudio may fail to build)"
+    warn "Continuing anyway - scene detection may not work"
+fi
 
 info "Installing from $WHISPERJAV_REPO@$WHISPERJAV_BRANCH"
 info "This includes all dependencies (whisper, stable-ts, faster-whisper, etc.)..."
