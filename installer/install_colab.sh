@@ -259,33 +259,17 @@ fi
 # Verify WhisperJAV installation
 info "Verifying WhisperJAV installation..."
 
-# Disable errexit AND ERR trap temporarily to capture the actual error message
-# (set +e alone doesn't disable the ERR trap)
-set +e
-trap - ERR
-WJ_CHECK=$("$VENV_PATH/bin/python" -c "
-import sys
-try:
-    import whisperjav
-    print('OK')
-except Exception as e:
-    print(f'ERROR:{e}', file=sys.stderr)
-    sys.exit(1)
-" 2>&1)
-verify_status=$?
-# Restore errexit and ERR trap
-set -e
-trap 'exit_code=$?; echo ""; echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND"; echo "Exit code: $exit_code"; exit 1' ERR
-
-if [[ $verify_status -ne 0 ]] || [[ "$WJ_CHECK" != *"OK"* ]]; then
-    error "WhisperJAV verification failed:"
-    echo "$WJ_CHECK" | while read line; do
-        error "  $line"
-    done
+# Use 'if' statement to bypass ERR trap (trap doesn't fire for if conditions)
+if "$VENV_PATH/bin/python" -c "import whisperjav; print('OK')" 2>&1; then
+    success "WhisperJAV installed successfully"
+else
+    error "WhisperJAV import failed. Running diagnostic..."
+    echo ""
+    # Show the actual import error (|| true prevents trap)
+    "$VENV_PATH/bin/python" -c "import whisperjav" 2>&1 || true
+    echo ""
     exit 1
 fi
-
-success "WhisperJAV installed successfully"
 
 # Verify CLI is available
 if [[ -f "$VENV_PATH/bin/whisperjav" ]]; then
