@@ -114,7 +114,7 @@ def _are_server_deps_installed() -> bool:
 
 def _install_server_deps() -> bool:
     """
-    Install whisperjav[local] server dependencies.
+    Install whisperjav[local-llm] server dependencies.
 
     These are platform-agnostic deps (uvicorn, fastapi, etc.) that must be
     installed before llama-cpp-python.
@@ -130,7 +130,7 @@ def _install_server_deps() -> bool:
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "whisperjav[local]"],
+            [sys.executable, "-m", "pip", "install", "whisperjav[local-llm]"],
             capture_output=True,
             text=True,
             timeout=120  # 2 minute timeout
@@ -252,7 +252,7 @@ def ensure_llama_cpp_installed() -> bool:
     the wheel is automatically downloaded and installed.
 
     Installation flow:
-    1. Install server deps first (whisperjav[local]) - platform agnostic
+    1. Install server deps first (whisperjav[local-llm]) - platform agnostic
     2. Detect CUDA version
     3. Try prebuilt wheel (HuggingFace, then GitHub)
     4. Fall back to source build (with 10s user cancel window)
@@ -328,7 +328,7 @@ def ensure_llama_cpp_installed() -> bool:
     print("!" * 60)
     print("\nCould not install llama-cpp-python automatically.")
     print("\nManual installation options:")
-    print("  1. pip install whisperjav[local]  # Install server deps")
+    print("  1. pip install whisperjav[local-llm]  # Install server deps")
     print("  2. python install.py --local-llm-build")
     print("\nAlternatively, use cloud translation providers:")
     print("  whisperjav-translate -i file.srt --provider deepseek")
