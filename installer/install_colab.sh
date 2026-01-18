@@ -259,8 +259,10 @@ fi
 # Verify WhisperJAV installation
 info "Verifying WhisperJAV installation..."
 
-# Disable errexit temporarily to capture the actual error message
+# Disable errexit AND ERR trap temporarily to capture the actual error message
+# (set +e alone doesn't disable the ERR trap)
 set +e
+trap - ERR
 WJ_CHECK=$("$VENV_PATH/bin/python" -c "
 import sys
 try:
@@ -271,7 +273,9 @@ except Exception as e:
     sys.exit(1)
 " 2>&1)
 verify_status=$?
+# Restore errexit and ERR trap
 set -e
+trap 'exit_code=$?; echo ""; echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND"; echo "Exit code: $exit_code"; exit 1' ERR
 
 if [[ $verify_status -ne 0 ]] || [[ "$WJ_CHECK" != *"OK"* ]]; then
     error "WhisperJAV verification failed:"
