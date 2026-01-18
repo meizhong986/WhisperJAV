@@ -259,6 +259,10 @@ fi
 # Verify WhisperJAV installation
 info "Verifying WhisperJAV installation..."
 
+# Override MPLBACKEND - Colab sets it to 'matplotlib_inline' which isn't in our venv
+# Use 'Agg' (non-interactive) backend which is always available
+export MPLBACKEND=Agg
+
 # Use 'if' statement to bypass ERR trap (trap doesn't fire for if conditions)
 if "$VENV_PATH/bin/python" -c "import whisperjav; print('OK')" 2>&1; then
     success "WhisperJAV installed successfully"
@@ -396,27 +400,29 @@ echo -e "${BLUE}  HOW TO USE${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo "Transcribe a video:"
-echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav /content/drive/MyDrive/video.mp4${NC}"
+echo -e "  ${GREEN}MPLBACKEND=Agg $VENV_PATH/bin/whisperjav /content/drive/MyDrive/video.mp4${NC}"
 echo ""
 echo "Transcribe with options:"
-echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav /content/drive/MyDrive/video.mp4 --mode balanced --sensitivity aggressive${NC}"
+echo -e "  ${GREEN}MPLBACKEND=Agg $VENV_PATH/bin/whisperjav /content/drive/MyDrive/video.mp4 --mode balanced --sensitivity aggressive${NC}"
 echo ""
 echo "Translate subtitles (cloud API):"
-echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav-translate -i /content/drive/MyDrive/video.srt --provider deepseek${NC}"
+echo -e "  ${GREEN}MPLBACKEND=Agg $VENV_PATH/bin/whisperjav-translate -i /content/drive/MyDrive/video.srt --provider deepseek${NC}"
 echo ""
 
 if [[ "$LLAMA_INSTALLED" == "true" ]]; then
     echo "Translate subtitles (local LLM):"
-    echo -e "  ${GREEN}$VENV_PATH/bin/whisperjav-translate -i /content/drive/MyDrive/video.srt --provider local${NC}"
+    echo -e "  ${GREEN}MPLBACKEND=Agg $VENV_PATH/bin/whisperjav-translate -i /content/drive/MyDrive/video.srt --provider local${NC}"
     echo ""
 fi
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Create convenience aliases file
+# Create convenience aliases file with MPLBACKEND fix
 cat > /content/whisperjav_aliases.sh << 'EOF'
 # WhisperJAV convenience aliases
+# MPLBACKEND=Agg fixes matplotlib backend conflict with Colab's isolated venv
+export MPLBACKEND=Agg
 alias whisperjav='/content/whisperjav_env/bin/whisperjav'
 alias whisperjav-translate='/content/whisperjav_env/bin/whisperjav-translate'
 EOF
