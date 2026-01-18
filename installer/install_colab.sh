@@ -10,7 +10,11 @@
 #   - Creates isolated venv to avoid numpy 2.x conflicts with Colab's ecosystem
 #   - Configures PyTorch for cu126 (Colab's CUDA version)
 #   - Installs system dependencies (portaudio19-dev for pyaudio/auditok)
-#   - Handles llama-cpp-python installation (prebuilt wheel or source build)
+#   - Optional llama-cpp-python for local LLM translation (prebuilt wheel only)
+#
+# Note: llama-cpp-python is now an optional extra (v1.8.0) to avoid 7+ minute
+# source builds. Local LLM translation uses prebuilt wheels if available,
+# otherwise cloud translation providers work without it.
 #
 # Usage:
 #   !git clone https://github.com/meizhong986/WhisperJAV.git
@@ -38,7 +42,7 @@ fi
 
 # Error handling - trap errors and show what failed
 set -e
-trap 'echo ""; echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND"; echo "Exit code: $?"; exit 1' ERR
+trap 'exit_code=$?; echo ""; echo "ERROR: Command failed at line $LINENO: $BASH_COMMAND"; echo "Exit code: $exit_code"; exit 1' ERR
 
 # Colors for output
 RED='\033[0;31m'
@@ -254,19 +258,26 @@ fi
 
 # Verify WhisperJAV installation
 info "Verifying WhisperJAV installation..."
+
+# Disable errexit temporarily to capture the actual error message
+set +e
 WJ_CHECK=$("$VENV_PATH/bin/python" -c "
 import sys
 try:
     import whisperjav
     print('OK')
 except Exception as e:
-    print(f'ERROR:{e}')
+    print(f'ERROR:{e}', file=sys.stderr)
     sys.exit(1)
 " 2>&1)
+verify_status=$?
+set -e
 
-if [[ "$WJ_CHECK" != "OK" ]]; then
+if [[ $verify_status -ne 0 ]] || [[ "$WJ_CHECK" != *"OK"* ]]; then
     error "WhisperJAV verification failed:"
-    error "$WJ_CHECK"
+    echo "$WJ_CHECK" | while read line; do
+        error "  $line"
+    done
     exit 1
 fi
 
@@ -281,10 +292,14 @@ else
 fi
 
 # ==============================================================================
-# STEP 5: INSTALL LLAMA-CPP-PYTHON (for local translation)
+# STEP 5: INSTALL LLAMA-CPP-PYTHON (OPTIONAL - for local LLM translation)
 # ==============================================================================
 
-section "Step 5/5: Installing llama-cpp-python (local LLM)"
+section "Step 5/5: Installing llama-cpp-python (optional)"
+
+info "llama-cpp-python enables local LLM translation without cloud APIs"
+info "Skipping source builds (takes 7+ minutes) - using prebuilt wheels only"
+echo ""
 
 LLAMA_INSTALLED=false
 

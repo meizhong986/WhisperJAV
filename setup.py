@@ -45,11 +45,9 @@ install_requires = [
     "accelerate>=0.26.0",    # Efficient model loading for Transformers
     "silero-vad>=6.0",
 
-    # Local LLM translation (v1.8.0)
-    # Using JamePeng's fork for better CUDA support and active maintenance
-    # [server] extra includes uvicorn for local LLM server
-    # See: https://github.com/JamePeng/llama-cpp-python
-    "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git",
+    # NOTE: llama-cpp-python moved to [local-llm] extra (v1.8.0)
+    # Building from source takes 7+ minutes on Colab/Linux
+    # Install separately: pip install whisperjav[local-llm]
 
     # Speech segmentation backends (v1.7.2)
     "ten-vad",
@@ -104,6 +102,16 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+# Optional dependencies (extras)
+# Install with: pip install whisperjav[local-llm]
+extras_require = {
+    # Local LLM translation - builds from source, takes 7+ minutes
+    # Using JamePeng's fork for better CUDA support and active maintenance
+    "local-llm": [
+        "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git",
+    ],
+}
+
 setup(
     name="whisperjav",
     version=__version__,
@@ -117,6 +125,7 @@ setup(
     classifiers=classifiers,
     python_requires=python_requires,
     install_requires=install_requires,
+    extras_require=extras_require,
     entry_points={
         "console_scripts": [
             "whisperjav=whisperjav.main:main",
