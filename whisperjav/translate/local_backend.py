@@ -39,6 +39,15 @@ import time
 from pathlib import Path
 from typing import Optional, Tuple
 
+# Import shared build utilities
+from .llama_build_utils import (
+    build_from_source as _build_from_source,
+    detect_cuda_version,
+    get_prebuilt_wheel_url,
+    download_wheel,
+    install_wheel,
+)
+
 logger = logging.getLogger(__name__)
 
 # HuggingFace wheel repository for lazy download
@@ -90,53 +99,75 @@ def _is_llama_cpp_installed() -> bool:
         return False
 
 
-def _detect_cuda_version() -> Optional[str]:
+def _are_server_deps_installed() -> bool:
+    """Check if server dependencies (uvicorn, fastapi, etc.) are installed."""
+    try:
+        import uvicorn  # noqa: F401
+        import fastapi  # noqa: F401
+        import pydantic_settings  # noqa: F401
+        import sse_starlette  # noqa: F401
+        import starlette_context  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _install_server_deps() -> bool:
     """
-    Detect CUDA version from nvidia-smi or torch.
+    Install whisperjav[local-llm] server dependencies.
+
+    These are platform-agnostic deps (uvicorn, fastapi, etc.) that must be
+    installed before llama-cpp-python.
 
     Returns:
-        CUDA version string like "cu124" or None if not available
+        True if installation succeeded or deps already installed, False otherwise
     """
-    # Try torch first (most reliable)
-    try:
-        import torch
-        if torch.cuda.is_available():
-            cuda_ver = torch.version.cuda
-            if cuda_ver:
-                # Convert "12.4" to "cu124"
-                parts = cuda_ver.split(".")
-                if len(parts) >= 2:
-                    return f"cu{parts[0]}{parts[1]}"
-    except Exception:
-        pass
+    if _are_server_deps_installed():
+        logger.debug("Server dependencies already installed")
+        return True
 
-    # Fall back to nvidia-smi
+    print("Installing server dependencies (uvicorn, fastapi, etc.)...")
+
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            [sys.executable, "-m", "pip", "install", "whisperjav[local-llm]"],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=120  # 2 minute timeout
         )
-        if result.returncode == 0:
-            driver_ver = result.stdout.strip().split("\n")[0]
-            # Map driver version to CUDA version
-            # Reference: https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/
-            major = int(driver_ver.split(".")[0])
-            if major >= 570:
-                return "cu128"
-            elif major >= 560:
-                return "cu126"
-            elif major >= 551:
-                return "cu124"
-            elif major >= 531:
-                return "cu121"
-            elif major >= 520:
-                return "cu118"
-    except Exception:
-        pass
 
-    return None
+        if result.returncode == 0:
+            print("  Server dependencies installed successfully!")
+            return True
+        else:
+            logger.warning(f"Failed to install server deps: {result.stderr[:200]}")
+            return False
+    except Exception as e:
+        logger.warning(f"Failed to install server deps: {e}")
+        return False
+
+
+def _wait_with_cancel_option(seconds: int = 10) -> bool:
+    """
+    Wait for specified seconds, allowing user to cancel with Ctrl+C.
+
+    Args:
+        seconds: Number of seconds to wait (default 10)
+
+    Returns:
+        True if user waited (proceed with build), False if user cancelled
+    """
+    print(f"\nPress Ctrl+C within {seconds}s to cancel, or wait to continue automatically...")
+
+    try:
+        for i in range(seconds, 0, -1):
+            print(f"  Starting in {i}s...", end='\r')
+            time.sleep(1)
+        print("  Starting build...       ")  # Extra spaces to clear countdown
+        return True
+    except KeyboardInterrupt:
+        print("\n  Build cancelled by user.")
+        return False
 
 
 def _get_wheel_filename(cuda_version: Optional[str] = None) -> Tuple[str, str]:
@@ -212,160 +243,6 @@ def _download_wheel_from_huggingface(cuda_version: Optional[str] = None) -> Opti
         return None
 
 
-def _download_wheel_from_github(cuda_version: Optional[str] = None) -> Optional[Path]:
-    """
-    Download llama-cpp-python wheel from JamePeng GitHub releases (fallback).
-
-    Returns:
-        Path to downloaded wheel, or None if not found
-    """
-    import json
-    import tempfile
-    import urllib.request
-    import urllib.error
-
-    # Determine platform identifiers
-    if sys.platform == "win32":
-        os_tag = "win"
-        wheel_platform = "win_amd64"
-    elif sys.platform == "linux":
-        os_tag = "linux"
-        wheel_platform = "linux_x86_64"
-    elif sys.platform == "darwin":
-        os_tag = "metal"
-        if platform.machine() == "arm64":
-            wheel_platform = "arm64"
-        else:
-            wheel_platform = "x86_64"
-    else:
-        return None
-
-    py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
-
-    # Build search criteria
-    # Note: CUDA 13.x (cu130) is NOT supported - no PyTorch/llama-cpp wheels available
-    target_cudas = []
-    if cuda_version and sys.platform in ("win32", "linux"):
-        # Search compatible CUDA versions in order (highest supported first)
-        if cuda_version >= "cu128":
-            target_cudas = ["cu128", "cu126", "cu124"]
-        elif cuda_version >= "cu126":
-            target_cudas = ["cu126", "cu124"]
-        elif cuda_version >= "cu124":
-            target_cudas = ["cu124"]
-        elif cuda_version >= "cu121":
-            target_cudas = ["cu121"]
-
-    try:
-        logger.info("Searching JamePeng GitHub releases...")
-        print("Searching JamePeng GitHub releases for prebuilt wheel...")
-
-        api_url = "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=50"
-        req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.v3+json"})
-        with urllib.request.urlopen(req, timeout=15) as response:
-            releases = json.loads(response.read().decode())
-
-        # Search for matching wheel
-        if os_tag == "metal":
-            # macOS: look for metal releases
-            for release in releases:
-                tag = release.get("tag_name", "")
-                if "-metal-" not in tag.lower():
-                    continue
-                for asset in release.get("assets", []):
-                    name = asset.get("name", "")
-                    if not name.endswith(".whl"):
-                        continue
-                    if py_ver not in name:
-                        continue
-                    if wheel_platform in name:
-                        wheel_url = asset.get("browser_download_url")
-                        return _download_wheel_url(wheel_url, name)
-        else:
-            # Windows/Linux: look for CUDA releases
-            for cuda_tag in target_cudas:
-                for release in releases:
-                    tag = release.get("tag_name", "")
-                    if f"-{cuda_tag}-" not in tag:
-                        continue
-                    if f"-{os_tag}-" not in tag:
-                        continue
-                    for asset in release.get("assets", []):
-                        name = asset.get("name", "")
-                        if not name.endswith(".whl"):
-                            continue
-                        if py_ver not in name:
-                            continue
-                        if wheel_platform in name:
-                            wheel_url = asset.get("browser_download_url")
-                            return _download_wheel_url(wheel_url, name)
-
-        logger.warning("No matching wheel found on JamePeng GitHub")
-        return None
-
-    except Exception as e:
-        logger.warning(f"Failed to search JamePeng GitHub: {e}")
-        return None
-
-
-def _download_wheel_url(url: str, filename: str) -> Optional[Path]:
-    """Download wheel from URL to temp directory."""
-    import tempfile
-    import urllib.request
-
-    try:
-        logger.info(f"Downloading: {filename}")
-        print(f"  Found: {filename}")
-        print(f"  Downloading...")
-
-        temp_dir = Path(tempfile.gettempdir()) / "whisperjav_wheels"
-        temp_dir.mkdir(exist_ok=True)
-        dest_path = temp_dir / filename
-
-        if dest_path.exists():
-            logger.info(f"Using cached wheel: {dest_path}")
-            return dest_path
-
-        urllib.request.urlretrieve(url, dest_path)
-        logger.info(f"Downloaded to: {dest_path}")
-        return dest_path
-
-    except Exception as e:
-        logger.warning(f"Failed to download wheel: {e}")
-        return None
-
-
-def _install_wheel(wheel_path: Path) -> bool:
-    """Install wheel using pip."""
-    try:
-        logger.info(f"Installing wheel: {wheel_path}")
-        print(f"Installing llama-cpp-python...")
-
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", str(wheel_path), "--no-deps"],
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 minute timeout
-        )
-
-        if result.returncode == 0:
-            # Also install server extras
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", "llama-cpp-python[server]"],
-                capture_output=True,
-                timeout=60
-            )
-            logger.info("Successfully installed llama-cpp-python")
-            print("  Successfully installed!")
-            return True
-        else:
-            logger.error(f"pip install failed: {result.stderr}")
-            return False
-
-    except Exception as e:
-        logger.error(f"Failed to install wheel: {e}")
-        return False
-
 
 def ensure_llama_cpp_installed() -> bool:
     """
@@ -373,6 +250,12 @@ def ensure_llama_cpp_installed() -> bool:
 
     This implements lazy download: on first use of `--provider local`,
     the wheel is automatically downloaded and installed.
+
+    Installation flow:
+    1. Install server deps first (whisperjav[local-llm]) - platform agnostic
+    2. Detect CUDA version
+    3. Try prebuilt wheel (HuggingFace, then GitHub)
+    4. Fall back to source build (with 10s user cancel window)
 
     Returns:
         True if llama-cpp-python is available, False otherwise
@@ -387,26 +270,55 @@ def ensure_llama_cpp_installed() -> bool:
     print("\nllama-cpp-python is required for local LLM translation.")
     print("This is a one-time download (~700MB).\n")
 
-    # Detect CUDA version
-    cuda_version = _detect_cuda_version()
+    # Step 1: Install server dependencies first (uvicorn, fastapi, etc.)
+    # These are platform-agnostic and declared in setup.py extras_require['local']
+    if not _install_server_deps():
+        print("WARNING: Could not install server dependencies.")
+        print("         Server may not start correctly.\n")
+
+    # Step 2: Detect CUDA version
+    cuda_version = detect_cuda_version()
     if cuda_version:
         print(f"Detected CUDA: {cuda_version}")
     else:
         print("CUDA not detected (will use CPU or Metal)")
 
-    # Try HuggingFace first
+    # Step 3: Try HuggingFace first
     wheel_path = _download_wheel_from_huggingface(cuda_version)
 
-    # Fall back to JamePeng GitHub
+    # Fall back to JamePeng GitHub (using shared utility)
     if not wheel_path:
         print("\nHuggingFace wheel not found, trying JamePeng GitHub...")
-        wheel_path = _download_wheel_from_github(cuda_version)
+        wheel_url, backend_desc = get_prebuilt_wheel_url(
+            cuda_version, verbose=True, version=WHEEL_VERSION
+        )
+        if wheel_url:
+            print(f"  Backend: {backend_desc}")
+            print(f"  URL: {wheel_url}")
+            wheel_path = download_wheel(wheel_url)
 
     # Install if we got a wheel
-    if wheel_path and _install_wheel(wheel_path):
+    if wheel_path and install_wheel(wheel_path):
         # Verify installation
         if _is_llama_cpp_installed():
             print("\n✓ llama-cpp-python installed successfully!")
+            print("  Future runs will start immediately.\n")
+            return True
+
+    # Step 4: Fall back to building from source (with 10s cancel window)
+    print("\nNo prebuilt wheel found. Building from source... (~10 min)")
+
+    # Give user 10 seconds to cancel before starting long build
+    if not _wait_with_cancel_option(seconds=10):
+        print("\nYou can manually install later with:")
+        print("  python install.py --local-llm-build")
+        print("\nOr use cloud translation providers:")
+        print("  whisperjav-translate -i file.srt --provider deepseek")
+        return False
+
+    if _build_from_source():
+        if _is_llama_cpp_installed():
+            print("\n✓ llama-cpp-python built and installed successfully!")
             print("  Future runs will start immediately.\n")
             return True
 
@@ -416,7 +328,7 @@ def ensure_llama_cpp_installed() -> bool:
     print("!" * 60)
     print("\nCould not install llama-cpp-python automatically.")
     print("\nManual installation options:")
-    print("  1. pip install llama-cpp-python[server]")
+    print("  1. pip install whisperjav[local-llm]  # Install server deps")
     print("  2. python install.py --local-llm-build")
     print("\nAlternatively, use cloud translation providers:")
     print("  whisperjav-translate -i file.srt --provider deepseek")

@@ -102,13 +102,17 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-# Optional dependencies (extras)
-# Install with: pip install whisperjav[local-llm]
+# Optional dependencies for local LLM translation
+# These are the server deps from llama-cpp-python[server], platform-agnostic
+# llama-cpp-python itself is lazy-installed at runtime with correct CUDA flags
 extras_require = {
-    # Local LLM translation - builds from source, takes 7+ minutes
-    # Using JamePeng's fork for better CUDA support and active maintenance
-    "local-llm": [
-        "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git",
+    'local-llm': [
+        "uvicorn>=0.22.0",
+        "fastapi>=0.100.0",
+        "pydantic-settings>=2.0.1",
+        "sse-starlette>=1.6.1",
+        "starlette-context>=0.3.6,<0.4",
+        # PyYAML already in install_requires
     ],
 }
 

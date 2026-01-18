@@ -21,8 +21,8 @@ REM   --cuda128               Install PyTorch for CUDA 12.8 (default for driver 
 REM   --no-speech-enhancement Skip speech enhancement packages
 REM   --minimal               Minimal install (transcription only)
 REM   --dev                   Install in development/editable mode
-REM   --local-llm             Install local LLM (fast - prebuilt wheel only)
-REM   --local-llm-build       Install local LLM (slow - builds from source if needed)
+REM   --local-llm             Install local LLM (tries prebuilt wheel first)
+REM   --local-llm-build       Install local LLM (builds from source)
 REM
 REM Note: CUDA 12.1/12.4/12.6 support removed in v1.8.0 (PyTorch 2.7.x dropped these)
 REM
@@ -559,15 +559,20 @@ if "%LOCAL_LLM%"=="1" (
         )
     ) else if "%LOCAL_LLM_BUILD%"=="1" (
         REM No prebuilt wheel, but user opted for source build
-        python -c "from install import get_llama_cpp_source_info; url,backend,cmake=get_llama_cpp_source_info(); print(f'SOURCE_URL={url}'); print(f'SOURCE_BACKEND={backend}'); print(f'SOURCE_CMAKE={cmake or \"\"}')" > "%TEMP%\llama_source.txt" 2>nul
+        python -c "from install import get_llama_cpp_source_info; url,backend,cmake,env=get_llama_cpp_source_info(); print(f'SOURCE_URL={url}'); print(f'SOURCE_BACKEND={backend}'); print(f'SOURCE_CMAKE={cmake or \"\"}'); print(f'SOURCE_PARALLEL={env.get(\"CMAKE_BUILD_PARALLEL_LEVEL\", \"\")}')" > "%TEMP%\llama_source.txt" 2>nul
         set "SOURCE_URL="
         set "SOURCE_BACKEND="
         set "SOURCE_CMAKE="
+        set "SOURCE_PARALLEL="
         for /f "tokens=1,* delims==" %%a in (%TEMP%\llama_source.txt) do set "%%a=%%b"
         del "%TEMP%\llama_source.txt" 2>nul
 
         echo   Backend: !SOURCE_BACKEND!
         call :log "llama-cpp-python backend: !SOURCE_BACKEND!"
+        if not "!SOURCE_PARALLEL!"=="" (
+            echo   Setting CMAKE_BUILD_PARALLEL_LEVEL=!SOURCE_PARALLEL!
+            set "CMAKE_BUILD_PARALLEL_LEVEL=!SOURCE_PARALLEL!"
+        )
         if not "!SOURCE_CMAKE!"=="" (
             echo   Setting CMAKE_ARGS=!SOURCE_CMAKE!
             set "CMAKE_ARGS=!SOURCE_CMAKE!"
@@ -787,8 +792,8 @@ if "%LOCAL_LLM%"=="1" (
     echo.
 ) else (
     echo   To enable local LLM translation, re-install with:
-    echo     installer\install_windows.bat --local-llm          ^(fast - prebuilt wheel^)
-    echo     installer\install_windows.bat --local-llm-build    ^(slow - builds if needed^)
+    echo     installer\install_windows.bat --local-llm-build    ^(builds from source^)
+    echo     installer\install_windows.bat --local-llm          ^(tries prebuilt wheel first^)
     echo.
 )
 echo   For help:
@@ -921,8 +926,8 @@ echo   --cuda128               Install PyTorch for CUDA 12.8 ^(default for drive
 echo   --no-speech-enhancement Skip speech enhancement packages
 echo   --minimal               Minimal install ^(transcription only^)
 echo   --dev                   Install in development/editable mode
-echo   --local-llm             Install local LLM ^(fast - prebuilt wheel only^)
-echo   --local-llm-build       Install local LLM ^(slow - builds from source if needed^)
+echo   --local-llm             Install local LLM ^(tries prebuilt wheel first^)
+echo   --local-llm-build       Install local LLM ^(builds from source^)
 echo   --help, -h              Show this help message
 echo.
 echo CUDA version selection:
