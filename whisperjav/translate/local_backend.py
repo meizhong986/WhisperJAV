@@ -398,25 +398,31 @@ def _wait_with_cancel_option(seconds: int = 10) -> bool:
         return False
 
 
-def _get_wheel_filename(cuda_version: Optional[str] = None) -> Tuple[str, str]:
+def _get_wheel_filenames(cuda_version: Optional[str] = None) -> Tuple[list, str]:
     """
-    Build wheel filename based on platform, Python version, and CUDA version.
+    Build possible wheel filenames based on platform, Python version, and CUDA version.
 
     Returns:
-        Tuple of (wheel_filename, backend_subfolder)
+        Tuple of (list_of_wheel_filenames, backend_subfolder)
+        Multiple filenames are returned for Linux to handle different platform tags.
     """
     py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
 
-    # Determine platform tag
+    # Determine platform tags (may have multiple variants for Linux)
     if sys.platform == "win32":
-        plat_tag = "win_amd64"
+        plat_tags = ["win_amd64"]
     elif sys.platform == "linux":
-        plat_tag = "manylinux_2_17_x86_64.manylinux2014_x86_64"
+        # Try multiple platform tags - wheels may use different conventions
+        # Order: most specific first
+        plat_tags = [
+            "manylinux_2_17_x86_64.manylinux2014_x86_64",  # Standard manylinux
+            "linux_x86_64",  # Simplified tag (used by some builds)
+        ]
     elif sys.platform == "darwin":
         if platform.machine() == "arm64":
-            plat_tag = "macosx_11_0_arm64"
+            plat_tags = ["macosx_11_0_arm64"]
         else:
-            plat_tag = "macosx_10_15_x86_64"
+            plat_tags = ["macosx_10_15_x86_64"]
     else:
         raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
@@ -428,44 +434,69 @@ def _get_wheel_filename(cuda_version: Optional[str] = None) -> Tuple[str, str]:
     else:
         backend = "cpu"
 
-    # Build wheel filename
+    # Build wheel filenames for all platform tag variants
     # Format: llama_cpp_python-{version}-{pyver}-{pyver}-{platform}.whl
-    wheel_name = f"llama_cpp_python-{WHEEL_VERSION}-{py_ver}-{py_ver}-{plat_tag}.whl"
+    wheel_names = [
+        f"llama_cpp_python-{WHEEL_VERSION}-{py_ver}-{py_ver}-{plat_tag}.whl"
+        for plat_tag in plat_tags
+    ]
 
-    return wheel_name, backend
+    return wheel_names, backend
+
+
+def _get_wheel_filename(cuda_version: Optional[str] = None) -> Tuple[str, str]:
+    """
+    Build wheel filename based on platform, Python version, and CUDA version.
+    Returns the first (preferred) filename variant.
+
+    Returns:
+        Tuple of (wheel_filename, backend_subfolder)
+    """
+    wheel_names, backend = _get_wheel_filenames(cuda_version)
+    return wheel_names[0], backend
 
 
 def _download_wheel_from_huggingface(cuda_version: Optional[str] = None) -> Optional[Path]:
     """
     Download llama-cpp-python wheel from HuggingFace.
 
+    Tries multiple wheel filename variants for Linux (manylinux vs linux_x86_64).
+
     Returns:
         Path to downloaded wheel, or None if not found
     """
     try:
-        from huggingface_hub import hf_hub_download, HfFileSystemResolvedPath
+        from huggingface_hub import hf_hub_download
         from huggingface_hub.utils import EntryNotFoundError
 
-        wheel_name, backend = _get_wheel_filename(cuda_version)
-        wheel_path = f"llama-cpp-python/{backend}/{wheel_name}"
+        wheel_names, backend = _get_wheel_filenames(cuda_version)
 
-        logger.info(f"Downloading wheel from HuggingFace: {WHEEL_REPO_ID}/{wheel_path}")
         print(f"Downloading llama-cpp-python from HuggingFace...")
-        print(f"  Wheel: {wheel_name}")
         print(f"  Backend: {backend}")
 
-        local_path = hf_hub_download(
-            repo_id=WHEEL_REPO_ID,
-            filename=wheel_path,
-            repo_type="dataset"
-        )
+        # Try each wheel filename variant
+        for wheel_name in wheel_names:
+            wheel_path = f"llama-cpp-python/{backend}/{wheel_name}"
+            logger.info(f"Trying HuggingFace: {WHEEL_REPO_ID}/{wheel_path}")
 
-        logger.info(f"Downloaded wheel to: {local_path}")
-        return Path(local_path)
+            try:
+                local_path = hf_hub_download(
+                    repo_id=WHEEL_REPO_ID,
+                    filename=wheel_path,
+                    repo_type="dataset"
+                )
+                print(f"  Found: {wheel_name}")
+                logger.info(f"Downloaded wheel to: {local_path}")
+                return Path(local_path)
+            except EntryNotFoundError:
+                logger.debug(f"Not found: {wheel_path}")
+                continue
 
-    except EntryNotFoundError:
-        logger.warning(f"Wheel not found on HuggingFace: {wheel_path}")
+        # None of the variants found
+        logger.warning(f"Wheel not found on HuggingFace for backend {backend}")
+        print(f"  Not found on HuggingFace (tried {len(wheel_names)} variants)")
         return None
+
     except Exception as e:
         logger.warning(f"Failed to download from HuggingFace: {e}")
         return None

@@ -169,6 +169,13 @@ else
     exit 1
 fi
 
+# Install pip in venv (required for runtime lazy installs like llama-cpp-python)
+# uv venv doesn't include pip by default, but local_backend.py needs it
+info "Installing pip in venv (for runtime lazy installs)..."
+if ! uv pip install --python "$VENV_PATH/bin/python" pip; then
+    warn "Could not install pip in venv - runtime installs may fail"
+fi
+
 # Helper function to run pip in venv with progress
 venv_pip() {
     info "Installing: $@"
