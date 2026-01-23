@@ -89,14 +89,242 @@ MODEL_REGISTRY = {
 # Lazy Download: Install llama-cpp-python on first use
 # =============================================================================
 
+# Cache for llama-cpp installation status to avoid repeated import attempts
+_llama_cpp_status_cache: Optional[Tuple[bool, Optional[str]]] = None
+
+
+def _check_llama_cpp_status() -> Tuple[bool, Optional[str]]:
+    """
+    Check if llama-cpp-python is installed and functional.
+
+    Returns:
+        Tuple of (is_functional, error_message)
+        - (True, None): llama-cpp-python is installed and working
+        - (False, None): llama-cpp-python is not installed (ImportError)
+        - (False, error_msg): llama-cpp-python is installed but broken (DLL issues)
+    """
+    global _llama_cpp_status_cache
+
+    # Return cached result if available
+    if _llama_cpp_status_cache is not None:
+        return _llama_cpp_status_cache
+
+    try:
+        import llama_cpp  # noqa: F401
+        _llama_cpp_status_cache = (True, None)
+        return (True, None)
+    except ImportError:
+        # Not installed at all
+        _llama_cpp_status_cache = (False, None)
+        return (False, None)
+    except (RuntimeError, OSError) as e:
+        # Installed but DLL loading failed
+        # RuntimeError: "Failed to load shared library 'ggml.dll'"
+        # OSError: Alternative DLL loading error on some systems
+        error_msg = str(e)
+        logger.warning(f"llama-cpp-python installed but not functional: {error_msg}")
+        _llama_cpp_status_cache = (False, error_msg)
+        return (False, error_msg)
+    except Exception as e:
+        # Unexpected error during import
+        error_msg = f"Unexpected error: {type(e).__name__}: {e}"
+        logger.warning(f"llama-cpp-python check failed: {error_msg}")
+        _llama_cpp_status_cache = (False, error_msg)
+        return (False, error_msg)
+
+
+def _clear_llama_cpp_status_cache():
+    """Clear the status cache to force re-check after reinstallation."""
+    global _llama_cpp_status_cache
+    _llama_cpp_status_cache = None
+
 
 def _is_llama_cpp_installed() -> bool:
     """Check if llama-cpp-python is installed and functional."""
+    is_functional, _ = _check_llama_cpp_status()
+    return is_functional
+
+
+def _diagnose_dll_failure(error_msg: str) -> str:
+    """
+    Diagnose DLL loading failure and provide actionable guidance.
+
+    Args:
+        error_msg: The error message from the failed import
+
+    Returns:
+        Diagnostic message with suggested fixes
+    """
+    diagnosis_parts = []
+
+    # Check for common error patterns
+    error_lower = error_msg.lower()
+
+    if "ggml.dll" in error_lower or "llama.dll" in error_lower:
+        diagnosis_parts.append("DLL Loading Failure Detected")
+        diagnosis_parts.append("-" * 40)
+
+        # Check CUDA version
+        cuda_version = detect_cuda_version()
+        if cuda_version:
+            diagnosis_parts.append(f"Current CUDA version (from PyTorch): {cuda_version}")
+        else:
+            diagnosis_parts.append("CUDA: Not detected (CPU-only mode)")
+
+        # Check if CUDA toolkit is installed (not just driver)
+        cuda_toolkit_installed = _check_cuda_toolkit_installed()
+        if cuda_toolkit_installed:
+            diagnosis_parts.append(f"CUDA Toolkit: Installed ({cuda_toolkit_installed})")
+        else:
+            diagnosis_parts.append("CUDA Toolkit: NOT FOUND (only driver installed?)")
+            diagnosis_parts.append("")
+            diagnosis_parts.append("LIKELY CAUSE: CUDA toolkit is not installed.")
+            diagnosis_parts.append("The llama-cpp-python DLLs need CUDA runtime libraries")
+            diagnosis_parts.append("(cublas64_*.dll, cudart64_*.dll) which come with")
+            diagnosis_parts.append("the CUDA Toolkit, not just the NVIDIA driver.")
+
+        # Check VC++ runtime
+        vc_installed = _check_vc_runtime_installed()
+        if vc_installed:
+            diagnosis_parts.append("Visual C++ Runtime: Installed")
+        else:
+            diagnosis_parts.append("Visual C++ Runtime: NOT FOUND")
+            diagnosis_parts.append("")
+            diagnosis_parts.append("POSSIBLE CAUSE: Visual C++ 2015-2022 Redistributable missing.")
+            diagnosis_parts.append("Download from: https://aka.ms/vs/17/release/vc_redist.x64.exe")
+
+        diagnosis_parts.append("")
+        diagnosis_parts.append("RECOMMENDED FIXES:")
+        diagnosis_parts.append("1. Reinstall llama-cpp-python with correct CUDA version:")
+        diagnosis_parts.append("   pip uninstall llama-cpp-python")
+        diagnosis_parts.append("   pip install llama-cpp-python  # Will auto-download correct wheel")
+        diagnosis_parts.append("")
+        diagnosis_parts.append("2. Or use CPU-only mode (slower but always works):")
+        diagnosis_parts.append("   whisperjav-translate --translate-gpu-layers 0")
+        diagnosis_parts.append("")
+        diagnosis_parts.append("3. Or use cloud translation providers:")
+        diagnosis_parts.append("   whisperjav-translate --provider deepseek")
+
+    elif "one of its dependencies" in error_lower:
+        diagnosis_parts.append("Missing Dependency Detected")
+        diagnosis_parts.append("A required DLL dependency could not be found.")
+        diagnosis_parts.append("")
+        diagnosis_parts.append("Common causes:")
+        diagnosis_parts.append("- CUDA toolkit not installed (only driver)")
+        diagnosis_parts.append("- CUDA version mismatch")
+        diagnosis_parts.append("- Missing Visual C++ Runtime")
+
+    else:
+        diagnosis_parts.append("Unknown DLL Error")
+        diagnosis_parts.append(f"Error: {error_msg}")
+
+    return "\n".join(diagnosis_parts)
+
+
+def _check_cuda_toolkit_installed() -> Optional[str]:
+    """
+    Check if CUDA toolkit is installed (not just driver).
+
+    Returns:
+        CUDA toolkit version string if found, None otherwise
+    """
     try:
-        import llama_cpp  # noqa: F401
-        return True
-    except ImportError:
+        # Try nvcc (CUDA compiler - only present with toolkit)
+        result = subprocess.run(
+            ["nvcc", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            # Parse version from output like "Cuda compilation tools, release 12.4, V12.4.131"
+            for line in result.stdout.split('\n'):
+                if 'release' in line.lower():
+                    import re
+                    match = re.search(r'release\s+(\d+\.\d+)', line, re.IGNORECASE)
+                    if match:
+                        return match.group(1)
+            return "installed (version unknown)"
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # Check common CUDA toolkit installation paths on Windows
+    if sys.platform == "win32":
+        import os
+        cuda_paths = [
+            os.environ.get("CUDA_PATH", ""),
+            r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA",
+        ]
+        for base_path in cuda_paths:
+            if base_path and os.path.exists(base_path):
+                # Check for version directories
+                if os.path.isdir(base_path):
+                    for item in os.listdir(base_path):
+                        if item.startswith("v") and os.path.isdir(os.path.join(base_path, item)):
+                            return item[1:]  # Remove 'v' prefix
+                    # CUDA_PATH points directly to versioned dir
+                    nvcc_path = os.path.join(base_path, "bin", "nvcc.exe")
+                    if os.path.exists(nvcc_path):
+                        return "installed"
+
+    return None
+
+
+def _check_vc_runtime_installed() -> bool:
+    """Check if Visual C++ 2015-2022 Redistributable is installed."""
+    if sys.platform != "win32":
+        return True  # Not needed on non-Windows
+
+    try:
+        import winreg
+        key_paths = [
+            r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+            r"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+        ]
+        for key_path in key_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path)
+                winreg.CloseKey(key)
+                return True
+            except FileNotFoundError:
+                continue
         return False
+    except Exception:
+        return True  # Assume OK if we can't check
+
+
+def _uninstall_llama_cpp() -> bool:
+    """
+    Uninstall llama-cpp-python to allow clean reinstallation.
+
+    Returns:
+        True if uninstallation succeeded or package wasn't installed
+    """
+    print("Uninstalling broken llama-cpp-python installation...")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "uninstall", "-y", "llama-cpp-python"],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        # Clear the status cache to force re-check
+        _clear_llama_cpp_status_cache()
+
+        if result.returncode == 0:
+            print("  Uninstalled successfully.")
+            return True
+        elif "not installed" in result.stdout.lower() or "not installed" in result.stderr.lower():
+            print("  Package was not installed.")
+            return True
+        else:
+            logger.warning(f"Uninstall may have failed: {result.stderr[:200]}")
+            return True  # Proceed anyway
+    except Exception as e:
+        logger.warning(f"Error during uninstall: {e}")
+        return True  # Proceed anyway
 
 
 def _are_server_deps_installed() -> bool:
@@ -252,18 +480,59 @@ def ensure_llama_cpp_installed() -> bool:
     the wheel is automatically downloaded and installed.
 
     Installation flow:
-    1. Install server deps first (whisperjav[local-llm]) - platform agnostic
-    2. Detect CUDA version
-    3. Try prebuilt wheel (HuggingFace, then GitHub)
-    4. Fall back to source build (with 10s user cancel window)
+    1. Check if already installed and functional
+    2. If broken (DLL issues), diagnose and offer reinstall
+    3. Install server deps first (whisperjav[local-llm]) - platform agnostic
+    4. Detect CUDA version
+    5. Try prebuilt wheel (HuggingFace, then GitHub)
+    6. Fall back to source build (with 10s user cancel window)
 
     Returns:
         True if llama-cpp-python is available, False otherwise
     """
-    if _is_llama_cpp_installed():
-        logger.debug("llama-cpp-python already installed")
+    # Step 0: Check current status (installed, not installed, or broken)
+    is_functional, error_msg = _check_llama_cpp_status()
+
+    if is_functional:
+        logger.debug("llama-cpp-python already installed and functional")
         return True
 
+    # Handle broken installation (DLL loading failed)
+    if error_msg is not None:
+        print("\n" + "!" * 60)
+        print("  LLAMA-CPP-PYTHON INSTALLATION BROKEN")
+        print("!" * 60)
+        print("\nllama-cpp-python is installed but cannot load its native libraries.")
+        print("")
+
+        # Show diagnosis
+        diagnosis = _diagnose_dll_failure(error_msg)
+        print(diagnosis)
+        print("")
+
+        # Offer to reinstall
+        print("Would you like to uninstall and reinstall llama-cpp-python?")
+        print("This may fix the issue by downloading the correct version.")
+        print("")
+
+        try:
+            response = input("Reinstall? (Y/n): ").strip().lower()
+            if response in ('', 'y', 'yes'):
+                _uninstall_llama_cpp()
+                _clear_llama_cpp_status_cache()
+                # Continue to fresh installation below
+            else:
+                print("\nSkipping reinstall. You can:")
+                print("  1. Fix the issue manually (see diagnosis above)")
+                print("  2. Use cloud translation: --provider deepseek")
+                return False
+        except (EOFError, KeyboardInterrupt):
+            # Non-interactive mode - try reinstall automatically
+            print("\nNon-interactive mode: attempting automatic reinstall...")
+            _uninstall_llama_cpp()
+            _clear_llama_cpp_status_cache()
+
+    # Fresh installation
     print("\n" + "=" * 60)
     print("  FIRST-TIME SETUP: Installing llama-cpp-python")
     print("=" * 60)
@@ -280,6 +549,15 @@ def ensure_llama_cpp_installed() -> bool:
     cuda_version = detect_cuda_version()
     if cuda_version:
         print(f"Detected CUDA: {cuda_version}")
+
+        # Validate CUDA toolkit availability for CUDA wheels
+        cuda_toolkit = _check_cuda_toolkit_installed()
+        if not cuda_toolkit:
+            print("")
+            print("WARNING: CUDA toolkit not detected (only driver installed).")
+            print("         GPU wheels require CUDA toolkit runtime libraries.")
+            print("         Will attempt installation anyway - may fall back to CPU.")
+            print("")
     else:
         print("CUDA not detected (will use CPU or Metal)")
 
@@ -299,11 +577,30 @@ def ensure_llama_cpp_installed() -> bool:
 
     # Install if we got a wheel
     if wheel_path and install_wheel(wheel_path):
-        # Verify installation
-        if _is_llama_cpp_installed():
+        # Clear cache and verify installation
+        _clear_llama_cpp_status_cache()
+        is_functional, error_msg = _check_llama_cpp_status()
+
+        if is_functional:
             print("\n✓ llama-cpp-python installed successfully!")
             print("  Future runs will start immediately.\n")
             return True
+        elif error_msg:
+            # Installation succeeded but DLL loading failed
+            print("\n" + "!" * 60)
+            print("  INSTALLATION COMPLETED BUT DLL LOADING FAILED")
+            print("!" * 60)
+            print("")
+            print(_diagnose_dll_failure(error_msg))
+            print("")
+            print("The wheel was installed but native libraries cannot load.")
+            print("This usually means CUDA version mismatch or missing dependencies.")
+            print("")
+            print("Options:")
+            print("  1. Install CUDA toolkit matching your PyTorch version")
+            print("  2. Use CPU-only mode: --translate-gpu-layers 0")
+            print("  3. Use cloud translation: --provider deepseek")
+            return False
 
     # Step 4: Fall back to building from source (with 10s cancel window)
     print("\nNo prebuilt wheel found. Building from source... (~10 min)")
@@ -317,10 +614,20 @@ def ensure_llama_cpp_installed() -> bool:
         return False
 
     if _build_from_source():
-        if _is_llama_cpp_installed():
+        _clear_llama_cpp_status_cache()
+        is_functional, error_msg = _check_llama_cpp_status()
+
+        if is_functional:
             print("\n✓ llama-cpp-python built and installed successfully!")
             print("  Future runs will start immediately.\n")
             return True
+        elif error_msg:
+            print("\n" + "!" * 60)
+            print("  BUILD COMPLETED BUT DLL LOADING FAILED")
+            print("!" * 60)
+            print("")
+            print(_diagnose_dll_failure(error_msg))
+            return False
 
     # All methods failed
     print("\n" + "!" * 60)
