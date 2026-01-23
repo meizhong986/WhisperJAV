@@ -240,12 +240,14 @@ section "Step 4/5: Installing WhisperJAV"
 
 # Install system dependencies required for building Python packages
 # - portaudio19-dev: Required for pyaudio (used by auditok for scene detection)
-info "Installing system dependencies (portaudio for pyaudio)..."
-if apt-get update -qq > /dev/null 2>&1 && apt-get install -y -qq portaudio19-dev > /dev/null 2>&1; then
-    success "System dependencies installed"
+# - libc++1 libc++abi1: Required for TEN VAD native library (LLVM C++ runtime)
+info "Installing system dependencies..."
+SYS_PKGS="portaudio19-dev libc++1 libc++abi1"
+if apt-get update -qq > /dev/null 2>&1 && apt-get install -y -qq $SYS_PKGS > /dev/null 2>&1; then
+    success "System dependencies installed ($SYS_PKGS)"
 else
-    warn "Could not install portaudio19-dev (pyaudio may fail to build)"
-    warn "Continuing anyway - scene detection may not work"
+    warn "Could not install some system dependencies: $SYS_PKGS"
+    warn "TEN VAD or pyaudio may not work - Silero fallback will be used"
 fi
 
 info "Installing from $WHISPERJAV_REPO@$WHISPERJAV_BRANCH"
