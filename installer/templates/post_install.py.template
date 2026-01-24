@@ -1096,6 +1096,122 @@ def print_installation_summary(install_start_time: float):
 # llama-cpp-python Installation (Local LLM Translation)
 # ==============================================================================
 
+# HuggingFace wheel repository - AVX2 builds that work on most CPUs
+# These wheels do NOT have AVX512, making them compatible with AMD Zen 2/3 CPUs
+HF_WHEEL_REPO = "mei986/whisperjav-wheels"
+HF_WHEEL_VERSION = "0.3.21"  # llama-cpp-python version in our wheel repo
+
+
+def get_huggingface_wheel_info() -> Tuple[Optional[str], Optional[str], str]:
+    """
+    Build HuggingFace wheel download URL based on platform, Python version, and CUDA.
+
+    HuggingFace wheels are AVX2-only (no AVX512), compatible with most CPUs including
+    AMD Ryzen (Zen 2/3) which don't support AVX512.
+
+    Available backends on HuggingFace:
+    - cu124: CUDA 12.4 (Windows cp310/311/312, Linux cp310/311/312)
+    - cu128: CUDA 12.8 (Windows cp310/311/312, Linux cp310/311/312)
+    - cu126: CUDA 12.6 (Linux cp312 only)
+    - metal: macOS Apple Silicon (currently empty)
+
+    Returns:
+        tuple: (wheel_url, wheel_filename, backend_desc) or (None, None, "") if not available
+    """
+    import platform as platform_module
+
+    py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+
+    # Determine platform tag
+    if sys.platform == "win32":
+        plat_tag = "win_amd64"
+    elif sys.platform == "linux":
+        plat_tag = "manylinux_2_17_x86_64.manylinux2014_x86_64"
+    elif sys.platform == "darwin":
+        if platform_module.machine() == "arm64":
+            plat_tag = "macosx_11_0_arm64"
+        else:
+            # Intel Mac - no wheels available
+            return None, None, ""
+    else:
+        return None, None, ""
+
+    # Determine CUDA backend
+    backend = None
+    if sys.platform == "darwin":
+        backend = "metal"  # Currently empty on HF, but check anyway
+    elif sys.platform in ("win32", "linux"):
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            # Map driver to CUDA version
+            driver_ver = driver_info.driver_version
+            if driver_ver >= (570, 0, 0):
+                # CUDA 12.8 compatible, try cu128 first then cu124
+                backend = "cu128"
+            elif driver_ver >= (550, 0, 0):
+                # CUDA 12.4 compatible
+                backend = "cu124"
+            elif driver_ver >= (525, 0, 0):
+                # CUDA 11.8 compatible - but HF only has cu124+
+                backend = "cu124"  # Try cu124, may work with newer driver
+
+    if not backend:
+        log("    No CUDA detected, HuggingFace wheels require GPU")
+        return None, None, ""
+
+    # Build wheel filename and URL
+    # Format: llama_cpp_python-{version}-{pyver}-{pyver}-{platform}.whl
+    wheel_filename = f"llama_cpp_python-{HF_WHEEL_VERSION}-{py_ver}-{py_ver}-{plat_tag}.whl"
+    wheel_path = f"llama-cpp-python/{backend}/{wheel_filename}"
+
+    # HuggingFace direct download URL
+    wheel_url = f"https://huggingface.co/datasets/{HF_WHEEL_REPO}/resolve/main/{wheel_path}"
+
+    return wheel_url, wheel_filename, f"CUDA ({backend} HuggingFace wheel v{HF_WHEEL_VERSION})"
+
+
+def download_huggingface_wheel() -> Tuple[Optional[str], Optional[str]]:
+    """
+    Download llama-cpp-python wheel from HuggingFace.
+
+    Returns:
+        tuple: (local_wheel_path, backend_desc) or (None, None) if failed
+    """
+    import tempfile
+    import urllib.request
+    import urllib.error
+
+    wheel_url, wheel_filename, backend_desc = get_huggingface_wheel_info()
+
+    if not wheel_url:
+        return None, None
+
+    log(f"    Trying HuggingFace wheel: {backend_desc}")
+
+    # Download to temp directory
+    temp_dir = tempfile.gettempdir()
+    local_path = os.path.join(temp_dir, wheel_filename)
+
+    # Check if already cached
+    if os.path.exists(local_path):
+        log(f"    Using cached wheel: {wheel_filename}")
+        return local_path, backend_desc
+
+    try:
+        log(f"    Downloading from HuggingFace...")
+        urllib.request.urlretrieve(wheel_url, local_path)
+        log(f"    Downloaded: {wheel_filename}")
+        return local_path, backend_desc
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            log(f"    Wheel not found on HuggingFace (404)")
+        else:
+            log(f"    HuggingFace download failed: HTTP {e.code}")
+        return None, None
+    except Exception as e:
+        log(f"    HuggingFace download failed: {e}")
+        return None, None
+
 
 def get_llama_cpp_prebuilt_wheel() -> Tuple[Optional[str], Optional[str]]:
     """
@@ -1348,9 +1464,13 @@ def install_llama_cpp_python() -> bool:
     """
     Install llama-cpp-python for local LLM translation.
 
-    Strategy:
-    1. Try prebuilt wheel first (fast install)
-    2. Fall back to source build if no wheel available
+    Strategy (in priority order):
+    1. HuggingFace wheels - AVX2 only, works on most CPUs (AMD Ryzen, older Intel)
+    2. JamePeng GitHub wheels - may have AVX512, works on newer Intel CPUs
+    3. Source build - compiles for user's specific hardware (slowest install)
+
+    The HuggingFace wheels are preferred because JamePeng's "Basic" builds
+    incorrectly enable AVX512, causing crashes on AMD Ryzen (Zen 2/3) CPUs.
 
     Note: This always attempts to install. For opt-in behavior,
     discuss with the project author about adding installer options.
@@ -1360,11 +1480,34 @@ def install_llama_cpp_python() -> bool:
     log("Installing llama-cpp-python for local LLM translation...")
     log("This enables translation without cloud API keys.")
 
-    # Try prebuilt wheel first
+    # Strategy 1: Try HuggingFace wheel first (AVX2, most compatible)
+    log("  Checking HuggingFace for compatible wheel...")
+    hf_wheel_path, hf_backend = download_huggingface_wheel()
+
+    if hf_wheel_path:
+        log(f"Backend: {hf_backend}")
+
+        if run_pip(
+            ["install", hf_wheel_path, "--progress-bar", "on"],
+            f"Install llama-cpp-python ({hf_backend})"
+        ):
+            # Add server extras
+            run_pip(
+                ["install", "llama-cpp-python[server]", "--progress-bar", "on"],
+                "Install llama-cpp-python server extras"
+            )
+            return True
+        else:
+            log("WARNING: HuggingFace wheel install failed, trying JamePeng...")
+
+    # Strategy 2: Try JamePeng GitHub wheel (fallback)
+    log("  Checking JamePeng GitHub for prebuilt wheel...")
     wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel()
 
     if wheel_url:
         log(f"Backend: {wheel_backend}")
+        log("NOTE: JamePeng wheels may require AVX512. If you see crashes,")
+        log("      consider building from source or using CPU-only mode.")
 
         if run_pip(
             ["install", wheel_url, "--progress-bar", "on"],
@@ -1377,9 +1520,10 @@ def install_llama_cpp_python() -> bool:
             )
             return True
         else:
-            log("WARNING: Prebuilt wheel failed, trying source build...")
+            log("WARNING: JamePeng wheel failed, trying source build...")
 
-    # Fall back to source build
+    # Strategy 3: Fall back to source build (slowest but most compatible)
+    log("  No prebuilt wheel available, building from source...")
     git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
 
     log(f"Backend: {backend}")
