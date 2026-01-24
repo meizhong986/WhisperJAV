@@ -97,10 +97,13 @@ def _check_llama_cpp_status() -> Tuple[bool, Optional[str]]:
     """
     Check if llama-cpp-python is installed and functional.
 
-    This function sets up CUDA DLL paths (from PyTorch) before attempting
-    to import llama_cpp, which fixes the common "ggml.dll not found" error
-    on Windows when CUDA Toolkit is not installed but PyTorch has bundled
-    CUDA libraries.
+    This function sets up CUDA library paths before attempting to import
+    llama_cpp, which fixes the common library loading errors:
+    - Windows: "ggml.dll not found" when CUDA Toolkit is not installed
+    - Linux: "libcudart.so.12: cannot open shared object file"
+
+    The fix works by adding PyTorch's bundled CUDA libraries to the library
+    search path before llama_cpp tries to load them.
 
     Returns:
         Tuple of (is_functional, error_message)
@@ -114,10 +117,12 @@ def _check_llama_cpp_status() -> Tuple[bool, Optional[str]]:
     if _llama_cpp_status_cache is not None:
         return _llama_cpp_status_cache
 
-    # CRITICAL: Set up CUDA DLL paths BEFORE importing llama_cpp
+    # CRITICAL: Set up CUDA library paths BEFORE importing llama_cpp
     # This allows llama_cpp to find CUDA libraries bundled with PyTorch
-    # (cublas64_12.dll, cudart64_12.dll, etc.)
-    _setup_pytorch_cuda_dll_paths()
+    # Windows: cublas64_12.dll, cudart64_12.dll, etc.
+    # Linux: libcudart.so.12, libcublas.so.12, etc.
+    _setup_pytorch_cuda_dll_paths()  # Windows
+    _setup_linux_cuda_library_paths()  # Linux
 
     try:
         import llama_cpp  # noqa: F401
@@ -319,8 +324,8 @@ def _check_vc_runtime_installed() -> bool:
         return True  # Assume OK if we can't check
 
 
-# Track whether we've already set up DLL paths (avoid redundant calls)
-_dll_paths_configured = False
+# Track whether we've already set up library paths (avoid redundant calls)
+_cuda_lib_paths_configured = False
 
 
 def _setup_pytorch_cuda_dll_paths() -> bool:
@@ -339,14 +344,14 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
     Returns:
         True if paths were configured, False otherwise
     """
-    global _dll_paths_configured
+    global _cuda_lib_paths_configured
 
     # Only needed on Windows
     if sys.platform != "win32":
         return True
 
     # Only configure once per session
-    if _dll_paths_configured:
+    if _cuda_lib_paths_configured:
         return True
 
     import os
@@ -378,10 +383,119 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
             except Exception as e:
                 logger.debug(f"Could not add CUDA Toolkit to DLL path: {e}")
 
-    _dll_paths_configured = True
+    _cuda_lib_paths_configured = True
 
     if paths_added:
         logger.info(f"Configured DLL search paths: {', '.join(paths_added)}")
+        return True
+
+    return False
+
+
+def _setup_linux_cuda_library_paths() -> bool:
+    """
+    Set up CUDA library paths on Linux before importing llama_cpp.
+
+    On Linux, shared libraries are resolved using LD_LIBRARY_PATH and the
+    dynamic linker cache. When llama-cpp-python is installed from a prebuilt
+    wheel, its .so files depend on CUDA runtime libraries (libcudart.so.12, etc.)
+    that may be installed in non-standard locations.
+
+    This function:
+    1. Finds CUDA libraries in PyTorch's lib folder and nvidia-cuda-runtime package
+    2. Preloads them using ctypes.CDLL with RTLD_GLOBAL (makes symbols available globally)
+    3. Sets LD_LIBRARY_PATH for any subprocesses we spawn (like llama_cpp.server)
+
+    This must be called BEFORE importing llama_cpp.
+
+    Returns:
+        True if libraries were preloaded, False otherwise
+    """
+    global _cuda_lib_paths_configured
+
+    # Only needed on Linux
+    if sys.platform != "linux":
+        return True
+
+    # Only configure once per session
+    if _cuda_lib_paths_configured:
+        return True
+
+    import os
+    import ctypes
+
+    lib_paths = []
+    libs_preloaded = []
+
+    # 1. Find PyTorch's lib folder (contains bundled CUDA libraries)
+    try:
+        import torch
+        torch_lib = os.path.join(os.path.dirname(torch.__file__), 'lib')
+        if os.path.exists(torch_lib):
+            lib_paths.append(torch_lib)
+            logger.debug(f"Found PyTorch CUDA libs: {torch_lib}")
+    except ImportError:
+        logger.debug("PyTorch not available")
+    except Exception as e:
+        logger.debug(f"Could not find PyTorch lib path: {e}")
+
+    # 2. Find nvidia-cuda-runtime package (pip-installed CUDA runtime)
+    # This is where libcudart.so.12 lives when installed via pip
+    try:
+        import nvidia.cuda_runtime
+        nvidia_lib = os.path.join(os.path.dirname(nvidia.cuda_runtime.__file__), 'lib')
+        if os.path.exists(nvidia_lib):
+            lib_paths.append(nvidia_lib)
+            logger.debug(f"Found nvidia-cuda-runtime libs: {nvidia_lib}")
+    except ImportError:
+        logger.debug("nvidia-cuda-runtime not available")
+    except Exception as e:
+        logger.debug(f"Could not find nvidia-cuda-runtime lib path: {e}")
+
+    # 3. Check LD_LIBRARY_PATH for any paths already there
+    existing_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+
+    # 4. Update LD_LIBRARY_PATH for subprocesses (e.g., llama_cpp.server)
+    if lib_paths:
+        new_paths = [p for p in lib_paths if p not in existing_ld_path]
+        if new_paths:
+            updated_ld_path = ":".join(new_paths)
+            if existing_ld_path:
+                updated_ld_path = f"{updated_ld_path}:{existing_ld_path}"
+            os.environ["LD_LIBRARY_PATH"] = updated_ld_path
+            logger.debug(f"Updated LD_LIBRARY_PATH: {updated_ld_path}")
+
+    # 5. Preload CUDA libraries using ctypes for the current process
+    # This is necessary because LD_LIBRARY_PATH changes don't affect
+    # the current process's dynamic linker cache
+    cuda_lib_names = [
+        "libcudart.so.12",
+        "libcublas.so.12",
+        "libcublasLt.so.12",
+        "libcudnn.so.8",
+        "libcudnn.so.9",
+    ]
+
+    for lib_path in lib_paths:
+        for lib_name in cuda_lib_names:
+            full_path = os.path.join(lib_path, lib_name)
+            if os.path.exists(full_path):
+                try:
+                    # RTLD_GLOBAL makes symbols available to subsequently loaded libraries
+                    ctypes.CDLL(full_path, mode=ctypes.RTLD_GLOBAL)
+                    libs_preloaded.append(lib_name)
+                    logger.debug(f"Preloaded CUDA library: {full_path}")
+                except OSError as e:
+                    logger.debug(f"Could not preload {full_path}: {e}")
+
+    _cuda_lib_paths_configured = True
+
+    if libs_preloaded:
+        logger.info(f"Preloaded CUDA libraries on Linux: {', '.join(set(libs_preloaded))}")
+        return True
+
+    if lib_paths:
+        logger.info(f"Set LD_LIBRARY_PATH for subprocesses: {', '.join(lib_paths)}")
         return True
 
     return False
@@ -907,9 +1021,27 @@ def ensure_llama_cpp_installed() -> bool:
             print("  2. Use cloud translation: --provider deepseek")
             print("  3. Install CUDA toolkit and retry")
             return False
+        else:
+            # Edge case: wheel installed (pip success) but package not importable
+            # This happens when: pip installed to wrong environment, namespace collision,
+            # or the wheel was corrupted during download
+            print("\n" + "!" * 60)
+            print("  UNEXPECTED: Wheel installed but package not importable")
+            print("!" * 60)
+            print("")
+            print("The wheel installation reported success, but the package")
+            print("cannot be imported. This may indicate:")
+            print("  - Installation went to a different Python environment")
+            print("  - Package namespace collision with existing install")
+            print("  - Corrupted wheel file")
+            print("")
+            print("Attempting to uninstall and rebuild from source...")
+            _uninstall_llama_cpp()
+            _clear_llama_cpp_status_cache()
+            # Fall through to source build below
 
     # Step 4: Fall back to building from source (with 10s cancel window)
-    print("\nNo prebuilt wheel found. Building from source... (~10 min)")
+    print("\nBuilding from source... (~10 min)")
 
     # Give user 10 seconds to cancel before starting long build
     if not _wait_with_cancel_option(seconds=10):

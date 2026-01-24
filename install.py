@@ -63,6 +63,9 @@ _spec.loader.exec_module(_llama_build_utils)
 get_llama_cpp_source_info = _llama_build_utils.get_llama_cpp_source_info
 get_prebuilt_wheel_url = _llama_build_utils.get_prebuilt_wheel_url
 
+# Alias for install_linux.sh compatibility (uses legacy function name)
+get_llama_cpp_prebuilt_wheel = get_prebuilt_wheel_url
+
 def run_pip(args, description, allow_fail=False):
     """Run pip command with error handling."""
     cmd = [sys.executable, "-m", "pip"] + args
