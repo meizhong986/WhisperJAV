@@ -387,6 +387,95 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
     return False
 
 
+def _check_llama_cpp_gpu_support() -> Tuple[Optional[bool], str]:
+    """
+    Check if installed llama-cpp-python has GPU (CUDA/Metal) support.
+
+    Uses package metadata to determine installation source.
+    Wheels from our HuggingFace repo or JamePeng GitHub have GPU support.
+    Vanilla pip install from PyPI is CPU-only.
+
+    Returns:
+        Tuple of (has_gpu_support, reason)
+        - (True, "cuda_wheel") - Installed from CUDA wheel
+        - (True, "metal_wheel") - Installed from Metal wheel
+        - (True, "source_build") - Built from source (assumed GPU if CUDA available)
+        - (False, "pypi_cpu") - Installed from PyPI (CPU-only)
+        - (None, "unknown") - Cannot determine
+    """
+    import json
+    import os
+
+    try:
+        import llama_cpp
+        from pathlib import Path
+
+        # Find the package's dist-info folder
+        package_dir = Path(llama_cpp.__file__).parent.parent
+
+        for dist_info in package_dir.glob("llama_cpp_python*.dist-info"):
+            # Method 1: Check direct_url.json for installation source
+            direct_url_file = dist_info / "direct_url.json"
+            if direct_url_file.exists():
+                try:
+                    with open(direct_url_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        url = data.get("url", "").lower()
+
+                        # Check URL for CUDA version indicators
+                        cuda_versions = ["cu118", "cu121", "cu124", "cu126", "cu128", "cu130"]
+                        if any(cv in url for cv in cuda_versions):
+                            logger.debug(f"Detected CUDA wheel from URL: {url}")
+                            return (True, "cuda_wheel")
+
+                        # Check for Metal (macOS)
+                        if "metal" in url:
+                            logger.debug(f"Detected Metal wheel from URL: {url}")
+                            return (True, "metal_wheel")
+
+                        # Check for known GPU wheel sources
+                        if "jamepeng" in url or "whisperjav-wheels" in url:
+                            # Our wheels and JamePeng wheels are GPU-enabled
+                            logger.debug(f"Detected GPU wheel from known source: {url}")
+                            return (True, "cuda_wheel")
+
+                        # Check if built from source (git URL)
+                        if "git+" in url or "github.com" in url:
+                            # Built from source - likely has GPU if user has CUDA
+                            logger.debug(f"Detected source build from URL: {url}")
+                            return (True, "source_build")
+
+                except Exception as e:
+                    logger.debug(f"Could not parse direct_url.json: {e}")
+
+            # Method 2: Check INSTALLER file
+            installer_file = dist_info / "INSTALLER"
+            if installer_file.exists():
+                try:
+                    installer = installer_file.read_text().strip().lower()
+                    # If installed via uv or pip without direct_url, likely from PyPI
+                    if installer in ("pip", "uv") and not direct_url_file.exists():
+                        logger.debug(f"Detected PyPI install (likely CPU-only)")
+                        return (False, "pypi_cpu")
+                except Exception:
+                    pass
+
+        # Method 3: Check environment for build indicators
+        # If CMAKE_ARGS was set with CUDA during build, it might be in the env
+        # This is a weak signal but better than nothing
+
+        # If we can't determine, return unknown
+        logger.debug("Could not determine llama-cpp-python build type")
+        return (None, "unknown")
+
+    except ImportError:
+        # llama-cpp-python not installed
+        return (None, "not_installed")
+    except Exception as e:
+        logger.debug(f"Error checking llama-cpp-python GPU support: {e}")
+        return (None, "unknown")
+
+
 def _uninstall_llama_cpp() -> bool:
     """
     Uninstall llama-cpp-python to allow clean reinstallation.
@@ -606,11 +695,12 @@ def ensure_llama_cpp_installed() -> bool:
 
     Installation flow:
     1. Check if already installed and functional
-    2. If broken (DLL issues), diagnose and offer reinstall
-    3. Install server deps first (whisperjav[local-llm]) - platform agnostic
-    4. Detect CUDA version
-    5. Try prebuilt wheel (HuggingFace, then GitHub)
-    6. Fall back to source build (with 10s user cancel window)
+    2. If functional but CPU-only on CUDA system, offer upgrade to GPU
+    3. If broken (DLL issues), diagnose and offer reinstall
+    4. Install server deps first (whisperjav[local-llm]) - platform agnostic
+    5. Detect CUDA version
+    6. Try prebuilt wheel (HuggingFace, then GitHub)
+    7. Fall back to source build (with 10s user cancel window)
 
     Returns:
         True if llama-cpp-python is available, False otherwise
@@ -619,8 +709,55 @@ def ensure_llama_cpp_installed() -> bool:
     is_functional, error_msg = _check_llama_cpp_status()
 
     if is_functional:
-        logger.debug("llama-cpp-python already installed and functional")
-        return True
+        # Step 1: Check if this is a suboptimal CPU build on a CUDA system
+        cuda_version = detect_cuda_version()
+
+        if cuda_version:
+            has_gpu, reason = _check_llama_cpp_gpu_support()
+
+            if has_gpu is False:
+                # CPU-only build detected on a CUDA-capable system
+                print("\n" + "=" * 60)
+                print("  NOTICE: CPU-only llama-cpp-python detected")
+                print("=" * 60)
+                print("")
+                print(f"Your system has CUDA GPU support ({cuda_version}), but the")
+                print(f"installed llama-cpp-python appears to be CPU-only.")
+                print(f"Detection: {reason}")
+                print("")
+                print("CPU mode works but is significantly slower than GPU mode.")
+                print("Reinstalling with GPU support is recommended for better performance.")
+                print("")
+
+                try:
+                    response = input("Reinstall with GPU support? (Y/n): ").strip().lower()
+                    if response in ('', 'y', 'yes'):
+                        print("\nReinstalling with GPU support...")
+                        _uninstall_llama_cpp()
+                        _clear_llama_cpp_status_cache()
+                        # Fall through to fresh installation below
+                    else:
+                        print("\nKeeping CPU-only version. You can reinstall later with:")
+                        print("  pip uninstall llama-cpp-python -y")
+                        print("  whisperjav-translate -i file.srt --provider local")
+                        logger.debug("User chose to keep CPU-only llama-cpp-python")
+                        return True
+                except (EOFError, KeyboardInterrupt):
+                    # Non-interactive mode - keep existing installation
+                    logger.debug("Non-interactive mode: keeping existing llama-cpp-python")
+                    return True
+            elif has_gpu is True:
+                # GPU build confirmed, all good
+                logger.debug(f"llama-cpp-python GPU support confirmed: {reason}")
+                return True
+            else:
+                # Unknown build type - assume it's fine
+                logger.debug(f"llama-cpp-python build type unknown: {reason}")
+                return True
+        else:
+            # No CUDA available, CPU build is appropriate
+            logger.debug("llama-cpp-python already installed (no CUDA detected)")
+            return True
 
     # Handle broken installation (DLL loading failed)
     if error_msg is not None:
