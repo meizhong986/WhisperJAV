@@ -97,6 +97,11 @@ def _check_llama_cpp_status() -> Tuple[bool, Optional[str]]:
     """
     Check if llama-cpp-python is installed and functional.
 
+    This function sets up CUDA DLL paths (from PyTorch) before attempting
+    to import llama_cpp, which fixes the common "ggml.dll not found" error
+    on Windows when CUDA Toolkit is not installed but PyTorch has bundled
+    CUDA libraries.
+
     Returns:
         Tuple of (is_functional, error_message)
         - (True, None): llama-cpp-python is installed and working
@@ -108,6 +113,11 @@ def _check_llama_cpp_status() -> Tuple[bool, Optional[str]]:
     # Return cached result if available
     if _llama_cpp_status_cache is not None:
         return _llama_cpp_status_cache
+
+    # CRITICAL: Set up CUDA DLL paths BEFORE importing llama_cpp
+    # This allows llama_cpp to find CUDA libraries bundled with PyTorch
+    # (cublas64_12.dll, cudart64_12.dll, etc.)
+    _setup_pytorch_cuda_dll_paths()
 
     try:
         import llama_cpp  # noqa: F401
@@ -155,6 +165,8 @@ def _diagnose_dll_failure(error_msg: str) -> str:
     Returns:
         Diagnostic message with suggested fixes
     """
+    import os
+
     diagnosis_parts = []
 
     # Check for common error patterns
@@ -171,17 +183,31 @@ def _diagnose_dll_failure(error_msg: str) -> str:
         else:
             diagnosis_parts.append("CUDA: Not detected (CPU-only mode)")
 
+        # Check if PyTorch CUDA libs were added to DLL path
+        try:
+            import torch
+            torch_lib = os.path.join(os.path.dirname(torch.__file__), 'lib')
+            if os.path.exists(torch_lib):
+                diagnosis_parts.append(f"PyTorch CUDA libs: {torch_lib} (added to DLL path)")
+            else:
+                diagnosis_parts.append("PyTorch CUDA libs: NOT FOUND")
+        except ImportError:
+            diagnosis_parts.append("PyTorch: NOT INSTALLED")
+
         # Check if CUDA toolkit is installed (not just driver)
         cuda_toolkit_installed = _check_cuda_toolkit_installed()
         if cuda_toolkit_installed:
             diagnosis_parts.append(f"CUDA Toolkit: Installed ({cuda_toolkit_installed})")
         else:
-            diagnosis_parts.append("CUDA Toolkit: NOT FOUND (only driver installed?)")
-            diagnosis_parts.append("")
-            diagnosis_parts.append("LIKELY CAUSE: CUDA toolkit is not installed.")
-            diagnosis_parts.append("The llama-cpp-python DLLs need CUDA runtime libraries")
-            diagnosis_parts.append("(cublas64_*.dll, cudart64_*.dll) which come with")
-            diagnosis_parts.append("the CUDA Toolkit, not just the NVIDIA driver.")
+            diagnosis_parts.append("CUDA Toolkit: NOT FOUND (only driver installed)")
+
+        diagnosis_parts.append("")
+        diagnosis_parts.append("ANALYSIS:")
+        diagnosis_parts.append("We added PyTorch's CUDA libraries to the DLL search path,")
+        diagnosis_parts.append("but the prebuilt wheel still cannot load. This suggests:")
+        diagnosis_parts.append("  - CUDA version mismatch (wheel built for different CUDA)")
+        diagnosis_parts.append("  - Missing Visual C++ Runtime")
+        diagnosis_parts.append("  - Corrupted wheel installation")
 
         # Check VC++ runtime
         vc_installed = _check_vc_runtime_installed()
@@ -291,6 +317,74 @@ def _check_vc_runtime_installed() -> bool:
         return False
     except Exception:
         return True  # Assume OK if we can't check
+
+
+# Track whether we've already set up DLL paths (avoid redundant calls)
+_dll_paths_configured = False
+
+
+def _setup_pytorch_cuda_dll_paths() -> bool:
+    """
+    Add PyTorch's bundled CUDA libraries to DLL search path on Windows.
+
+    This fixes the DLL loading issue where llama-cpp-python's prebuilt wheels
+    can't find CUDA runtime libraries (cublas64_12.dll, cudart64_12.dll, etc.).
+
+    PyTorch bundles these libraries in its lib folder, but llama-cpp-python
+    doesn't know to look there. By adding PyTorch's lib folder to the DLL
+    search path, we make these libraries available.
+
+    This must be called BEFORE importing llama_cpp.
+
+    Returns:
+        True if paths were configured, False otherwise
+    """
+    global _dll_paths_configured
+
+    # Only needed on Windows
+    if sys.platform != "win32":
+        return True
+
+    # Only configure once per session
+    if _dll_paths_configured:
+        return True
+
+    import os
+
+    paths_added = []
+
+    # Add PyTorch's lib folder (contains bundled CUDA libraries)
+    try:
+        import torch
+        torch_lib = os.path.join(os.path.dirname(torch.__file__), 'lib')
+        if os.path.exists(torch_lib):
+            os.add_dll_directory(torch_lib)
+            paths_added.append(f"PyTorch lib: {torch_lib}")
+            logger.debug(f"Added PyTorch CUDA libs to DLL path: {torch_lib}")
+    except ImportError:
+        logger.debug("PyTorch not available, skipping CUDA DLL path setup")
+    except Exception as e:
+        logger.debug(f"Could not add PyTorch lib to DLL path: {e}")
+
+    # Also check for CUDA_PATH (system CUDA toolkit) as fallback
+    cuda_path = os.environ.get("CUDA_PATH", "")
+    if cuda_path:
+        cuda_bin = os.path.join(cuda_path, "bin")
+        if os.path.exists(cuda_bin):
+            try:
+                os.add_dll_directory(cuda_bin)
+                paths_added.append(f"CUDA Toolkit: {cuda_bin}")
+                logger.debug(f"Added CUDA Toolkit to DLL path: {cuda_bin}")
+            except Exception as e:
+                logger.debug(f"Could not add CUDA Toolkit to DLL path: {e}")
+
+    _dll_paths_configured = True
+
+    if paths_added:
+        logger.info(f"Configured DLL search paths: {', '.join(paths_added)}")
+        return True
+
+    return False
 
 
 def _uninstall_llama_cpp() -> bool:
@@ -596,10 +690,12 @@ def ensure_llama_cpp_installed() -> bool:
     wheel_path = _download_wheel_from_huggingface(cuda_version)
 
     # Fall back to JamePeng GitHub (using shared utility)
+    # Note: Don't filter by WHEEL_VERSION - get the latest release from JamePeng
+    # HuggingFace has our curated 0.3.21 wheels, JamePeng may have newer versions
     if not wheel_path:
         print("\nHuggingFace wheel not found, trying JamePeng GitHub...")
         wheel_url, backend_desc = get_prebuilt_wheel_url(
-            cuda_version, verbose=True, version=WHEEL_VERSION
+            cuda_version, verbose=True, version=None  # Get latest available
         )
         if wheel_url:
             print(f"  Backend: {backend_desc}")
@@ -618,19 +714,61 @@ def ensure_llama_cpp_installed() -> bool:
             return True
         elif error_msg:
             # Installation succeeded but DLL loading failed
+            # Offer to build from source as fallback (cascading architecture)
             print("\n" + "!" * 60)
-            print("  INSTALLATION COMPLETED BUT DLL LOADING FAILED")
+            print("  PREBUILT WHEEL CANNOT LOAD DEPENDENCIES")
             print("!" * 60)
             print("")
             print(_diagnose_dll_failure(error_msg))
             print("")
-            print("The wheel was installed but native libraries cannot load.")
-            print("This usually means CUDA version mismatch or missing dependencies.")
+            print("The prebuilt wheel was installed but its native libraries")
+            print("cannot load. This is usually fixable by building from source,")
+            print("which links against your actual CUDA installation.")
             print("")
-            print("Options:")
-            print("  1. Install CUDA toolkit matching your PyTorch version")
-            print("  2. Use CPU-only mode: --translate-gpu-layers 0")
-            print("  3. Use cloud translation: --provider deepseek")
+            print("Building from source takes ~10 minutes but is more reliable.")
+            print("")
+
+            try:
+                response = input("Build from source instead? (Y/n): ").strip().lower()
+                if response in ('', 'y', 'yes'):
+                    print("\nUninstalling broken wheel and building from source...")
+                    _uninstall_llama_cpp()
+                    _clear_llama_cpp_status_cache()
+
+                    if _build_from_source():
+                        _clear_llama_cpp_status_cache()
+                        is_functional, error_msg = _check_llama_cpp_status()
+
+                        if is_functional:
+                            print("\n✓ llama-cpp-python built and installed successfully!")
+                            print("  Future runs will start immediately.\n")
+                            return True
+                        else:
+                            print("\nSource build completed but still cannot load.")
+                            print("This may indicate a deeper system issue.")
+                    else:
+                        print("\nSource build failed.")
+                else:
+                    print("\nSkipping source build.")
+            except (EOFError, KeyboardInterrupt):
+                # Non-interactive mode - try source build automatically
+                print("\nNon-interactive mode: attempting source build...")
+                _uninstall_llama_cpp()
+                _clear_llama_cpp_status_cache()
+
+                if _build_from_source():
+                    _clear_llama_cpp_status_cache()
+                    is_functional, _ = _check_llama_cpp_status()
+                    if is_functional:
+                        print("\n✓ llama-cpp-python built successfully!")
+                        return True
+
+            # If we get here, both wheel and source build failed
+            print("")
+            print("Alternative options:")
+            print("  1. Use CPU-only mode: --translate-gpu-layers 0")
+            print("  2. Use cloud translation: --provider deepseek")
+            print("  3. Install CUDA toolkit and retry")
             return False
 
     # Step 4: Fall back to building from source (with 10s cancel window)
