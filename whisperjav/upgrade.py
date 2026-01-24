@@ -95,19 +95,29 @@ def print_step(step: int, total: int, message: str):
     print(f"\n[{step}/{total}] {message}")
 
 
+def _safe_print(message: str):
+    """Print message with fallback for encoding issues (Windows cp1252)."""
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        # Fall back to ASCII-safe version
+        ascii_msg = message.encode('ascii', errors='replace').decode('ascii')
+        print(ascii_msg)
+
+
 def print_success(message: str):
     """Print a success message."""
-    print(f"      \u2713 {message}")
+    _safe_print(f"      [OK] {message}")
 
 
 def print_warning(message: str):
     """Print a warning message."""
-    print(f"      \u26a0 {message}")
+    _safe_print(f"      [!] {message}")
 
 
 def print_error(message: str):
     """Print an error message."""
-    print(f"      \u2717 {message}")
+    _safe_print(f"      [X] {message}")
 
 
 def detect_installation() -> Optional[Path]:

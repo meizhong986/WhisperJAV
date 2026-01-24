@@ -2,19 +2,44 @@
 
 **Release Date:** January 24, 2026
 **Type:** Hotfix Release
-**Issue:** [#141 - Local LLM DLL Loading Failures](https://github.com/meizhong986/WhisperJAV/issues/141)
+**Issue:** [#141 - Local LLM Translation Fixes](https://github.com/meizhong986/WhisperJAV/issues/141)
 
 ---
 
-## Bug Fixes
+## What's Fixed
 
-This hotfix addresses critical issues with local LLM translation:
+This hotfix resolves critical issues with **Local LLM Translation** that prevented GPU acceleration from working correctly.
 
-| Fix | Description | Affected Users |
-|-----|-------------|----------------|
-| **Linux CUDA library loading** | `libcudart.so.12: cannot open shared object file` even with PyTorch CUDA installed | Linux users with NVIDIA GPUs |
-| **Function name mismatch** | `get_llama_cpp_prebuilt_wheel` not found in install.py | Users running `install_linux.sh` or `install_windows.bat` |
-| **Edge case handling** | "Successfully installed!" immediately followed by "INSTALLATION FAILED" | Windows users in rare pip/import race conditions |
+### Issues Resolved
+
+| Problem You Experienced | What Was Wrong | Now Fixed |
+|------------------------|----------------|-----------|
+| **Local LLM runs on CPU despite having NVIDIA GPU** | Windows couldn't find CUDA libraries needed for GPU acceleration | ✅ Automatically uses PyTorch's bundled CUDA libraries |
+| **Translation crashes with "Windows Error 0xc000001d"** | System CUDA version (e.g., 13.0) conflicted with the installed wheel (built for 12.8) | ✅ Uses correct CUDA version, ignores incompatible system CUDA |
+| **"libcudart.so.12 not found" on Linux** | CUDA libraries weren't in the library search path | ✅ Preloads CUDA libraries from PyTorch before starting |
+| **"DLL load failed" or "ggml.dll not found" on Windows** | llama-cpp-python couldn't locate GPU acceleration libraries | ✅ Adds PyTorch's CUDA DLLs to Windows search path |
+| **Installation script errors** | Install scripts referenced a renamed function | ✅ Added compatibility alias |
+| **"Successfully installed!" then "INSTALLATION FAILED"** | Race condition between pip install and import verification | ✅ Handles edge case with retry logic |
+
+### How to Tell If You Were Affected
+
+You likely experienced these issues if:
+- Local LLM translation was **very slow** (running on CPU instead of GPU)
+- You saw error messages mentioning **DLL**, **CUDA**, or **libcudart**
+- Translation failed immediately after the server tried to start
+- You have a **newer NVIDIA driver** (CUDA 12.4+) or recently updated your GPU drivers
+
+### After Updating
+
+With v1.8.1, local LLM translation should:
+- ✅ Automatically detect and use your NVIDIA GPU
+- ✅ Start the local server without DLL/library errors
+- ✅ Run translation at full GPU speed (10-50x faster than CPU)
+
+You can verify GPU is being used by checking the console output for:
+```
+Found CUDA DLLs in PyTorch: ['cublas64_12.dll', 'cudart64_12.dll']...
+```
 
 ---
 
