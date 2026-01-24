@@ -339,6 +339,12 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
     doesn't know to look there. By adding PyTorch's lib folder to the DLL
     search path, we make these libraries available.
 
+    IMPORTANT: We do NOT add the system CUDA Toolkit path if PyTorch has bundled
+    CUDA libs. This prevents version conflicts when the system has a different
+    CUDA version (e.g., system has CUDA 13.0 but PyTorch bundles CUDA 12.8).
+    The llama-cpp-python wheel is selected based on PyTorch's CUDA version,
+    so PyTorch's bundled libs are the correct ones to use.
+
     This must be called BEFORE importing llama_cpp.
 
     Returns:
@@ -357,31 +363,49 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
     import os
 
     paths_added = []
+    pytorch_cuda_found = False
 
     # Add PyTorch's lib folder (contains bundled CUDA libraries)
     try:
         import torch
         torch_lib = os.path.join(os.path.dirname(torch.__file__), 'lib')
         if os.path.exists(torch_lib):
-            os.add_dll_directory(torch_lib)
-            paths_added.append(f"PyTorch lib: {torch_lib}")
-            logger.debug(f"Added PyTorch CUDA libs to DLL path: {torch_lib}")
+            # Check if PyTorch has bundled CUDA libraries
+            # Look for common CUDA DLLs (cudart64_*.dll, cublas64_*.dll)
+            cuda_dlls = [f for f in os.listdir(torch_lib)
+                        if f.startswith(('cudart64_', 'cublas64_')) and f.endswith('.dll')]
+            if cuda_dlls:
+                os.add_dll_directory(torch_lib)
+                paths_added.append(f"PyTorch lib: {torch_lib}")
+                logger.debug(f"Added PyTorch CUDA libs to DLL path: {torch_lib}")
+                logger.debug(f"Found CUDA DLLs in PyTorch: {cuda_dlls[:3]}...")  # Log first 3
+                pytorch_cuda_found = True
+            else:
+                # PyTorch exists but no CUDA libs (CPU-only PyTorch)
+                logger.debug(f"PyTorch lib exists but no CUDA DLLs found: {torch_lib}")
     except ImportError:
         logger.debug("PyTorch not available, skipping CUDA DLL path setup")
     except Exception as e:
         logger.debug(f"Could not add PyTorch lib to DLL path: {e}")
 
-    # Also check for CUDA_PATH (system CUDA toolkit) as fallback
-    cuda_path = os.environ.get("CUDA_PATH", "")
-    if cuda_path:
-        cuda_bin = os.path.join(cuda_path, "bin")
-        if os.path.exists(cuda_bin):
-            try:
-                os.add_dll_directory(cuda_bin)
-                paths_added.append(f"CUDA Toolkit: {cuda_bin}")
-                logger.debug(f"Added CUDA Toolkit to DLL path: {cuda_bin}")
-            except Exception as e:
-                logger.debug(f"Could not add CUDA Toolkit to DLL path: {e}")
+    # ONLY add system CUDA Toolkit if PyTorch does NOT have bundled CUDA libs
+    # This prevents version conflicts (e.g., system CUDA 13.0 vs PyTorch CUDA 12.8)
+    if not pytorch_cuda_found:
+        cuda_path = os.environ.get("CUDA_PATH", "")
+        if cuda_path:
+            cuda_bin = os.path.join(cuda_path, "bin")
+            if os.path.exists(cuda_bin):
+                try:
+                    os.add_dll_directory(cuda_bin)
+                    paths_added.append(f"CUDA Toolkit: {cuda_bin}")
+                    logger.debug(f"Added CUDA Toolkit to DLL path: {cuda_bin}")
+                except Exception as e:
+                    logger.debug(f"Could not add CUDA Toolkit to DLL path: {e}")
+    else:
+        # Log that we're intentionally NOT adding system CUDA Toolkit
+        cuda_path = os.environ.get("CUDA_PATH", "")
+        if cuda_path:
+            logger.debug(f"Skipping system CUDA Toolkit ({cuda_path}) - using PyTorch's bundled CUDA libs to avoid version conflicts")
 
     _cuda_lib_paths_configured = True
 
