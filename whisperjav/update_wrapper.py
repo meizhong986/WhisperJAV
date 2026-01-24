@@ -123,13 +123,19 @@ def run_upgrade(wheel_only: bool = False) -> tuple:
 
     logger.info(f"Running: {' '.join(cmd)}")
 
+    # Set UTF-8 encoding to prevent Unicode crashes on Windows cp1252 console
+    # This is critical for upgrading from older versions that may use Unicode symbols
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=1800,  # 30 minute timeout
-            cwd=str(INSTALL_DIR)
+            cwd=str(INSTALL_DIR),
+            env=env
         )
 
         # Log output

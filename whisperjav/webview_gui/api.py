@@ -2385,19 +2385,26 @@ class WhisperJAVAPI:
             if wheel_only:
                 cmd.append("--wheel-only")
 
+            # Set UTF-8 encoding to prevent Unicode crashes on Windows cp1252 console
+            # This propagates to upgrade.py subprocess for older versions with Unicode symbols
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+
             # Spawn update wrapper as detached process
             if sys.platform == "win32":
                 subprocess.Popen(
                     cmd,
                     creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
                     close_fds=True,
-                    cwd=str(install_dir)
+                    cwd=str(install_dir),
+                    env=env
                 )
             else:
                 subprocess.Popen(
                     cmd,
                     start_new_session=True,
-                    cwd=str(install_dir)
+                    cwd=str(install_dir),
+                    env=env
                 )
 
             return {
