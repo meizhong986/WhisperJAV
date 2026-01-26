@@ -3,44 +3,52 @@ whisperjav-translate: Thin wrapper around PySubtrans for subtitle translation.
 
 Usage:
     whisperjav-translate -i input.srt [OPTIONS]
+
+This is the entry point for the 'whisperjav-translate' command.
+Requires the [translate] extra: pip install whisperjav[translate]
 """
 
+# ===========================================================================
+# EARLY SETUP - Must be before any library imports
+# ===========================================================================
+from whisperjav.utils.console import setup_console, print_missing_extra_error
+setup_console()
+
+import sys
+
+# Check for translate extra dependencies before importing them
+def _check_translate_dependencies():
+    """Check if translation dependencies are installed."""
+    missing = []
+
+    try:
+        import pysubtrans  # noqa: F401
+    except ImportError:
+        missing.append("pysubtrans")
+
+    try:
+        import openai  # noqa: F401
+    except ImportError:
+        missing.append("openai")
+
+    if missing:
+        print_missing_extra_error(
+            extra_name="translate",
+            missing_packages=missing,
+            feature_description="AI-powered subtitle translation using PySubtrans"
+        )
+        sys.exit(1)
+
+_check_translate_dependencies()
+
+# ===========================================================================
+# Standard imports (after dependency check)
+# ===========================================================================
 import argparse
 import logging
 import os
-import sys
-import io
 from pathlib import Path
 from typing import Optional
-
-# Fix stdout/stderr encoding for Windows to handle unicode in file paths
-# Critical for Japanese, Korean, Chinese file names
-def _ensure_utf8_console():
-    """Ensure stdout and stderr use UTF-8 encoding."""
-    if sys.stdout is not None and (not hasattr(sys.stdout, 'encoding') or sys.stdout.encoding.lower() != 'utf-8'):
-        try:
-            sys.stdout = io.TextIOWrapper(
-                sys.stdout.buffer if hasattr(sys.stdout, 'buffer') else io.BufferedWriter(io.FileIO(1, 'w')),
-                encoding='utf-8',
-                errors='replace',
-                line_buffering=True
-            )
-        except (AttributeError, OSError):
-            pass
-
-    if sys.stderr is not None and (not hasattr(sys.stderr, 'encoding') or sys.stderr.encoding.lower() != 'utf-8'):
-        try:
-            sys.stderr = io.TextIOWrapper(
-                sys.stderr.buffer if hasattr(sys.stderr, 'buffer') else io.BufferedWriter(io.FileIO(2, 'w')),
-                encoding='utf-8',
-                errors='replace',
-                line_buffering=True
-            )
-        except (AttributeError, OSError):
-            pass
-
-# Apply fix at module level
-_ensure_utf8_console()
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_SOURCES, SUPPORTED_TARGETS
 from .core import translate_subtitle

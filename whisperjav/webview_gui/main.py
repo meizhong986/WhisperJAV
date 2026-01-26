@@ -3,11 +3,58 @@ WhisperJAV PyWebView GUI Entry Point
 
 Modern web-based GUI launcher for WhisperJAV.
 Handles asset path resolution for both development and bundled modes.
+
+Requires the [gui] extra: pip install whisperjav[gui]
 """
 
-import os
+# ===========================================================================
+# EARLY SETUP - Must be before any library imports
+# ===========================================================================
 import sys
-import io
+
+# Console setup (UTF-8, warnings)
+from whisperjav.utils.console import setup_console, print_missing_extra_error
+setup_console()
+
+# Platform detection
+from whisperjav.utils.platform import is_windows
+
+# ===========================================================================
+# GUI DEPENDENCY CHECK - Before importing pywebview
+# ===========================================================================
+def _check_gui_dependencies():
+    """Check if GUI dependencies are installed."""
+    missing = []
+
+    try:
+        import webview  # noqa: F401
+    except ImportError:
+        missing.append("pywebview")
+
+    # Windows-specific dependencies
+    if is_windows():
+        try:
+            import clr  # pythonnet
+        except ImportError:
+            missing.append("pythonnet")
+
+    if missing:
+        print_missing_extra_error(
+            extra_name="gui",
+            missing_packages=missing,
+            feature_description="PyWebView GUI interface"
+        )
+        if is_windows():
+            print("Note: On Windows, WebView2 runtime is also required.")
+            print("Download from: https://developer.microsoft.com/en-us/microsoft-edge/webview2/")
+        sys.exit(1)
+
+_check_gui_dependencies()
+
+# ===========================================================================
+# Standard imports (after dependency check)
+# ===========================================================================
+import os
 import platform
 from pathlib import Path
 import time
@@ -15,34 +62,6 @@ import json
 
 import webview
 from webview.dom import DOMEventHandler
-
-# Fix stdout/stderr encoding for Windows console
-def _ensure_utf8_output():
-    """Ensure stdout and stderr use UTF-8 encoding."""
-    if sys.stdout is not None and (not hasattr(sys.stdout, 'encoding') or sys.stdout.encoding.lower() != 'utf-8'):
-        try:
-            sys.stdout = io.TextIOWrapper(
-                sys.stdout.buffer if hasattr(sys.stdout, 'buffer') else io.BufferedWriter(io.FileIO(1, 'w')),
-                encoding='utf-8',
-                errors='replace',
-                line_buffering=True
-            )
-        except (AttributeError, OSError):
-            pass
-
-    if sys.stderr is not None and (not hasattr(sys.stderr, 'encoding') or sys.stderr.encoding.lower() != 'utf-8'):
-        try:
-            sys.stderr = io.TextIOWrapper(
-                sys.stderr.buffer if hasattr(sys.stderr, 'buffer') else io.BufferedWriter(io.FileIO(2, 'w')),
-                encoding='utf-8',
-                errors='replace',
-                line_buffering=True
-            )
-        except (AttributeError, OSError):
-            pass
-
-# Apply fix at module level
-_ensure_utf8_output()
 
 
 def _setup_conda_path():

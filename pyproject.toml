@@ -1,7 +1,373 @@
+# =============================================================================
+# WhisperJAV - pyproject.toml
+# =============================================================================
+# Modern Python packaging configuration with modular extras and platform support.
+# This is the single source of truth for package metadata and dependencies.
+#
+# Installation examples:
+#   pip install whisperjav              # Core only (minimal)
+#   pip install whisperjav[cli]         # CLI with audio processing
+#   pip install whisperjav[gui]         # GUI support
+#   pip install whisperjav[translate]   # Translation module
+#   pip install whisperjav[all]         # Everything
+#   pip install whisperjav[colab]       # Google Colab optimized
+#
+# Migration: This replaces the monolithic setup.py dependency list with
+# modular extras that allow users to install only what they need.
+# =============================================================================
+
 [build-system]
-requires = [
-    "setuptools>=61.0",
-    "wheel",
-    "cython>=3.0"
-]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+# -----------------------------------------------------------------------------
+# Project Metadata
+# -----------------------------------------------------------------------------
+[project]
+name = "whisperjav"
+dynamic = ["version"]
+description = "Japanese Adult Video Subtitle Generator with AI-powered transcription"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "MeiZhong"}]
+maintainers = [{name = "MeiZhong"}]
+requires-python = ">=3.10,<3.13"
+keywords = [
+    "whisper",
+    "transcription",
+    "subtitles",
+    "japanese",
+    "audio",
+    "speech-to-text",
+    "asr",
+    "stable-ts",
+    "faster-whisper",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Multimedia :: Video",
+]
+
+# -----------------------------------------------------------------------------
+# Core Dependencies (Minimal for basic operation)
+# -----------------------------------------------------------------------------
+# These are the essential dependencies needed for the most basic functionality.
+# Users who want more features should install the appropriate extras.
+dependencies = [
+    # Whisper backends (core ASR engines)
+    "openai-whisper @ git+https://github.com/openai/whisper@main",
+    "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
+    "faster-whisper>=1.1.0",
+
+    # Audio/video handling
+    "ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git",
+
+    # Subtitle processing
+    "pysrt",
+    "srt",
+
+    # Utilities
+    "tqdm",
+    "colorama",
+    "requests",
+    "aiofiles",
+    "regex",
+
+    # Configuration system
+    "pydantic>=2.0,<3.0",
+    "PyYAML>=6.0",
+    "jsonschema",
+]
+
+# -----------------------------------------------------------------------------
+# Optional Dependencies (Extras)
+# -----------------------------------------------------------------------------
+# Each extra represents a feature set that users can opt into.
+# Platform markers (sys_platform) ensure Windows-only deps aren't installed elsewhere.
+
+[project.optional-dependencies]
+
+# CLI audio processing features
+# Install with: pip install whisperjav[cli]
+cli = [
+    # Audio I/O
+    "soundfile",
+    "pydub",
+
+    # Scientific computing (pinned for compatibility)
+    "numpy>=1.26.0,<2.0",  # NumPy 1.26.x for pyvideotrans compatibility
+    "scipy>=1.10.1",
+
+    # Audio analysis
+    "librosa>=0.10.0",
+    "pyloudnorm",
+
+    # Voice Activity Detection
+    "auditok",
+    "silero-vad>=6.0",
+    "ten-vad",
+
+    # Performance and utilities
+    "numba>=0.58.0",
+    "psutil>=5.9.0",
+
+    # Scene detection clustering
+    "scikit-learn>=1.3.0",
+]
+
+# GUI dependencies (platform-aware)
+# Install with: pip install whisperjav[gui]
+gui = [
+    "pywebview>=5.0.0",
+    # Windows-only dependencies (skipped on Linux/macOS)
+    "pythonnet>=3.0; sys_platform == 'win32'",
+    "pywin32>=305; sys_platform == 'win32'",
+]
+
+# Translation module
+# Install with: pip install whisperjav[translate]
+translate = [
+    "pysubtrans>=1.5.0",  # AI subtitle translation (requires Python 3.10+)
+    "openai>=1.35.0",     # GPT provider
+    "google-genai>=1.39.0",  # Gemini provider
+]
+
+# Local LLM support (server dependencies)
+# Install with: pip install whisperjav[llm]
+# Note: llama-cpp-python itself is installed separately with CUDA detection
+llm = [
+    "uvicorn>=0.22.0",
+    "fastapi>=0.100.0",
+    "pydantic-settings>=2.0.1",
+    "sse-starlette>=1.6.1",
+    "starlette-context>=0.3.6,<0.4",
+]
+
+# Speech enhancement backends
+# Install with: pip install whisperjav[enhance]
+enhance = [
+    # ModelScope (ZipEnhancer)
+    "modelscope>=1.20",
+    "addict",
+    "datasets>=2.14.0,<4.0",  # 4.x breaks modelscope
+    "simplejson",
+    "sortedcontainers",
+    "packaging",
+
+    # ClearVoice (fork with relaxed librosa)
+    "clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",
+
+    # BS-RoFormer vocal isolation
+    "bs-roformer-infer",
+
+    # ONNX inference
+    "onnxruntime>=1.16.0",
+]
+
+# HuggingFace ecosystem (for kotoba-whisper, model downloads)
+# Install with: pip install whisperjav[huggingface]
+huggingface = [
+    "huggingface-hub>=0.25.0",
+    "transformers>=4.40.0",
+    "accelerate>=0.26.0",
+    "hf_xet",  # Faster HuggingFace downloads
+]
+
+# Analysis and visualization tools
+# Install with: pip install whisperjav[analysis]
+analysis = [
+    "scikit-learn>=1.3.0",
+    "matplotlib",
+    "Pillow",
+]
+
+# pyvideotrans compatibility layer
+# Install with: pip install whisperjav[compatibility]
+compatibility = [
+    "av>=13.0.0",
+    "imageio>=2.31.0",
+    "imageio-ffmpeg>=0.4.9",
+    "httpx>=0.27.0",
+    "websockets>=13.0",
+    "soxr>=0.3.0",
+]
+
+# Development dependencies
+# Install with: pip install whisperjav[dev]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff>=0.1.0",
+    "pre-commit",
+]
+
+# =============================================================================
+# Combined Extras (Self-referencing)
+# =============================================================================
+
+# Full installation with all features
+# Install with: pip install whisperjav[all]
+all = [
+    "whisperjav[cli,gui,translate,llm,enhance,huggingface,analysis,compatibility]",
+]
+
+# Google Colab optimized (no GUI, focused on transcription + translation)
+# Install with: %pip install whisperjav[colab]
+colab = [
+    "whisperjav[cli,translate,huggingface]",
+]
+
+# Kaggle optimized (similar to Colab)
+# Install with: !pip install whisperjav[kaggle]
+kaggle = [
+    "whisperjav[cli,translate,huggingface]",
+]
+
+# Windows full experience (includes GUI)
+# Install with: pip install whisperjav[windows]
+windows = [
+    "whisperjav[all]",
+]
+
+# Linux/macOS CLI-focused (no Windows GUI deps)
+# Install with: pip install whisperjav[unix]
+unix = [
+    "whisperjav[cli,translate,enhance,huggingface,analysis,compatibility]",
+]
+
+# -----------------------------------------------------------------------------
+# Entry Points (CLI Commands)
+# -----------------------------------------------------------------------------
+[project.scripts]
+whisperjav = "whisperjav.main:main"
+whisperjav-gui = "whisperjav.webview_gui.main:main"
+whisperjav-translate = "whisperjav.translate.cli:main"
+whisperjav-upgrade = "whisperjav.upgrade:main"
+
+# -----------------------------------------------------------------------------
+# Project URLs
+# -----------------------------------------------------------------------------
+[project.urls]
+Homepage = "https://github.com/meizhong986/whisperjav"
+Documentation = "https://github.com/meizhong986/whisperjav#readme"
+Repository = "https://github.com/meizhong986/whisperjav.git"
+Issues = "https://github.com/meizhong986/whisperjav/issues"
+Changelog = "https://github.com/meizhong986/whisperjav/releases"
+
+# -----------------------------------------------------------------------------
+# Setuptools Configuration
+# -----------------------------------------------------------------------------
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = {attr = "whisperjav.__version__.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["whisperjav*"]
+exclude = ["tests*", "docs*", "installer*", "notebook*"]
+
+[tool.setuptools.package-data]
+whisperjav = [
+    "config/*.json",
+    "config/v4/**/*.yaml",
+    "config/v4/**/*.md",
+    "config/components/**/*.py",
+    "instructions/*.txt",
+    "translate/defaults/*.txt",
+    "webview_gui/assets/*.html",
+    "webview_gui/assets/*.css",
+    "webview_gui/assets/*.js",
+    "webview_gui/assets/*.ico",
+    "Menu/*.json",
+]
+
+# -----------------------------------------------------------------------------
+# Tool Configuration: Ruff (Linter/Formatter)
+# -----------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+exclude = [
+    ".git",
+    ".ruff_cache",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    "installer/generated",
+    ".venv",
+    "venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "W",      # pycodestyle warnings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default argument
+    "B905",   # zip without strict
+    "UP007",  # Use X | Y for type union (requires 3.10+)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["whisperjav"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+# -----------------------------------------------------------------------------
+# Tool Configuration: Pytest
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# -----------------------------------------------------------------------------
+# Tool Configuration: Coverage
+# -----------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["whisperjav"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/webview_gui/assets/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
