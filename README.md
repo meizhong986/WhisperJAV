@@ -8,8 +8,8 @@
     <img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"/>
   </a>
   <br>
-  <img src="https://img.shields.io/badge/version-1.8.1-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/python-3.9--3.12-green.svg" alt="Python">
+  <img src="https://img.shields.io/badge/version-1.8.2-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/python-3.10--3.12-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
 
@@ -264,202 +264,296 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Installation
 
-### Windows (Recommended - Standalone Installer)
+Find your situation below and follow the guide.
 
-*Best for: Most users, beginners, and those who want a GUI.*
+---
 
-1. **Download the Installer:**
-   [**WhisperJAV-1.8.1-Windows-x86_64.exe**](https://github.com/meizhong986/WhisperJAV/releases/latest)
+### Which Installation Path Should I Follow?
 
-2. **Run the Installer:**
-   Double-click the downloaded `.exe` file. No admin rights required.
+| Your Situation | Go To |
+|----------------|-------|
+| **New user on Windows** wanting GUI | [Windows Standalone Installer](#windows-standalone-installer) |
+| **Already have v1.8.x** and want to update | [Upgrading from v1.8.x](#upgrading-from-v18x) |
+| **Have v1.7.x or earlier** | [Upgrading from v1.7.x or Earlier](#upgrading-from-v17x-or-earlier) |
+| **Linux or macOS user** | [Linux](#linux-ubuntudebian) or [macOS](#macos-apple-silicon--intel) |
+| **Colab or Kaggle** | [Cloud Notebooks](#google-colab--kaggle) |
+| **Developer or expert** wanting pip | [Expert Installation](#expert-installation) |
 
-3. **Follow the Prompts:**
-   The installer handles all dependencies automatically:
-   - Python 3.10.18 with conda
-   - FFmpeg for audio/video processing
-   - Git for GitHub package installs
-   - PyTorch with CUDA support (auto-detected)
+---
 
-4. **Launch:**
-   Open "WhisperJAV" from your Desktop shortcut.
+### Windows Standalone Installer
 
-**Installation Time:** ~10-20 minutes (internet-dependent)
-**First Run:** AI models download (~3GB, 5-10 minutes additional)
+The standalone installer provides a complete, self-contained WhisperJAV environment with GUI. No Python knowledge required.
 
-<details>
-<summary><strong>Upgrading from v1.7.x?</strong> (Click to expand)</summary>
+**Download:** [**WhisperJAV-1.8.2-Windows-x86_64.exe**](https://github.com/meizhong986/WhisperJAV/releases/latest)
 
-A fresh installation is required due to breaking dependency changes:
+**Steps:**
+1. Download the `.exe` file from the link above
+2. Double-click to run (no admin rights needed)
+3. Follow the on-screen prompts
+4. Launch from the Desktop shortcut when complete
 
-1. **Uninstall v1.7.x first:**
+**What gets installed:**
+- Python 3.10 (bundled, does not affect your system Python)
+- FFmpeg for audio/video processing
+- PyTorch with CUDA support (auto-detected)
+- All WhisperJAV dependencies
+
+**Timing:**
+- Installation: 10-20 minutes (depends on internet speed)
+- First transcription: Additional 5-10 minutes for AI model download (~3GB)
+
+**Location:** `%LOCALAPPDATA%\WhisperJAV` (typically `C:\Users\YourName\AppData\Local\WhisperJAV`)
+
+---
+
+### Upgrading from v1.8.x
+
+If you have v1.8.0, v1.8.1, or any 1.8.x version, you can upgrade in place.
+
+#### Windows GUI Users
+
+Open Command Prompt and run:
+```batch
+"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade
+```
+
+Or from the WhisperJAV environment:
+```batch
+whisperjav-upgrade
+```
+
+The upgrade tool will:
+1. Create a rollback snapshot (in case you need to revert)
+2. Download and install the new version
+3. Update your desktop shortcut
+
+**Rollback if needed:**
+```batch
+whisperjav-upgrade --rollback
+```
+
+#### Linux / macOS / Expert Users
+
+From your WhisperJAV virtual environment:
+```bash
+source whisperjav-env/bin/activate
+whisperjav-upgrade
+```
+
+Or upgrade specific components only:
+```bash
+whisperjav-upgrade --extras cli,translate
+```
+
+**Available extras:** `cli`, `gui`, `translate`, `llm`, `enhance`, `huggingface`, `analysis`, `all`
+
+---
+
+### Upgrading from v1.7.x or Earlier
+
+Version 1.8.x has breaking dependency changes. A clean installation is required.
+
+#### Windows GUI Users
+
+1. **Uninstall v1.7.x:**
    - Open **Settings** → **Apps** → Search "WhisperJAV" → **Uninstall**
    - Or run: `%LOCALAPPDATA%\WhisperJAV\Uninstall-WhisperJAV.exe`
 
-2. **Install v1.8.x:** Run the new installer.
+2. **Install v1.8.2:** Download and run the [new installer](#windows-standalone-installer)
 
-**What's preserved:** Your AI models (`%USERPROFILE%\.cache\huggingface\`), transcription outputs, and custom files are stored outside the installation directory and will not be deleted.
+#### Linux / macOS Users
 
-</details>
+1. **Remove the old environment:**
+   ```bash
+   rm -rf whisperjav-env
+   ```
 
-<details>
-<summary><strong>Windows Expert - Source Install</strong> (Click to expand)</summary>
+2. **Re-run the installer:**
+   ```bash
+   cd whisperjav
+   git pull
+   ./installer/install_linux.sh
+   ```
 
-**Prerequisites:**
-- Python 3.10-3.12 ([python.org](https://www.python.org/downloads/))
-- FFmpeg in PATH ([gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/))
-- Git ([git-scm.com](https://git-scm.com/download/win))
-
-```batch
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-
-:: Standard install (auto-detects GPU)
-installer\install_windows.bat
-
-:: Or with options:
-installer\install_windows.bat --cpu-only     # Force CPU only
-installer\install_windows.bat --cuda118      # Force CUDA 11.8
-installer\install_windows.bat --local-llm    # Include local LLM support
-```
-
-</details>
+**What is preserved across upgrades:**
+- AI models: `~/.cache/huggingface/` (Linux/Mac) or `%USERPROFILE%\.cache\huggingface\` (Windows)
+- Your transcription output files
+- Any files outside the installation directory
 
 ---
 
 ### macOS (Apple Silicon & Intel)
 
-*Best for: M1/M2/M3/M4 Macs and Intel Mac users. CLI + GUI supported.*
-
-**1. Install Prerequisites**
+#### Prerequisites
 
 ```bash
-# Install Xcode Command Line Tools (required for GUI)
+# Install Xcode Command Line Tools
 xcode-select --install
 
-# Install Homebrew (if not installed)
+# Install Homebrew (if not already installed)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Install system tools
+# Install required tools
 brew install python@3.11 ffmpeg git
 ```
 
-**2. Install WhisperJAV**
+#### Installation
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh
-
-# Run the installer (auto-detects Mac architecture)
 ./installer/install_linux.sh
+```
 
-# With local LLM support (Apple Silicon builds with Metal):
+**With local LLM support (builds llama-cpp with Metal):**
+```bash
 ./installer/install_linux.sh --local-llm-build
 ```
 
-> **Apple Silicon:** Native MPS acceleration enabled automatically.
-> **Intel Macs:** CPU-only mode (5-10x slower than Apple Silicon).
-
-> **Upgrading from v1.7.x?** Remove your old virtual environment first: `rm -rf whisperjav-env`, then run the installer again.
+**Notes:**
+- Apple Silicon (M1/M2/M3/M4): Uses MPS acceleration automatically
+- Intel Macs: CPU-only mode, significantly slower than Apple Silicon
 
 ---
 
-### Linux (Ubuntu/Debian/Fedora)
+### Linux (Ubuntu/Debian)
 
-*Best for: Servers, desktops with NVIDIA GPUs.*
-
-**1. Install System Dependencies**
+#### Prerequisites
 
 ```bash
-# Debian / Ubuntu
 sudo apt-get update
-sudo apt-get install -y python3-dev python3-pip build-essential ffmpeg libsndfile1 git
+sudo apt-get install -y python3-dev python3-pip python3-venv build-essential ffmpeg libsndfile1 git
+```
 
-# Fedora / RHEL
+For Fedora/RHEL:
+```bash
 sudo dnf install python3-devel gcc ffmpeg libsndfile git
 ```
 
-**2. Install WhisperJAV**
+#### Installation
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh
-
-# Standard install (auto-detects GPU)
 ./installer/install_linux.sh
-
-# With options:
-./installer/install_linux.sh --cpu-only        # Force CPU only
-./installer/install_linux.sh --local-llm       # Include local LLM (prebuilt wheel)
-./installer/install_linux.sh --local-llm-build # Include local LLM (build from source)
 ```
 
-> **Performance:** A 2-hour video takes ~5-10 minutes on GPU vs ~30-60 minutes on CPU.
+**Options:**
+```bash
+./installer/install_linux.sh --cpu-only        # Force CPU mode (no CUDA)
+./installer/install_linux.sh --local-llm       # Include local LLM support
+```
 
-> **Upgrading from v1.7.x?** Remove your old virtual environment first: `rm -rf whisperjav-env`, then run the installer again.
+**NVIDIA GPU users:** The installer auto-detects CUDA. Ensure you have recent NVIDIA drivers installed (version 525+).
 
 ---
 
 ### Google Colab / Kaggle
 
-Use the one-click notebooks - no installation required:
+No local installation required. Use these notebooks directly:
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb)
 [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb)
 
+The notebooks handle all installation automatically. Free GPU runtime is available on both platforms.
+
 ---
 
-### Advanced / Developer
+### Expert Installation
 
-*Best for: Contributors and Python experts.*
+For users comfortable with Python package management. Choose the components you need.
 
-<details>
-<summary><b>Manual pip install</b></summary>
+#### Modular Installation (New in v1.8.2)
 
-> **Warning:** Manual pip install requires careful dependency management. We strongly recommend using the installer scripts above.
+WhisperJAV supports modular extras. Install only what you need:
 
 ```bash
-# 1. Create virtual environment
-python -m venv whisperjav-env
-source whisperjav-env/bin/activate  # Linux/Mac
-# whisperjav-env\Scripts\activate   # Windows
-
-# 2. Install PyTorch FIRST (critical for GPU support)
-# NVIDIA GPU:
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
-# Apple Silicon:
-pip install torch torchaudio
-# CPU only:
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-# 3. Install WhisperJAV
+# Core only (minimal)
 pip install git+https://github.com/meizhong986/whisperjav.git
+
+# CLI with audio processing
+pip install "whisperjav[cli] @ git+https://github.com/meizhong986/whisperjav.git"
+
+# GUI support
+pip install "whisperjav[gui] @ git+https://github.com/meizhong986/whisperjav.git"
+
+# Translation support
+pip install "whisperjav[translate] @ git+https://github.com/meizhong986/whisperjav.git"
+
+# Everything
+pip install "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
 ```
 
-</details>
+**Available extras:**
 
-<details>
-<summary><b>Editable / Dev install</b></summary>
+| Extra | Description |
+|-------|-------------|
+| `cli` | Audio processing, VAD, scene detection |
+| `gui` | PyWebView GUI (Windows: WebView2, Linux/Mac: WebKit) |
+| `translate` | AI translation (PySubtrans, OpenAI, Gemini) |
+| `llm` | Local LLM server (FastAPI, llama-cpp) |
+| `enhance` | Speech enhancement (ClearVoice, BS-RoFormer) |
+| `huggingface` | HuggingFace Transformers pipeline |
+| `analysis` | Scientific analysis, visualization |
+| `all` | All of the above |
+| `colab` | Optimized for Colab/Kaggle (cli + translate + huggingface) |
 
-Use this if you plan to modify the code.
+#### PyTorch Installation (Required First)
+
+PyTorch must be installed before WhisperJAV. Choose your platform:
+
+```bash
+# NVIDIA GPU (CUDA 12.8)
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+# NVIDIA GPU (CUDA 11.8)
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Apple Silicon (MPS)
+pip install torch torchaudio
+
+# CPU only
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+```
+
+#### Development Installation
+
+For contributing or modifying the code:
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 
-# Windows
-installer\install_windows.bat --dev
-
-# Mac/Linux
-./installer/install_linux.sh --dev
-
-# Or manual
+# Install in editable mode with dev dependencies
 pip install -e ".[dev]"
+
+# Run tests
+python -m pytest tests/
 ```
 
-</details>
+#### Windows Source Installation
+
+```batch
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+
+:: Standard install
+installer\install_windows.bat
+
+:: Options
+installer\install_windows.bat --cpu-only
+installer\install_windows.bat --cuda118
+installer\install_windows.bat --local-llm
+installer\install_windows.bat --dev
+```
+
+**Prerequisites for Windows source install:**
+- Python 3.10-3.12 from [python.org](https://www.python.org/downloads/)
+- FFmpeg in PATH from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/)
+- Git from [git-scm.com](https://git-scm.com/download/win)
 
 ---
 
@@ -467,33 +561,25 @@ pip install -e ".[dev]"
 
 | Requirement | Minimum | Recommended |
 |-------------|---------|-------------|
-| **OS** | Windows 10/11, macOS 11+, Linux | Latest versions |
-| **Python** | 3.10 | 3.11 or 3.12 |
+| **OS** | Windows 10, macOS 11, Ubuntu 20.04 | Windows 11, macOS 14, Ubuntu 22.04 |
+| **Python** | 3.10 | 3.11 |
 | **RAM** | 8 GB | 16 GB |
-| **Disk Space** | 8 GB | 15 GB (with models) |
-| **GPU** | Optional | NVIDIA RTX 2060+ or Apple Silicon |
+| **Disk** | 8 GB | 15 GB (with models) |
+| **GPU** | None (CPU works) | NVIDIA RTX 2060+ or Apple Silicon |
 
-**Supported GPU Acceleration:**
-- NVIDIA CUDA 11.8+ (Windows/Linux)
-- Apple MPS (macOS Apple Silicon)
-- CPU fallback (all platforms, 5-10x slower)
+**GPU Support:**
+- NVIDIA: CUDA 11.8 or 12.x (Windows, Linux)
+- Apple Silicon: MPS acceleration (M1/M2/M3/M4)
+- AMD ROCm: Experimental (Linux only)
+- CPU fallback: Works on all platforms, 5-10x slower
 
-<details>
-<summary>Detailed Windows Prerequisites (for source install)</summary>
+**Processing Time Estimates (per hour of video):**
 
-#### NVIDIA GPU Setup
-1. Install latest [NVIDIA drivers](https://www.nvidia.com/drivers) (570+ recommended for CUDA 12.8)
-2. CUDA Toolkit is bundled with PyTorch - no separate install needed
-
-#### FFmpeg
-1. Download from [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds)
-2. Extract to `C:\ffmpeg`
-3. Add `C:\ffmpeg\bin` to your PATH
-
-#### Python
-Download from [python.org](https://www.python.org/downloads/windows/). Check "Add Python to PATH" during installation.
-
-</details>
+| Hardware | Time |
+|----------|------|
+| NVIDIA RTX GPU | 5-10 minutes |
+| Apple Silicon | 8-15 minutes |
+| CPU | 30-60 minutes |
 
 ---
 
@@ -551,19 +637,6 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\huggingface\hub\models--Sys
 
 ---
 
-## Performance
-
-Rough estimates for processing time per hour of video:
-
-| Platform | Time |
-|----------|------|
-| NVIDIA GPU (CUDA) | 5-10 minutes |
-| Apple Silicon (MPS) | 8-15 minutes |
-| AMD GPU (ROCm) | 10-20 minutes |
-| CPU only | 30-60 minutes |
-
----
-
 ## Contributing
 
 Contributions welcome. See `CONTRIBUTING.md` for guidelines.
@@ -571,8 +644,9 @@ Contributions welcome. See `CONTRIBUTING.md` for guidelines.
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
-pip install -e .[dev]
+pip install -e ".[dev]"
 python -m pytest tests/
+python -m ruff check whisperjav/
 ```
 
 ---
