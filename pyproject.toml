@@ -187,8 +187,8 @@ huggingface = [
 
 # Analysis and visualization tools
 # Install with: pip install whisperjav[analysis]
+# Note: scikit-learn is in [cli] for scene detection clustering
 analysis = [
-    "scikit-learn>=1.3.0",
     "matplotlib",
     "Pillow",
 ]

@@ -1,0 +1,1875 @@
+"""
+WhisperJAV v{{VERSION}} Post-Install Script
+======================================
+
+This script runs after the conda environment is created and:
+1. Performs comprehensive preflight checks (disk space, network, WebView2)
+2. Detects NVIDIA GPU and installs appropriate PyTorch build
+3. Offers CPU-only fallback for systems without NVIDIA GPU
+4. Installs all Python dependencies from requirements_v{{VERSION}}.txt
+5. Installs WhisperJAV from GitHub
+6. Creates desktop shortcut
+7. Provides detailed installation summary
+
+All output is logged to install_log_v{{VERSION}}.txt
+"""
+
+import os
+import sys
+import re
+import time
+import shlex
+import shutil
+import subprocess
+import traceback
+from datetime import datetime
+from pathlib import Path
+from typing import NamedTuple, Optional, Sequence, Tuple
+
+try:
+    import pynvml  # type: ignore
+    PYNVML_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency
+    pynvml = None  # type: ignore
+    PYNVML_AVAILABLE = False
+
+LOG_FILE = os.path.join(sys.prefix, "install_log_v{{VERSION}}.txt")
+
+# ==============================================================================
+# Package Manager Detection (uv preferred, pip fallback)
+# ==============================================================================
+# uv is a fast Rust-based package installer (10-30x faster than pip)
+# It's bundled with the installer similar to how git is bundled via conda
+UV_EXE = os.path.join(sys.prefix, "uv.exe")
+USE_UV = os.path.exists(UV_EXE)
+
+# Configure uv timeout for slow connections (default is 30s, we use 5 minutes)
+# This is set via environment variable, not CLI flag (unlike pip's --timeout)
+if USE_UV:
+    os.environ["UV_HTTP_TIMEOUT"] = "300"  # 5 minutes for large downloads
+
+MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (11, 8, 0)
+CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio"
+
+
+class DriverMatrixEntry(NamedTuple):
+    min_driver: Tuple[int, int, int]
+    cuda_version: str
+    pip_command: str
+
+
+class DriverInfo(NamedTuple):
+    driver_version: Optional[Tuple[int, int, int]]
+    gpu_name: Optional[str]
+    source: str
+
+
+class TorchInstallPlan(NamedTuple):
+    pip_args: list[str]
+    pip_command: str
+    description: str
+    uses_gpu: bool
+    target_label: str
+    driver_requirement: Optional[Tuple[int, int, int]]
+    driver_detected: Optional[Tuple[int, int, int]]
+    gpu_name: Optional[str]
+    reason: str
+
+
+TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
+    # Simplified CUDA matrix for v1.8.0+ (aligned with pyvideotrans requirements)
+    # - CUDA 12.8: Optimal for modern drivers (570+), supports all RTX 20xx/30xx/40xx/50xx
+    # - CUDA 11.8: Universal fallback for older drivers, supports all CUDA-capable GPUs
+    #
+    # Note: CUDA 12.1/12.4/12.6 removed - PyTorch 2.7.x dropped 12.1/12.4 support
+    #       Users with drivers 530-569 will use CUDA 11.8 (works perfectly)
+    #       To get CUDA 12.8, update driver to 570+ (free from nvidia.com)
+
+    # Driver 570+ → CUDA 12.8 (RTX 20xx/30xx/40xx/50xx with modern drivers)
+    DriverMatrixEntry(
+        (570, 0, 0),
+        "CUDA 12.8",
+        "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu128"
+    ),
+    # Driver 450+ → CUDA 11.8 (Universal fallback for all older drivers)
+    DriverMatrixEntry(
+        (450, 0, 0),
+        "CUDA 11.8",
+        "pip3 install torch torchaudio --index-url https://download.pytorch.org/whl/cu118"
+    ),
+)
+
+
+def log(message: str):
+    """Log message to console and file with timestamp"""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] {message}"
+    print(line)
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
+
+def log_section(title: str):
+    """Log a section header for better readability"""
+    log("\n" + "=" * 80)
+    log(f"  {title}")
+    log("=" * 80)
+
+
+def format_version_tuple(version: Optional[Tuple[int, int, int]]) -> str:
+    if not version:
+        return "unknown"
+    return ".".join(str(part) for part in version)
+
+
+def parse_version_string(version_str: str) -> Optional[Tuple[int, int, int]]:
+    if not version_str:
+        return None
+    digits = [int(piece) for piece in re.split(r"[^0-9]", version_str) if piece.isdigit()]
+    if not digits:
+        return None
+    while len(digits) < 3:
+        digits.append(0)
+    return tuple(digits[:3])  # type: ignore[return-value]
+
+
+def get_uv_version() -> Optional[str]:
+    """Get uv version string if available."""
+    if not USE_UV:
+        return None
+    try:
+        result = subprocess.run(
+            [UV_EXE, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def log_installer_info():
+    """Log which package installer will be used."""
+    if USE_UV:
+        uv_version = get_uv_version()
+        if uv_version:
+            log(f"Package installer: {uv_version} (10-30x faster than pip)")
+        else:
+            log("Package installer: uv (version unknown)")
+    else:
+        log("Package installer: pip (uv not bundled - using standard installer)")
+        log("  Note: Installation will be slower but fully functional")
+
+
+def get_package_installer_cmd() -> Tuple[list, str]:
+    """
+    Get the appropriate package installer command prefix.
+
+    Returns:
+        tuple: (command_prefix_list, installer_name)
+
+    uv is preferred (10-30x faster) with pip as fallback.
+    """
+    python_exe = os.path.join(sys.prefix, 'python.exe')
+
+    if USE_UV:
+        # uv pip install --python <path> ensures we install to the right env
+        return ([UV_EXE, "pip", "install", "--python", python_exe], "uv")
+    else:
+        return ([python_exe, "-m", "pip", "install"], "pip")
+
+
+def ensure_pynvml_loaded() -> bool:
+    """Attempt to import or install pynvml for driver detection."""
+    global PYNVML_AVAILABLE, pynvml
+
+    if PYNVML_AVAILABLE:
+        return True
+
+    try:
+        import importlib
+
+        pynvml = importlib.import_module("pynvml")  # type: ignore
+        PYNVML_AVAILABLE = True
+        return True
+    except ImportError:
+        log("Installing nvidia-ml-py for NVIDIA driver detection...")
+        if run_pip([
+            "install",
+            "nvidia-ml-py",
+            "--progress-bar",
+            "on"
+        ], "Install NVML helper"):
+            try:
+                import importlib
+
+                pynvml = importlib.import_module("pynvml")  # type: ignore
+                PYNVML_AVAILABLE = True
+                return True
+            except ImportError:
+                log("WARNING: pynvml module still unavailable after installation attempt.")
+    return False
+
+
+def detect_nvidia_driver() -> DriverInfo:
+    """Detect NVIDIA driver version using nvidia-smi or NVML."""
+    smi_cmd = [
+        "nvidia-smi",
+        "--query-gpu=driver_version,name",
+        "--format=csv,noheader",
+    ]
+    try:
+        result = subprocess.run(
+            smi_cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding='utf-8',
+            timeout=10
+        )
+        line = result.stdout.strip().splitlines()[0]
+        if "," in line:
+            driver_str, gpu_name = line.split(",", 1)
+        else:
+            driver_str, gpu_name = line, "Unknown GPU"
+        driver_tuple = parse_version_string(driver_str.strip())
+        if driver_tuple:
+            return DriverInfo(driver_tuple, gpu_name.strip(), "nvidia-smi")
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired, IndexError):
+        pass
+
+    if ensure_pynvml_loaded():
+        try:
+            pynvml.nvmlInit()  # type: ignore[attr-defined]
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # type: ignore[attr-defined]
+            driver_str = pynvml.nvmlSystemGetDriverVersion()  # type: ignore[attr-defined]
+            gpu_name = pynvml.nvmlDeviceGetName(handle)  # type: ignore[attr-defined]
+            if isinstance(driver_str, bytes):
+                driver_str = driver_str.decode('utf-8')
+            if isinstance(gpu_name, bytes):
+                gpu_name = gpu_name.decode('utf-8')
+            driver_tuple = parse_version_string(str(driver_str))
+            if driver_tuple:
+                return DriverInfo(driver_tuple, str(gpu_name), "pynvml")
+        except Exception as exc:  # pragma: no cover - hardware specific
+            log(f"WARNING: NVML detection failed: {exc}")
+        finally:
+            try:
+                pynvml.nvmlShutdown()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+    return DriverInfo(None, None, "none")
+
+
+def verify_existing_torch_stack() -> bool:
+    """Return True if CUDA-enabled torch and torchaudio meet requirements."""
+    log("Checking for existing CUDA-enabled PyTorch and torchaudio...")
+    try:
+        import torch
+        import torchaudio
+    except ImportError as exc:
+        log(f"PyTorch stack missing: {exc}")
+        return False
+
+    log(f"Found PyTorch {torch.__version__}")
+    try:
+        log(f"Found torchaudio {torchaudio.__version__}")
+    except Exception:
+        log("Unable to determine torchaudio version.")
+    cuda_available = torch.cuda.is_available()
+    log(f"PyTorch CUDA available: {'YES' if cuda_available else 'NO'}")
+
+    if not cuda_available:
+        return False
+
+    cuda_str = getattr(torch.version, "cuda", "") or ""
+    cuda_tuple = parse_version_string(cuda_str)
+    if not cuda_tuple:
+        log("Unable to determine PyTorch CUDA version; reinstall required.")
+        return False
+
+    if cuda_tuple >= MIN_TORCH_CUDA_VERSION:
+        log(f"Existing PyTorch satisfies CUDA >= {format_version_tuple(MIN_TORCH_CUDA_VERSION)}. Skipping reinstall.")
+        return True
+
+    log(
+        "Installed PyTorch CUDA version "
+        f"{format_version_tuple(cuda_tuple)} is below required "
+        f"{format_version_tuple(MIN_TORCH_CUDA_VERSION)}. Reinstalling..."
+    )
+    return False
+
+
+def normalize_pip_command(command: str) -> list[str]:
+    parts = shlex.split(command)
+    if len(parts) < 2:
+        raise ValueError(f"Invalid pip command: {command}")
+    head = parts[0].lower()
+    if head not in {"pip", "pip3"}:
+        raise ValueError(f"Unsupported pip executable '{parts[0]}' in command: {command}")
+    return parts[1:]
+
+
+def select_torch_install_plan(driver_info: DriverInfo) -> TorchInstallPlan:
+    if driver_info.driver_version:
+        for entry in TORCH_DRIVER_MATRIX:
+            if driver_info.driver_version >= entry.min_driver:
+                return TorchInstallPlan(
+                    pip_args=normalize_pip_command(entry.pip_command),
+                    pip_command=entry.pip_command,
+                    description=f"Install PyTorch/Torchaudio ({entry.cuda_version})",
+                    uses_gpu=True,
+                    target_label=entry.cuda_version,
+                    driver_requirement=entry.min_driver,
+                    driver_detected=driver_info.driver_version,
+                    gpu_name=driver_info.gpu_name,
+                    reason=""
+                )
+
+        min_required = TORCH_DRIVER_MATRIX[-1].min_driver
+        reason = (
+            f"Detected driver {format_version_tuple(driver_info.driver_version)} "
+            f"on {driver_info.gpu_name or 'GPU'} is below minimum "
+            f"{format_version_tuple(min_required)} for CUDA wheels."
+        )
+    else:
+        reason = "No NVIDIA GPU or driver detected."
+
+    return TorchInstallPlan(
+        pip_args=normalize_pip_command(CPU_FALLBACK_COMMAND),
+        pip_command=CPU_FALLBACK_COMMAND,
+        description="Install PyTorch/Torchaudio (CPU-only)",
+        uses_gpu=False,
+        target_label="CPU",
+        driver_requirement=None,
+        driver_detected=driver_info.driver_version,
+        gpu_name=driver_info.gpu_name,
+        reason=reason
+    )
+
+
+def install_pytorch_and_torchaudio(plan: TorchInstallPlan) -> bool:
+    log(f"Selected pip command: {plan.pip_command}")
+    pip_preview = f"{sys.executable} -m pip {' '.join(plan.pip_args)}"
+    log(f"Executing pip command: {pip_preview}")
+    return run_pip(plan.pip_args, plan.description)
+
+
+def timed_input(prompt: str, timeout_seconds: int, default_response: str = "") -> str:
+    """
+    Get user input with timeout, returning default if timeout expires.
+    Allows unattended installation while preserving interactive option.
+
+    Args:
+        prompt: The prompt to display to user
+        timeout_seconds: Seconds to wait before using default
+        default_response: Value to return if timeout expires
+
+    Returns:
+        User input or default_response if timeout
+    """
+    import threading
+
+    print(prompt, end='', flush=True)
+
+    # Use threading for cross-platform timeout support
+    result = [default_response]  # Mutable container for thread communication
+
+    def get_input():
+        try:
+            result[0] = input()
+        except (EOFError, KeyboardInterrupt):
+            result[0] = default_response
+
+    input_thread = threading.Thread(target=get_input, daemon=True)
+    input_thread.start()
+    input_thread.join(timeout=timeout_seconds)
+
+    if input_thread.is_alive():
+        # Timeout occurred
+        print(f"\n[Auto-continuing after {timeout_seconds}s timeout - using default: '{default_response}']")
+        return default_response
+    else:
+        return result[0]
+
+
+def check_disk_space(min_gb: int = 8) -> bool:
+    """Check if sufficient disk space is available"""
+    try:
+        total, used, free = shutil.disk_usage(sys.prefix)
+        free_gb = free / (1024**3)
+        log(f"Disk free space: {free_gb:.1f} GB (minimum required: {min_gb} GB)")
+        if free_gb < min_gb:
+            log("ERROR: Not enough free disk space for installation.")
+            log(f"       Please free up at least {min_gb} GB and retry.")
+            return False
+        return True
+    except Exception as e:
+        log(f"WARNING: Could not determine disk space: {e}")
+        return True  # Non-fatal, proceed with caution
+
+
+def check_network(timeout: int = 10) -> bool:
+    """Check if network connectivity to PyPI is available"""
+    log("Checking network connectivity to PyPI...")
+    try:
+        import urllib.request
+        urllib.request.urlopen("https://pypi.org", timeout=timeout)
+        log("Network check: OK")
+        return True
+    except Exception as e:
+        log(f"ERROR: Network check failed: {e}")
+        log("       Internet connection is required for downloading dependencies.")
+        return False
+
+
+def check_vc_redist() -> bool:
+    """Check if Visual C++ 2015-2022 Redistributable (x64) is installed."""
+    log("Checking for Visual C++ Redistributable...")
+    try:
+        import winreg
+        # VC++ 2015-2022 (v14.x) x64 - check multiple possible locations
+        key_paths = [
+            r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+            r"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+        ]
+        for key_path in key_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path)
+                winreg.CloseKey(key)
+                log("  VC++ Redistributable: Installed")
+                return True
+            except FileNotFoundError:
+                continue
+        log("  VC++ Redistributable: NOT FOUND")
+        return False
+    except Exception as e:
+        log(f"  VC++ check error: {e}")
+        return True  # Assume OK if can't check
+
+
+def ensure_vc_redist() -> bool:
+    """Ensure VC++ Redistributable is installed, download and install if missing."""
+    if check_vc_redist():
+        return True
+
+    log("")
+    log("Visual C++ 2015-2022 Redistributable is required for PyTorch and other native libraries.")
+    log("Downloading and installing VC++ Redistributable...")
+
+    vc_url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    vc_path = os.path.join(os.environ.get("TEMP", sys.prefix), "vc_redist.x64.exe")
+
+    try:
+        # Download VC++ Redistributable
+        log(f"  Downloading from: {vc_url}")
+        import urllib.request
+        urllib.request.urlretrieve(vc_url, vc_path)
+        log(f"  Downloaded to: {vc_path}")
+
+        # Install silently
+        log("  Installing VC++ Redistributable (this may take a minute)...")
+        result = subprocess.run(
+            [vc_path, "/install", "/quiet", "/norestart"],
+            capture_output=True,
+            timeout=300  # 5 minute timeout
+        )
+
+        # Clean up installer
+        try:
+            os.remove(vc_path)
+        except Exception:
+            pass
+
+        if result.returncode == 0:
+            log("  VC++ Redistributable: Installed successfully")
+            return True
+        elif result.returncode == 1638:
+            # 1638 = Another version is already installed
+            log("  VC++ Redistributable: A compatible version is already installed")
+            return True
+        elif result.returncode == 3010:
+            # 3010 = Reboot required (but install succeeded)
+            log("  VC++ Redistributable: Installed (reboot may be required later)")
+            return True
+        else:
+            log(f"  WARNING: VC++ install returned code {result.returncode}")
+            log("  The installation may still work. Continuing...")
+            return True  # Non-fatal, proceed
+
+    except subprocess.TimeoutExpired:
+        log("  WARNING: VC++ installation timed out")
+        log("  You may need to install it manually from: https://aka.ms/vs/17/release/vc_redist.x64.exe")
+        return True  # Non-fatal
+    except Exception as e:
+        log(f"  WARNING: Failed to install VC++ Redistributable: {e}")
+        log("  You may need to install it manually from: https://aka.ms/vs/17/release/vc_redist.x64.exe")
+        return True  # Non-fatal, proceed
+
+
+def check_webview2_windows() -> bool:
+    """Check if Microsoft Edge WebView2 runtime is installed (Windows only)"""
+    import platform
+    if platform.system() != 'Windows':
+        return True  # Only needed on Windows
+
+    log("Checking for Microsoft Edge WebView2 runtime...")
+    try:
+        import winreg
+        key_paths = [
+            r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+            r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+        ]
+        for key_path in key_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path)
+                winreg.CloseKey(key)
+                log("WebView2 runtime: Detected")
+                return True
+            except FileNotFoundError:
+                continue
+        log("WebView2 runtime: NOT DETECTED")
+        return False
+    except Exception as e:
+        log(f"WARNING: Could not check WebView2 status: {e}")
+        return True  # Assume OK if can't check
+
+
+def prompt_webview2_install():
+    """Prompt user to install WebView2 and open download page"""
+    log("\n" + "!" * 80)
+    log("  IMPORTANT: WebView2 Runtime Required for GUI")
+    log("!" * 80)
+    log("")
+    log("WhisperJAV uses Microsoft Edge WebView2 for its modern web-based interface.")
+    log("WebView2 is not currently installed on this system.")
+    log("")
+    log("The installer will now open your browser to download WebView2.")
+    log("You have 30 seconds to install it, or the installer will continue automatically.")
+    log("")
+
+    download_url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+    try:
+        import webbrowser
+        webbrowser.open(download_url)
+        log(f"Opening: {download_url}")
+    except Exception:
+        log(f"Please manually download from: {download_url}")
+
+    log("")
+    timed_input("Press Enter after installing WebView2 (auto-continues in 30s): ", 30, "")
+
+    # Re-check after user confirms
+    if check_webview2_windows():
+        log("WebView2 detected! Installation will continue.")
+    else:
+        log("WARNING: WebView2 still not detected. You can install it later.")
+        log("         The application will not launch without WebView2.")
+
+
+def check_cuda_driver() -> DriverInfo:
+    """Log and return detected NVIDIA driver information."""
+    log("Checking for NVIDIA GPU and driver version...")
+    driver_info = detect_nvidia_driver()
+
+    if driver_info.driver_version:
+        log(
+            f"Detected NVIDIA driver {format_version_tuple(driver_info.driver_version)} "
+            f"for GPU {driver_info.gpu_name or 'Unknown GPU'} "
+            f"via {driver_info.source}."
+        )
+    else:
+        log("No NVIDIA GPU detected or driver information unavailable.")
+
+    return driver_info
+
+
+def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
+    """Install PyTorch/Torchaudio with best available acceleration."""
+    log_section("PyTorch Installation")
+
+    if verify_existing_torch_stack():
+        return True
+
+    driver_info = driver_info or detect_nvidia_driver()
+    plan = select_torch_install_plan(driver_info)
+
+    if plan.uses_gpu:
+        log(
+            f"Preparing to install CUDA-enabled PyTorch ({plan.target_label}) "
+            f"for GPU {plan.gpu_name or 'Unknown GPU'} with driver "
+            f"{format_version_tuple(plan.driver_detected)}"
+        )
+    else:
+        log("\n" + "!" * 80)
+        log("  GPU ACCELERATION NOT AVAILABLE")
+        log("!" * 80)
+        if plan.reason:
+            log(plan.reason)
+        log("\nWithout CUDA this installer will configure CPU-only PyTorch.")
+        log("Processing will be significantly slower (6-10x).")
+        response = timed_input("Install CPU-only PyTorch? (Y/n): ", 20, "y").strip().lower()
+        if response != 'y':
+            log("User declined CPU-only PyTorch installation.")
+            return False
+
+    if not install_pytorch_and_torchaudio(plan):
+        return False
+
+    try:
+        import torch
+
+        log(f"PyTorch {torch.__version__} installed successfully!")
+        if torch.cuda.is_available():
+            log(f"CUDA acceleration: ENABLED (devices: {torch.cuda.device_count()})")
+        else:
+            log("CUDA acceleration: DISABLED (CPU-only mode)")
+    except Exception as exc:
+        log(f"WARNING: PyTorch installed but verification failed: {exc}")
+
+    return True
+
+
+# Track if Git timeouts have been configured (only do it once)
+_git_timeouts_configured = False
+
+
+def is_git_timeout_error(error_output: str) -> bool:
+    """
+    Detect if error was caused by Git connection timeout (common with GFW/VPN).
+
+    The 21-second timeout is Windows TCP retransmission default - when GitHub
+    connections are blocked or slow (GFW), Windows gives up after 21 seconds.
+
+    See: https://github.com/meizhong986/WhisperJAV/issues/111
+    """
+    timeout_patterns = [
+        "Failed to connect to github.com port 443 after 21",
+        "Connection timed out after",
+        "Could not connect to server",
+        "Connection reset by peer",
+        "Connection refused",
+    ]
+    error_lower = error_output.lower()
+    return any(pattern.lower() in error_lower for pattern in timeout_patterns)
+
+
+def configure_git_for_slow_connections() -> bool:
+    """
+    Configure Git with extended timeouts for users behind GFW or slow VPN.
+
+    This addresses the 21-second TCP timeout issue where Windows gives up
+    on connections before they can be established through VPN/proxy.
+
+    See: https://github.com/meizhong986/WhisperJAV/issues/111
+
+    Returns:
+        True if configuration succeeded, False otherwise
+    """
+    global _git_timeouts_configured
+
+    if _git_timeouts_configured:
+        return True
+
+    log("")
+    log("=" * 60)
+    log("  Configuring Git for slow/unstable connections (GFW mode)")
+    log("=" * 60)
+    log("Detected connection timeout. This often happens with VPN or")
+    log("behind the Great Firewall. Configuring extended timeouts...")
+    log("")
+
+    # Find Git executable
+    git_exe = shutil.which("git")
+    if not git_exe:
+        # Try common locations
+        for path in [
+            os.path.join(sys.prefix, "Library", "bin", "git.exe"),
+            r"C:\Program Files\Git\bin\git.exe",
+            r"C:\Program Files (x86)\Git\bin\git.exe",
+        ]:
+            if os.path.exists(path):
+                git_exe = path
+                break
+
+    if not git_exe:
+        log("WARNING: Git executable not found. Cannot configure timeouts.")
+        return False
+
+    log(f"Using Git: {git_exe}")
+
+    # Git timeout configurations
+    # See: https://git-scm.com/docs/git-config
+    git_configs = [
+        # Connection timeout: 120 seconds (was 21 seconds default)
+        ("http.connectTimeout", "120"),
+        # Overall operation timeout: 300 seconds (5 minutes)
+        ("http.timeout", "300"),
+        # Disable speed-based abortion for slow connections
+        ("http.lowSpeedLimit", "0"),
+        ("http.lowSpeedTime", "999999"),
+        # Larger buffer for slow connections (512MB)
+        ("http.postBuffer", "524288000"),
+        # More retries on failure
+        ("http.maxRetries", "5"),
+    ]
+
+    success = True
+    for key, value in git_configs:
+        try:
+            result = subprocess.run(
+                [git_exe, "config", "--global", key, value],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                log(f"  + {key} = {value}")
+            else:
+                log(f"  x Failed to set {key}: {result.stderr}")
+                success = False
+        except Exception as e:
+            log(f"  x Error setting {key}: {e}")
+            success = False
+
+    # Also set environment variables for the current process
+    os.environ["GIT_HTTP_CONNECT_TIMEOUT"] = "120"
+    os.environ["GIT_HTTP_TIMEOUT"] = "300"
+    log("")
+    log("Environment variables set:")
+    log("  GIT_HTTP_CONNECT_TIMEOUT=120")
+    log("  GIT_HTTP_TIMEOUT=300")
+    log("")
+
+    if success:
+        log("+ Git configured for slow connections. Retrying installation...")
+        _git_timeouts_configured = True
+    else:
+        log("! Some Git configurations failed, but will attempt to continue.")
+        _git_timeouts_configured = True  # Don't retry configuration
+
+    log("")
+    return success
+
+
+def filter_pip_specific_args(args: list, installer_name: str) -> list:
+    """
+    Filter out pip-specific arguments that uv doesn't support.
+
+    uv and pip have different CLI interfaces. This function removes
+    pip-specific arguments when using uv.
+
+    Incompatible arguments:
+    - --progress-bar: uv shows progress by default, no flag needed
+    - --timeout: uv uses UV_HTTP_TIMEOUT env var instead
+
+    Args:
+        args: List of arguments
+        installer_name: "uv" or "pip"
+
+    Returns:
+        Filtered list of arguments
+    """
+    if installer_name == "pip":
+        return args  # pip supports all these arguments
+
+    # Filter out pip-specific arguments for uv
+    filtered = []
+    skip_next = False
+    for i, arg in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+
+        # --progress-bar on/off OR --progress-bar=on/off - uv doesn't support this
+        # Handle both space-separated (--progress-bar on) and joined (--progress-bar=on)
+        if arg.startswith("--progress-bar"):
+            if "=" not in arg:
+                skip_next = True  # Skip the next argument (on/off) for space-separated
+            continue  # Skip this argument in both cases
+
+        # --timeout=X or --timeout X - uv uses UV_HTTP_TIMEOUT env var
+        if arg.startswith("--timeout"):
+            if "=" not in arg:
+                skip_next = True  # Skip the next argument (timeout value)
+            continue
+
+        filtered.append(arg)
+
+    return filtered
+
+
+def run_pip(args: list, description: str, retries: int = 3) -> bool:
+    """
+    Run package install command with retries and smart Git timeout handling.
+
+    Uses uv (if available) for 10-30x faster installation, with pip fallback.
+    If a Git timeout is detected (common with GFW/VPN), this function will
+    automatically configure Git with extended timeouts and retry.
+
+    Note: pip-specific arguments (--progress-bar, --timeout) are automatically
+    filtered out when using uv. uv uses UV_HTTP_TIMEOUT env var for timeouts.
+
+    Args:
+        args: Pip-style arguments (e.g., ["install", "package"])
+        description: Human-readable description for logging
+        retries: Number of retry attempts (default 3)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    global _git_timeouts_configured
+
+    log(f"Starting: {description}")
+
+    # Get installer command prefix (uv or pip)
+    installer_prefix, installer_name = get_package_installer_cmd()
+
+    # Normalize args: if first arg is "install", skip it (already in prefix)
+    normalized_args = args[1:] if args and args[0] == "install" else args
+
+    # Filter out pip-specific arguments when using uv
+    normalized_args = filter_pip_specific_args(normalized_args, installer_name)
+
+    # Build the command
+    cmd = installer_prefix + normalized_args
+
+    # Check if this is a git+https install (more timeout-sensitive)
+    is_git_install = any("git+" in str(arg) for arg in args)
+
+    # For pip only: add timeout flag for git installs (uv uses UV_HTTP_TIMEOUT env var)
+    if installer_name == "pip" and is_git_install and "--timeout" not in str(args):
+        cmd = installer_prefix + ["--timeout=120"] + normalized_args
+
+    for attempt in range(retries):
+        # Log command (truncate if too long)
+        cmd_str = ' '.join(cmd)
+        display_cmd = cmd_str[:120] + '...' if len(cmd_str) > 120 else cmd_str
+        log(f"[{installer_name}] Attempt {attempt+1}/{retries}: {display_cmd}")
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                encoding='utf-8',
+                timeout=1800  # 30 minute timeout for large downloads
+            )
+            if result.stdout:
+                # Only log last 20 lines to avoid clutter
+                lines = result.stdout.strip().split('\n')
+                for line in lines[-20:]:
+                    log(f"  {line}")
+            log(f"SUCCESS: {description}")
+            return True
+
+        except subprocess.TimeoutExpired:
+            log(f"ERROR: {description} timed out (30 minutes)")
+            if attempt < retries - 1:
+                log("Retrying in 10 seconds...")
+                time.sleep(10)
+
+        except subprocess.CalledProcessError as e:
+            log(f"ERROR: {description} failed (rc={e.returncode})")
+            error_output = ""
+            if e.stdout:
+                lines = e.stdout.strip().split('\n')
+                for line in lines[-20:]:
+                    log(f"  {line}")
+                error_output += e.stdout
+            if e.stderr:
+                lines = e.stderr.strip().split('\n')
+                for line in lines[-20:]:
+                    log(f"  {line}")
+                error_output += e.stderr
+
+            # Check for Git timeout pattern (Issue #111 - GFW users)
+            if is_git_install and is_git_timeout_error(error_output):
+                if not _git_timeouts_configured:
+                    log("")
+                    log("Detected Git connection timeout (common with VPN/GFW).")
+                    configure_git_for_slow_connections()
+                    # Don't count this as a failed attempt
+                    log("Retrying with extended Git timeouts...")
+                    time.sleep(5)
+                    continue
+
+            if attempt < retries - 1:
+                log("Retrying in 10 seconds...")
+                time.sleep(10)
+
+        except Exception as e:
+            log(f"ERROR: Unexpected error during package installation: {e}")
+            if attempt < retries - 1:
+                log("Retrying in 10 seconds...")
+                time.sleep(10)
+
+    log(f"FATAL: {description} failed after {retries} attempts")
+    return False
+
+
+def get_config_directory() -> str:
+    """
+    Get the WhisperJAV configuration directory.
+
+    Config location: %APPDATA%\\WhisperJAV (e.g., C:\\Users\\Name\\AppData\\Roaming\\WhisperJAV)
+    This is the standard location for user configuration on Windows.
+
+    Returns:
+        Path to the config directory
+    """
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        # Fallback for edge cases
+        appdata = os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+    return os.path.join(appdata, "WhisperJAV")
+
+
+def setup_config_directory() -> bool:
+    """
+    Create the WhisperJAV configuration directory if it doesn't exist.
+
+    Returns:
+        True if successful, False otherwise
+    """
+    config_dir = get_config_directory()
+    log(f"Setting up config directory: {config_dir}")
+
+    try:
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir, exist_ok=True)
+            log(f"  Created config directory: {config_dir}")
+        else:
+            log(f"  Config directory already exists")
+        return True
+    except Exception as e:
+        log(f"  WARNING: Could not create config directory: {e}")
+        return False
+
+
+def migrate_config() -> bool:
+    """
+    Migrate configuration from old locations to new %APPDATA% location.
+
+    Migration sources (in priority order):
+    1. %LOCALAPPDATA%\\WhisperJAV\\whisperjav_config.json (old installer location)
+    2. Installation directory\\whisperjav_config.json (legacy location)
+
+    This function is idempotent - if config already exists in new location,
+    it will not overwrite it.
+
+    Returns:
+        True if migration was successful or not needed, False on error
+    """
+    config_dir = get_config_directory()
+    new_config_path = os.path.join(config_dir, "whisperjav_config.json")
+
+    # If config already exists in new location, skip migration
+    if os.path.exists(new_config_path):
+        log(f"  Config already exists in new location, skipping migration")
+        return True
+
+    # Potential old config locations
+    old_locations = []
+
+    # 1. Old %LOCALAPPDATA% location (from previous installer versions)
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        old_locations.append(os.path.join(localappdata, "WhisperJAV", "whisperjav_config.json"))
+
+    # 2. Installation directory (legacy location)
+    old_locations.append(os.path.join(sys.prefix, "whisperjav_config.json"))
+
+    # Try to find and migrate config from old locations
+    for old_path in old_locations:
+        if os.path.exists(old_path):
+            try:
+                log(f"  Found config at old location: {old_path}")
+                log(f"  Migrating to: {new_config_path}")
+
+                # Ensure config directory exists
+                os.makedirs(config_dir, exist_ok=True)
+
+                # Copy config to new location
+                shutil.copy2(old_path, new_config_path)
+                log(f"  ✓ Config migrated successfully")
+
+                # Note: We don't delete the old config - user may have other installations
+                return True
+
+            except Exception as e:
+                log(f"  WARNING: Could not migrate config: {e}")
+                # Non-fatal - user can reconfigure
+                return True
+
+    log(f"  No existing config found - fresh installation")
+    return True
+
+
+def create_failure_file(error_message: str):
+    """Create a failure marker file with troubleshooting info"""
+    failure_file = os.path.join(sys.prefix, "INSTALLATION_FAILED_v{{VERSION}}.txt")
+    try:
+        with open(failure_file, "w", encoding="utf-8") as f:
+            f.write("WhisperJAV v{{VERSION}} Installation Failed\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Error: {error_message}\n\n")
+            f.write("Manual Cleanup Steps:\n")
+            f.write(f"1. Delete installation directory: {sys.prefix}\n")
+            f.write("2. Delete desktop shortcut: WhisperJAV v{{VERSION}}.lnk\n")
+            f.write(f"3. Check install_log_v{{VERSION}}.txt for details\n\n")
+            f.write("Common Solutions:\n")
+            f.write("- Out of disk space: Free up 8GB and retry\n")
+            f.write("- Network error: Check internet connection and firewall\n")
+            f.write("- CUDA error: Update NVIDIA drivers or try CPU mode\n")
+            f.write("- WebView2 missing: Install from https://go.microsoft.com/fwlink/p/?LinkId=2124703\n\n")
+            f.write("Support: https://github.com/meizhong986/WhisperJAV/issues\n")
+        log(f"Failure details written to: {failure_file}")
+    except Exception:
+        pass
+
+
+def print_installation_summary(install_start_time: float):
+    """Print a comprehensive installation summary"""
+    install_duration = int(time.time() - install_start_time)
+    minutes = install_duration // 60
+    seconds = install_duration % 60
+
+    log("\n\n")
+    log("=" * 80)
+    log(" " * 20 + "WhisperJAV v{{VERSION}} Installation Complete!")
+    log("=" * 80)
+    log("")
+    log(f"Installation Summary:")
+    log(f"  ✓ Installation directory: {sys.prefix}")
+    log(f"  ✓ Python version: {sys.version.split()[0]}")
+
+    # Show which package installer was used
+    if USE_UV:
+        uv_version = get_uv_version()
+        if uv_version:
+            log(f"  ✓ Package installer: {uv_version} (fast mode)")
+        else:
+            log(f"  ✓ Package installer: uv (fast mode)")
+    else:
+        log(f"  ✓ Package installer: pip (standard mode)")
+
+    try:
+        import torch
+        if torch.cuda.is_available():
+            log(f"  ✓ PyTorch: {torch.__version__} with CUDA {torch.version.cuda}")
+            log(f"  ✓ GPU acceleration: ENABLED ({torch.cuda.get_device_name(0)})")
+        else:
+            log(f"  ✓ PyTorch: {torch.__version__} (CPU-only mode)")
+            log(f"  ⚠ GPU acceleration: DISABLED (processing will be slower)")
+    except Exception:
+        log(f"  ? PyTorch: Status unknown")
+
+    if check_webview2_windows():
+        log(f"  ✓ WebView2 runtime: Detected")
+    else:
+        log(f"  ⚠ WebView2 runtime: NOT DETECTED (GUI will not work)")
+        log(f"    Install from: https://go.microsoft.com/fwlink/p/?LinkId=2124703")
+
+    log(f"  ✓ Desktop shortcut: Created")
+    log(f"  ✓ Installation time: {minutes}m {seconds}s")
+    log("")
+    log("Next Steps:")
+    log("  1. Launch WhisperJAV from the desktop shortcut")
+    log("  2. On first run, AI models will download (~3GB, 5-10 minutes)")
+    log("  3. Select your video files and start processing!")
+    log("")
+    log(f"Logs saved to: {LOG_FILE}")
+    log("=" * 80)
+    log("")
+
+
+# ==============================================================================
+# llama-cpp-python Installation (Local LLM Translation)
+# ==============================================================================
+
+# HuggingFace wheel repository - AVX2 builds that work on most CPUs
+# These wheels do NOT have AVX512, making them compatible with AMD Zen 2/3 CPUs
+HF_WHEEL_REPO = "mei986/whisperjav-wheels"
+HF_WHEEL_VERSION = "0.3.21"  # llama-cpp-python version in our wheel repo
+
+
+def get_huggingface_wheel_info() -> Tuple[Optional[str], Optional[str], str]:
+    """
+    Build HuggingFace wheel download URL based on platform, Python version, and CUDA.
+
+    HuggingFace wheels are AVX2-only (no AVX512), compatible with most CPUs including
+    AMD Ryzen (Zen 2/3) which don't support AVX512.
+
+    Available backends on HuggingFace:
+    - cu124: CUDA 12.4 (Windows cp310/311/312, Linux cp310/311/312)
+    - cu128: CUDA 12.8 (Windows cp310/311/312, Linux cp310/311/312)
+    - cu126: CUDA 12.6 (Linux cp312 only)
+    - metal: macOS Apple Silicon (currently empty)
+
+    Returns:
+        tuple: (wheel_url, wheel_filename, backend_desc) or (None, None, "") if not available
+    """
+    import platform as platform_module
+
+    py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+
+    # Determine platform tag
+    if sys.platform == "win32":
+        plat_tag = "win_amd64"
+    elif sys.platform == "linux":
+        plat_tag = "manylinux_2_17_x86_64.manylinux2014_x86_64"
+    elif sys.platform == "darwin":
+        if platform_module.machine() == "arm64":
+            plat_tag = "macosx_11_0_arm64"
+        else:
+            # Intel Mac - no wheels available
+            return None, None, ""
+    else:
+        return None, None, ""
+
+    # Determine CUDA backend
+    backend = None
+    if sys.platform == "darwin":
+        backend = "metal"  # Currently empty on HF, but check anyway
+    elif sys.platform in ("win32", "linux"):
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            # Map driver to CUDA version
+            driver_ver = driver_info.driver_version
+            if driver_ver >= (570, 0, 0):
+                # CUDA 12.8 compatible, try cu128 first then cu124
+                backend = "cu128"
+            elif driver_ver >= (550, 0, 0):
+                # CUDA 12.4 compatible
+                backend = "cu124"
+            elif driver_ver >= (525, 0, 0):
+                # CUDA 11.8 compatible - but HF only has cu124+
+                backend = "cu124"  # Try cu124, may work with newer driver
+
+    if not backend:
+        log("    No CUDA detected, HuggingFace wheels require GPU")
+        return None, None, ""
+
+    # Build wheel filename and URL
+    # Format: llama_cpp_python-{version}-{pyver}-{pyver}-{platform}.whl
+    wheel_filename = f"llama_cpp_python-{HF_WHEEL_VERSION}-{py_ver}-{py_ver}-{plat_tag}.whl"
+    wheel_path = f"llama-cpp-python/{backend}/{wheel_filename}"
+
+    # HuggingFace direct download URL
+    wheel_url = f"https://huggingface.co/datasets/{HF_WHEEL_REPO}/resolve/main/{wheel_path}"
+
+    return wheel_url, wheel_filename, f"CUDA ({backend} HuggingFace wheel v{HF_WHEEL_VERSION})"
+
+
+def download_huggingface_wheel() -> Tuple[Optional[str], Optional[str]]:
+    """
+    Download llama-cpp-python wheel from HuggingFace.
+
+    Returns:
+        tuple: (local_wheel_path, backend_desc) or (None, None) if failed
+    """
+    import tempfile
+    import urllib.request
+    import urllib.error
+
+    wheel_url, wheel_filename, backend_desc = get_huggingface_wheel_info()
+
+    if not wheel_url:
+        return None, None
+
+    log(f"    Trying HuggingFace wheel: {backend_desc}")
+
+    # Download to temp directory
+    temp_dir = tempfile.gettempdir()
+    local_path = os.path.join(temp_dir, wheel_filename)
+
+    # Check if already cached
+    if os.path.exists(local_path):
+        log(f"    Using cached wheel: {wheel_filename}")
+        return local_path, backend_desc
+
+    try:
+        log(f"    Downloading from HuggingFace...")
+        urllib.request.urlretrieve(wheel_url, local_path)
+        log(f"    Downloaded: {wheel_filename}")
+        return local_path, backend_desc
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            log(f"    Wheel not found on HuggingFace (404)")
+        else:
+            log(f"    HuggingFace download failed: HTTP {e.code}")
+        return None, None
+    except Exception as e:
+        log(f"    HuggingFace download failed: {e}")
+        return None, None
+
+
+def get_llama_cpp_prebuilt_wheel() -> Tuple[Optional[str], Optional[str]]:
+    """
+    Try to find a prebuilt wheel from JamePeng's releases.
+
+    Auto-detects platform, Python version, and CUDA version.
+    Queries GitHub API to find matching wheel dynamically.
+
+    Release naming conventions (from JamePeng/llama-cpp-python):
+    - CUDA: v{ver}-cu{cuda}-Basic-{os}-{date} (e.g., v0.3.21-cu128-Basic-win-20260111)
+    - Metal: v{ver}-metal-{date} (when available)
+    - Wheel: llama_cpp_python-{ver}-cp{py}-cp{py}-{platform}.whl
+
+    Returns:
+        tuple: (wheel_url, backend_desc) or (None, None) if no suitable wheel found
+    """
+    import json
+    import platform as platform_module
+    import urllib.request
+    import urllib.error
+
+    # Determine platform identifiers
+    if sys.platform == "win32":
+        os_tag = "win"
+        wheel_platform = "win_amd64"
+    elif sys.platform == "linux":
+        os_tag = "linux"
+        wheel_platform = "linux_x86_64"
+    elif sys.platform == "darwin":
+        os_tag = "metal"  # JamePeng uses -metal- tag for macOS
+        if platform_module.machine() == "arm64":
+            wheel_platform = "arm64"  # Matches macosx_*_arm64
+        else:
+            wheel_platform = "x86_64"
+    else:
+        log(f"    Unknown platform: {sys.platform}")
+        return None, None
+
+    # Python version
+    py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+
+    # Detect CUDA version for Windows/Linux
+    target_cudas = []
+    if sys.platform in ("win32", "linux"):
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            # Map driver version to compatible CUDA versions
+            # Using the same logic as TORCH_DRIVER_MATRIX
+            # Note: CUDA 13.x (cu130) is NOT supported - no PyTorch/llama-cpp wheels available
+            driver_ver = driver_info.driver_version
+            # Simplified: CUDA 12.8 (driver 570+) or CUDA 11.8 (driver 450+)
+            if driver_ver >= (570, 0, 0):
+                target_cudas = ["cu128", "cu118"]
+            elif driver_ver >= (450, 0, 0):
+                target_cudas = ["cu118"]
+            log(f"    Detected driver {format_version_tuple(driver_ver)}, compatible CUDA: {target_cudas}")
+        else:
+            log("    No CUDA detected")
+
+    log(f"    Searching for prebuilt wheel: {os_tag}, {py_ver}, platform={wheel_platform}")
+
+    # Query GitHub API for releases
+    try:
+        api_url = "https://api.github.com/repos/JamePeng/llama-cpp-python/releases?per_page=50"
+        req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.v3+json"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            releases = json.loads(response.read().decode())
+    except Exception as e:
+        log(f"    Could not fetch releases: {e}")
+        return None, None
+
+    # Search strategy:
+    # 1. For Windows/Linux with CUDA: find cu{version} release matching OS
+    # 2. For macOS: find metal release
+    # 3. Match wheel file by Python version and platform
+
+    if os_tag == "metal":
+        # macOS: look for -metal- releases
+        for release in releases:
+            tag = release.get("tag_name", "")
+            if "-metal-" not in tag.lower():
+                continue
+            for asset in release.get("assets", []):
+                name = asset.get("name", "")
+                if not name.endswith(".whl"):
+                    continue
+                if py_ver not in name:
+                    continue
+                if wheel_platform in name:
+                    wheel_url = asset.get("browser_download_url")
+                    log(f"    Found prebuilt wheel: {name}")
+                    return wheel_url, "Metal (prebuilt wheel)"
+    else:
+        # Windows/Linux: look for CUDA releases
+        for cuda_tag in target_cudas:
+            for release in releases:
+                tag = release.get("tag_name", "")
+                # Match: v{ver}-cu{cuda}-Basic-{os}-{date}
+                if f"-{cuda_tag}-" not in tag:
+                    continue
+                if f"-{os_tag}-" not in tag:
+                    continue
+                for asset in release.get("assets", []):
+                    name = asset.get("name", "")
+                    if not name.endswith(".whl"):
+                        continue
+                    if py_ver not in name:
+                        continue
+                    if wheel_platform in name:
+                        wheel_url = asset.get("browser_download_url")
+                        log(f"    Found prebuilt wheel: {name}")
+                        return wheel_url, f"CUDA ({cuda_tag} prebuilt wheel)"
+
+    log(f"    No matching prebuilt wheel found for {py_ver}/{os_tag}/{wheel_platform}")
+    return None, None
+
+
+def get_cuda_architecture() -> Optional[str]:
+    """
+    Detect CUDA compute capability for the installed GPU.
+
+    Returns:
+        str or None: CUDA architecture (e.g., "89" for RTX 40 series) or None if not detected
+    """
+    # Try nvidia-smi first
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            # Format is like "8.9" -> we want "89"
+            cap = result.stdout.strip().split('\n')[0].strip()
+            if '.' in cap:
+                major, minor = cap.split('.')
+                return f"{major}{minor}"
+    except Exception:
+        pass
+
+    # Fallback: try to infer from GPU name
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            gpu_name = result.stdout.strip().lower()
+            # Map GPU series to compute capability
+            if any(x in gpu_name for x in ["rtx 40", "rtx 50", "ada", "l40"]):
+                return "89"  # Ada Lovelace
+            elif any(x in gpu_name for x in ["rtx 30", "a100", "a10", "a30", "a40"]):
+                return "86"  # Ampere
+            elif any(x in gpu_name for x in ["rtx 20", "gtx 16", "t4", "quadro rtx"]):
+                return "75"  # Turing
+            elif any(x in gpu_name for x in ["v100", "titan v"]):
+                return "70"  # Volta
+            elif any(x in gpu_name for x in ["gtx 10", "p100", "p40", "p4"]):
+                return "61"  # Pascal
+    except Exception:
+        pass
+
+    return None
+
+
+def get_build_parallel_level() -> int:
+    """
+    Get optimal CMAKE_BUILD_PARALLEL_LEVEL based on CPU cores.
+
+    Returns:
+        int: Number of parallel build jobs (min 2, max 16, default ~75% of cores)
+    """
+    try:
+        import multiprocessing
+        cores = multiprocessing.cpu_count()
+        # Use ~75% of cores, min 2, max 16
+        parallel = max(2, min(16, int(cores * 0.75)))
+        return parallel
+    except Exception:
+        return 4  # Safe default
+
+
+def get_llama_cpp_source_info() -> Tuple[str, str, Optional[str], dict]:
+    """
+    Get llama-cpp-python source build info based on platform.
+
+    Auto-detects GPU/Metal/CPU and returns appropriate build configuration.
+
+    Optimizations:
+    - CMAKE_BUILD_PARALLEL_LEVEL: Uses ~75% of CPU cores for faster builds
+    - CMAKE_CUDA_ARCHITECTURES: Targets specific GPU for faster builds and smaller binary
+
+    Returns:
+        tuple: (git_url, backend_desc, cmake_args, env_vars)
+            - git_url: Git URL for pip install
+            - backend_desc: Human-readable description
+            - cmake_args: CMAKE_ARGS value or None
+            - env_vars: Dict of additional environment variables to set
+    """
+    import platform as platform_module
+
+    git_url = "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git"
+    cmake_args = None
+    env_vars = {}
+
+    # Set parallel build level for faster compilation
+    parallel_level = get_build_parallel_level()
+    env_vars["CMAKE_BUILD_PARALLEL_LEVEL"] = str(parallel_level)
+
+    if sys.platform == "darwin":
+        chip = platform_module.processor() or platform_module.machine()
+        if "arm" in chip.lower() or "apple" in chip.lower():
+            backend = f"Metal (Apple Silicon) - building from source ({parallel_level} jobs)"
+            cmake_args = "-DGGML_METAL=on"
+        else:
+            backend = f"CPU (Intel Mac) - building from source ({parallel_level} jobs)"
+    elif sys.platform == "win32":
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            cuda_arch = get_cuda_architecture()
+            if cuda_arch:
+                cmake_args = f"-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES={cuda_arch}"
+                backend = f"CUDA (sm_{cuda_arch}) - building from source ({parallel_level} jobs)"
+            else:
+                cmake_args = "-DGGML_CUDA=on"
+                backend = f"CUDA - building from source ({parallel_level} jobs)"
+        else:
+            backend = f"CPU - building from source ({parallel_level} jobs)"
+    else:
+        # Linux
+        driver_info = detect_nvidia_driver()
+        if driver_info.driver_version:
+            cuda_arch = get_cuda_architecture()
+            if cuda_arch:
+                cmake_args = f"-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES={cuda_arch}"
+                backend = f"CUDA (sm_{cuda_arch}) - building from source ({parallel_level} jobs)"
+            else:
+                cmake_args = "-DGGML_CUDA=on"
+                backend = f"CUDA - building from source ({parallel_level} jobs)"
+        else:
+            backend = f"CPU - building from source ({parallel_level} jobs)"
+
+    return git_url, backend, cmake_args, env_vars
+
+
+def install_llama_cpp_python() -> bool:
+    """
+    Install llama-cpp-python for local LLM translation.
+
+    Strategy (in priority order):
+    1. HuggingFace wheels - AVX2 only, works on most CPUs (AMD Ryzen, older Intel)
+    2. JamePeng GitHub wheels - may have AVX512, works on newer Intel CPUs
+    3. Source build - compiles for user's specific hardware (slowest install)
+
+    The HuggingFace wheels are preferred because JamePeng's "Basic" builds
+    incorrectly enable AVX512, causing crashes on AMD Ryzen (Zen 2/3) CPUs.
+
+    Note: This always attempts to install. For opt-in behavior,
+    discuss with the project author about adding installer options.
+    """
+    log_section("Phase 5.3: Local LLM Translation (llama-cpp-python)")
+
+    log("Installing llama-cpp-python for local LLM translation...")
+    log("This enables translation without cloud API keys.")
+
+    # Strategy 1: Try HuggingFace wheel first (AVX2, most compatible)
+    log("  Checking HuggingFace for compatible wheel...")
+    hf_wheel_path, hf_backend = download_huggingface_wheel()
+
+    if hf_wheel_path:
+        log(f"Backend: {hf_backend}")
+
+        if run_pip(
+            ["install", hf_wheel_path, "--progress-bar", "on"],
+            f"Install llama-cpp-python ({hf_backend})"
+        ):
+            # Add server extras
+            run_pip(
+                ["install", "llama-cpp-python[server]", "--progress-bar", "on"],
+                "Install llama-cpp-python server extras"
+            )
+            return True
+        else:
+            log("WARNING: HuggingFace wheel install failed, trying JamePeng...")
+
+    # Strategy 2: Try JamePeng GitHub wheel (fallback)
+    log("  Checking JamePeng GitHub for prebuilt wheel...")
+    wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel()
+
+    if wheel_url:
+        log(f"Backend: {wheel_backend}")
+        log("NOTE: JamePeng wheels may require AVX512. If you see crashes,")
+        log("      consider building from source or using CPU-only mode.")
+
+        if run_pip(
+            ["install", wheel_url, "--progress-bar", "on"],
+            f"Install llama-cpp-python ({wheel_backend})"
+        ):
+            # Add server extras
+            run_pip(
+                ["install", "llama-cpp-python[server]", "--progress-bar", "on"],
+                "Install llama-cpp-python server extras"
+            )
+            return True
+        else:
+            log("WARNING: JamePeng wheel failed, trying source build...")
+
+    # Strategy 3: Fall back to source build (slowest but most compatible)
+    log("  No prebuilt wheel available, building from source...")
+    git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
+
+    log(f"Backend: {backend}")
+    for key, value in env_vars.items():
+        log(f"Setting {key}={value}")
+        os.environ[key] = value
+    if cmake_args:
+        log(f"Setting CMAKE_ARGS={cmake_args}")
+        os.environ["CMAKE_ARGS"] = cmake_args
+
+    if run_pip(
+        ["install", git_url, "--progress-bar", "on"],
+        f"Install llama-cpp-python ({backend})"
+    ):
+        return True
+
+    log("WARNING: llama-cpp-python failed (local LLM translation will not work)")
+    log("         Cloud translation providers still available.")
+    return False
+
+
+def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
+    """
+    Embed icon into executable file using LIEF library.
+
+    Args:
+        exe_path: Path to the .exe file
+        icon_path: Path to the .ico file
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        log(f"Embedding icon into executable...")
+
+        # Try to import lief, install if not available
+        try:
+            import lief
+        except ImportError:
+            log(f"Installing LIEF library for icon embedding...")
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "lief"],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.returncode != 0:
+                log(f"INFO: Could not install LIEF library")
+                return False
+            import lief
+
+        # Load the executable
+        binary = lief.parse(exe_path)
+        if not binary:
+            log(f"INFO: Could not parse executable with LIEF")
+            return False
+
+        # Load and add the icon
+        icon_manager = lief.PE.ResourcesManager.from_file(exe_path)
+        icon_manager.change_icon(icon_path)
+
+        # Save the modified executable
+        builder = lief.PE.Builder(binary)
+        builder.build_resources(True)
+        builder.build()
+        builder.write(exe_path)
+
+        log(f"✓ Icon embedded successfully")
+        return True
+
+    except Exception as e:
+        log(f"INFO: Could not embed icon: {e}")
+        log(f"      The executable will use default Python icon")
+        log(f"      The desktop shortcut will still display the correct icon")
+        return False
+
+
+def copy_launcher_to_root() -> str:
+    """
+    Copy Scripts/whisperjav-gui.exe to installation root as WhisperJAV-GUI.exe
+    and embed the whisperjav icon into it.
+
+    Returns:
+        Path to copied .exe or None if failed
+    """
+    scripts_exe = os.path.join(sys.prefix, "Scripts", "whisperjav-gui.exe")
+    root_exe = os.path.join(sys.prefix, "WhisperJAV-GUI.exe")
+    icon_file = os.path.join(sys.prefix, "whisperjav_icon.ico")
+
+    if not os.path.exists(scripts_exe):
+        log(f"INFO: Scripts launcher not found: {scripts_exe}")
+        log(f"      This is normal - the shortcut will use pythonw.exe instead")
+        log(f"      (Both methods work equally well)")
+        return None
+
+    try:
+        log(f"Copying launcher to root directory...")
+        shutil.copy2(scripts_exe, root_exe)
+
+        if os.path.exists(root_exe):
+            log(f"✓ Launcher created: WhisperJAV-GUI.exe")
+            log(f"  Users can double-click this file to launch the GUI")
+
+            # Try to embed icon if icon file exists
+            if os.path.exists(icon_file):
+                embed_icon_in_exe(root_exe, icon_file)
+            else:
+                log(f"INFO: Icon file not found: {icon_file}")
+                log(f"      Desktop shortcut will still show correct icon")
+
+            return root_exe
+        else:
+            log(f"INFO: Could not create launcher in root (will use pythonw.exe fallback)")
+            return None
+
+    except Exception as e:
+        log(f"INFO: Could not copy launcher: {e}")
+        log(f"      The shortcut will use pythonw.exe fallback instead")
+        return None
+
+
+def main() -> int:
+    """Main installation workflow"""
+    install_start_time = time.time()
+
+    log_section("WhisperJAV v{{VERSION}} Post-Install Started")
+    log(f"Installation prefix: {sys.prefix}")
+    log(f"Python executable: {sys.executable}")
+    log(f"Python version: {sys.version}")
+    log_installer_info()  # Log which package installer (uv or pip) will be used
+
+    # === Phase 1: Preflight Checks ===
+    log_section("Phase 1: Preflight Checks")
+
+    # Check write permission to installation directory
+    log("Checking write permission to installation directory...")
+    try:
+        test_file = os.path.join(sys.prefix, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        log("  Write permission: OK")
+    except PermissionError:
+        log("  FATAL: No write permission to installation directory!")
+        log(f"  Directory: {sys.prefix}")
+        create_failure_file("No write permission to installation directory")
+        return 1
+    except Exception as e:
+        log(f"  Write permission check warning: {e}")
+        # Non-fatal, proceed
+
+    if not check_disk_space(8):
+        create_failure_file("Insufficient disk space (8GB required)")
+        return 1
+
+    if not check_network():
+        create_failure_file("Network connectivity required")
+        return 1
+
+    # Ensure VC++ Redistributable is installed (required for PyTorch, native libs)
+    ensure_vc_redist()
+
+    # Setup config directory in %APPDATA% and migrate from old location if needed
+    log("")
+    log("Setting up configuration directory...")
+    setup_config_directory()
+    migrate_config()
+
+    # Check WebView2 (non-fatal, but prompt user)
+    if not check_webview2_windows():
+        prompt_webview2_install()
+
+    # === Phase 2: GPU and CUDA Detection ===
+    log_section("Phase 2: GPU and CUDA Detection")
+    driver_info = check_cuda_driver()
+
+    # === Phase 3: PyTorch Installation ===
+    log_section("Phase 3: PyTorch Installation")
+    if not install_pytorch(driver_info):
+        create_failure_file("PyTorch installation failed")
+        return 1
+
+    # === Phase 4: Python Dependencies ===
+    log_section("Phase 4: Python Dependencies Installation")
+
+    req_path = os.path.join(sys.prefix, "requirements_v{{VERSION}}.txt")
+    if not os.path.exists(req_path):
+        log(f"ERROR: requirements_v{{VERSION}}.txt not found at {req_path}")
+        create_failure_file(f"Missing requirements file: {req_path}")
+        return 1
+
+    log(f"Installing dependencies from: {req_path}")
+    log("This will download ~500MB of packages. Please wait...")
+
+    if not run_pip(
+        ["install", "-r", req_path, "--progress-bar", "on"],
+        "Install Python dependencies"
+    ):
+        create_failure_file("Dependencies installation failed")
+        return 1
+
+    # === Phase 5: WhisperJAV Application ===
+    log_section("Phase 5: WhisperJAV Application Installation")
+
+    # Find WhisperJAV wheel in installation directory
+    import glob
+    wheel_pattern = os.path.join(sys.prefix, "whisperjav-*.whl")
+    wheels = glob.glob(wheel_pattern)
+
+    if not wheels:
+        log(f"ERROR: No WhisperJAV wheel found matching: {wheel_pattern}")
+        log("ERROR: The installer package may be corrupted or incomplete")
+        create_failure_file(f"Missing local wheel (pattern: {wheel_pattern})")
+        return 1
+
+    if len(wheels) > 1:
+        log(f"WARNING: Multiple wheels found, using first: {wheels[0]}")
+
+    local_wheel = wheels[0]
+    log(f"Installing WhisperJAV from local wheel: {local_wheel}")
+    log("Using --no-deps to avoid reinstalling dependencies...")
+
+    if not run_pip(
+        ["install", "--no-deps", local_wheel, "--progress-bar", "on"],
+        "Install WhisperJAV application"
+    ):
+        create_failure_file("WhisperJAV application installation failed")
+        return 1
+
+    # === Phase 5.3: Local LLM Translation (Optional) ===
+    # Non-fatal: users can still use cloud translation if this fails
+    # User choice: environment variable or interactive prompt
+
+    # Check if installation preference is set via environment variable
+    # (can be set by NSIS checkbox or command line)
+    install_local_llm_env = os.environ.get("WHISPERJAV_INSTALL_LOCAL_LLM", "").lower()
+
+    if install_local_llm_env == "1" or install_local_llm_env == "yes":
+        # Explicitly requested
+        log_section("Phase 5.3: Local LLM Translation (Requested)")
+        install_llama_cpp_python()
+    elif install_local_llm_env == "0" or install_local_llm_env == "no":
+        # Explicitly skipped
+        log_section("Phase 5.3: Local LLM Translation (Skipped)")
+        log("Local LLM translation skipped (WHISPERJAV_INSTALL_LOCAL_LLM=0)")
+        log("You can install it later with: pip install llama-cpp-python[server]")
+    else:
+        # Interactive prompt for GUI users
+        log_section("Phase 5.3: Local LLM Translation (Optional)")
+        log("")
+        log("=" * 60)
+        log("  LOCAL LLM TRANSLATION (Optional)")
+        log("=" * 60)
+        log("")
+        log("WhisperJAV can translate subtitles using local AI models,")
+        log("allowing offline translation without API keys.")
+        log("")
+        log("Requirements:")
+        log("  - NVIDIA GPU with CUDA 12.4+ (fast, ~1 min download)")
+        log("  - OR builds from source (~45 min, requires VS Build Tools)")
+        log("")
+        log("If you skip this, you can still use cloud translation providers")
+        log("(DeepSeek, Gemini, Claude, etc.) with API keys.")
+        log("")
+
+        # Default to 'n' (skip) for unattended installs
+        # 30-second timeout for interactive installs
+        response = timed_input(
+            "Install local LLM translation? (y/N): ",
+            30,
+            "n"
+        ).strip().lower()
+
+        if response == 'y' or response == 'yes':
+            install_llama_cpp_python()
+        else:
+            log("")
+            log("Skipping local LLM translation.")
+            log("You can install it later with:")
+            log("  pip install llama-cpp-python[server]")
+            log("Or re-run: python install.py --local-llm-build")
+
+    # === Phase 5.5: Copy Launcher to Root ===
+    log_section("Phase 5.5: User-Friendly Launcher Setup")
+    launcher_exe = copy_launcher_to_root()
+
+    # === Phase 5.8: Verify Icon File ===
+    log_section("Phase 5.8: Icon File Verification")
+    icon_path = os.path.join(sys.prefix, 'whisperjav_icon.ico')
+    if os.path.exists(icon_path):
+        icon_size = os.path.getsize(icon_path)
+        log(f"✓ Icon file found: {icon_path}")
+        log(f"  Size: {icon_size:,} bytes")
+        if icon_size < 1000:
+            log(f"  WARNING: Icon file may be corrupted (too small)")
+    else:
+        log(f"✗ WARNING: Icon file NOT found at: {icon_path}")
+        log(f"  This may cause the application icon to not display correctly.")
+        log(f"  Checking alternative locations...")
+
+        # Check if it's in the package
+        site_packages_icon = os.path.join(sys.prefix, 'Lib', 'site-packages', 'whisperjav', 'webview_gui', 'assets', 'whisperjav_icon.ico')
+        if os.path.exists(site_packages_icon):
+            log(f"  Found icon in package: {site_packages_icon}")
+        else:
+            log(f"  Icon not found in package either")
+
+    # === Installation Complete ===
+    # Note: Desktop shortcut is now created by NSIS installer during installation
+    # The shortcut launches: pythonw.exe -m whisperjav.webview_gui.main
+    # Working directory is set to the installation folder ($INSTDIR)
+    # Icon: whisperjav_icon.ico in installation folder
+    print_installation_summary(install_start_time)
+
+    log("\nInstallation completed successfully!")
+    log("You may now close this window.")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        exit_code = main()
+
+        if exit_code != 0:
+            log("\n" + "!" * 80)
+            log("  INSTALLATION FAILED")
+            log("!" * 80)
+            log(f"Check {LOG_FILE} for details.")
+            log("This window will close in 60 seconds...")
+            time.sleep(60)
+        else:
+            log("\nInstallation complete! Window will close in 15 seconds...")
+            log("(Press Enter to close immediately)")
+            timed_input("", 15, "")
+
+        sys.exit(exit_code)
+
+    except KeyboardInterrupt:
+        log("\nInstallation interrupted by user.")
+        sys.exit(1)
+
+    except Exception as e:
+        log(f"\nFATAL: Unhandled exception occurred:")
+        log(str(e))
+        log("\nFull traceback:")
+        log(traceback.format_exc())
+        log("\nThis window will close in 60 seconds...")
+        time.sleep(60)
+        sys.exit(1)
