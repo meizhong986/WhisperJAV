@@ -16,7 +16,11 @@ For CLI usage:
     whisperjav-translate -i subtitles.srt --provider deepseek -t english
 """
 
-from . import cli, core, providers, service
+# NOTE: cli is NOT imported here to avoid triggering dependency checks
+# when main.py imports translate_with_config. The CLI has its own entry point
+# (whisperjav-translate) that handles dependency checking appropriately.
+# Users who need cli can still do: from whisperjav.translate import cli
+from . import core, providers, service
 
 # Export high-level service API for direct usage
 from .service import (
@@ -26,7 +30,7 @@ from .service import (
 )
 
 __all__ = [
-    'cli',
+    # Submodules (cli omitted - use entry point or explicit import)
     'core',
     'providers',
     'service',

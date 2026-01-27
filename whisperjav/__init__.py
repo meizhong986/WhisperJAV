@@ -86,6 +86,13 @@ For more information, see: https://github.com/meizhong986/whisperjav
 
 from whisperjav.__version__ import __version__, __version_info__
 
+# TODO: Implement lazy imports for GUI startup performance
+# Current Issue: These imports load torch, stable_whisper, librosa at import time,
+# causing ~6-10 second delay when starting the GUI (which doesn't need these).
+# Solution: Use __getattr__ for lazy loading or move to explicit imports in code.
+# See: https://peps.python.org/pep-0562/ for module __getattr__
+# Priority: Medium - affects user experience but not functionality
+
 # Public API exports
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline

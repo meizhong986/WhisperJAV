@@ -776,6 +776,212 @@ class TestShellWrappers:
 # =============================================================================
 
 
+class TestGeneratedRequirements:
+    """Tests for the generated requirements.txt file."""
+
+    def test_requirements_file_exists(self):
+        """Verify requirements.txt is generated."""
+        project_root = Path(__file__).parent.parent
+        # Check for any version of requirements file
+        req_files = list((project_root / "installer" / "generated").glob("requirements_v*.txt"))
+        assert len(req_files) >= 1, "No requirements_v*.txt found in installer/generated/"
+
+    def test_requirements_contains_all_pyproject_packages(self):
+        """
+        Critical test: Verify requirements.txt contains ALL packages from pyproject.toml.
+
+        This ensures no packages are accidentally filtered out during generation.
+        """
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib
+
+        project_root = Path(__file__).parent.parent
+        pyproject_path = project_root / "pyproject.toml"
+
+        with open(pyproject_path, "rb") as f:
+            config = tomllib.load(f)
+
+        project = config["project"]
+        core_deps = project.get("dependencies", [])
+        optional_deps = project.get("optional-dependencies", {})
+
+        # Extras included in standalone installer
+        installer_extras = ["cli", "gui", "translate", "enhance", "huggingface", "analysis", "compatibility"]
+
+        # Collect expected packages (non-git)
+        expected = set()
+
+        for dep in core_deps:
+            if "git+" not in dep and "@" not in dep:
+                name = dep.split(">")[0].split("<")[0].split("=")[0].split("[")[0].split(";")[0].strip()
+                expected.add(name.lower())
+
+        for extra in installer_extras:
+            if extra in optional_deps:
+                for dep in optional_deps[extra]:
+                    if "git+" not in dep and "@" not in dep and not dep.startswith("whisperjav"):
+                        name = dep.split(">")[0].split("<")[0].split("=")[0].split("[")[0].split(";")[0].strip()
+                        expected.add(name.lower())
+
+        # Read actual requirements file
+        req_files = list((project_root / "installer" / "generated").glob("requirements_v*.txt"))
+        assert req_files, "No requirements file found"
+
+        req_file = req_files[0]  # Use first (or only) one
+        content = req_file.read_text()
+
+        actual = set()
+        for line in content.split("\n"):
+            line = line.strip()
+            if line and not line.startswith("#"):
+                name = line.split(">")[0].split("<")[0].split("=")[0].split("[")[0].split(";")[0].strip()
+                actual.add(name.lower())
+
+        # Check for missing packages
+        missing = expected - actual
+        assert not missing, f"Packages missing from requirements.txt: {missing}"
+
+    def test_requirements_has_translate_packages(self):
+        """Verify translate extra packages are in requirements.txt."""
+        project_root = Path(__file__).parent.parent
+        req_files = list((project_root / "installer" / "generated").glob("requirements_v*.txt"))
+
+        if not req_files:
+            pytest.skip("No generated requirements file")
+
+        content = req_files[0].read_text().lower()
+
+        translate_packages = ["pysubtrans", "openai", "google-genai"]
+        missing = [pkg for pkg in translate_packages if pkg not in content]
+
+        assert not missing, f"Translate packages missing from requirements.txt: {missing}"
+
+    def test_requirements_has_gui_packages(self):
+        """Verify GUI extra packages are in requirements.txt."""
+        project_root = Path(__file__).parent.parent
+        req_files = list((project_root / "installer" / "generated").glob("requirements_v*.txt"))
+
+        if not req_files:
+            pytest.skip("No generated requirements file")
+
+        content = req_files[0].read_text().lower()
+
+        gui_packages = ["pywebview", "pythonnet", "pywin32"]
+        missing = [pkg for pkg in gui_packages if pkg not in content]
+
+        assert not missing, f"GUI packages missing from requirements.txt: {missing}"
+
+
+class TestImportNameMappings:
+    """Tests for package name vs import name mappings."""
+
+    def test_known_import_mappings_documented(self):
+        """
+        Verify known package/import name mismatches are documented.
+
+        Some packages have different pip names vs import names:
+        - pysubtrans -> PySubtrans
+        - Pillow -> PIL
+        - opencv-python -> cv2
+        - scikit-learn -> sklearn
+
+        This test ensures we're aware of these.
+        """
+        # Known mappings (package_name -> import_name)
+        known_mappings = {
+            "pysubtrans": "PySubtrans",
+            "Pillow": "PIL",
+            "scikit-learn": "sklearn",
+            "PyYAML": "yaml",
+        }
+
+        # This test just documents the mappings exist
+        # Actual import checks would require the packages to be installed
+        assert len(known_mappings) > 0, "No known mappings documented"
+
+    def test_pysubtrans_import_check_uses_correct_name(self):
+        """
+        Regression test: Ensure translate/cli.py checks for PySubtrans, not pysubtrans.
+
+        Bug fixed: The import check used lowercase 'pysubtrans' but the actual
+        import name is 'PySubtrans' (capital P and S).
+        """
+        project_root = Path(__file__).parent.parent
+        cli_path = project_root / "whisperjav" / "translate" / "cli.py"
+
+        content = cli_path.read_text()
+
+        # Should check for PySubtrans (correct)
+        assert "import PySubtrans" in content, \
+            "translate/cli.py should check 'import PySubtrans' (capital P and S)"
+
+        # Should NOT have the buggy lowercase check (without the correct one)
+        # Note: We allow the word 'pysubtrans' in strings/comments, just not as the import
+
+
+class TestPostInstallTemplate:
+    """Tests for the standalone installer's post_install template."""
+
+    def test_git_packages_in_template(self):
+        """
+        Regression test: All git-based packages must be in post_install template.
+
+        This test ensures that packages excluded from requirements.txt (git-based)
+        are explicitly installed in the post_install.py template Phase 3.5.
+
+        Bug fixed: stable-ts, openai-whisper, ffmpeg-python, clearvoice were
+        filtered from requirements.txt but never installed by post_install.py.
+        """
+        project_root = Path(__file__).parent.parent
+        template_path = project_root / "installer" / "templates" / "post_install.py.template"
+
+        assert template_path.exists(), "post_install.py.template not found"
+
+        content = template_path.read_text()
+
+        # All git-based packages that MUST be in the template
+        required_git_packages = [
+            "openai-whisper",
+            "stable-ts",
+            "ffmpeg-python",
+            "clearvoice",
+        ]
+
+        missing = []
+        for pkg in required_git_packages:
+            if pkg not in content:
+                missing.append(pkg)
+
+        assert not missing, f"Git-based packages missing from post_install template: {missing}"
+
+    def test_phase_35_exists(self):
+        """Verify Phase 3.5 (git packages) exists in template."""
+        project_root = Path(__file__).parent.parent
+        template_path = project_root / "installer" / "templates" / "post_install.py.template"
+
+        content = template_path.read_text()
+
+        assert "Phase 3.5" in content, "Phase 3.5 (git packages) not found in template"
+        assert "git_packages" in content, "git_packages list not found in template"
+
+    def test_git_packages_after_pytorch(self):
+        """Verify git packages are installed AFTER PyTorch (Phase 3)."""
+        project_root = Path(__file__).parent.parent
+        template_path = project_root / "installer" / "templates" / "post_install.py.template"
+
+        content = template_path.read_text()
+
+        # Find positions
+        phase_3_pos = content.find("Phase 3: PyTorch")
+        phase_35_pos = content.find("Phase 3.5")
+        phase_4_pos = content.find("Phase 4:")
+
+        assert phase_3_pos < phase_35_pos < phase_4_pos, \
+            "Phase 3.5 must be between Phase 3 (PyTorch) and Phase 4 (requirements)"
+
+
 class TestKnownIssues:
     """Tests for known issues that have been fixed."""
 

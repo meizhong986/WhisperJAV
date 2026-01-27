@@ -22,7 +22,7 @@ def _check_translate_dependencies():
     missing = []
 
     try:
-        import pysubtrans  # noqa: F401
+        import PySubtrans  # noqa: F401 - Note: package name is 'pysubtrans' but import is 'PySubtrans'
     except ImportError:
         missing.append("pysubtrans")
 

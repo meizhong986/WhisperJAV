@@ -213,12 +213,13 @@ class ReleaseBuilder:
 #
 # Extras included: {', '.join(installer_extras)}
 #
-# Note: The following are handled separately in post_install_v{self.version}.py:
-# - PyTorch (CUDA version detected at install time)
-# - openai-whisper (git-based)
-# - stable-ts (git-based)
-# - ffmpeg-python (git-based)
-# - clearvoice (git-based)
+# Note: The following are installed separately in post_install_v{self.version}.py:
+# - Phase 3: PyTorch (CUDA version detected at install time)
+# - Phase 3.5: Git-based packages (require git, benefit from retry logic):
+#   - openai-whisper (core ASR)
+#   - stable-ts (WhisperJAV fork for Japanese)
+#   - ffmpeg-python (audio/video processing)
+#   - clearvoice (speech enhancement)
 #
 # Installation: pip install -r requirements_v{self.version}.txt
 
