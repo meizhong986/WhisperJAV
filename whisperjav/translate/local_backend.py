@@ -1192,47 +1192,147 @@ def _find_free_port() -> int:
         return s.getsockname()[1]
 
 
-def _wait_for_server(port: int, max_wait: int = 300) -> bool:
-    """Wait for server to be ready.
+def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str]]:
+    """Wait for server to be ready AND verify inference works.
+
+    This function performs a two-phase readiness check:
+    1. HTTP Ready: Wait for /v1/models endpoint to respond (server is up)
+    2. Inference Ready: Make a small completion request to verify model loads
+
+    The second phase is critical because llama-cpp-python uses lazy model loading -
+    the model isn't loaded until the first inference request. Many issues (#148, #132)
+    showed servers passing health checks but failing on first real request.
 
     Args:
         port: Server port to check
         max_wait: Maximum wait time in seconds (default 5 minutes for large models)
 
     Returns:
-        True if server is ready, False if server died or timeout
+        Tuple of (success, error_message)
+        - (True, None): Server is ready and inference verified
+        - (False, error_msg): Server failed with specific error
     """
+    import json
     import urllib.request
     import urllib.error
 
-    url = f"http://localhost:{port}/v1/models"
     start_time = time.time()
     last_log_time = start_time
 
-    while True:
+    # =========================================================================
+    # Phase 1: Wait for HTTP server to be up
+    # =========================================================================
+    models_url = f"http://localhost:{port}/v1/models"
+    http_ready = False
+
+    while not http_ready:
         elapsed = time.time() - start_time
 
         # Check timeout
         if elapsed > max_wait:
-            logger.warning(f"Server startup timed out after {max_wait}s")
-            return False
+            logger.warning(f"Server startup timed out after {max_wait}s (HTTP not ready)")
+            return False, "Server HTTP endpoint did not become available"
 
         # Check if process died
         if _server_process is not None and _server_process.poll() is not None:
-            return False
+            return False, "Server process exited before becoming ready"
 
         # Periodic progress logging (every 30s)
         if time.time() - last_log_time > 30:
-            logger.info(f"Still waiting for server... ({int(elapsed)}s elapsed, loading model)")
+            logger.info(f"Still waiting for server... ({int(elapsed)}s elapsed, starting up)")
             last_log_time = time.time()
 
         try:
-            with urllib.request.urlopen(url, timeout=2) as response:
+            with urllib.request.urlopen(models_url, timeout=2) as response:
                 if response.status == 200:
-                    return True
-        except (urllib.error.URLError, ConnectionRefusedError, TimeoutError):
+                    http_ready = True
+                    logger.debug(f"HTTP server ready after {elapsed:.1f}s")
+        except (urllib.error.URLError, ConnectionRefusedError, TimeoutError, OSError):
             pass
-        time.sleep(0.5)
+
+        if not http_ready:
+            time.sleep(0.5)
+
+    # =========================================================================
+    # Phase 2: Verify inference works (triggers lazy model loading)
+    # =========================================================================
+    # This is the critical check that was missing - /v1/models responds before
+    # the model is actually loaded. We need to make a real inference request.
+    completions_url = f"http://localhost:{port}/v1/completions"
+
+    # Minimal inference request - just verify the model loads and CUDA works
+    test_payload = json.dumps({
+        "prompt": "Hello",
+        "max_tokens": 1,
+        "temperature": 0.0
+    }).encode('utf-8')
+
+    logger.info("Verifying model loads correctly (this may take a moment)...")
+
+    # Allow up to 120s for model loading on first inference
+    # Large models (8B+) can take 30-60s to load into GPU memory
+    inference_timeout = min(120, max_wait - (time.time() - start_time))
+    if inference_timeout < 10:
+        inference_timeout = 10  # Minimum 10s for inference check
+
+    try:
+        req = urllib.request.Request(
+            completions_url,
+            data=test_payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=inference_timeout) as response:
+            if response.status == 200:
+                # Read response to ensure it completed
+                response.read()
+                total_time = time.time() - start_time
+                logger.info(f"Server ready and inference verified ({total_time:.1f}s total)")
+                return True, None
+
+    except urllib.error.HTTPError as e:
+        # Server returned an error status
+        error_body = ""
+        try:
+            error_body = e.read().decode('utf-8', errors='replace')[:500]
+        except Exception:
+            pass
+
+        if e.code == 500:
+            # Internal server error - likely CUDA/model loading failure
+            error_msg = f"Model loading failed (HTTP 500)"
+            if "cuda" in error_body.lower() or "gpu" in error_body.lower():
+                error_msg += " - CUDA/GPU error detected"
+            elif "memory" in error_body.lower():
+                error_msg += " - Memory allocation error"
+            logger.error(f"Inference verification failed: {error_msg}")
+            logger.debug(f"Server error response: {error_body}")
+            return False, error_msg
+
+        elif e.code == 503:
+            # Service unavailable - model not loaded
+            return False, "Model failed to load (HTTP 503 Service Unavailable)"
+
+        else:
+            return False, f"Inference request failed (HTTP {e.code}): {error_body[:200]}"
+
+    except urllib.error.URLError as e:
+        # Connection error during inference
+        return False, f"Connection lost during inference verification: {e.reason}"
+
+    except TimeoutError:
+        # Inference took too long - likely CPU mode or model loading stuck
+        return False, (
+            f"Inference verification timed out after {inference_timeout}s. "
+            "Model may be loading on CPU (very slow) or stuck. "
+            "Try: --translate-gpu-layers 0 for explicit CPU mode"
+        )
+
+    except Exception as e:
+        return False, f"Unexpected error during inference verification: {e}"
+
+    return False, "Inference verification failed for unknown reason"
 
 
 def _release_gpu_memory():
@@ -1394,9 +1494,13 @@ def start_local_server(
         stderr_file.close()
         raise RuntimeError(f"Failed to start server: {e}")
 
-    # Wait for server to be ready (5 min timeout for large models)
+    # Wait for server to be ready AND verify inference works
+    # The two-phase check (HTTP ready + inference verification) catches issues like #148
+    # where the server starts but fails on first real request due to CUDA issues
     logger.info(f"Waiting for server on port {port} (this may take 1-2 minutes for large models)...")
-    if not _wait_for_server(port):
+    server_ready, readiness_error = _wait_for_server(port)
+
+    if not server_ready:
         # Get exit code and stderr if process died
         exit_code = _server_process.poll() if _server_process else None
         stderr_output = ""
@@ -1409,17 +1513,45 @@ def start_local_server(
 
         stop_local_server()
 
-        # Provide specific guidance for common errors
-        error_msg = f"Failed to start local server: Server process exited (code: {exit_code})"
+        # Build error message - start with the readiness check failure reason
+        if readiness_error:
+            error_msg = f"Failed to start local server: {readiness_error}"
+        else:
+            error_msg = f"Failed to start local server: Server process exited (code: {exit_code})"
 
-        # Always show stderr content first for debugging
+        # Always show stderr content for debugging
         if stderr_output:
             stderr_lines = stderr_output.strip().split('\n')[-15:]
             error_msg += f"\n\nServer stderr:\n" + "\n".join(stderr_lines)
 
         # Add specific guidance based on error type
         stderr_lower = stderr_output.lower()
-        if "0xc000001d" in stderr_output or "illegal instruction" in stderr_lower:
+        readiness_lower = (readiness_error or "").lower()
+
+        # Check for inference-specific failures (new checks from improved health check)
+        if "model loading failed" in readiness_lower or "http 500" in readiness_lower:
+            error_msg += (
+                "\n\n[Diagnosis: Model failed to load during inference]"
+                "\nThe server started but the model could not be loaded for inference."
+                "\nThis typically indicates CUDA version mismatch or GPU memory issues."
+                "\n"
+                "\nFixes to try:"
+                "\n  - Use CPU mode: --translate-gpu-layers 0"
+                "\n  - Use smaller model: --translate-model llama-3b"
+                "\n  - Rebuild llama-cpp-python from source for your CUDA version"
+            )
+        elif "inference verification timed out" in readiness_lower:
+            error_msg += (
+                "\n\n[Diagnosis: Inference too slow or stuck]"
+                "\nThe model may have loaded to CPU instead of GPU (very slow),"
+                "\nor the inference process is stuck."
+                "\n"
+                "\nFixes to try:"
+                "\n  - Explicitly use CPU: --translate-gpu-layers 0"
+                "\n  - Check GPU memory: Close other applications using GPU"
+                "\n  - Use smaller model: --translate-model llama-3b"
+            )
+        elif "0xc000001d" in stderr_output or "illegal instruction" in stderr_lower:
             error_msg += (
                 "\n\n[Diagnosis: Binary compatibility issue]"
                 "\nThis error can be caused by:"
@@ -1442,8 +1574,8 @@ def start_local_server(
                 "\nTry: taskkill /f /im python.exe (WARNING: kills ALL Python processes)"
                 "\nOr use a smaller model: --translate-model llama-3b"
             )
-        elif not stderr_output:
-            # No stderr captured - check for common issues
+        elif not stderr_output and not readiness_error:
+            # No stderr captured and no specific readiness error
             error_msg += (
                 "\n\n[No error details captured]"
                 "\nPossible causes:"
