@@ -119,13 +119,23 @@ try:
         DEFAULT_RETRY_COUNT,
         CPU_TORCH_INDEX,
     )
-    from whisperjav.installer.core.registry import Package, InstallSource, Extra
+    # Registry - SINGLE SOURCE OF TRUTH for packages
+    from whisperjav.installer.core.registry import (
+        Package,
+        InstallSource,
+        Extra,
+        PACKAGES,
+        get_packages_by_extra,
+        get_packages_in_install_order,
+    )
     _INSTALLER_AVAILABLE = True
+    _REGISTRY_AVAILABLE = True
 except ImportError as e:
     # Fallback if installer module not available (shouldn't happen)
     print(f"WARNING: Could not import installer module: {e}")
     print("         Using legacy fallback functions.")
     _INSTALLER_AVAILABLE = False
+    _REGISTRY_AVAILABLE = False
 
 
 # =============================================================================
@@ -492,6 +502,173 @@ def create_failure_file(error_message: str):
         log(f"Failure details written to: {failure_file}")
     except Exception:
         pass
+
+
+# =============================================================================
+# Registry Query Functions
+# =============================================================================
+#
+# WHY QUERY REGISTRY:
+# The registry is the SINGLE SOURCE OF TRUTH for packages. By querying it
+# instead of hardcoding lists, we ensure install.py stays in sync automatically.
+# See recommendation from audit: "Refactor install.py to use registry"
+#
+
+
+def _get_packages_for_step(extras: list, exclude_names: set = None) -> list:
+    """
+    Get pip install specs for packages in given extras.
+
+    Args:
+        extras: List of Extra enum values to include
+        exclude_names: Package names to exclude (e.g., torch for separate install)
+
+    Returns:
+        List of pip install specs (e.g., "numpy>=1.26.0,<2.0")
+    """
+    if not _REGISTRY_AVAILABLE:
+        return []
+
+    exclude_names = exclude_names or set()
+    specs = []
+
+    for extra in extras:
+        for pkg in get_packages_by_extra(extra):
+            if pkg.name.lower() in {n.lower() for n in exclude_names}:
+                continue
+            if not pkg.matches_platform():
+                continue
+
+            # For PyPI packages, use the version spec
+            if pkg.source == InstallSource.PYPI:
+                spec = f"{pkg.name}{pkg.version}" if pkg.version else pkg.name
+                specs.append(spec)
+
+    return specs
+
+
+def _get_git_packages_for_step(extras: list) -> list:
+    """
+    Get git-based packages for given extras.
+
+    Args:
+        extras: List of Extra enum values to include
+
+    Returns:
+        List of (git_url, description) tuples
+    """
+    if not _REGISTRY_AVAILABLE:
+        return []
+
+    packages = []
+    for extra in extras:
+        for pkg in get_packages_by_extra(extra):
+            if pkg.source == InstallSource.GIT and pkg.git_url:
+                if pkg.matches_platform():
+                    desc = pkg.reason or f"Install {pkg.name}"
+                    packages.append((pkg.git_url, desc))
+
+    return packages
+
+
+def _get_core_deps_from_registry() -> list:
+    """
+    Get core dependency specs from registry.
+
+    Returns packages from CLI extra (scientific + audio processing)
+    that should be installed early in the pipeline.
+
+    Returns:
+        List of pip install specs
+    """
+    if not _REGISTRY_AVAILABLE:
+        # Fallback to hardcoded if registry not available
+        return [
+            "numpy>=1.26.0,<2.0",
+            "scipy>=1.10.1",
+            "numba>=0.58.0",
+            "librosa>=0.10.0",
+            "soundfile",
+            "pydub",
+            "pyloudnorm",
+            "pysrt",
+            "srt",
+            "tqdm",
+            "colorama",
+            "requests",
+            "regex",
+            "aiofiles",
+            "jsonschema",
+            "pydantic>=2.0,<3.0",
+            "PyYAML>=6.0",
+            "av>=13.0.0",
+            "imageio>=2.31.0",
+            "imageio-ffmpeg>=0.4.9",
+            "httpx>=0.27.0",
+            "websockets>=13.0",
+            "soxr>=0.3.0",
+        ]
+
+    # Exclude torch/torchaudio (installed in Step 2)
+    # Exclude git-based packages (installed separately)
+    specs = []
+    exclude_names = {"torch", "torchaudio", "openai-whisper", "stable-ts", "ffmpeg-python"}
+
+    # Core packages (CORE extra) - excluding torch
+    for pkg in get_packages_by_extra(Extra.CORE):
+        if pkg.name.lower() in {n.lower() for n in exclude_names}:
+            continue
+        if pkg.source != InstallSource.PYPI:
+            continue
+        if not pkg.matches_platform():
+            continue
+        spec = f"{pkg.name}{pkg.version}" if pkg.version else pkg.name
+        specs.append(spec)
+
+    # CLI packages (scientific + audio)
+    for pkg in get_packages_by_extra(Extra.CLI):
+        if pkg.source != InstallSource.PYPI:
+            continue
+        if not pkg.matches_platform():
+            continue
+        spec = f"{pkg.name}{pkg.version}" if pkg.version else pkg.name
+        specs.append(spec)
+
+    # Compatibility packages
+    for pkg in get_packages_by_extra(Extra.COMPATIBILITY):
+        if pkg.source != InstallSource.PYPI:
+            continue
+        if not pkg.matches_platform():
+            continue
+        spec = f"{pkg.name}{pkg.version}" if pkg.version else pkg.name
+        specs.append(spec)
+
+    return specs
+
+
+def _get_huggingface_deps_from_registry() -> list:
+    """Get HuggingFace package specs from registry."""
+    return _get_packages_for_step([Extra.HUGGINGFACE])
+
+
+def _get_translate_deps_from_registry() -> list:
+    """Get translation package specs from registry."""
+    return _get_packages_for_step([Extra.TRANSLATE])
+
+
+def _get_gui_deps_from_registry() -> list:
+    """Get GUI package specs from registry."""
+    return _get_packages_for_step([Extra.GUI])
+
+
+def _get_enhance_deps_from_registry() -> list:
+    """
+    Get speech enhancement package specs from registry (PyPI only).
+
+    Note: ClearVoice is git-based and handled separately.
+    """
+    exclude = {"clearvoice"}  # Git-based, handled separately
+    return _get_packages_for_step([Extra.ENHANCE], exclude_names=exclude)
 
 
 # =============================================================================
@@ -973,44 +1150,16 @@ def main():
     # - scipy depends on numpy
     # - These are the foundation for all audio processing
     #
+    # WHY QUERY REGISTRY:
+    # Package list comes from registry (SINGLE SOURCE OF TRUTH).
+    # This eliminates drift between install.py and pyproject.toml.
+    #
     print_header("Installing core dependencies", "Step 3/6")
-    core_deps = [
-        # Scientific stack (order matters: numpy before numba)
-        "numpy>=1.26.0,<2.0",  # NumPy 1.26.x for pyvideotrans compatibility
-        "scipy>=1.10.1",
-        "numba>=0.58.0",  # 0.58.0+ supports NumPy 1.22-2.0
-
-        # Audio processing
-        "librosa>=0.10.0",
-        "soundfile",
-        "pydub",
-        "pyloudnorm",
-
-        # Subtitle processing
-        "pysrt",
-        "srt",
-
-        # Utilities
-        "tqdm",
-        "colorama",
-        "requests",
-        "regex",
-        "aiofiles",
-        "jsonschema",
-
-        # Configuration
-        "pydantic>=2.0,<3.0",
-        "PyYAML>=6.0",
-
-        # pyvideotrans compatibility (Phase 1 prep)
-        "av>=13.0.0",
-        "imageio>=2.31.0",
-        "imageio-ffmpeg>=0.4.9",
-        "httpx>=0.27.0",
-        "websockets>=13.0",
-        "soxr>=0.3.0",
-    ]
-    run_pip(executor, ["install"] + core_deps, "Install core dependencies")
+    core_deps = _get_core_deps_from_registry()
+    if core_deps:
+        run_pip(executor, ["install"] + core_deps, "Install core dependencies")
+    else:
+        log("    No core dependencies to install (registry query returned empty)")
 
     # -------------------------------------------------------------------------
     # Step 4: Install Whisper packages
@@ -1025,42 +1174,40 @@ def main():
     # These packages depend on torch. Since torch is already installed with
     # GPU support, pip will NOT try to install CPU torch to satisfy deps.
     #
+    # WHY QUERY REGISTRY:
+    # Git URLs and package specs come from registry (SINGLE SOURCE OF TRUTH).
+    #
     print_header("Installing Whisper packages", "Step 4/6")
-    run_pip(
-        executor,
-        ["install", "git+https://github.com/openai/whisper@main"],
-        "Install openai-whisper from GitHub"
-    )
-    run_pip(
-        executor,
-        ["install", "git+https://github.com/meizhong986/stable-ts-fix-setup.git@main"],
-        "Install stable-ts from GitHub"
-    )
-    run_pip(
-        executor,
-        ["install", "git+https://github.com/kkroening/ffmpeg-python.git"],
-        "Install ffmpeg-python from GitHub"
-    )
-    run_pip(executor, ["install", "faster-whisper>=1.1.0"], "Install faster-whisper")
+
+    # Install git-based packages from CORE extra
+    git_packages = _get_git_packages_for_step([Extra.CORE])
+    for git_url, description in git_packages:
+        run_pip(executor, ["install", git_url], description)
+
+    # Install PyPI-based Whisper packages (faster-whisper)
+    for pkg in get_packages_by_extra(Extra.CORE) if _REGISTRY_AVAILABLE else []:
+        if pkg.source == InstallSource.PYPI and "whisper" in pkg.name.lower():
+            spec = f"{pkg.name}{pkg.version}" if pkg.version else pkg.name
+            run_pip(executor, ["install", spec], f"Install {pkg.name}")
 
     # -------------------------------------------------------------------------
     # Step 5: Install optional packages
     # -------------------------------------------------------------------------
+    #
+    # WHY QUERY REGISTRY:
+    # Package specs come from registry (SINGLE SOURCE OF TRUTH).
+    #
     print_header("Installing optional packages", "Step 5/6")
 
-    # HuggingFace / Transformers
-    run_pip(
-        executor,
-        ["install", "huggingface-hub>=0.25.0", "transformers>=4.40.0", "accelerate>=0.26.0"],
-        "Install HuggingFace packages"
-    )
+    # HuggingFace / Transformers (from registry)
+    hf_deps = _get_huggingface_deps_from_registry()
+    if hf_deps:
+        run_pip(executor, ["install"] + hf_deps, "Install HuggingFace packages")
 
-    # Translation (pysubtrans requires Python 3.10+)
-    run_pip(
-        executor,
-        ["install", "pysubtrans>=1.5.0", "openai>=1.35.0", "google-genai>=1.39.0"],
-        "Install translation packages"
-    )
+    # Translation (from registry) - pysubtrans requires Python 3.10+
+    translate_deps = _get_translate_deps_from_registry()
+    if translate_deps:
+        run_pip(executor, ["install"] + translate_deps, "Install translation packages")
 
     # -------------------------------------------------------------------------
     # Local LLM (llama-cpp-python) - OPTIONAL
@@ -1080,12 +1227,33 @@ def main():
     else:
         log("\n    Skipping local LLM (use --local-llm or --local-llm-build to install)")
 
-    # VAD packages
-    run_pip(executor, ["install", "silero-vad>=6.0", "auditok"], "Install VAD packages")
+    # VAD packages (already included in CLI extra from registry via _get_core_deps_from_registry)
+    # These are explicitly called out for clarity (silero-vad, auditok, ten-vad)
+    vad_packages = []
+    if _REGISTRY_AVAILABLE:
+        for pkg in get_packages_by_extra(Extra.CLI):
+            if pkg.source == InstallSource.PYPI and pkg.matches_platform():
+                if any(v in pkg.name.lower() for v in ["vad", "auditok"]):
+                    spec = f"{pkg.name}{pkg.version}" if pkg.version else pkg.name
+                    vad_packages.append(spec)
+
+    if not vad_packages:
+        # Fallback if registry query fails
+        vad_packages = ["silero-vad>=6.0", "auditok"]
+
+    run_pip(executor, ["install"] + vad_packages, "Install VAD packages")
 
     if not args.minimal:
         run_pip(executor, ["install", "ten-vad"], "Install TEN VAD", allow_fail=True)
-        run_pip(executor, ["install", "scikit-learn>=1.3.0"], "Install scikit-learn")
+        # scikit-learn is in CLI extra from registry
+        if _REGISTRY_AVAILABLE:
+            for pkg in get_packages_by_extra(Extra.CLI):
+                if pkg.name == "scikit-learn" and pkg.matches_platform():
+                    spec = f"{pkg.name}{pkg.version}" if pkg.version else pkg.name
+                    run_pip(executor, ["install", spec], "Install scikit-learn")
+                    break
+        else:
+            run_pip(executor, ["install", "scikit-learn>=1.3.0"], "Install scikit-learn")
 
     # -------------------------------------------------------------------------
     # Speech Enhancement - OPTIONAL
@@ -1098,15 +1266,20 @@ def main():
     if not args.no_speech_enhancement and not args.minimal:
         _install_speech_enhancement(executor)
 
-    # GUI dependencies
-    run_pip(executor, ["install", "pywebview>=5.0.0"], "Install PyWebView", allow_fail=True)
-    if sys.platform == "win32":
-        run_pip(
-            executor,
-            ["install", "pythonnet>=3.0", "pywin32>=305"],
-            "Install Windows GUI deps",
-            allow_fail=True
-        )
+    # GUI dependencies (from registry)
+    gui_deps = _get_gui_deps_from_registry()
+    if gui_deps:
+        run_pip(executor, ["install"] + gui_deps, "Install GUI packages", allow_fail=True)
+    else:
+        # Fallback
+        run_pip(executor, ["install", "pywebview>=5.0.0"], "Install PyWebView", allow_fail=True)
+        if sys.platform == "win32":
+            run_pip(
+                executor,
+                ["install", "pythonnet>=3.0", "pywin32>=305"],
+                "Install Windows GUI deps",
+                allow_fail=True
+            )
 
     # -------------------------------------------------------------------------
     # Step 6: Install WhisperJAV
@@ -1246,53 +1419,68 @@ def _install_speech_enhancement(executor: StepExecutor):
     WHY SEPARATE FUNCTION:
     These packages are complex and may fail. We isolate them so failures
     don't affect the rest of the installation.
+
+    WHY QUERY REGISTRY:
+    Package specs come from registry (SINGLE SOURCE OF TRUTH).
     """
     log("\n    Installing speech enhancement packages...")
     log("    (These can be tricky - failures here are non-fatal)")
 
-    # ModelScope dependencies (including oss2 required for ZipEnhancer)
-    run_pip(
-        executor,
-        ["install", "addict", "simplejson", "sortedcontainers", "packaging", "oss2"],
-        "Install ModelScope dependencies (including oss2)",
-        allow_fail=True
-    )
-    run_pip(
-        executor,
-        ["install", "datasets>=2.14.0,<4.0"],
-        "Install datasets",
-        allow_fail=True
-    )
-    run_pip(
-        executor,
-        ["install", "modelscope>=1.20"],
-        "Install ModelScope",
-        allow_fail=True
-    )
+    # Get PyPI-based enhancement packages from registry
+    enhance_deps = _get_enhance_deps_from_registry()
+    if enhance_deps:
+        run_pip(
+            executor,
+            ["install"] + enhance_deps,
+            "Install speech enhancement dependencies",
+            allow_fail=True
+        )
+    else:
+        # Fallback to hardcoded if registry query fails
+        run_pip(
+            executor,
+            ["install", "addict", "simplejson", "sortedcontainers", "packaging", "oss2"],
+            "Install ModelScope dependencies (including oss2)",
+            allow_fail=True
+        )
+        run_pip(
+            executor,
+            ["install", "datasets>=2.14.0,<4.0"],
+            "Install datasets",
+            allow_fail=True
+        )
+        run_pip(
+            executor,
+            ["install", "modelscope>=1.20"],
+            "Install ModelScope",
+            allow_fail=True
+        )
+        run_pip(
+            executor,
+            ["install", "bs-roformer-infer"],
+            "Install BS-RoFormer",
+            allow_fail=True
+        )
+        run_pip(
+            executor,
+            ["install", "onnxruntime>=1.16.0"],
+            "Install ONNX Runtime",
+            allow_fail=True
+        )
 
-    # ClearVoice (custom fork with relaxed librosa dependency)
-    run_pip(
-        executor,
-        ["install", "git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice"],
-        "Install ClearVoice (forked)",
-        allow_fail=True
-    )
-
-    # BS-RoFormer vocal isolation
-    run_pip(
-        executor,
-        ["install", "bs-roformer-infer"],
-        "Install BS-RoFormer",
-        allow_fail=True
-    )
-
-    # ONNX Runtime
-    run_pip(
-        executor,
-        ["install", "onnxruntime>=1.16.0"],
-        "Install ONNX Runtime",
-        allow_fail=True
-    )
+    # ClearVoice (git-based - custom fork with relaxed librosa dependency)
+    git_packages = _get_git_packages_for_step([Extra.ENHANCE]) if _REGISTRY_AVAILABLE else []
+    if git_packages:
+        for git_url, description in git_packages:
+            run_pip(executor, ["install", git_url], description, allow_fail=True)
+    else:
+        # Fallback
+        run_pip(
+            executor,
+            ["install", "git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice"],
+            "Install ClearVoice (forked)",
+            allow_fail=True
+        )
 
 
 def _verify_installation():
