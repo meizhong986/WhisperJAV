@@ -587,6 +587,21 @@ PACKAGES: List[Package] = [
     # =========================================================================
     # PHASE 5: Enhancement Packages (Order 70-79)
     # =========================================================================
+    #
+    # ZIPENHANCER DEPENDENCIES (ModelScope-based):
+    # ZipEnhancer requires specific packages for model download and inference.
+    # Reference: https://modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base
+    #
+    # IMPORTANT - Version Sensitivity:
+    # - datasets: ZipEnhancer docs recommend ==2.18.0, but we use >=2.14.0,<4.0
+    #   for broader compatibility. If you encounter issues, try pinning to 2.18.0.
+    # - modelscope: >=1.20 required, 1.22.0 recommended by ZipEnhancer docs.
+    #
+    # LINUX SYSTEM DEPENDENCIES (not pip-installable):
+    # - libsndfile1: Required for soundfile package. Install with:
+    #   sudo apt-get install libsndfile1  (Debian/Ubuntu)
+    #   sudo dnf install libsndfile       (Fedora/RHEL)
+    #
     Package(
         name="modelscope",
         version=">=1.20",
@@ -595,34 +610,40 @@ PACKAGES: List[Package] = [
         reason="ModelScope framework for ZipEnhancer speech enhancement",
     ),
     Package(
-        name="addict",
+        name="oss2",
         extra=Extra.ENHANCE,
         order=71,
+        reason="Alibaba Cloud OSS SDK - required by ModelScope to download models from China CDN",
+    ),
+    Package(
+        name="addict",
+        extra=Extra.ENHANCE,
+        order=72,
         reason="Dict subclass for modelscope configs",
     ),
     Package(
         name="datasets",
         version=">=2.14.0,<4.0",
         extra=Extra.ENHANCE,
-        order=72,
-        reason="HuggingFace datasets - pinned <4.0 due to modelscope compat",
+        order=73,
+        reason="HuggingFace datasets - pinned <4.0 due to modelscope compat (ZipEnhancer recommends 2.18.0)",
     ),
     Package(
         name="simplejson",
         extra=Extra.ENHANCE,
-        order=73,
+        order=74,
         reason="JSON handling for modelscope",
     ),
     Package(
         name="sortedcontainers",
         extra=Extra.ENHANCE,
-        order=74,
+        order=75,
         reason="Sorted collections for modelscope",
     ),
     Package(
         name="packaging",
         extra=Extra.ENHANCE,
-        order=75,
+        order=76,
         reason="Version parsing for modelscope",
     ),
     Package(
@@ -630,13 +651,13 @@ PACKAGES: List[Package] = [
         extra=Extra.ENHANCE,
         source=InstallSource.GIT,
         git_url="git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",
-        order=76,
+        order=77,
         reason="ClearVoice speech enhancement - custom fork with relaxed librosa",
     ),
     Package(
         name="bs-roformer-infer",
         extra=Extra.ENHANCE,
-        order=77,
+        order=78,
         import_name="bs_roformer",  # pip name != import name
         reason="BS-RoFormer vocal isolation",
     ),
@@ -644,7 +665,7 @@ PACKAGES: List[Package] = [
         name="onnxruntime",
         version=">=1.16.0",
         extra=Extra.ENHANCE,
-        order=78,
+        order=79,
         reason="ONNX inference for speech enhancement models",
     ),
 

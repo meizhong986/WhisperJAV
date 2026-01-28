@@ -157,11 +157,22 @@ llm = [
 
 # Speech enhancement backends
 # Install with: pip install whisperjav[enhance]
+#
+# LINUX USERS: You also need system package libsndfile1:
+#   sudo apt-get install libsndfile1  (Debian/Ubuntu)
+#   sudo dnf install libsndfile       (Fedora/RHEL)
+#
+# VERSION NOTES:
+# - datasets: ZipEnhancer recommends ==2.18.0, we use >=2.14.0,<4.0 for flexibility.
+#   If you encounter ModelScope issues, try: pip install datasets==2.18.0
+# - modelscope: >=1.20 required, 1.22.0 recommended by ZipEnhancer docs.
 enhance = [
-    # ModelScope (ZipEnhancer)
+    # ModelScope (ZipEnhancer) - core framework
     "modelscope>=1.20",
+    # oss2: Alibaba Cloud OSS SDK - required by ModelScope to download models
+    "oss2",
     "addict",
-    "datasets>=2.14.0,<4.0",  # 4.x breaks modelscope
+    "datasets>=2.14.0,<4.0",  # 4.x breaks modelscope; ZipEnhancer recommends 2.18.0
     "simplejson",
     "sortedcontainers",
     "packaging",

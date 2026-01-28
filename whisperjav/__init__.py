@@ -84,35 +84,66 @@ For programmatic use::
 For more information, see: https://github.com/meizhong986/whisperjav
 """
 
+# =============================================================================
+# LAZY IMPORTS (PEP 562)
+# =============================================================================
+# Heavy modules (torch, whisper, librosa) are NOT imported at package load time.
+# They are loaded on first access via __getattr__. This enables:
+# - Fast GUI startup (~1 second instead of ~10 seconds)
+# - Lighter memory footprint for utilities that don't need ML
+#
+# Usage remains unchanged:
+#   from whisperjav import FasterPipeline  # Loads on first use
+#   pipeline = FasterPipeline()            # Now torch/whisper are loaded
+#
+# See: https://peps.python.org/pep-0562/
+# =============================================================================
+
 from whisperjav.__version__ import __version__, __version_info__
 
-# TODO: Implement lazy imports for GUI startup performance
-# Current Issue: These imports load torch, stable_whisper, librosa at import time,
-# causing ~6-10 second delay when starting the GUI (which doesn't need these).
-# Solution: Use __getattr__ for lazy loading or move to explicit imports in code.
-# See: https://peps.python.org/pep-0562/ for module __getattr__
-# Priority: Medium - affects user experience but not functionality
-
-# Public API exports
-from whisperjav.pipelines.faster_pipeline import FasterPipeline
-from whisperjav.pipelines.fast_pipeline import FastPipeline
-from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
-from whisperjav.modules.media_discovery import MediaDiscovery
-from whisperjav.utils.logger import setup_logger
-
+# Lightweight imports only - these don't pull in torch/whisper
+# (setup_logger is lazy-loaded too since it may pull in heavy deps indirectly)
 
 __all__ = [
-    # Version
+    # Version (always available)
     "__version__",
     "__version_info__",
-    # Pipelines
+    # Pipelines (lazy-loaded)
     "FasterPipeline",
     "FastPipeline",
     "FidelityPipeline",
-    # Utilities
+    # Utilities (lazy-loaded)
     "MediaDiscovery",
     "setup_logger",
 ]
+
+# Mapping of lazy attributes to their import paths
+_LAZY_IMPORTS = {
+    "FasterPipeline": "whisperjav.pipelines.faster_pipeline",
+    "FastPipeline": "whisperjav.pipelines.fast_pipeline",
+    "FidelityPipeline": "whisperjav.pipelines.fidelity_pipeline",
+    "MediaDiscovery": "whisperjav.modules.media_discovery",
+    "setup_logger": "whisperjav.utils.logger",
+}
+
+
+def __getattr__(name: str):
+    """
+    Lazy import handler (PEP 562).
+
+    Called when an attribute is not found in the module namespace.
+    Imports the requested class/function on first access.
+    """
+    if name in _LAZY_IMPORTS:
+        import importlib
+        module_path = _LAZY_IMPORTS[name]
+        module = importlib.import_module(module_path)
+        attr = getattr(module, name)
+        # Cache it in the module namespace for subsequent access
+        globals()[name] = attr
+        return attr
+
+    raise AttributeError(f"module 'whisperjav' has no attribute '{name}'")
 
 
 # Don't import main at top level - avoid premature loading
