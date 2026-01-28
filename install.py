@@ -54,17 +54,24 @@ Options:
     --no-speech-enhancement Skip speech enhancement packages
     --minimal               Minimal install (transcription only)
     --dev                   Install in development/editable mode
-    --local-llm             Install local LLM (tries prebuilt wheel first)
-    --local-llm-build       Install local LLM (builds from source)
+    --local-llm             Install local LLM without prompting (prebuilt wheel)
+    --local-llm-build       Install local LLM without prompting (builds from source)
+    --no-local-llm          Skip local LLM installation without prompting
+    --skip-preflight        Skip preflight checks (disk space, network, etc.)
     --help                  Show this help message
 
+Interactive Prompts:
+    By default, the script prompts for optional features with a 30-second timeout.
+    If no response, defaults are used (Y for LLM installation).
+    Use explicit flags (--local-llm, --no-local-llm) to skip prompts.
+
 Examples:
-    python install.py                    # Standard install with CUDA 12.8
+    python install.py                    # Standard install (prompts for LLM, default Y)
     python install.py --cuda118          # Install with CUDA 11.8 (older drivers)
     python install.py --cpu-only         # CPU-only install
     python install.py --minimal --dev    # Minimal dev install
-    python install.py --local-llm        # Include local LLM (uses prebuilt wheel)
-    python install.py --local-llm-build  # Include local LLM (builds if no wheel)
+    python install.py --local-llm        # Include local LLM (no prompt)
+    python install.py --no-local-llm     # Skip local LLM (no prompt)
 
 Author: Senior Architect
 Date: 2026-01-26
@@ -374,6 +381,54 @@ def run_preflight_checks() -> bool:
     log("")
     log("  All preflight checks passed!")
     return True
+
+
+# =============================================================================
+# Timed User Input (for interactive prompts with timeout)
+# =============================================================================
+#
+# WHY TIMED INPUT:
+# Users expect installation to complete even if they step away.
+# We provide a timeout with sensible defaults so installations don't hang.
+#
+
+
+def timed_input(prompt: str, timeout_seconds: int, default_response: str) -> str:
+    """
+    Get user input with timeout, returning default if timeout expires.
+    Allows unattended installation while preserving interactive option.
+
+    Args:
+        prompt: The prompt to display to user
+        timeout_seconds: Seconds to wait before using default
+        default_response: Value to return if timeout expires
+
+    Returns:
+        User input or default_response if timeout
+    """
+    import threading
+
+    print(prompt, end='', flush=True)
+
+    # Use threading for cross-platform timeout support
+    result = [default_response]  # Mutable container for thread communication
+
+    def get_input():
+        try:
+            result[0] = input()
+        except (EOFError, KeyboardInterrupt):
+            result[0] = default_response
+
+    input_thread = threading.Thread(target=get_input, daemon=True)
+    input_thread.start()
+    input_thread.join(timeout=timeout_seconds)
+
+    if input_thread.is_alive():
+        # Timeout occurred
+        print(f"\n[Auto-continuing after {timeout_seconds}s timeout - using default: '{default_response}']")
+        return default_response
+    else:
+        return result[0]
 
 
 # =============================================================================
@@ -1041,9 +1096,11 @@ def main():
     parser.add_argument("--dev", action="store_true",
                         help="Install in development/editable mode")
     parser.add_argument("--local-llm", action="store_true",
-                        help="Install local LLM support (fast - prebuilt wheel only)")
+                        help="Install local LLM support without prompting (fast - prebuilt wheel only)")
     parser.add_argument("--local-llm-build", action="store_true",
-                        help="Install local LLM support (slow - build from source if needed)")
+                        help="Install local LLM support without prompting (slow - build from source if needed)")
+    parser.add_argument("--no-local-llm", action="store_true",
+                        help="Skip local LLM installation without prompting")
     parser.add_argument("--skip-preflight", action="store_true",
                         help="Skip preflight checks (disk space, network, etc.)")
 
@@ -1210,8 +1267,12 @@ def main():
         run_pip(executor, ["install"] + translate_deps, "Install translation packages")
 
     # -------------------------------------------------------------------------
-    # Local LLM (llama-cpp-python) - OPTIONAL
+    # Local LLM (llama-cpp-python) - Included by Default
     # -------------------------------------------------------------------------
+    #
+    # WHY INCLUDED BY DEFAULT:
+    # Users expect default installations to provide full capabilities.
+    # Local LLM enables offline translation without API keys.
     #
     # WHY SPECIAL HANDLING:
     # llama-cpp-python requires platform-specific builds:
@@ -1219,13 +1280,52 @@ def main():
     # - Intel Mac: CPU only (no Metal)
     # - Windows/Linux: Prebuilt CUDA wheels available from HuggingFace
     #
-    # We use get_prebuilt_wheel_url() from llama_build_utils.py to select
-    # the correct wheel based on platform and CUDA version.
+    # PROMPT BEHAVIOR:
+    # - --local-llm or --local-llm-build: Install without prompting
+    # - --no-local-llm: Skip without prompting
+    # - Neither flag: Prompt user with 30s timeout, default "Y" (install)
     #
     if args.local_llm or args.local_llm_build:
+        # Explicit flag to install - no prompt needed
         _install_local_llm(executor, args.local_llm_build)
+    elif args.no_local_llm:
+        # Explicit flag to skip - no prompt needed
+        log("\n    Skipping local LLM (--no-local-llm specified)")
+        log("    You can install it later with: pip install llama-cpp-python[server]")
     else:
-        log("\n    Skipping local LLM (use --local-llm or --local-llm-build to install)")
+        # Interactive prompt with timeout and default "Y" (install)
+        log("")
+        log("=" * 60)
+        log("  LOCAL LLM TRANSLATION")
+        log("=" * 60)
+        log("")
+        log("WhisperJAV can translate subtitles using local AI models,")
+        log("allowing offline translation without API keys.")
+        log("")
+        log("Requirements:")
+        log("  - NVIDIA GPU with CUDA: Fast (~1 min download)")
+        log("  - OR builds from source: Slower (~10-45 min)")
+        log("")
+        log("If you skip this, you can still use cloud translation providers")
+        log("(DeepSeek, Gemini, Claude, etc.) with API keys.")
+        log("")
+
+        # Default to 'y' (install) for full capabilities
+        # 30-second timeout for unattended installs
+        response = timed_input(
+            "Install local LLM translation? (Y/n): ",
+            30,
+            "y"
+        ).strip().lower()
+
+        if response == '' or response == 'y' or response == 'yes':
+            _install_local_llm(executor, build_from_source=False)
+        else:
+            log("")
+            log("Skipping local LLM translation.")
+            log("You can install it later with:")
+            log("  pip install llama-cpp-python[server]")
+            log("Or re-run: python install.py --local-llm")
 
     # VAD packages (already included in CLI extra from registry via _get_core_deps_from_registry)
     # These are explicitly called out for clarity (silero-vad, auditok, ten-vad)
