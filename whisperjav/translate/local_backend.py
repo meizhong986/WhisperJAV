@@ -426,7 +426,8 @@ def _setup_linux_cuda_library_paths() -> bool:
     that may be installed in non-standard locations.
 
     This function:
-    1. Finds CUDA libraries in PyTorch's lib folder and nvidia-cuda-runtime package
+    1. Finds CUDA libraries in PyTorch's lib folder, nvidia-cuda-runtime package,
+       and system CUDA installation (/usr/local/cuda/lib64)
     2. Preloads them using ctypes.CDLL with RTLD_GLOBAL (makes symbols available globally)
     3. Sets LD_LIBRARY_PATH for any subprocesses we spawn (like llama_cpp.server)
 
@@ -476,10 +477,18 @@ def _setup_linux_cuda_library_paths() -> bool:
     except Exception as e:
         logger.debug(f"Could not find nvidia-cuda-runtime lib path: {e}")
 
-    # 3. Check LD_LIBRARY_PATH for any paths already there
+    # 3. Check system CUDA installation (standard Linux location)
+    # This is critical for Colab/Kaggle where CUDA is at /usr/local/cuda
+    # but the venv doesn't inherit LD_LIBRARY_PATH pointing there
+    system_cuda_lib = "/usr/local/cuda/lib64"
+    if os.path.exists(system_cuda_lib):
+        lib_paths.append(system_cuda_lib)
+        logger.debug(f"Found system CUDA libs: {system_cuda_lib}")
+
+    # 4. Check LD_LIBRARY_PATH for any paths already there
     existing_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
 
-    # 4. Update LD_LIBRARY_PATH for subprocesses (e.g., llama_cpp.server)
+    # 5. Update LD_LIBRARY_PATH for subprocesses (e.g., llama_cpp.server)
     if lib_paths:
         new_paths = [p for p in lib_paths if p not in existing_ld_path]
         if new_paths:
@@ -489,7 +498,7 @@ def _setup_linux_cuda_library_paths() -> bool:
             os.environ["LD_LIBRARY_PATH"] = updated_ld_path
             logger.debug(f"Updated LD_LIBRARY_PATH: {updated_ld_path}")
 
-    # 5. Preload CUDA libraries using ctypes for the current process
+    # 6. Preload CUDA libraries using ctypes for the current process
     # This is necessary because LD_LIBRARY_PATH changes don't affect
     # the current process's dynamic linker cache
     cuda_lib_names = [
