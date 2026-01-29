@@ -29,7 +29,7 @@
 VENV_PATH="/content/whisperjav_env"
 PYTORCH_INDEX="https://download.pytorch.org/whl/cu126"
 WHISPERJAV_REPO="https://github.com/meizhong986/WhisperJAV.git"
-WHISPERJAV_BRANCH="v1.8.2rc1"
+WHISPERJAV_BRANCH="v1.8.2-rc1"
 HF_WHEEL_REPO="mei986/whisperjav-wheels"
 LLAMA_CPP_VERSION="0.3.21"
 

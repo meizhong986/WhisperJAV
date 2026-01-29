@@ -375,7 +375,17 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
             cuda_dlls = [f for f in os.listdir(torch_lib)
                         if f.startswith(('cudart64_', 'cublas64_')) and f.endswith('.dll')]
             if cuda_dlls:
+                # 1. Add to current process's DLL search path
                 os.add_dll_directory(torch_lib)
+
+                # 2. Also add to PATH for subprocesses (e.g., llama_cpp.server)
+                # os.add_dll_directory() only affects the current process, not children
+                # Subprocesses inherit PATH, so we must update it for the server to work
+                existing_path = os.environ.get("PATH", "")
+                if torch_lib not in existing_path:
+                    os.environ["PATH"] = f"{torch_lib};{existing_path}"
+                    logger.debug(f"Added PyTorch lib to PATH for subprocesses: {torch_lib}")
+
                 paths_added.append(f"PyTorch lib: {torch_lib}")
                 logger.debug(f"Added PyTorch CUDA libs to DLL path: {torch_lib}")
                 logger.debug(f"Found CUDA DLLs in PyTorch: {cuda_dlls[:3]}...")  # Log first 3
@@ -396,7 +406,15 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
             cuda_bin = os.path.join(cuda_path, "bin")
             if os.path.exists(cuda_bin):
                 try:
+                    # 1. Add to current process's DLL search path
                     os.add_dll_directory(cuda_bin)
+
+                    # 2. Also add to PATH for subprocesses
+                    existing_path = os.environ.get("PATH", "")
+                    if cuda_bin not in existing_path:
+                        os.environ["PATH"] = f"{cuda_bin};{existing_path}"
+                        logger.debug(f"Added CUDA Toolkit to PATH for subprocesses: {cuda_bin}")
+
                     paths_added.append(f"CUDA Toolkit: {cuda_bin}")
                     logger.debug(f"Added CUDA Toolkit to DLL path: {cuda_bin}")
                 except Exception as e:
