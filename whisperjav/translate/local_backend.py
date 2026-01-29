@@ -32,12 +32,106 @@ import atexit
 import gc
 import logging
 import platform
+import re
 import socket
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
+
+
+@dataclass
+class ServerDiagnostics:
+    """Diagnostic information from server startup and health check.
+
+    This captures critical operational parameters that users NEED to know
+    to understand whether their system is capable of running local LLM translation.
+    """
+    # GPU/CPU status
+    gpu_layers_loaded: int = 0
+    total_layers: int = 0
+    using_cuda: bool = False
+    vram_used_gb: float = 0.0
+
+    # Inference performance
+    inference_speed_tps: float = 0.0  # tokens per second
+
+    # Derived
+    @property
+    def is_gpu_accelerated(self) -> bool:
+        """True if any layers are on GPU."""
+        return self.gpu_layers_loaded > 0 and self.using_cuda
+
+    @property
+    def gpu_offload_percent(self) -> float:
+        """Percentage of layers on GPU (0-100)."""
+        if self.total_layers == 0:
+            return 0.0
+        return (self.gpu_layers_loaded / self.total_layers) * 100
+
+    @property
+    def estimated_batch_time_seconds(self) -> float:
+        """Estimated time for a typical translation batch (1000 tokens output)."""
+        if self.inference_speed_tps <= 0:
+            return float('inf')
+        return 1000.0 / self.inference_speed_tps
+
+    def get_status_summary(self) -> str:
+        """Get a human-readable status summary for console output."""
+        if self.is_gpu_accelerated:
+            if self.gpu_offload_percent >= 100:
+                status = f"GPU: {self.gpu_layers_loaded} layers on CUDA"
+            else:
+                status = f"Partial GPU: {self.gpu_layers_loaded}/{self.total_layers} layers on CUDA ({self.gpu_offload_percent:.0f}%)"
+            if self.vram_used_gb > 0:
+                status += f", {self.vram_used_gb:.1f}GB VRAM"
+        else:
+            status = "CPU ONLY (no GPU acceleration)"
+
+        if self.inference_speed_tps > 0:
+            status += f" | Speed: {self.inference_speed_tps:.1f} tokens/sec"
+
+            # Add time estimate
+            batch_time = self.estimated_batch_time_seconds
+            if batch_time < 60:
+                status += f" (~{batch_time:.0f}s per batch)"
+            else:
+                status += f" (~{batch_time/60:.1f}min per batch)"
+
+        return status
+
+    def get_warnings(self) -> list[str]:
+        """Get list of warnings based on diagnostics."""
+        warnings = []
+
+        if not self.is_gpu_accelerated:
+            warnings.append(
+                "Running on CPU only - translation will be VERY slow (10-50x slower than GPU). "
+                "Consider using a smaller model or cloud provider."
+            )
+        elif self.gpu_offload_percent < 100:
+            warnings.append(
+                f"Only {self.gpu_offload_percent:.0f}% of model layers on GPU. "
+                "Partial offload is slower than full GPU or full CPU. "
+                "Try a smaller model or use --translate-gpu-layers 0 for CPU mode."
+            )
+
+        if self.inference_speed_tps > 0 and self.inference_speed_tps < 5:
+            warnings.append(
+                f"Very slow inference ({self.inference_speed_tps:.1f} tokens/sec). "
+                f"A typical batch may take {self.estimated_batch_time_seconds/60:.0f}+ minutes. "
+                "Translation timeout is likely. Use a smaller model or cloud provider."
+            )
+        elif self.inference_speed_tps > 0 and self.inference_speed_tps < 10:
+            warnings.append(
+                f"Slow inference ({self.inference_speed_tps:.1f} tokens/sec). "
+                f"Each batch may take {self.estimated_batch_time_seconds:.0f}+ seconds. "
+                "Consider using a smaller model for faster results."
+            )
+
+        return warnings
 
 # Import shared build utilities
 from .llama_build_utils import (
@@ -1219,7 +1313,77 @@ def _find_free_port() -> int:
         return s.getsockname()[1]
 
 
-def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str]]:
+def _parse_server_stderr(stderr_path: str) -> ServerDiagnostics:
+    """Parse llama-cpp-python server stderr to extract GPU/CUDA information.
+
+    llama-cpp-python logs critical info to stderr during startup:
+    - "llm_load_tensors: offloading X layers to GPU"
+    - "llm_load_tensors: VRAM used: X.XX GiB"
+    - "ggml_cuda_init: found X CUDA devices"
+    - Total layer count from model loading
+
+    Args:
+        stderr_path: Path to the stderr temp file
+
+    Returns:
+        ServerDiagnostics with parsed GPU/CUDA information
+    """
+    diag = ServerDiagnostics()
+
+    try:
+        with open(stderr_path, 'r', encoding='utf-8', errors='replace') as f:
+            stderr_content = f.read()
+    except Exception:
+        return diag
+
+    # Parse GPU layers offloaded
+    # llama-cpp-python logs multiple lines, we want the most informative one:
+    # - "offloading 33 repeating layers to GPU" (just count)
+    # - "offloaded 33/33 layers to GPU" (count AND total)
+    # Use findall to get all matches and prefer the one with total
+
+    # First, try the pattern with explicit total (X/Y format)
+    offload_with_total = re.search(r'offload(?:ing|ed)\s+(\d+)/(\d+)\s+layers?\s+to\s+GPU', stderr_content, re.IGNORECASE)
+    if offload_with_total:
+        diag.gpu_layers_loaded = int(offload_with_total.group(1))
+        diag.total_layers = int(offload_with_total.group(2))
+        diag.using_cuda = True
+    else:
+        # Fall back to pattern without total
+        offload_match = re.search(r'offload(?:ing|ed)\s+(\d+)\s+(?:repeating\s+)?layers?\s+to\s+GPU', stderr_content, re.IGNORECASE)
+        if offload_match:
+            diag.gpu_layers_loaded = int(offload_match.group(1))
+            diag.using_cuda = True
+
+    # Parse total layers if not found above
+    # Pattern: "llama_model_loader: - model has 35 layers"
+    if diag.total_layers == 0:
+        layers_match = re.search(r'model\s+has\s+(\d+)\s+layers', stderr_content, re.IGNORECASE)
+        if layers_match:
+            diag.total_layers = int(layers_match.group(1))
+
+    # Parse VRAM usage
+    # Pattern: "llm_load_tensors: VRAM used: 5.23 GiB" or "VRAM: 5.23 GB"
+    vram_match = re.search(r'VRAM(?:\s+used)?:\s*([\d.]+)\s*(?:GiB|GB)', stderr_content, re.IGNORECASE)
+    if vram_match:
+        diag.vram_used_gb = float(vram_match.group(1))
+
+    # Check for CUDA initialization
+    # Pattern: "ggml_cuda_init: found 1 CUDA devices"
+    cuda_match = re.search(r'(?:ggml_cuda_init|CUDA|cuda).*(?:found|device|initialized)', stderr_content, re.IGNORECASE)
+    if cuda_match:
+        diag.using_cuda = True
+
+    # Check for explicit CPU-only mode
+    # Pattern: "using CPU backend" or "no CUDA devices found"
+    cpu_only_match = re.search(r'(?:using\s+CPU|no\s+CUDA|CPU\s+only|CUDA.*not\s+available)', stderr_content, re.IGNORECASE)
+    if cpu_only_match and not diag.gpu_layers_loaded:
+        diag.using_cuda = False
+
+    return diag
+
+
+def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str], Optional[ServerDiagnostics]]:
     """Wait for server to be ready AND verify inference works.
 
     This function performs a two-phase readiness check:
@@ -1235,9 +1399,9 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
         max_wait: Maximum wait time in seconds (default 5 minutes for large models)
 
     Returns:
-        Tuple of (success, error_message)
-        - (True, None): Server is ready and inference verified
-        - (False, error_msg): Server failed with specific error
+        Tuple of (success, error_message, diagnostics)
+        - (True, None, ServerDiagnostics): Server is ready and inference verified
+        - (False, error_msg, None): Server failed with specific error
     """
     import json
     import urllib.request
@@ -1245,6 +1409,7 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
 
     start_time = time.time()
     last_log_time = start_time
+    diagnostics = ServerDiagnostics()
 
     # =========================================================================
     # Phase 1: Wait for HTTP server to be up
@@ -1258,11 +1423,11 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
         # Check timeout
         if elapsed > max_wait:
             logger.warning(f"Server startup timed out after {max_wait}s (HTTP not ready)")
-            return False, "Server HTTP endpoint did not become available"
+            return False, "Server HTTP endpoint did not become available", None
 
         # Check if process died
         if _server_process is not None and _server_process.poll() is not None:
-            return False, "Server process exited before becoming ready"
+            return False, "Server process exited before becoming ready", None
 
         # Periodic progress logging (every 30s)
         if time.time() - last_log_time > 30:
@@ -1281,26 +1446,30 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
             time.sleep(0.5)
 
     # =========================================================================
-    # Phase 2: Verify inference works (triggers lazy model loading)
+    # Phase 2: Verify inference works AND measure speed
     # =========================================================================
-    # This is the critical check that was missing - /v1/models responds before
-    # the model is actually loaded. We need to make a real inference request.
+    # This is critical - /v1/models responds before the model is loaded.
+    # We need a real inference request to verify CUDA works AND measure speed.
+    # Using 20 tokens gives a meaningful speed measurement while staying fast.
     completions_url = f"http://localhost:{port}/v1/completions"
 
-    # Minimal inference request - just verify the model loads and CUDA works
+    # Request enough tokens to get meaningful speed measurement
+    # 20 tokens takes ~0.5-2s on GPU, ~5-20s on CPU - enough to differentiate
     test_payload = json.dumps({
-        "prompt": "Hello",
-        "max_tokens": 1,
+        "prompt": "Count from 1 to 10:",
+        "max_tokens": 20,
         "temperature": 0.0
     }).encode('utf-8')
 
-    logger.info("Verifying model loads correctly (this may take a moment)...")
+    logger.info("Verifying model loads and measuring inference speed...")
 
     # Allow up to 120s for model loading on first inference
     # Large models (8B+) can take 30-60s to load into GPU memory
     inference_timeout = min(120, max_wait - (time.time() - start_time))
     if inference_timeout < 10:
         inference_timeout = 10  # Minimum 10s for inference check
+
+    inference_start = time.time()
 
     try:
         req = urllib.request.Request(
@@ -1312,11 +1481,29 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
 
         with urllib.request.urlopen(req, timeout=inference_timeout) as response:
             if response.status == 200:
-                # Read response to ensure it completed
-                response.read()
+                # Read and parse response for speed measurement
+                inference_elapsed = time.time() - inference_start
+                response_body = response.read().decode('utf-8', errors='replace')
+
+                # Parse response to get actual token count
+                try:
+                    response_data = json.loads(response_body)
+                    usage = response_data.get('usage', {})
+                    completion_tokens = usage.get('completion_tokens', 0)
+
+                    if completion_tokens > 0 and inference_elapsed > 0:
+                        # Calculate tokens per second
+                        # Note: First request includes model loading time, so this
+                        # is a lower bound. Real inference may be faster.
+                        diagnostics.inference_speed_tps = completion_tokens / inference_elapsed
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    # Fall back to rough estimate based on max_tokens
+                    if inference_elapsed > 0:
+                        diagnostics.inference_speed_tps = 20.0 / inference_elapsed
+
                 total_time = time.time() - start_time
                 logger.info(f"Server ready and inference verified ({total_time:.1f}s total)")
-                return True, None
+                return True, None, diagnostics
 
     except urllib.error.HTTPError as e:
         # Server returned an error status
@@ -1335,18 +1522,18 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
                 error_msg += " - Memory allocation error"
             logger.error(f"Inference verification failed: {error_msg}")
             logger.debug(f"Server error response: {error_body}")
-            return False, error_msg
+            return False, error_msg, None
 
         elif e.code == 503:
             # Service unavailable - model not loaded
-            return False, "Model failed to load (HTTP 503 Service Unavailable)"
+            return False, "Model failed to load (HTTP 503 Service Unavailable)", None
 
         else:
-            return False, f"Inference request failed (HTTP {e.code}): {error_body[:200]}"
+            return False, f"Inference request failed (HTTP {e.code}): {error_body[:200]}", None
 
     except urllib.error.URLError as e:
         # Connection error during inference
-        return False, f"Connection lost during inference verification: {e.reason}"
+        return False, f"Connection lost during inference verification: {e.reason}", None
 
     except TimeoutError:
         # Inference took too long - likely CPU mode or model loading stuck
@@ -1354,12 +1541,12 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
             f"Inference verification timed out after {inference_timeout}s. "
             "Model may be loading on CPU (very slow) or stuck. "
             "Try: --translate-gpu-layers 0 for explicit CPU mode"
-        )
+        ), None
 
     except Exception as e:
-        return False, f"Unexpected error during inference verification: {e}"
+        return False, f"Unexpected error during inference verification: {e}", None
 
-    return False, "Inference verification failed for unknown reason"
+    return False, "Inference verification failed for unknown reason", None
 
 
 def _release_gpu_memory():
@@ -1525,7 +1712,7 @@ def start_local_server(
     # The two-phase check (HTTP ready + inference verification) catches issues like #148
     # where the server starts but fails on first real request due to CUDA issues
     logger.info(f"Waiting for server on port {port} (this may take 1-2 minutes for large models)...")
-    server_ready, readiness_error = _wait_for_server(port)
+    server_ready, readiness_error, diagnostics = _wait_for_server(port)
 
     if not server_ready:
         # Get exit code and stderr if process died
@@ -1618,6 +1805,55 @@ def start_local_server(
             )
 
         raise RuntimeError(error_msg)
+
+    # =========================================================================
+    # Server ready - Parse stderr and report diagnostics
+    # =========================================================================
+    # Parse server stderr to get GPU layer info (complements speed measurement)
+    try:
+        stderr_file.close()
+        stderr_diagnostics = _parse_server_stderr(stderr_path)
+
+        # Merge stderr diagnostics with inference diagnostics
+        if diagnostics is None:
+            diagnostics = stderr_diagnostics
+        else:
+            # Prefer stderr info for GPU layers (more accurate than inference timing)
+            diagnostics.gpu_layers_loaded = stderr_diagnostics.gpu_layers_loaded
+            diagnostics.total_layers = stderr_diagnostics.total_layers
+            diagnostics.using_cuda = stderr_diagnostics.using_cuda or diagnostics.using_cuda
+            diagnostics.vram_used_gb = stderr_diagnostics.vram_used_gb
+    except Exception:
+        # Don't fail if diagnostics parsing fails
+        if diagnostics is None:
+            diagnostics = ServerDiagnostics()
+
+    # Report diagnostics to console - THIS IS CRITICAL FOR USER VISIBILITY
+    print("")
+    print("=" * 60)
+    print("  LOCAL LLM SERVER STATUS")
+    print("=" * 60)
+    print(f"  {diagnostics.get_status_summary()}")
+
+    # Show warnings prominently
+    warnings = diagnostics.get_warnings()
+    if warnings:
+        print("")
+        print("  " + "!" * 56)
+        print("  WARNINGS:")
+        for warning in warnings:
+            # Wrap warning text for console
+            for line in warning.split('. '):
+                print(f"    - {line.strip()}")
+        print("  " + "!" * 56)
+
+    print("=" * 60)
+    print("")
+
+    # Also log for programmatic access
+    logger.info(f"Server diagnostics: {diagnostics.get_status_summary()}")
+    for warning in warnings:
+        logger.warning(warning)
 
     api_base = f"http://127.0.0.1:{port}/v1"
     logger.info(f"Local server ready at {api_base}")
