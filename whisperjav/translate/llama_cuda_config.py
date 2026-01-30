@@ -32,24 +32,30 @@ OFFICIAL_CUDA_VERSIONS: Dict[str, Dict] = {
         "min_driver": (575, 0, 0),
         "on_huggingface": False,  # Dev only, uses JamePeng cascade
         "standalone_installer": False,
+        "wheel_version": "0.3.21",
     },
     "cu128": {
         "description": "CUDA 12.8 (primary)",
         "min_driver": (570, 0, 0),
         "on_huggingface": True,
         "standalone_installer": True,
+        "wheel_version": "0.3.21",
     },
     "cu126": {
         "description": "CUDA 12.6 (Colab)",
         "min_driver": (560, 0, 0),
         "on_huggingface": True,
         "standalone_installer": False,
+        "wheel_version": "0.3.21",
     },
     "cu118": {
-        "description": "CUDA 11.8 (legacy fallback)",
+        "description": "CUDA 11.8 (legacy, RTX 20 series/Turing)",
         "min_driver": (450, 0, 0),
-        "on_huggingface": True,  # Will be uploaded
+        "on_huggingface": True,
         "standalone_installer": True,
+        "wheel_version": "0.3.16",  # From dougeeai, sm75 only
+        "gpu_arch": "sm75",  # Turing only (RTX 20 series)
+        "notes": "Only supports RTX 20 series (Turing/sm75). RTX 30/40 users should use cu128.",
     },
 }
 
@@ -131,6 +137,25 @@ def is_on_huggingface(cuda_version: str) -> bool:
     """Check if wheels for this CUDA version are on HuggingFace."""
     config = OFFICIAL_CUDA_VERSIONS.get(cuda_version)
     return config.get("on_huggingface", False) if config else False
+
+
+def get_wheel_version(cuda_version: str) -> str:
+    """
+    Get the llama-cpp-python wheel version for a specific CUDA version.
+
+    Different CUDA versions may have different wheel versions available.
+    For example, cu118 uses 0.3.16 (from dougeeai) while others use 0.3.21.
+
+    Args:
+        cuda_version: CUDA version (e.g., "cu128", "cu118")
+
+    Returns:
+        Wheel version string (e.g., "0.3.21")
+    """
+    config = OFFICIAL_CUDA_VERSIONS.get(cuda_version)
+    if config and "wheel_version" in config:
+        return config["wheel_version"]
+    return HUGGINGFACE_WHEEL_VERSION  # Default
 
 
 def is_standalone_supported(cuda_version: str) -> bool:

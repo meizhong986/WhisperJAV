@@ -1111,11 +1111,14 @@ def print_installation_summary(install_start_time: float):
 # =============================================================================
 
 OFFICIAL_CUDA_VERSIONS = {
-    "cu130": {"description": "CUDA 13.0 (dev)", "min_driver": (575, 0, 0), "on_huggingface": False},
-    "cu128": {"description": "CUDA 12.8 (primary)", "min_driver": (570, 0, 0), "on_huggingface": True},
-    "cu126": {"description": "CUDA 12.6 (Colab)", "min_driver": (560, 0, 0), "on_huggingface": True},
-    "cu118": {"description": "CUDA 11.8 (fallback)", "min_driver": (450, 0, 0), "on_huggingface": True},
+    "cu130": {"description": "CUDA 13.0 (dev)", "min_driver": (575, 0, 0), "on_huggingface": False, "wheel_version": "0.3.21"},
+    "cu128": {"description": "CUDA 12.8 (primary)", "min_driver": (570, 0, 0), "on_huggingface": True, "wheel_version": "0.3.21"},
+    "cu126": {"description": "CUDA 12.6 (Colab)", "min_driver": (560, 0, 0), "on_huggingface": True, "wheel_version": "0.3.21"},
+    "cu118": {"description": "CUDA 11.8 (RTX 20/Turing)", "min_driver": (450, 0, 0), "on_huggingface": True, "wheel_version": "0.3.16", "gpu_arch": "sm75"},
 }
+
+# Default wheel version (used if not specified per-CUDA)
+HUGGINGFACE_WHEEL_VERSION = "0.3.21"
 
 # Backward compatibility: newer driver can run older wheels
 CUDA_FALLBACK_ORDER = ["cu130", "cu128", "cu126", "cu118"]
@@ -1134,7 +1137,13 @@ STANDALONE_CUDA_VERSIONS = ["cu128", "cu118"]
 # set used for non-GPU code paths (matrix operations that don't use CUDA).
 #
 HF_WHEEL_REPO = "mei986/whisperjav-wheels"
-HF_WHEEL_VERSION = "0.3.21"  # llama-cpp-python version in our wheel repo
+HF_WHEEL_VERSION = "0.3.21"  # Default llama-cpp-python version (may vary per CUDA)
+
+
+def get_wheel_version_for_cuda(cuda_version: str) -> str:
+    """Get wheel version for a specific CUDA version (may differ per CUDA)."""
+    config = OFFICIAL_CUDA_VERSIONS.get(cuda_version, {})
+    return config.get("wheel_version", HF_WHEEL_VERSION)
 
 
 def get_installed_pytorch_cuda_version() -> Optional[str]:
@@ -1257,13 +1266,15 @@ def get_huggingface_wheel_info(pytorch_cuda: Optional[str] = None) -> Tuple[Opti
 
     # Build wheel filename and URL
     # Format: llama_cpp_python-{version}-{pyver}-{pyver}-{platform}.whl
-    wheel_filename = f"llama_cpp_python-{HF_WHEEL_VERSION}-{py_ver}-{py_ver}-{plat_tag}.whl"
+    # Note: wheel version may vary per CUDA (e.g., cu118 uses 0.3.16)
+    wheel_version = get_wheel_version_for_cuda(backend)
+    wheel_filename = f"llama_cpp_python-{wheel_version}-{py_ver}-{py_ver}-{plat_tag}.whl"
     wheel_path = f"llama-cpp-python/{backend}/{wheel_filename}"
 
     # HuggingFace direct download URL
     wheel_url = f"https://huggingface.co/datasets/{HF_WHEEL_REPO}/resolve/main/{wheel_path}"
 
-    return wheel_url, wheel_filename, f"CUDA ({backend} HuggingFace wheel v{HF_WHEEL_VERSION})"
+    return wheel_url, wheel_filename, f"CUDA ({backend} HuggingFace wheel v{wheel_version})"
 
 
 def download_huggingface_wheel(pytorch_cuda: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:

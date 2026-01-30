@@ -147,6 +147,7 @@ from .llama_cuda_config import (
     OFFICIAL_CUDA_VERSIONS,
     FALLBACK_ORDER,
     HUGGINGFACE_WHEEL_VERSION,
+    get_wheel_version,
 )
 
 logger = logging.getLogger(__name__)
@@ -887,10 +888,14 @@ def _get_wheel_filenames(cuda_version: Optional[str] = None) -> Tuple[list, str]
     else:
         backend = "cpu"
 
+    # Get wheel version for this CUDA version (may differ per CUDA version)
+    # e.g., cu118 uses 0.3.16 while others use 0.3.21
+    wheel_version = get_wheel_version(cuda_version) if cuda_version else WHEEL_VERSION
+
     # Build wheel filenames for all platform tag variants
     # Format: llama_cpp_python-{version}-{pyver}-{pyver}-{platform}.whl
     wheel_names = [
-        f"llama_cpp_python-{WHEEL_VERSION}-{py_ver}-{py_ver}-{plat_tag}.whl"
+        f"llama_cpp_python-{wheel_version}-{py_ver}-{py_ver}-{plat_tag}.whl"
         for plat_tag in plat_tags
     ]
 
