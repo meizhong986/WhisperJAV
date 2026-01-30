@@ -379,15 +379,17 @@ Same design as US6. Custom folder users follow the same uninstall-then-reinstall
 
 ## Appendix A: NVIDIA Driver to CUDA Mapping
 
-**Note**: CUDA 13.x is NOT supported - no PyTorch wheels available.
+**Official CUDA versions** (see `llama_cuda_config.py` for authoritative source):
+- cu128: Primary (standalone installer)
+- cu126: Google Colab
+- cu118: Legacy fallback
 
-| Driver Version | CUDA Support | PyTorch Index URL |
-|----------------|--------------|-------------------|
-| 570.65+ | CUDA 12.8 | cu128 |
-| 560.76+ | CUDA 12.6 | cu126 |
-| 551.61+ | CUDA 12.4 | cu124 |
-| 531.14+ | CUDA 12.1 | cu121 |
-| 520.6+ | CUDA 11.8 | cu118 |
+| Driver Version | CUDA Support | Wheel Priority |
+|----------------|--------------|----------------|
+| 575.0+ | CUDA 13.0 | cu130 (dev only, not on HuggingFace) |
+| 570.0+ | CUDA 12.8 | cu128 (primary) |
+| 560.0+ | CUDA 12.6 | cu126 (Colab) |
+| 450.0+ | CUDA 11.8 | cu118 (legacy fallback) |
 
 ## Appendix B: File Reference
 

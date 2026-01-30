@@ -285,6 +285,12 @@ def main():
         type=int,
         help=f"Max batch size (default: {settings.get('max_batch_size', 30)})"
     )
+    process_group.add_argument(
+        '--translate-gpu-layers',
+        type=int,
+        default=-1,
+        help="GPU layers for local LLM: -1=all (default), 0=CPU only, N=specific count"
+    )
 
     # Instructions
     instr_group = parser.add_argument_group("Instructions")
@@ -427,6 +433,28 @@ def main():
     # Build extra context
     extra_context = build_extra_context(args)
 
+    # =========================================================================
+    # DIAGNOSTIC: CLI Configuration Summary
+    # =========================================================================
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"  WHISPERJAV TRANSLATE - CLI Configuration", file=sys.stderr)
+    print(f"{'='*60}", file=sys.stderr)
+    print(f"  Files to process: {len(files_to_process)}", file=sys.stderr)
+    print(f"  Provider: {provider_name}", file=sys.stderr)
+    print(f"  Model: {model}", file=sys.stderr)
+    print(f"  Source: {source_lang} -> Target: {target_lang}", file=sys.stderr)
+    print(f"  Tone: {effective_tone}", file=sys.stderr)
+    print(f"  Scene threshold: {merged.get('scene_threshold', 60.0)}s", file=sys.stderr)
+    print(f"  Max batch size: {merged.get('max_batch_size', 30)}", file=sys.stderr)
+    if instruction_file:
+        print(f"  Instructions: {instruction_file}", file=sys.stderr)
+    print(f"  Provider options: {provider_options}", file=sys.stderr)
+    if provider_name == 'local':
+        n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)
+        print(f"  NOTE: Local LLM provider - server will be started", file=sys.stderr)
+        print(f"  GPU layers: {n_gpu_layers} (-1=all, 0=CPU only)", file=sys.stderr)
+    print(f"{'='*60}\n", file=sys.stderr)
+
     # Batch translation loop
     success_count = 0
     fail_count = 0
@@ -463,21 +491,29 @@ def main():
 
                 # Start local LLM server (only once for batch)
                 if i == 0:
+                    n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)
+                    print(f"\n[CLI] Starting local LLM server...", file=sys.stderr)
+                    print(f"[CLI]   Model: {model}", file=sys.stderr)
+                    print(f"[CLI]   GPU layers: {n_gpu_layers} (-1=all, 0=CPU)", file=sys.stderr)
                     try:
-                        api_base, _ = start_local_server(model=model)
+                        api_base, server_port = start_local_server(model=model, n_gpu_layers=n_gpu_layers)
+                        print(f"[CLI]   Server ready at: {api_base}", file=sys.stderr)
                     except Exception as e:
-                        print(f"Error: Failed to start local server: {e}", file=sys.stderr)
+                        print(f"[CLI] ERROR: Failed to start local server: {e}", file=sys.stderr)
                         sys.exit(1)
 
                 # Use Custom Server provider - designed for local OpenAI-compatible servers
                 # This uses /v1/chat/completions endpoint which llama-cpp-python supports
+                server_address = api_base.replace('/v1', '')
                 local_provider_config = {
                     'pysubtrans_name': 'Custom Server',
-                    'server_address': api_base.replace('/v1', ''),  # Custom Server adds endpoint itself
+                    'server_address': server_address,
                     'endpoint': '/v1/chat/completions',
                     'supports_conversation': True,
                     'supports_system_messages': True,
                 }
+                if i == 0:
+                    print(f"[CLI]   PySubtrans config: Custom Server at {server_address}", file=sys.stderr)
 
                 try:
                     result_path = translate_subtitle(
@@ -500,7 +536,9 @@ def main():
                 finally:
                     # Stop server after last file
                     if i == len(files_to_process) - 1:
+                        print(f"\n[CLI] Stopping local LLM server...", file=sys.stderr)
                         stop_local_server()
+                        print(f"[CLI]   Server stopped, GPU memory released", file=sys.stderr)
             else:
                 result_path = translate_subtitle(
                     input_path=str(input_path),

@@ -37,6 +37,27 @@ def translate_subtitle(
             init_project
         )
 
+        # =========================================================================
+        # DIAGNOSTIC: Translation Configuration
+        # =========================================================================
+        print(f"\n[TRANSLATE] PySubtrans Configuration:", file=sys.stderr)
+        print(f"[TRANSLATE]   Input: {input_path}", file=sys.stderr)
+        print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
+        print(f"[TRANSLATE]   Provider: {provider_config.get('pysubtrans_name', 'unknown')}", file=sys.stderr)
+        print(f"[TRANSLATE]   Model: {model}", file=sys.stderr)
+        print(f"[TRANSLATE]   Source lang: {source_lang} -> Target lang: {target_lang}", file=sys.stderr)
+        print(f"[TRANSLATE]   Max batch size: {max_batch_size}", file=sys.stderr)
+        print(f"[TRANSLATE]   Scene threshold: {scene_threshold}s", file=sys.stderr)
+        print(f"[TRANSLATE]   Streaming: {stream}", file=sys.stderr)
+
+        # Log provider-specific settings
+        if 'server_address' in provider_config:
+            print(f"[TRANSLATE]   Server address: {provider_config['server_address']}", file=sys.stderr)
+        if 'endpoint' in provider_config:
+            print(f"[TRANSLATE]   Endpoint: {provider_config['endpoint']}", file=sys.stderr)
+        if 'api_base' in provider_config:
+            print(f"[TRANSLATE]   API base: {provider_config['api_base']}", file=sys.stderr)
+
         # Build prompt
         prompt = f"Translate these subtitles from {source_lang} into {target_lang}."
         if extra_context:
@@ -73,33 +94,72 @@ def translate_subtitle(
         # Merge provider-specific options
         if provider_options:
             opt_kwargs.update(provider_options)
+            print(f"[TRANSLATE]   Provider options: temperature={provider_options.get('temperature')}, top_p={provider_options.get('top_p')}", file=sys.stderr)
+
+        # =========================================================================
+        # DIAGNOSTIC: Final opt_kwargs (what PySubtrans actually receives)
+        # =========================================================================
+        if debug:
+            print(f"[TRANSLATE] Full opt_kwargs for PySubtrans:", file=sys.stderr)
+            for k, v in opt_kwargs.items():
+                # Don't log API key
+                if k == 'api_key':
+                    print(f"[TRANSLATE]   {k}: {'*' * 8 if v else '(empty)'}", file=sys.stderr)
+                elif k == 'prompt':
+                    print(f"[TRANSLATE]   {k}: {v[:50]}...", file=sys.stderr)
+                else:
+                    print(f"[TRANSLATE]   {k}: {v}", file=sys.stderr)
 
         # Initialize options and provider
+        print(f"[TRANSLATE] Initializing PySubtrans options...", file=sys.stderr)
         options = init_options(**opt_kwargs)
 
         # Initialize provider
+        print(f"[TRANSLATE] Initializing provider: {provider_config['pysubtrans_name']}...", file=sys.stderr)
         provider = init_translation_provider(provider_config['pysubtrans_name'], options)
+
+        # Validate provider settings
         if hasattr(provider, 'ValidateSettings') and not provider.ValidateSettings():
             msg = getattr(provider, 'validation_message', 'Invalid provider settings')
-            print(f"ERROR: Provider validation failed: {msg}", file=sys.stderr)
+            print(f"[TRANSLATE] ERROR: Provider validation failed: {msg}", file=sys.stderr)
             return None
+        print(f"[TRANSLATE]   Provider initialized and validated", file=sys.stderr)
+
+        # Log provider internals for debugging (if available)
+        if debug:
+            if hasattr(provider, 'client') and provider.client:
+                client = provider.client
+                if hasattr(client, 'settings'):
+                    settings = client.settings
+                    print(f"[TRANSLATE]   Client timeout: {getattr(settings, 'timeout', 'unknown')}", file=sys.stderr)
+                    print(f"[TRANSLATE]   Client server_address: {getattr(settings, 'server_address', 'unknown')}", file=sys.stderr)
+                    print(f"[TRANSLATE]   Client endpoint: {getattr(settings, 'endpoint', 'unknown')}", file=sys.stderr)
 
         # Initialize project (PySubtrans 1.5.x expects subtitle path in 'filepath' kwarg)
+        print(f"[TRANSLATE] Loading subtitle project...", file=sys.stderr)
         project = init_project(options, filepath=str(input_path), persistent=True)
 
         # Check if resuming from existing project
         if hasattr(project, 'existing_project') and project.existing_project:
-            print("Resuming translation from existing project file...", file=sys.stderr)
+            print("[TRANSLATE]   Resuming from existing project file (.subtrans)", file=sys.stderr)
             if hasattr(project, 'subtitles') and project.subtitles:
                 if hasattr(project.subtitles, 'any_translated') and project.subtitles.any_translated:
-                    print("Found previously translated content - will skip already-translated batches", file=sys.stderr)
+                    print("[TRANSLATE]   Found previously translated content - will skip already-translated batches", file=sys.stderr)
+        else:
+            print(f"[TRANSLATE]   New project created", file=sys.stderr)
+
+        # Log subtitle count
+        if hasattr(project, 'subtitles') and project.subtitles:
+            subtitle_count = len(project.subtitles) if hasattr(project.subtitles, '__len__') else 'unknown'
+            print(f"[TRANSLATE]   Subtitle lines: {subtitle_count}", file=sys.stderr)
 
         # Set instructions if provided
         if instruction_file is not None and hasattr(project, 'SetInstructions'):
             try:
                 project.SetInstructions(str(instruction_file))
-            except Exception:
-                pass
+                print(f"[TRANSLATE]   Instructions loaded from: {instruction_file}", file=sys.stderr)
+            except Exception as e:
+                print(f"[TRANSLATE]   Warning: Could not load instructions: {e}", file=sys.stderr)
 
         # Register auto-save handler to save project after each batch
         if hasattr(project, 'events') and hasattr(project.events, 'batch_translated'):
@@ -114,12 +174,14 @@ def translate_subtitle(
             project.events.batch_translated.connect(_auto_save_handler)
 
         # Initialize translator and translate
+        print(f"[TRANSLATE] Initializing translator...", file=sys.stderr)
         translator = init_translator(options, translation_provider=provider)
 
         # Enable resume mode to skip already-translated batches when resuming
         # This is critical for interrupted translations - without it, the translator
         # will re-translate everything from the beginning even if a .subtrans file exists
         translator.resume = True
+        print(f"[TRANSLATE]   Resume mode: enabled (will skip already-translated batches)", file=sys.stderr)
 
         if emit_raw_output:
             def _emit_raw(message):
@@ -148,28 +210,61 @@ def translate_subtitle(
             # Without this, the wrappers are replaced but never actually receive events
             translator.events.connect_default_loggers()
 
-        # Translate subtitles
-        project.TranslateSubtitles(translator)
+        # =========================================================================
+        # DIAGNOSTIC: Translation Start
+        # =========================================================================
+        import time as _time
+        _translation_start = _time.time()
+        _translation_success = False
+        print(f"\n[TRANSLATE] Starting translation...", file=sys.stderr)
+        print(f"[TRANSLATE]   This may take several minutes depending on batch size and model speed.", file=sys.stderr)
+        print(f"[TRANSLATE]   If using local LLM, watch for timeout errors (consider smaller batch size).", file=sys.stderr)
+        print(f"", file=sys.stderr)
+
+        # Translate subtitles (with timing regardless of success/failure)
+        try:
+            project.TranslateSubtitles(translator)
+            _translation_success = True
+        finally:
+            _translation_elapsed = _time.time() - _translation_start
+            if _translation_success:
+                print(f"\n[TRANSLATE] Translation completed in {_translation_elapsed:.1f}s", file=sys.stderr)
+            else:
+                print(f"\n[TRANSLATE] Translation FAILED after {_translation_elapsed:.1f}s", file=sys.stderr)
 
         # Save final project state after successful translation
+        print(f"[TRANSLATE] Saving project state...", file=sys.stderr)
         if hasattr(project, 'SaveProject'):
             try:
                 project.SaveProject()
-            except Exception:
-                pass  # Don't fail on final save
+                print(f"[TRANSLATE]   Project state saved (.subtrans file)", file=sys.stderr)
+            except Exception as e:
+                print(f"[TRANSLATE]   Warning: Could not save project state: {e}", file=sys.stderr)
 
         # Save translation
+        print(f"[TRANSLATE] Saving translated subtitles...", file=sys.stderr)
         saved_path = None
         try:
             saved_path = project.SaveTranslation(str(output_path))
         except TypeError:
             saved_path = project.SaveTranslation()
-        except Exception:
+        except Exception as e:
+            print(f"[TRANSLATE]   Warning: SaveTranslation error: {e}", file=sys.stderr)
             saved_path = None
 
         # Convert to Path if needed
         if isinstance(saved_path, (str, Path)):
             output_path = Path(saved_path)
+
+        # =========================================================================
+        # DIAGNOSTIC: Final Summary
+        # =========================================================================
+        print(f"", file=sys.stderr)
+        print(f"[TRANSLATE] " + "=" * 50, file=sys.stderr)
+        print(f"[TRANSLATE]   TRANSLATION COMPLETE", file=sys.stderr)
+        print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
+        print(f"[TRANSLATE] " + "=" * 50, file=sys.stderr)
+        print(f"", file=sys.stderr)
 
         return output_path
 

@@ -591,11 +591,11 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
             print("  1. Ensure you have an NVIDIA GPU")
             print("  2. Install latest NVIDIA drivers from nvidia.com")
             print("  3. Reinstall PyTorch with CUDA:")
-            print("     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
+            print("     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128")
         else:
             print("  Linux detected:")
             print("  1. For NVIDIA GPUs:")
-            print("     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
+            print("     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128")
             print("  2. For AMD GPUs (experimental):")
             print("     See https://pytorch.org/get-started/locally/ for ROCm installation")
 
@@ -624,7 +624,7 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
         print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
         print("WhisperJAV requires PyTorch to function.")
         print("Please install it using:\n")
-        print("  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
+        print("  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128")
         print("\nOr for CPU-only (slower):")
         print("  pip install torch torchvision torchaudio")
         print(f"\n{Fore.RED}{'='*70}{Style.RESET_ALL}\n")

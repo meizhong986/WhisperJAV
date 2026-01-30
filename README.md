@@ -627,7 +627,7 @@ Run `whisperjav --help` for all options.
 **Slow processing / GPU warning**: Your PyTorch might be CPU-only. Reinstall with GPU support:
 ```bash
 pip uninstall torch torchvision torchaudio
-pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 ```
 
 **model.bin error in faster mode**: Enable Windows Developer Mode or run as Administrator, then delete the cached model folder:

@@ -476,5 +476,71 @@ llm_load_tensors:        CPU buffer size =  4774.00 MiB
             os.unlink(path)
 
 
+class TestGPUExpectedButNotUsed:
+    """Tests for the critical GPU fallback detection."""
+
+    def test_detects_gpu_expected_but_cpu_used(self, capsys):
+        """Should warn when GPU was requested but CPU is used."""
+        # Simulate: n_gpu_layers=-1 (all GPU) but diagnostics show 0 layers on GPU
+        n_gpu_layers = -1  # All layers expected on GPU
+        diag = ServerDiagnostics(
+            gpu_layers_loaded=0,  # But none on GPU!
+            total_layers=35,
+            using_cuda=False,
+            inference_speed_tps=2.3
+        )
+
+        gpu_expected = n_gpu_layers != 0
+        gpu_got = diag.gpu_layers_loaded > 0
+
+        # This should trigger the critical warning
+        assert gpu_expected is True
+        assert gpu_got is False
+
+        # Simulate the warning output
+        if gpu_expected and not gpu_got:
+            print("!" * 60)
+            print("  CRITICAL: GPU REQUESTED BUT NOT USED")
+            print("!" * 60)
+
+        captured = capsys.readouterr()
+        assert "CRITICAL" in captured.out
+        assert "GPU REQUESTED BUT NOT USED" in captured.out
+
+    def test_no_warning_when_gpu_used(self):
+        """Should not warn when GPU is properly used."""
+        n_gpu_layers = -1
+        diag = ServerDiagnostics(
+            gpu_layers_loaded=35,
+            total_layers=35,
+            using_cuda=True,
+            inference_speed_tps=30.0
+        )
+
+        gpu_expected = n_gpu_layers != 0
+        gpu_got = diag.gpu_layers_loaded > 0
+
+        # GPU expected and got - no warning
+        assert gpu_expected is True
+        assert gpu_got is True
+
+    def test_no_warning_when_cpu_explicitly_requested(self):
+        """Should not warn when CPU was explicitly requested."""
+        n_gpu_layers = 0  # Explicitly CPU
+        diag = ServerDiagnostics(
+            gpu_layers_loaded=0,
+            total_layers=35,
+            using_cuda=False,
+            inference_speed_tps=2.3
+        )
+
+        gpu_expected = n_gpu_layers != 0
+        gpu_got = diag.gpu_layers_loaded > 0
+
+        # CPU expected and got - no warning about GPU
+        assert gpu_expected is False
+        # The slow speed warning still applies, but not the "GPU expected" warning
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

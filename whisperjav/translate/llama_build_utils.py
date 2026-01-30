@@ -10,7 +10,15 @@ This module provides helper functions for:
 Used by:
 - install.py
 - local_backend.py
-- post_install.py (installer)
+- post_install.py (installer) - NOTE: post_install.py has its own copy
+  because it runs before whisperjav is installed
+
+CUDA VERSION SUPPORT:
+    Only 4 CUDA versions are officially supported (see llama_cuda_config.py):
+    - cu128: Primary (standalone installer)
+    - cu118: Fallback (standalone installer)
+    - cu126: Google Colab
+    - cu130: Development only
 """
 
 import json
@@ -23,6 +31,14 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple, Dict
+
+# Import centralized CUDA config
+from .llama_cuda_config import (
+    OFFICIAL_CUDA_VERSIONS,
+    FALLBACK_ORDER,
+    get_compatible_cuda_versions,
+    is_on_huggingface,
+)
 
 
 def get_cuda_architecture() -> Optional[str]:
@@ -109,14 +125,16 @@ def detect_cuda_version() -> Optional[str]:
             # Map driver version to CUDA version
             # Reference: https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/
             major = int(driver_ver.split(".")[0])
-            if major >= 570:
-                return "cu128"
+            # Map driver to CUDA version based on official support matrix
+            # (see llama_cuda_config.py for authoritative min_driver values)
+            if major >= 575:
+                return "cu130"  # Development only
+            elif major >= 570:
+                return "cu128"  # Primary
             elif major >= 560:
-                return "cu126"
-            elif major >= 550:
-                return "cu124"
-            elif major >= 520:
-                return "cu118"
+                return "cu126"  # Colab
+            elif major >= 450:
+                return "cu118"  # Legacy fallback
     except Exception:
         pass
 
@@ -170,17 +188,21 @@ def get_prebuilt_wheel_url(
     # Python version
     py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
 
-    # Build search criteria for CUDA versions (try newer first, fallback to older)
+    # Build search criteria for CUDA versions
+    # Key insight: CUDA is backward compatible - newer systems can run older wheels
+    # So we try the exact version first, then fall back to older versions
+    #
+    # IMPORTANT: Only 4 CUDA versions are officially supported:
+    #   cu128, cu118, cu126, cu130 (see llama_cuda_config.py)
+
     target_cudas = []
     if cuda_version and sys.platform in ("win32", "linux"):
-        if cuda_version >= "cu128":
-            target_cudas = ["cu128", "cu126", "cu124", "cu118"]
-        elif cuda_version >= "cu126":
-            target_cudas = ["cu126", "cu124", "cu118"]
-        elif cuda_version >= "cu124":
-            target_cudas = ["cu124", "cu118"]
-        elif cuda_version >= "cu118":
-            target_cudas = ["cu118"]
+        # Get compatible versions from centralized config
+        target_cudas = get_compatible_cuda_versions(cuda_version)
+
+        if not target_cudas:
+            # Fallback if parsing fails - use all official versions
+            target_cudas = list(FALLBACK_ORDER)
 
     if verbose:
         print(f"    Searching for prebuilt wheel: {os_tag}, {py_ver}, platform={wheel_platform}")

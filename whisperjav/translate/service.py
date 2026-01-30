@@ -24,6 +24,7 @@ Usage from main.py:
 
 import logging
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Callable, Optional
@@ -305,6 +306,25 @@ def translate_with_config(
     logger.debug(f"Provider: {provider} ({resolved_model})")
     logger.debug(f"Tone: {tone}")
 
+    # =========================================================================
+    # DIAGNOSTIC: Configuration Summary
+    # =========================================================================
+    print(f"\n[SERVICE] Translation Configuration:", file=sys.stderr)
+    print(f"[SERVICE]   Input file: {input_file}", file=sys.stderr)
+    print(f"[SERVICE]   Output file: {resolved_output_path}", file=sys.stderr)
+    print(f"[SERVICE]   Provider: {provider}", file=sys.stderr)
+    print(f"[SERVICE]   Model: {resolved_model}", file=sys.stderr)
+    print(f"[SERVICE]   Source: {source_lang} -> Target: {target_lang}", file=sys.stderr)
+    print(f"[SERVICE]   Tone: {tone}", file=sys.stderr)
+    print(f"[SERVICE]   Max batch size: {resolved_max_batch_size}", file=sys.stderr)
+    print(f"[SERVICE]   Scene threshold: {resolved_scene_threshold}s", file=sys.stderr)
+    print(f"[SERVICE]   Stream: {stream}", file=sys.stderr)
+    print(f"[SERVICE]   Provider options: {provider_options}", file=sys.stderr)
+    if resolved_instruction_file:
+        print(f"[SERVICE]   Instructions: {resolved_instruction_file}", file=sys.stderr)
+    else:
+        print(f"[SERVICE]   Instructions: (none)", file=sys.stderr)
+
     # Report progress if callback provided
     if progress_callback:
         progress_callback(f"Translating {input_file.name} from {source_lang} to {target_lang}...")
@@ -316,24 +336,40 @@ def translate_with_config(
         if provider == 'local':
             from .local_backend import start_local_server, stop_local_server
 
+            # =========================================================================
+            # DIAGNOSTIC: Local LLM Provider
+            # =========================================================================
+            print(f"\n[SERVICE] Local LLM Provider Mode", file=sys.stderr)
+            print(f"[SERVICE]   n_gpu_layers: {n_gpu_layers} (-1 = all layers on GPU)", file=sys.stderr)
+
             # Start local LLM server
+            print(f"[SERVICE] Starting local LLM server...", file=sys.stderr)
             try:
-                api_base, _ = start_local_server(
+                api_base, server_port = start_local_server(
                     model=resolved_model,
                     n_gpu_layers=n_gpu_layers
                 )
+                print(f"[SERVICE]   Server started at: {api_base}", file=sys.stderr)
+                print(f"[SERVICE]   Port: {server_port}", file=sys.stderr)
             except Exception as e:
+                print(f"[SERVICE]   ERROR: Failed to start local server: {e}", file=sys.stderr)
                 raise TranslationError(f"Failed to start local server: {e}")
 
             # Use Custom Server provider - designed for local OpenAI-compatible servers
             # This uses /v1/chat/completions endpoint which llama-cpp-python supports
+            server_address = api_base.replace('/v1', '')
             local_provider_config = {
                 'pysubtrans_name': 'Custom Server',
-                'server_address': api_base.replace('/v1', ''),  # Custom Server adds endpoint itself
+                'server_address': server_address,
                 'endpoint': '/v1/chat/completions',
                 'supports_conversation': True,
                 'supports_system_messages': True,
             }
+
+            print(f"[SERVICE] Local provider config for PySubtrans:", file=sys.stderr)
+            print(f"[SERVICE]   pysubtrans_name: Custom Server", file=sys.stderr)
+            print(f"[SERVICE]   server_address: {server_address}", file=sys.stderr)
+            print(f"[SERVICE]   endpoint: /v1/chat/completions", file=sys.stderr)
 
             try:
                 result_path = translate_subtitle(
@@ -355,8 +391,18 @@ def translate_with_config(
                 )
             finally:
                 # Always stop server when done
+                print(f"[SERVICE] Stopping local LLM server...", file=sys.stderr)
                 stop_local_server()
+                print(f"[SERVICE]   Server stopped, GPU memory released", file=sys.stderr)
         else:
+            # =========================================================================
+            # DIAGNOSTIC: Cloud Provider
+            # =========================================================================
+            print(f"\n[SERVICE] Cloud Provider Mode: {provider}", file=sys.stderr)
+            print(f"[SERVICE]   Using provider config: {provider_config.get('pysubtrans_name', provider)}", file=sys.stderr)
+            if 'api_base' in provider_config:
+                print(f"[SERVICE]   API base: {provider_config['api_base']}", file=sys.stderr)
+
             result_path = translate_subtitle(
                 input_path=str(input_file),
                 output_path=resolved_output_path,

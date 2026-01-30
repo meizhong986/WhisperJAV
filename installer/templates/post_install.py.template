@@ -1095,25 +1095,96 @@ def print_installation_summary(install_start_time: float):
 # ==============================================================================
 # llama-cpp-python Installation (Local LLM Translation)
 # ==============================================================================
+#
+# CUDA VERSION SUPPORT - SINGLE SOURCE OF TRUTH
+# =============================================================================
+# This section MUST stay in sync with whisperjav/translate/llama_cuda_config.py
+#
+# Only 4 CUDA versions are officially supported:
+#   - cu128: Primary (standalone installer, driver 570+)
+#   - cu118: Fallback (standalone installer, driver 450+)
+#   - cu126: Google Colab (driver 560+)
+#   - cu130: Development only (driver 575+)
+#
+# NOTE: post_install.py runs BEFORE whisperjav is installed, so it cannot
+# import from llama_cuda_config.py. This config is duplicated here.
+# =============================================================================
 
-# HuggingFace wheel repository - AVX2 builds that work on most CPUs
-# These wheels do NOT have AVX512, making them compatible with AMD Zen 2/3 CPUs
+OFFICIAL_CUDA_VERSIONS = {
+    "cu130": {"description": "CUDA 13.0 (dev)", "min_driver": (575, 0, 0), "on_huggingface": False},
+    "cu128": {"description": "CUDA 12.8 (primary)", "min_driver": (570, 0, 0), "on_huggingface": True},
+    "cu126": {"description": "CUDA 12.6 (Colab)", "min_driver": (560, 0, 0), "on_huggingface": True},
+    "cu118": {"description": "CUDA 11.8 (fallback)", "min_driver": (450, 0, 0), "on_huggingface": True},
+}
+
+# Backward compatibility: newer driver can run older wheels
+CUDA_FALLBACK_ORDER = ["cu130", "cu128", "cu126", "cu118"]
+
+# Standalone installer (.exe) only supports these two
+STANDALONE_CUDA_VERSIONS = ["cu128", "cu118"]
+
+# HuggingFace wheel repository for pre-built CUDA wheels
+#
+# Why HuggingFace instead of JamePeng GitHub:
+#   - JamePeng's "Basic" builds include AVX512 CPU instructions, which crash on AMD Ryzen
+#   - Our HuggingFace wheels are built with AVX2 only (no AVX512)
+#   - This ensures compatibility with both Intel and AMD CPUs
+#
+# The wheels ARE CUDA/GPU wheels - the AVX2 comment refers to the CPU instruction
+# set used for non-GPU code paths (matrix operations that don't use CUDA).
+#
 HF_WHEEL_REPO = "mei986/whisperjav-wheels"
 HF_WHEEL_VERSION = "0.3.21"  # llama-cpp-python version in our wheel repo
 
 
-def get_huggingface_wheel_info() -> Tuple[Optional[str], Optional[str], str]:
+def get_installed_pytorch_cuda_version() -> Optional[str]:
+    """
+    Get CUDA version from installed PyTorch.
+
+    This is more reliable than driver-based detection because it returns
+    the actual CUDA version that PyTorch was compiled against. The llama-cpp-python
+    wheel must match PyTorch's CUDA version to avoid runtime library mismatches.
+
+    This function should be called AFTER PyTorch is installed (Phase 3).
+
+    Returns:
+        CUDA version string like "cu128", "cu118", or None if:
+        - PyTorch not installed
+        - PyTorch is CPU-only
+        - CUDA version cannot be determined
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+
+        cuda_ver = getattr(torch.version, "cuda", None)
+        if not cuda_ver:
+            return None
+
+        # Convert "12.8" to "cu128", "11.8" to "cu118"
+        parts = cuda_ver.split(".")
+        if len(parts) >= 2:
+            return f"cu{parts[0]}{parts[1]}"
+        return None
+    except ImportError:
+        return None
+    except Exception:
+        return None
+
+
+def get_huggingface_wheel_info(pytorch_cuda: Optional[str] = None) -> Tuple[Optional[str], Optional[str], str]:
     """
     Build HuggingFace wheel download URL based on platform, Python version, and CUDA.
 
     HuggingFace wheels are AVX2-only (no AVX512), compatible with most CPUs including
     AMD Ryzen (Zen 2/3) which don't support AVX512.
 
-    Available backends on HuggingFace:
-    - cu124: CUDA 12.4 (Windows cp310/311/312, Linux cp310/311/312)
-    - cu128: CUDA 12.8 (Windows cp310/311/312, Linux cp310/311/312)
-    - cu126: CUDA 12.6 (Linux cp312 only)
-    - metal: macOS Apple Silicon (currently empty)
+    Official backends on HuggingFace (see llama_cuda_config.py):
+    - cu128: CUDA 12.8 (primary, Windows/Linux)
+    - cu126: CUDA 12.6 (Colab)
+    - cu118: CUDA 11.8 (legacy fallback)
+    - metal: macOS Apple Silicon
 
     Returns:
         tuple: (wheel_url, wheel_filename, backend_desc) or (None, None, "") if not available
@@ -1137,23 +1208,48 @@ def get_huggingface_wheel_info() -> Tuple[Optional[str], Optional[str], str]:
         return None, None, ""
 
     # Determine CUDA backend
+    # Priority: pytorch_cuda (from installed PyTorch) > driver-based detection
+    #
+    # IMPORTANT: Only 4 CUDA versions are supported (see OFFICIAL_CUDA_VERSIONS)
+    # - cu128: Primary (standalone installer)
+    # - cu118: Fallback (standalone installer)
+    # - cu126: Colab
+    # - cu130: Dev only (not on HuggingFace)
+    #
     backend = None
     if sys.platform == "darwin":
         backend = "metal"  # Currently empty on HF, but check anyway
     elif sys.platform in ("win32", "linux"):
-        driver_info = detect_nvidia_driver()
-        if driver_info.driver_version:
-            # Map driver to CUDA version
-            driver_ver = driver_info.driver_version
-            if driver_ver >= (570, 0, 0):
-                # CUDA 12.8 compatible, try cu128 first then cu124
-                backend = "cu128"
-            elif driver_ver >= (550, 0, 0):
-                # CUDA 12.4 compatible
-                backend = "cu124"
-            elif driver_ver >= (525, 0, 0):
-                # CUDA 11.8 compatible - but HF only has cu124+
-                backend = "cu124"  # Try cu124, may work with newer driver
+        if pytorch_cuda:
+            # Use PyTorch's CUDA version - this is the most reliable method
+            # because it matches what PyTorch was compiled against
+            log(f"    Using PyTorch CUDA version: {pytorch_cuda}")
+
+            # Check if this CUDA version has wheels on HuggingFace
+            cuda_config = OFFICIAL_CUDA_VERSIONS.get(pytorch_cuda)
+            if cuda_config and cuda_config.get("on_huggingface"):
+                backend = pytorch_cuda
+            elif pytorch_cuda == "cu130":
+                # cu130 is dev-only, not on HuggingFace
+                log(f"    cu130 not on HuggingFace (dev only), will try JamePeng")
+                return None, None, ""
+            else:
+                # Unknown or unsupported CUDA version
+                log(f"    CUDA {pytorch_cuda} not on HuggingFace, will try JamePeng")
+                return None, None, ""
+        else:
+            # Fallback: driver-based detection (when PyTorch not yet installed)
+            driver_info = detect_nvidia_driver()
+            if driver_info.driver_version:
+                # Map driver to CUDA version using official config
+                driver_ver = driver_info.driver_version
+                for cuda_ver in CUDA_FALLBACK_ORDER:
+                    cuda_config = OFFICIAL_CUDA_VERSIONS.get(cuda_ver)
+                    if cuda_config and driver_ver >= cuda_config["min_driver"]:
+                        if cuda_config.get("on_huggingface"):
+                            backend = cuda_ver
+                            break
+                        # Skip versions not on HuggingFace (like cu130)
 
     if not backend:
         log("    No CUDA detected, HuggingFace wheels require GPU")
@@ -1170,9 +1266,12 @@ def get_huggingface_wheel_info() -> Tuple[Optional[str], Optional[str], str]:
     return wheel_url, wheel_filename, f"CUDA ({backend} HuggingFace wheel v{HF_WHEEL_VERSION})"
 
 
-def download_huggingface_wheel() -> Tuple[Optional[str], Optional[str]]:
+def download_huggingface_wheel(pytorch_cuda: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """
     Download llama-cpp-python wheel from HuggingFace.
+
+    Args:
+        pytorch_cuda: CUDA version from PyTorch (e.g., "cu128") or None to auto-detect
 
     Returns:
         tuple: (local_wheel_path, backend_desc) or (None, None) if failed
@@ -1181,7 +1280,7 @@ def download_huggingface_wheel() -> Tuple[Optional[str], Optional[str]]:
     import urllib.request
     import urllib.error
 
-    wheel_url, wheel_filename, backend_desc = get_huggingface_wheel_info()
+    wheel_url, wheel_filename, backend_desc = get_huggingface_wheel_info(pytorch_cuda)
 
     if not wheel_url:
         return None, None
@@ -1213,7 +1312,7 @@ def download_huggingface_wheel() -> Tuple[Optional[str], Optional[str]]:
         return None, None
 
 
-def get_llama_cpp_prebuilt_wheel() -> Tuple[Optional[str], Optional[str]]:
+def get_llama_cpp_prebuilt_wheel(pytorch_cuda: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """
     Try to find a prebuilt wheel from JamePeng's releases.
 
@@ -1224,6 +1323,9 @@ def get_llama_cpp_prebuilt_wheel() -> Tuple[Optional[str], Optional[str]]:
     - CUDA: v{ver}-cu{cuda}-Basic-{os}-{date} (e.g., v0.3.21-cu128-Basic-win-20260111)
     - Metal: v{ver}-metal-{date} (when available)
     - Wheel: llama_cpp_python-{ver}-cp{py}-cp{py}-{platform}.whl
+
+    Args:
+        pytorch_cuda: CUDA version from PyTorch (e.g., "cu128", "cu118") or None to auto-detect
 
     Returns:
         tuple: (wheel_url, backend_desc) or (None, None) if no suitable wheel found
@@ -1254,22 +1356,39 @@ def get_llama_cpp_prebuilt_wheel() -> Tuple[Optional[str], Optional[str]]:
     py_ver = f"cp{sys.version_info.major}{sys.version_info.minor}"
 
     # Detect CUDA version for Windows/Linux
+    # Priority: pytorch_cuda (from installed PyTorch) > driver-based detection
+    #
+    # IMPORTANT: Only 4 CUDA versions are supported (see OFFICIAL_CUDA_VERSIONS)
+    #
     target_cudas = []
     if sys.platform in ("win32", "linux"):
-        driver_info = detect_nvidia_driver()
-        if driver_info.driver_version:
-            # Map driver version to compatible CUDA versions
-            # Using the same logic as TORCH_DRIVER_MATRIX
-            # Note: CUDA 13.x (cu130) is NOT supported - no PyTorch/llama-cpp wheels available
-            driver_ver = driver_info.driver_version
-            # Simplified: CUDA 12.8 (driver 570+) or CUDA 11.8 (driver 450+)
-            if driver_ver >= (570, 0, 0):
-                target_cudas = ["cu128", "cu118"]
-            elif driver_ver >= (450, 0, 0):
-                target_cudas = ["cu118"]
-            log(f"    Detected driver {format_version_tuple(driver_ver)}, compatible CUDA: {target_cudas}")
+        if pytorch_cuda:
+            # Use PyTorch's CUDA version - this ensures wheel matches PyTorch
+            log(f"    Using PyTorch CUDA version: {pytorch_cuda}")
+
+            # Build compatible version list (exact match first, then older)
+            try:
+                pytorch_num = int(pytorch_cuda[2:])  # cu128 -> 128
+                for cuda_ver in CUDA_FALLBACK_ORDER:
+                    ver_num = int(cuda_ver[2:])
+                    if ver_num <= pytorch_num:
+                        target_cudas.append(cuda_ver)
+            except (ValueError, IndexError):
+                # Fallback if parsing fails
+                target_cudas = list(CUDA_FALLBACK_ORDER)
         else:
-            log("    No CUDA detected")
+            # Fallback: driver-based detection (when PyTorch not yet installed)
+            driver_info = detect_nvidia_driver()
+            if driver_info.driver_version:
+                # Map driver version to compatible CUDA versions using official config
+                driver_ver = driver_info.driver_version
+                for cuda_ver in CUDA_FALLBACK_ORDER:
+                    cuda_config = OFFICIAL_CUDA_VERSIONS.get(cuda_ver)
+                    if cuda_config and driver_ver >= cuda_config["min_driver"]:
+                        target_cudas.append(cuda_ver)
+                log(f"    Detected driver {format_version_tuple(driver_ver)}, compatible CUDA: {target_cudas}")
+            else:
+                log("    No CUDA detected")
 
     log(f"    Searching for prebuilt wheel: {os_tag}, {py_ver}, platform={wheel_platform}")
 
@@ -1472,6 +1591,10 @@ def install_llama_cpp_python() -> bool:
     The HuggingFace wheels are preferred because JamePeng's "Basic" builds
     incorrectly enable AVX512, causing crashes on AMD Ryzen (Zen 2/3) CPUs.
 
+    IMPORTANT: The llama-cpp-python wheel MUST match PyTorch's CUDA version.
+    We detect PyTorch's CUDA version (installed in Phase 3) and use that
+    to select the appropriate wheel, avoiding CUDA library mismatches.
+
     Note: This always attempts to install. For opt-in behavior,
     discuss with the project author about adding installer options.
     """
@@ -1480,9 +1603,20 @@ def install_llama_cpp_python() -> bool:
     log("Installing llama-cpp-python for local LLM translation...")
     log("This enables translation without cloud API keys.")
 
+    # Detect PyTorch's CUDA version (installed in Phase 3)
+    # This is more reliable than driver detection because:
+    # 1. PyTorch bundles its own CUDA runtime libraries
+    # 2. llama-cpp-python must match PyTorch's CUDA version
+    # 3. Driver version doesn't always map cleanly to CUDA version
+    pytorch_cuda = get_installed_pytorch_cuda_version()
+    if pytorch_cuda:
+        log(f"  Detected PyTorch CUDA version: {pytorch_cuda}")
+    else:
+        log("  PyTorch CUDA not available (CPU-only or not installed)")
+
     # Strategy 1: Try HuggingFace wheel first (AVX2, most compatible)
     log("  Checking HuggingFace for compatible wheel...")
-    hf_wheel_path, hf_backend = download_huggingface_wheel()
+    hf_wheel_path, hf_backend = download_huggingface_wheel(pytorch_cuda)
 
     if hf_wheel_path:
         log(f"Backend: {hf_backend}")
@@ -1496,13 +1630,21 @@ def install_llama_cpp_python() -> bool:
                 ["install", "llama-cpp-python[server]", "--progress-bar", "on"],
                 "Install llama-cpp-python server extras"
             )
-            return True
+            # EARLY VALIDATION: Verify the wheel actually loads
+            valid, msg = validate_llama_cpp_installation()
+            if valid:
+                log(f"  [OK] Validation passed: {msg}")
+                return True
+            else:
+                log(f"  [!!] Validation FAILED: {msg}")
+                log("       Will try JamePeng wheel as fallback...")
+                # Continue to JamePeng fallback
         else:
             log("WARNING: HuggingFace wheel install failed, trying JamePeng...")
 
     # Strategy 2: Try JamePeng GitHub wheel (fallback)
     log("  Checking JamePeng GitHub for prebuilt wheel...")
-    wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel()
+    wheel_url, wheel_backend = get_llama_cpp_prebuilt_wheel(pytorch_cuda)
 
     if wheel_url:
         log(f"Backend: {wheel_backend}")
@@ -1518,7 +1660,16 @@ def install_llama_cpp_python() -> bool:
                 ["install", "llama-cpp-python[server]", "--progress-bar", "on"],
                 "Install llama-cpp-python server extras"
             )
-            return True
+            # EARLY VALIDATION: Verify the wheel actually loads
+            valid, msg = validate_llama_cpp_installation()
+            if valid:
+                log(f"  [OK] Validation passed: {msg}")
+                return True
+            else:
+                log(f"  [!!] Validation FAILED: {msg}")
+                log("       JamePeng wheel may have AVX512 compatibility issues.")
+                log("       Will try source build as fallback...")
+                # Continue to source build fallback
         else:
             log("WARNING: JamePeng wheel failed, trying source build...")
 
@@ -1538,11 +1689,148 @@ def install_llama_cpp_python() -> bool:
         ["install", git_url, "--progress-bar", "on"],
         f"Install llama-cpp-python ({backend})"
     ):
-        return True
+        # EARLY VALIDATION: Verify the source build actually loads
+        valid, msg = validate_llama_cpp_installation()
+        if valid:
+            log(f"  [OK] Validation passed: {msg}")
+            return True
+        else:
+            log(f"  [!!] Validation FAILED after source build: {msg}")
+            log("       This may indicate missing build dependencies or CUDA issues.")
+            # No more fallbacks - source build was our last resort
+            return False
 
     log("WARNING: llama-cpp-python failed (local LLM translation will not work)")
     log("         Cloud translation providers still available.")
     return False
+
+
+def validate_llama_cpp_installation() -> Tuple[bool, str]:
+    """
+    Verify llama-cpp-python can load its native libraries.
+
+    This is called IMMEDIATELY after wheel installation to catch issues early
+    (at install time) instead of surprising the user at runtime.
+
+    Early detection is better than runtime failure!
+
+    Returns:
+        (success, message)
+    """
+    log("  Validating llama-cpp-python installation...")
+
+    # Step 1: Set up CUDA library paths (same as runtime does)
+    # This is critical - without this, DLL loading will fail
+    _setup_cuda_dll_paths_for_validation()
+
+    # Step 2: Try to import llama_cpp
+    try:
+        import llama_cpp  # noqa: F401
+        log("    [OK] llama_cpp module imported successfully")
+    except ImportError as e:
+        error_msg = str(e)
+        log(f"    [!!] Import failed: {error_msg}")
+        return False, f"Module import failed: {error_msg}"
+    except (RuntimeError, OSError) as e:
+        # DLL/shared library loading failed
+        error_msg = str(e)
+        log(f"    [!!] Native library loading failed: {error_msg}")
+
+        # Provide specific guidance
+        if "ggml.dll" in error_msg.lower() or "ggml" in error_msg.lower():
+            log("    This usually means CUDA version mismatch between wheel and PyTorch.")
+            log("    The wheel was built for a different CUDA version.")
+        elif "cuda" in error_msg.lower():
+            log("    CUDA library loading issue detected.")
+
+        return False, f"Native library failed: {error_msg}"
+    except Exception as e:
+        error_msg = str(e)
+        log(f"    [!!] Unexpected error: {error_msg}")
+        return False, f"Unexpected error: {error_msg}"
+
+    # Step 3: Check GPU support (optional - import success is the main goal)
+    try:
+        has_gpu, reason = _check_llama_cpp_has_gpu()
+        if has_gpu:
+            log(f"    [OK] GPU support confirmed: {reason}")
+            return True, f"GPU support: {reason}"
+        else:
+            log(f"    [INFO] No GPU support detected: {reason}")
+            log("           Translation will use CPU (slower but functional)")
+            return True, f"CPU only: {reason}"
+    except Exception as e:
+        # Don't fail validation just because we couldn't check GPU
+        log(f"    [INFO] Could not verify GPU support: {e}")
+        return True, "Import successful (GPU status unknown)"
+
+
+def _setup_cuda_dll_paths_for_validation():
+    """Set up CUDA library paths before importing llama_cpp for validation."""
+    # Add PyTorch's bundled CUDA libs to DLL search path
+    # This mirrors the logic in local_backend.py _setup_pytorch_cuda_dll_paths()
+    try:
+        import torch
+        torch_lib = os.path.join(os.path.dirname(torch.__file__), 'lib')
+        if os.path.exists(torch_lib):
+            if sys.platform == "win32":
+                # Add to current process DLL search path
+                os.add_dll_directory(torch_lib)
+
+            # Also add to PATH for this process
+            existing_path = os.environ.get("PATH", "")
+            if torch_lib not in existing_path:
+                os.environ["PATH"] = f"{torch_lib};{existing_path}"
+                log(f"    Added PyTorch CUDA libs to PATH: {torch_lib}")
+    except ImportError:
+        log("    PyTorch not available for DLL path setup")
+    except Exception as e:
+        log(f"    Could not set up CUDA DLL paths: {e}")
+
+
+def _check_llama_cpp_has_gpu() -> Tuple[bool, str]:
+    """
+    Check if llama-cpp-python has GPU support by examining package metadata.
+
+    Returns:
+        (has_gpu, reason)
+    """
+    import json
+
+    try:
+        import llama_cpp
+        from pathlib import Path
+
+        # Find the package's dist-info folder
+        package_dir = Path(llama_cpp.__file__).parent.parent
+
+        for dist_info in package_dir.glob("llama_cpp_python*.dist-info"):
+            # Check direct_url.json for installation source
+            direct_url_file = dist_info / "direct_url.json"
+            if direct_url_file.exists():
+                with open(direct_url_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    url = data.get("url", "").lower()
+
+                    # Check for CUDA indicators in URL
+                    for cuda_ver in OFFICIAL_CUDA_VERSIONS.keys():
+                        if cuda_ver in url:
+                            return True, f"CUDA wheel ({cuda_ver})"
+
+                    # Check for known GPU wheel sources
+                    if "jamepeng" in url or "whisperjav-wheels" in url:
+                        return True, "GPU wheel (known source)"
+
+                    if "metal" in url:
+                        return True, "Metal wheel (macOS)"
+
+                    if "git+" in url:
+                        return True, "Source build (assumed GPU if CUDA available)"
+
+        return False, "Could not determine build type"
+
+    except Exception as e:
+        return False, f"Check failed: {e}"
 
 
 def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:

@@ -112,7 +112,7 @@ Returns `(success, error_message)` tuple for better diagnostics.
 2. **JamePeng GitHub wheels** (may have AVX512)
 3. **Source build** (slowest but guaranteed compatible)
 
-Available HuggingFace wheels: cu121, cu124, cu126, cu128, metal
+Official HuggingFace wheels: cu128 (primary), cu126 (Colab), cu118 (legacy), metal
 
 ---
 

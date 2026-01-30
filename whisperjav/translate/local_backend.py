@@ -142,15 +142,24 @@ from .llama_build_utils import (
     install_wheel,
 )
 
+# Import centralized CUDA config
+from .llama_cuda_config import (
+    OFFICIAL_CUDA_VERSIONS,
+    FALLBACK_ORDER,
+    HUGGINGFACE_WHEEL_VERSION,
+)
+
 logger = logging.getLogger(__name__)
 
 # HuggingFace wheel repository for lazy download
+# NOTE: Version is defined in llama_cuda_config.py (SINGLE SOURCE OF TRUTH)
 WHEEL_REPO_ID = "mei986/whisperjav-wheels"
-WHEEL_VERSION = "0.3.21"  # llama-cpp-python version in our wheel repo
+WHEEL_VERSION = HUGGINGFACE_WHEEL_VERSION
 
 # Global server process reference
 _server_process: Optional[subprocess.Popen] = None
 _server_port: Optional[int] = None
+_server_stderr_path: Optional[str] = None  # Track stderr temp file for cleanup
 
 # Note: atexit handler registered after stop_local_server is defined (see end of module)
 
@@ -646,7 +655,7 @@ def _setup_linux_cuda_library_paths() -> bool:
     return False
 
 
-def _check_llama_cpp_gpu_support() -> Tuple[Optional[bool], str]:
+def _check_llama_cpp_gpu_support() -> Tuple[Optional[bool], str, Optional[str]]:
     """
     Check if installed llama-cpp-python has GPU (CUDA/Metal) support.
 
@@ -655,12 +664,12 @@ def _check_llama_cpp_gpu_support() -> Tuple[Optional[bool], str]:
     Vanilla pip install from PyPI is CPU-only.
 
     Returns:
-        Tuple of (has_gpu_support, reason)
-        - (True, "cuda_wheel") - Installed from CUDA wheel
-        - (True, "metal_wheel") - Installed from Metal wheel
-        - (True, "source_build") - Built from source (assumed GPU if CUDA available)
-        - (False, "pypi_cpu") - Installed from PyPI (CPU-only)
-        - (None, "unknown") - Cannot determine
+        Tuple of (has_gpu_support, reason, wheel_cuda_version)
+        - (True, "cuda_wheel", "cu128") - Installed from CUDA wheel (with version)
+        - (True, "metal_wheel", None) - Installed from Metal wheel
+        - (True, "source_build", None) - Built from source (assumed GPU if CUDA available)
+        - (False, "pypi_cpu", None) - Installed from PyPI (CPU-only)
+        - (None, "unknown", None) - Cannot determine
     """
     import json
     import os
@@ -681,28 +690,30 @@ def _check_llama_cpp_gpu_support() -> Tuple[Optional[bool], str]:
                         data = json.load(f)
                         url = data.get("url", "").lower()
 
-                        # Check URL for CUDA version indicators
-                        cuda_versions = ["cu118", "cu121", "cu124", "cu126", "cu128", "cu130"]
-                        if any(cv in url for cv in cuda_versions):
-                            logger.debug(f"Detected CUDA wheel from URL: {url}")
-                            return (True, "cuda_wheel")
+                        # Check URL for CUDA version indicators and extract the version
+                        # Only check official CUDA versions (see llama_cuda_config.py)
+                        for cv in OFFICIAL_CUDA_VERSIONS.keys():
+                            if cv in url:
+                                logger.debug(f"Detected CUDA wheel ({cv}) from URL: {url}")
+                                return (True, "cuda_wheel", cv)
 
                         # Check for Metal (macOS)
                         if "metal" in url:
                             logger.debug(f"Detected Metal wheel from URL: {url}")
-                            return (True, "metal_wheel")
+                            return (True, "metal_wheel", None)
 
-                        # Check for known GPU wheel sources
+                        # Check for known GPU wheel sources (but unknown CUDA version)
                         if "jamepeng" in url or "whisperjav-wheels" in url:
                             # Our wheels and JamePeng wheels are GPU-enabled
-                            logger.debug(f"Detected GPU wheel from known source: {url}")
-                            return (True, "cuda_wheel")
+                            # but we couldn't extract CUDA version from URL
+                            logger.debug(f"Detected GPU wheel from known source (unknown CUDA version): {url}")
+                            return (True, "cuda_wheel", None)
 
                         # Check if built from source (git URL)
                         if "git+" in url or "github.com" in url:
                             # Built from source - likely has GPU if user has CUDA
                             logger.debug(f"Detected source build from URL: {url}")
-                            return (True, "source_build")
+                            return (True, "source_build", None)
 
                 except Exception as e:
                     logger.debug(f"Could not parse direct_url.json: {e}")
@@ -715,7 +726,7 @@ def _check_llama_cpp_gpu_support() -> Tuple[Optional[bool], str]:
                     # If installed via uv or pip without direct_url, likely from PyPI
                     if installer in ("pip", "uv") and not direct_url_file.exists():
                         logger.debug(f"Detected PyPI install (likely CPU-only)")
-                        return (False, "pypi_cpu")
+                        return (False, "pypi_cpu", None)
                 except Exception:
                     pass
 
@@ -725,14 +736,14 @@ def _check_llama_cpp_gpu_support() -> Tuple[Optional[bool], str]:
 
         # If we can't determine, return unknown
         logger.debug("Could not determine llama-cpp-python build type")
-        return (None, "unknown")
+        return (None, "unknown", None)
 
     except ImportError:
         # llama-cpp-python not installed
-        return (None, "not_installed")
+        return (None, "not_installed", None)
     except Exception as e:
         logger.debug(f"Error checking llama-cpp-python GPU support: {e}")
-        return (None, "unknown")
+        return (None, "unknown", None)
 
 
 def _uninstall_llama_cpp() -> bool:
@@ -972,7 +983,7 @@ def ensure_llama_cpp_installed() -> bool:
         cuda_version = detect_cuda_version()
 
         if cuda_version:
-            has_gpu, reason = _check_llama_cpp_gpu_support()
+            has_gpu, reason, wheel_cuda = _check_llama_cpp_gpu_support()
 
             if has_gpu is False:
                 # CPU-only build detected on a CUDA-capable system
@@ -1006,12 +1017,83 @@ def ensure_llama_cpp_installed() -> bool:
                     logger.debug("Non-interactive mode: keeping existing llama-cpp-python")
                     return True
             elif has_gpu is True:
-                # GPU build confirmed, all good
-                logger.debug(f"llama-cpp-python GPU support confirmed: {reason}")
-                return True
+                # GPU build confirmed - but check CUDA version compatibility!
+                if wheel_cuda and wheel_cuda != cuda_version:
+                    # CUDA version mismatch detected
+                    # Extract numeric versions for compatibility check
+                    # cu130 -> 130, cu128 -> 128, cu126 -> 126, cu118 -> 118
+                    try:
+                        system_num = int(cuda_version[2:])  # cu130 -> 130
+                        wheel_num = int(wheel_cuda[2:])     # cu128 -> 128
+                    except (ValueError, IndexError):
+                        system_num = wheel_num = 0  # Can't parse, assume compatible
+
+                    # CUDA backward compatibility:
+                    # - Newer system can run older wheels (system >= wheel is OK)
+                    # - Older system CANNOT run newer wheels (system < wheel is BAD)
+                    # Example: cu130 system can run cu128 wheel, but cu128 system cannot run cu130 wheel
+                    if system_num < wheel_num:
+                        # System is OLDER than wheel - this is problematic
+                        print("\n" + "!" * 60)
+                        print("  WARNING: CUDA VERSION INCOMPATIBILITY DETECTED")
+                        print("!" * 60)
+                        print("")
+                        print(f"  System CUDA version:  {cuda_version}")
+                        print(f"  Installed wheel for:  {wheel_cuda}")
+                        print("")
+                        print("  The installed llama-cpp-python wheel was built for a NEWER")
+                        print("  CUDA version than your system supports. This will cause")
+                        print("  runtime errors when loading GPU kernels.")
+                        print("")
+                        print("  Recommended: Reinstall with a compatible wheel.")
+                        print("")
+
+                        try:
+                            response = input("Reinstall with correct CUDA version? (Y/n): ").strip().lower()
+                            if response in ('', 'y', 'yes'):
+                                print(f"\nReinstalling for CUDA {cuda_version}...")
+                                _uninstall_llama_cpp()
+                                _clear_llama_cpp_status_cache()
+                                # Fall through to fresh installation below
+                            else:
+                                print("\nKeeping current wheel. If you encounter GPU errors, run:")
+                                print("  pip uninstall llama-cpp-python -y")
+                                print("  whisperjav-translate -i file.srt --provider local")
+                                logger.warning(f"CUDA version mismatch: system={cuda_version}, wheel={wheel_cuda}")
+                                return True
+                        except (EOFError, KeyboardInterrupt):
+                            # Non-interactive mode - try to reinstall automatically
+                            print(f"\nNon-interactive mode: reinstalling for CUDA {cuda_version}...")
+                            _uninstall_llama_cpp()
+                            _clear_llama_cpp_status_cache()
+                            # Fall through to fresh installation below
+                    else:
+                        # System is same or newer than wheel - backward compatible
+                        logger.debug(f"llama-cpp-python CUDA wheel compatible (backward compat): system={cuda_version}, wheel={wheel_cuda}")
+                        return True
+                elif wheel_cuda is None and reason == "cuda_wheel":
+                    # GPU wheel from known source but unknown CUDA version
+                    # This is risky - the wheel might not be compatible
+                    logger.warning(f"GPU wheel detected but CUDA version unknown - may cause issues")
+                    return True
+                else:
+                    # wheel_cuda matches cuda_version, or it's a source build
+                    logger.debug(f"llama-cpp-python GPU support confirmed: {reason}")
+                    return True
             else:
-                # Unknown build type - assume it's fine
-                logger.debug(f"llama-cpp-python build type unknown: {reason}")
+                # Unknown build type - this is risky, warn the user
+                print("\n" + "=" * 60)
+                print("  WARNING: Unknown llama-cpp-python build type")
+                print("=" * 60)
+                print("")
+                print(f"Your system has CUDA GPU support ({cuda_version}), but we")
+                print("cannot determine if the installed llama-cpp-python is compatible.")
+                print("")
+                print("If you experience GPU errors, reinstall with:")
+                print("  pip uninstall llama-cpp-python -y")
+                print("  whisperjav-translate -i file.srt --provider local")
+                print("")
+                logger.warning(f"llama-cpp-python build type unknown on CUDA system: {reason}")
                 return True
         else:
             # No CUDA available, CPU build is appropriate
@@ -1636,7 +1718,7 @@ def start_local_server(
     Raises:
         RuntimeError: If server fails to start or llama-cpp-python unavailable
     """
-    global _server_process, _server_port
+    global _server_process, _server_port, _server_stderr_path
 
     # Release GPU memory from previous operations (e.g., Whisper transcription)
     # This helps prevent llama-cpp-python initialization failures
@@ -1666,24 +1748,39 @@ def start_local_server(
         print(f"  If this fails, close other terminals running translations.")
         print(f"{'!'*60}\n")
 
-    # Model selection
+    # =========================================================================
+    # DIAGNOSTIC: Model Selection
+    # =========================================================================
+    print(f"\n[LOCAL-LLM] Configuration:", file=sys.stderr)
+    print(f"[LOCAL-LLM]   Requested model: {model}", file=sys.stderr)
+    print(f"[LOCAL-LLM]   GPU layers: {n_gpu_layers} (-1 = all)", file=sys.stderr)
+    print(f"[LOCAL-LLM]   Context size: {n_ctx} tokens", file=sys.stderr)
+
     if model == "auto":
         vram = get_available_vram_gb()
         model = get_best_model_for_vram(vram)
+        print(f"[LOCAL-LLM]   Detected VRAM: {vram:.1f} GB", file=sys.stderr)
+        print(f"[LOCAL-LLM]   Auto-selected model: {model}", file=sys.stderr)
         logger.info(f"VRAM: {vram:.1f}GB, selected model: {model}")
 
     # Download model
+    print(f"[LOCAL-LLM] Downloading/verifying model...", file=sys.stderr)
     try:
         model_path = ensure_model_downloaded(model)
     except Exception as e:
         raise RuntimeError(f"Failed to download model: {e}")
 
+    print(f"[LOCAL-LLM]   Model path: {model_path}", file=sys.stderr)
+    print(f"[LOCAL-LLM]   Model size: {model_path.stat().st_size / (1024**3):.2f} GB", file=sys.stderr)
     logger.info(f"Starting local server with {model_path.name}...")
 
     # Find free port
     port = _find_free_port()
+    print(f"[LOCAL-LLM]   Server port: {port}", file=sys.stderr)
 
-    # Start server using llama-cpp-python's built-in server
+    # =========================================================================
+    # DIAGNOSTIC: Server Command
+    # =========================================================================
     cmd = [
         sys.executable, "-m", "llama_cpp.server",
         "--model", str(model_path),
@@ -1692,11 +1789,17 @@ def start_local_server(
         "--n_gpu_layers", str(n_gpu_layers),
         "--n_ctx", str(n_ctx),
     ]
+    print(f"[LOCAL-LLM] Starting server with command:", file=sys.stderr)
+    print(f"[LOCAL-LLM]   {' '.join(cmd[:4])} ...", file=sys.stderr)
+    print(f"[LOCAL-LLM]   --n_gpu_layers {n_gpu_layers}", file=sys.stderr)
+    print(f"[LOCAL-LLM]   --n_ctx {n_ctx}", file=sys.stderr)
 
     # Use temp file for stderr to avoid blocking (pipes can fill up and block the server)
     import tempfile
     stderr_file = tempfile.NamedTemporaryFile(mode='w+', suffix='_llm_server.log', delete=False)
     stderr_path = stderr_file.name
+    _server_stderr_path = stderr_path  # Track for cleanup
+    print(f"[LOCAL-LLM]   Server log: {stderr_path}", file=sys.stderr)
 
     try:
         _server_process = subprocess.Popen(
@@ -1828,6 +1931,50 @@ def start_local_server(
         if diagnostics is None:
             diagnostics = ServerDiagnostics()
 
+    # =========================================================================
+    # CRITICAL CHECK: Verify GPU was used when expected
+    # =========================================================================
+    # If user requested GPU (n_gpu_layers != 0) but no layers on GPU, that's a problem
+    gpu_expected = n_gpu_layers != 0  # -1 means "all", any positive means "some"
+    gpu_got = diagnostics.gpu_layers_loaded > 0
+
+    if gpu_expected and not gpu_got:
+        # This is the ROOT CAUSE of silent CPU fallback!
+        print("")
+        print("!" * 60)
+        print("  CRITICAL: GPU REQUESTED BUT NOT USED")
+        print("!" * 60)
+        print("")
+        print(f"  You requested GPU mode (n_gpu_layers={n_gpu_layers})")
+        print(f"  But the model loaded with 0 layers on GPU (CPU only)")
+        print("")
+        print("  This will cause EXTREMELY SLOW translation (10-50x slower)")
+        print("  and likely timeout errors.")
+        print("")
+        print("  Possible causes:")
+        print("    1. llama-cpp-python was installed without CUDA support")
+        print("       Fix: pip uninstall llama-cpp-python && reinstall with CUDA wheel")
+        print("")
+        print("    2. CUDA version mismatch (wheel built for different CUDA)")
+        print("       Fix: Check nvidia-smi and install matching wheel")
+        print("")
+        print("    3. Insufficient GPU memory for this model")
+        print("       Fix: Use smaller model (--translate-model llama-3b)")
+        print("")
+        print("    4. GPU in use by another process")
+        print("       Fix: Close other GPU applications")
+        print("")
+        print("  To explicitly use CPU mode without this warning:")
+        print("    --translate-gpu-layers 0")
+        print("")
+        print("!" * 60)
+
+        # Also log for programmatic access
+        logger.error(
+            f"GPU requested (n_gpu_layers={n_gpu_layers}) but model loaded on CPU. "
+            "Translation will be very slow and may timeout."
+        )
+
     # Report diagnostics to console - THIS IS CRITICAL FOR USER VISIBILITY
     print("")
     print("=" * 60)
@@ -1863,7 +2010,7 @@ def start_local_server(
 
 def stop_local_server():
     """Stop the local LLM server if running."""
-    global _server_process, _server_port
+    global _server_process, _server_port, _server_stderr_path
 
     if _server_process is not None:
         logger.info("Stopping local server...")
@@ -1878,6 +2025,18 @@ def stop_local_server():
         finally:
             _server_process = None
             _server_port = None
+
+    # Clean up stderr temp file
+    if _server_stderr_path is not None:
+        try:
+            import os
+            if os.path.exists(_server_stderr_path):
+                os.remove(_server_stderr_path)
+                logger.debug(f"Cleaned up server log: {_server_stderr_path}")
+        except Exception as e:
+            logger.debug(f"Could not remove server log {_server_stderr_path}: {e}")
+        finally:
+            _server_stderr_path = None
 
     # Cleanup GPU memory
     gc.collect()
