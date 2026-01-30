@@ -49,13 +49,12 @@ OFFICIAL_CUDA_VERSIONS: Dict[str, Dict] = {
         "wheel_version": "0.3.21",
     },
     "cu118": {
-        "description": "CUDA 11.8 (legacy, RTX 20 series/Turing)",
+        "description": "CUDA 11.8 (legacy fallback)",
         "min_driver": (450, 0, 0),
         "on_huggingface": True,
         "standalone_installer": True,
-        "wheel_version": "0.3.16",  # From dougeeai, sm75 only
-        "gpu_arch": "sm75",  # Turing only (RTX 20 series)
-        "notes": "Only supports RTX 20 series (Turing/sm75). RTX 30/40 users should use cu128.",
+        "wheel_version": "0.2.26",  # From jllllll, all GPU architectures
+        "notes": "Universal fallback for drivers 450-569. Recommend upgrading to driver 570+ for cu128.",
     },
 }
 
@@ -144,7 +143,7 @@ def get_wheel_version(cuda_version: str) -> str:
     Get the llama-cpp-python wheel version for a specific CUDA version.
 
     Different CUDA versions may have different wheel versions available.
-    For example, cu118 uses 0.3.16 (from dougeeai) while others use 0.3.21.
+    For example, cu118 uses 0.2.26 (from jllllll) while others use 0.3.21.
 
     Args:
         cuda_version: CUDA version (e.g., "cu128", "cu118")

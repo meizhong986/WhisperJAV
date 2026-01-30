@@ -1114,7 +1114,7 @@ OFFICIAL_CUDA_VERSIONS = {
     "cu130": {"description": "CUDA 13.0 (dev)", "min_driver": (575, 0, 0), "on_huggingface": False, "wheel_version": "0.3.21"},
     "cu128": {"description": "CUDA 12.8 (primary)", "min_driver": (570, 0, 0), "on_huggingface": True, "wheel_version": "0.3.21"},
     "cu126": {"description": "CUDA 12.6 (Colab)", "min_driver": (560, 0, 0), "on_huggingface": True, "wheel_version": "0.3.21"},
-    "cu118": {"description": "CUDA 11.8 (RTX 20/Turing)", "min_driver": (450, 0, 0), "on_huggingface": True, "wheel_version": "0.3.16", "gpu_arch": "sm75"},
+    "cu118": {"description": "CUDA 11.8 (legacy)", "min_driver": (450, 0, 0), "on_huggingface": True, "wheel_version": "0.2.26"},
 }
 
 # Default wheel version (used if not specified per-CUDA)

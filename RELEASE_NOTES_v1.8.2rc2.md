@@ -81,7 +81,7 @@ When you use `--provider local` for translation, the system installs llama-cpp-p
 
 ## Known Limitations
 
-- **cu118 limited to RTX 20 series**: The cu118 wheel (0.3.16) only supports Turing GPUs (sm75). RTX 30/40 users with old drivers should upgrade to driver 570+ and use cu128.
+- **cu118 is an older wheel version**: The cu118 wheel uses llama-cpp-python 0.2.26 (vs 0.3.21 for cu128). Works on all GPU architectures but has fewer features. **Recommendation**: Upgrade your NVIDIA driver to 570+ to use cu128 for best performance.
 - **No CPU fallback wheel**: Source build required if CUDA wheels fail
 
 ---
