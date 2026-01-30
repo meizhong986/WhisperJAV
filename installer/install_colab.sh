@@ -29,7 +29,7 @@
 VENV_PATH="/content/whisperjav_env"
 PYTORCH_INDEX="https://download.pytorch.org/whl/cu126"
 WHISPERJAV_REPO="https://github.com/meizhong986/WhisperJAV.git"
-WHISPERJAV_BRANCH="v1.8.2-rc1"
+WHISPERJAV_BRANCH="main"
 HF_WHEEL_REPO="mei986/whisperjav-wheels"
 LLAMA_CPP_VERSION="0.3.21"
 
@@ -248,8 +248,11 @@ section "Step 4/5: Installing WhisperJAV"
 # Install system dependencies required for building Python packages
 # - portaudio19-dev: Required for pyaudio (used by auditok for scene detection)
 # - libc++1 libc++abi1: Required for TEN VAD native library (LLVM C++ runtime)
+# - libsndfile1: Required for soundfile/librosa (audio processing)
+# - ffmpeg: Required for ffmpeg-python and audio conversion
+# - libgl1: Required for opencv (if used via imageio/other tools)
 info "Installing system dependencies..."
-SYS_PKGS="portaudio19-dev libc++1 libc++abi1"
+SYS_PKGS="portaudio19-dev libc++1 libc++abi1 libsndfile1 ffmpeg libgl1"
 if apt-get update -qq > /dev/null 2>&1 && apt-get install -y -qq $SYS_PKGS > /dev/null 2>&1; then
     success "System dependencies installed ($SYS_PKGS)"
 else
@@ -260,7 +263,10 @@ fi
 info "Installing from $WHISPERJAV_REPO@$WHISPERJAV_BRANCH"
 info "This includes all dependencies (whisper, stable-ts, faster-whisper, etc.)..."
 
-if ! venv_pip "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}"; then
+# Install opencv-python-headless explicitly for safety
+venv_pip "opencv-python-headless"
+
+if ! venv_pip "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}#egg=whisperjav[cli,enhance,translate,huggingface,analysis,compatibility]"; then
     error "WhisperJAV installation failed"
     exit 1
 fi
