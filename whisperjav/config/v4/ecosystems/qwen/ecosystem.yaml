@@ -1,0 +1,63 @@
+# =============================================================================
+# Qwen Ecosystem Configuration
+# =============================================================================
+# Qwen3-ASR pipeline using the qwen-asr package for automatic speech recognition.
+# Supports optional ForcedAligner for word-level timestamps.
+# =============================================================================
+
+schemaVersion: v1
+kind: Ecosystem
+
+metadata:
+  name: qwen
+  displayName: "Qwen3-ASR"
+  description: |
+    ASR using Qwen3-ASR with transformers backend.
+    Supports automatic language detection and optional ForcedAligner
+    for precise word-level timestamps.
+    Optimized for multilingual transcription including Japanese.
+  version: "1.0.0"
+  tags:
+    - qwen
+    - transformers
+    - multilingual
+    - word-timestamps
+    - japanese
+  author: "WhisperJAV Team"
+
+# Default values inherited by all models in this ecosystem
+defaults:
+  model.device: auto
+  model.dtype: bfloat16
+  model.max_inference_batch_size: 1  # batch_size=1 for accuracy
+  model.max_new_tokens: 4096  # Supports ~10 min audio (10 min × 400 char/min × 2 tokens/char)
+  decode.language: null  # null = auto-detect
+  timestamps: word
+  aligner.enabled: true
+
+# Architectural notes:
+# - ForcedAligner has 3-minute internal limit (MAX_FORCE_ALIGN_INPUT_SECONDS=180)
+# - For audio > 3 min, qwen-asr chunks internally but scene detection recommended
+# - max_new_tokens=4096 safely handles 5-10 min segments
+
+# Implementation provider
+provider:
+  module: whisperjav.modules.qwen_asr
+  class: QwenASR
+  install_requires:
+    - qwen-asr>=0.1.0
+    - torch>=2.0.0
+    - transformers>=4.36.0
+  optional_requires:
+    - flash-attn>=2.0.0
+
+# Compatible auxiliary tools
+compatible_tools:
+  - auditok-scene-detection
+  - silero-scene-detection
+
+# Ecosystem capabilities
+supports_gpu: true
+supports_batching: true
+supports_word_timestamps: true
+default_language: null  # auto-detect

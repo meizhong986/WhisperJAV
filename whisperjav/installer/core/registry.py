@@ -104,6 +104,7 @@ class Extra(Enum):
     LLM = "llm"             # Local LLM server (FastAPI, uvicorn)
     ENHANCE = "enhance"     # Speech enhancement (ClearVoice, BS-RoFormer)
     HUGGINGFACE = "huggingface"  # HuggingFace Transformers
+    QWEN = "qwen"           # Qwen3-ASR support (v1.8.3+)
     ANALYSIS = "analysis"   # Scientific analysis and visualization
     COMPATIBILITY = "compatibility"  # pyvideotrans compatibility
     DEV = "dev"             # Development dependencies
@@ -698,6 +699,27 @@ PACKAGES: List[Package] = [
         extra=Extra.HUGGINGFACE,
         order=83,
         reason="Faster HuggingFace downloads via XetHub",
+    ),
+
+    # =========================================================================
+    # PHASE 5: Qwen3-ASR Packages (Order 84)
+    # =========================================================================
+    #
+    # WHY AFTER HUGGINGFACE:
+    # qwen-asr depends on transformers and torch. By installing after HuggingFace,
+    # we ensure the transformers backend is available.
+    #
+    # PACKAGE NAME vs IMPORT NAME:
+    # - pip install: qwen-asr (with hyphen)
+    # - import: qwen_asr (with underscore)
+    #
+    Package(
+        name="qwen-asr",
+        version=">=0.0.6",
+        extra=Extra.QWEN,
+        order=84,
+        import_name="qwen_asr",  # pip name (qwen-asr) != import name (qwen_asr)
+        reason="Qwen3-ASR transformers backend for multilingual ASR with ForcedAligner",
     ),
 
     # =========================================================================

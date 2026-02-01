@@ -145,7 +145,7 @@ def parse_arguments():
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers"], default="balanced",
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen"], default="balanced",
                        help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
@@ -415,6 +415,47 @@ def parse_arguments():
     hf_group.add_argument("--hf-dtype", type=str, default="auto",
                          choices=["auto", "float16", "bfloat16", "float32"],
                          help="Data type (default: auto)")
+
+    # Qwen3-ASR mode arguments
+    qwen_group = parser.add_argument_group("Qwen3-ASR Mode Options (--mode qwen)")
+    qwen_group.add_argument("--qwen-model-id", type=str,
+                           default="Qwen/Qwen3-ASR-1.7B",
+                           help="Qwen3-ASR model ID (default: Qwen/Qwen3-ASR-1.7B)")
+    qwen_group.add_argument("--qwen-device", type=str, default="auto",
+                           choices=["auto", "cuda", "cpu"],
+                           help="Device to use (default: auto)")
+    qwen_group.add_argument("--qwen-dtype", type=str, default="auto",
+                           choices=["auto", "float16", "bfloat16", "float32"],
+                           help="Data type (default: auto)")
+    qwen_group.add_argument("--qwen-batch-size", type=int, default=1,
+                           help="Maximum inference batch size (default: 1 for accuracy)")
+    qwen_group.add_argument("--qwen-max-tokens", type=int, default=4096,
+                           help="Maximum tokens to generate (default: 4096, supports ~10 min audio)")
+    qwen_group.add_argument("--qwen-language", type=str, default=None,
+                           help="Language code (e.g., 'ja', 'en') or None for auto-detect (default: auto)")
+    qwen_group.add_argument("--qwen-timestamps", type=str, default="word",
+                           choices=["word", "none"],
+                           help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word)")
+    qwen_group.add_argument("--qwen-aligner", type=str,
+                           default="Qwen/Qwen3-ForcedAligner-0.6B",
+                           help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B)")
+    qwen_group.add_argument("--qwen-scene", type=str, default="none",
+                           choices=["none", "auditok", "silero", "semantic"],
+                           help="Scene detection method (default: none)")
+    qwen_group.add_argument("--qwen-context", type=str, default="",
+                           help="Context string to help improve transcription accuracy (e.g., speaker names, domain terminology)")
+    qwen_group.add_argument("--qwen-attn", type=str, default="auto",
+                           choices=["auto", "sdpa", "flash_attention_2", "eager"],
+                           help="Attention implementation: 'auto' (detect flash-attn), 'sdpa', 'flash_attention_2', 'eager' (default: auto)")
+    qwen_group.add_argument("--qwen-enhancer", type=str, default="none",
+                           choices=["none", "clearvoice", "bs-roformer", "zipenhancer", "ffmpeg-dsp"],
+                           help="Speech enhancement backend (default: none)")
+    qwen_group.add_argument("--qwen-enhancer-model", type=str, default=None,
+                           help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
+    qwen_group.add_argument("--qwen-segmenter", type=str, default="none",
+                           choices=["none", "silero", "silero-v4.0", "silero-v3.1",
+                                    "nemo", "nemo-lite", "whisper-vad", "ten"],
+                           help="Post-ASR VAD filter to remove hallucinations in non-speech regions (default: none)")
 
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
@@ -715,6 +756,33 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             hf_device=getattr(args, 'hf_device', 'auto'),
             hf_dtype=getattr(args, 'hf_dtype', 'auto'),
             subs_language=args.subs_language,
+        )
+    elif args.mode == "qwen":
+        # Qwen3-ASR pipeline using TransformersPipeline with qwen backend
+        from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
+        pipeline = TransformersPipeline(
+            output_dir=args.output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp,
+            save_metadata_json=getattr(args, 'debug', False),
+            progress_display=progress,
+            subs_language=args.subs_language,
+            # Qwen-specific parameters
+            asr_backend="qwen",
+            qwen_model_id=getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
+            qwen_device=getattr(args, 'qwen_device', 'auto'),
+            qwen_dtype=getattr(args, 'qwen_dtype', 'auto'),
+            qwen_batch_size=getattr(args, 'qwen_batch_size', 1),  # batch_size=1 for accuracy
+            qwen_max_tokens=getattr(args, 'qwen_max_tokens', 4096),
+            qwen_language=getattr(args, 'qwen_language', None),
+            qwen_timestamps=getattr(args, 'qwen_timestamps', 'word'),
+            qwen_aligner=getattr(args, 'qwen_aligner', 'Qwen/Qwen3-ForcedAligner-0.6B'),
+            qwen_scene=getattr(args, 'qwen_scene', 'none'),
+            qwen_context=getattr(args, 'qwen_context', ''),
+            qwen_attn=getattr(args, 'qwen_attn', 'auto'),
+            qwen_enhancer=getattr(args, 'qwen_enhancer', 'none'),
+            qwen_enhancer_model=getattr(args, 'qwen_enhancer_model', None),
+            qwen_segmenter=getattr(args, 'qwen_segmenter', 'none'),
         )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
@@ -1169,6 +1237,12 @@ def main():
             # No config resolution needed - pipeline receives args directly
             resolved_config = None
             logger.debug("Transformers mode: skipping legacy config resolution (uses --hf-* args)")
+
+        elif args.mode == "qwen":
+            # Qwen mode: uses dedicated --qwen-* arguments, not legacy config
+            # No config resolution needed - pipeline receives args directly
+            resolved_config = None
+            logger.debug("Qwen mode: skipping legacy config resolution (uses --qwen-* args)")
 
         else:
             # Legacy mode: use pipeline resolver

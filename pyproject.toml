@@ -196,6 +196,14 @@ huggingface = [
     "hf_xet",  # Faster HuggingFace downloads
 ]
 
+# Qwen3-ASR support (v1.8.3+)
+# Install with: pip install whisperjav[qwen]
+# Note: Requires huggingface extra for transformers backend
+qwen = [
+    "qwen-asr>=0.0.6",
+    "whisperjav[huggingface]",  # Transformers/torch dependency
+]
+
 # Analysis and visualization tools
 # Install with: pip install whisperjav[analysis]
 # Note: scikit-learn is in [cli] for scene detection clustering
@@ -231,7 +239,7 @@ dev = [
 # Full installation with all features
 # Install with: pip install whisperjav[all]
 all = [
-    "whisperjav[cli,gui,translate,llm,enhance,huggingface,analysis,compatibility]",
+    "whisperjav[cli,gui,translate,llm,enhance,huggingface,qwen,analysis,compatibility]",
 ]
 
 # Google Colab optimized (no GUI, focused on transcription + translation)

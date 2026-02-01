@@ -138,6 +138,10 @@ def validate_pyproject_sync(pyproject_path: Path = None) -> List[str]:
         extra_pkgs = actual_packages - expected_set
         if extra_pkgs:
             for pkg in sorted(extra_pkgs):
+                # Skip self-referencing extras (e.g., "whisperjav[huggingface]")
+                # These are valid pyproject.toml patterns for combining extras
+                if pkg.startswith("whisperjav["):
+                    continue
                 errors.append(f"Extra [{extra_name}] has undeclared package: {pkg}")
 
     # Check for extras in pyproject.toml that aren't in registry

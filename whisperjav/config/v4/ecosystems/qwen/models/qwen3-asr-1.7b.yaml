@@ -1,0 +1,156 @@
+# =============================================================================
+# Qwen3-ASR 1.7B Model Configuration
+# =============================================================================
+# Multilingual ASR model from Qwen with optional ForcedAligner for
+# word-level timestamps. Supports automatic language detection.
+#
+# Reference: https://github.com/QwenLM/Qwen3-ASR
+# =============================================================================
+
+schemaVersion: v1
+kind: Model
+
+metadata:
+  name: qwen3-asr-1.7b
+  ecosystem: qwen
+  displayName: "Qwen3-ASR 1.7B"
+  description: |
+    Qwen3-ASR 1.7B is a multilingual automatic speech recognition model
+    that supports automatic language detection and optional ForcedAligner
+    for precise word-level timestamps.
+  version: "1.0.0"
+  tags:
+    - qwen
+    - multilingual
+    - word-timestamps
+    - japanese
+    - recommended
+
+provider: qwen
+
+# =============================================================================
+# Model Parameters
+# =============================================================================
+spec:
+  # --- Model Loading ---
+  model.id: "Qwen/Qwen3-ASR-1.7B"
+  model.device: auto
+  model.dtype: bfloat16
+  model.max_inference_batch_size: 1  # batch_size=1 for accuracy
+  model.max_new_tokens: 4096  # Supports ~10 min audio
+
+  # --- Decoding ---
+  decode.language: null  # null = auto-detect
+  decode.task: transcribe
+
+  # --- Timestamps ---
+  timestamps.mode: word  # "word" (uses ForcedAligner) or "none"
+
+  # --- ForcedAligner ---
+  aligner.enabled: true
+  aligner.id: "Qwen/Qwen3-ForcedAligner-0.6B"
+
+  # --- Architectural Limits (from qwen-asr) ---
+  # ForcedAligner: 180 sec max per chunk (internally chunked if longer)
+  # ASR without aligner: 1200 sec max
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  conservative:
+    # Maximum accuracy: small batch, generous tokens
+    model.max_inference_batch_size: 1
+    model.max_new_tokens: 4096
+
+  balanced:
+    # Default settings (empty = use spec values)
+    {}
+
+  aggressive:
+    # Higher throughput: larger batch, extended tokens for long audio
+    model.max_inference_batch_size: 16
+    model.max_new_tokens: 8192
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  model.id:
+    widget: text
+    label: "Model ID"
+    description: "Qwen model identifier"
+    group: model
+    readonly: true
+
+  model.device:
+    widget: dropdown
+    label: "Device"
+    description: "Compute device for inference"
+    options:
+      - auto
+      - cuda
+      - cpu
+    group: model
+
+  model.dtype:
+    widget: dropdown
+    label: "Data Type"
+    description: "Floating point precision (bfloat16 recommended)"
+    options:
+      - auto
+      - bfloat16
+      - float16
+      - float32
+    group: model
+
+  model.max_inference_batch_size:
+    widget: spinner
+    label: "Batch Size"
+    description: "Maximum inference batch size"
+    min: 1
+    max: 64
+    step: 1
+    group: model
+
+  model.max_new_tokens:
+    widget: spinner
+    label: "Max Tokens"
+    description: "Maximum new tokens per utterance"
+    min: 64
+    max: 1024
+    step: 64
+    group: model
+
+  decode.language:
+    widget: text
+    label: "Language"
+    description: "Language code (e.g., 'ja', 'en') or leave empty for auto-detect"
+    group: decode
+
+  timestamps.mode:
+    widget: dropdown
+    label: "Timestamp Mode"
+    description: "Timestamp granularity (word uses ForcedAligner)"
+    options:
+      - word
+      - none
+    group: timestamps
+
+  aligner.enabled:
+    widget: checkbox
+    label: "Enable ForcedAligner"
+    description: "Use ForcedAligner for word-level timestamps"
+    group: aligner
+
+  aligner.id:
+    widget: text
+    label: "Aligner Model"
+    description: "ForcedAligner model identifier"
+    group: aligner
+    advanced: true
+
+# Compatible tools
+compatible_tools:
+  - auditok-scene-detection
+  - silero-scene-detection
