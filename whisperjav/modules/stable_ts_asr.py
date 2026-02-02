@@ -22,6 +22,7 @@ except Exception:  # pragma: no cover - optional dependency guard
 
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
+from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
 # Suppress specific warnings from stable_whisper
@@ -187,7 +188,10 @@ class StableTSASR:
         # --- END V3 PARAMETER UNPACKING ---
 
         self.lexical_sets = LexicalSets()
-        
+
+        # Initialize Japanese post-processor (shared module for consistent behavior)
+        self._japanese_postprocessor = JapanesePostProcessor()
+
         # Pre-cache the appropriate Silero VAD version
         self._precache_silero_vad()
         
@@ -574,11 +578,14 @@ class StableTSASR:
         return final_output_path
     
     def _postprocess_japanese_dialogue(self,
-                                      result: stable_whisper.WhisperResult, 
+                                      result: stable_whisper.WhisperResult,
                                       preset: str = "default") -> stable_whisper.WhisperResult:
         """
         Applies a unified, multi-pass regrouping strategy to a stable-ts result
         for optimal Japanese conversational dialogue segmentation.
+
+        This method delegates to the shared JapanesePostProcessor module to ensure
+        consistent behavior across all ASR backends (StableTSASR, QwenASR, etc.).
 
         Args:
             result: The WhisperResult object from a stable-ts transcription.
@@ -587,134 +594,14 @@ class StableTSASR:
         Returns:
             The modified WhisperResult object after post-processing.
         """
-        logger.debug(f"Applying Japanese post-processing with '{preset}' preset.")
-        
-        if not result.segments:
-            logger.debug("No segments found in transcription result. Skipping post-processing.")
-            return
-
-        # --- Preset Parameters ---
-        gap_threshold = {
-            "default": 0.3,
-            "high_moan": 0.1,
-            "narrative": 0.4,
-        }.get(preset, 0.3)
-
-        segment_length = {
-            "default": 35,
-            "high_moan": 25,
-            "narrative": 45,
-        }.get(preset, 35)
-
-        # --- Linguistic Ending Clusters ---
-        BASE_ENDINGS = ['ね', 'よ', 'わ', 'の', 'ぞ', 'ぜ', 'さ', 'か', 'かな', 'な']
-        MODERN_ENDINGS = ['じゃん', 'っしょ', 'んだ', 'わけ', 'かも', 'だろう']
-        KANSAI_ENDINGS = ['わ', 'で', 'ねん', 'な', 'や']
-        FEMININE_ENDINGS = ['かしら', 'こと', 'わね', 'のよ']
-        MASCULINE_ENDINGS = ['ぜ', 'ぞ', 'だい', 'かい']
-        
-        POLITE_FORMS = ['です', 'ます', 'でした', 'ましょう', 'ませんか']
-        CASUAL_CONTRACTIONS = ['ちゃ', 'じゃ', 'きゃ', 'にゃ', 'ひゃ', 'みゃ', 'りゃ']
-        QUESTION_PARTICLES = ['の', 'か']
-
-        FINAL_ENDINGS_TO_LOCK = list(set(
-            BASE_ENDINGS +
-            MODERN_ENDINGS +
-            KANSAI_ENDINGS +
-            FEMININE_ENDINGS +
-            MASCULINE_ENDINGS
-        ))
-
-        AIZUCHI_FILLERS = [
-            'あの', 'あのー', 'ええと', 'えっと', 'まあ', 'なんか', 'こう',
-            'うん', 'はい', 'ええ', 'そう', 'えっ', 'あっ',
-        ]
-
-        EXPRESSIVE_EMOTIONS = ['ああ', 'うう', 'ええ', 'おお', 'はあ', 'ふう', 'あっ', 
-            'うっ', 'はっ', 'ふっ', 'んっ'
-        ]
-
-        CONVERSATIONAL_VERBAL_ENDINGS = [
-            'てる',  # from -te iru
-            'でる',  # from -de iru
-            'ちゃう', # from -te shimau
-            'じゃう', # from -de shimau
-            'とく',  # from -te oku
-            'どく',  # from -de oku
-            'んない'  # from -ranai
-        ]
-
-        try:
-            # --- Pass 1: Remove Fillers and Aizuchi ---
-            logger.debug("Phase 1: Sanitization (Fillers and Aizuchi Removal)")
-            result.remove_words_by_str(AIZUCHI_FILLERS, case_sensitive=False, strip=True, verbose=False)
-
-            # --- Pass 2: Structural Anchoring ---
-            logger.debug("Phase 2: Structural Anchoring")
-
-            # 2a: Split by strong punctuation marks (full-width and half-width)
-            result.regroup("sp= 。 / ？ / ！ / … / ． /. /? /!+1")
-
-            # 2b: Lock known structural boundaries
-            result.lock(startswith=['「', '『'], left=True, right=False, strip=False)
-            result.lock(endswith=['」', '』'], right=True, left=False, strip=False)
-            result.lock(endswith=FINAL_ENDINGS_TO_LOCK, right=True, left=False, strip=True)
-            result.lock(endswith=POLITE_FORMS, right=True, strip=True)
-            result.lock(endswith=QUESTION_PARTICLES, right=True, strip=True)
-
-            for ending in CONVERSATIONAL_VERBAL_ENDINGS:
-                result.custom_operation('word', 'end', ending, 'lockright', word_level=True)
-            
-            # 2c: Lock expressive/emotive interjections
-            result.lock(
-                startswith=EXPRESSIVE_EMOTIONS,
-                endswith=EXPRESSIVE_EMOTIONS,
-                left=True,
-                right=True
-            )
-
-            # --- Pass 3: Merge & Heuristic Refinement ---
-            logger.debug("Phase 3: Heuristic-Based Merging & Refinement")
-            result.merge_by_punctuation(
-                punctuation=['、', '，', ','],
-                max_chars=40,
-                max_words=15
-            )
-
-            result.merge_by_gap(
-                min_gap=gap_threshold,
-                max_chars=40,
-                max_words=15,
-                is_sum_max=True
-            )
-
-            # Optional: Apply split by long pause
-            result.split_by_gap(max_gap=1.2)
-
-            # --- Pass 4: Final Cleanup & Formatting ---
-            logger.debug("Phase 4: Final Cleanup & Formatting")
-            result.split_by_length(
-                max_chars=segment_length,
-                max_words=15,
-                even_split=False
-            )
-
-            # Proactive safety: split long segments
-            result.split_by_duration(max_dur=8.5, even_split=False, lock=True)
-
-            result.reassign_ids()
-            
-            logger.debug("Japanese post-processing complete.")
-            return result
-
-        except Exception as e:
-            # Change ERROR to DEBUG for word timestamp issues
-            error_msg = str(e).lower()
-            if any(term in error_msg for term in ['word timestamp', 'word_level', 'word-level', 'missing word']):
-                logger.debug(f"Japanese post-processing skipped - no word timestamps: {e}")
-            else:
-                logger.error(f"An error occurred during Japanese post-processing: {e}")
-            logger.debug(traceback.format_exc())
+        # Delegate to shared Japanese post-processor (v1.8.4+)
+        # This ensures consistent regrouping behavior across all ASR backends
+        return self._japanese_postprocessor.process(
+            result,
+            preset=preset,
+            language='ja',  # StableTSASR is always Japanese-focused
+            skip_if_not_japanese=False  # Always apply (we know it's Japanese)
+        )
 
     def _postprocess(self, result):
         """Apply advanced Japanese-specific post-processing using embedded logic."""

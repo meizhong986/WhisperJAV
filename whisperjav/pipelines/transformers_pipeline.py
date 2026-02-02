@@ -92,6 +92,9 @@ class TransformersPipeline(BasePipeline):
         qwen_enhancer: str = "none",  # Speech enhancement for Qwen mode
         qwen_enhancer_model: Optional[str] = None,  # Enhancer model variant for Qwen
         qwen_segmenter: str = "none",  # Post-ASR VAD filter for Qwen mode
+        # Japanese post-processing options for Qwen mode (v1.8.4+)
+        qwen_japanese_postprocess: bool = True,  # Apply Japanese regrouping
+        qwen_postprocess_preset: str = "default",  # Preset: default, high_moan, narrative
         # Standard options
         subs_language: str = "native",
         **kwargs
@@ -134,6 +137,8 @@ class TransformersPipeline(BasePipeline):
             qwen_enhancer: Speech enhancement backend for Qwen mode ('none', 'clearvoice', 'bs-roformer', 'zipenhancer', 'ffmpeg-dsp'). Default: 'none'
             qwen_enhancer_model: Optional model variant for Qwen mode enhancer
             qwen_segmenter: Post-ASR VAD filter for Qwen mode ('none', 'silero', 'silero-v4.0', 'silero-v3.1', 'nemo', 'nemo-lite', 'whisper-vad', 'ten'). Filters out ASR segments in non-speech regions. Default: 'none'
+            qwen_japanese_postprocess: Apply Japanese-specific subtitle regrouping (default: True). Improves quality by handling sentence particles, aizuchi removal, and natural segmentation.
+            qwen_postprocess_preset: Japanese post-processing preset: 'default' (conversational), 'high_moan' (adult content), 'narrative' (longer passages)
             subs_language: Subtitle language ('native' or 'direct-to-english')
             **kwargs: Additional parameters for base class
         """
@@ -181,6 +186,9 @@ class TransformersPipeline(BasePipeline):
             "aligner_id": qwen_aligner,
             "context": qwen_context,
             "attn_implementation": qwen_attn,
+            # Japanese post-processing (v1.8.4+)
+            "japanese_postprocess": qwen_japanese_postprocess,
+            "postprocess_preset": qwen_postprocess_preset,
         }
 
         # Scene detection config - use qwen_scene for qwen backend, hf_scene otherwise
@@ -247,6 +255,9 @@ class TransformersPipeline(BasePipeline):
                 'aligner_id': qwen_aligner,
                 'context': qwen_context,
                 'attn_implementation': qwen_attn,
+                # Japanese post-processing (v1.8.4+)
+                'japanese_postprocess': qwen_japanese_postprocess,
+                'postprocess_preset': qwen_postprocess_preset,
             }
         else:
             self._asr_config = {

@@ -456,6 +456,15 @@ def parse_arguments():
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1",
                                     "nemo", "nemo-lite", "whisper-vad", "ten"],
                            help="Post-ASR VAD filter to remove hallucinations in non-speech regions (default: none)")
+    qwen_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
+                           action="store_true", default=True,
+                           help="Apply Japanese-specific subtitle regrouping (default: enabled)")
+    qwen_group.add_argument("--no-qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
+                           action="store_false",
+                           help="Disable Japanese-specific subtitle regrouping")
+    qwen_group.add_argument("--qwen-postprocess-preset", type=str, default="default",
+                           choices=["default", "high_moan", "narrative"],
+                           help="Japanese post-processing preset: 'default' (conversational), 'high_moan' (adult content), 'narrative' (longer passages)")
 
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
@@ -783,6 +792,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             qwen_enhancer=getattr(args, 'qwen_enhancer', 'none'),
             qwen_enhancer_model=getattr(args, 'qwen_enhancer_model', None),
             qwen_segmenter=getattr(args, 'qwen_segmenter', 'none'),
+            # Japanese post-processing (v1.8.4+)
+            qwen_japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', True),
+            qwen_postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'default'),
         )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)

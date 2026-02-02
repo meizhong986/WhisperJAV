@@ -25,6 +25,7 @@ import torch
 import stable_whisper
 
 from whisperjav.utils.logger import logger
+from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 
 # Suppress common transformers warnings
 warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
@@ -108,6 +109,9 @@ class QwenASR:
         aligner_id: str = DEFAULT_ALIGNER_ID,
         context: str = "",  # Context string to help ASR
         attn_implementation: str = "auto",  # Attention: auto, sdpa, flash_attention_2, eager
+        # Japanese post-processing (v1.8.4+)
+        japanese_postprocess: bool = True,  # Apply Japanese-specific regrouping
+        postprocess_preset: str = "default",  # Preset: "default", "high_moan", "narrative"
     ):
         """
         Initialize QwenASR.
@@ -125,6 +129,15 @@ class QwenASR:
             aligner_id: HuggingFace model ID for the aligner
             context: Context string to help qwen-asr improve transcription accuracy
             attn_implementation: Attention implementation ('auto', 'sdpa', 'flash_attention_2', 'eager')
+            japanese_postprocess: Whether to apply Japanese-specific regrouping (default: True)
+                                  This improves subtitle quality for Japanese dialogue by:
+                                  - Removing fillers and backchanneling (aizuchi)
+                                  - Anchoring on sentence particles (ね, よ, etc.)
+                                  - Merging/splitting for natural reading
+            postprocess_preset: Processing preset for Japanese post-processing:
+                                - "default": General conversational dialogue
+                                - "high_moan": Adult content with frequent vocalizations
+                                - "narrative": Longer narrative passages
         """
         self.model_id = model_id
         self.device_request = device
@@ -138,6 +151,13 @@ class QwenASR:
         self.aligner_id = aligner_id
         self.context = context
         self.attn_implementation = attn_implementation
+
+        # Japanese post-processing settings (v1.8.4+)
+        self.japanese_postprocess = japanese_postprocess
+        self.postprocess_preset = postprocess_preset
+
+        # Initialize post-processor (lightweight, no GPU resources)
+        self._postprocessor = JapanesePostProcessor() if japanese_postprocess else None
 
         # Model is lazily loaded
         self.model = None
@@ -681,6 +701,19 @@ class QwenASR:
                 logger.info(f"[DIAG]   last segment: '{result.segments[-1].text[:50]}...'")
 
             logger.debug(f"transcribe_any returned {segment_count} segments")
+
+            # Apply Japanese-specific post-processing (v1.8.4+)
+            if self._postprocessor and result.segments:
+                detected_lang = self._map_language_code(self._detected_language) if self._detected_language else None
+                logger.debug(f"Applying Japanese post-processing (preset={self.postprocess_preset}, lang={detected_lang})")
+                result = self._postprocessor.process(
+                    result,
+                    preset=self.postprocess_preset,
+                    language=detected_lang,
+                    skip_if_not_japanese=True
+                )
+                logger.debug(f"Post-processing complete, {len(result.segments)} segments after")
+
             return result
 
         except torch.cuda.OutOfMemoryError:
@@ -707,6 +740,17 @@ class QwenASR:
 
             self._detected_language = detected_language_holder[0]
             logger.info(f"Retry successful with batch_size={self.batch_size} (was {original_batch})")
+
+            # Apply Japanese-specific post-processing (v1.8.4+) - also for retry path
+            if self._postprocessor and result.segments:
+                detected_lang = self._map_language_code(self._detected_language) if self._detected_language else None
+                result = self._postprocessor.process(
+                    result,
+                    preset=self.postprocess_preset,
+                    language=detected_lang,
+                    skip_if_not_japanese=True
+                )
+
             return result
 
     def _transcribe_without_aligner(self, audio_path: Path) -> stable_whisper.WhisperResult:
