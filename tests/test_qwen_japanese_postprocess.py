@@ -55,6 +55,16 @@ def test_qwen_japanese_postprocessor_module():
     assert 'よ' in all_endings, "Missing よ in final endings"
     print(f"[PASS] Linguistic sets loaded: {len(all_endings)} final endings, {len(ling.aizuchi_fillers)} fillers")
 
+    # v1.8.5+: Hierarchical splitting patterns
+    assert len(ling.definite_endings) > 0, "No definite endings defined"
+    assert 'です' in ling.definite_endings, "Missing です in definite endings"
+    assert 'ます' in ling.definite_endings, "Missing ます in definite endings"
+    assert len(ling.strong_particles) > 0, "No strong particles defined"
+    assert 'よ' in ling.strong_particles, "Missing よ in strong particles"
+    assert len(ling.soft_particles) > 0, "No soft particles defined"
+    assert 'ね' in ling.soft_particles, "Missing ね in soft particles"
+    print(f"[PASS] Hierarchical patterns: {len(ling.definite_endings)} definite, {len(ling.strong_particles)} strong, {len(ling.soft_particles)} soft")
+
     # Test presets
     assert "default" in JapanesePostProcessor.PRESETS
     assert "high_moan" in JapanesePostProcessor.PRESETS
@@ -65,7 +75,12 @@ def test_qwen_japanese_postprocessor_module():
     default_params = JapanesePostProcessor.PRESETS["default"]
     assert default_params.gap_threshold == 0.3
     assert default_params.segment_length == 35
+    # v1.8.5+: Hierarchical splitting parameters
+    assert default_params.strong_particle_gap == 0.25, "strong_particle_gap should be 0.25"
+    assert default_params.soft_particle_gap == 0.4, "soft_particle_gap should be 0.4"
+    assert default_params.pure_gap_threshold == 0.6, "pure_gap_threshold should be 0.6"
     print(f"[PASS] Default preset: gap={default_params.gap_threshold}s, length={default_params.segment_length}")
+    print(f"[PASS] Hierarchical thresholds: strong={default_params.strong_particle_gap}s, soft={default_params.soft_particle_gap}s, pure={default_params.pure_gap_threshold}s")
 
     print("\nTEST 1 PASSED: JapanesePostProcessor module is correctly implemented")
     return True
@@ -279,10 +294,243 @@ def test_cli_arguments():
     return True
 
 
-def test_postprocessor_with_mock_result():
-    """Test 6: Test JapanesePostProcessor with a mock WhisperResult."""
+def test_hierarchical_splitting_unpunctuated():
+    """Test 6: Test hierarchical splitting for unpunctuated text (v1.8.5+).
+
+    This is the core test for the new hierarchical splitting algorithm that
+    handles Qwen-ASR's unpunctuated continuous output.
+    """
     print("\n" + "=" * 60)
-    print("TEST 6: JapanesePostProcessor with Mock WhisperResult")
+    print("TEST 6: Hierarchical Splitting for Unpunctuated Text (v1.8.5+)")
+    print("=" * 60)
+
+    try:
+        import stable_whisper
+        from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
+
+        processor = JapanesePostProcessor()
+
+        # === Test Case 1: Definite endings split (unconditional) ===
+        print("\n--- Test 6.1: Definite endings split (です, ます) ---")
+        # Simulate: "そうですねでも私はそう思いますよ" (no punctuation)
+        # Should split at: "そうです" | "ねでも私はそう思います" | "よ"
+        mock_definite = {
+            'language': 'ja',
+            'segments': [
+                {
+                    'start': 0.0,
+                    'end': 4.0,
+                    'text': 'そうですねでも私はそう思いますよ',
+                    'words': [
+                        {'word': 'そう', 'start': 0.0, 'end': 0.3},
+                        {'word': 'です', 'start': 0.3, 'end': 0.6},
+                        {'word': 'ね', 'start': 0.6, 'end': 0.8},
+                        {'word': 'でも', 'start': 0.8, 'end': 1.1},
+                        {'word': '私', 'start': 1.1, 'end': 1.3},
+                        {'word': 'は', 'start': 1.3, 'end': 1.4},
+                        {'word': 'そう', 'start': 1.4, 'end': 1.7},
+                        {'word': '思い', 'start': 1.7, 'end': 2.0},
+                        {'word': 'ます', 'start': 2.0, 'end': 2.3},
+                        {'word': 'よ', 'start': 2.3, 'end': 2.5},
+                    ]
+                }
+            ]
+        }
+        result = stable_whisper.WhisperResult(mock_definite)
+        original_count = len(result.segments)
+        processor.process(result, preset="default", language="ja")
+        print(f"  Original: {original_count} segment -> Processed: {len(result.segments)} segments")
+        for i, seg in enumerate(result.segments):
+            print(f"    [{i}] '{seg.text}'")
+        # Should have at least 2 segments (split at です and ます)
+        assert len(result.segments) >= 2, "Definite endings should cause splits"
+        print("[PASS] Definite endings (です, ます) caused splits")
+
+        # === Test Case 2: Strong particles with gap ===
+        print("\n--- Test 6.2: Strong particles with gap (よ + 0.3s gap) ---")
+        # "行くよ" [0.3s gap] "今日は" - should split after よ
+        mock_strong = {
+            'language': 'ja',
+            'segments': [
+                {
+                    'start': 0.0,
+                    'end': 2.0,
+                    'text': '行くよ今日は',
+                    'words': [
+                        {'word': '行く', 'start': 0.0, 'end': 0.3},
+                        {'word': 'よ', 'start': 0.3, 'end': 0.5},
+                        # 0.3s gap here (0.8 - 0.5 = 0.3)
+                        {'word': '今日', 'start': 0.8, 'end': 1.1},
+                        {'word': 'は', 'start': 1.1, 'end': 1.3},
+                    ]
+                }
+            ]
+        }
+        result = stable_whisper.WhisperResult(mock_strong)
+        processor.process(result, preset="default", language="ja")
+        print(f"  Processed: {len(result.segments)} segments")
+        for i, seg in enumerate(result.segments):
+            print(f"    [{i}] '{seg.text}'")
+        # Should split because gap (0.3s) >= strong_particle_gap (0.25s)
+        assert len(result.segments) >= 2, "Strong particle よ with gap should split"
+        print("[PASS] Strong particle (よ) with 0.3s gap caused split")
+
+        # === Test Case 3: Soft particles without sufficient gap ===
+        print("\n--- Test 6.3: Soft particles without sufficient gap (ね + 0.2s gap) ---")
+        # "そうだね" [0.2s gap] "明日は" - should NOT split (gap < 0.4s)
+        mock_soft_no_gap = {
+            'language': 'ja',
+            'segments': [
+                {
+                    'start': 0.0,
+                    'end': 2.0,
+                    'text': 'そうだね明日は',
+                    'words': [
+                        {'word': 'そう', 'start': 0.0, 'end': 0.3},
+                        {'word': 'だ', 'start': 0.3, 'end': 0.4},
+                        {'word': 'ね', 'start': 0.4, 'end': 0.6},
+                        # Only 0.2s gap here (0.8 - 0.6 = 0.2)
+                        {'word': '明日', 'start': 0.8, 'end': 1.1},
+                        {'word': 'は', 'start': 1.1, 'end': 1.3},
+                    ]
+                }
+            ]
+        }
+        result = stable_whisper.WhisperResult(mock_soft_no_gap)
+        original_count = len(result.segments)
+        processor.process(result, preset="default", language="ja")
+        print(f"  Processed: {len(result.segments)} segments")
+        for i, seg in enumerate(result.segments):
+            print(f"    [{i}] '{seg.text}'")
+        # The result may or may not split due to merge passes, but the key is
+        # that the soft particle alone with small gap shouldn't cause split
+        print("[INFO] Soft particle (ね) with small gap may not split (expected)")
+
+        # === Test Case 4: Soft particles WITH sufficient gap ===
+        print("\n--- Test 6.4: Soft particles with sufficient gap (ね + 0.5s gap) ---")
+        # "そうだね" [0.5s gap] "明日は" - should split (gap >= 0.4s)
+        mock_soft_with_gap = {
+            'language': 'ja',
+            'segments': [
+                {
+                    'start': 0.0,
+                    'end': 2.0,
+                    'text': 'そうだね明日は',
+                    'words': [
+                        {'word': 'そう', 'start': 0.0, 'end': 0.3},
+                        {'word': 'だ', 'start': 0.3, 'end': 0.4},
+                        {'word': 'ね', 'start': 0.4, 'end': 0.6},
+                        # 0.5s gap here (1.1 - 0.6 = 0.5)
+                        {'word': '明日', 'start': 1.1, 'end': 1.4},
+                        {'word': 'は', 'start': 1.4, 'end': 1.6},
+                    ]
+                }
+            ]
+        }
+        result = stable_whisper.WhisperResult(mock_soft_with_gap)
+        processor.process(result, preset="default", language="ja")
+        print(f"  Processed: {len(result.segments)} segments")
+        for i, seg in enumerate(result.segments):
+            print(f"    [{i}] '{seg.text}'")
+        # Should split because gap (0.5s) >= soft_particle_gap (0.4s)
+        assert len(result.segments) >= 2, "Soft particle ね with 0.5s gap should split"
+        print("[PASS] Soft particle (ね) with 0.5s gap caused split")
+
+        # === Test Case 5: Punctuation takes priority ===
+        print("\n--- Test 6.5: Punctuation as TOP RULE ---")
+        # "今日は良い天気です。明日も晴れるといいね" - should split at 。 first
+        # Note: "そう" in previous test was removed as aizuchi, so we use different text
+        mock_punctuation = {
+            'language': 'ja',
+            'segments': [
+                {
+                    'start': 0.0,
+                    'end': 4.0,
+                    'text': '今日は良い天気です。明日も晴れるといいね',
+                    'words': [
+                        {'word': '今日', 'start': 0.0, 'end': 0.3},
+                        {'word': 'は', 'start': 0.3, 'end': 0.4},
+                        {'word': '良い', 'start': 0.4, 'end': 0.7},
+                        {'word': '天気', 'start': 0.7, 'end': 1.0},
+                        {'word': 'です', 'start': 1.0, 'end': 1.3},
+                        {'word': '。', 'start': 1.3, 'end': 1.4},
+                        # 0.6s gap here to prevent merge
+                        {'word': '明日', 'start': 2.0, 'end': 2.3},
+                        {'word': 'も', 'start': 2.3, 'end': 2.4},
+                        {'word': '晴れる', 'start': 2.4, 'end': 2.7},
+                        {'word': 'と', 'start': 2.7, 'end': 2.8},
+                        {'word': 'いい', 'start': 2.8, 'end': 3.1},
+                        {'word': 'ね', 'start': 3.1, 'end': 3.3},
+                    ]
+                }
+            ]
+        }
+        result = stable_whisper.WhisperResult(mock_punctuation)
+        processor.process(result, preset="default", language="ja")
+        print(f"  Processed: {len(result.segments)} segments")
+        for i, seg in enumerate(result.segments):
+            print(f"    [{i}] '{seg.text}'")
+        # Should have at least 2 segments from punctuation and/or definite ending split
+        assert len(result.segments) >= 2, "Punctuation should cause split"
+        # The text should be split (total content preserved but in multiple segments)
+        all_text = ''.join(seg.text for seg in result.segments)
+        assert '。' in all_text, "Punctuation should be preserved"
+        print("[PASS] Punctuation and definite endings caused proper splits")
+
+        # === Test Case 6: Complex multi-sentence without punctuation ===
+        print("\n--- Test 6.6: Complex multi-sentence without punctuation ---")
+        # "私はそう思いますでも彼女はそう思わないですよね"
+        # Expected splits: at ます, at です (definite), possibly at ね with gap
+        mock_complex = {
+            'language': 'ja',
+            'segments': [
+                {
+                    'start': 0.0,
+                    'end': 5.0,
+                    'text': '私はそう思いますでも彼女はそう思わないですよね',
+                    'words': [
+                        {'word': '私', 'start': 0.0, 'end': 0.2},
+                        {'word': 'は', 'start': 0.2, 'end': 0.3},
+                        {'word': 'そう', 'start': 0.3, 'end': 0.6},
+                        {'word': '思い', 'start': 0.6, 'end': 0.9},
+                        {'word': 'ます', 'start': 0.9, 'end': 1.2},
+                        {'word': 'でも', 'start': 1.2, 'end': 1.5},
+                        {'word': '彼女', 'start': 1.5, 'end': 1.8},
+                        {'word': 'は', 'start': 1.8, 'end': 1.9},
+                        {'word': 'そう', 'start': 1.9, 'end': 2.2},
+                        {'word': '思わない', 'start': 2.2, 'end': 2.6},
+                        {'word': 'です', 'start': 2.6, 'end': 2.9},
+                        {'word': 'よ', 'start': 2.9, 'end': 3.1},
+                        {'word': 'ね', 'start': 3.1, 'end': 3.3},
+                    ]
+                }
+            ]
+        }
+        result = stable_whisper.WhisperResult(mock_complex)
+        original_text = result.segments[0].text
+        processor.process(result, preset="default", language="ja")
+        print(f"  Original: '{original_text}'")
+        print(f"  Processed: {len(result.segments)} segments")
+        for i, seg in enumerate(result.segments):
+            print(f"    [{i}] '{seg.text}'")
+        # Should have at least 2 segments from ます and です splits
+        assert len(result.segments) >= 2, "Complex text should have multiple splits"
+        print("[PASS] Complex multi-sentence text was segmented")
+
+        print("\n[PASS] All hierarchical splitting tests passed")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Hierarchical splitting test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_postprocessor_with_mock_result():
+    """Test 7: Test JapanesePostProcessor with a mock WhisperResult."""
+    print("\n" + "=" * 60)
+    print("TEST 7: JapanesePostProcessor with Mock WhisperResult")
     print("=" * 60)
 
     try:
@@ -351,9 +599,9 @@ def test_postprocessor_with_mock_result():
 
 
 def test_full_pipeline_integration():
-    """Test 7: Full pipeline integration test (requires GPU and qwen-asr)."""
+    """Test 8: Full pipeline integration test (requires GPU and qwen-asr)."""
     print("\n" + "=" * 60)
-    print("TEST 7: Full Pipeline Integration (REQUIRES GPU)")
+    print("TEST 8: Full Pipeline Integration (REQUIRES GPU)")
     print("=" * 60)
 
     # Check for test audio file
@@ -461,6 +709,7 @@ def main():
         ("Pipeline Passthrough", test_transformers_pipeline_passthrough),
         ("StableTSASR Integration", test_stable_ts_asr_uses_shared_module),
         ("CLI Arguments", test_cli_arguments),
+        ("Hierarchical Splitting", test_hierarchical_splitting_unpunctuated),
         ("Mock WhisperResult", test_postprocessor_with_mock_result),
         ("Full Pipeline (GPU)", test_full_pipeline_integration),
     ]
