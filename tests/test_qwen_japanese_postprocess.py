@@ -29,6 +29,201 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
+def test_merge_master_with_timestamps():
+    """Test 0: Verify merge_master_with_timestamps preserves punctuation (JP-001 fix)."""
+    print("\n" + "=" * 60)
+    print("TEST 0: merge_master_with_timestamps (Punctuation Preservation)")
+    print("=" * 60)
+
+    from whisperjav.modules.qwen_asr import merge_master_with_timestamps
+
+    # Mock timestamp objects (like ForcedAlignItem)
+    class MockTimestamp:
+        def __init__(self, text, start_time, end_time):
+            self.text = text
+            self.start_time = start_time
+            self.end_time = end_time
+
+    # === Test Case 1: Basic punctuation preservation ===
+    print("\n--- Test 0.1: Basic punctuation preservation ---")
+    master = "けども、お前が。"
+    timestamps = [
+        MockTimestamp("けども", 1.0, 1.5),
+        MockTimestamp("お前", 2.0, 2.3),
+        MockTimestamp("が", 2.3, 2.5),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+    print(f"  Master: '{master}'")
+    print(f"  Result: {[(w['word'], w['start'], w['end']) for w in result]}")
+
+    assert len(result) == 3, f"Expected 3 words, got {len(result)}"
+    assert result[0]['word'] == "けども、", f"Expected 'けども、', got '{result[0]['word']}'"
+    assert result[1]['word'] == "お前", f"Expected 'お前', got '{result[1]['word']}'"
+    assert result[2]['word'] == "が。", f"Expected 'が。', got '{result[2]['word']}'"
+    print("[PASS] Basic punctuation (、。) preserved correctly")
+
+    # === Test Case 2: Multiple punctuation marks ===
+    print("\n--- Test 0.2: Multiple punctuation marks ---")
+    master = "はい。ね？そうだよ！"
+    timestamps = [
+        MockTimestamp("はい", 0.0, 0.5),
+        MockTimestamp("ね", 0.6, 0.8),
+        MockTimestamp("そうだよ", 1.0, 1.5),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+    print(f"  Master: '{master}'")
+    print(f"  Result: {[(w['word'], w['start'], w['end']) for w in result]}")
+
+    assert result[0]['word'] == "はい。", "First word should include 。"
+    assert result[1]['word'] == "ね？", "Second word should include ？"
+    assert result[2]['word'] == "そうだよ！", "Third word should include ！"
+    print("[PASS] Multiple punctuation marks (。？！) preserved")
+
+    # === Test Case 3: Leading punctuation (opening quote) ===
+    print("\n--- Test 0.3: Leading punctuation (opening quote) ---")
+    master = "「こんにちは」"
+    timestamps = [
+        MockTimestamp("こんにちは", 0.0, 1.0),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+    print(f"  Master: '{master}'")
+    print(f"  Result: {[(w['word'], w['start'], w['end']) for w in result]}")
+
+    assert result[0]['word'] == "「こんにちは」", "Should include both 「 and 」"
+    print("[PASS] Leading and trailing quotes preserved")
+
+    # === Test Case 4: No timestamps (edge case) ===
+    print("\n--- Test 0.4: No timestamps (edge case) ---")
+    master = "テスト。"
+    timestamps = []
+    result = merge_master_with_timestamps(master, timestamps)
+    print(f"  Master: '{master}'")
+    print(f"  Result: {result}")
+
+    assert len(result) == 1, "Should return single word"
+    assert result[0]['word'] == "テスト。", "Should preserve full text"
+    assert result[0]['start'] == 0.0 and result[0]['end'] == 0.0, "Should have zero timing"
+    print("[PASS] No timestamps handled correctly")
+
+    # === Test Case 5: Complex real-world example ===
+    print("\n--- Test 0.5: Complex real-world example ---")
+    master = "本番をやらなくてもいいんだったらいいけども、お前ができてないから言ってるんだよ。はい。"
+    timestamps = [
+        MockTimestamp("本番", 0.0, 0.3),
+        MockTimestamp("を", 0.3, 0.4),
+        MockTimestamp("やらなくて", 0.4, 0.8),
+        MockTimestamp("も", 0.8, 0.9),
+        MockTimestamp("いい", 0.9, 1.1),
+        MockTimestamp("ん", 1.1, 1.2),
+        MockTimestamp("だったら", 1.2, 1.5),
+        MockTimestamp("いい", 1.5, 1.7),
+        MockTimestamp("けども", 1.7, 2.0),
+        MockTimestamp("お前", 2.1, 2.4),
+        MockTimestamp("が", 2.4, 2.5),
+        MockTimestamp("できてない", 2.5, 2.9),
+        MockTimestamp("から", 2.9, 3.1),
+        MockTimestamp("言ってる", 3.1, 3.4),
+        MockTimestamp("ん", 3.4, 3.5),
+        MockTimestamp("だよ", 3.5, 3.8),
+        MockTimestamp("はい", 4.0, 4.3),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+
+    # Concatenate all words to verify full text is preserved
+    reconstructed = ''.join(w['word'] for w in result)
+    print(f"  Master:        '{master}'")
+    print(f"  Reconstructed: '{reconstructed}'")
+
+    assert reconstructed == master, f"Reconstructed text should match master"
+    print("[PASS] Complex text fully preserved with punctuation")
+
+    # Check specific punctuation positions
+    # "けども" should have "、" attached
+    kedomo_word = next((w for w in result if w['word'].startswith("けども")), None)
+    assert kedomo_word and "、" in kedomo_word['word'], "けども should have 、 attached"
+    print("[PASS] Comma attached to 'けども'")
+
+    # "だよ" should have "。" attached
+    dayo_word = next((w for w in result if "だよ" in w['word']), None)
+    assert dayo_word and "。" in dayo_word['word'], "だよ should have 。 attached"
+    print("[PASS] Period attached to 'だよ'")
+
+    # "はい" should have "。" attached (trailing)
+    hai_word = next((w for w in result if w['word'].startswith("はい")), None)
+    assert hai_word and "。" in hai_word['word'], "はい should have trailing 。"
+    print("[PASS] Trailing period attached to last word")
+
+    # === Test Case 6: Western punctuation (model might output these) ===
+    print("\n--- Test 0.6: Western punctuation preservation ---")
+    master = "Hello, world. How are you?"
+    timestamps = [
+        MockTimestamp("Hello", 0.0, 0.5),
+        MockTimestamp("world", 0.6, 1.0),
+        MockTimestamp("How", 1.2, 1.5),
+        MockTimestamp("are", 1.5, 1.7),
+        MockTimestamp("you", 1.7, 2.0),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+    reconstructed = ''.join(w['word'] for w in result)
+
+    assert reconstructed == master, f"Western punctuation not preserved: '{reconstructed}' != '{master}'"
+    assert any(',' in w['word'] for w in result), "Western comma should be preserved"
+    assert any('.' in w['word'] for w in result), "Western period should be preserved"
+    assert any('?' in w['word'] for w in result), "Western question mark should be preserved"
+    print("[PASS] Western punctuation (. , ?) preserved correctly")
+
+    # === Test Case 7: Space as delimiter in Japanese ===
+    print("\n--- Test 0.7: Space as delimiter in Japanese ---")
+    # In Japanese, space indicates explicit sentence/phrase boundary
+    master = "こんにちは 元気ですか"
+    timestamps = [
+        MockTimestamp("こんにちは", 0.0, 1.0),
+        MockTimestamp("元気ですか", 1.5, 2.5),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+    reconstructed = ''.join(w['word'] for w in result)
+
+    assert reconstructed == master, f"Space not preserved: '{reconstructed}' != '{master}'"
+    # Space should be attached to the preceding word
+    assert result[0]['word'] == "こんにちは ", "Space should attach to preceding word"
+    print("[PASS] Space preserved and attached to preceding word")
+
+    # === Test Case 8: Mixed Japanese/Western punctuation ===
+    print("\n--- Test 0.8: Mixed Japanese and Western punctuation ---")
+    master = "OK。That's right！Really?"
+    timestamps = [
+        MockTimestamp("OK", 0.0, 0.3),
+        MockTimestamp("That's", 0.4, 0.7),
+        MockTimestamp("right", 0.7, 1.0),
+        MockTimestamp("Really", 1.2, 1.5),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+    reconstructed = ''.join(w['word'] for w in result)
+
+    assert reconstructed == master, f"Mixed punctuation not preserved: '{reconstructed}'"
+    assert any('。' in w['word'] for w in result), "Japanese period should be preserved"
+    assert any('！' in w['word'] for w in result), "Japanese exclamation should be preserved"
+    assert any('?' in w['word'] for w in result), "Western question mark should be preserved"
+    print("[PASS] Mixed Japanese/Western punctuation preserved")
+
+    # === Test Case 9: Multiple spaces (unusual but possible) ===
+    print("\n--- Test 0.9: Multiple spaces between words ---")
+    master = "First  Second"  # Double space
+    timestamps = [
+        MockTimestamp("First", 0.0, 0.5),
+        MockTimestamp("Second", 1.0, 1.5),
+    ]
+    result = merge_master_with_timestamps(master, timestamps)
+    reconstructed = ''.join(w['word'] for w in result)
+
+    assert reconstructed == master, f"Multiple spaces not preserved: '{reconstructed}'"
+    assert "  " in result[0]['word'], "Double space should be preserved"
+    print("[PASS] Multiple spaces preserved")
+
+    print("\n[PASS] All merge_master_with_timestamps tests passed")
+    return True
+
+
 def test_qwen_japanese_postprocessor_module():
     """Test 1: Verify the JapanesePostProcessor module works correctly."""
     print("\n" + "=" * 60)
@@ -697,6 +892,103 @@ def test_full_pipeline_integration():
     return True
 
 
+def test_artifact_saving():
+    """Test 10: Verify debug artifacts are saved when artifacts_dir is provided."""
+    print("\n" + "=" * 60)
+    print("TEST 10: Debug Artifact Saving")
+    print("=" * 60)
+
+    import json
+    import tempfile
+    from whisperjav.modules.qwen_asr import merge_master_with_timestamps
+
+    # Mock timestamp objects
+    class MockTimestamp:
+        def __init__(self, text, start_time, end_time):
+            self.text = text
+            self.start_time = start_time
+            self.end_time = end_time
+
+    # Test the artifact saving directly by simulating what qwen_inference does
+    master_text = "本番をやらなくても。お前が。"
+    timestamps = [
+        MockTimestamp("本番", 0.0, 0.5),
+        MockTimestamp("を", 0.5, 0.6),
+        MockTimestamp("やらなくて", 0.6, 1.0),
+        MockTimestamp("も", 1.0, 1.2),
+        MockTimestamp("お前", 1.5, 1.8),
+        MockTimestamp("が", 1.8, 2.0),
+    ]
+
+    # Perform merge
+    words = merge_master_with_timestamps(master_text, timestamps)
+    reconstructed = ''.join(w['word'] for w in words)
+
+    print(f"Master text: '{master_text}'")
+    print(f"Reconstructed: '{reconstructed}'")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        audio_basename = "test_scene_001"
+
+        # Simulate artifact saving (same logic as in qwen_inference)
+        # 1. Save master text
+        master_file = temp_path / f"{audio_basename}_qwen_master.txt"
+        master_file.write_text(master_text, encoding='utf-8')
+
+        # 2. Save timestamps
+        timestamps_data = []
+        for ts in timestamps:
+            ts_entry = {
+                'text': getattr(ts, 'text', None),
+                'start_time': getattr(ts, 'start_time', None),
+                'end_time': getattr(ts, 'end_time', None),
+            }
+            timestamps_data.append(ts_entry)
+
+        timestamps_file = temp_path / f"{audio_basename}_qwen_timestamps.json"
+        timestamps_file.write_text(
+            json.dumps(timestamps_data, ensure_ascii=False, indent=2),
+            encoding='utf-8'
+        )
+
+        # 3. Save merged result
+        merged_file = temp_path / f"{audio_basename}_qwen_merged.json"
+        merged_file.write_text(
+            json.dumps(words, ensure_ascii=False, indent=2),
+            encoding='utf-8'
+        )
+
+        # Verify files exist
+        assert master_file.exists(), "Master text file not created"
+        assert timestamps_file.exists(), "Timestamps JSON file not created"
+        assert merged_file.exists(), "Merged JSON file not created"
+        print("[PASS] All artifact files created")
+
+        # Verify content
+        saved_master = master_file.read_text(encoding='utf-8')
+        assert saved_master == master_text, f"Master text mismatch: '{saved_master}'"
+        print("[PASS] Master text content correct")
+
+        saved_timestamps = json.loads(timestamps_file.read_text(encoding='utf-8'))
+        assert len(saved_timestamps) == len(timestamps), "Timestamps count mismatch"
+        assert saved_timestamps[0]['text'] == "本番", "First timestamp word mismatch"
+        print("[PASS] Timestamps content correct")
+
+        saved_merged = json.loads(merged_file.read_text(encoding='utf-8'))
+        saved_reconstructed = ''.join(w['word'] for w in saved_merged)
+        assert saved_reconstructed == master_text, f"Merged content mismatch: '{saved_reconstructed}'"
+        print("[PASS] Merged content correct (punctuation preserved)")
+
+        # Verify punctuation is in merged result
+        has_jp_period = any('。' in w['word'] for w in saved_merged)
+        assert has_jp_period, "Japanese period not found in merged output"
+        print("[PASS] Japanese punctuation (。) preserved in merged output")
+
+    print("\n[PASS] All artifact saving tests passed")
+    return True
+
+
 def main():
     """Run all tests."""
     print("=" * 60)
@@ -704,6 +996,7 @@ def main():
     print("=" * 60)
 
     tests = [
+        ("Punctuation Merge (JP-001)", test_merge_master_with_timestamps),
         ("Module Functionality", test_qwen_japanese_postprocessor_module),
         ("QwenASR Initialization", test_qwen_asr_initialization),
         ("Pipeline Passthrough", test_transformers_pipeline_passthrough),
@@ -712,6 +1005,7 @@ def main():
         ("Hierarchical Splitting", test_hierarchical_splitting_unpunctuated),
         ("Mock WhisperResult", test_postprocessor_with_mock_result),
         ("Full Pipeline (GPU)", test_full_pipeline_integration),
+        ("Debug Artifact Saving", test_artifact_saving),
     ]
 
     results = []

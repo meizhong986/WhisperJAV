@@ -15,6 +15,7 @@ Based on: https://github.com/QwenLM/Qwen3-ASR
 """
 
 import gc
+import json
 import os
 import time
 import warnings
@@ -29,6 +30,127 @@ from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 
 # Suppress common transformers warnings
 warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
+
+
+def merge_master_with_timestamps(
+    master_text: str,
+    timestamps: List[Any]
+) -> List[dict]:
+    """
+    Merge master text (with punctuation) with timestamp metadata (without punctuation).
+
+    The ForcedAligner strips punctuation from words during alignment because punctuation
+    has no audio representation. However, the ASR's raw output (master_text) contains
+    the complete transcript including punctuation.
+
+    This function reconciles both sources:
+    - CONTENT comes from master_text (preserves punctuation)
+    - TIMING comes from timestamps (ForcedAligner output)
+
+    Punctuation attachment rules:
+    - Leading punctuation (e.g., 「 at start) → attaches to FIRST word
+    - Middle punctuation (e.g., 、。between words) → attaches to PRECEDING word
+    - Trailing punctuation (e.g., 。at end) → attaches to LAST word
+
+    Args:
+        master_text: Complete transcript from ASR (includes punctuation)
+        timestamps: List of ForcedAlignItem objects or dicts with:
+                   - 'text' or .text: The word (cleaned, no punctuation)
+                   - 'start_time' or .start_time: Start time in seconds
+                   - 'end_time' or .end_time: End time in seconds
+
+    Returns:
+        List of word dicts for stable-ts:
+        [{'word': str, 'start': float, 'end': float}, ...]
+
+    Example:
+        master_text = "けども、お前が。"
+        timestamps = [("けども", 1.0, 1.5), ("お前", 2.0, 2.3), ("が", 2.3, 2.5)]
+
+        Output: [
+            {'word': 'けども、', 'start': 1.0, 'end': 1.5},
+            {'word': 'お前', 'start': 2.0, 'end': 2.3},
+            {'word': 'が。', 'start': 2.3, 'end': 2.5}
+        ]
+    """
+    # Handle edge cases
+    if not master_text or not master_text.strip():
+        return []
+
+    if not timestamps:
+        # No timing data - return master as single "word"
+        return [{'word': master_text.strip(), 'start': 0.0, 'end': 0.0}]
+
+    # Helper to get attributes from timestamp objects or dicts
+    def get_attr(obj, attr):
+        if hasattr(obj, attr):
+            return getattr(obj, attr)
+        if isinstance(obj, dict):
+            return obj.get(attr)
+        return None
+
+    result = []
+    master_pos = 0  # Current position in master text
+
+    for ts in timestamps:
+        ts_word = get_attr(ts, 'text')
+        ts_start = get_attr(ts, 'start_time')
+        ts_end = get_attr(ts, 'end_time')
+
+        # Skip empty words
+        if not ts_word:
+            continue
+
+        # Find this word in master text, starting from current position
+        word_start = master_text.find(ts_word, master_pos)
+
+        if word_start == -1:
+            # Word not found in master text (shouldn't normally happen)
+            # This could occur if ASR text differs from aligner input
+            # Fall back to using the timestamp word as-is
+            logger.debug(f"Word '{ts_word}' not found in master text at pos {master_pos}")
+            result.append({
+                'word': ts_word,
+                'start': float(ts_start) if ts_start is not None else 0.0,
+                'end': float(ts_end) if ts_end is not None else 0.0
+            })
+            continue
+
+        word_end = word_start + len(ts_word)
+
+        # Check for gap (punctuation/spaces) between previous position and this word
+        if word_start > master_pos:
+            gap = master_text[master_pos:word_start]
+
+            if result:
+                # Attach gap to PREVIOUS word (punctuation follows preceding content)
+                result[-1]['word'] += gap
+            else:
+                # No previous word - this is LEADING content (e.g., opening quote 「)
+                # Prepend to current word
+                ts_word = gap + ts_word
+
+        # Add this word with its timing
+        result.append({
+            'word': ts_word,
+            'start': float(ts_start) if ts_start is not None else 0.0,
+            'end': float(ts_end) if ts_end is not None else 0.0
+        })
+
+        # Move position past this word
+        master_pos = word_end
+
+    # Handle trailing content after the last timestamp word
+    if master_pos < len(master_text):
+        trailing = master_text[master_pos:]
+        if result:
+            # Attach trailing content to last word
+            result[-1]['word'] += trailing
+        elif trailing.strip():
+            # Edge case: no timestamps matched but there's content
+            result.append({'word': trailing, 'start': 0.0, 'end': 0.0})
+
+    return result
 
 
 class QwenASR:
@@ -439,7 +561,8 @@ class QwenASR:
     def transcribe(
         self,
         audio_path: Union[str, Path],
-        progress_callback: Optional[Callable[[float, str], None]] = None
+        progress_callback: Optional[Callable[[float, str], None]] = None,
+        artifacts_dir: Optional[Union[str, Path]] = None,
     ) -> stable_whisper.WhisperResult:
         """
         Transcribe audio file using Qwen3-ASR with stable-ts regrouping.
@@ -453,6 +576,10 @@ class QwenASR:
             audio_path: Path to audio file
             progress_callback: Optional callback for progress updates
                                (progress_percent, status_message)
+            artifacts_dir: Optional directory to save debug artifacts. If provided,
+                          saves: {basename}_qwen_master.txt (raw ASR text),
+                          {basename}_qwen_timestamps.json (ForcedAligner data),
+                          {basename}_qwen_merged.json (merged word list)
 
         Returns:
             stable_whisper.WhisperResult with sentence-level segments
@@ -504,7 +631,7 @@ class QwenASR:
             return result
 
         # With aligner: use transcribe_any for word-to-sentence regrouping
-        result = self._transcribe_with_regrouping(audio_path, progress_callback)
+        result = self._transcribe_with_regrouping(audio_path, progress_callback, artifacts_dir)
 
         process_time = time.time() - start_time
         segment_count = len(result.segments) if result.segments else 0
@@ -532,7 +659,8 @@ class QwenASR:
     def _transcribe_with_regrouping(
         self,
         audio_path: Path,
-        progress_callback: Optional[Callable[[float, str], None]] = None
+        progress_callback: Optional[Callable[[float, str], None]] = None,
+        artifacts_dir: Optional[Union[str, Path]] = None,
     ) -> stable_whisper.WhisperResult:
         """
         Transcribe with ForcedAligner and stable-ts regrouping.
@@ -554,6 +682,7 @@ class QwenASR:
         qwen_language = self.language
         qwen_context = self.context  # Context string for ASR
         detected_language_holder = [None]  # Use list to allow mutation in closure
+        save_artifacts_dir = Path(artifacts_dir) if artifacts_dir else None  # Artifact save directory
 
         def qwen_inference(audio: str, **kwargs) -> List[List[dict]]:
             """
@@ -576,7 +705,7 @@ class QwenASR:
                 logger.info(f"[DIAG]   audio: {audio}")
                 logger.info(f"[DIAG]   model.max_new_tokens: {qwen_model.max_new_tokens}")
                 logger.info(f"[DIAG]   model.max_inference_batch_size: {qwen_model.max_inference_batch_size}")
-                logger.info(f"[DIAG]   context: '{qwen_context[:50]}...' if context else '(none)'")
+                logger.info(f"[DIAG]   context: {repr(qwen_context[:50]) + '...' if qwen_context else '(none)'}")
                 logger.info(f"[DIAG]   language: {qwen_language}")
 
                 # Call qwen-asr with timestamps enabled
@@ -604,51 +733,76 @@ class QwenASR:
                     detected_language_holder[0] = result.language
                     logger.info(f"[DIAG]   detected language: {result.language}")
 
-                # Get timestamps
+                # Get timestamps from ForcedAligner
                 time_stamps = getattr(result, 'time_stamps', None)
                 logger.info(f"[DIAG]   timestamps count: {len(time_stamps) if time_stamps else 0}")
 
                 if not time_stamps:
                     # No word timestamps - return text as single "word"
-                    full_text = getattr(result, 'text', '').strip()
-                    if full_text:
+                    if raw_text.strip():
                         logger.warning("No word timestamps from aligner, returning full text as single segment")
-                        return [[{'word': full_text, 'start': 0.0, 'end': 0.0}]]
+                        return [[{'word': raw_text.strip(), 'start': 0.0, 'end': 0.0}]]
                     return []
 
-                # Convert qwen-asr timestamps to stable-ts word format
-                words = []
-                for ts in time_stamps:
-                    word_text = getattr(ts, 'text', '')
-                    word_start = getattr(ts, 'start_time', None)
-                    word_end = getattr(ts, 'end_time', None)
-
-                    # Skip empty words
-                    if not word_text:
-                        continue
-
-                    # Handle None timestamps
-                    if word_start is None:
-                        word_start = 0.0
-                    if word_end is None:
-                        word_end = float(word_start) + 0.1
-
-                    words.append({
-                        'word': word_text,
-                        'start': float(word_start),
-                        'end': float(word_end),
-                    })
+                # === CRITICAL: Merge master text with timestamps ===
+                # The ForcedAligner strips punctuation from words (clean_token removes non-L/N chars).
+                # But the ASR raw_text contains the complete transcript WITH punctuation.
+                # We use raw_text as SOURCE OF TRUTH for content, timestamps for timing.
+                #
+                # This preserves punctuation (、。？！) which represents sentence boundaries.
+                words = merge_master_with_timestamps(raw_text, time_stamps)
 
                 if not words:
-                    logger.warning("No valid words extracted from timestamps")
+                    logger.warning("No valid words after merging master text with timestamps")
                     return []
 
                 # DIAGNOSTIC: Log word extraction stats
                 total_duration = words[-1]['end'] if words else 0
-                logger.info(f"[DIAG] Words extracted: {len(words)} words, duration: {total_duration:.2f}s")
+                total_chars = sum(len(w['word']) for w in words)
+                logger.info(f"[DIAG] Words merged: {len(words)} words, {total_chars} chars, duration: {total_duration:.2f}s")
                 if words:
-                    logger.info(f"[DIAG]   first word: '{words[0]['word']}' @ {words[0]['start']:.2f}s")
-                    logger.info(f"[DIAG]   last word: '{words[-1]['word']}' @ {words[-1]['end']:.2f}s")
+                    # Show first/last words (truncate if too long for logging)
+                    first_word = words[0]['word'][:20] + ('...' if len(words[0]['word']) > 20 else '')
+                    last_word = words[-1]['word'][:20] + ('...' if len(words[-1]['word']) > 20 else '')
+                    logger.info(f"[DIAG]   first word: '{first_word}' @ {words[0]['start']:.2f}s")
+                    logger.info(f"[DIAG]   last word: '{last_word}' @ {words[-1]['end']:.2f}s")
+
+                # === SAVE DEBUG ARTIFACTS (when artifacts_dir is provided) ===
+                if save_artifacts_dir:
+                    try:
+                        save_artifacts_dir.mkdir(parents=True, exist_ok=True)
+                        audio_basename = Path(audio).stem
+
+                        # 1. Save master text (raw ASR output with punctuation)
+                        master_file = save_artifacts_dir / f"{audio_basename}_qwen_master.txt"
+                        master_file.write_text(raw_text, encoding='utf-8')
+
+                        # 2. Save timestamps (ForcedAligner output)
+                        timestamps_data = []
+                        for ts in time_stamps:
+                            ts_entry = {
+                                'text': getattr(ts, 'text', None) or (ts.get('text') if isinstance(ts, dict) else None),
+                                'start_time': getattr(ts, 'start_time', None) or (ts.get('start_time') if isinstance(ts, dict) else None),
+                                'end_time': getattr(ts, 'end_time', None) or (ts.get('end_time') if isinstance(ts, dict) else None),
+                            }
+                            timestamps_data.append(ts_entry)
+
+                        timestamps_file = save_artifacts_dir / f"{audio_basename}_qwen_timestamps.json"
+                        timestamps_file.write_text(
+                            json.dumps(timestamps_data, ensure_ascii=False, indent=2),
+                            encoding='utf-8'
+                        )
+
+                        # 3. Save merged result (words with punctuation restored)
+                        merged_file = save_artifacts_dir / f"{audio_basename}_qwen_merged.json"
+                        merged_file.write_text(
+                            json.dumps(words, ensure_ascii=False, indent=2),
+                            encoding='utf-8'
+                        )
+
+                        logger.debug(f"[DIAG] Saved artifacts to: {save_artifacts_dir}")
+                    except Exception as e:
+                        logger.warning(f"Failed to save debug artifacts: {e}")
 
                 # Return as list of word lists (one list = one segment)
                 # transcribe_any expects: List[List[Dict]]

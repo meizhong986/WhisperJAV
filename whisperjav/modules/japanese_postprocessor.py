@@ -404,8 +404,16 @@ class JapanesePostProcessor:
 
         # === Level 0: Punctuation Split (TOP RULE) ===
         # If punctuation exists, split by it first - this is explicit intent
-        logger.debug("  Level 0: Punctuation split")
-        punctuation_pattern = 'any=。,？,！,…,．,.,?,!'
+        # Includes both Japanese and Western punctuation for robustness
+        # Also includes SPACE - in Japanese, space indicates explicit sentence boundary
+        #
+        # Japanese punctuation: 。？！…．「」
+        # Western punctuation:  . ? !
+        # Space as delimiter:   (space) - significant in Japanese, indicates boundary
+        #
+        # Note: Commas (、,) are NOT included as they don't end sentences
+        logger.debug("  Level 0: Punctuation split (JP + Western + space)")
+        punctuation_pattern = 'any=。,？,！,…,．,.,?,!,」,』, '
         result.custom_operation(
             'word', 'end', punctuation_pattern, 'splitright', word_level=True
         )

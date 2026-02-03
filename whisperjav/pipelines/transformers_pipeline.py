@@ -725,7 +725,11 @@ class TransformersPipeline(BasePipeline):
 
                     try:
                         # Transcribe scene
-                        asr_result = asr.transcribe(scene_path)
+                        # For Qwen backend, pass artifacts_dir to save debug artifacts
+                        if self.asr_backend == "qwen":
+                            asr_result = asr.transcribe(scene_path, artifacts_dir=scene_srts_dir)
+                        else:
+                            asr_result = asr.transcribe(scene_path)
                         # Convert to unified segment format (handles both WhisperResult and List[Dict])
                         segments = self._convert_asr_result_to_segments(asr_result)
 
@@ -774,7 +778,11 @@ class TransformersPipeline(BasePipeline):
                 # Full-file transcription (no scenes)
                 logger.info("Transcribing full audio file...")
 
-                asr_result = asr.transcribe(extracted_audio)
+                # For Qwen backend, pass artifacts_dir to save debug artifacts
+                if self.asr_backend == "qwen":
+                    asr_result = asr.transcribe(extracted_audio, artifacts_dir=scene_srts_dir)
+                else:
+                    asr_result = asr.transcribe(extracted_audio)
                 # Convert to unified segment format (handles both WhisperResult and List[Dict])
                 segments = self._convert_asr_result_to_segments(asr_result)
 
@@ -815,6 +823,16 @@ class TransformersPipeline(BasePipeline):
                 final_raw_subs.mkdir(exist_ok=True)
                 for file in temp_raw_subs.glob(f"{media_basename}*"):
                     shutil.copy2(file, final_raw_subs / file.name)
+
+            # Copy Qwen debug artifacts to raw_subs (when using Qwen backend)
+            if self.asr_backend == "qwen" and scene_srts_dir.exists():
+                final_raw_subs = self.output_dir / "raw_subs"
+                final_raw_subs.mkdir(exist_ok=True)
+                # Copy JSON and TXT artifacts (_qwen_master.txt, _qwen_timestamps.json, _qwen_merged.json)
+                for pattern in ["*_qwen_master.txt", "*_qwen_timestamps.json", "*_qwen_merged.json"]:
+                    for artifact in scene_srts_dir.glob(pattern):
+                        shutil.copy2(artifact, final_raw_subs / artifact.name)
+                        logger.debug(f"Copied artifact: {artifact.name}")
 
             self.metadata_manager.update_processing_stage(
                 master_metadata, "postprocessing", "completed",
