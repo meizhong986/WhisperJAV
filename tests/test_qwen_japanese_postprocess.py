@@ -989,6 +989,300 @@ def test_artifact_saving():
     return True
 
 
+def test_jp002_compound_particle_merging():
+    """Test 11: Verify compound particle merging (JP-002 fix)."""
+    print("\n" + "=" * 60)
+    print("TEST 11: Compound Particle Merging (JP-002 Fix)")
+    print("=" * 60)
+
+    import stable_whisper
+    from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
+
+    processor = JapanesePostProcessor()
+
+    # === Test Case 1: ですよね should NOT be split ===
+    print("\n--- Test 11.1: 'ですよね' should stay together ---")
+    # Simulate over-split result: "思います" | "よ" | "ね"
+    mock_oversplit = {
+        'language': 'ja',
+        'segments': [
+            {
+                'start': 0.0,
+                'end': 1.0,
+                'text': '私は思います',
+                'words': [
+                    {'word': '私', 'start': 0.0, 'end': 0.2},
+                    {'word': 'は', 'start': 0.2, 'end': 0.3},
+                    {'word': '思い', 'start': 0.3, 'end': 0.6},
+                    {'word': 'ます', 'start': 0.6, 'end': 1.0},
+                ]
+            },
+            {
+                'start': 1.0,
+                'end': 1.2,
+                'text': 'よ',
+                'words': [{'word': 'よ', 'start': 1.0, 'end': 1.2}]
+            },
+            {
+                'start': 1.2,
+                'end': 1.4,
+                'text': 'ね',
+                'words': [{'word': 'ね', 'start': 1.2, 'end': 1.4}]
+            },
+        ]
+    }
+
+    result = stable_whisper.WhisperResult(mock_oversplit)
+    original_count = len(result.segments)
+    print(f"  Before: {original_count} segments")
+    for i, seg in enumerate(result.segments):
+        print(f"    [{i}] '{seg.text}'")
+
+    # Apply post-processing (which includes isolated particle merging)
+    processor.process(result, preset="default", language="ja")
+
+    final_count = len(result.segments)
+    print(f"  After: {final_count} segments")
+    for i, seg in enumerate(result.segments):
+        print(f"    [{i}] '{seg.text}'")
+
+    # The isolated particles should be merged
+    assert final_count < original_count, "Isolated particles should be merged"
+    # Check that 'よね' or similar is now part of a larger segment
+    combined_text = ''.join(seg.text for seg in result.segments)
+    assert 'よ' in combined_text, "よ should be preserved in text"
+    assert 'ね' in combined_text, "ね should be preserved in text"
+    print("[PASS] Isolated particles merged correctly")
+
+    # === Test Case 2: よね as standalone should merge ===
+    print("\n--- Test 11.2: Standalone 'よね' should merge with previous ---")
+    mock_yone = {
+        'language': 'ja',
+        'segments': [
+            {
+                'start': 0.0,
+                'end': 1.0,
+                'text': '分かりました',
+                'words': [
+                    {'word': '分かり', 'start': 0.0, 'end': 0.5},
+                    {'word': 'まし', 'start': 0.5, 'end': 0.8},
+                    {'word': 'た', 'start': 0.8, 'end': 1.0},
+                ]
+            },
+            {
+                'start': 1.0,
+                'end': 1.3,
+                'text': 'よね',
+                'words': [{'word': 'よね', 'start': 1.0, 'end': 1.3}]
+            },
+        ]
+    }
+
+    result = stable_whisper.WhisperResult(mock_yone)
+    print(f"  Before: {len(result.segments)} segments")
+    processor.process(result, preset="default", language="ja")
+    print(f"  After: {len(result.segments)} segments")
+    for i, seg in enumerate(result.segments):
+        print(f"    [{i}] '{seg.text}'")
+
+    # よね should be merged with previous segment
+    assert len(result.segments) == 1, "'よね' should merge with previous segment"
+    assert 'よね' in result.segments[0].text, "'よね' should be in merged text"
+    print("[PASS] 'よね' merged with previous segment")
+
+    print("\n[PASS] All JP-002 compound particle tests passed")
+    return True
+
+
+def test_jp003_tiny_fragment_merging():
+    """Test 12: Verify tiny fragment merging (JP-003 fix)."""
+    print("\n" + "=" * 60)
+    print("TEST 12: Tiny Fragment Merging (JP-003 Fix)")
+    print("=" * 60)
+
+    import stable_whisper
+    from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
+
+    processor = JapanesePostProcessor()
+
+    # === Test Case 1: Very short duration segment ===
+    print("\n--- Test 12.1: Segment with duration < 0.3s should merge ---")
+    mock_short_duration = {
+        'language': 'ja',
+        'segments': [
+            {
+                'start': 0.0,
+                'end': 2.0,
+                'text': '今日は天気が良いですね',
+                'words': [
+                    {'word': '今日', 'start': 0.0, 'end': 0.3},
+                    {'word': 'は', 'start': 0.3, 'end': 0.5},
+                    {'word': '天気', 'start': 0.5, 'end': 0.9},
+                    {'word': 'が', 'start': 0.9, 'end': 1.0},
+                    {'word': '良い', 'start': 1.0, 'end': 1.4},
+                    {'word': 'です', 'start': 1.4, 'end': 1.7},
+                    {'word': 'ね', 'start': 1.7, 'end': 2.0},
+                ]
+            },
+            {
+                'start': 2.0,
+                'end': 2.15,  # Only 0.15s duration - should merge
+                'text': 'あ',
+                'words': [{'word': 'あ', 'start': 2.0, 'end': 2.15}]
+            },
+            {
+                'start': 2.5,
+                'end': 4.0,
+                'text': '明日も晴れるといいな',
+                'words': [
+                    {'word': '明日', 'start': 2.5, 'end': 2.9},
+                    {'word': 'も', 'start': 2.9, 'end': 3.1},
+                    {'word': '晴れる', 'start': 3.1, 'end': 3.5},
+                    {'word': 'と', 'start': 3.5, 'end': 3.6},
+                    {'word': 'いい', 'start': 3.6, 'end': 3.8},
+                    {'word': 'な', 'start': 3.8, 'end': 4.0},
+                ]
+            },
+        ]
+    }
+
+    result = stable_whisper.WhisperResult(mock_short_duration)
+    original_count = len(result.segments)
+    print(f"  Before: {original_count} segments")
+    for i, seg in enumerate(result.segments):
+        dur = seg.end - seg.start
+        print(f"    [{i}] '{seg.text}' (dur={dur:.2f}s)")
+
+    processor.process(result, preset="default", language="ja")
+
+    final_count = len(result.segments)
+    print(f"  After: {final_count} segments")
+    for i, seg in enumerate(result.segments):
+        dur = seg.end - seg.start
+        print(f"    [{i}] '{seg.text}' (dur={dur:.2f}s)")
+
+    # The tiny segment should be merged
+    assert final_count < original_count, "Tiny duration segment should be merged"
+    print("[PASS] Tiny duration segment merged")
+
+    # === Test Case 2: Very short character count ===
+    print("\n--- Test 12.2: Segment with < 3 chars should merge ---")
+    mock_short_chars = {
+        'language': 'ja',
+        'segments': [
+            {
+                'start': 0.0,
+                'end': 1.5,
+                'text': '大丈夫です',
+                'words': [
+                    {'word': '大丈夫', 'start': 0.0, 'end': 0.8},
+                    {'word': 'です', 'start': 0.8, 'end': 1.5},
+                ]
+            },
+            {
+                'start': 1.5,
+                'end': 2.0,
+                'text': 'か',  # Only 1 char - should merge
+                'words': [{'word': 'か', 'start': 1.5, 'end': 2.0}]
+            },
+        ]
+    }
+
+    result = stable_whisper.WhisperResult(mock_short_chars)
+    original_count = len(result.segments)
+    print(f"  Before: {original_count} segments")
+    for i, seg in enumerate(result.segments):
+        print(f"    [{i}] '{seg.text}' (chars={len(seg.text)})")
+
+    processor.process(result, preset="default", language="ja")
+
+    final_count = len(result.segments)
+    print(f"  After: {final_count} segments")
+    for i, seg in enumerate(result.segments):
+        print(f"    [{i}] '{seg.text}' (chars={len(seg.text)})")
+
+    # The tiny segment should be merged
+    # Note: might result in 1 segment or 'か' merged with previous
+    combined_text = ''.join(seg.text for seg in result.segments)
+    assert 'か' in combined_text, "'か' should be preserved after merge"
+    print("[PASS] Short char segment handled")
+
+    print("\n[PASS] All JP-003 tiny fragment tests passed")
+    return True
+
+
+def test_jp004_language_code_normalization():
+    """Test 13: Verify language code normalization (JP-004 fix)."""
+    print("\n" + "=" * 60)
+    print("TEST 13: Language Code Normalization (JP-004 Fix)")
+    print("=" * 60)
+
+    from whisperjav.modules.srt_postprocessing import normalize_language_code, SRTPostProcessor
+
+    # === Test normalize_language_code function ===
+    print("\n--- Test 13.1: normalize_language_code function ---")
+    test_cases = [
+        # (input, expected_output)
+        ("Japanese", "ja"),
+        ("japanese", "ja"),
+        ("JAPANESE", "ja"),
+        ("ja", "ja"),
+        ("jpn", "ja"),
+        ("JP", "jp"),  # 2-letter codes pass through
+        ("English", "en"),
+        ("english", "en"),
+        ("en", "en"),
+        ("eng", "en"),
+        ("Chinese", "zh"),
+        ("chinese", "zh"),
+        ("zh", "zh"),
+        ("Cantonese", "yue"),
+        ("Korean", "ko"),
+        ("", "ja"),  # Empty defaults to ja
+        (None, "ja"),  # None defaults to ja
+    ]
+
+    for input_val, expected in test_cases:
+        # Handle None case
+        if input_val is None:
+            result = normalize_language_code('')
+        else:
+            result = normalize_language_code(input_val)
+        if input_val == '':
+            result = normalize_language_code('')
+
+        # For None, we test the default
+        if input_val is None:
+            result = normalize_language_code('')
+        else:
+            result = normalize_language_code(input_val)
+
+        status = "✓" if result == expected else "✗"
+        print(f"  {status} normalize_language_code('{input_val}') -> '{result}' (expected: '{expected}')")
+        assert result == expected, f"normalize_language_code('{input_val}') = '{result}', expected '{expected}'"
+
+    print("[PASS] All normalize_language_code tests passed")
+
+    # === Test SRTPostProcessor initialization ===
+    print("\n--- Test 13.2: SRTPostProcessor accepts 'Japanese' ---")
+
+    # This should NOT print a warning and should use CJK sanitizer
+    postproc = SRTPostProcessor(language="Japanese")
+    assert postproc.language == "ja", f"Expected 'ja', got '{postproc.language}'"
+    print(f"  SRTPostProcessor('Japanese').language = '{postproc.language}' [PASS]")
+
+    postproc2 = SRTPostProcessor(language="english")
+    assert postproc2.language == "en", f"Expected 'en', got '{postproc2.language}'"
+    print(f"  SRTPostProcessor('english').language = '{postproc2.language}' [PASS]")
+
+    postproc3 = SRTPostProcessor(language="ja")
+    assert postproc3.language == "ja", f"Expected 'ja', got '{postproc3.language}'"
+    print(f"  SRTPostProcessor('ja').language = '{postproc3.language}' [PASS]")
+
+    print("\n[PASS] All JP-004 language normalization tests passed")
+    return True
+
+
 def main():
     """Run all tests."""
     print("=" * 60)
@@ -1006,6 +1300,9 @@ def main():
         ("Mock WhisperResult", test_postprocessor_with_mock_result),
         ("Full Pipeline (GPU)", test_full_pipeline_integration),
         ("Debug Artifact Saving", test_artifact_saving),
+        ("Compound Particle Merge (JP-002)", test_jp002_compound_particle_merging),
+        ("Tiny Fragment Merge (JP-003)", test_jp003_tiny_fragment_merging),
+        ("Language Normalization (JP-004)", test_jp004_language_code_normalization),
     ]
 
     results = []

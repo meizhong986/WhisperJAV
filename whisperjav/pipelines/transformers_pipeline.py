@@ -26,7 +26,7 @@ import stable_whisper
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.transformers_asr import TransformersASR
-from whisperjav.modules.srt_postprocessing import SRTPostProcessor
+from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 from whisperjav.utils.progress_display import DummyProgress
@@ -196,14 +196,15 @@ class TransformersPipeline(BasePipeline):
         if self.scene_method not in ("none", "auditok", "silero", "semantic"):
             raise ValueError(f"Invalid scene method: {self.scene_method}. Must be 'none', 'auditok', 'silero', or 'semantic'")
 
-        # Determine output language code
+        # Determine output language code (JP-004 fix: normalize language codes)
+        # Accepts both ISO codes ('ja') and full names ('Japanese')
         if subs_language == 'direct-to-english':
             self.lang_code = 'en'
         elif asr_backend == "qwen":
             # For Qwen, use detected language or default to 'ja'
-            self.lang_code = qwen_language or 'ja'
+            self.lang_code = normalize_language_code(qwen_language or 'ja')
         else:
-            self.lang_code = hf_language
+            self.lang_code = normalize_language_code(hf_language)
 
         # =================================================================
         # SCOPE-BASED RESOURCE MANAGEMENT (v1.7.3+)

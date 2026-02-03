@@ -8,19 +8,104 @@ from whisperjav.config.sanitization_config import SanitizationConfig
 from whisperjav.utils.logger import logger
 
 
+def normalize_language_code(language: str) -> str:
+    """
+    Normalize language names/codes to ISO 639-1 codes.
+
+    This function handles the common case where ASR models return full language
+    names (e.g., "Japanese") but downstream components expect ISO codes ("ja").
+
+    JP-004 fix: Qwen-ASR returns "Japanese" but SRTPostProcessor expects "ja".
+
+    Args:
+        language: Language name or code (e.g., "Japanese", "ja", "english", "en")
+
+    Returns:
+        Normalized ISO 639-1 language code (e.g., "ja", "en", "zh")
+
+    Examples:
+        >>> normalize_language_code("Japanese")
+        'ja'
+        >>> normalize_language_code("ja")
+        'ja'
+        >>> normalize_language_code("ENGLISH")
+        'en'
+    """
+    if not language:
+        return 'ja'  # Default to Japanese for this project
+
+    # Mapping of full names and variants to ISO codes
+    language_map = {
+        # Japanese
+        'japanese': 'ja',
+        'jpn': 'ja',
+        'jp': 'ja',
+        # English
+        'english': 'en',
+        'eng': 'en',
+        # Chinese
+        'chinese': 'zh',
+        'mandarin': 'zh',
+        'zho': 'zh',
+        'cmn': 'zh',
+        # Cantonese
+        'cantonese': 'yue',
+        # Korean
+        'korean': 'ko',
+        'kor': 'ko',
+        # Other common languages
+        'french': 'fr',
+        'fra': 'fr',
+        'german': 'de',
+        'deu': 'de',
+        'italian': 'it',
+        'ita': 'it',
+        'spanish': 'es',
+        'spa': 'es',
+        'portuguese': 'pt',
+        'por': 'pt',
+        'russian': 'ru',
+        'rus': 'ru',
+    }
+
+    lang_lower = language.lower().strip()
+
+    # Check if it's already a 2-letter code
+    if len(lang_lower) == 2:
+        return lang_lower
+
+    # Look up in mapping
+    if lang_lower in language_map:
+        return language_map[lang_lower]
+
+    # If it's a 3-letter code or unknown, try to extract first 2 chars
+    # But only if it looks like a valid code (lowercase letters only)
+    if len(lang_lower) >= 2 and lang_lower[:2].isalpha():
+        return lang_lower[:2]
+
+    # Fallback: return as-is (let downstream handle it)
+    logger.debug(f"Unknown language '{language}', returning as-is")
+    return language
+
+
 class SRTPostProcessor:
     """Post-processor that routes to appropriate language-specific sanitizer"""
-    
+
     def __init__(self, language: str = 'ja', **kwargs):
         """
         Initialize post-processor with language selection.
-        
+
         Args:
             language: Language code ('ja' for Japanese, 'en' for English)
+                     Also accepts full names like 'Japanese', 'English' (JP-004 fix)
             **kwargs: Additional parameters passed to sanitizers
         """
-        self.language = language
+        # Normalize language code (JP-004 fix)
+        # Accepts both ISO codes ('ja') and full names ('Japanese')
+        self.language = normalize_language_code(language)
         self.config = kwargs
+
+        logger.debug(f"SRTPostProcessor: normalized language '{language}' -> '{self.language}'")
 
         # For CJK languages (Japanese, Korean, Chinese), create sanitizer once
         # Korean and Chinese use the same sanitizer - Japanese-specific patterns

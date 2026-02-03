@@ -41,11 +41,56 @@ class JapaneseLinguisticSets:
     - Dialectal variations (Kansai-ben, feminine/masculine speech)
     - Backchanneling (aizuchi) and fillers
     - Emotional interjections
+    - Compound particle sequences (v1.8.6+ JP-002 fix)
     """
 
     # Base sentence-final particles
     base_endings: List[str] = field(default_factory=lambda: [
         'ね', 'よ', 'わ', 'の', 'ぞ', 'ぜ', 'さ', 'か', 'かな', 'な'
+    ])
+
+    # === Compound Particle Sequences (v1.8.6+ JP-002 fix) ===
+    # These are particle combinations that should NOT be split apart.
+    # When a segment consists ONLY of these isolated particles, it should
+    # be merged back with the previous segment.
+    #
+    # Order matters: longer patterns checked first to avoid partial matches
+    compound_particle_sequences: List[str] = field(default_factory=lambda: [
+        # Three-particle compounds (most specific first)
+        'ですよね',   # polite + emphatic + confirmation
+        'ますよね',   # polite verb + emphatic + confirmation
+        'でしたよね', # polite past + emphatic + confirmation
+        'ましたよね', # polite verb past + emphatic + confirmation
+        'ですよな',   # polite + emphatic + masculine soft
+        'ますよな',   # polite verb + emphatic + masculine soft
+        # Two-particle compounds
+        'ですよ',     # polite + emphatic
+        'ますよ',     # polite verb + emphatic
+        'ですね',     # polite + confirmation
+        'ますね',     # polite verb + confirmation
+        'ですな',     # polite + masculine soft
+        'ますな',     # polite verb + masculine soft
+        'だよね',     # casual + emphatic + confirmation
+        'だよな',     # casual + emphatic + masculine soft
+        'だよ',       # casual + emphatic
+        'だね',       # casual + confirmation
+        'だな',       # casual + masculine soft
+        'よね',       # emphatic + confirmation
+        'よな',       # emphatic + masculine soft
+        'わね',       # feminine + confirmation
+        'わよ',       # feminine + emphatic
+        'のよ',       # explanation + emphatic (feminine)
+        'のね',       # explanation + confirmation
+        'のな',       # explanation + masculine soft
+        'かな',       # wondering (already in base but also compound-like)
+        'っけ',       # trying to remember
+    ])
+
+    # Isolated particles that should be merged if they form a standalone segment
+    # These are particles that make no sense without preceding content
+    mergeable_isolated_particles: List[str] = field(default_factory=lambda: [
+        'よ', 'ね', 'な', 'わ', 'の', 'さ', 'ぞ', 'ぜ',
+        'よね', 'よな', 'わね', 'わよ', 'のよ', 'のね',
     ])
 
     # Modern casual endings
@@ -174,6 +219,11 @@ class PresetParameters:
     soft_particle_gap: float = 0.4     # ね, な, わ, の - softer particles
     pure_gap_threshold: float = 0.6    # Fallback: any word followed by this gap
 
+    # Tiny fragment prevention thresholds (v1.8.6+ JP-003 fix)
+    # Segments below these thresholds are merged with adjacent segments
+    min_segment_duration: float = 0.3   # Minimum duration in seconds
+    min_segment_chars: int = 3          # Minimum character count
+
 
 class JapanesePostProcessor:
     """
@@ -194,21 +244,27 @@ class JapanesePostProcessor:
             segment_length=35,
             strong_particle_gap=0.25,
             soft_particle_gap=0.4,
-            pure_gap_threshold=0.6
+            pure_gap_threshold=0.6,
+            min_segment_duration=0.3,
+            min_segment_chars=3
         ),
         "high_moan": PresetParameters(
             gap_threshold=0.1,
             segment_length=25,
             strong_particle_gap=0.15,  # More aggressive for short utterances
             soft_particle_gap=0.25,
-            pure_gap_threshold=0.4
+            pure_gap_threshold=0.4,
+            min_segment_duration=0.2,  # Allow shorter segments for moans
+            min_segment_chars=2
         ),
         "narrative": PresetParameters(
             gap_threshold=0.4,
             segment_length=45,
             strong_particle_gap=0.35,  # More conservative for longer phrases
             soft_particle_gap=0.5,
-            pure_gap_threshold=0.7
+            pure_gap_threshold=0.7,
+            min_segment_duration=0.4,  # Longer minimum for readability
+            min_segment_chars=4
         ),
     }
 
@@ -285,9 +341,11 @@ class JapanesePostProcessor:
 
         Pass 1: Sanitization (remove fillers/aizuchi)
         Pass 2: Hierarchical linguistic splitting (for unpunctuated text)
+        Pass 2.5: Merge isolated particles (JP-002 fix - prevents over-splitting)
         Pass 3: Structural anchoring (lock remaining boundaries)
         Pass 4: Merging (combine by punctuation and gaps)
         Pass 5: Formatting (split for readability)
+        Pass 6: Merge tiny fragments (JP-003 fix - ensures readable subtitles)
         """
         # --- Pass 1: Remove Fillers and Aizuchi ---
         logger.debug("Phase 1: Sanitization (Fillers and Aizuchi Removal)")
@@ -302,6 +360,13 @@ class JapanesePostProcessor:
         # This is the key change for handling unpunctuated Qwen-ASR output
         logger.debug("Phase 2: Hierarchical Linguistic Splitting")
         self._apply_hierarchical_splitting(result, params)
+
+        # --- Pass 2.5: Merge Isolated Particles (v1.8.6+ JP-002 fix) ---
+        # After splitting, segments that are ONLY isolated particles should be
+        # merged back with the previous segment to prevent over-fragmentation.
+        # Example: "...です" | "よ" | "ね" → "...ですよね"
+        logger.debug("Phase 2.5: Merge Isolated Particles (JP-002 fix)")
+        self._merge_isolated_particles(result)
 
         # --- Pass 3: Structural Anchoring ---
         logger.debug("Phase 3: Structural Anchoring")
@@ -368,8 +433,183 @@ class JapanesePostProcessor:
         # Safety: split very long segments by duration
         result.split_by_duration(max_dur=8.5, even_split=False, lock=True)
 
-        # Reassign segment IDs
+        # --- Pass 6: Merge Tiny Fragments (v1.8.6+ JP-003 fix) ---
+        # After all formatting, ensure no segments are too small to be readable.
+        # This must be the FINAL pass to catch any fragments created by earlier passes.
+        logger.debug(f"Phase 6: Merge Tiny Fragments (JP-003 fix, min_dur={params.min_segment_duration}s, min_chars={params.min_segment_chars})")
+        self._merge_tiny_fragments(result, params)
+
+        # Reassign segment IDs (final cleanup)
         result.reassign_ids()
+
+    def _merge_adjacent_segments(
+        self,
+        result: stable_whisper.WhisperResult,
+        first_idx: int,
+        second_idx: int
+    ) -> bool:
+        """
+        Merge two adjacent segments using stable-ts internal method.
+
+        Args:
+            result: WhisperResult containing segments
+            first_idx: Index of first segment (must be < second_idx)
+            second_idx: Index of second segment (must be first_idx + 1)
+
+        Returns:
+            True if merge successful, False otherwise
+        """
+        try:
+            # Validate indices
+            if first_idx < 0 or first_idx >= len(result.segments):
+                return False
+            if second_idx < 0 or second_idx >= len(result.segments):
+                return False
+            if second_idx != first_idx + 1:
+                logger.debug(f"  Indices not adjacent: {first_idx}, {second_idx}")
+                return False
+
+            # Use stable-ts _merge_segments method
+            if hasattr(result, '_merge_segments'):
+                result._merge_segments([first_idx, second_idx])
+                return True
+            else:
+                # Fallback: manual segment merge via add()
+                seg1 = result.segments[first_idx]
+                seg2 = result.segments[second_idx]
+
+                # Use Segment.add() which returns a new merged segment
+                merged = seg1.add(seg2)
+
+                # Replace first segment with merged, remove second
+                result.segments[first_idx] = merged
+                result.segments.pop(second_idx)
+                return True
+
+        except Exception as e:
+            logger.debug(f"  Merge failed: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return False
+
+    def _merge_isolated_particles(
+        self,
+        result: stable_whisper.WhisperResult
+    ) -> None:
+        """
+        Merge segments that are only isolated particles back with previous segment.
+
+        This fixes JP-002 (over-splitting of compound endings like ですよね).
+        When hierarchical splitting creates segments that contain ONLY particles
+        (よ, ね, わ, etc.) with no substantial content, merge them back.
+
+        Args:
+            result: WhisperResult to modify in-place
+        """
+        if not result.segments or len(result.segments) < 2:
+            return
+
+        # Get set of mergeable particles for fast lookup
+        mergeable = set(self.ling.mergeable_isolated_particles)
+
+        # Iterate backwards to safely merge without index issues
+        # We merge segment[i] into segment[i-1] if segment[i] is isolated particle
+        i = len(result.segments) - 1
+        merge_count = 0
+
+        while i > 0:
+            seg = result.segments[i]
+
+            # Get segment text, stripped
+            seg_text = seg.text.strip() if hasattr(seg, 'text') else ''
+
+            # Check if segment is ONLY an isolated particle (or compound particle)
+            # Must be short (1-4 chars) and match known particle patterns
+            if seg_text and len(seg_text) <= 4 and seg_text in mergeable:
+                # Merge this segment into previous (indices: i-1, i)
+                if self._merge_adjacent_segments(result, i - 1, i):
+                    merge_count += 1
+                    logger.debug(f"  Merged isolated particle '{seg_text}' into previous segment")
+                    # Don't decrement i since we removed an element and need to re-check at same position
+                    # (the segment at i is now what was at i+1)
+                    continue
+
+            i -= 1
+
+        if merge_count > 0:
+            logger.debug(f"  Total isolated particles merged: {merge_count}")
+
+    def _merge_tiny_fragments(
+        self,
+        result: stable_whisper.WhisperResult,
+        params: PresetParameters
+    ) -> None:
+        """
+        Merge segments that are too short to be readable subtitles.
+
+        This fixes JP-003 (tiny subtitle fragments). Segments below the
+        threshold for duration OR character count are merged with adjacent
+        segments (prefer merging with previous).
+
+        Args:
+            result: WhisperResult to modify in-place
+            params: Preset parameters with min_segment_duration and min_segment_chars
+        """
+        if not result.segments or len(result.segments) < 2:
+            return
+
+        min_dur = params.min_segment_duration
+        min_chars = params.min_segment_chars
+
+        # Iterate backwards to safely merge
+        i = len(result.segments) - 1
+        merge_count = 0
+
+        while i >= 0:
+            # Re-check bounds since we're modifying the list
+            if i >= len(result.segments):
+                i = len(result.segments) - 1
+                continue
+            if i < 0:
+                break
+
+            seg = result.segments[i]
+
+            # Calculate segment metrics
+            seg_text = seg.text.strip() if hasattr(seg, 'text') else ''
+            seg_duration = (seg.end - seg.start) if hasattr(seg, 'start') and hasattr(seg, 'end') else 0
+            seg_chars = len(seg_text)
+
+            # Check if segment is "tiny" (below EITHER threshold)
+            is_tiny = (seg_duration < min_dur) or (seg_chars < min_chars)
+
+            if is_tiny and seg_text:  # Only merge non-empty segments
+                merged = False
+
+                # Prefer merging with previous segment
+                if i > 0:
+                    # Merge: segment at i-1 + segment at i
+                    if self._merge_adjacent_segments(result, i - 1, i):
+                        merge_count += 1
+                        merged = True
+                        logger.debug(f"  Merged tiny segment '{seg_text[:10]}' (dur={seg_duration:.2f}s, chars={seg_chars}) with prev")
+                        # After merge, the list is shorter. Don't decrement - re-check at same position
+                        continue
+
+                # Fallback: merge with next segment
+                if not merged and i < len(result.segments) - 1:
+                    # Merge: segment at i + segment at i+1
+                    if self._merge_adjacent_segments(result, i, i + 1):
+                        merge_count += 1
+                        merged = True
+                        logger.debug(f"  Merged tiny segment '{seg_text[:10]}' (dur={seg_duration:.2f}s, chars={seg_chars}) with next")
+                        # After merge, segment at i is now the merged result, continue checking
+                        continue
+
+            i -= 1
+
+        if merge_count > 0:
+            logger.debug(f"  Total tiny fragments merged: {merge_count}")
 
     def _apply_hierarchical_splitting(
         self,
