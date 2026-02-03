@@ -233,7 +233,7 @@ class QwenASR:
         attn_implementation: str = "auto",  # Attention: auto, sdpa, flash_attention_2, eager
         # Japanese post-processing (v1.8.4+)
         japanese_postprocess: bool = True,  # Apply Japanese-specific regrouping
-        postprocess_preset: str = "default",  # Preset: "default", "high_moan", "narrative"
+        postprocess_preset: str = "high_moan",  # Preset: "high_moan" (default for JAV), "default", "narrative"
     ):
         """
         Initialize QwenASR.

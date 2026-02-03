@@ -94,7 +94,7 @@ class TransformersPipeline(BasePipeline):
         qwen_segmenter: str = "none",  # Post-ASR VAD filter for Qwen mode
         # Japanese post-processing options for Qwen mode (v1.8.4+)
         qwen_japanese_postprocess: bool = True,  # Apply Japanese regrouping
-        qwen_postprocess_preset: str = "default",  # Preset: default, high_moan, narrative
+        qwen_postprocess_preset: str = "high_moan",  # Preset: high_moan (default for JAV), default, narrative
         # Standard options
         subs_language: str = "native",
         **kwargs

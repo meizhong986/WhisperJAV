@@ -462,9 +462,9 @@ def parse_arguments():
     qwen_group.add_argument("--no-qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_false",
                            help="Disable Japanese-specific subtitle regrouping")
-    qwen_group.add_argument("--qwen-postprocess-preset", type=str, default="default",
+    qwen_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
                            choices=["default", "high_moan", "narrative"],
-                           help="Japanese post-processing preset: 'default' (conversational), 'high_moan' (adult content), 'narrative' (longer passages)")
+                           help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
 
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
@@ -794,7 +794,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             qwen_segmenter=getattr(args, 'qwen_segmenter', 'none'),
             # Japanese post-processing (v1.8.4+)
             qwen_japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', True),
-            qwen_postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'default'),
+            qwen_postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),
         )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
