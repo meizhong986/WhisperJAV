@@ -34,6 +34,7 @@ hypothesis_results.json
 workaround_results.json
 tests/*_results.json
 results/
+test_*
 
 # IDE
 .vscode/
@@ -46,6 +47,7 @@ results/
 Thumbs.db
 
 # Project specific
+test_*/
 test_media/
 test_output/
 docs/
