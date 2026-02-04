@@ -21,6 +21,7 @@ See: docs/architecture/ADR-004-dedicated-qwen-pipeline.md
 
 import gc
 import os
+import shutil
 import time
 from datetime import timedelta
 from pathlib import Path
@@ -116,6 +117,10 @@ class QwenPipeline(BasePipeline):
         # Speech segmentation config
         self.segmenter_backend = speech_segmenter
 
+        # Cross-scene context propagation (disabled for MVP; structure retained
+        # for future enablement once quality gates are in place)
+        self.cross_scene_context = False
+
         # Qwen ASR config (stored as dict for deferred construction)
         self._asr_config = {
             "model_id": model_id,
@@ -195,11 +200,17 @@ class QwenPipeline(BasePipeline):
         )
 
         master_metadata = {
+            "metadata_master": {
+                "structure_version": "1.0.0",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
             "input_file": str(input_file),
             "basename": media_basename,
             "pipeline": "qwen",
             "model_id": self.model_id,
             "stages": {},
+            "output_files": {},
+            "summary": {},
         }
 
         # ==============================================================
@@ -330,7 +341,8 @@ class QwenPipeline(BasePipeline):
         from whisperjav.modules.qwen_asr import QwenASR
         asr = QwenASR(**self._asr_config)
 
-        # Context biasing: user glossary is the base; cross-scene tail is appended
+        # Context biasing: user context applies to first scene only (MVP).
+        # Cross-scene propagation is gated by self.cross_scene_context flag.
         user_context = self._asr_config.get("context", "")
         previous_tail = ""
 
@@ -344,13 +356,18 @@ class QwenPipeline(BasePipeline):
             )
 
             try:
-                # Assemble per-scene context (user glossary + previous scene tail)
-                if previous_tail and user_context:
-                    scene_context = f"{user_context}\n{previous_tail}"
-                elif previous_tail:
-                    scene_context = previous_tail
+                # Assemble per-scene context
+                if self.cross_scene_context:
+                    # Cross-scene propagation: user glossary + previous scene tail
+                    if previous_tail and user_context:
+                        scene_context = f"{user_context}\n{previous_tail}"
+                    elif previous_tail:
+                        scene_context = previous_tail
+                    else:
+                        scene_context = user_context
                 else:
-                    scene_context = user_context
+                    # MVP: user context for first scene only, no context for rest
+                    scene_context = user_context if idx == 0 else ""
 
                 # Transcribe with per-scene context
                 result = asr.transcribe(
@@ -365,8 +382,8 @@ class QwenPipeline(BasePipeline):
                 segment_count = len(result.segments) if result.segments else 0
                 scene_results.append((result, idx))
 
-                # Extract tail for cross-scene context propagation
-                if result.segments:
+                # Extract tail for cross-scene context propagation (when enabled)
+                if self.cross_scene_context and result.segments:
                     tail_segments = result.segments[-2:] if len(result.segments) >= 2 else result.segments
                     previous_tail = " ".join(seg.text.strip() for seg in tail_segments if seg.text.strip())
                 # If 0 segments (silence/music), previous_tail carries forward
@@ -463,6 +480,13 @@ class QwenPipeline(BasePipeline):
 
         if num_subtitles > 0:
             processed_path, stats = self.postprocessor.process(stitched_srt_path, final_srt_path)
+
+            # Copy sanitized output to the final named path (sanitizer writes
+            # next to input as *.sanitized.srt; we need the canonical name)
+            if processed_path != final_srt_path:
+                shutil.copy2(processed_path, final_srt_path)
+                logger.debug("Copied final SRT from %s to %s", processed_path, final_srt_path)
+
             logger.info(
                 "[QwenPipeline PID %s] Phase 8: %d subtitles, %d hallucinations removed",
                 os.getpid(),
@@ -481,6 +505,13 @@ class QwenPipeline(BasePipeline):
         }
         master_metadata["srt_path"] = str(processed_path)
 
+        # Metadata contract: keys expected by main.py
+        master_metadata["output_files"]["final_srt"] = str(final_srt_path)
+        master_metadata["output_files"]["stitched_srt"] = str(stitched_srt_path)
+        master_metadata["summary"]["final_subtitles_refined"] = (
+            stats.get("total_subtitles", 0) - stats.get("empty_removed", 0)
+        )
+
         # ==============================================================
         # COMPLETE
         # ==============================================================
@@ -490,14 +521,14 @@ class QwenPipeline(BasePipeline):
         logger.info(
             "[QwenPipeline PID %s] Complete: %s (%d subtitles in %s)",
             os.getpid(),
-            processed_path.name,
-            stats.get("total_subtitles", 0),
+            final_srt_path.name,
+            master_metadata["summary"]["final_subtitles_refined"],
             str(timedelta(seconds=int(total_time))),
         )
 
         # Save metadata JSON if debug mode
         if self.save_metadata_json:
-            self.metadata_manager.save_master_metadata(media_basename, master_metadata)
+            self.metadata_manager.save_master_metadata(master_metadata, media_basename)
 
         # Cleanup temp files
         self.cleanup_temp_files(media_basename)
