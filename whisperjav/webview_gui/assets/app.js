@@ -215,6 +215,50 @@ const TransformersManager = {
 };
 
 // ============================================================
+// Qwen3-ASR Manager (v1.8.4+)
+// ============================================================
+const QwenManager = {
+    params: null,
+    customized: false,
+
+    defaults: {
+        // Model settings
+        model_id: 'Qwen/Qwen3-ASR-1.7B',
+        device: 'auto',
+        dtype: 'auto',
+        attn_implementation: 'auto',
+        // Processing settings
+        batch_size: 1,  // batch_size=1 recommended for accuracy
+        max_new_tokens: 4096,
+        language: null,  // null = auto-detect
+        // Aligner settings
+        use_aligner: true,
+        aligner_id: 'Qwen/Qwen3-ForcedAligner-0.6B',
+        // Post-processing
+        japanese_postprocess: true,
+        postprocess_preset: 'high_moan',
+        // Scene detection (from main dropdown)
+        scene: 'semantic',
+    },
+
+    getParams() {
+        return this.customized && this.params
+            ? { ...this.defaults, ...this.params }
+            : { ...this.defaults };
+    },
+
+    setParams(params) {
+        this.params = params;
+        this.customized = true;
+    },
+
+    resetToDefaults() {
+        this.params = null;
+        this.customized = false;
+    }
+};
+
+// ============================================================
 // UI Helpers - Loading States
 // ============================================================
 const UIHelpers = {
@@ -1066,6 +1110,7 @@ const EnsembleManager = {
             customized: false,
             params: null,  // null = use defaults, object = full custom config
             isTransformers: false,  // Track if using Transformers pipeline
+            isQwen: false,  // Track if using Qwen3-ASR pipeline
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         pass2: {
@@ -1079,6 +1124,7 @@ const EnsembleManager = {
             customized: false,
             params: null,
             isTransformers: false,  // Fidelity is a legacy pipeline
+            isQwen: false,  // Track if using Qwen3-ASR pipeline
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'smart_merge',
@@ -1098,6 +1144,10 @@ const EnsembleManager = {
         { value: 'kotoba-tech/kotoba-whisper-v2.0', label: 'Kotoba v2.0' },
         { value: 'openai/whisper-large-v3-turbo', label: 'Whisper Large v3 Turbo' },
         { value: 'openai/whisper-large-v2', label: 'Whisper Large v2' }
+    ],
+    qwenModels: [
+        { value: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR-1.7B    8GB' },
+        { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' }
     ],
 
     async init() {
@@ -1124,9 +1174,11 @@ const EnsembleManager = {
 
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
 
-        // Update isTransformers flags based on synced pipeline values
+        // Update isTransformers and isQwen flags based on synced pipeline values
         this.state.pass1.isTransformers = this.state.pass1.pipeline === 'transformers';
+        this.state.pass1.isQwen = this.state.pass1.pipeline === 'qwen';
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
+        this.state.pass2.isQwen = this.state.pass2.pipeline === 'qwen';
 
         // Pass 2 enable/disable
         document.getElementById('pass2-enabled').addEventListener('change', (e) => {
@@ -1231,7 +1283,14 @@ const EnsembleManager = {
     handlePipelineChange(passKey, newValue, selectElement) {
         const passState = this.state[passKey];
         const isTransformers = newValue === 'transformers';
+        const isQwen = newValue === 'qwen';
         const wasTransformers = passState.isTransformers;
+        const wasQwen = passState.isQwen;
+
+        // Determine pipeline category for model swapping
+        const getPipelineType = (isT, isQ) => isT ? 'transformers' : (isQ ? 'qwen' : 'legacy');
+        const oldType = getPipelineType(wasTransformers, wasQwen);
+        const newType = getPipelineType(isTransformers, isQwen);
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -1240,11 +1299,12 @@ const EnsembleManager = {
                 passState.customized = false;
                 passState.params = null;
                 passState.isTransformers = isTransformers;
+                passState.isQwen = isQwen;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
                 // Swap model options if pipeline type changed
-                if (wasTransformers !== isTransformers) {
-                    this.swapModelOptions(passKey, isTransformers);
+                if (oldType !== newType) {
+                    this.swapModelOptions(passKey, newType);
                 }
             } else {
                 // Revert selection
@@ -1253,18 +1313,31 @@ const EnsembleManager = {
         } else {
             passState.pipeline = newValue;
             passState.isTransformers = isTransformers;
+            passState.isQwen = isQwen;
             this.updateRowGreyingState(passKey);
             // Swap model options if pipeline type changed
-            if (wasTransformers !== isTransformers) {
-                this.swapModelOptions(passKey, isTransformers);
+            if (oldType !== newType) {
+                this.swapModelOptions(passKey, newType);
             }
         }
     },
 
     // Swap model dropdown options based on pipeline type
-    swapModelOptions(passKey, isTransformers) {
+    // pipelineType: 'legacy' | 'transformers' | 'qwen'
+    swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
-        const models = isTransformers ? this.transformersModels : this.legacyModels;
+        let models;
+
+        switch (pipelineType) {
+            case 'transformers':
+                models = this.transformersModels;
+                break;
+            case 'qwen':
+                models = this.qwenModels;
+                break;
+            default:
+                models = this.legacyModels;
+        }
 
         // Clear existing options
         modelSelect.innerHTML = '';
@@ -1282,7 +1355,10 @@ const EnsembleManager = {
         this.state[passKey].model = models[0].value;
     },
 
-    // Update row greying based on pipeline type (Transformers disables Sensitivity + Speech Segmenter)
+    // Update row greying based on pipeline type
+    // - Transformers: Disable sensitivity AND segmenter (uses HF internal chunking)
+    // - Qwen: Disable sensitivity only, KEEP segmenter (uses post-ASR VAD filter)
+    // - Legacy: Enable both
     updateRowGreyingState(passKey) {
         const passState = this.state[passKey];
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
@@ -1291,30 +1367,43 @@ const EnsembleManager = {
         // Check if pass2 is disabled (controls should be disabled regardless of pipeline)
         const isPass2Disabled = passKey === 'pass2' && !this.state.pass2.enabled;
 
-        if (passState.isTransformers) {
-            // Disable sensitivity and speech segmenter for Transformers
-            // Note: Transformers uses HuggingFace internal chunking, not external VAD
-            // Speech segmentation support planned for v1.8.0
-            sensitivitySelect.disabled = true;
-            sensitivitySelect.title = 'Sensitivity not applicable for Transformers mode';
-            segmenterSelect.disabled = true;
-            segmenterSelect.title = 'Transformers uses HF internal chunking (segmentation planned for v1.8.0)';
+        // Sensitivity: Disabled for both Transformers and Qwen (neither uses sensitivity presets)
+        const disableSensitivity = passState.isTransformers || passState.isQwen;
 
-            // Set to 'none' for visual clarity
+        // Segmenter: Only disabled for Transformers (uses HF internal chunking)
+        // Qwen DOES use segmenter as a post-ASR VAD filter (--qwen-segmenter)
+        const disableSegmenter = passState.isTransformers;
+
+        if (disableSensitivity) {
+            const pipelineName = passState.isTransformers ? 'Transformers' : 'Qwen3-ASR';
+            sensitivitySelect.disabled = true;
+            sensitivitySelect.title = `Sensitivity not applicable for ${pipelineName} mode`;
+
+            // Set sensitivity to 'none' for visual clarity (if option exists)
             if (sensitivitySelect.querySelector('option[value="none"]')) {
                 sensitivitySelect.value = 'none';
                 passState.sensitivity = 'none';
             }
+        } else {
+            // Re-enable sensitivity (unless pass2 is disabled)
+            sensitivitySelect.disabled = isPass2Disabled;
+            sensitivitySelect.title = '';
+        }
+
+        if (disableSegmenter) {
+            segmenterSelect.disabled = true;
+            segmenterSelect.title = 'Transformers uses HF internal chunking';
+
+            // Set segmenter to 'none' for visual clarity (if option exists)
             if (segmenterSelect.querySelector('option[value="none"]')) {
                 segmenterSelect.value = 'none';
                 passState.speechSegmenter = 'none';
             }
         } else {
-            // Re-enable sensitivity and segmenter (unless pass2 is disabled)
-            sensitivitySelect.disabled = isPass2Disabled;
-            sensitivitySelect.title = '';
+            // Re-enable segmenter (unless pass2 is disabled)
+            // Note: Qwen uses segmenter as post-ASR VAD filter
             segmenterSelect.disabled = isPass2Disabled;
-            segmenterSelect.title = '';
+            segmenterSelect.title = passState.isQwen ? 'Post-ASR VAD filter for Qwen3-ASR' : '';
         }
     },
 
@@ -1544,9 +1633,13 @@ const EnsembleManager = {
         // passKey is 'pass1' or 'pass2'
         const passState = this.state[passKey];
 
-        // Route to Transformers-specific handler if applicable
+        // Route to pipeline-specific handler if applicable
         if (passState.isTransformers) {
             await this.openTransformersCustomize(passKey);
+            return;
+        }
+        if (passState.isQwen) {
+            await this.openQwenCustomize(passKey);
             return;
         }
 
@@ -2580,6 +2673,270 @@ const EnsembleManager = {
         return control;
     },
 
+    // ========== Qwen3-ASR Pipeline Customization ==========
+
+    async openQwenCustomize(passKey) {
+        this.state.currentCustomize = passKey;
+        const passState = this.state[passKey];
+
+        try {
+            // Get Qwen parameter schema from API
+            const result = await pywebview.api.get_qwen_schema();
+
+            if (!result.success) {
+                ErrorHandler.show('Error', 'Failed to load Qwen3-ASR parameters: ' + (result.error || 'Unknown error'));
+                return;
+            }
+
+            // Set modal title
+            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+            const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
+            document.getElementById('customizeModalTitle').textContent =
+                `${passLabel} Settings (Qwen3-ASR)${customStatus}`;
+
+            // Store schema for reset functionality
+            this._qwenSchema = result.schema;
+
+            // Get current values (use stored params or defaults)
+            const currentValues = passState.customized && passState.params
+                ? { ...passState.params }
+                : { ...QwenManager.defaults };
+
+            // Get scene detector from main dropdown
+            currentValues.scene = passState.sceneDetector || 'semantic';
+
+            // Generate Qwen-specific tabs
+            this.generateQwenTabs(result.schema, currentValues);
+
+            // Show modal
+            document.getElementById('customizeModal').classList.add('active');
+
+        } catch (error) {
+            ErrorHandler.show('Error', 'Failed to open Qwen3-ASR customize dialog: ' + error);
+        }
+    },
+
+    generateQwenTabs(schema, currentValues) {
+        // Update tab labels for Qwen context
+        const tabLabels = {
+            'model': 'Model',
+            'quality': 'Quality',
+            'segmenter': 'Aligner',
+            'enhancer': 'Post-Process',
+            'scene': 'Scene'
+        };
+
+        // Clear all tab panels and update labels
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (panel) panel.innerHTML = '';
+            const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
+            if (tabBtn) {
+                tabBtn.textContent = tabLabels[tab];
+                tabBtn.style.display = '';
+            }
+        });
+
+        // Generate Model tab
+        this.generateQwenModelTab('tab-model', schema.model, currentValues);
+
+        // Generate Quality tab (batch_size, max_new_tokens, language)
+        this.generateQwenQualityTab('tab-quality', schema.quality, currentValues);
+
+        // Generate Aligner tab (in Segmenter slot - use_aligner, aligner_id)
+        this.generateQwenAlignerTab('tab-segmenter', schema.aligner, currentValues);
+
+        // Generate Post-Processing tab (in Enhancer slot)
+        this.generateQwenPostProcessTab('tab-enhancer', schema.postprocess, currentValues);
+
+        // Generate Scene tab
+        this.generateQwenSceneTab('tab-scene', schema.scene, currentValues);
+
+        // Reset to first tab
+        this.switchModalTab('model');
+    },
+
+    generateQwenModelTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Model ID dropdown
+        const modelDef = schemaSection.model_id;
+        container.appendChild(this.createTransformersDropdown(
+            'model_id', 'ASR Model',
+            modelDef.options,
+            currentValues.model_id || modelDef.default,
+            '1.7B is more accurate, 0.6B is faster and uses less VRAM'
+        ));
+
+        // Device dropdown
+        const deviceDef = schemaSection.device;
+        container.appendChild(this.createTransformersDropdown(
+            'device', 'Device',
+            deviceDef.options,
+            currentValues.device || deviceDef.default,
+            'Compute device (auto will detect GPU availability)'
+        ));
+
+        // Data type dropdown
+        const dtypeDef = schemaSection.dtype;
+        container.appendChild(this.createTransformersDropdown(
+            'dtype', 'Data Type',
+            dtypeDef.options,
+            currentValues.dtype || dtypeDef.default,
+            'Model precision (auto selects based on hardware)'
+        ));
+
+        // Attention implementation
+        const attnDef = schemaSection.attn_implementation;
+        container.appendChild(this.createTransformersDropdown(
+            'attn_implementation', 'Attention',
+            attnDef.options,
+            currentValues.attn_implementation || attnDef.default,
+            'Attention implementation (sdpa is fastest on most GPUs)'
+        ));
+    },
+
+    generateQwenQualityTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Batch size slider
+        const batchDef = schemaSection.batch_size;
+        container.appendChild(this.createTransformersSlider(
+            'batch_size', batchDef.label,
+            batchDef.min, batchDef.max, batchDef.step,
+            currentValues.batch_size ?? batchDef.default,
+            'Batch size 1 is recommended for best accuracy'
+        ));
+
+        // Max new tokens slider
+        const tokensDef = schemaSection.max_new_tokens;
+        container.appendChild(this.createTransformersSlider(
+            'max_new_tokens', tokensDef.label,
+            tokensDef.min, tokensDef.max, tokensDef.step,
+            currentValues.max_new_tokens ?? tokensDef.default,
+            'Maximum tokens per segment (4096 covers ~5-10 min audio)'
+        ));
+
+        // Language dropdown
+        const langDef = schemaSection.language;
+        container.appendChild(this.createTransformersDropdown(
+            'language', 'Language',
+            langDef.options,
+            currentValues.language || langDef.default,
+            'Force language or auto-detect (null = auto)'
+        ));
+    },
+
+    generateQwenAlignerTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Use aligner toggle
+        const alignerToggle = document.createElement('div');
+        alignerToggle.className = 'param-control';
+        alignerToggle.dataset.param = 'use_aligner';
+
+        const toggleLabel = document.createElement('label');
+        toggleLabel.className = 'checkbox-label';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'hf-use_aligner';
+        checkbox.checked = currentValues.use_aligner !== false;
+
+        const span = document.createElement('span');
+        span.textContent = 'Use ForcedAligner for word-level timestamps';
+
+        toggleLabel.appendChild(checkbox);
+        toggleLabel.appendChild(span);
+        alignerToggle.appendChild(toggleLabel);
+
+        const toggleDesc = document.createElement('p');
+        toggleDesc.className = 'param-description';
+        toggleDesc.textContent = 'ForcedAligner provides precise word timestamps for better subtitle timing';
+        alignerToggle.appendChild(toggleDesc);
+
+        container.appendChild(alignerToggle);
+
+        // Aligner model dropdown
+        const alignerDef = schemaSection.aligner_id;
+        container.appendChild(this.createTransformersDropdown(
+            'aligner_id', 'Aligner Model',
+            alignerDef.options,
+            currentValues.aligner_id || alignerDef.default,
+            'ForcedAligner model for word-level timestamps'
+        ));
+
+        // Note about 3-minute limit
+        const noteDiv = document.createElement('div');
+        noteDiv.className = 'param-note';
+        noteDiv.innerHTML = '<strong>Note:</strong> ForcedAligner has a 3-minute segment limit. ' +
+            'For longer audio, use Scene Detection to split into shorter segments.';
+        container.appendChild(noteDiv);
+    },
+
+    generateQwenPostProcessTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Japanese post-processing toggle
+        const jpToggle = document.createElement('div');
+        jpToggle.className = 'param-control';
+        jpToggle.dataset.param = 'japanese_postprocess';
+
+        const toggleLabel = document.createElement('label');
+        toggleLabel.className = 'checkbox-label';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'hf-japanese_postprocess';
+        checkbox.checked = currentValues.japanese_postprocess !== false;
+
+        const span = document.createElement('span');
+        span.textContent = 'Enable Japanese post-processing';
+
+        toggleLabel.appendChild(checkbox);
+        toggleLabel.appendChild(span);
+        jpToggle.appendChild(toggleLabel);
+
+        const toggleDesc = document.createElement('p');
+        toggleDesc.className = 'param-description';
+        toggleDesc.textContent = 'Apply Japanese-specific regrouping for better subtitle quality';
+        jpToggle.appendChild(toggleDesc);
+
+        container.appendChild(jpToggle);
+
+        // Preset dropdown
+        const presetDef = schemaSection.postprocess_preset;
+        container.appendChild(this.createTransformersDropdown(
+            'postprocess_preset', 'Preset',
+            presetDef.options,
+            currentValues.postprocess_preset || presetDef.default,
+            'Regrouping preset optimized for different content types'
+        ));
+    },
+
+    generateQwenSceneTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Scene detection dropdown (read-only, synced with main dropdown)
+        const sceneDef = schemaSection.scene;
+        const sceneControl = this.createTransformersDropdown(
+            'scene', sceneDef.label,
+            sceneDef.options,
+            currentValues.scene || sceneDef.default,
+            'Scene detection splits audio into segments before processing'
+        );
+
+        // Add note that this syncs with main dropdown
+        const noteDiv = document.createElement('div');
+        noteDiv.className = 'param-note';
+        noteDiv.innerHTML = '<strong>Note:</strong> Scene detection is configured in the main Ensemble tab. ' +
+            'Qwen3-ASR uses the --qwen-scene parameter internally.';
+        sceneControl.appendChild(noteDiv);
+
+        container.appendChild(sceneControl);
+    },
+
     generateModelTab(tabId, currentModel, currentDevice, pipeline) {
         const container = document.getElementById(tabId);
 
@@ -3401,33 +3758,41 @@ const EnsembleManager = {
         // - If customized: send full params (backend uses as-is)
         // - If not customized: send pipeline+sensitivity (backend resolves defaults)
 
+        // Helpers for pipeline-specific null handling:
+        // - Sensitivity: null for both Transformers AND Qwen (neither uses sensitivity presets)
+        // - Segmenter: null for Transformers only (Qwen uses segmenter as post-ASR VAD filter)
+        const disableSensitivity = (passState) => passState.isTransformers || passState.isQwen;
+        const disableSegmenter = (passState) => passState.isTransformers;  // NOT Qwen!
+
         const config = {
             inputs: AppState.selectedFiles,
             output_dir: document.getElementById('outputDir').value,
             pass1: {
                 pipeline: this.state.pass1.pipeline,
-                sensitivity: this.state.pass1.isTransformers ? null : this.state.pass1.sensitivity,
+                sensitivity: disableSensitivity(this.state.pass1) ? null : this.state.pass1.sensitivity,
                 sceneDetector: this.state.pass1.sceneDetector,
                 speechEnhancer: this.state.pass1.speechEnhancer,
                 dspEffects: this.state.pass1.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass1.dspEffects : null,
-                speechSegmenter: this.state.pass1.isTransformers ? null : this.state.pass1.speechSegmenter,
+                speechSegmenter: disableSegmenter(this.state.pass1) ? null : this.state.pass1.speechSegmenter,
                 model: this.state.pass1.model,
                 customized: this.state.pass1.customized,
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
-                isTransformers: this.state.pass1.isTransformers
+                isTransformers: this.state.pass1.isTransformers,
+                isQwen: this.state.pass1.isQwen
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
                 pipeline: this.state.pass2.pipeline,
-                sensitivity: this.state.pass2.isTransformers ? null : this.state.pass2.sensitivity,
+                sensitivity: disableSensitivity(this.state.pass2) ? null : this.state.pass2.sensitivity,
                 sceneDetector: this.state.pass2.sceneDetector,
                 speechEnhancer: this.state.pass2.speechEnhancer,
                 dspEffects: this.state.pass2.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass2.dspEffects : null,
-                speechSegmenter: this.state.pass2.isTransformers ? null : this.state.pass2.speechSegmenter,
+                speechSegmenter: disableSegmenter(this.state.pass2) ? null : this.state.pass2.speechSegmenter,
                 model: this.state.pass2.model,
                 customized: this.state.pass2.customized,
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
-                isTransformers: this.state.pass2.isTransformers
+                isTransformers: this.state.pass2.isTransformers,
+                isQwen: this.state.pass2.isQwen
             },
             merge_strategy: this.state.mergeStrategy,
             source_language: document.getElementById('source-language').value,

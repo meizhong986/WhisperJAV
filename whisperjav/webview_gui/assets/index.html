@@ -359,11 +359,18 @@
                                     <div class="col-label">Pass 1</div>
                                     <div class="col-pipeline">
                                         <select id="pass1-pipeline" class="form-select compact">
-                                            <option value="balanced" selected>Balanced</option>
-                                            <option value="fast">Fast</option>
-                                            <option value="faster">Faster</option>
-                                            <option value="fidelity">Fidelity</option>
-                                            <option value="transformers">Transformers (HF)</option>
+                                            <optgroup label="Whisper-Based">
+                                                <option value="balanced" selected>Balanced</option>
+                                                <option value="fast">Fast</option>
+                                                <option value="faster">Faster</option>
+                                                <option value="fidelity">Fidelity</option>
+                                            </optgroup>
+                                            <optgroup label="HuggingFace">
+                                                <option value="transformers">Transformers (HF)</option>
+                                            </optgroup>
+                                            <optgroup label="Qwen3-ASR">
+                                                <option value="qwen">Qwen3-ASR</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -493,11 +500,18 @@
                                     </div>
                                     <div class="col-pipeline">
                                         <select id="pass2-pipeline" class="form-select compact" disabled>
-                                            <option value="balanced">Balanced</option>
-                                            <option value="fast">Fast</option>
-                                            <option value="faster">Faster</option>
-                                            <option value="fidelity" selected>Fidelity</option>
-                                            <option value="transformers">Transformers (HF)</option>
+                                            <optgroup label="Whisper-Based">
+                                                <option value="balanced">Balanced</option>
+                                                <option value="fast">Fast</option>
+                                                <option value="faster">Faster</option>
+                                                <option value="fidelity" selected>Fidelity</option>
+                                            </optgroup>
+                                            <optgroup label="HuggingFace">
+                                                <option value="transformers">Transformers (HF)</option>
+                                            </optgroup>
+                                            <optgroup label="Qwen3-ASR">
+                                                <option value="qwen">Qwen3-ASR</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>

@@ -1761,6 +1761,136 @@ class WhisperJAVAPI:
             }
         }
 
+    def get_qwen_schema(self) -> Dict[str, Any]:
+        """
+        Get parameter schema for Qwen3-ASR pipeline customize modal.
+
+        Returns the schema used by the frontend to generate the customize
+        modal UI for Qwen3-ASR pipeline parameters.
+        """
+        return {
+            "success": True,
+            "schema": {
+                "model": {
+                    "model_id": {
+                        "type": "dropdown",
+                        "label": "ASR Model",
+                        "options": [
+                            {"value": "Qwen/Qwen3-ASR-1.7B", "label": "Qwen3-ASR-1.7B (8GB VRAM)"},
+                            {"value": "Qwen/Qwen3-ASR-0.6B", "label": "Qwen3-ASR-0.6B (4GB VRAM)"},
+                        ],
+                        "default": "Qwen/Qwen3-ASR-1.7B"
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "options": [
+                            {"value": "auto", "label": "Auto (detect GPU)"},
+                            {"value": "cuda", "label": "CUDA (GPU)"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto"
+                    },
+                    "dtype": {
+                        "type": "dropdown",
+                        "label": "Data Type",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "float16", "label": "Float16 (faster)"},
+                            {"value": "bfloat16", "label": "BFloat16"},
+                            {"value": "float32", "label": "Float32 (slower)"},
+                        ],
+                        "default": "auto"
+                    },
+                    "attn_implementation": {
+                        "type": "dropdown",
+                        "label": "Attention",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "sdpa", "label": "SDPA (fastest)"},
+                            {"value": "flash_attention_2", "label": "Flash Attention 2"},
+                            {"value": "eager", "label": "Eager (slowest)"},
+                        ],
+                        "default": "auto"
+                    },
+                },
+                "quality": {
+                    "batch_size": {
+                        "type": "slider",
+                        "label": "Batch Size",
+                        "min": 1,
+                        "max": 8,
+                        "step": 1,
+                        "default": 1
+                    },
+                    "max_new_tokens": {
+                        "type": "slider",
+                        "label": "Max New Tokens",
+                        "min": 1024,
+                        "max": 8192,
+                        "step": 512,
+                        "default": 4096
+                    },
+                    "language": {
+                        "type": "dropdown",
+                        "label": "Language",
+                        "options": [
+                            {"value": "null", "label": "Auto-detect"},
+                            {"value": "ja", "label": "Japanese"},
+                            {"value": "en", "label": "English"},
+                            {"value": "zh", "label": "Chinese"},
+                        ],
+                        "default": "null"
+                    },
+                },
+                "aligner": {
+                    "use_aligner": {
+                        "type": "checkbox",
+                        "label": "Use ForcedAligner",
+                        "default": True
+                    },
+                    "aligner_id": {
+                        "type": "dropdown",
+                        "label": "Aligner Model",
+                        "options": [
+                            {"value": "Qwen/Qwen3-ForcedAligner-0.6B", "label": "Qwen3-ForcedAligner-0.6B (default)"},
+                        ],
+                        "default": "Qwen/Qwen3-ForcedAligner-0.6B"
+                    },
+                },
+                "postprocess": {
+                    "japanese_postprocess": {
+                        "type": "checkbox",
+                        "label": "Japanese Post-processing",
+                        "default": True
+                    },
+                    "postprocess_preset": {
+                        "type": "dropdown",
+                        "label": "Preset",
+                        "options": [
+                            {"value": "high_moan", "label": "High Moan (JAV optimized)"},
+                            {"value": "default", "label": "Default (general)"},
+                            {"value": "narrative", "label": "Narrative (story focus)"},
+                        ],
+                        "default": "high_moan"
+                    },
+                },
+                "scene": {
+                    "scene": {
+                        "type": "dropdown",
+                        "label": "Scene Detection",
+                        "options": [
+                            {"value": "semantic", "label": "Semantic (recommended)"},
+                            {"value": "auditok", "label": "Auditok (energy-based)"},
+                            {"value": "silero", "label": "Silero (neural VAD)"},
+                            {"value": "none", "label": "None (process whole file)"},
+                        ],
+                        "default": "semantic"
+                    },
+                },
+            }
+        }
+
     # ========================================================================
     # Two-Pass Ensemble Methods
     # ========================================================================
@@ -2009,6 +2139,13 @@ class WhisperJAVAPI:
         - isTransformers=True: Skip sensitivity, pass HF params if customized
         - isTransformers=False: Standard legacy handling with sensitivity
 
+        Qwen Pass Handling:
+        - isQwen=True: Skip sensitivity, pass Qwen params if customized
+        - isQwen=False: Standard legacy handling with sensitivity
+
+        Note: All pipelines use generic --passN-* args (e.g., --pass1-model, --pass1-scene-detector).
+        For Qwen pipelines, pass_worker.py translates these to qwen_* parameters.
+
         Args:
             config: Two-pass ensemble configuration
 
@@ -2036,6 +2173,11 @@ class WhisperJAVAPI:
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-hf-params", json.dumps(pass1['params'])]
             # else: minimal args - backend uses model defaults
+        elif pass1.get('isQwen'):
+            # Qwen pass: no sensitivity, handle Qwen params
+            if pass1.get('customized') and pass1.get('params'):
+                args += ["--pass1-qwen-params", json.dumps(pass1['params'])]
+            # else: minimal args - backend uses model defaults
         else:
             # Legacy pass: use sensitivity
             args += ["--pass1-sensitivity", pass1.get('sensitivity', 'balanced')]
@@ -2043,18 +2185,29 @@ class WhisperJAVAPI:
                 args += ["--pass1-params", json.dumps(pass1['params'])]
 
         # Pass 1: Scene Detector
+        # Note: All pipelines use --pass1-scene-detector. For Qwen, pass_worker.py
+        # translates this to qwen_scene parameter.
         scene1 = pass1.get('sceneDetector')
         if scene1 and scene1 != 'none':
             args += ["--pass1-scene-detector", scene1]
 
-        # Pass 1: Speech Segmenter (legacy pipelines only)
-        # Note: Transformers uses HF internal chunking; segmentation support planned for v1.8.0
-        if not pass1.get('isTransformers'):
-            segmenter1 = pass1.get('speechSegmenter')
-            if segmenter1:  # Pass any value including "none" to disable VAD
+        # Pass 1: Speech Segmenter
+        # - Transformers: Skip (uses HF internal chunking)
+        # - Qwen/Legacy: Use --pass1-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
+        segmenter1 = pass1.get('speechSegmenter')
+        if pass1.get('isTransformers'):
+            # Transformers: Skip segmenter entirely (HF internal chunking)
+            pass
+        else:
+            # Both Qwen and Legacy use --pass1-speech-segmenter
+            # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
+            # For Legacy: used as pre-ASR speech segmentation
+            if segmenter1:  # Pass any value including "none" to disable
                 args += ["--pass1-speech-segmenter", segmenter1]
 
         # Pass 1: Speech Enhancer
+        # Note: All pipelines use --pass1-speech-enhancer. For Qwen, pass_worker.py
+        # translates this to qwen_enhancer parameter.
         enhancer1 = pass1.get('speechEnhancer')
         if enhancer1 and enhancer1 != 'none':
             # Handle FFmpeg DSP with selected effects
@@ -2066,6 +2219,8 @@ class WhisperJAVAPI:
                 args += ["--pass1-speech-enhancer", enhancer1]
 
         # Pass 1: Model
+        # Note: All pipelines use --pass1-model. For Qwen, pass_worker.py
+        # translates this to qwen_model_id parameter.
         model1 = pass1.get('model')
         if model1:
             args += ["--pass1-model", model1]
@@ -2080,6 +2235,11 @@ class WhisperJAVAPI:
                 if pass2.get('customized') and pass2.get('params'):
                     args += ["--pass2-hf-params", json.dumps(pass2['params'])]
                 # else: minimal args - backend uses model defaults
+            elif pass2.get('isQwen'):
+                # Qwen pass: no sensitivity, handle Qwen params
+                if pass2.get('customized') and pass2.get('params'):
+                    args += ["--pass2-qwen-params", json.dumps(pass2['params'])]
+                # else: minimal args - backend uses model defaults
             else:
                 # Legacy pass: use sensitivity
                 args += ["--pass2-sensitivity", pass2.get('sensitivity', 'balanced')]
@@ -2087,18 +2247,29 @@ class WhisperJAVAPI:
                     args += ["--pass2-params", json.dumps(pass2['params'])]
 
             # Pass 2: Scene Detector
+            # Note: All pipelines use --pass2-scene-detector. For Qwen, pass_worker.py
+            # translates this to qwen_scene parameter.
             scene2 = pass2.get('sceneDetector')
             if scene2 and scene2 != 'none':
                 args += ["--pass2-scene-detector", scene2]
 
-            # Pass 2: Speech Segmenter (legacy pipelines only)
-            # Note: Transformers uses HF internal chunking; segmentation support planned for v1.8.0
-            if not pass2.get('isTransformers'):
-                segmenter2 = pass2.get('speechSegmenter')
-                if segmenter2:  # Pass any value including "none" to disable VAD
+            # Pass 2: Speech Segmenter
+            # - Transformers: Skip (uses HF internal chunking)
+            # - Qwen/Legacy: Use --pass2-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
+            segmenter2 = pass2.get('speechSegmenter')
+            if pass2.get('isTransformers'):
+                # Transformers: Skip segmenter entirely (HF internal chunking)
+                pass
+            else:
+                # Both Qwen and Legacy use --pass2-speech-segmenter
+                # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
+                # For Legacy: used as pre-ASR speech segmentation
+                if segmenter2:  # Pass any value including "none" to disable
                     args += ["--pass2-speech-segmenter", segmenter2]
 
             # Pass 2: Speech Enhancer
+            # Note: All pipelines use --pass2-speech-enhancer. For Qwen, pass_worker.py
+            # translates this to qwen_enhancer parameter.
             enhancer2 = pass2.get('speechEnhancer')
             if enhancer2 and enhancer2 != 'none':
                 # Handle FFmpeg DSP with selected effects
@@ -2110,6 +2281,8 @@ class WhisperJAVAPI:
                     args += ["--pass2-speech-enhancer", enhancer2]
 
             # Pass 2: Model
+            # Note: All pipelines use --pass2-model. For Qwen, pass_worker.py
+            # translates this to qwen_model_id parameter.
             model2 = pass2.get('model')
             if model2:
                 args += ["--pass2-model", model2]
@@ -2127,6 +2300,8 @@ class WhisperJAVAPI:
         args += ["--subs-language", subs_language]
 
         # Source language
+        # Note: All pipelines use --language. For Qwen, pass_worker.py translates
+        # this to qwen_language via pass_config['language'].
         source_language = config.get('source_language', 'japanese')
         args += ["--language", source_language]
 
