@@ -24,6 +24,7 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
     KotobaFasterWhisperPipeline,
 )
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
+from whisperjav.pipelines.qwen_pipeline import QwenPipeline
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -36,6 +37,7 @@ PIPELINE_CLASSES = {
     "fidelity": FidelityPipeline,
     "kotoba-faster-whisper": KotobaFasterWhisperPipeline,
     "transformers": TransformersPipeline,
+    "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
 }
 
 DEFAULT_HF_PARAMS = {
@@ -330,6 +332,70 @@ def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     for key, hf_key in override_mapping.items():
         if key in overrides:
             params[hf_key] = overrides[key]
+
+    return params
+
+
+# Default Qwen3-ASR parameters
+DEFAULT_QWEN_PARAMS = {
+    "qwen_model_id": "Qwen/Qwen3-ASR-1.7B",
+    "qwen_device": "auto",
+    "qwen_dtype": "auto",
+    "qwen_batch_size": 1,
+    "qwen_max_tokens": 4096,
+    "qwen_language": None,  # None = auto-detect
+    "qwen_timestamps": "word",
+    "qwen_aligner": "Qwen/Qwen3-ForcedAligner-0.6B",
+    "qwen_scene": "semantic",
+    "qwen_context": "",
+    "qwen_context_file": None,
+    "qwen_attn": "auto",
+    "qwen_enhancer": "none",
+    "qwen_enhancer_model": None,
+    "qwen_segmenter": "none",
+    "qwen_japanese_postprocess": True,
+    "qwen_postprocess_preset": "high_moan",
+}
+
+
+def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return qwen_* parameters for the Qwen3-ASR pipeline with overrides applied."""
+
+    params = DEFAULT_QWEN_PARAMS.copy()
+
+    qwen_params = pass_config.get("qwen_params") or {}
+    mapping = {
+        "model_id": "qwen_model_id",
+        "device": "qwen_device",
+        "dtype": "qwen_dtype",
+        "batch_size": "qwen_batch_size",
+        "max_new_tokens": "qwen_max_tokens",
+        "language": "qwen_language",
+        "timestamps": "qwen_timestamps",
+        "aligner_id": "qwen_aligner",
+        "use_aligner": "qwen_use_aligner",  # Special handling below
+        "scene": "qwen_scene",
+        "context": "qwen_context",
+        "context_file": "qwen_context_file",
+        "attn_implementation": "qwen_attn",
+        "japanese_postprocess": "qwen_japanese_postprocess",
+        "postprocess_preset": "qwen_postprocess_preset",
+    }
+
+    # Track which qwen_* keys were explicitly set by user
+    user_set_keys = set()
+
+    for key, value in qwen_params.items():
+        if key in mapping:
+            params[mapping[key]] = value
+            user_set_keys.add(mapping[key])
+        elif key.startswith("qwen_"):
+            params[key] = value
+            user_set_keys.add(key)
+
+    # Handle use_aligner special case: if False, set aligner to None
+    if qwen_params.get("use_aligner") is False:
+        params["qwen_aligner"] = None
 
     return params
 
@@ -733,6 +799,85 @@ def _build_pipeline(
         except Exception as e:
             logger.error(
                 "[Worker %s] Pass %s: FAILED to create TransformersPipeline - %s: %s",
+                os.getpid(), pass_number, type(e).__name__, e
+            )
+            raise
+
+    # Qwen3-ASR pipeline (uses TransformersPipeline with asr_backend="qwen")
+    if pipeline_name == "qwen":
+        qwen_defaults = prepare_qwen_params(pass_config)
+        logger.debug(
+            "[Worker %s] Pass %s: Qwen defaults BEFORE overrides - qwen_model_id=%s, qwen_scene=%s",
+            os.getpid(), pass_number, qwen_defaults.get("qwen_model_id"), qwen_defaults.get("qwen_scene")
+        )
+        # Apply GUI-specified overrides for qwen pipeline
+        if pass_config.get("model"):
+            qwen_defaults["qwen_model_id"] = pass_config["model"]
+            logger.debug("Pass %s: Override qwen_model_id = %s", pass_number, pass_config["model"])
+        if pass_config.get("scene_detector") and pass_config["scene_detector"] != "none":
+            qwen_defaults["qwen_scene"] = pass_config["scene_detector"]
+            logger.debug("Pass %s: Override qwen_scene = %s", pass_number, pass_config["scene_detector"])
+        elif pass_config.get("scene_detector") == "none":
+            qwen_defaults["qwen_scene"] = "none"
+        # Apply source language override for qwen pipeline
+        if pass_config.get("language"):
+            qwen_defaults["qwen_language"] = pass_config["language"]
+            logger.debug("Pass %s: Override qwen_language = %s", pass_number, pass_config["language"])
+        # Apply speech enhancer override for qwen pipeline
+        if pass_config.get("speech_enhancer"):
+            enhancer_backend, enhancer_model = _parse_speech_enhancer(pass_config["speech_enhancer"])
+            qwen_defaults["qwen_enhancer"] = enhancer_backend
+            if enhancer_model:
+                qwen_defaults["qwen_enhancer_model"] = enhancer_model
+            logger.debug("Pass %s: Override qwen_enhancer = %s, model = %s", pass_number, enhancer_backend, enhancer_model)
+        # Apply speech segmenter override for qwen pipeline (post-ASR VAD filter)
+        if pass_config.get("speech_segmenter"):
+            qwen_defaults["qwen_segmenter"] = pass_config["speech_segmenter"]
+            logger.debug("Pass %s: Override qwen_segmenter = %s", pass_number, pass_config["speech_segmenter"])
+        # Map qwen_* prefixed params to QwenPipeline's parameter names
+        qwen_pipeline_params = {
+            "model_id": qwen_defaults.get("qwen_model_id", "Qwen/Qwen3-ASR-1.7B"),
+            "device": qwen_defaults.get("qwen_device", "auto"),
+            "dtype": qwen_defaults.get("qwen_dtype", "auto"),
+            "batch_size": qwen_defaults.get("qwen_batch_size", 1),
+            "max_new_tokens": qwen_defaults.get("qwen_max_tokens", 4096),
+            "language": qwen_defaults.get("qwen_language", None),
+            "timestamps": qwen_defaults.get("qwen_timestamps", "word"),
+            "aligner_id": qwen_defaults.get("qwen_aligner", "Qwen/Qwen3-ForcedAligner-0.6B"),
+            "scene_detector": qwen_defaults.get("qwen_scene", "none"),
+            "context": qwen_defaults.get("qwen_context", ""),
+            "context_file": qwen_defaults.get("qwen_context_file", None),
+            "attn_implementation": qwen_defaults.get("qwen_attn", "auto"),
+            "speech_enhancer": qwen_defaults.get("qwen_enhancer", "none"),
+            "speech_enhancer_model": qwen_defaults.get("qwen_enhancer_model", None),
+            "speech_segmenter": qwen_defaults.get("qwen_segmenter", "none"),
+            "japanese_postprocess": qwen_defaults.get("qwen_japanese_postprocess", True),
+            "postprocess_preset": qwen_defaults.get("qwen_postprocess_preset", "high_moan"),
+        }
+        logger.debug(
+            "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",
+            os.getpid(), pass_number,
+            qwen_pipeline_params["model_id"],
+            qwen_pipeline_params["scene_detector"],
+            qwen_pipeline_params["speech_segmenter"],
+        )
+        try:
+            pipeline = QwenPipeline(
+                output_dir=output_dir,
+                temp_dir=str(pass_temp_dir),
+                keep_temp_files=keep_temp_files,
+                progress_display=None,
+                subs_language=subs_language,
+                **qwen_pipeline_params,
+            )
+            logger.debug(
+                "[Worker %s] Pass %s: QwenPipeline created successfully",
+                os.getpid(), pass_number
+            )
+            return pipeline
+        except Exception as e:
+            logger.error(
+                "[Worker %s] Pass %s: FAILED to create QwenPipeline - %s: %s",
                 os.getpid(), pass_number, type(e).__name__, e
             )
             raise

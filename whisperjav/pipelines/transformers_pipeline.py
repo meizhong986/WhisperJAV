@@ -85,6 +85,7 @@ class TransformersPipeline(BasePipeline):
         qwen_aligner: str = "Qwen/Qwen3-ForcedAligner-0.6B",
         qwen_scene: str = "none",
         qwen_context: str = "",  # Context string for ASR accuracy
+        qwen_context_file: Optional[str] = None,  # Path to context/glossary text file
         qwen_attn: str = "auto",  # Attention: auto, sdpa, flash_attention_2, eager
         # Speech enhancement (default: none = skip enhancement)
         hf_speech_enhancer: str = "none",
@@ -184,7 +185,7 @@ class TransformersPipeline(BasePipeline):
             "timestamps": qwen_timestamps,
             "use_aligner": qwen_timestamps == "word",
             "aligner_id": qwen_aligner,
-            "context": qwen_context,
+            "context": self._resolve_context(qwen_context, qwen_context_file),
             "attn_implementation": qwen_attn,
             # Japanese post-processing (v1.8.4+)
             "japanese_postprocess": qwen_japanese_postprocess,
@@ -254,7 +255,7 @@ class TransformersPipeline(BasePipeline):
                 'timestamps': qwen_timestamps,
                 'use_aligner': qwen_timestamps == "word",
                 'aligner_id': qwen_aligner,
-                'context': qwen_context,
+                'context': self._resolve_context(qwen_context, qwen_context_file),
                 'attn_implementation': qwen_attn,
                 # Japanese post-processing (v1.8.4+)
                 'japanese_postprocess': qwen_japanese_postprocess,
@@ -303,6 +304,25 @@ class TransformersPipeline(BasePipeline):
                 "[TransformersPipeline PID %s] Initialized with asr_backend=%s, model_id=%s, task=%s, language=%s, scene=%s",
                 os.getpid(), asr_backend, hf_model_id, hf_task, hf_language, self.scene_method
             )
+
+    @staticmethod
+    def _resolve_context(context: str, context_file: Optional[str]) -> str:
+        """Resolve context from inline string and/or file path.
+
+        If both are provided, they are concatenated with a newline separator.
+        """
+        parts = []
+        if context:
+            parts.append(context)
+        if context_file:
+            try:
+                file_content = Path(context_file).read_text(encoding='utf-8').strip()
+                if file_content:
+                    parts.append(file_content)
+                    logger.debug(f"Loaded context from file: {context_file} ({len(file_content)} chars)")
+            except Exception as e:
+                logger.warning(f"Failed to load context file '{context_file}': {e}")
+        return "\n".join(parts)
 
     def get_mode_name(self) -> str:
         """Return pipeline mode name."""

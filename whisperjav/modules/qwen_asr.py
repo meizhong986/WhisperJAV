@@ -563,6 +563,7 @@ class QwenASR:
         audio_path: Union[str, Path],
         progress_callback: Optional[Callable[[float, str], None]] = None,
         artifacts_dir: Optional[Union[str, Path]] = None,
+        context: Optional[str] = None,
     ) -> stable_whisper.WhisperResult:
         """
         Transcribe audio file using Qwen3-ASR with stable-ts regrouping.
@@ -580,6 +581,10 @@ class QwenASR:
                           saves: {basename}_qwen_master.txt (raw ASR text),
                           {basename}_qwen_timestamps.json (ForcedAligner data),
                           {basename}_qwen_merged.json (merged word list)
+            context: Optional per-call context string for contextual biasing.
+                     When None, uses self.context from __init__ (backward-compatible).
+                     When provided, overrides self.context for this specific call.
+                     Enables cross-scene context propagation from QwenPipeline.
 
         Returns:
             stable_whisper.WhisperResult with sentence-level segments
@@ -621,9 +626,12 @@ class QwenASR:
 
         start_time = time.time()
 
+        # Resolve per-call context override (None = use self.context from __init__)
+        effective_context = context if context is not None else self.context
+
         # If aligner is disabled, fall back to simple transcription
         if not self.use_aligner:
-            result = self._transcribe_without_aligner(audio_path)
+            result = self._transcribe_without_aligner(audio_path, effective_context)
             process_time = time.time() - start_time
             logger.debug(f"Transcription (no aligner) complete in {process_time:.1f}s")
             if progress_callback:
@@ -631,7 +639,7 @@ class QwenASR:
             return result
 
         # With aligner: use transcribe_any for word-to-sentence regrouping
-        result = self._transcribe_with_regrouping(audio_path, progress_callback, artifacts_dir)
+        result = self._transcribe_with_regrouping(audio_path, progress_callback, artifacts_dir, effective_context)
 
         process_time = time.time() - start_time
         segment_count = len(result.segments) if result.segments else 0
@@ -661,6 +669,7 @@ class QwenASR:
         audio_path: Path,
         progress_callback: Optional[Callable[[float, str], None]] = None,
         artifacts_dir: Optional[Union[str, Path]] = None,
+        effective_context: str = "",
     ) -> stable_whisper.WhisperResult:
         """
         Transcribe with ForcedAligner and stable-ts regrouping.
@@ -679,8 +688,9 @@ class QwenASR:
         """
         # Store reference to self for use in inference function
         qwen_model = self.model
-        qwen_language = self.language
-        qwen_context = self.context  # Context string for ASR
+        # Normalize language to qwen-asr format (e.g., 'ja' -> 'Japanese')
+        qwen_language = self._normalize_language_for_qwen(self.language)
+        qwen_context = effective_context  # Context string for ASR (may be per-call override)
         detected_language_holder = [None]  # Use list to allow mutation in closure
         save_artifacts_dir = Path(artifacts_dir) if artifacts_dir else None  # Artifact save directory
 
@@ -907,7 +917,7 @@ class QwenASR:
 
             return result
 
-    def _transcribe_without_aligner(self, audio_path: Path) -> stable_whisper.WhisperResult:
+    def _transcribe_without_aligner(self, audio_path: Path, effective_context: str = "") -> stable_whisper.WhisperResult:
         """
         Transcribe without ForcedAligner (no word timestamps).
 
@@ -916,15 +926,19 @@ class QwenASR:
 
         Args:
             audio_path: Path to audio file
+            effective_context: Context string for ASR (may be per-call override)
 
         Returns:
             WhisperResult with single segment
         """
         try:
+            # Normalize language to qwen-asr format (e.g., 'ja' -> 'Japanese')
+            qwen_language = self._normalize_language_for_qwen(self.language)
+
             results = self.model.transcribe(
                 audio=str(audio_path),
-                context=self.context,  # Pass context to improve accuracy
-                language=self.language,
+                context=effective_context,  # Pass context to improve accuracy
+                language=qwen_language,
                 return_time_stamps=False,
             )
 
@@ -965,6 +979,242 @@ class QwenASR:
             logger.error(f"Error in _transcribe_without_aligner: {type(e).__name__}: {e}")
             raise
 
+    # =========================================================================
+    # Language Mapping Constants
+    # =========================================================================
+    # qwen-asr supported languages (from error message in qwen_asr library)
+    QWEN_SUPPORTED_LANGUAGES = {
+        'Chinese', 'English', 'Cantonese', 'Arabic', 'German', 'French',
+        'Spanish', 'Portuguese', 'Indonesian', 'Italian', 'Korean', 'Russian',
+        'Thai', 'Vietnamese', 'Japanese', 'Turkish', 'Hindi', 'Malay', 'Dutch',
+        'Swedish', 'Danish', 'Finnish', 'Polish', 'Czech', 'Filipino', 'Persian',
+        'Greek', 'Romanian', 'Hungarian', 'Macedonian'
+    }
+
+    # Comprehensive mapping: various input formats → qwen-asr canonical names
+    # Handles: ISO codes, full names, case variations, common aliases
+    LANGUAGE_TO_QWEN_MAP = {
+        # Japanese - most important for WhisperJAV
+        'ja': 'Japanese',
+        'jp': 'Japanese',  # Common alias
+        'jpn': 'Japanese',  # ISO 639-2
+        'japanese': 'Japanese',
+        # English
+        'en': 'English',
+        'eng': 'English',
+        'english': 'English',
+        # Chinese
+        'zh': 'Chinese',
+        'zho': 'Chinese',
+        'chi': 'Chinese',
+        'chinese': 'Chinese',
+        'mandarin': 'Chinese',
+        # Cantonese
+        'yue': 'Cantonese',
+        'cantonese': 'Cantonese',
+        # Korean
+        'ko': 'Korean',
+        'kor': 'Korean',
+        'korean': 'Korean',
+        # Arabic
+        'ar': 'Arabic',
+        'ara': 'Arabic',
+        'arabic': 'Arabic',
+        # German
+        'de': 'German',
+        'deu': 'German',
+        'ger': 'German',
+        'german': 'German',
+        # French
+        'fr': 'French',
+        'fra': 'French',
+        'fre': 'French',
+        'french': 'French',
+        # Spanish
+        'es': 'Spanish',
+        'spa': 'Spanish',
+        'spanish': 'Spanish',
+        # Portuguese
+        'pt': 'Portuguese',
+        'por': 'Portuguese',
+        'portuguese': 'Portuguese',
+        # Indonesian
+        'id': 'Indonesian',
+        'ind': 'Indonesian',
+        'indonesian': 'Indonesian',
+        # Italian
+        'it': 'Italian',
+        'ita': 'Italian',
+        'italian': 'Italian',
+        # Russian
+        'ru': 'Russian',
+        'rus': 'Russian',
+        'russian': 'Russian',
+        # Thai
+        'th': 'Thai',
+        'tha': 'Thai',
+        'thai': 'Thai',
+        # Vietnamese
+        'vi': 'Vietnamese',
+        'vie': 'Vietnamese',
+        'vietnamese': 'Vietnamese',
+        # Turkish
+        'tr': 'Turkish',
+        'tur': 'Turkish',
+        'turkish': 'Turkish',
+        # Hindi
+        'hi': 'Hindi',
+        'hin': 'Hindi',
+        'hindi': 'Hindi',
+        # Malay
+        'ms': 'Malay',
+        'msa': 'Malay',
+        'may': 'Malay',
+        'malay': 'Malay',
+        # Dutch
+        'nl': 'Dutch',
+        'nld': 'Dutch',
+        'dut': 'Dutch',
+        'dutch': 'Dutch',
+        # Swedish
+        'sv': 'Swedish',
+        'swe': 'Swedish',
+        'swedish': 'Swedish',
+        # Danish
+        'da': 'Danish',
+        'dan': 'Danish',
+        'danish': 'Danish',
+        # Finnish
+        'fi': 'Finnish',
+        'fin': 'Finnish',
+        'finnish': 'Finnish',
+        # Polish
+        'pl': 'Polish',
+        'pol': 'Polish',
+        'polish': 'Polish',
+        # Czech
+        'cs': 'Czech',
+        'ces': 'Czech',
+        'cze': 'Czech',
+        'czech': 'Czech',
+        # Filipino
+        'fil': 'Filipino',
+        'tl': 'Filipino',  # Tagalog maps to Filipino
+        'tagalog': 'Filipino',
+        'filipino': 'Filipino',
+        # Persian
+        'fa': 'Persian',
+        'fas': 'Persian',
+        'per': 'Persian',
+        'persian': 'Persian',
+        'farsi': 'Persian',
+        # Greek
+        'el': 'Greek',
+        'ell': 'Greek',
+        'gre': 'Greek',
+        'greek': 'Greek',
+        # Romanian
+        'ro': 'Romanian',
+        'ron': 'Romanian',
+        'rum': 'Romanian',
+        'romanian': 'Romanian',
+        # Hungarian
+        'hu': 'Hungarian',
+        'hun': 'Hungarian',
+        'hungarian': 'Hungarian',
+        # Macedonian
+        'mk': 'Macedonian',
+        'mkd': 'Macedonian',
+        'mac': 'Macedonian',
+        'macedonian': 'Macedonian',
+    }
+
+    # Reverse mapping: qwen-asr names → ISO codes (for stable-ts output)
+    QWEN_TO_ISO_MAP = {
+        'japanese': 'ja',
+        'english': 'en',
+        'chinese': 'zh',
+        'cantonese': 'yue',
+        'korean': 'ko',
+        'arabic': 'ar',
+        'german': 'de',
+        'french': 'fr',
+        'spanish': 'es',
+        'portuguese': 'pt',
+        'indonesian': 'id',
+        'italian': 'it',
+        'russian': 'ru',
+        'thai': 'th',
+        'vietnamese': 'vi',
+        'turkish': 'tr',
+        'hindi': 'hi',
+        'malay': 'ms',
+        'dutch': 'nl',
+        'swedish': 'sv',
+        'danish': 'da',
+        'finnish': 'fi',
+        'polish': 'pl',
+        'czech': 'cs',
+        'filipino': 'fil',
+        'persian': 'fa',
+        'greek': 'el',
+        'romanian': 'ro',
+        'hungarian': 'hu',
+        'macedonian': 'mk',
+    }
+
+    def _normalize_language_for_qwen(self, language: Optional[str]) -> Optional[str]:
+        """
+        Normalize language input to qwen-asr expected format.
+
+        qwen-asr expects full language names like 'Japanese', 'English', etc.
+        This method accepts various input formats and converts them to the
+        canonical qwen-asr format.
+
+        Handles:
+            - ISO 639-1 codes: 'ja', 'en', 'zh'
+            - ISO 639-2 codes: 'jpn', 'eng', 'zho'
+            - Full names: 'Japanese', 'English', 'Chinese'
+            - Case variations: 'JA', 'JAPANESE', 'japanese'
+            - Common aliases: 'jp' for Japanese
+
+        Args:
+            language: Input language in any format, or None for auto-detect
+
+        Returns:
+            Canonical qwen-asr language name (e.g., 'Japanese'), or None for auto-detect
+        """
+        # None = auto-detect (valid for qwen-asr)
+        if language is None:
+            return None
+
+        # Empty string = auto-detect
+        if not language or not language.strip():
+            return None
+
+        # Normalize: strip whitespace, lowercase for lookup
+        lang_normalized = language.strip().lower()
+
+        # Direct lookup in mapping
+        if lang_normalized in self.LANGUAGE_TO_QWEN_MAP:
+            result = self.LANGUAGE_TO_QWEN_MAP[lang_normalized]
+            logger.debug(f"Language normalized: '{language}' -> '{result}'")
+            return result
+
+        # Check if already a valid qwen-asr language name (case-insensitive)
+        for supported in self.QWEN_SUPPORTED_LANGUAGES:
+            if lang_normalized == supported.lower():
+                logger.debug(f"Language already valid: '{language}' -> '{supported}'")
+                return supported
+
+        # Unknown language - log warning and pass through
+        # (let qwen-asr handle the error with its detailed message)
+        logger.warning(
+            f"Unknown language '{language}' - passing to qwen-asr as-is. "
+            f"Supported: {', '.join(sorted(self.QWEN_SUPPORTED_LANGUAGES))}"
+        )
+        return language
+
     def _map_language_code(self, language: str) -> str:
         """
         Map qwen-asr language names to ISO language codes.
@@ -981,22 +1231,14 @@ class QwenASR:
         if not language:
             return 'ja'  # Default to Japanese
 
-        language_map = {
-            'japanese': 'ja',
-            'english': 'en',
-            'chinese': 'zh',
-            'cantonese': 'yue',
-            'french': 'fr',
-            'german': 'de',
-            'italian': 'it',
-            'korean': 'ko',
-            'portuguese': 'pt',
-            'russian': 'ru',
-            'spanish': 'es',
-        }
-
         lang_lower = language.lower()
-        return language_map.get(lang_lower, lang_lower[:2] if len(lang_lower) >= 2 else 'ja')
+
+        # Use the reverse mapping
+        if lang_lower in self.QWEN_TO_ISO_MAP:
+            return self.QWEN_TO_ISO_MAP[lang_lower]
+
+        # Fallback: use first 2 characters as code
+        return lang_lower[:2] if len(lang_lower) >= 2 else 'ja'
 
     def unload_model(self) -> None:
         """Free GPU memory by unloading the model."""

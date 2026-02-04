@@ -175,7 +175,7 @@ def parse_arguments():
                                help="Enable two-pass ensemble mode")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers"],
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
                                help="Pipeline for pass 1 (default: balanced)")
     twopass_group.add_argument("--pass1-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -186,6 +186,8 @@ def parse_arguments():
                                help="JSON string of full parameters for pass 1 (custom mode)")
     twopass_group.add_argument("--pass1-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 1 (when pipeline=transformers)")
+    twopass_group.add_argument("--pass1-qwen-params", default=None,
+                               help="JSON string of Qwen3-ASR parameters for pass 1 (when pipeline=qwen)")
     twopass_group.add_argument("--pass1-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 1 (default: auditok)")
@@ -197,7 +199,7 @@ def parse_arguments():
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers"],
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
                                help="Pipeline for pass 2 (enables pass 2)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -208,6 +210,8 @@ def parse_arguments():
                                help="JSON string of full parameters for pass 2 (custom mode)")
     twopass_group.add_argument("--pass2-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 2 (when pipeline=transformers)")
+    twopass_group.add_argument("--pass2-qwen-params", default=None,
+                               help="JSON string of Qwen3-ASR parameters for pass 2 (when pipeline=qwen)")
     twopass_group.add_argument("--pass2-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 2 (default: none)")
@@ -444,6 +448,8 @@ def parse_arguments():
                            help="Scene detection method (default: none)")
     qwen_group.add_argument("--qwen-context", type=str, default="",
                            help="Context string to help improve transcription accuracy (e.g., speaker names, domain terminology)")
+    qwen_group.add_argument("--qwen-context-file", type=str, default=None,
+                           help="Path to text file with glossary/context terms for contextual biasing (e.g., performer names, domain vocabulary)")
     qwen_group.add_argument("--qwen-attn", type=str, default="auto",
                            choices=["auto", "sdpa", "flash_attention_2", "eager"],
                            help="Attention implementation: 'auto' (detect flash-attn), 'sdpa', 'flash_attention_2', 'eager' (default: auto)")
@@ -767,34 +773,37 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             subs_language=args.subs_language,
         )
     elif args.mode == "qwen":
-        # Qwen3-ASR pipeline using TransformersPipeline with qwen backend
-        from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
-        pipeline = TransformersPipeline(
+        # Dedicated Qwen3-ASR pipeline (ADR-004)
+        from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+        pipeline = QwenPipeline(
             output_dir=args.output_dir,
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp,
             save_metadata_json=getattr(args, 'debug', False),
             progress_display=progress,
             subs_language=args.subs_language,
-            # Qwen-specific parameters
-            asr_backend="qwen",
-            qwen_model_id=getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
-            qwen_device=getattr(args, 'qwen_device', 'auto'),
-            qwen_dtype=getattr(args, 'qwen_dtype', 'auto'),
-            qwen_batch_size=getattr(args, 'qwen_batch_size', 1),  # batch_size=1 for accuracy
-            qwen_max_tokens=getattr(args, 'qwen_max_tokens', 4096),
-            qwen_language=getattr(args, 'qwen_language', None),
-            qwen_timestamps=getattr(args, 'qwen_timestamps', 'word'),
-            qwen_aligner=getattr(args, 'qwen_aligner', 'Qwen/Qwen3-ForcedAligner-0.6B'),
-            qwen_scene=getattr(args, 'qwen_scene', 'none'),
-            qwen_context=getattr(args, 'qwen_context', ''),
-            qwen_attn=getattr(args, 'qwen_attn', 'auto'),
-            qwen_enhancer=getattr(args, 'qwen_enhancer', 'none'),
-            qwen_enhancer_model=getattr(args, 'qwen_enhancer_model', None),
-            qwen_segmenter=getattr(args, 'qwen_segmenter', 'none'),
-            # Japanese post-processing (v1.8.4+)
-            qwen_japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', True),
-            qwen_postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),
+            # Scene detection
+            scene_detector=getattr(args, 'qwen_scene', 'none'),
+            # Speech enhancement
+            speech_enhancer=getattr(args, 'qwen_enhancer', 'none'),
+            speech_enhancer_model=getattr(args, 'qwen_enhancer_model', None),
+            # Speech segmentation / VAD
+            speech_segmenter=getattr(args, 'qwen_segmenter', 'none'),
+            # Qwen ASR
+            model_id=getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
+            device=getattr(args, 'qwen_device', 'auto'),
+            dtype=getattr(args, 'qwen_dtype', 'auto'),
+            batch_size=getattr(args, 'qwen_batch_size', 1),
+            max_new_tokens=getattr(args, 'qwen_max_tokens', 4096),
+            language=getattr(args, 'qwen_language', None),
+            timestamps=getattr(args, 'qwen_timestamps', 'word'),
+            aligner_id=getattr(args, 'qwen_aligner', 'Qwen/Qwen3-ForcedAligner-0.6B'),
+            context=getattr(args, 'qwen_context', ''),
+            context_file=getattr(args, 'qwen_context_file', None),
+            attn_implementation=getattr(args, 'qwen_attn', 'auto'),
+            # Japanese post-processing
+            japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', True),
+            postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),
         )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
@@ -1437,6 +1446,23 @@ def main():
                     logger.error(f"Invalid JSON in --pass2-hf-params: {e}")
                     sys.exit(1)
 
+            # Parse Qwen3-ASR params (for pipeline=qwen)
+            pass1_qwen_params = None
+            if getattr(args, 'pass1_qwen_params', None):
+                try:
+                    pass1_qwen_params = json.loads(args.pass1_qwen_params)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass1-qwen-params: {e}")
+                    sys.exit(1)
+
+            pass2_qwen_params = None
+            if getattr(args, 'pass2_qwen_params', None):
+                try:
+                    pass2_qwen_params = json.loads(args.pass2_qwen_params)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --pass2-qwen-params: {e}")
+                    sys.exit(1)
+
             # Build pass configurations
             # Full Configuration Snapshot approach:
             # - If params provided: use as full config (customized)
@@ -1451,6 +1477,7 @@ def main():
                 'model': args.pass1_model,
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params,  # For transformers pipeline
+                'qwen_params': pass1_qwen_params,  # For qwen pipeline
                 'language': language_code,  # Source language code (e.g., 'en', 'ja')
                 'device': args.device,  # Hardware override (None = auto-detect)
                 'compute_type': args.compute_type,  # Compute type override (None = auto)
@@ -1467,6 +1494,7 @@ def main():
                     'model': args.pass2_model,
                     'params': pass2_params,
                     'hf_params': pass2_hf_params,  # For transformers pipeline
+                    'qwen_params': pass2_qwen_params,  # For qwen pipeline
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)
