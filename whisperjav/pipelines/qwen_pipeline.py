@@ -24,6 +24,7 @@ import os
 import shutil
 import time
 from datetime import timedelta
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -46,6 +47,34 @@ from whisperjav.modules.speech_enhancement import (
 #   - QwenASR (from whisperjav.modules.qwen_asr)
 #   - SpeechSegmenterFactory (from whisperjav.modules.speech_segmentation)
 #   - torch (for CUDA cleanup)
+
+
+class TimestampMode(Enum):
+    """
+    Controls how subtitle timestamps are resolved when VAD is active.
+
+    Bridges Phase 4 (Speech Segmentation) and Phase 5 (ASR) — each VAD group
+    has known time boundaries from the speech segmenter, and the ASR may also
+    produce word-level timestamps via the ForcedAligner. This mode controls
+    which source is used and how they interact.
+
+    Modes:
+        ALIGNER_WITH_VAD_FALLBACK:
+            Primary: aligner word timestamps → granular sentencing.
+            Fallback: VAD group boundaries for segments where aligner returned null.
+            This is the default and recommended mode.
+
+        ALIGNER_ONLY:
+            Aligner timestamps only. Segments with null timestamps keep zeros.
+            Use if you want to diagnose aligner failures without masking.
+
+        VAD_ONLY:
+            VAD group boundaries only. Aligner timestamps are discarded.
+            Use if the aligner is unreliable for a particular audio type.
+    """
+    ALIGNER_WITH_VAD_FALLBACK = "aligner_vad_fallback"
+    ALIGNER_ONLY = "aligner_only"
+    VAD_ONLY = "vad_only"
 
 
 class QwenPipeline(BasePipeline):
@@ -87,6 +116,9 @@ class QwenPipeline(BasePipeline):
         context_file: Optional[str] = None,
         attn_implementation: str = "auto",
 
+        # Timestamp resolution (bridges Phase 4 VAD and Phase 5 ASR)
+        timestamp_mode: str = "aligner_vad_fallback",
+
         # Japanese post-processing (inside Phase 5)
         japanese_postprocess: bool = True,
         postprocess_preset: str = "high_moan",
@@ -116,6 +148,16 @@ class QwenPipeline(BasePipeline):
 
         # Speech segmentation config
         self.segmenter_backend = speech_segmenter
+
+        # Timestamp resolution mode
+        try:
+            self.timestamp_mode = TimestampMode(timestamp_mode)
+        except ValueError:
+            logger.warning(
+                "Unknown timestamp_mode '%s', defaulting to 'aligner_vad_fallback'",
+                timestamp_mode,
+            )
+            self.timestamp_mode = TimestampMode.ALIGNER_WITH_VAD_FALLBACK
 
         # Cross-scene context propagation (disabled for MVP; structure retained
         # for future enablement once quality gates are in place)
@@ -149,8 +191,8 @@ class QwenPipeline(BasePipeline):
         self.postprocessor = SRTPostProcessor(language=self.lang_code)
 
         logger.debug(
-            "[QwenPipeline PID %s] Initialized (model=%s, scene=%s, enhancer=%s, segmenter=%s)",
-            os.getpid(), model_id, scene_detector, speech_enhancer, speech_segmenter,
+            "[QwenPipeline PID %s] Initialized (model=%s, scene=%s, enhancer=%s, segmenter=%s, timestamps=%s)",
+            os.getpid(), model_id, scene_detector, speech_enhancer, speech_segmenter, self.timestamp_mode.value,
         )
 
     def get_mode_name(self) -> str:
@@ -318,7 +360,7 @@ class QwenPipeline(BasePipeline):
                         seg_result.speech_coverage_ratio * 100,
                     )
                 except Exception as e:
-                    logger.warning(f"Phase 4: Scene {idx + 1} segmentation failed: {e}, skipping VAD filter")
+                    logger.warning(f"Phase 4: Scene {idx + 1} segmentation failed: {e}, will transcribe full scene")
 
             segmenter.cleanup()
             del segmenter
@@ -340,6 +382,10 @@ class QwenPipeline(BasePipeline):
 
         from whisperjav.modules.qwen_asr import QwenASR
         asr = QwenASR(**self._asr_config)
+
+        # Debug artifacts directory (master text, timestamps, merged words)
+        raw_subs_dir = self.temp_dir / "raw_subs"
+        raw_subs_dir.mkdir(exist_ok=True)
 
         # Context biasing: user context applies to first scene only (MVP).
         # Cross-scene propagation is gated by self.cross_scene_context flag.
@@ -369,21 +415,29 @@ class QwenPipeline(BasePipeline):
                     # MVP: user context for first scene only, no context for rest
                     scene_context = user_context if idx == 0 else ""
 
-                # Transcribe with per-scene context
-                result = asr.transcribe(
-                    scene_path,
-                    context=scene_context if scene_context else None,
-                )
+                # Transcribe: per-speech-region (VAD active) or full scene
+                if idx in speech_regions_per_scene:
+                    # Pre-ASR segmentation: transcribe each speech region
+                    # individually, following WhisperProASR pattern
+                    result = self._transcribe_speech_regions(
+                        scene_path, speech_regions_per_scene[idx],
+                        asr=asr,
+                        context=scene_context if scene_context else None,
+                        artifacts_dir=raw_subs_dir,
+                    )
+                else:
+                    # No VAD: transcribe full scene audio
+                    result = asr.transcribe(
+                        scene_path,
+                        context=scene_context if scene_context else None,
+                        artifacts_dir=raw_subs_dir,
+                    )
 
-                # Post-ASR VAD filter: remove segments outside speech regions
-                if idx in speech_regions_per_scene and result.segments:
-                    result = self._apply_vad_filter(result, speech_regions_per_scene[idx])
-
-                segment_count = len(result.segments) if result.segments else 0
+                segment_count = len(result.segments) if result and result.segments else 0
                 scene_results.append((result, idx))
 
                 # Extract tail for cross-scene context propagation (when enabled)
-                if self.cross_scene_context and result.segments:
+                if self.cross_scene_context and result and result.segments:
                     tail_segments = result.segments[-2:] if len(result.segments) >= 2 else result.segments
                     previous_tail = " ".join(seg.text.strip() for seg in tail_segments if seg.text.strip())
                 # If 0 segments (silence/music), previous_tail carries forward
@@ -536,7 +590,239 @@ class QwenPipeline(BasePipeline):
         return master_metadata
 
     # ------------------------------------------------------------------
-    # Post-ASR VAD filter
+    # Pre-ASR speech region transcription (WhisperProASR pattern)
+    # ------------------------------------------------------------------
+
+    def _transcribe_speech_regions(
+        self,
+        scene_path: Path,
+        seg_result,
+        asr,
+        context: Optional[str] = None,
+        artifacts_dir: Optional[Path] = None,
+    ) -> Optional[stable_whisper.WhisperResult]:
+        """
+        Transcribe individual speech regions from a scene.
+
+        Follows the WhisperProASR pattern: for each VAD group, slice the scene
+        audio to extract only the speech portion, transcribe that clip, and
+        offset timestamps back to scene-relative time.
+
+        This is the correct pipeline flow:
+            scene audio → VAD groups → per-group transcription → offset → combine
+
+        Args:
+            scene_path: Path to scene WAV (16kHz mono, from Phase 3)
+            seg_result: SegmentationResult from Phase 4
+            asr: QwenASR instance
+            context: Optional context string for ASR
+            artifacts_dir: Optional dir for debug artifacts
+
+        Returns:
+            Combined WhisperResult with all speech regions, or None if empty.
+        """
+        import soundfile as sf
+        import numpy as np
+
+        # Read scene audio once
+        audio_data, sr = sf.read(str(scene_path))
+        if audio_data.ndim > 1:
+            audio_data = np.mean(audio_data, axis=1)
+
+        speech_regions_dir = self.temp_dir / "speech_regions"
+        speech_regions_dir.mkdir(exist_ok=True)
+
+        combined_result = None
+        total_groups = len(seg_result.groups)
+        total_fallback_applied = 0
+
+        for group_idx, group in enumerate(seg_result.groups):
+            if not group:
+                continue
+
+            # Group time range (same pattern as WhisperProASR._transcribe_vad_group)
+            group_start_sec = group[0].start_sec
+            group_end_sec = group[-1].end_sec
+
+            # Skip very short groups
+            group_duration = group_end_sec - group_start_sec
+            if group_duration < 0.1:
+                logger.debug(
+                    "Phase 5: Skipping speech region %d/%d (%.3fs < 0.1s)",
+                    group_idx + 1, total_groups, group_duration,
+                )
+                continue
+
+            # Slice audio for this speech group
+            start_sample = int(group_start_sec * sr)
+            end_sample = int(group_end_sec * sr)
+            group_audio = audio_data[start_sample:end_sample]
+
+            # Write to temp WAV (QwenASR requires file paths)
+            region_stem = f"{scene_path.stem}_region_{group_idx:04d}"
+            region_path = speech_regions_dir / f"{region_stem}.wav"
+            sf.write(str(region_path), group_audio, sr)
+
+            logger.debug(
+                "Phase 5: Transcribing speech region %d/%d [%.2f-%.2fs] (%.1fs)",
+                group_idx + 1, total_groups,
+                group_start_sec, group_end_sec, group_duration,
+            )
+
+            # Transcribe the speech region
+            try:
+                result = asr.transcribe(
+                    region_path,
+                    context=context,
+                    artifacts_dir=artifacts_dir,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Phase 5: Speech region %d/%d transcription failed: %s",
+                    group_idx + 1, total_groups, e,
+                )
+                continue
+
+            if result is None or not result.segments:
+                continue
+
+            # ── Timestamp resolution ──────────────────────────────────
+            # Apply configured timestamp mode BEFORE offsetting to
+            # scene-relative time.  At this point, timestamps are
+            # region-relative (0-based, within the sliced audio clip).
+            if self.timestamp_mode == TimestampMode.VAD_ONLY:
+                # Discard aligner timestamps; use VAD group boundaries
+                self._apply_vad_only_timestamps(result, group_duration)
+            elif self.timestamp_mode == TimestampMode.ALIGNER_WITH_VAD_FALLBACK:
+                # Fall back to VAD boundaries for zero-timestamp segments
+                fb = self._apply_vad_timestamp_fallback(result, group_duration)
+                if fb:
+                    total_fallback_applied += fb
+                    logger.info(
+                        "Phase 5: VAD timestamp fallback applied to %d/%d segments "
+                        "in speech region %d/%d [%.2f-%.2fs]",
+                        fb, len(result.segments),
+                        group_idx + 1, total_groups,
+                        group_start_sec, group_end_sec,
+                    )
+            # ALIGNER_ONLY: use aligner timestamps as-is (no fallback)
+
+            # Offset timestamps by group start (WhisperProASR pattern:
+            # start_value = seg.start + start_sec)
+            self._offset_result_timestamps(result, group_start_sec)
+
+            # Combine: first result becomes the container
+            if combined_result is None:
+                combined_result = result
+            else:
+                combined_result.segments.extend(result.segments)
+
+        if combined_result and combined_result.segments:
+            logger.debug(
+                "Phase 5: Combined %d segments from %d speech groups",
+                len(combined_result.segments), total_groups,
+            )
+            if total_fallback_applied:
+                logger.info(
+                    "Phase 5: VAD timestamp fallback applied to %d/%d total segments (mode=%s)",
+                    total_fallback_applied, len(combined_result.segments),
+                    self.timestamp_mode.value,
+                )
+
+        return combined_result
+
+    @staticmethod
+    def _offset_result_timestamps(
+        result: stable_whisper.WhisperResult, offset_sec: float,
+    ):
+        """
+        Offset all timestamps in a WhisperResult by offset_sec.
+
+        Same principle as WhisperProASR._process_segments() adding start_sec
+        to each segment's start/end values.
+        """
+        for seg in result.segments:
+            seg.start += offset_sec
+            seg.end += offset_sec
+            if hasattr(seg, 'words') and seg.words:
+                for word in seg.words:
+                    word.start += offset_sec
+                    word.end += offset_sec
+
+    # ------------------------------------------------------------------
+    # Timestamp resolution helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _apply_vad_timestamp_fallback(
+        result: stable_whisper.WhisperResult,
+        group_duration: float,
+    ) -> int:
+        """
+        Apply VAD timestamp fallback for segments where the aligner returned null.
+
+        When the ForcedAligner fails to assign timestamps, words get start=0.0
+        and end=0.0 (from merge_master_with_timestamps). After stable-ts
+        regrouping, these become segments with start=0.0 and end=0.0.
+
+        This method detects such segments and assigns the VAD group's duration
+        as a coarse but correct timestamp.  The text is real (ASR produced it),
+        and the timing is approximate (speech occurred within the VAD window).
+
+        Timestamps at this point are region-relative (0-based).  The caller
+        applies _offset_result_timestamps() afterward to shift to scene time.
+
+        Detection heuristic: seg.end <= 0.0 indicates aligner failure.
+        A legitimate segment at the start of a clip will have end > 0.0
+        (non-zero duration).
+
+        Args:
+            result: WhisperResult with region-relative timestamps
+            group_duration: Duration of the VAD group in seconds
+
+        Returns:
+            Number of segments that received fallback timestamps
+        """
+        if not result or not result.segments:
+            return 0
+
+        fallback_count = 0
+        for seg in result.segments:
+            if seg.end <= 0.0:
+                seg.start = 0.0
+                seg.end = group_duration
+                fallback_count += 1
+
+        return fallback_count
+
+    @staticmethod
+    def _apply_vad_only_timestamps(
+        result: stable_whisper.WhisperResult,
+        group_duration: float,
+    ) -> None:
+        """
+        Force VAD group timestamps on all segments, discarding aligner timestamps.
+
+        Used in VAD_ONLY mode where aligner timestamps are intentionally ignored
+        in favour of the speech segmenter's time boundaries.
+
+        All segments receive the full group time range (0 → group_duration).
+        After _offset_result_timestamps, this becomes group_start → group_end.
+
+        Args:
+            result: WhisperResult with region-relative timestamps
+            group_duration: Duration of the VAD group in seconds
+        """
+        if not result or not result.segments:
+            return
+
+        for seg in result.segments:
+            seg.start = 0.0
+            seg.end = group_duration
+
+    # ------------------------------------------------------------------
+    # Post-ASR VAD filter (DEPRECATED — replaced by pre-ASR segmentation
+    # above; retained for reference only, no longer called)
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -547,6 +833,9 @@ class QwenPipeline(BasePipeline):
     ) -> stable_whisper.WhisperResult:
         """
         Filter ASR segments by overlap with VAD speech regions.
+
+        DEPRECATED: Replaced by _transcribe_speech_regions() which does
+        pre-ASR segmentation (the correct pipeline flow).
 
         Keeps only ASR segments that overlap sufficiently with detected speech.
         Same pattern as TransformersPipeline.

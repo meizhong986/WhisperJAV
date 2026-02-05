@@ -522,9 +522,13 @@ class QwenASR:
             if attn_impl and attn_impl != "sdpa":
                 model_kwargs["attn_implementation"] = attn_impl
 
-            # Add aligner if enabled
+            # Add aligner if enabled (with matching device/dtype per official docs)
             if self.use_aligner:
                 model_kwargs["forced_aligner"] = self.aligner_id
+                model_kwargs["forced_aligner_kwargs"] = {
+                    "dtype": self._dtype,
+                    "device_map": self._device,
+                }
 
             logger.debug(
                 "[QwenASR PID %s] Calling Qwen3ASRModel.from_pretrained(%s)...",
