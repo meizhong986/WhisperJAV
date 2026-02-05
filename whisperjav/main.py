@@ -472,6 +472,20 @@ def parse_arguments():
                            choices=["default", "high_moan", "narrative"],
                            help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
 
+    # Context-Aware Chunking (v1.8.7+)
+    qwen_group.add_argument("--qwen-input-mode", type=str, default="context_aware",
+                           choices=["context_aware", "vad_slicing"],
+                           help="Audio input strategy: 'context_aware' (new default, feeds ~180s scenes for LALM context) or 'vad_slicing' (legacy, chops into tiny VAD fragments)")
+    qwen_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
+                           action="store_true", default=True,
+                           help="Enforce 150-210s scene boundaries for ForcedAligner 300s limit (default: enabled)")
+    qwen_group.add_argument("--no-qwen-safe-chunking", dest="qwen_safe_chunking",
+                           action="store_false",
+                           help="Disable safe chunking, allow longer scenes")
+    qwen_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_interpolation",
+                           choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
+                           help="Timestamp resolution: 'aligner_interpolation' (new default, smooth interpolation), 'aligner_vad_fallback' (snap to VAD), 'aligner_only' (no fallback), 'vad_only' (discard aligner)")
+
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
     return parser.parse_args()
@@ -782,6 +796,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             save_metadata_json=getattr(args, 'debug', False),
             progress_display=progress,
             subs_language=args.subs_language,
+            # Context-Aware Chunking (v1.8.7+)
+            qwen_input_mode=getattr(args, 'qwen_input_mode', 'context_aware'),
+            qwen_safe_chunking=getattr(args, 'qwen_safe_chunking', True),
             # Scene detection
             scene_detector=getattr(args, 'qwen_scene', 'none'),
             # Speech enhancement
@@ -801,6 +818,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             context=getattr(args, 'qwen_context', ''),
             context_file=getattr(args, 'qwen_context_file', None),
             attn_implementation=getattr(args, 'qwen_attn', 'auto'),
+            # Timestamp resolution
+            timestamp_mode=getattr(args, 'qwen_timestamp_mode', 'aligner_interpolation'),
             # Japanese post-processing
             japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', True),
             postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),

@@ -49,6 +49,29 @@ from whisperjav.modules.speech_enhancement import (
 #   - torch (for CUDA cleanup)
 
 
+class InputMode(Enum):
+    """
+    Controls how audio is chunked before being passed to the ASR.
+
+    The Qwen3-ASR model is a Large Audio-Language Model (LALM) designed for
+    long-form transcription. Tiny fragments strip context, causing hallucinations
+    which then cause the ForcedAligner to fail.
+
+    Modes:
+        CONTEXT_AWARE (New Default):
+            Feeds full scenes (~180s chunks) directly to ASR.
+            Respects the model's need for context while staying within the
+            ForcedAligner's 300s architectural limit.
+
+        VAD_SLICING (Legacy):
+            Chops audio into tiny VAD segments (often <5s).
+            Destroys LALM context but useful for regression testing or
+            when VAD-based filtering is specifically needed.
+    """
+    CONTEXT_AWARE = "context_aware"
+    VAD_SLICING = "vad_slicing"
+
+
 class TimestampMode(Enum):
     """
     Controls how subtitle timestamps are resolved when VAD is active.
@@ -59,10 +82,16 @@ class TimestampMode(Enum):
     which source is used and how they interact.
 
     Modes:
-        ALIGNER_WITH_VAD_FALLBACK:
+        ALIGNER_WITH_INTERPOLATION (New Default):
+            Primary: aligner word timestamps → granular sentencing.
+            For NULL timestamps: mathematically interpolate based on character
+            length between valid anchor timestamps. Creates smooth, readable
+            subtitles instead of snapping to VAD boundaries.
+
+        ALIGNER_WITH_VAD_FALLBACK (Legacy):
             Primary: aligner word timestamps → granular sentencing.
             Fallback: VAD group boundaries for segments where aligner returned null.
-            This is the default and recommended mode.
+            Subtitles snap to coarse VAD boundaries when aligner fails.
 
         ALIGNER_ONLY:
             Aligner timestamps only. Segments with null timestamps keep zeros.
@@ -72,6 +101,7 @@ class TimestampMode(Enum):
             VAD group boundaries only. Aligner timestamps are discarded.
             Use if the aligner is unreliable for a particular audio type.
     """
+    ALIGNER_WITH_INTERPOLATION = "aligner_interpolation"
     ALIGNER_WITH_VAD_FALLBACK = "aligner_vad_fallback"
     ALIGNER_ONLY = "aligner_only"
     VAD_ONLY = "vad_only"
@@ -92,6 +122,11 @@ class QwenPipeline(BasePipeline):
         temp_dir: str = "./temp",
         keep_temp_files: bool = False,
         progress_display=None,
+
+        # === Context-Aware Chunking Configuration (v1.8.7+) ===
+        # Controls audio input strategy for Qwen3-ASR (LALM)
+        qwen_input_mode: str = "context_aware",  # "context_aware" or "vad_slicing"
+        qwen_safe_chunking: bool = True,  # Enforce 150-210s scene boundaries
 
         # Scene detection (Phase 2)
         scene_detector: str = "none",
@@ -117,7 +152,7 @@ class QwenPipeline(BasePipeline):
         attn_implementation: str = "auto",
 
         # Timestamp resolution (bridges Phase 4 VAD and Phase 5 ASR)
-        timestamp_mode: str = "aligner_vad_fallback",
+        timestamp_mode: str = "aligner_interpolation",  # New default for context-aware
 
         # Japanese post-processing (inside Phase 5)
         japanese_postprocess: bool = True,
@@ -139,6 +174,22 @@ class QwenPipeline(BasePipeline):
         # Progress display
         self.progress_display = progress_display
 
+        # === Context-Aware Chunking Configuration ===
+        # Input mode: controls whether to feed full scenes (context_aware) or
+        # tiny VAD fragments (vad_slicing) to the ASR
+        try:
+            self.input_mode = InputMode(qwen_input_mode)
+        except ValueError:
+            logger.warning(
+                "Unknown qwen_input_mode '%s', defaulting to 'context_aware'",
+                qwen_input_mode,
+            )
+            self.input_mode = InputMode.CONTEXT_AWARE
+
+        # Safe chunking: when True, enforces 150-210s scene boundaries to stay
+        # within ForcedAligner's 300s architectural limit
+        self.safe_chunking = qwen_safe_chunking
+
         # Scene detection config
         self.scene_method = scene_detector
 
@@ -154,10 +205,10 @@ class QwenPipeline(BasePipeline):
             self.timestamp_mode = TimestampMode(timestamp_mode)
         except ValueError:
             logger.warning(
-                "Unknown timestamp_mode '%s', defaulting to 'aligner_vad_fallback'",
+                "Unknown timestamp_mode '%s', defaulting to 'aligner_interpolation'",
                 timestamp_mode,
             )
-            self.timestamp_mode = TimestampMode.ALIGNER_WITH_VAD_FALLBACK
+            self.timestamp_mode = TimestampMode.ALIGNER_WITH_INTERPOLATION
 
         # Cross-scene context propagation (disabled for MVP; structure retained
         # for future enablement once quality gates are in place)
@@ -191,8 +242,10 @@ class QwenPipeline(BasePipeline):
         self.postprocessor = SRTPostProcessor(language=self.lang_code)
 
         logger.debug(
-            "[QwenPipeline PID %s] Initialized (model=%s, scene=%s, enhancer=%s, segmenter=%s, timestamps=%s)",
-            os.getpid(), model_id, scene_detector, speech_enhancer, speech_segmenter, self.timestamp_mode.value,
+            "[QwenPipeline PID %s] Initialized (model=%s, input_mode=%s, safe_chunking=%s, "
+            "scene=%s, enhancer=%s, segmenter=%s, timestamps=%s)",
+            os.getpid(), model_id, self.input_mode.value, self.safe_chunking,
+            scene_detector, speech_enhancer, speech_segmenter, self.timestamp_mode.value,
         )
 
     def get_mode_name(self) -> str:
@@ -276,7 +329,13 @@ class QwenPipeline(BasePipeline):
         # ==============================================================
         # PHASE 2: SCENE DETECTION (optional, default: none)
         # ==============================================================
-        logger.info("[QwenPipeline PID %s] Phase 2: Scene detection (method=%s)", os.getpid(), self.scene_method)
+        # When safe_chunking is enabled, enforce 150-210s scene boundaries
+        # to stay within the ForcedAligner's 300s architectural limit while
+        # providing enough context for the LALM (3 minutes = sweet spot).
+        logger.info(
+            "[QwenPipeline PID %s] Phase 2: Scene detection (method=%s, safe_chunking=%s)",
+            os.getpid(), self.scene_method, self.safe_chunking,
+        )
         phase2_start = time.time()
 
         scenes_dir = self.temp_dir / "scenes"
@@ -288,7 +347,25 @@ class QwenPipeline(BasePipeline):
             logger.info("[QwenPipeline PID %s] Phase 2: Scene detection disabled, using full audio as single scene", os.getpid())
         else:
             from whisperjav.modules.scene_detection import DynamicSceneDetector
-            scene_detector = DynamicSceneDetector(method=self.scene_method)
+
+            # Configure scene detector parameters
+            scene_detector_kwargs = {"method": self.scene_method}
+
+            # === Safe Chunking Override (v1.8.7+) ===
+            # When safe_chunking is True, enforce 150-210s scene boundaries.
+            # This creates ~3-minute blocks that:
+            # - Are long enough for LALM context (accuracy)
+            # - Are safely below the 300s ForcedAligner limit (stability)
+            if self.safe_chunking:
+                scene_detector_kwargs["min_scene_duration"] = 150  # seconds
+                scene_detector_kwargs["max_scene_duration"] = 210  # seconds
+                logger.info(
+                    "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
+                    "(min=150s, max=210s for ForcedAligner 300s limit)",
+                    os.getpid(),
+                )
+
+            scene_detector = DynamicSceneDetector(**scene_detector_kwargs)
             scene_paths = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
             logger.info(
                 "[QwenPipeline PID %s] Phase 2: Detected %d scenes (method=%s)",
@@ -415,10 +492,42 @@ class QwenPipeline(BasePipeline):
                     # MVP: user context for first scene only, no context for rest
                     scene_context = user_context if idx == 0 else ""
 
-                # Transcribe: per-speech-region (VAD active) or full scene
-                if idx in speech_regions_per_scene:
-                    # Pre-ASR segmentation: transcribe each speech region
-                    # individually, following WhisperProASR pattern
+                # === Input Mode Branching (v1.8.7+) ===
+                # CONTEXT_AWARE: Feed full scene (~180s) to ASR for LALM context
+                # VAD_SLICING:   Chop into tiny VAD fragments (legacy behavior)
+                if self.input_mode == InputMode.CONTEXT_AWARE:
+                    # --- NEW DEFAULT: Context-Aware Transcription ---
+                    # Feed the FULL scene file (approx 180s from Phase 2) directly
+                    # to the ASR. This gives Qwen3 the 3-minute context it needs
+                    # as a Large Audio-Language Model.
+                    logger.debug(
+                        "Phase 5: Scene %d — CONTEXT_AWARE mode, transcribing full scene (%.1fs)",
+                        scene_num, dur_sec,
+                    )
+                    result = asr.transcribe(
+                        scene_path,
+                        context=scene_context if scene_context else None,
+                        artifacts_dir=raw_subs_dir,
+                    )
+
+                    # Apply timestamp interpolation if configured
+                    if result and result.segments:
+                        if self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
+                            interp_count = self._apply_timestamp_interpolation(result)
+                            if interp_count:
+                                logger.debug(
+                                    "Phase 5: Scene %d — interpolated timestamps for %d segments",
+                                    scene_num, interp_count,
+                                )
+
+                elif self.input_mode == InputMode.VAD_SLICING and idx in speech_regions_per_scene:
+                    # --- LEGACY: VAD Slicing Transcription ---
+                    # Chops audio into tiny VAD segments. Destroys LALM context
+                    # but useful for regression testing or specific VAD use cases.
+                    logger.debug(
+                        "Phase 5: Scene %d — VAD_SLICING mode, transcribing %d speech regions",
+                        scene_num, len(speech_regions_per_scene[idx].groups),
+                    )
                     result = self._transcribe_speech_regions(
                         scene_path, speech_regions_per_scene[idx],
                         asr=asr,
@@ -426,7 +535,11 @@ class QwenPipeline(BasePipeline):
                         artifacts_dir=raw_subs_dir,
                     )
                 else:
-                    # No VAD: transcribe full scene audio
+                    # No VAD data or VAD_SLICING without VAD: transcribe full scene
+                    logger.debug(
+                        "Phase 5: Scene %d — no VAD data, transcribing full scene (%.1fs)",
+                        scene_num, dur_sec,
+                    )
                     result = asr.transcribe(
                         scene_path,
                         context=scene_context if scene_context else None,
@@ -464,6 +577,9 @@ class QwenPipeline(BasePipeline):
 
         master_metadata["stages"]["asr"] = {
             "model_id": self.model_id,
+            "input_mode": self.input_mode.value,
+            "timestamp_mode": self.timestamp_mode.value,
+            "safe_chunking": self.safe_chunking,
             "scenes_transcribed": sum(1 for r, _ in scene_results if r is not None and r.segments),
             "scenes_empty": sum(1 for r, _ in scene_results if r is not None and not r.segments),
             "scenes_failed": sum(1 for r, _ in scene_results if r is None),
@@ -693,6 +809,18 @@ class QwenPipeline(BasePipeline):
             if self.timestamp_mode == TimestampMode.VAD_ONLY:
                 # Discard aligner timestamps; use VAD group boundaries
                 self._apply_vad_only_timestamps(result, group_duration)
+            elif self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
+                # Interpolate timestamps proportionally by character length
+                interp = self._apply_timestamp_interpolation(result)
+                if interp:
+                    total_fallback_applied += interp
+                    logger.debug(
+                        "Phase 5: Interpolated timestamps for %d/%d segments "
+                        "in speech region %d/%d [%.2f-%.2fs]",
+                        interp, len(result.segments),
+                        group_idx + 1, total_groups,
+                        group_start_sec, group_end_sec,
+                    )
             elif self.timestamp_mode == TimestampMode.ALIGNER_WITH_VAD_FALLBACK:
                 # Fall back to VAD boundaries for zero-timestamp segments
                 fb = self._apply_vad_timestamp_fallback(result, group_duration)
@@ -819,6 +947,123 @@ class QwenPipeline(BasePipeline):
         for seg in result.segments:
             seg.start = 0.0
             seg.end = group_duration
+
+    @staticmethod
+    def _apply_timestamp_interpolation(
+        result: stable_whisper.WhisperResult,
+    ) -> int:
+        """
+        Interpolate timestamps for segments where the aligner returned NULL.
+
+        This is the new default for CONTEXT_AWARE mode (v1.8.7+). Instead of
+        snapping to coarse VAD boundaries, we mathematically fill gaps based
+        on character length between valid anchor timestamps.
+
+        Algorithm:
+            1. Identify "anchor" segments with valid timestamps (end > 0)
+            2. Identify "gap" segments between anchors with NULL timestamps (end <= 0)
+            3. For each gap:
+               - GapDuration = Start(NextAnchor) - End(PrevAnchor)
+               - TotalChars = sum of character lengths in gap segments
+               - Assign duration proportional to character length
+
+        Edge cases:
+            - Leading NULLs (no previous anchor): Use 0.0 as start
+            - Trailing NULLs (no next anchor): Use last anchor's end as start,
+              estimate duration from character count
+            - All NULLs (total aligner failure): Distribute across full result
+
+        Args:
+            result: WhisperResult with segments to process
+
+        Returns:
+            Number of segments that received interpolated timestamps
+        """
+        if not result or not result.segments:
+            return 0
+
+        segments = result.segments
+        n = len(segments)
+        interpolated_count = 0
+
+        # Find all anchor indices (segments with valid timestamps)
+        anchors = []
+        for i, seg in enumerate(segments):
+            if seg.end > 0:
+                anchors.append(i)
+
+        # If no anchors at all, we can't interpolate - mark all as needing attention
+        if not anchors:
+            logger.debug("No anchor timestamps found, cannot interpolate")
+            return 0
+
+        # Process gaps between anchors
+        # Also handle leading gap (before first anchor) and trailing gap (after last anchor)
+
+        def interpolate_gap(gap_indices: List[int], start_time: float, end_time: float):
+            """Distribute time proportionally by character count."""
+            nonlocal interpolated_count
+
+            if not gap_indices:
+                return
+
+            # Calculate total characters in gap
+            total_chars = sum(len(segments[i].text.strip()) for i in gap_indices)
+            if total_chars == 0:
+                total_chars = len(gap_indices)  # Fallback: equal distribution
+
+            gap_duration = end_time - start_time
+            if gap_duration <= 0:
+                gap_duration = 0.5 * len(gap_indices)  # Fallback: 0.5s per segment
+
+            current_time = start_time
+            for idx in gap_indices:
+                seg = segments[idx]
+                seg_chars = len(seg.text.strip()) or 1
+                seg_duration = gap_duration * (seg_chars / total_chars)
+
+                seg.start = current_time
+                seg.end = current_time + seg_duration
+                current_time = seg.end
+                interpolated_count += 1
+
+        # Handle leading gap (segments before first anchor)
+        if anchors[0] > 0:
+            leading_indices = list(range(0, anchors[0]))
+            leading_end = segments[anchors[0]].start
+            interpolate_gap(leading_indices, 0.0, leading_end)
+
+        # Handle gaps between anchors
+        for i in range(len(anchors) - 1):
+            prev_anchor_idx = anchors[i]
+            next_anchor_idx = anchors[i + 1]
+
+            # Find gap indices between these anchors
+            gap_indices = []
+            for j in range(prev_anchor_idx + 1, next_anchor_idx):
+                if segments[j].end <= 0:
+                    gap_indices.append(j)
+
+            if gap_indices:
+                gap_start = segments[prev_anchor_idx].end
+                gap_end = segments[next_anchor_idx].start
+                interpolate_gap(gap_indices, gap_start, gap_end)
+
+        # Handle trailing gap (segments after last anchor)
+        if anchors[-1] < n - 1:
+            trailing_indices = []
+            for j in range(anchors[-1] + 1, n):
+                if segments[j].end <= 0:
+                    trailing_indices.append(j)
+
+            if trailing_indices:
+                trailing_start = segments[anchors[-1]].end
+                # Estimate trailing duration: 0.5s per character (conservative)
+                total_trailing_chars = sum(len(segments[i].text.strip()) for i in trailing_indices)
+                estimated_duration = max(0.5, total_trailing_chars * 0.05)  # ~50ms per char
+                interpolate_gap(trailing_indices, trailing_start, trailing_start + estimated_duration)
+
+        return interpolated_count
 
     # ------------------------------------------------------------------
     # Post-ASR VAD filter (DEPRECATED — replaced by pre-ASR segmentation
