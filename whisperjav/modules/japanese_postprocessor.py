@@ -580,8 +580,15 @@ class JapanesePostProcessor:
             seg_duration = (seg.end - seg.start) if hasattr(seg, 'start') and hasattr(seg, 'end') else 0
             seg_chars = len(seg_text)
 
-            # Check if segment is "tiny" (below EITHER threshold)
-            is_tiny = (seg_duration < min_dur) or (seg_chars < min_chars)
+            # Check if segment is "tiny" (below EITHER threshold).
+            # IMPORTANT: Zero-duration segments are NOT treated as tiny.
+            # A duration of 0.0 means the aligner failed to assign timestamps,
+            # not that the audio is genuinely short.  These segments contain
+            # real speech and will receive VAD fallback timestamps later in
+            # the pipeline.  Only apply the duration check when duration is
+            # positive (i.e. the aligner actually produced timing data).
+            is_tiny_by_duration = (seg_duration > 0 and seg_duration < min_dur)
+            is_tiny = is_tiny_by_duration or (seg_chars < min_chars)
 
             if is_tiny and seg_text:  # Only merge non-empty segments
                 merged = False
