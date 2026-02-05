@@ -503,6 +503,11 @@ class JapanesePostProcessor:
         When hierarchical splitting creates segments that contain ONLY particles
         (よ, ね, わ, etc.) with no substantial content, merge them back.
 
+        IMPLEMENTATION NOTE (v1.8.7+):
+        This method uses a collect-then-merge approach instead of backwards
+        iteration with in-place modification. This avoids the IndexError crash
+        caused by stable_whisper's _merge_segments desynchronizing list indices.
+
         Args:
             result: WhisperResult to modify in-place
         """
@@ -512,13 +517,15 @@ class JapanesePostProcessor:
         # Get set of mergeable particles for fast lookup
         mergeable = set(self.ling.mergeable_isolated_particles)
 
-        # Iterate backwards to safely merge without index issues
-        # We merge segment[i] into segment[i-1] if segment[i] is isolated particle
-        i = len(result.segments) - 1
-        merge_count = 0
+        # === Safe Merge Strategy ===
+        # 1. Collect indices of isolated particles that need merging
+        # 2. Apply merges in reverse order (highest indices first)
 
-        while i > 0:
-            seg = result.segments[i]
+        merge_operations = []  # List of (prev_idx, particle_idx) tuples
+
+        for i, seg in enumerate(result.segments):
+            if i == 0:
+                continue  # First segment has nothing to merge into
 
             # Get segment text, stripped
             seg_text = seg.text.strip() if hasattr(seg, 'text') else ''
@@ -526,15 +533,40 @@ class JapanesePostProcessor:
             # Check if segment is ONLY an isolated particle (or compound particle)
             # Must be short (1-4 chars) and match known particle patterns
             if seg_text and len(seg_text) <= 4 and seg_text in mergeable:
-                # Merge this segment into previous (indices: i-1, i)
-                if self._merge_adjacent_segments(result, i - 1, i):
-                    merge_count += 1
-                    logger.debug(f"  Merged isolated particle '{seg_text}' into previous segment")
-                    # Don't decrement i since we removed an element and need to re-check at same position
-                    # (the segment at i is now what was at i+1)
-                    continue
+                # Check if previous segment isn't already being merged
+                if not merge_operations or merge_operations[-1][1] != i - 1:
+                    merge_operations.append((i - 1, i))
+                    logger.debug(f"  Will merge isolated particle '{seg_text}' into previous segment")
 
-            i -= 1
+        # === Apply Merges in Reverse Order ===
+        merge_count = 0
+        # Sort by second index descending
+        merge_operations.sort(key=lambda x: x[1], reverse=True)
+
+        consumed = set()
+
+        for first_idx, second_idx in merge_operations:
+            if first_idx in consumed or second_idx in consumed:
+                continue
+
+            if first_idx < 0 or second_idx >= len(result.segments):
+                continue
+
+            try:
+                if hasattr(result, '_merge_segments'):
+                    result._merge_segments([first_idx, second_idx])
+                    merge_count += 1
+                    consumed.add(second_idx)
+                else:
+                    seg1 = result.segments[first_idx]
+                    seg2 = result.segments[second_idx]
+                    merged = seg1.add(seg2)
+                    result.segments[first_idx] = merged
+                    result.segments.pop(second_idx)
+                    merge_count += 1
+                    consumed.add(second_idx)
+            except Exception as e:
+                logger.debug(f"  Merge failed at indices ({first_idx}, {second_idx}): {e}")
 
         if merge_count > 0:
             logger.debug(f"  Total isolated particles merged: {merge_count}")
@@ -551,6 +583,12 @@ class JapanesePostProcessor:
         threshold for duration OR character count are merged with adjacent
         segments (prefer merging with previous).
 
+        IMPLEMENTATION NOTE (v1.8.7+):
+        This method uses a forward-iteration buffer approach instead of
+        backwards iteration with in-place modification. This avoids the
+        IndexError crash caused by stable_whisper's _merge_segments
+        desynchronizing list indices.
+
         Args:
             result: WhisperResult to modify in-place
             params: Preset parameters with min_segment_duration and min_segment_chars
@@ -561,20 +599,15 @@ class JapanesePostProcessor:
         min_dur = params.min_segment_duration
         min_chars = params.min_segment_chars
 
-        # Iterate backwards to safely merge
-        i = len(result.segments) - 1
-        merge_count = 0
+        # === Safe Merge Strategy ===
+        # Instead of modifying the list while iterating, we:
+        # 1. Collect merge operations (pairs of indices to merge)
+        # 2. Apply merges in reverse order (highest indices first)
+        # This ensures indices remain valid during the merge phase.
 
-        while i >= 0:
-            # Re-check bounds since we're modifying the list
-            if i >= len(result.segments):
-                i = len(result.segments) - 1
-                continue
-            if i < 0:
-                break
+        merge_operations = []  # List of (first_idx, second_idx) tuples
 
-            seg = result.segments[i]
-
+        for i, seg in enumerate(result.segments):
             # Calculate segment metrics
             seg_text = seg.text.strip() if hasattr(seg, 'text') else ''
             seg_duration = (seg.end - seg.start) if hasattr(seg, 'start') and hasattr(seg, 'end') else 0
@@ -583,37 +616,68 @@ class JapanesePostProcessor:
             # Check if segment is "tiny" (below EITHER threshold).
             # IMPORTANT: Zero-duration segments are NOT treated as tiny.
             # A duration of 0.0 means the aligner failed to assign timestamps,
-            # not that the audio is genuinely short.  These segments contain
+            # not that the audio is genuinely short. These segments contain
             # real speech and will receive VAD fallback timestamps later in
-            # the pipeline.  Only apply the duration check when duration is
+            # the pipeline. Only apply the duration check when duration is
             # positive (i.e. the aligner actually produced timing data).
             is_tiny_by_duration = (seg_duration > 0 and seg_duration < min_dur)
             is_tiny = is_tiny_by_duration or (seg_chars < min_chars)
 
             if is_tiny and seg_text:  # Only merge non-empty segments
-                merged = False
-
                 # Prefer merging with previous segment
                 if i > 0:
-                    # Merge: segment at i-1 + segment at i
-                    if self._merge_adjacent_segments(result, i - 1, i):
-                        merge_count += 1
-                        merged = True
-                        logger.debug(f"  Merged tiny segment '{seg_text[:10]}' (dur={seg_duration:.2f}s, chars={seg_chars}) with prev")
-                        # After merge, the list is shorter. Don't decrement - re-check at same position
+                    # Check if previous segment isn't already being merged
+                    # (avoid double-merge of same segment)
+                    if not merge_operations or merge_operations[-1][1] != i - 1:
+                        merge_operations.append((i - 1, i))
+                        logger.debug(
+                            f"  Will merge tiny segment '{seg_text[:15]}...' "
+                            f"(dur={seg_duration:.2f}s, chars={seg_chars}) with prev"
+                        )
                         continue
 
                 # Fallback: merge with next segment
-                if not merged and i < len(result.segments) - 1:
-                    # Merge: segment at i + segment at i+1
-                    if self._merge_adjacent_segments(result, i, i + 1):
-                        merge_count += 1
-                        merged = True
-                        logger.debug(f"  Merged tiny segment '{seg_text[:10]}' (dur={seg_duration:.2f}s, chars={seg_chars}) with next")
-                        # After merge, segment at i is now the merged result, continue checking
-                        continue
+                if i < len(result.segments) - 1:
+                    merge_operations.append((i, i + 1))
+                    logger.debug(
+                        f"  Will merge tiny segment '{seg_text[:15]}...' "
+                        f"(dur={seg_duration:.2f}s, chars={seg_chars}) with next"
+                    )
 
-            i -= 1
+        # === Apply Merges in Reverse Order ===
+        # Process from highest indices to lowest so earlier indices stay valid
+        merge_count = 0
+        # Sort by second index descending to process from end
+        merge_operations.sort(key=lambda x: x[1], reverse=True)
+
+        # Track which indices have been consumed by merges
+        consumed = set()
+
+        for first_idx, second_idx in merge_operations:
+            # Skip if either segment was already consumed by a previous merge
+            if first_idx in consumed or second_idx in consumed:
+                continue
+
+            # Validate indices are still in bounds
+            if first_idx < 0 or second_idx >= len(result.segments):
+                continue
+
+            try:
+                if hasattr(result, '_merge_segments'):
+                    result._merge_segments([first_idx, second_idx])
+                    merge_count += 1
+                    consumed.add(second_idx)  # second_idx is removed after merge
+                else:
+                    # Fallback: manual merge
+                    seg1 = result.segments[first_idx]
+                    seg2 = result.segments[second_idx]
+                    merged = seg1.add(seg2)
+                    result.segments[first_idx] = merged
+                    result.segments.pop(second_idx)
+                    merge_count += 1
+                    consumed.add(second_idx)
+            except Exception as e:
+                logger.debug(f"  Merge failed at indices ({first_idx}, {second_idx}): {e}")
 
         if merge_count > 0:
             logger.debug(f"  Total tiny fragments merged: {merge_count}")
