@@ -58,16 +58,26 @@ class InputMode(Enum):
     which then cause the ForcedAligner to fail.
 
     Modes:
-        CONTEXT_AWARE (New Default):
-            Feeds full scenes (~180s chunks) directly to ASR.
-            Respects the model's need for context while staying within the
-            ForcedAligner's 300s architectural limit.
+        ASSEMBLY (Decoupled Assembly Line):
+            Separates text generation from forced alignment into distinct
+            VRAM-exclusive phases. Flow:
+                Batch(ASR text-only) → Sanitize → VRAM Swap → Batch(Align)
+            Benefits: higher batch size (ASR-only needs less VRAM), mid-pipeline
+            hallucination removal prevents aligner NULL failures, and creates
+            the architectural socket for future vLLM integration.
+            Scene max duration enforced at 120s (aligner hard limit is 180s).
 
-        VAD_SLICING (Legacy):
-            Chops audio into tiny VAD segments (often <5s).
+        CONTEXT_AWARE:
+            Feeds full scenes (~30-90s chunks) directly to coupled ASR+Aligner.
+            Preserves LALM context. Good quality but limited to batch_size=1
+            because both models are loaded simultaneously.
+
+        VAD_SLICING:
+            Chops audio into VAD segments (up to ~29s groups via TEN).
             Destroys LALM context but useful for regression testing or
             when VAD-based filtering is specifically needed.
     """
+    ASSEMBLY = "assembly"
     CONTEXT_AWARE = "context_aware"
     VAD_SLICING = "vad_slicing"
 
@@ -356,17 +366,30 @@ class QwenPipeline(BasePipeline):
             scene_detector_kwargs = {"method": self.scene_method}
 
             # === Safe Chunking Override (v1.8.7+) ===
-            # When safe_chunking is True, enforce scene boundaries (30-90s).
-            # This creates manageable blocks for semantic scene detection.
+            # When safe_chunking is True, enforce scene boundaries.
+            # Assembly mode uses wider windows (up to 120s) to preserve LALM
+            # context while staying under the ForcedAligner 180s hard limit.
+            # Other modes use tighter windows (30-90s).
             if self.safe_chunking:
-                # Parameter names must match DynamicSceneDetector contract
-                scene_detector_kwargs["min_duration"] = 30  # seconds
-                scene_detector_kwargs["max_duration"] = 90  # seconds
-                logger.info(
-                    "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
-                    "(min=30s, max=90s)",
-                    os.getpid(),
-                )
+                if self.input_mode == InputMode.ASSEMBLY:
+                    # Assembly mode: wider scenes for LALM context, but strictly
+                    # under the aligner's 180s limit (120s gives safe headroom)
+                    scene_detector_kwargs["min_duration"] = 30   # seconds
+                    scene_detector_kwargs["max_duration"] = 120  # seconds
+                    logger.info(
+                        "[QwenPipeline PID %s] Phase 2: Assembly safe chunking "
+                        "(min=30s, max=120s, aligner limit=180s)",
+                        os.getpid(),
+                    )
+                else:
+                    # Context-aware / VAD modes: tighter boundaries
+                    scene_detector_kwargs["min_duration"] = 30  # seconds
+                    scene_detector_kwargs["max_duration"] = 90  # seconds
+                    logger.info(
+                        "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
+                        "(min=30s, max=90s)",
+                        os.getpid(),
+                    )
 
             scene_detector = DynamicSceneDetector(**scene_detector_kwargs)
             scene_paths = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
@@ -460,126 +483,133 @@ class QwenPipeline(BasePipeline):
         # ==============================================================
         # PHASE 5: ASR TRANSCRIPTION (VRAM Block 2)
         # ==============================================================
-        logger.info("[QwenPipeline PID %s] Phase 5: ASR transcription (model=%s)", os.getpid(), self.model_id)
+        logger.info("[QwenPipeline PID %s] Phase 5: ASR transcription (model=%s, mode=%s)",
+                    os.getpid(), self.model_id, self.input_mode.value)
         phase5_start = time.time()
 
         from whisperjav.modules.qwen_asr import QwenASR
-        asr = QwenASR(**self._asr_config)
 
         # Debug artifacts directory (master text, timestamps, merged words)
         raw_subs_dir = self.temp_dir / "raw_subs"
         raw_subs_dir.mkdir(exist_ok=True)
 
-        # Context biasing: user context applies to first scene only (MVP).
-        # Cross-scene propagation is gated by self.cross_scene_context flag.
-        user_context = self._asr_config.get("context", "")
-        previous_tail = ""
-
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
 
-        for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
-            scene_num = idx + 1
-            logger.info(
-                "[QwenPipeline PID %s] Phase 5: Transcribing scene %d/%d (%.1fs)",
-                os.getpid(), scene_num, len(scene_paths), dur_sec,
+        if self.input_mode == InputMode.ASSEMBLY:
+            # ==============================================================
+            # ASSEMBLY MODE: Decoupled Assembly Line (v1.8.8+)
+            # ==============================================================
+            # Batch(ASR text-only) → Sanitize → VRAM Swap → Batch(Align)
+            # → Merge+Reconstruct WhisperResult
+            #
+            # Benefits over coupled modes:
+            #   - Higher batch_size (ASR-only needs ~3.4GB vs ~4.6GB coupled)
+            #   - Mid-pipeline hallucination removal prevents aligner NULLs
+            #   - Creates vLLM integration socket (aligner is PyTorch-only)
+            # ==============================================================
+            scene_results = self._phase5_assembly(
+                scene_paths=scene_paths,
+                raw_subs_dir=raw_subs_dir,
             )
+        else:
+            # ==============================================================
+            # COUPLED MODES: Context-Aware / VAD Slicing
+            # ==============================================================
+            asr = QwenASR(**self._asr_config)
 
-            try:
-                # Assemble per-scene context
-                if self.cross_scene_context:
-                    # Cross-scene propagation: user glossary + previous scene tail
-                    if previous_tail and user_context:
-                        scene_context = f"{user_context}\n{previous_tail}"
-                    elif previous_tail:
-                        scene_context = previous_tail
+            # Context biasing: user context applies to first scene only (MVP).
+            # Cross-scene propagation is gated by self.cross_scene_context flag.
+            user_context = self._asr_config.get("context", "")
+            previous_tail = ""
+
+            for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
+                scene_num = idx + 1
+                logger.info(
+                    "[QwenPipeline PID %s] Phase 5: Transcribing scene %d/%d (%.1fs)",
+                    os.getpid(), scene_num, len(scene_paths), dur_sec,
+                )
+
+                try:
+                    # Assemble per-scene context
+                    if self.cross_scene_context:
+                        if previous_tail and user_context:
+                            scene_context = f"{user_context}\n{previous_tail}"
+                        elif previous_tail:
+                            scene_context = previous_tail
+                        else:
+                            scene_context = user_context
                     else:
-                        scene_context = user_context
-                else:
-                    # MVP: user context for first scene only, no context for rest
-                    scene_context = user_context if idx == 0 else ""
+                        scene_context = user_context if idx == 0 else ""
 
-                # === Input Mode Branching (v1.8.7+) ===
-                # CONTEXT_AWARE: Feed full scene (~180s) to ASR for LALM context
-                # VAD_SLICING:   Chop into tiny VAD fragments (legacy behavior)
-                if self.input_mode == InputMode.CONTEXT_AWARE:
-                    # --- NEW DEFAULT: Context-Aware Transcription ---
-                    # Feed the FULL scene file (approx 180s from Phase 2) directly
-                    # to the ASR. This gives Qwen3 the 3-minute context it needs
-                    # as a Large Audio-Language Model.
-                    logger.debug(
-                        "Phase 5: Scene %d — CONTEXT_AWARE mode, transcribing full scene (%.1fs)",
-                        scene_num, dur_sec,
-                    )
-                    result = asr.transcribe(
-                        scene_path,
-                        context=scene_context if scene_context else None,
-                        artifacts_dir=raw_subs_dir,
-                    )
+                    # === Input Mode Branching ===
+                    if self.input_mode == InputMode.CONTEXT_AWARE:
+                        logger.debug(
+                            "Phase 5: Scene %d — CONTEXT_AWARE mode, transcribing full scene (%.1fs)",
+                            scene_num, dur_sec,
+                        )
+                        result = asr.transcribe(
+                            scene_path,
+                            context=scene_context if scene_context else None,
+                            artifacts_dir=raw_subs_dir,
+                        )
 
-                    # Apply timestamp interpolation if configured
-                    if result and result.segments:
-                        if self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
-                            interp_count = self._apply_timestamp_interpolation(result)
-                            if interp_count:
-                                logger.debug(
-                                    "Phase 5: Scene %d — interpolated timestamps for %d segments",
-                                    scene_num, interp_count,
-                                )
+                        if result and result.segments:
+                            if self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
+                                interp_count = self._apply_timestamp_interpolation(result)
+                                if interp_count:
+                                    logger.debug(
+                                        "Phase 5: Scene %d — interpolated timestamps for %d segments",
+                                        scene_num, interp_count,
+                                    )
 
-                elif self.input_mode == InputMode.VAD_SLICING and idx in speech_regions_per_scene:
-                    # --- LEGACY: VAD Slicing Transcription ---
-                    # Chops audio into tiny VAD segments. Destroys LALM context
-                    # but useful for regression testing or specific VAD use cases.
-                    logger.debug(
-                        "Phase 5: Scene %d — VAD_SLICING mode, transcribing %d speech regions",
-                        scene_num, len(speech_regions_per_scene[idx].groups),
-                    )
-                    result = self._transcribe_speech_regions(
-                        scene_path, speech_regions_per_scene[idx],
-                        asr=asr,
-                        context=scene_context if scene_context else None,
-                        artifacts_dir=raw_subs_dir,
-                    )
-                else:
-                    # No VAD data or VAD_SLICING without VAD: transcribe full scene
-                    logger.debug(
-                        "Phase 5: Scene %d — no VAD data, transcribing full scene (%.1fs)",
-                        scene_num, dur_sec,
-                    )
-                    result = asr.transcribe(
-                        scene_path,
-                        context=scene_context if scene_context else None,
-                        artifacts_dir=raw_subs_dir,
-                    )
+                    elif self.input_mode == InputMode.VAD_SLICING and idx in speech_regions_per_scene:
+                        logger.debug(
+                            "Phase 5: Scene %d — VAD_SLICING mode, transcribing %d speech regions",
+                            scene_num, len(speech_regions_per_scene[idx].groups),
+                        )
+                        result = self._transcribe_speech_regions(
+                            scene_path, speech_regions_per_scene[idx],
+                            asr=asr,
+                            context=scene_context if scene_context else None,
+                            artifacts_dir=raw_subs_dir,
+                        )
+                    else:
+                        logger.debug(
+                            "Phase 5: Scene %d — no VAD data, transcribing full scene (%.1fs)",
+                            scene_num, dur_sec,
+                        )
+                        result = asr.transcribe(
+                            scene_path,
+                            context=scene_context if scene_context else None,
+                            artifacts_dir=raw_subs_dir,
+                        )
 
-                segment_count = len(result.segments) if result and result.segments else 0
-                scene_results.append((result, idx))
+                    segment_count = len(result.segments) if result and result.segments else 0
+                    scene_results.append((result, idx))
 
-                # Extract tail for cross-scene context propagation (when enabled)
-                if self.cross_scene_context and result and result.segments:
-                    tail_segments = result.segments[-2:] if len(result.segments) >= 2 else result.segments
-                    previous_tail = " ".join(seg.text.strip() for seg in tail_segments if seg.text.strip())
-                # If 0 segments (silence/music), previous_tail carries forward
+                    if self.cross_scene_context and result and result.segments:
+                        tail_segments = result.segments[-2:] if len(result.segments) >= 2 else result.segments
+                        previous_tail = " ".join(seg.text.strip() for seg in tail_segments if seg.text.strip())
 
-                if segment_count == 0:
-                    logger.info(f"Phase 5: Scene {scene_num} produced 0 segments (may be non-speech audio)")
-                else:
-                    logger.debug(f"Phase 5: Scene {scene_num} produced {segment_count} segments")
+                    if segment_count == 0:
+                        logger.info(f"Phase 5: Scene {scene_num} produced 0 segments (may be non-speech audio)")
+                    else:
+                        logger.debug(f"Phase 5: Scene {scene_num} produced {segment_count} segments")
 
-            except Exception as e:
-                logger.warning(f"Phase 5: Scene {scene_num} failed: {e}, skipping")
-                scene_results.append((None, idx))
+                except Exception as e:
+                    logger.warning(f"Phase 5: Scene {scene_num} failed: {e}, skipping")
+                    scene_results.append((None, idx))
 
-        # VRAM Block 2 cleanup
-        asr.cleanup()
-        del asr
-        gc.collect()
-        try:
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+            # VRAM Block 2 cleanup (coupled modes)
+            asr.cleanup()
+            del asr
+            gc.collect()
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except ImportError:
+                pass
 
         master_metadata["stages"]["asr"] = {
             "model_id": self.model_id,
@@ -864,6 +894,244 @@ class QwenPipeline(BasePipeline):
                 )
 
         return combined_result
+
+    # ------------------------------------------------------------------
+    # Decoupled Assembly Line (v1.8.8+)
+    # ------------------------------------------------------------------
+
+    def _phase5_assembly(
+        self,
+        scene_paths: List[Tuple],
+        raw_subs_dir: Path,
+    ) -> List[Tuple[Optional[stable_whisper.WhisperResult], int]]:
+        """
+        Execute the Decoupled Assembly Line flow for Phase 5.
+
+        Separates text generation from forced alignment into VRAM-exclusive
+        phases, enabling higher batch sizes and mid-pipeline sanitization.
+
+        Flow:
+            1. Load ASR model (text-only, no aligner)
+            2. Batch text generation across all scenes
+            3. Unload ASR model (free VRAM)
+            4. Sanitize raw text (remove hallucinations before alignment)
+            5. Load standalone ForcedAligner
+            6. Batch alignment (text → timestamps)
+            7. Unload aligner (free VRAM)
+            8. Reconstruct WhisperResult via transcribe_any (Option A)
+
+        Args:
+            scene_paths: List of (path, start_sec, end_sec, dur_sec) tuples.
+            raw_subs_dir: Directory for debug artifacts.
+
+        Returns:
+            List of (WhisperResult, scene_index) tuples matching the
+            contract expected by Phase 6.
+        """
+        from whisperjav.modules.qwen_asr import QwenASR, merge_master_with_timestamps
+        from whisperjav.modules.text_sanitizer import TextSanitizer
+
+        n_scenes = len(scene_paths)
+        user_context = self._asr_config.get("context", "")
+        language = self._asr_config.get("language", None)
+
+        # Build per-scene context list (MVP: user context for scene 0 only)
+        contexts = []
+        for idx in range(n_scenes):
+            if self.cross_scene_context:
+                contexts.append(user_context)  # all scenes get user context
+            else:
+                contexts.append(user_context if idx == 0 else "")
+
+        # Collect audio paths for batch API
+        audio_paths = [sp[0] for sp in scene_paths]
+
+        # ── Step 1+2: Batch Text Generation ──────────────────────────
+        logger.info(
+            "[QwenPipeline PID %s] Phase 5 Assembly: Step 1 — "
+            "Batch text generation (%d scenes)",
+            os.getpid(), n_scenes,
+        )
+
+        asr = QwenASR(**self._asr_config)
+        asr.load_model_text_only()
+
+        raw_texts = asr.transcribe_text_only(
+            audio_paths=audio_paths,
+            contexts=contexts,
+            language=language,
+        )
+
+        # Save raw text artifacts for debugging
+        for idx, text in enumerate(raw_texts):
+            if text and raw_subs_dir:
+                artifact_path = raw_subs_dir / f"scene_{idx:04d}_assembly_raw.txt"
+                try:
+                    artifact_path.write_text(text, encoding="utf-8")
+                except Exception:
+                    pass
+
+        # ── Step 3: Unload ASR Model (VRAM Swap) ────────────────────
+        logger.info(
+            "[QwenPipeline PID %s] Phase 5 Assembly: Step 3 — "
+            "VRAM swap (unloading ASR model)",
+            os.getpid(),
+        )
+        asr.unload_model()
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+
+        # ── Step 4: Mid-Pipeline Text Sanitization ──────────────────
+        logger.info(
+            "[QwenPipeline PID %s] Phase 5 Assembly: Step 4 — "
+            "Text sanitization (hallucination removal before alignment)",
+            os.getpid(),
+        )
+
+        sanitizer = TextSanitizer(language=language or "ja")
+        clean_texts, sanitize_stats = sanitizer.clean_batch(raw_texts)
+
+        # Save sanitized text artifacts
+        for idx, text in enumerate(clean_texts):
+            if raw_subs_dir:
+                artifact_path = raw_subs_dir / f"scene_{idx:04d}_assembly_clean.txt"
+                try:
+                    artifact_path.write_text(text, encoding="utf-8")
+                except Exception:
+                    pass
+
+        # ── Step 5+6: Batch Alignment ────────────────────────────────
+        logger.info(
+            "[QwenPipeline PID %s] Phase 5 Assembly: Step 5 — "
+            "Batch alignment (%d scenes with text)",
+            os.getpid(),
+            sum(1 for t in clean_texts if t.strip()),
+        )
+
+        asr.load_aligner_only()
+
+        align_results = asr.align_standalone(
+            audio_paths=audio_paths,
+            texts=clean_texts,
+            language=language,
+        )
+
+        # ── Step 7: Unload Aligner (VRAM Cleanup) ───────────────────
+        logger.info(
+            "[QwenPipeline PID %s] Phase 5 Assembly: Step 7 — "
+            "Cleanup (unloading aligner)",
+            os.getpid(),
+        )
+        asr.unload_model()
+        del asr
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+
+        # ── Step 8: Reconstruct WhisperResult ────────────────────────
+        # Use transcribe_any with a pre-computed word list (Option A)
+        # to get proper sentence-level regrouping via stable-ts.
+        logger.info(
+            "[QwenPipeline PID %s] Phase 5 Assembly: Step 8 — "
+            "Reconstructing WhisperResult (%d scenes)",
+            os.getpid(), n_scenes,
+        )
+
+        scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
+
+        for idx in range(n_scenes):
+            scene_path, start_sec, end_sec, dur_sec = scene_paths[idx]
+            text = clean_texts[idx]
+            timestamps = align_results[idx]
+
+            if not text or not text.strip():
+                # Empty scene (silence/music) — no transcription
+                logger.debug(
+                    "Phase 5 Assembly: Scene %d/%d — empty text, skipping",
+                    idx + 1, n_scenes,
+                )
+                scene_results.append((None, idx))
+                continue
+
+            if timestamps is None:
+                # Text exists but alignment failed — create result without timestamps
+                logger.warning(
+                    "Phase 5 Assembly: Scene %d/%d — alignment returned None, "
+                    "using text without timestamps",
+                    idx + 1, n_scenes,
+                )
+                words = [{'word': text.strip(), 'start': 0.0, 'end': 0.0}]
+            else:
+                # Merge sanitized text with aligner timestamps
+                words = merge_master_with_timestamps(text, timestamps)
+
+                if not words:
+                    logger.warning(
+                        "Phase 5 Assembly: Scene %d/%d — merge produced no words",
+                        idx + 1, n_scenes,
+                    )
+                    scene_results.append((None, idx))
+                    continue
+
+            # Save merged word artifacts for debugging
+            if raw_subs_dir:
+                try:
+                    import json
+                    artifact_path = raw_subs_dir / f"scene_{idx:04d}_assembly_merged.json"
+                    artifact_path.write_text(
+                        json.dumps(words, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                except Exception:
+                    pass
+
+            # Reconstruct WhisperResult using transcribe_any with
+            # a pre-computed inference function (Option A).
+            # This reuses stable-ts's sentence regrouping logic so
+            # Phase 6 (SRT generation) works without changes.
+            try:
+                precomputed_words = words  # capture for closure
+
+                def precomputed_inference(audio, **kwargs):
+                    return [precomputed_words]
+
+                result = stable_whisper.transcribe_any(
+                    inference_func=precomputed_inference,
+                    audio=str(scene_path),
+                    audio_type='str',
+                    regroup=True,
+                    vad=False,
+                    demucs=False,
+                    suppress_silence=True,
+                    suppress_word_ts=True,
+                    verbose=False,
+                )
+
+                segment_count = len(result.segments) if result and result.segments else 0
+                logger.debug(
+                    "Phase 5 Assembly: Scene %d/%d — %d segments after regrouping",
+                    idx + 1, n_scenes, segment_count,
+                )
+
+                scene_results.append((result, idx))
+
+            except Exception as e:
+                logger.warning(
+                    "Phase 5 Assembly: Scene %d/%d — reconstruction failed: %s",
+                    idx + 1, n_scenes, e,
+                )
+                scene_results.append((None, idx))
+
+        return scene_results
 
     @staticmethod
     def _offset_result_timestamps(

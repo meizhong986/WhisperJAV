@@ -283,6 +283,7 @@ class QwenASR:
 
         # Model is lazily loaded
         self.model = None
+        self._standalone_aligner = None  # For decoupled assembly mode
         self._device = None
         self._dtype = None
 
@@ -984,6 +985,294 @@ class QwenASR:
             raise
 
     # =========================================================================
+    # Decoupled Assembly Line Methods (v1.8.8+)
+    # =========================================================================
+    # These methods enable the "assembly" input mode where text generation and
+    # forced alignment run as separate VRAM-exclusive phases. This allows:
+    #   - Higher batch_size for text-only ASR (no aligner loaded)
+    #   - Mid-pipeline sanitization between generation and alignment
+    #   - Future vLLM integration (ASR supports vLLM, aligner does not)
+    #
+    # Usage pattern from QwenPipeline:
+    #   asr.load_model_text_only()
+    #   texts = asr.transcribe_text_only(paths, contexts, language)
+    #   asr.unload_model()           # free ASR VRAM
+    #   clean_texts = sanitize(texts) # mid-pipeline cleaning
+    #   asr.load_aligner_only()
+    #   timestamps = asr.align_standalone(paths, clean_texts, language)
+    #   asr.unload_model()           # free aligner VRAM
+
+    def load_model_text_only(self) -> None:
+        """
+        Load Qwen3-ASR model WITHOUT the ForcedAligner.
+
+        Saves ~1.2GB VRAM compared to coupled loading, enabling higher
+        batch_size on consumer GPUs (e.g., batch_size=4 on 12GB cards).
+        """
+        if self.model is not None:
+            logger.debug("ASR model already loaded (text-only mode)")
+            return
+
+        # Detect device and dtype
+        self._device = self._detect_device()
+        self._dtype = self._detect_dtype(self._device)
+        attn_impl = self._detect_attn_implementation()
+
+        logger.info("Loading Qwen3-ASR model (text-only, no aligner)...")
+        logger.info(f"  Model:    {self.model_id}")
+        logger.info(f"  Device:   {self._device}")
+        logger.info(f"  Dtype:    {self._dtype}")
+        logger.info(f"  Batch:    {self.batch_size}")
+        logger.info(f"  Attention: {attn_impl}")
+
+        start_time = time.time()
+
+        try:
+            from qwen_asr import Qwen3ASRModel
+
+            model_kwargs = {
+                "dtype": self._dtype,
+                "device_map": self._device,
+                "max_inference_batch_size": self.batch_size,
+                "max_new_tokens": self.max_new_tokens,
+            }
+
+            if attn_impl and attn_impl != "sdpa":
+                model_kwargs["attn_implementation"] = attn_impl
+
+            # NO forced_aligner argument — text-only mode
+            self.model = Qwen3ASRModel.from_pretrained(
+                self.model_id, **model_kwargs
+            )
+
+            load_time = time.time() - start_time
+            logger.info(f"  Loaded (text-only) in {load_time:.1f}s")
+
+        except ImportError as e:
+            raise ImportError(
+                "qwen-asr package required for QwenASR. "
+                "Install with: pip install qwen-asr"
+            ) from e
+
+    def load_aligner_only(self) -> None:
+        """
+        Load standalone Qwen3-ForcedAligner WITHOUT the ASR model.
+
+        The aligner is a 0.6B parameter non-autoregressive model that
+        maps text tokens to audio positions. Loading it alone uses ~1.2GB VRAM.
+
+        Prerequisite: self.model should be None (unloaded) to free VRAM.
+        """
+        if self._standalone_aligner is not None:
+            logger.debug("Standalone aligner already loaded")
+            return
+
+        if self.model is not None:
+            logger.warning(
+                "ASR model still loaded while loading aligner — "
+                "VRAM may be insufficient. Call unload_model() first."
+            )
+
+        # Ensure device/dtype are detected
+        if self._device is None:
+            self._device = self._detect_device()
+        if self._dtype is None:
+            self._dtype = self._detect_dtype(self._device)
+
+        logger.info("Loading standalone ForcedAligner...")
+        logger.info(f"  Aligner:  {self.aligner_id}")
+        logger.info(f"  Device:   {self._device}")
+        logger.info(f"  Dtype:    {self._dtype}")
+
+        start_time = time.time()
+
+        try:
+            from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
+
+            self._standalone_aligner = Qwen3ForcedAligner.from_pretrained(
+                self.aligner_id,
+                dtype=self._dtype,
+                device_map=self._device,
+            )
+
+            load_time = time.time() - start_time
+            logger.info(f"  Aligner loaded in {load_time:.1f}s")
+
+        except ImportError as e:
+            raise ImportError(
+                "qwen-asr package required for ForcedAligner. "
+                "Install with: pip install qwen-asr"
+            ) from e
+
+    def transcribe_text_only(
+        self,
+        audio_paths: List[Union[str, Path]],
+        contexts: Optional[List[str]] = None,
+        language: Optional[str] = None,
+    ) -> List[str]:
+        """
+        Batch text generation WITHOUT forced alignment.
+
+        Feeds audio to Qwen3-ASR and returns raw transcription text.
+        The ASR model must be loaded via load_model_text_only() first
+        (or will be loaded lazily).
+
+        Args:
+            audio_paths: List of paths to audio files (one per scene)
+            contexts: Optional per-scene context strings. If None, empty
+                      context is used for all scenes.
+            language: Language code (e.g., 'ja') or None for auto-detect.
+                      Applied to all scenes uniformly.
+
+        Returns:
+            List of raw transcription text strings (one per audio file).
+            Empty string for scenes that produced no speech.
+        """
+        n = len(audio_paths)
+        if n == 0:
+            return []
+
+        # Lazy load
+        if self.model is None:
+            self.load_model_text_only()
+
+        # Normalize language to qwen-asr format
+        qwen_language = self._normalize_language_for_qwen(language)
+
+        # Build context list (per-scene or broadcast)
+        if contexts is None:
+            ctx_list = [""] * n
+        else:
+            if len(contexts) != n:
+                raise ValueError(
+                    f"contexts length ({len(contexts)}) must match "
+                    f"audio_paths length ({n})"
+                )
+            ctx_list = contexts
+
+        # Convert paths to strings for qwen-asr
+        audio_strs = [str(p) for p in audio_paths]
+
+        logger.info(
+            "Assembly: Batch text generation — %d scenes, batch_size=%d, language=%s",
+            n, self.batch_size, qwen_language or "auto",
+        )
+
+        start_time = time.time()
+
+        results = self.model.transcribe(
+            audio=audio_strs,
+            context=ctx_list,
+            language=qwen_language,
+            return_time_stamps=False,
+        )
+
+        elapsed = time.time() - start_time
+        logger.info("Assembly: Text generation complete in %.1fs (%d scenes)", elapsed, n)
+
+        # Extract text from ASRTranscription objects
+        texts = []
+        for i, r in enumerate(results):
+            text = getattr(r, 'text', '').strip()
+            if text:
+                logger.debug(
+                    "Assembly: Scene %d/%d — %d chars: '%s...'",
+                    i + 1, n, len(text), text[:60],
+                )
+            else:
+                logger.debug("Assembly: Scene %d/%d — empty (silence/music)", i + 1, n)
+
+            # Store detected language from first non-empty result
+            if text and self._detected_language is None:
+                lang = getattr(r, 'language', None)
+                if lang:
+                    self._detected_language = lang
+
+            texts.append(text)
+
+        return texts
+
+    def align_standalone(
+        self,
+        audio_paths: List[Union[str, Path]],
+        texts: List[str],
+        language: Optional[str] = None,
+    ) -> List[Optional[Any]]:
+        """
+        Batch forced alignment using the standalone aligner.
+
+        Takes pre-sanitized text and aligns it against the original audio
+        to produce word-level timestamps. The standalone aligner must be
+        loaded via load_aligner_only() first (or will be loaded lazily).
+
+        Args:
+            audio_paths: List of paths to audio files (one per scene).
+            texts: List of sanitized text strings (one per scene).
+                   Empty strings are skipped (no alignment needed).
+            language: Language code (e.g., 'ja'). Required by the aligner
+                      for language-specific tokenization (nagisa for Japanese).
+
+        Returns:
+            List of ForcedAlignResult objects (one per scene).
+            None for scenes with empty text (silence/music).
+        """
+        n = len(audio_paths)
+        if n != len(texts):
+            raise ValueError(
+                f"audio_paths length ({n}) must match texts length ({len(texts)})"
+            )
+
+        # Lazy load
+        if self._standalone_aligner is None:
+            self.load_aligner_only()
+
+        # Resolve language for aligner (requires canonical name like "Japanese")
+        qwen_language = self._normalize_language_for_qwen(language) or "Japanese"
+
+        # Separate scenes with text from empty scenes
+        to_align_indices = []
+        to_align_audio = []
+        to_align_text = []
+        for i, (path, text) in enumerate(zip(audio_paths, texts)):
+            if text.strip():
+                to_align_indices.append(i)
+                to_align_audio.append(str(path))
+                to_align_text.append(text)
+
+        logger.info(
+            "Assembly: Batch alignment — %d/%d scenes have text, language=%s",
+            len(to_align_indices), n, qwen_language,
+        )
+
+        # Initialize results with None for all scenes
+        results: List[Optional[Any]] = [None] * n
+
+        if not to_align_indices:
+            logger.info("Assembly: No scenes with text to align")
+            return results
+
+        start_time = time.time()
+
+        # Run batch alignment
+        align_results = self._standalone_aligner.align(
+            audio=to_align_audio,
+            text=to_align_text,
+            language=qwen_language,
+        )
+
+        # Map results back to scene indices
+        for k, idx in enumerate(to_align_indices):
+            results[idx] = align_results[k]
+
+        elapsed = time.time() - start_time
+        logger.info(
+            "Assembly: Alignment complete in %.1fs (%d scenes aligned)",
+            elapsed, len(to_align_indices),
+        )
+
+        return results
+
+    # =========================================================================
     # Language Mapping Constants
     # =========================================================================
     # qwen-asr supported languages (from error message in qwen_asr library)
@@ -1245,16 +1534,28 @@ class QwenASR:
         return lang_lower[:2] if len(lang_lower) >= 2 else 'ja'
 
     def unload_model(self) -> None:
-        """Free GPU memory by unloading the model."""
+        """Free GPU memory by unloading the ASR model and/or standalone aligner."""
+        unloaded = []
+
         if self.model is not None:
-            logger.debug("Unloading Qwen3-ASR model...")
             try:
                 del self.model
             except Exception as e:
-                logger.warning(f"Error deleting model: {e}")
+                logger.warning(f"Error deleting ASR model: {e}")
             finally:
                 self.model = None
+            unloaded.append("ASR model")
 
+        if self._standalone_aligner is not None:
+            try:
+                del self._standalone_aligner
+            except Exception as e:
+                logger.warning(f"Error deleting standalone aligner: {e}")
+            finally:
+                self._standalone_aligner = None
+            unloaded.append("standalone aligner")
+
+        if unloaded:
             # Force garbage collection
             try:
                 gc.collect()
@@ -1264,7 +1565,7 @@ class QwenASR:
             # NOTE: CUDA cache cleanup is handled by caller via safe_cuda_cleanup()
             # This keeps ASR modules free of subprocess-awareness logic.
 
-            logger.debug("Qwen3-ASR model unloaded, GPU memory freed")
+            logger.debug("Unloaded: %s — GPU memory freed", ", ".join(unloaded))
 
     def cleanup(self) -> None:
         """Cleanup resources. Alias for unload_model()."""
