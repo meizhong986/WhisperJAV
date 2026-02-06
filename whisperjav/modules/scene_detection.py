@@ -983,9 +983,11 @@ class DynamicSceneDetector:
             )
 
             # Build config from parameters
+            # Use self.min_duration/max_duration as fallbacks to honor the class-level settings
+            # when not explicitly overridden in kwargs (fixes parameter contract bug)
             adapter_config = SemanticClusteringConfig(
-                min_duration=float(config.get("min_duration", 20.0)),
-                max_duration=float(config.get("max_duration", 420.0)),
+                min_duration=float(config.get("min_duration", self.min_duration)),
+                max_duration=float(config.get("max_duration", self.max_duration)),
                 snap_window=float(config.get("snap_window", 5.0)),
                 clustering_threshold=float(config.get("clustering_threshold", 18.0)),
                 sample_rate=int(config.get("sample_rate", 16000)),

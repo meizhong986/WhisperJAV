@@ -123,20 +123,23 @@ class QwenPipeline(BasePipeline):
         keep_temp_files: bool = False,
         progress_display=None,
 
-        # === Context-Aware Chunking Configuration (v1.8.7+) ===
+        # === Input Mode Configuration (v1.8.7+) ===
         # Controls audio input strategy for Qwen3-ASR (LALM)
-        qwen_input_mode: str = "context_aware",  # "context_aware" or "vad_slicing"
-        qwen_safe_chunking: bool = True,  # Enforce 150-210s scene boundaries
+        qwen_input_mode: str = "vad_slicing",  # "vad_slicing" (default) or "context_aware"
+        qwen_safe_chunking: bool = True,  # Enforce scene boundaries for context-aware mode
 
         # Scene detection (Phase 2)
-        scene_detector: str = "none",
+        # Default to "semantic" for context-aware mode - it has true MERGE logic
+        # to guarantee min_duration is met (unlike auditok/silero which only filter)
+        scene_detector: str = "semantic",
 
         # Speech enhancement (Phase 3)
         speech_enhancer: str = "none",
         speech_enhancer_model: Optional[str] = None,
 
         # Speech segmentation / VAD (Phase 4)
-        speech_segmenter: str = "none",
+        speech_segmenter: str = "ten",  # Default to TEN backend for VAD
+        segmenter_max_group_duration: float = 29.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
 
         # Qwen ASR (Phase 5)
         model_id: str = "Qwen/Qwen3-ASR-1.7B",
@@ -199,6 +202,7 @@ class QwenPipeline(BasePipeline):
 
         # Speech segmentation config
         self.segmenter_backend = speech_segmenter
+        self.segmenter_max_group_duration = segmenter_max_group_duration
 
         # Timestamp resolution mode
         try:
@@ -352,16 +356,15 @@ class QwenPipeline(BasePipeline):
             scene_detector_kwargs = {"method": self.scene_method}
 
             # === Safe Chunking Override (v1.8.7+) ===
-            # When safe_chunking is True, enforce 150-210s scene boundaries.
-            # This creates ~3-minute blocks that:
-            # - Are long enough for LALM context (accuracy)
-            # - Are safely below the 300s ForcedAligner limit (stability)
+            # When safe_chunking is True, enforce scene boundaries (30-90s).
+            # This creates manageable blocks for semantic scene detection.
             if self.safe_chunking:
-                scene_detector_kwargs["min_scene_duration"] = 150  # seconds
-                scene_detector_kwargs["max_scene_duration"] = 210  # seconds
+                # Parameter names must match DynamicSceneDetector contract
+                scene_detector_kwargs["min_duration"] = 30  # seconds
+                scene_detector_kwargs["max_duration"] = 90  # seconds
                 logger.info(
                     "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
-                    "(min=150s, max=210s for ForcedAligner 300s limit)",
+                    "(min=30s, max=90s)",
                     os.getpid(),
                 )
 
@@ -424,7 +427,10 @@ class QwenPipeline(BasePipeline):
             phase4_start = time.time()
 
             from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
-            segmenter = SpeechSegmenterFactory.create(self.segmenter_backend)
+            segmenter = SpeechSegmenterFactory.create(
+                self.segmenter_backend,
+                max_group_duration_s=self.segmenter_max_group_duration,
+            )
 
             for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
                 try:

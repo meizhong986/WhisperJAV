@@ -443,9 +443,9 @@ def parse_arguments():
     qwen_group.add_argument("--qwen-aligner", type=str,
                            default="Qwen/Qwen3-ForcedAligner-0.6B",
                            help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B)")
-    qwen_group.add_argument("--qwen-scene", type=str, default="none",
+    qwen_group.add_argument("--qwen-scene", type=str, default="semantic",
                            choices=["none", "auditok", "silero", "semantic"],
-                           help="Scene detection method (default: none)")
+                           help="Scene detection method (default: semantic)")
     qwen_group.add_argument("--qwen-context", type=str, default="",
                            help="Context string to help improve transcription accuracy (e.g., speaker names, domain terminology)")
     qwen_group.add_argument("--qwen-context-file", type=str, default=None,
@@ -458,10 +458,12 @@ def parse_arguments():
                            help="Speech enhancement backend (default: none)")
     qwen_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
-    qwen_group.add_argument("--qwen-segmenter", type=str, default="none",
+    qwen_group.add_argument("--qwen-segmenter", type=str, default="ten",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1",
                                     "nemo", "nemo-lite", "whisper-vad", "ten"],
-                           help="Post-ASR VAD filter to remove hallucinations in non-speech regions (default: none)")
+                           help="Speech segmentation backend for VAD-based chunking (default: ten)")
+    qwen_group.add_argument("--qwen-max-group-duration", type=float, default=29.0,
+                           help="Max duration (seconds) for VAD segment grouping (default: 29.0)")
     qwen_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_true", default=True,
                            help="Apply Japanese-specific subtitle regrouping (default: enabled)")
@@ -473,18 +475,18 @@ def parse_arguments():
                            help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
 
     # Context-Aware Chunking (v1.8.7+)
-    qwen_group.add_argument("--qwen-input-mode", type=str, default="context_aware",
+    qwen_group.add_argument("--qwen-input-mode", type=str, default="vad_slicing",
                            choices=["context_aware", "vad_slicing"],
-                           help="Audio input strategy: 'context_aware' (new default, feeds ~180s scenes for LALM context) or 'vad_slicing' (legacy, chops into tiny VAD fragments)")
+                           help="Audio input strategy: 'vad_slicing' (default, stable VAD-based chunking) or 'context_aware' (experimental, feeds ~180s scenes for LALM context)")
     qwen_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_true", default=True,
                            help="Enforce 150-210s scene boundaries for ForcedAligner 300s limit (default: enabled)")
     qwen_group.add_argument("--no-qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_false",
                            help="Disable safe chunking, allow longer scenes")
-    qwen_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_interpolation",
+    qwen_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_vad_fallback",
                            choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
-                           help="Timestamp resolution: 'aligner_interpolation' (new default, smooth interpolation), 'aligner_vad_fallback' (snap to VAD), 'aligner_only' (no fallback), 'vad_only' (discard aligner)")
+                           help="Timestamp resolution: 'aligner_vad_fallback' (default, stable VAD boundaries), 'aligner_interpolation' (smooth interpolation), 'aligner_only' (no fallback), 'vad_only' (discard aligner)")
 
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
@@ -806,6 +808,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             speech_enhancer_model=getattr(args, 'qwen_enhancer_model', None),
             # Speech segmentation / VAD
             speech_segmenter=getattr(args, 'qwen_segmenter', 'none'),
+            segmenter_max_group_duration=getattr(args, 'qwen_max_group_duration', 29.0),
             # Qwen ASR
             model_id=getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
             device=getattr(args, 'qwen_device', 'auto'),
