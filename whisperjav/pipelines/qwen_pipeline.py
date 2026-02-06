@@ -171,6 +171,9 @@ class QwenPipeline(BasePipeline):
         japanese_postprocess: bool = True,
         postprocess_preset: str = "high_moan",
 
+        # Assembly text cleaner (Step 4 of assembly mode)
+        assembly_cleaner: bool = True,  # Enable/disable pre-alignment text cleaning
+
         # Output
         subs_language: str = "native",
 
@@ -227,6 +230,9 @@ class QwenPipeline(BasePipeline):
         # Cross-scene context propagation (disabled for MVP; structure retained
         # for future enablement once quality gates are in place)
         self.cross_scene_context = False
+
+        # Assembly text cleaner toggle (for --qwen-assembly-cleaner on|off)
+        self.assembly_cleaner_enabled = assembly_cleaner
 
         # Qwen ASR config (stored as dict for deferred construction)
         self._asr_config = {
@@ -711,18 +717,29 @@ class QwenPipeline(BasePipeline):
         }
         master_metadata["srt_path"] = str(processed_path)
 
-        # Metadata contract: keys expected by main.py
+        # Metadata contract: keys expected by main.py's aggregate_subtitle_metrics()
         master_metadata["output_files"]["final_srt"] = str(final_srt_path)
         master_metadata["output_files"]["stitched_srt"] = str(stitched_srt_path)
         master_metadata["summary"]["final_subtitles_refined"] = (
             stats.get("total_subtitles", 0) - stats.get("empty_removed", 0)
         )
+        master_metadata["summary"]["final_subtitles_raw"] = num_subtitles
+        master_metadata["summary"]["quality_metrics"] = {
+            "hallucinations_removed": stats.get("removed_hallucinations", 0),
+            "repetitions_removed": stats.get("removed_repetitions", 0),
+            "duration_adjustments": stats.get("duration_adjustments", 0),
+            "empty_removed": stats.get("empty_removed", 0),
+            "cps_filtered": stats.get("cps_filtered", 0),
+            "logprob_filtered": 0,       # N/A for Qwen pipeline
+            "nonverbal_filtered": 0,     # N/A for Qwen pipeline
+        }
 
         # ==============================================================
         # COMPLETE
         # ==============================================================
         total_time = time.time() - pipeline_start
         master_metadata["total_time_sec"] = total_time
+        master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
 
         logger.info(
             "[QwenPipeline PID %s] Complete: %s (%d subtitles in %s)",
@@ -929,7 +946,9 @@ class QwenPipeline(BasePipeline):
             contract expected by Phase 6.
         """
         from whisperjav.modules.qwen_asr import QwenASR, merge_master_with_timestamps
-        from whisperjav.modules.text_sanitizer import TextSanitizer
+        from whisperjav.modules.assembly_text_cleaner import (
+            AssemblyTextCleaner, AssemblyCleanerConfig,
+        )
 
         n_scenes = len(scene_paths)
         user_context = self._asr_config.get("context", "")
@@ -962,6 +981,17 @@ class QwenPipeline(BasePipeline):
             language=language,
         )
 
+        # [DIAG] Per-scene text generation summary
+        for idx, text in enumerate(raw_texts):
+            chars = len(text) if text else 0
+            dur = scene_paths[idx][3]  # dur_sec
+            preview = text[:80].replace('\n', ' ') if text else "(empty)"
+            logger.info(
+                "[DIAG] Assembly Step 2: Scene %d/%d — %d chars, %.1fs audio | '%s%s'",
+                idx + 1, n_scenes, chars, dur, preview,
+                "..." if chars > 80 else "",
+            )
+
         # Save raw text artifacts for debugging
         for idx, text in enumerate(raw_texts):
             if text and raw_subs_dir:
@@ -986,15 +1016,39 @@ class QwenPipeline(BasePipeline):
         except ImportError:
             pass
 
-        # ── Step 4: Mid-Pipeline Text Sanitization ──────────────────
+        # ── Step 4: Mid-Pipeline Text Cleaning ────────────────────
         logger.info(
             "[QwenPipeline PID %s] Phase 5 Assembly: Step 4 — "
-            "Text sanitization (hallucination removal before alignment)",
-            os.getpid(),
+            "Text cleaning (pre-alignment, enabled=%s)",
+            os.getpid(), self.assembly_cleaner_enabled,
         )
 
-        sanitizer = TextSanitizer(language=language or "ja")
-        clean_texts, sanitize_stats = sanitizer.clean_batch(raw_texts)
+        cleaner_config = AssemblyCleanerConfig(enabled=self.assembly_cleaner_enabled)
+        cleaner = AssemblyTextCleaner(config=cleaner_config, language=language or "ja")
+        clean_texts, sanitize_stats = cleaner.clean_batch(raw_texts)
+
+        # [DIAG] Per-scene cleaning summary
+        for idx, stat in enumerate(sanitize_stats):
+            if stat.get("bypassed"):
+                logger.info(
+                    "[DIAG] Assembly Step 4: Scene %d/%d — BYPASSED (cleaner disabled)",
+                    idx + 1, n_scenes,
+                )
+            else:
+                removed = stat.get("chars_removed", 0)
+                orig_len = stat.get("original_length", 0)
+                stages = stat.get("stages", {})
+                active_stages = [
+                    name for name, s in stages.items()
+                    if s.get("modifications", 0) > 0
+                ]
+                logger.info(
+                    "[DIAG] Assembly Step 4: Scene %d/%d — %d→%d chars (-%d), "
+                    "active stages: %s",
+                    idx + 1, n_scenes,
+                    orig_len, orig_len - removed, removed,
+                    ", ".join(active_stages) if active_stages else "(none)",
+                )
 
         # Save sanitized text artifacts
         for idx, text in enumerate(clean_texts):
@@ -1081,6 +1135,28 @@ class QwenPipeline(BasePipeline):
                     )
                     scene_results.append((None, idx))
                     continue
+
+            # [DIAG] Post-merge diagnostics: word count, duration, CPS
+            n_words = len(words)
+            total_chars = sum(len(w.get('word', '')) for w in words)
+            if n_words > 0 and words[-1].get('end', 0) > 0:
+                word_duration = words[-1]['end'] - words[0].get('start', 0)
+                cps = total_chars / word_duration if word_duration > 0 else 0
+                first_w = words[0].get('word', '')[:20]
+                last_w = words[-1].get('word', '')[:20]
+                cps_flag = " *** HIGH CPS — possible hallucination" if cps > 30 else ""
+                logger.info(
+                    "[DIAG] Assembly Step 8: Scene %d/%d — %d words, %d chars, "
+                    "%.1fs span, %.1f CPS%s | first='%s' last='%s'",
+                    idx + 1, n_scenes, n_words, total_chars,
+                    word_duration, cps, cps_flag, first_w, last_w,
+                )
+            else:
+                logger.info(
+                    "[DIAG] Assembly Step 8: Scene %d/%d — %d words, %d chars, "
+                    "no valid timestamps",
+                    idx + 1, n_scenes, n_words, total_chars,
+                )
 
             # Save merged word artifacts for debugging
             if raw_subs_dir:

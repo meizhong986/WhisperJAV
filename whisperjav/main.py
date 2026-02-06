@@ -488,6 +488,14 @@ def parse_arguments():
                            choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
                            help="Timestamp resolution: 'aligner_vad_fallback' (default, stable VAD boundaries), 'aligner_interpolation' (smooth interpolation), 'aligner_only' (no fallback), 'vad_only' (discard aligner)")
 
+    # Assembly text cleaner (pre-alignment cleaning in assembly mode)
+    qwen_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
+                           action="store_true", default=True,
+                           help="Enable pre-alignment text cleaning in assembly mode (default: enabled)")
+    qwen_group.add_argument("--no-qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
+                           action="store_false",
+                           help="Disable pre-alignment text cleaning (pass raw ASR text to aligner)")
+
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
     return parser.parse_args()
@@ -826,6 +834,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Japanese post-processing
             japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', True),
             postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),
+            # Assembly text cleaner
+            assembly_cleaner=getattr(args, 'qwen_assembly_cleaner', True),
         )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)

@@ -320,7 +320,7 @@ class HallucinationRemover:
         if not text or not text.strip() or not self._exact_lists:
             return text, []
 
-        effective_language = language or self.primary_language
+        effective_language = (language or self.primary_language).lower()
 
         # Map ISO code to JSON key (e.g., 'ko' -> 'korean', 'zh' -> 'chinese')
         mapped_language = self.LANGUAGE_CODE_MAP.get(effective_language, effective_language)
@@ -464,13 +464,14 @@ class HallucinationRemover:
             return '', modifications
         
         # Map ISO code to JSON key (e.g., 'ko' -> 'korean', 'zh' -> 'chinese')
-        mapped_language = self.LANGUAGE_CODE_MAP.get(language, language)
+        language_lower = language.lower() if language else language
+        mapped_language = self.LANGUAGE_CODE_MAP.get(language_lower, language_lower)
 
         # Check external database patterns (from JSON files)
         lang_list = self._exact_lists.get(mapped_language, set())
         if not lang_list:
             # Try original language code
-            lang_list = self._exact_lists.get(language, set())
+            lang_list = self._exact_lists.get(language_lower, set())
         if not lang_list:
             # Final fallback to Japanese
             for fallback in ['japanese', 'ja']:
