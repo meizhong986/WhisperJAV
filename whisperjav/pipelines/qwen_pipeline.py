@@ -541,9 +541,12 @@ class QwenPipeline(BasePipeline):
             user_context = self._asr_config.get("context", "")
             previous_tail = ""
 
-            # Sentinel tracking (same contract as assembly mode)
-            collapse_count = 0
-            recovery_count = 0
+            # Sentinel tracking — instance-level so _transcribe_speech_regions()
+            # can also accumulate stats (same contract as assembly mode)
+            self._sentinel_stats = {
+                "alignment_collapses": 0,
+                "alignment_recoveries": 0,
+            }
 
             for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
                 scene_num = idx + 1
@@ -582,7 +585,7 @@ class QwenPipeline(BasePipeline):
                             assessment = assess_alignment_quality(words, dur_sec)
 
                             if assessment["status"] == "COLLAPSED":
-                                collapse_count += 1
+                                self._sentinel_stats["alignment_collapses"] += 1
                                 logger.warning(
                                     "[SENTINEL] Scene %d/%d: Alignment Collapse — "
                                     "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
@@ -607,7 +610,7 @@ class QwenPipeline(BasePipeline):
                                 result = self._reconstruct_from_words(
                                     corrected_words, scene_path,
                                 )
-                                recovery_count += 1
+                                self._sentinel_stats["alignment_recoveries"] += 1
 
                                 recovery_method = "VAD_RESCUE" if vad_regions else "PROPORTIONAL"
                                 logger.info(
@@ -653,7 +656,7 @@ class QwenPipeline(BasePipeline):
                             assessment = assess_alignment_quality(words, dur_sec)
 
                             if assessment["status"] == "COLLAPSED":
-                                collapse_count += 1
+                                self._sentinel_stats["alignment_collapses"] += 1
                                 logger.warning(
                                     "[SENTINEL] Scene %d/%d: Alignment Collapse — "
                                     "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
@@ -670,7 +673,7 @@ class QwenPipeline(BasePipeline):
                                 result = self._reconstruct_from_words(
                                     corrected_words, scene_path,
                                 )
-                                recovery_count += 1
+                                self._sentinel_stats["alignment_recoveries"] += 1
                                 logger.info(
                                     "[SENTINEL] Scene %d/%d: Recovered via PROPORTIONAL",
                                     scene_num, len(scene_paths),
@@ -703,11 +706,8 @@ class QwenPipeline(BasePipeline):
             except ImportError:
                 pass
 
-            # Store sentinel stats from coupled modes
-            self._sentinel_stats = {
-                "alignment_collapses": collapse_count,
-                "alignment_recoveries": recovery_count,
-            }
+            # self._sentinel_stats already accumulated during the loop
+            # (including from _transcribe_speech_regions() calls)
 
         # Sentinel stats (populated by both assembly and coupled modes)
         sentinel_stats = getattr(self, "_sentinel_stats", {})
@@ -889,6 +889,11 @@ class QwenPipeline(BasePipeline):
         """
         import soundfile as sf
         import numpy as np
+        from whisperjav.modules.alignment_sentinel import (
+            extract_words_from_result,
+            assess_alignment_quality,
+            redistribute_collapsed_words,
+        )
 
         # Read scene audio once
         audio_data, sr = sf.read(str(scene_path))
@@ -955,11 +960,6 @@ class QwenPipeline(BasePipeline):
             # ── Alignment Sentinel: detect collapsed timestamps ──
             # Per-group: no sub-group VAD available (the entire clip IS
             # a speech region), so Strategy B (proportional) is used.
-            from whisperjav.modules.alignment_sentinel import (
-                extract_words_from_result,
-                assess_alignment_quality,
-                redistribute_collapsed_words,
-            )
             words = extract_words_from_result(result)
             assessment = assess_alignment_quality(words, group_duration)
 
@@ -970,6 +970,9 @@ class QwenPipeline(BasePipeline):
                 result = self._reconstruct_from_words(
                     corrected_words, region_path,
                 )
+                # Accumulate into instance-level stats (read by process())
+                self._sentinel_stats["alignment_collapses"] += 1
+                self._sentinel_stats["alignment_recoveries"] += 1
                 logger.warning(
                     "[SENTINEL] Speech region %d/%d: Alignment collapse "
                     "recovered (PROPORTIONAL)",
@@ -1343,27 +1346,11 @@ class QwenPipeline(BasePipeline):
                 except Exception:
                     pass
 
-            # Reconstruct WhisperResult using transcribe_any with
-            # a pre-computed inference function (Option A).
-            # This reuses stable-ts's sentence regrouping logic so
-            # Phase 6 (SRT generation) works without changes.
+            # Reconstruct WhisperResult via shared helper (Option A).
+            # Uses transcribe_any with pre-computed words for stable-ts
+            # sentence regrouping — Phase 6 (SRT generation) works unchanged.
             try:
-                precomputed_words = words  # capture for closure
-
-                def precomputed_inference(audio, **kwargs):
-                    return [precomputed_words]
-
-                result = stable_whisper.transcribe_any(
-                    inference_func=precomputed_inference,
-                    audio=str(scene_path),
-                    audio_type='str',
-                    regroup=True,
-                    vad=False,
-                    demucs=False,
-                    suppress_silence=True,
-                    suppress_word_ts=True,
-                    verbose=False,
-                )
+                result = self._reconstruct_from_words(words, scene_path)
 
                 segment_count = len(result.segments) if result and result.segments else 0
                 logger.debug(
