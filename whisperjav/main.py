@@ -496,6 +496,13 @@ def parse_arguments():
                            action="store_false",
                            help="Disable pre-alignment text cleaning (pass raw ASR text to aligner)")
 
+    # Generation safety controls (v1.8.9+)
+    qwen_group.add_argument("--qwen-repetition-penalty", type=float, default=1.1,
+                           help="Repetition penalty for token generation (1.0=off, >1.0=penalize repeats; default: 1.1)")
+    qwen_group.add_argument("--qwen-max-tokens-per-second", type=float, default=20.0,
+                           help="Dynamic token budget per audio second (0=disabled, >0=scale budget; default: 20.0). "
+                                "Caps generation time: 47s audio → 940 tokens instead of 4096.")
+
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
     return parser.parse_args()
@@ -836,6 +843,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),
             # Assembly text cleaner
             assembly_cleaner=getattr(args, 'qwen_assembly_cleaner', True),
+            # Generation safety controls (v1.8.9+)
+            repetition_penalty=getattr(args, 'qwen_repetition_penalty', 1.1),
+            max_tokens_per_audio_second=getattr(args, 'qwen_max_tokens_per_second', 20.0),
         )
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)

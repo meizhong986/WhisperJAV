@@ -174,6 +174,10 @@ class QwenPipeline(BasePipeline):
         # Assembly text cleaner (Step 4 of assembly mode)
         assembly_cleaner: bool = True,  # Enable/disable pre-alignment text cleaning
 
+        # Generation safety controls (v1.8.9+)
+        repetition_penalty: float = 1.1,              # Pipeline default: conservative penalty for JAV
+        max_tokens_per_audio_second: float = 20.0,    # Pipeline default: dynamic scaling enabled
+
         # Output
         subs_language: str = "native",
 
@@ -249,6 +253,8 @@ class QwenPipeline(BasePipeline):
             "attn_implementation": attn_implementation,
             "japanese_postprocess": japanese_postprocess,
             "postprocess_preset": postprocess_preset,
+            "repetition_penalty": repetition_penalty,
+            "max_tokens_per_audio_second": max_tokens_per_audio_second,
         }
         self.model_id = model_id
 
@@ -962,8 +968,9 @@ class QwenPipeline(BasePipeline):
             else:
                 contexts.append(user_context if idx == 0 else "")
 
-        # Collect audio paths for batch API
+        # Collect audio paths and durations for batch API
         audio_paths = [sp[0] for sp in scene_paths]
+        audio_durations = [sp[3] for sp in scene_paths]  # dur_sec
 
         # ── Step 1+2: Batch Text Generation ──────────────────────────
         logger.info(
@@ -979,6 +986,7 @@ class QwenPipeline(BasePipeline):
             audio_paths=audio_paths,
             contexts=contexts,
             language=language,
+            audio_durations=audio_durations,
         )
 
         # [DIAG] Per-scene text generation summary
@@ -1073,6 +1081,7 @@ class QwenPipeline(BasePipeline):
             audio_paths=audio_paths,
             texts=clean_texts,
             language=language,
+            audio_durations=audio_durations,
         )
 
         # ── Step 7: Unload Aligner (VRAM Cleanup) ───────────────────

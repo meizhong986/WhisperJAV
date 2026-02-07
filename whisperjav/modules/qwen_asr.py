@@ -234,6 +234,10 @@ class QwenASR:
         # Japanese post-processing (v1.8.4+)
         japanese_postprocess: bool = True,  # Apply Japanese-specific regrouping
         postprocess_preset: str = "high_moan",  # Preset: "high_moan" (default for JAV), "default", "narrative"
+        # Generation safety controls (v1.8.9+)
+        repetition_penalty: float = 1.0,          # 1.0 = off; >1.0 penalizes repeated tokens via HF generation_config
+        max_tokens_per_audio_second: float = 0.0,  # 0 = disabled; >0 = dynamic per-scene token budget scaling
+        min_tokens_floor: int = 256,               # minimum token budget when dynamic scaling is active
     ):
         """
         Initialize QwenASR.
@@ -277,6 +281,11 @@ class QwenASR:
         # Japanese post-processing settings (v1.8.4+)
         self.japanese_postprocess = japanese_postprocess
         self.postprocess_preset = postprocess_preset
+
+        # Generation safety controls (v1.8.9+)
+        self.repetition_penalty = repetition_penalty
+        self.max_tokens_per_audio_second = max_tokens_per_audio_second
+        self.min_tokens_floor = min_tokens_floor
 
         # Initialize post-processor (lightweight, no GPU resources)
         self._postprocessor = JapanesePostProcessor() if japanese_postprocess else None
@@ -367,6 +376,68 @@ class QwenASR:
         except ImportError:
             logger.debug("flash-attn not available, using sdpa")
             return "sdpa"
+
+    def _apply_generation_config(self) -> None:
+        """
+        Apply generation safety controls to the thinker's HF GenerationConfig.
+
+        Sets repetition_penalty on the underlying thinker model's generation_config
+        after model load. This is the standard HuggingFace mechanism — the outer
+        generate() call reads from generation_config when no explicit kwarg is passed.
+
+        Access chain (verified):
+            self.model.model.thinker.generation_config
+            - self.model → Qwen3ASRModel
+            - .model → Qwen3ASRForConditionalGeneration (HF model)
+            - .thinker → Qwen3ASRThinkerForConditionalGeneration (GenerationMixin)
+            - .generation_config → HF GenerationConfig
+
+        Wrapped in try/except: if qwen-asr restructures internals, we log a
+        warning instead of crashing. The penalty is a quality improvement, not
+        a correctness requirement.
+        """
+        if self.repetition_penalty == 1.0:
+            return  # 1.0 = no penalty, nothing to set
+
+        try:
+            gen_config = self.model.model.thinker.generation_config
+            gen_config.repetition_penalty = self.repetition_penalty
+            logger.info(
+                "  Generation safety: repetition_penalty=%.2f applied to thinker",
+                self.repetition_penalty,
+            )
+        except AttributeError as e:
+            logger.warning(
+                "Could not apply repetition_penalty — qwen-asr model structure "
+                "may have changed: %s. Generation will proceed without penalty.",
+                e,
+            )
+
+    def _compute_dynamic_token_limit(self, audio_duration_sec: float) -> int:
+        """
+        Compute a dynamic max_new_tokens limit scaled to audio duration.
+
+        When max_tokens_per_audio_second > 0, the token budget is proportional
+        to the audio length instead of a fixed 4096. This caps the damage from
+        degenerate autoregressive loops: a 10-second clip gets ~256 tokens
+        instead of burning through 4096.
+
+        The result is clamped to [min_tokens_floor, max_new_tokens] — never
+        exceeds the static limit, never goes below the floor.
+
+        Args:
+            audio_duration_sec: Duration of the audio clip in seconds.
+
+        Returns:
+            Token budget for this clip.
+        """
+        if self.max_tokens_per_audio_second <= 0 or audio_duration_sec <= 0:
+            return self.max_new_tokens
+        dynamic = max(
+            self.min_tokens_floor,
+            int(audio_duration_sec * self.max_tokens_per_audio_second),
+        )
+        return min(dynamic, self.max_new_tokens)  # never exceed static limit
 
     def _get_audio_duration(self, audio_path: Union[str, Path]) -> float:
         """
@@ -548,6 +619,9 @@ class QwenASR:
                 os.getpid(), self.model_id, load_time
             )
 
+            # Apply generation safety controls (v1.8.9+)
+            self._apply_generation_config()
+
         except ImportError as e:
             logger.error(
                 "qwen-asr package not installed. Install with: pip install qwen-asr"
@@ -634,17 +708,32 @@ class QwenASR:
         # Resolve per-call context override (None = use self.context from __init__)
         effective_context = context if context is not None else self.context
 
-        # If aligner is disabled, fall back to simple transcription
-        if not self.use_aligner:
-            result = self._transcribe_without_aligner(audio_path, effective_context)
-            process_time = time.time() - start_time
-            logger.debug(f"Transcription (no aligner) complete in {process_time:.1f}s")
-            if progress_callback:
-                progress_callback(1.0, "Transcription complete")
-            return result
+        # Dynamic token budget (v1.8.9+): scale max_new_tokens to audio duration
+        scene_token_limit = self._compute_dynamic_token_limit(audio_duration)
+        original_max_tokens = None
+        if self.model is not None and scene_token_limit != self.max_new_tokens:
+            original_max_tokens = self.model.max_new_tokens
+            self.model.max_new_tokens = scene_token_limit
+            logger.debug(
+                "Dynamic token budget: %d tokens for %.1fs audio (%.1f tok/s)",
+                scene_token_limit, audio_duration, self.max_tokens_per_audio_second,
+            )
 
-        # With aligner: use transcribe_any for word-to-sentence regrouping
-        result = self._transcribe_with_regrouping(audio_path, progress_callback, artifacts_dir, effective_context)
+        try:
+            # If aligner is disabled, fall back to simple transcription
+            if not self.use_aligner:
+                result = self._transcribe_without_aligner(audio_path, effective_context)
+                process_time = time.time() - start_time
+                logger.debug(f"Transcription (no aligner) complete in {process_time:.1f}s")
+                if progress_callback:
+                    progress_callback(1.0, "Transcription complete")
+                return result
+
+            # With aligner: use transcribe_any for word-to-sentence regrouping
+            result = self._transcribe_with_regrouping(audio_path, progress_callback, artifacts_dir, effective_context)
+        finally:
+            if original_max_tokens is not None and self.model is not None:
+                self.model.max_new_tokens = original_max_tokens
 
         process_time = time.time() - start_time
         segment_count = len(result.segments) if result.segments else 0
@@ -1048,6 +1137,9 @@ class QwenASR:
             load_time = time.time() - start_time
             logger.info(f"  Loaded (text-only) in {load_time:.1f}s")
 
+            # Apply generation safety controls (v1.8.9+)
+            self._apply_generation_config()
+
         except ImportError as e:
             raise ImportError(
                 "qwen-asr package required for QwenASR. "
@@ -1109,6 +1201,7 @@ class QwenASR:
         audio_paths: List[Union[str, Path]],
         contexts: Optional[List[str]] = None,
         language: Optional[str] = None,
+        audio_durations: Optional[List[float]] = None,
     ) -> List[str]:
         """
         Batch text generation WITHOUT forced alignment.
@@ -1117,17 +1210,24 @@ class QwenASR:
         The ASR model must be loaded via load_model_text_only() first
         (or will be loaded lazily).
 
+        Processes scenes one at a time with tqdm progress and per-scene
+        logging to eliminate the silent gap during long batch processing.
+
         Args:
             audio_paths: List of paths to audio files (one per scene)
             contexts: Optional per-scene context strings. If None, empty
                       context is used for all scenes.
             language: Language code (e.g., 'ja') or None for auto-detect.
                       Applied to all scenes uniformly.
+            audio_durations: Optional per-scene audio durations in seconds.
+                             Used for progress display only.
 
         Returns:
             List of raw transcription text strings (one per audio file).
             Empty string for scenes that produced no speech.
         """
+        from tqdm import tqdm
+
         n = len(audio_paths)
         if n == 0:
             return []
@@ -1154,41 +1254,67 @@ class QwenASR:
         audio_strs = [str(p) for p in audio_paths]
 
         logger.info(
-            "Assembly: Batch text generation — %d scenes, batch_size=%d, language=%s",
-            n, self.batch_size, qwen_language or "auto",
+            "Assembly: Text generation — %d scenes, language=%s",
+            n, qwen_language or "auto",
         )
 
-        start_time = time.time()
-
-        results = self.model.transcribe(
-            audio=audio_strs,
-            context=ctx_list,
-            language=qwen_language,
-            return_time_stamps=False,
-        )
-
-        elapsed = time.time() - start_time
-        logger.info("Assembly: Text generation complete in %.1fs (%d scenes)", elapsed, n)
-
-        # Extract text from ASRTranscription objects
         texts = []
-        for i, r in enumerate(results):
-            text = getattr(r, 'text', '').strip()
-            if text:
-                logger.debug(
-                    "Assembly: Scene %d/%d — %d chars: '%s...'",
-                    i + 1, n, len(text), text[:60],
+        batch_start = time.time()
+
+        with tqdm(
+            total=n,
+            desc="ASR Text Gen",
+            unit="scene",
+            bar_format="{desc} {bar} {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+        ) as pbar:
+            for i in range(n):
+                dur = audio_durations[i] if audio_durations else None
+                dur_str = f"{dur:.0f}s" if dur else "?"
+                pbar.set_description(f"ASR Text Gen | Scene {i+1}/{n} ({dur_str} audio)")
+
+                scene_start = time.time()
+
+                # Dynamic token budget (v1.8.9+): scale max_new_tokens to audio duration
+                scene_token_limit = self._compute_dynamic_token_limit(dur or 0)
+                original_max_tokens = self.model.max_new_tokens
+                self.model.max_new_tokens = scene_token_limit
+                try:
+                    result = self.model.transcribe(
+                        audio=[audio_strs[i]],
+                        context=[ctx_list[i]],
+                        language=qwen_language,
+                        return_time_stamps=False,
+                    )
+                finally:
+                    self.model.max_new_tokens = original_max_tokens
+
+                scene_elapsed = time.time() - scene_start
+                text = getattr(result[0], 'text', '').strip() if result else ''
+
+                # Per-scene log line (visible even without tqdm)
+                chars = len(text)
+                speed = chars / scene_elapsed if scene_elapsed > 0 else 0
+                budget_info = f", budget={scene_token_limit}" if scene_token_limit != self.max_new_tokens else ""
+                logger.info(
+                    "  Scene %d/%d: %d chars in %.1fs (%.1f chars/s) | audio=%s%s",
+                    i + 1, n, chars, scene_elapsed, speed, dur_str, budget_info,
                 )
-            else:
-                logger.debug("Assembly: Scene %d/%d — empty (silence/music)", i + 1, n)
 
-            # Store detected language from first non-empty result
-            if text and self._detected_language is None:
-                lang = getattr(r, 'language', None)
-                if lang:
-                    self._detected_language = lang
+                # Store detected language from first non-empty result
+                if text and self._detected_language is None and result:
+                    lang = getattr(result[0], 'language', None)
+                    if lang:
+                        self._detected_language = lang
 
-            texts.append(text)
+                pbar.update(1)
+                texts.append(text)
+
+        elapsed = time.time() - batch_start
+        avg = elapsed / n if n > 0 else 0
+        logger.info(
+            "Assembly: Text generation complete — %d scenes in %.1fs (avg %.1fs/scene)",
+            n, elapsed, avg,
+        )
 
         return texts
 
@@ -1197,6 +1323,7 @@ class QwenASR:
         audio_paths: List[Union[str, Path]],
         texts: List[str],
         language: Optional[str] = None,
+        audio_durations: Optional[List[float]] = None,
     ) -> List[Optional[Any]]:
         """
         Batch forced alignment using the standalone aligner.
@@ -1205,17 +1332,24 @@ class QwenASR:
         to produce word-level timestamps. The standalone aligner must be
         loaded via load_aligner_only() first (or will be loaded lazily).
 
+        Processes scenes one at a time with tqdm progress and per-scene
+        logging to provide continuous feedback during alignment.
+
         Args:
             audio_paths: List of paths to audio files (one per scene).
             texts: List of sanitized text strings (one per scene).
                    Empty strings are skipped (no alignment needed).
             language: Language code (e.g., 'ja'). Required by the aligner
                       for language-specific tokenization (nagisa for Japanese).
+            audio_durations: Optional per-scene audio durations in seconds.
+                             Used for progress display only.
 
         Returns:
             List of ForcedAlignResult objects (one per scene).
             None for scenes with empty text (silence/music).
         """
+        from tqdm import tqdm
+
         n = len(audio_paths)
         if n != len(texts):
             raise ValueError(
@@ -1239,9 +1373,10 @@ class QwenASR:
                 to_align_audio.append(str(path))
                 to_align_text.append(text)
 
+        n_with_text = len(to_align_indices)
         logger.info(
-            "Assembly: Batch alignment — %d/%d scenes have text, language=%s",
-            len(to_align_indices), n, qwen_language,
+            "Assembly: Alignment — %d/%d scenes with text, language=%s",
+            n_with_text, n, qwen_language,
         )
 
         # Initialize results with None for all scenes
@@ -1251,23 +1386,46 @@ class QwenASR:
             logger.info("Assembly: No scenes with text to align")
             return results
 
-        start_time = time.time()
+        batch_start = time.time()
 
-        # Run batch alignment
-        align_results = self._standalone_aligner.align(
-            audio=to_align_audio,
-            text=to_align_text,
-            language=qwen_language,
-        )
+        with tqdm(
+            total=n_with_text,
+            desc="Aligning",
+            unit="scene",
+            bar_format="{desc} {bar} {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+        ) as pbar:
+            for k, idx in enumerate(to_align_indices):
+                dur = audio_durations[idx] if audio_durations else None
+                dur_str = f"{dur:.0f}s" if dur else "?"
+                chars = len(to_align_text[k])
+                pbar.set_description(
+                    f"Aligning | Scene {idx+1}/{n} ({dur_str}, {chars} chars)"
+                )
 
-        # Map results back to scene indices
-        for k, idx in enumerate(to_align_indices):
-            results[idx] = align_results[k]
+                scene_start = time.time()
 
-        elapsed = time.time() - start_time
+                align_result = self._standalone_aligner.align(
+                    audio=[to_align_audio[k]],
+                    text=[to_align_text[k]],
+                    language=qwen_language,
+                )
+
+                scene_elapsed = time.time() - scene_start
+                results[idx] = align_result[0]
+
+                # Per-scene log line
+                logger.info(
+                    "  Scene %d/%d: aligned in %.1fs | audio=%s, %d chars",
+                    idx + 1, n, scene_elapsed, dur_str, chars,
+                )
+
+                pbar.update(1)
+
+        elapsed = time.time() - batch_start
+        avg = elapsed / n_with_text if n_with_text > 0 else 0
         logger.info(
-            "Assembly: Alignment complete in %.1fs (%d scenes aligned)",
-            elapsed, len(to_align_indices),
+            "Assembly: Alignment complete — %d scenes in %.1fs (avg %.1fs/scene)",
+            n_with_text, elapsed, avg,
         )
 
         return results
