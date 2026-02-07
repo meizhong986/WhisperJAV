@@ -522,6 +522,7 @@ class QwenPipeline(BasePipeline):
             scene_results = self._phase5_assembly(
                 scene_paths=scene_paths,
                 raw_subs_dir=raw_subs_dir,
+                speech_regions_per_scene=speech_regions_per_scene,
             )
         else:
             # ==============================================================
@@ -623,6 +624,9 @@ class QwenPipeline(BasePipeline):
             except ImportError:
                 pass
 
+        # Sentinel stats (only populated in assembly mode)
+        sentinel_stats = getattr(self, "_sentinel_stats", {})
+
         master_metadata["stages"]["asr"] = {
             "model_id": self.model_id,
             "input_mode": self.input_mode.value,
@@ -631,6 +635,8 @@ class QwenPipeline(BasePipeline):
             "scenes_transcribed": sum(1 for r, _ in scene_results if r is not None and r.segments),
             "scenes_empty": sum(1 for r, _ in scene_results if r is not None and not r.segments),
             "scenes_failed": sum(1 for r, _ in scene_results if r is None),
+            "alignment_collapses": sentinel_stats.get("alignment_collapses", 0),
+            "alignment_recoveries": sentinel_stats.get("alignment_recoveries", 0),
             "time_sec": time.time() - phase5_start,
         }
         logger.info("[QwenPipeline PID %s] Phase 5: Complete (%.1fs)", os.getpid(), time.time() - phase5_start)
@@ -926,6 +932,7 @@ class QwenPipeline(BasePipeline):
         self,
         scene_paths: List[Tuple],
         raw_subs_dir: Path,
+        speech_regions_per_scene: Optional[Dict] = None,
     ) -> List[Tuple[Optional[stable_whisper.WhisperResult], int]]:
         """
         Execute the Decoupled Assembly Line flow for Phase 5.
@@ -946,6 +953,9 @@ class QwenPipeline(BasePipeline):
         Args:
             scene_paths: List of (path, start_sec, end_sec, dur_sec) tuples.
             raw_subs_dir: Directory for debug artifacts.
+            speech_regions_per_scene: Dict mapping scene index to
+                SegmentationResult from Phase 4. Used by the alignment
+                sentinel for VAD-guided collapse recovery.
 
         Returns:
             List of (WhisperResult, scene_index) tuples matching the
@@ -954,6 +964,10 @@ class QwenPipeline(BasePipeline):
         from whisperjav.modules.qwen_asr import QwenASR, merge_master_with_timestamps
         from whisperjav.modules.assembly_text_cleaner import (
             AssemblyTextCleaner, AssemblyCleanerConfig,
+        )
+        from whisperjav.modules.alignment_sentinel import (
+            assess_alignment_quality,
+            redistribute_collapsed_words,
         )
 
         n_scenes = len(scene_paths)
@@ -1110,6 +1124,8 @@ class QwenPipeline(BasePipeline):
         )
 
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
+        collapse_count = 0
+        recovery_count = 0
 
         for idx in range(n_scenes):
             scene_path, start_sec, end_sec, dur_sec = scene_paths[idx]
@@ -1144,6 +1160,45 @@ class QwenPipeline(BasePipeline):
                     )
                     scene_results.append((None, idx))
                     continue
+
+                # ── Alignment Sentinel: detect and recover from collapse ──
+                assessment = assess_alignment_quality(words, dur_sec)
+
+                if assessment["status"] == "COLLAPSED":
+                    collapse_count += 1
+                    logger.warning(
+                        "[SENTINEL] Scene %d/%d: Alignment Collapse — "
+                        "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
+                        idx + 1, n_scenes,
+                        assessment["coverage_ratio"] * 100,
+                        assessment["aggregate_cps"],
+                        assessment["char_count"],
+                        assessment["word_span_sec"],
+                    )
+
+                    # Extract VAD regions for this scene (if available)
+                    vad_regions = None
+                    if speech_regions_per_scene and idx in speech_regions_per_scene:
+                        seg_result = speech_regions_per_scene[idx]
+                        vad_regions = [
+                            (s.start_sec, s.end_sec) for s in seg_result.segments
+                        ]
+
+                    # Recover: redistribute words across speech regions
+                    words = redistribute_collapsed_words(
+                        words, dur_sec, vad_regions,
+                    )
+                    recovery_count += 1
+
+                    recovery_method = "VAD_RESCUE" if vad_regions else "PROPORTIONAL"
+                    new_span = (
+                        words[-1]["end"] - words[0]["start"] if words else 0
+                    )
+                    logger.info(
+                        "[SENTINEL] Scene %d/%d: Recovered via %s — "
+                        "new span: %.1fs",
+                        idx + 1, n_scenes, recovery_method, new_span,
+                    )
 
             # [DIAG] Post-merge diagnostics: word count, duration, CPS
             n_words = len(words)
@@ -1215,6 +1270,12 @@ class QwenPipeline(BasePipeline):
                     idx + 1, n_scenes, e,
                 )
                 scene_results.append((None, idx))
+
+        # Store sentinel stats for metadata (read by process())
+        self._sentinel_stats = {
+            "alignment_collapses": collapse_count,
+            "alignment_recoveries": recovery_count,
+        }
 
         return scene_results
 
