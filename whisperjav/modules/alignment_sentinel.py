@@ -6,14 +6,16 @@ The ForcedAligner sometimes "collapses": it maps all words in a scene to a
 The ASR text is correct, but the timestamps are garbage.
 
 This module provides:
+    extract_words_from_result()  — extract word dicts from WhisperResult
     assess_alignment_quality()   — detect collapse signatures
     redistribute_collapsed_words() — recover by redistributing timestamps
 
 Architecture: standalone module-level functions (no class), same pattern as
 merge_master_with_timestamps() in qwen_asr.py.  Independently testable.
 
-Integration point: Phase 5 Assembly Step 8, after merge_master_with_timestamps()
-and before transcribe_any().
+Integration points:
+    - Assembly mode: Phase 5 Step 8, after merge_master_with_timestamps()
+    - Coupled modes: after asr.transcribe() returns a WhisperResult
 """
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -117,6 +119,36 @@ def assess_alignment_quality(
         )
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Word extraction (coupled-mode adapter)
+# ---------------------------------------------------------------------------
+
+def extract_words_from_result(result) -> List[Dict[str, Any]]:
+    """
+    Extract word dicts from a WhisperResult's segments.
+
+    Produces the same [{word, start, end}] format as merge_master_with_timestamps(),
+    enabling the existing sentinel + recovery pipeline to work on coupled-mode results
+    (where only the final WhisperResult is available, not raw word dicts).
+
+    Args:
+        result: A stable_whisper.WhisperResult with .segments, each segment
+                having .text, .start, .end, and optionally .words attributes.
+
+    Returns:
+        List of word dicts: [{'word': str, 'start': float, 'end': float}, ...]
+    """
+    words = []
+    for seg in result.segments:
+        if hasattr(seg, 'words') and seg.words:
+            for w in seg.words:
+                words.append({'word': w.word, 'start': w.start, 'end': w.end})
+        else:
+            # Segment has no word-level data — treat segment text as single "word"
+            words.append({'word': seg.text.strip(), 'start': seg.start, 'end': seg.end})
+    return words
 
 
 # ---------------------------------------------------------------------------

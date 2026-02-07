@@ -528,12 +528,22 @@ class QwenPipeline(BasePipeline):
             # ==============================================================
             # COUPLED MODES: Context-Aware / VAD Slicing
             # ==============================================================
+            from whisperjav.modules.alignment_sentinel import (
+                extract_words_from_result,
+                assess_alignment_quality,
+                redistribute_collapsed_words,
+            )
+
             asr = QwenASR(**self._asr_config)
 
             # Context biasing: user context applies to first scene only (MVP).
             # Cross-scene propagation is gated by self.cross_scene_context flag.
             user_context = self._asr_config.get("context", "")
             previous_tail = ""
+
+            # Sentinel tracking (same contract as assembly mode)
+            collapse_count = 0
+            recovery_count = 0
 
             for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
                 scene_num = idx + 1
@@ -567,6 +577,46 @@ class QwenPipeline(BasePipeline):
                         )
 
                         if result and result.segments:
+                            # ── Alignment Sentinel: detect collapsed timestamps ──
+                            words = extract_words_from_result(result)
+                            assessment = assess_alignment_quality(words, dur_sec)
+
+                            if assessment["status"] == "COLLAPSED":
+                                collapse_count += 1
+                                logger.warning(
+                                    "[SENTINEL] Scene %d/%d: Alignment Collapse — "
+                                    "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
+                                    scene_num, len(scene_paths),
+                                    assessment["coverage_ratio"] * 100,
+                                    assessment["aggregate_cps"],
+                                    assessment["char_count"],
+                                    assessment["word_span_sec"],
+                                )
+
+                                # VAD regions for this scene (if available from Phase 4)
+                                vad_regions = None
+                                if idx in speech_regions_per_scene:
+                                    vad_regions = [
+                                        (s.start_sec, s.end_sec)
+                                        for s in speech_regions_per_scene[idx].segments
+                                    ]
+
+                                corrected_words = redistribute_collapsed_words(
+                                    words, dur_sec, vad_regions,
+                                )
+                                result = self._reconstruct_from_words(
+                                    corrected_words, scene_path,
+                                )
+                                recovery_count += 1
+
+                                recovery_method = "VAD_RESCUE" if vad_regions else "PROPORTIONAL"
+                                logger.info(
+                                    "[SENTINEL] Scene %d/%d: Recovered via %s",
+                                    scene_num, len(scene_paths), recovery_method,
+                                )
+
+                            # Interpolation handles remaining null gaps in the
+                            # (possibly recovered) result
                             if self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
                                 interp_count = self._apply_timestamp_interpolation(result)
                                 if interp_count:
@@ -597,6 +647,35 @@ class QwenPipeline(BasePipeline):
                             artifacts_dir=raw_subs_dir,
                         )
 
+                        # ── Alignment Sentinel: detect collapsed timestamps ──
+                        if result and result.segments:
+                            words = extract_words_from_result(result)
+                            assessment = assess_alignment_quality(words, dur_sec)
+
+                            if assessment["status"] == "COLLAPSED":
+                                collapse_count += 1
+                                logger.warning(
+                                    "[SENTINEL] Scene %d/%d: Alignment Collapse — "
+                                    "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
+                                    scene_num, len(scene_paths),
+                                    assessment["coverage_ratio"] * 100,
+                                    assessment["aggregate_cps"],
+                                    assessment["char_count"],
+                                    assessment["word_span_sec"],
+                                )
+
+                                corrected_words = redistribute_collapsed_words(
+                                    words, dur_sec,
+                                )
+                                result = self._reconstruct_from_words(
+                                    corrected_words, scene_path,
+                                )
+                                recovery_count += 1
+                                logger.info(
+                                    "[SENTINEL] Scene %d/%d: Recovered via PROPORTIONAL",
+                                    scene_num, len(scene_paths),
+                                )
+
                     segment_count = len(result.segments) if result and result.segments else 0
                     scene_results.append((result, idx))
 
@@ -624,7 +703,13 @@ class QwenPipeline(BasePipeline):
             except ImportError:
                 pass
 
-        # Sentinel stats (only populated in assembly mode)
+            # Store sentinel stats from coupled modes
+            self._sentinel_stats = {
+                "alignment_collapses": collapse_count,
+                "alignment_recoveries": recovery_count,
+            }
+
+        # Sentinel stats (populated by both assembly and coupled modes)
         sentinel_stats = getattr(self, "_sentinel_stats", {})
 
         master_metadata["stages"]["asr"] = {
@@ -866,6 +951,30 @@ class QwenPipeline(BasePipeline):
 
             if result is None or not result.segments:
                 continue
+
+            # ── Alignment Sentinel: detect collapsed timestamps ──
+            # Per-group: no sub-group VAD available (the entire clip IS
+            # a speech region), so Strategy B (proportional) is used.
+            from whisperjav.modules.alignment_sentinel import (
+                extract_words_from_result,
+                assess_alignment_quality,
+                redistribute_collapsed_words,
+            )
+            words = extract_words_from_result(result)
+            assessment = assess_alignment_quality(words, group_duration)
+
+            if assessment["status"] == "COLLAPSED":
+                corrected_words = redistribute_collapsed_words(
+                    words, group_duration,
+                )
+                result = self._reconstruct_from_words(
+                    corrected_words, region_path,
+                )
+                logger.warning(
+                    "[SENTINEL] Speech region %d/%d: Alignment collapse "
+                    "recovered (PROPORTIONAL)",
+                    group_idx + 1, total_groups,
+                )
 
             # ── Timestamp resolution ──────────────────────────────────
             # Apply configured timestamp mode BEFORE offsetting to
@@ -1296,6 +1405,48 @@ class QwenPipeline(BasePipeline):
                 for word in seg.words:
                     word.start += offset_sec
                     word.end += offset_sec
+
+    # ------------------------------------------------------------------
+    # Sentinel reconstruction helper (shared by assembly + coupled modes)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _reconstruct_from_words(
+        words: List[Dict],
+        audio_path,
+    ) -> stable_whisper.WhisperResult:
+        """
+        Reconstruct a WhisperResult from word dicts via transcribe_any.
+
+        Uses stable-ts's transcribe_any() with a pre-computed inference function
+        (Option A) to get proper sentence-level regrouping. This is the same
+        pattern used inline in assembly Step 8, extracted for reuse by both
+        assembly and coupled-mode sentinel recovery.
+
+        Args:
+            words: List of {'word': str, 'start': float, 'end': float} dicts.
+            audio_path: Path to the audio file (needed by transcribe_any for
+                        duration metadata, not re-transcribed).
+
+        Returns:
+            Reconstructed WhisperResult with sentence-level regrouping.
+        """
+        precomputed = words
+
+        def precomputed_inference(audio, **kwargs):
+            return [precomputed]
+
+        return stable_whisper.transcribe_any(
+            inference_func=precomputed_inference,
+            audio=str(audio_path),
+            audio_type='str',
+            regroup=True,
+            vad=False,
+            demucs=False,
+            suppress_silence=True,
+            suppress_word_ts=True,
+            verbose=False,
+        )
 
     # ------------------------------------------------------------------
     # Timestamp resolution helpers
