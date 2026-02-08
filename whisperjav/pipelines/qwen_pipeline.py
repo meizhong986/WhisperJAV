@@ -20,6 +20,7 @@ See: docs/architecture/ADR-004-dedicated-qwen-pipeline.md
 """
 
 import gc
+import json
 import os
 import shutil
 import time
@@ -492,6 +493,14 @@ class QwenPipeline(BasePipeline):
         else:
             logger.info("[QwenPipeline PID %s] Phase 4: Skipped (segmenter=none)", os.getpid())
 
+        # Collect VAD speech regions per scene for diagnostics (Phase 2)
+        vad_regions_data: Dict[int, list] = {}
+        for _v_idx, _v_seg in speech_regions_per_scene.items():
+            vad_regions_data[_v_idx] = [
+                {"start": round(s.start_sec, 3), "end": round(s.end_sec, 3)}
+                for s in _v_seg.segments
+            ]
+
         # ==============================================================
         # PHASE 5: ASR TRANSCRIPTION (VRAM Block 2)
         # ==============================================================
@@ -548,6 +557,9 @@ class QwenPipeline(BasePipeline):
                 "alignment_recoveries": 0,
             }
 
+            # Per-scene diagnostics (Phase 2: pipeline metadata emission)
+            self._scene_diagnostics: Dict[int, dict] = {}
+
             for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
                 scene_num = idx + 1
                 logger.info(
@@ -579,10 +591,19 @@ class QwenPipeline(BasePipeline):
                             artifacts_dir=raw_subs_dir,
                         )
 
+                        # Diagnostics tracking
+                        _diag_sentinel = {"status": "N/A", "assessment": None, "recovery": None}
+                        _diag_interp_count = 0
+
                         if result and result.segments:
                             # ── Alignment Sentinel: detect collapsed timestamps ──
                             words = extract_words_from_result(result)
                             assessment = assess_alignment_quality(words, dur_sec)
+                            _diag_sentinel = {
+                                "status": assessment["status"],
+                                "assessment": assessment,
+                                "recovery": None,
+                            }
 
                             if assessment["status"] == "COLLAPSED":
                                 self._sentinel_stats["alignment_collapses"] += 1
@@ -613,6 +634,10 @@ class QwenPipeline(BasePipeline):
                                 self._sentinel_stats["alignment_recoveries"] += 1
 
                                 recovery_method = "VAD_RESCUE" if vad_regions else "PROPORTIONAL"
+                                _diag_sentinel["recovery"] = {
+                                    "strategy": "vad_guided" if vad_regions else "proportional",
+                                    "words_redistributed": len(corrected_words),
+                                }
                                 logger.info(
                                     "[SENTINEL] Scene %d/%d: Recovered via %s",
                                     scene_num, len(scene_paths), recovery_method,
@@ -621,12 +646,30 @@ class QwenPipeline(BasePipeline):
                             # Interpolation handles remaining null gaps in the
                             # (possibly recovered) result
                             if self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
-                                interp_count = self._apply_timestamp_interpolation(result)
-                                if interp_count:
+                                _diag_interp_count = self._apply_timestamp_interpolation(result)
+                                if _diag_interp_count:
                                     logger.debug(
                                         "Phase 5: Scene %d — interpolated timestamps for %d segments",
-                                        scene_num, interp_count,
+                                        scene_num, _diag_interp_count,
                                     )
+
+                        # Build per-scene diagnostics
+                        _total_segs = len(result.segments) if result and result.segments else 0
+                        self._scene_diagnostics[idx] = {
+                            "schema_version": "1.0.0",
+                            "scene_index": idx,
+                            "scene_start_sec": start_sec,
+                            "scene_end_sec": end_sec,
+                            "scene_duration_sec": dur_sec,
+                            "input_mode": self.input_mode.value,
+                            "sentinel": _diag_sentinel,
+                            "timing_sources": {
+                                "aligner_native": max(0, _total_segs - _diag_interp_count),
+                                "interpolated": _diag_interp_count,
+                                "total_segments": _total_segs,
+                            },
+                            "vad_regions": vad_regions_data.get(idx, []),
+                        }
 
                     elif self.input_mode == InputMode.VAD_SLICING and idx in speech_regions_per_scene:
                         logger.debug(
@@ -638,6 +681,10 @@ class QwenPipeline(BasePipeline):
                             asr=asr,
                             context=scene_context if scene_context else None,
                             artifacts_dir=raw_subs_dir,
+                            scene_idx=idx,
+                            scene_start_sec=start_sec,
+                            scene_end_sec=end_sec,
+                            scene_duration_sec=dur_sec,
                         )
                     else:
                         logger.debug(
@@ -650,10 +697,18 @@ class QwenPipeline(BasePipeline):
                             artifacts_dir=raw_subs_dir,
                         )
 
+                        # Diagnostics tracking (fallback path)
+                        _diag_sentinel = {"status": "N/A", "assessment": None, "recovery": None}
+
                         # ── Alignment Sentinel: detect collapsed timestamps ──
                         if result and result.segments:
                             words = extract_words_from_result(result)
                             assessment = assess_alignment_quality(words, dur_sec)
+                            _diag_sentinel = {
+                                "status": assessment["status"],
+                                "assessment": assessment,
+                                "recovery": None,
+                            }
 
                             if assessment["status"] == "COLLAPSED":
                                 self._sentinel_stats["alignment_collapses"] += 1
@@ -674,10 +729,31 @@ class QwenPipeline(BasePipeline):
                                     corrected_words, scene_path,
                                 )
                                 self._sentinel_stats["alignment_recoveries"] += 1
+                                _diag_sentinel["recovery"] = {
+                                    "strategy": "proportional",
+                                    "words_redistributed": len(corrected_words),
+                                }
                                 logger.info(
                                     "[SENTINEL] Scene %d/%d: Recovered via PROPORTIONAL",
                                     scene_num, len(scene_paths),
                                 )
+
+                        # Build per-scene diagnostics (fallback path)
+                        _total_segs = len(result.segments) if result and result.segments else 0
+                        self._scene_diagnostics[idx] = {
+                            "schema_version": "1.0.0",
+                            "scene_index": idx,
+                            "scene_start_sec": start_sec,
+                            "scene_end_sec": end_sec,
+                            "scene_duration_sec": dur_sec,
+                            "input_mode": "fallback",
+                            "sentinel": _diag_sentinel,
+                            "timing_sources": {
+                                "aligner_native": _total_segs,
+                                "total_segments": _total_segs,
+                            },
+                            "vad_regions": vad_regions_data.get(idx, []),
+                        }
 
                     segment_count = len(result.segments) if result and result.segments else 0
                     scene_results.append((result, idx))
@@ -708,6 +784,17 @@ class QwenPipeline(BasePipeline):
 
             # self._sentinel_stats already accumulated during the loop
             # (including from _transcribe_speech_regions() calls)
+
+            # Save per-scene diagnostics JSON (Phase 2)
+            for _d_idx, _d_data in getattr(self, "_scene_diagnostics", {}).items():
+                try:
+                    diag_path = raw_subs_dir / f"scene_{_d_idx:04d}_diagnostics.json"
+                    diag_path.write_text(
+                        json.dumps(_d_data, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                except Exception:
+                    pass
 
         # Sentinel stats (populated by both assembly and coupled modes)
         sentinel_stats = getattr(self, "_sentinel_stats", {})
@@ -866,6 +953,10 @@ class QwenPipeline(BasePipeline):
         asr,
         context: Optional[str] = None,
         artifacts_dir: Optional[Path] = None,
+        scene_idx: Optional[int] = None,
+        scene_start_sec: float = 0.0,
+        scene_end_sec: float = 0.0,
+        scene_duration_sec: float = 0.0,
     ) -> Optional[stable_whisper.WhisperResult]:
         """
         Transcribe individual speech regions from a scene.
@@ -906,6 +997,12 @@ class QwenPipeline(BasePipeline):
         combined_result = None
         total_groups = len(seg_result.groups)
         total_fallback_applied = 0
+
+        # Per-group diagnostics tracking
+        _diag_collapses = 0
+        _diag_recoveries = 0
+        _diag_interp_count = 0
+        _diag_vad_fallback_count = 0
 
         for group_idx, group in enumerate(seg_result.groups):
             if not group:
@@ -973,6 +1070,8 @@ class QwenPipeline(BasePipeline):
                 # Accumulate into instance-level stats (read by process())
                 self._sentinel_stats["alignment_collapses"] += 1
                 self._sentinel_stats["alignment_recoveries"] += 1
+                _diag_collapses += 1
+                _diag_recoveries += 1
                 logger.warning(
                     "[SENTINEL] Speech region %d/%d: Alignment collapse "
                     "recovered (PROPORTIONAL)",
@@ -991,6 +1090,7 @@ class QwenPipeline(BasePipeline):
                 interp = self._apply_timestamp_interpolation(result)
                 if interp:
                     total_fallback_applied += interp
+                    _diag_interp_count += interp
                     logger.debug(
                         "Phase 5: Interpolated timestamps for %d/%d segments "
                         "in speech region %d/%d [%.2f-%.2fs]",
@@ -1003,6 +1103,7 @@ class QwenPipeline(BasePipeline):
                 fb = self._apply_vad_timestamp_fallback(result, group_duration)
                 if fb:
                     total_fallback_applied += fb
+                    _diag_vad_fallback_count += fb
                     logger.info(
                         "Phase 5: VAD timestamp fallback applied to %d/%d segments "
                         "in speech region %d/%d [%.2f-%.2fs]",
@@ -1033,6 +1134,37 @@ class QwenPipeline(BasePipeline):
                     total_fallback_applied, len(combined_result.segments),
                     self.timestamp_mode.value,
                 )
+
+        # Build per-scene diagnostics (VAD_SLICING)
+        if scene_idx is not None and hasattr(self, "_scene_diagnostics"):
+            _total_segs = len(combined_result.segments) if combined_result and combined_result.segments else 0
+            _aligner_native = max(0, _total_segs - _diag_interp_count - _diag_vad_fallback_count)
+            self._scene_diagnostics[scene_idx] = {
+                "schema_version": "1.0.0",
+                "scene_index": scene_idx,
+                "scene_start_sec": scene_start_sec,
+                "scene_end_sec": scene_end_sec,
+                "scene_duration_sec": scene_duration_sec,
+                "input_mode": "vad_slicing",
+                "sentinel": {
+                    "status": "COLLAPSED" if _diag_collapses > 0 else "OK",
+                    "assessment": None,
+                    "recovery": {
+                        "strategy": "proportional",
+                        "groups_recovered": _diag_recoveries,
+                    } if _diag_recoveries > 0 else None,
+                },
+                "timing_sources": {
+                    "aligner_native": _aligner_native,
+                    "vad_fallback": _diag_vad_fallback_count,
+                    "interpolated": _diag_interp_count,
+                    "total_segments": _total_segs,
+                },
+                "vad_regions": [
+                    {"start": round(s.start_sec, 3), "end": round(s.end_sec, 3)}
+                    for s in seg_result.segments
+                ],
+            }
 
         return combined_result
 
@@ -1085,6 +1217,15 @@ class QwenPipeline(BasePipeline):
         n_scenes = len(scene_paths)
         user_context = self._asr_config.get("context", "")
         language = self._asr_config.get("language", None)
+
+        # Build VAD regions data for diagnostics
+        vad_regions_data: Dict[int, list] = {}
+        if speech_regions_per_scene:
+            for _v_idx, _v_seg in speech_regions_per_scene.items():
+                vad_regions_data[_v_idx] = [
+                    {"start": round(s.start_sec, 3), "end": round(s.end_sec, 3)}
+                    for s in _v_seg.segments
+                ]
 
         # Build per-scene context list (MVP: user context for scene 0 only)
         contexts = []
@@ -1238,11 +1379,15 @@ class QwenPipeline(BasePipeline):
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
         collapse_count = 0
         recovery_count = 0
+        _assembly_diagnostics: Dict[int, dict] = {}
 
         for idx in range(n_scenes):
             scene_path, start_sec, end_sec, dur_sec = scene_paths[idx]
             text = clean_texts[idx]
             timestamps = align_results[idx]
+
+            # Diagnostics tracking for this scene
+            _diag_sentinel = {"status": "N/A", "assessment": None, "recovery": None}
 
             if not text or not text.strip():
                 # Empty scene (silence/music) — no transcription
@@ -1275,6 +1420,11 @@ class QwenPipeline(BasePipeline):
 
                 # ── Alignment Sentinel: detect and recover from collapse ──
                 assessment = assess_alignment_quality(words, dur_sec)
+                _diag_sentinel = {
+                    "status": assessment["status"],
+                    "assessment": assessment,
+                    "recovery": None,
+                }
 
                 if assessment["status"] == "COLLAPSED":
                     collapse_count += 1
@@ -1302,6 +1452,10 @@ class QwenPipeline(BasePipeline):
                     )
                     recovery_count += 1
 
+                    _diag_sentinel["recovery"] = {
+                        "strategy": "vad_guided" if vad_regions else "proportional",
+                        "words_redistributed": len(words),
+                    }
                     recovery_method = "VAD_RESCUE" if vad_regions else "PROPORTIONAL"
                     new_span = (
                         words[-1]["end"] - words[0]["start"] if words else 0
@@ -1337,7 +1491,6 @@ class QwenPipeline(BasePipeline):
             # Save merged word artifacts for debugging
             if raw_subs_dir:
                 try:
-                    import json
                     artifact_path = raw_subs_dir / f"scene_{idx:04d}_assembly_merged.json"
                     artifact_path.write_text(
                         json.dumps(words, ensure_ascii=False, indent=2),
@@ -1345,6 +1498,28 @@ class QwenPipeline(BasePipeline):
                     )
                 except Exception:
                     pass
+
+            # Build per-scene diagnostics (assembly mode)
+            _raw_chars = len(raw_texts[idx]) if idx < len(raw_texts) and raw_texts[idx] else 0
+            _clean_chars = len(clean_texts[idx]) if idx < len(clean_texts) and clean_texts[idx] else 0
+            _assembly_diagnostics[idx] = {
+                "schema_version": "1.0.0",
+                "scene_index": idx,
+                "scene_start_sec": start_sec,
+                "scene_end_sec": end_sec,
+                "scene_duration_sec": dur_sec,
+                "input_mode": "assembly",
+                "sentinel": _diag_sentinel,
+                "timing_sources": {
+                    "aligner_native": n_words,
+                    "total_segments": n_words,
+                },
+                "vad_regions": vad_regions_data.get(idx, []),
+                "asr_stats": {
+                    "raw_char_count": _raw_chars,
+                    "clean_char_count": _clean_chars,
+                },
+            }
 
             # Reconstruct WhisperResult via shared helper (Option A).
             # Uses transcribe_any with pre-computed words for stable-ts
@@ -1366,6 +1541,17 @@ class QwenPipeline(BasePipeline):
                     idx + 1, n_scenes, e,
                 )
                 scene_results.append((None, idx))
+
+        # Save assembly diagnostics JSON
+        for _d_idx, _d_data in _assembly_diagnostics.items():
+            try:
+                diag_path = raw_subs_dir / f"scene_{_d_idx:04d}_diagnostics.json"
+                diag_path.write_text(
+                    json.dumps(_d_data, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
 
         # Store sentinel stats for metadata (read by process())
         self._sentinel_stats = {

@@ -274,6 +274,7 @@ whisperjav = "whisperjav.main:main"
 whisperjav-gui = "whisperjav.webview_gui.main:main"
 whisperjav-translate = "whisperjav.translate.cli:main"
 whisperjav-upgrade = "whisperjav.upgrade:main"
+whisperjav-bench = "whisperjav.bench.cli:main"
 
 # -----------------------------------------------------------------------------
 # Project URLs
