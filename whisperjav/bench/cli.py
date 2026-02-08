@@ -72,6 +72,11 @@ Examples:
         help="Scene indices to show detailed drill-down for.",
     )
     parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="Print full sub provenance traceability table for each test.",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable verbose logging.",
@@ -97,6 +102,8 @@ def main(argv=None):
         analyze,
         print_scene_detail,
         print_summary,
+        print_timing_analytics,
+        print_traceability_table,
         write_json_report,
     )
 
@@ -127,6 +134,14 @@ def main(argv=None):
 
     # Print console summary
     print_summary(analysis, benchmark_name=args.name)
+
+    # Timing source analytics (always shown when provenance data exists)
+    print_timing_analytics(analysis)
+
+    # Full provenance traceability table
+    if args.trace:
+        for t_idx in range(len(tests)):
+            print_traceability_table(analysis, t_idx)
 
     # Scene drill-down
     if args.scene_detail is not None:

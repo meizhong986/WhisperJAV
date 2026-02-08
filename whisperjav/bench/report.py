@@ -17,10 +17,15 @@ from typing import List, Optional
 from whisperjav.bench.loader import SubtitleEntry, SceneBoundary, TestResult
 from whisperjav.bench.matcher import match_subtitles, match_subtitles_by_scene
 from whisperjav.bench.metrics import (
+    analyze_temporal_order,
     compute_cer_from_segments,
     compute_iou,
     compute_timing_offsets,
     compute_timing_score,
+)
+from whisperjav.bench.provenance import (
+    build_sub_provenance,
+    compute_timing_source_analytics,
 )
 
 
@@ -102,6 +107,9 @@ def analyze(
         san_stage = stages.get("sanitisation", {})
         san_stats = san_stage.get("stats", {})
 
+        # Temporal ordering integrity
+        temporal_order = analyze_temporal_order(test_dicts)
+
         test_analysis = {
             "name": t.name,
             "input_mode": t.input_mode,
@@ -109,6 +117,7 @@ def analyze(
             "cer": global_cer,
             "timing_iou": timing_iou,
             "timing_offsets": timing_offsets,
+            "temporal_order": temporal_order,
             "subtitle_count": len(t.final_srt),
             "matched_count": len(matched),
             "missed_count": len(match_result["missed"]),
@@ -149,6 +158,29 @@ def analyze(
                 }
 
         test_analysis["scene_metrics"] = scene_metrics
+
+        # --- Sub provenance traceability ---
+        # Build GT match map: test sub index -> (gt_sub, iou)
+        gt_match_map = {}
+        for gt_sub, test_sub in matched:
+            iou = compute_iou(
+                gt_sub["start"], gt_sub["end"],
+                test_sub["start"], test_sub["end"],
+            )
+            gt_match_map[test_sub["index"]] = (gt_sub, iou)
+
+        provenances = build_sub_provenance(
+            test_dicts,
+            t.scene_boundaries,
+            t.scene_diagnostics,
+            gt_match_map,
+            temporal_order,
+        )
+        analytics = compute_timing_source_analytics(provenances)
+
+        test_analysis["provenance"] = provenances
+        test_analysis["timing_analytics"] = analytics
+
         test_analyses.append(test_analysis)
 
     result["tests"] = test_analyses
@@ -299,6 +331,39 @@ def print_summary(
                 file=out,
             )
 
+    # Temporal ordering integrity
+    any_order_issues = any(
+        not t["temporal_order"]["is_monotonic"] or t["temporal_order"]["overlap_count"] > 0
+        for t in tests
+    )
+    if any_order_issues:
+        print("\nTemporal ordering:", file=out)
+        for t in tests:
+            to = t["temporal_order"]
+            issues = []
+            if not to["is_monotonic"]:
+                issues.append(
+                    f"{to['regression_count']} regressions "
+                    f"(max {to['max_regression_sec']:.1f}s back)"
+                )
+            if to["overlap_count"] > 0:
+                issues.append(
+                    f"{to['overlap_count']} overlaps "
+                    f"({to['total_overlap_sec']:.1f}s total)"
+                )
+            if issues:
+                print(f"  {t['name']}: {', '.join(issues)}", file=out)
+                # Show each regression detail
+                for reg in to["regressions"]:
+                    print(
+                        f"    Sub #{reg['prev_index']} ({_fmt_time_precise(reg['prev_start'])}) "
+                        f"-> #{reg['curr_index']} ({_fmt_time_precise(reg['curr_start'])}): "
+                        f"-{reg['regression_sec']:.1f}s",
+                        file=out,
+                    )
+            else:
+                print(f"  {t['name']}: OK", file=out)
+
     # Pipeline events
     print("\nPipeline events:", file=out)
     for t in tests:
@@ -321,6 +386,165 @@ def print_summary(
         else:
             print(f"  {t['name']}: (clean run)", file=out)
 
+    print(file=out)
+
+
+# ---------------------------------------------------------------------------
+# Timing source analytics
+# ---------------------------------------------------------------------------
+
+def print_timing_analytics(
+    analysis: dict,
+    file=None,
+):
+    """Print timing source analytics for each test."""
+    out = file or sys.stdout
+    tests = analysis.get("tests", [])
+
+    has_analytics = any(t.get("timing_analytics") for t in tests)
+    if not has_analytics:
+        return
+
+    print("Timing Source Analytics:", file=out)
+    for t in tests:
+        analytics = t.get("timing_analytics")
+        if not analytics:
+            continue
+
+        total = analytics["total_subs"]
+        matched = analytics["total_matched"]
+        print(
+            f"  {t['name']}: {t['input_mode']} "
+            f"({total} subs, {matched} matched)",
+            file=out,
+        )
+
+        for source, stats in sorted(analytics["by_timing_source"].items()):
+            count = stats["count"]
+            pct = stats["pct"]
+            mean_iou = stats["mean_iou"]
+            good = stats["good_pct"]
+            acceptable = stats["acceptable_pct"]
+
+            iou_str = f"{mean_iou:.2f}" if mean_iou is not None else " n/a"
+            print(
+                f"    {source:<22} {count:3d} ({pct:4.1f}%) "
+                f"| IoU: {iou_str} "
+                f"| Good: {good:5.1f}% "
+                f"| Accept: {acceptable:5.1f}%",
+                file=out,
+            )
+
+        oob = analytics["out_of_bounds_count"]
+        reg = analytics["regression_count"]
+        ovlp = analytics["overlap_count"]
+        if oob or reg or ovlp:
+            parts = []
+            if oob:
+                parts.append(f"Out of bounds: {oob}")
+            if reg:
+                parts.append(f"Regressions: {reg}")
+            if ovlp:
+                parts.append(f"Overlaps: {ovlp}")
+            print(f"    {' | '.join(parts)}", file=out)
+
+    print(file=out)
+
+
+# ---------------------------------------------------------------------------
+# Traceability table
+# ---------------------------------------------------------------------------
+
+def print_traceability_table(
+    analysis: dict,
+    test_index: int,
+    file=None,
+):
+    """
+    Print full per-sub provenance traceability table for a single test.
+
+    Args:
+        analysis: Full analysis dict from analyze().
+        test_index: 0-based index into analysis["tests"].
+        file: Output stream (default: stdout).
+    """
+    out = file or sys.stdout
+    tests = analysis.get("tests", [])
+    if test_index < 0 or test_index >= len(tests):
+        print(f"Test index {test_index} out of range.", file=out)
+        return
+
+    t = tests[test_index]
+    provenances = t.get("provenance", [])
+    if not provenances:
+        print(f"No provenance data for {t['name']}.", file=out)
+        return
+
+    print(f"\nSub Provenance: {t['name']}: {t['input_mode']}", file=out)
+
+    header = (
+        f"{'#':>4}  {'Start->End':<19} {'Dur':>5}  "
+        f"{'Scn':>3}  {'SceneRange':<21} {'Rel.Start':>9}  "
+        f"{'VAD':>3}  {'Source':<22} {'GT#':>4}  {'IoU':>5}  {'Flags'}"
+    )
+    sep_line = "=" * len(header)
+    print(sep_line, file=out)
+    print(header, file=out)
+    print(sep_line, file=out)
+
+    for p in provenances:
+        idx = p["sub_index"]
+        start_str = _fmt_time_precise(p["start"])[3:]  # Skip leading "00:" for MM:SS.fff
+        end_str = _fmt_time_precise(p["end"])[3:]
+        time_range = f"{start_str}->{end_str}"
+        dur_str = f"{p['duration']:.1f}s"
+
+        scn = f"{p['scene_index']}" if p["scene_index"] is not None else "?"
+        if p["scene_index"] is not None:
+            scene_range = (
+                f"{_fmt_time_precise(p['scene_start'])[3:]}->"
+                f"{_fmt_time_precise(p['scene_end'])[3:]}"
+            )
+        else:
+            scene_range = "?"
+
+        rel_start = f"{p['scene_relative_start']:.1f}s" if p["scene_index"] is not None else "?"
+
+        vad = f"{p['vad_group_index']}" if p["vad_group_index"] is not None else "-"
+        source = p["timing_source"]
+
+        gt_idx = f"{p['gt_match_index']}" if p["gt_match_index"] is not None else "-"
+        iou_str = f"{p['gt_iou']:.2f}" if p["gt_iou"] is not None else "  -  "
+
+        # Flags
+        flags = []
+        if p["has_regression"]:
+            flags.append("REGR")
+        if p["out_of_scene_bounds"]:
+            flags.append("OOB")
+        if p["has_overlap"]:
+            flags.append("OVLP")
+        flag_str = ",".join(flags)
+
+        print(
+            f"{idx:>4}  {time_range:<19} {dur_str:>5}  "
+            f"{scn:>3}  {scene_range:<21} {rel_start:>9}  "
+            f"{vad:>3}  {source:<22} {gt_idx:>4}  {iou_str:>5}  {flag_str}",
+            file=out,
+        )
+
+    print(sep_line, file=out)
+
+    # Summary line
+    total = len(provenances)
+    reg_count = sum(1 for p in provenances if p["has_regression"])
+    oob_count = sum(1 for p in provenances if p["out_of_scene_bounds"])
+    ovlp_count = sum(1 for p in provenances if p["has_overlap"])
+    print(
+        f"  {total} subs | {reg_count} regressions | "
+        f"{oob_count} out-of-bounds | {ovlp_count} overlaps",
+        file=out,
+    )
     print(file=out)
 
 
@@ -428,6 +652,35 @@ def print_scene_detail(
                 if parts:
                     print(f"  Timing sources: {', '.join(parts)}", file=out)
 
+        # Temporal ordering issues in this scene
+        to = test_analysis.get("temporal_order", {})
+        scene_regs = [
+            r for r in to.get("regressions", [])
+            if (r["curr_start"] >= start and r["curr_start"] < end)
+            or (r["prev_start"] >= start and r["prev_start"] < end)
+        ]
+        scene_overlaps = [
+            o for o in to.get("overlaps", [])
+            if (o["curr_start"] >= start and o["curr_start"] < end)
+            or (o["prev_start"] >= start and o["prev_start"] < end)
+        ]
+        if scene_regs or scene_overlaps:
+            print("  Temporal ordering issues:", file=out)
+            for r in scene_regs:
+                print(
+                    f"    REGRESSION: #{r['prev_index']} "
+                    f"({_fmt_time_precise(r['prev_start'])}) -> "
+                    f"#{r['curr_index']} ({_fmt_time_precise(r['curr_start'])}): "
+                    f"-{r['regression_sec']:.1f}s",
+                    file=out,
+                )
+            for o in scene_overlaps:
+                print(
+                    f"    Overlap: #{o['prev_index']} -> #{o['curr_index']}: "
+                    f"{o['overlap_sec']:.3f}s",
+                    file=out,
+                )
+
         # Raw / clean text
         raw = t.raw_texts.get(scene_index)
         if raw:
@@ -487,6 +740,39 @@ def print_scene_detail(
                 line += " ..."
             print(line, file=out)
 
+        # Mini-provenance table for subs in this scene
+        scene_provs = [
+            p for p in test_analysis.get("provenance", [])
+            if p["scene_index"] == scene_index
+        ]
+        if scene_provs:
+            print("  Sub provenance in scene:", file=out)
+            print(
+                f"    {'#':>4}  {'RelStart':>8}  {'VAD':>3}  "
+                f"{'Source':<22} {'GT#':>4}  {'IoU':>5}  {'Flags'}",
+                file=out,
+            )
+            for p in scene_provs[:15]:
+                rel_s = f"{p['scene_relative_start']:.1f}s"
+                vad = f"{p['vad_group_index']}" if p["vad_group_index"] is not None else "-"
+                gt_idx = f"{p['gt_match_index']}" if p["gt_match_index"] is not None else "-"
+                iou_str = f"{p['gt_iou']:.2f}" if p["gt_iou"] is not None else "  -  "
+                flags = []
+                if p["has_regression"]:
+                    flags.append("REGR")
+                if p["out_of_scene_bounds"]:
+                    flags.append("OOB")
+                if p["has_overlap"]:
+                    flags.append("OVLP")
+                flag_str = ",".join(flags)
+                print(
+                    f"    {p['sub_index']:>4}  {rel_s:>8}  {vad:>3}  "
+                    f"{p['timing_source']:<22} {gt_idx:>4}  {iou_str:>5}  {flag_str}",
+                    file=out,
+                )
+            if len(scene_provs) > 15:
+                print(f"    ... ({len(scene_provs) - 15} more)", file=out)
+
 
 # ---------------------------------------------------------------------------
 # JSON report
@@ -516,10 +802,13 @@ def _prepare_json(analysis: dict) -> dict:
     clean = copy.deepcopy(analysis)
 
     # Remove match_detail from scene_metrics (too verbose for JSON)
+    # Remove provenance list (too verbose), keep timing_analytics
     for test in clean.get("tests", []):
         for s_idx, sm in test.get("scene_metrics", {}).items():
             if "match_detail" in sm:
                 # Keep counts but remove raw pairs
                 del sm["match_detail"]
+        if "provenance" in test:
+            del test["provenance"]
 
     return clean

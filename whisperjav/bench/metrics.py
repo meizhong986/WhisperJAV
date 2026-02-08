@@ -144,6 +144,96 @@ def compute_timing_score(
     return total_iou / len(matched_pairs)
 
 
+# ---------------------------------------------------------------------------
+# Temporal ordering integrity
+# ---------------------------------------------------------------------------
+
+def analyze_temporal_order(subs: List[dict]) -> dict:
+    """
+    Analyze temporal ordering integrity of a subtitle sequence.
+
+    Detects two distinct issue types:
+      1. Regressions: sub[i+1].start < sub[i].start
+         Non-monotonic start times — the SRT jumps backwards in time.
+         Typical cause: scenes reassembled in wrong order, or alignment
+         assigned timestamps from wrong audio context.
+
+      2. Overlaps: sub[i+1].start < sub[i].end (but starts are monotonic)
+         Consecutive subs whose time ranges intersect.
+         Less severe than regressions but still indicates timing issues.
+
+    Args:
+        subs: List of dicts with 'start', 'end', 'index' keys, in SRT order.
+
+    Returns:
+        Dict with:
+            is_monotonic: True if all start times are non-decreasing
+            regressions: List of violation dicts, each with:
+                position: int (0-based position of the second sub in the pair)
+                prev_index: SRT index of the earlier-numbered sub
+                curr_index: SRT index of the later-numbered sub
+                prev_start: float
+                curr_start: float
+                regression_sec: float (positive = how far back it jumped)
+            regression_count: int
+            max_regression_sec: float
+            overlaps: List of overlap dicts, each with:
+                position: int
+                prev_index: SRT index
+                curr_index: SRT index
+                overlap_sec: float
+            overlap_count: int
+            total_overlap_sec: float
+    """
+    regressions = []
+    overlaps = []
+    max_regression = 0.0
+    total_overlap = 0.0
+
+    for i in range(len(subs) - 1):
+        curr = subs[i]
+        nxt = subs[i + 1]
+
+        curr_start = curr["start"]
+        curr_end = curr["end"]
+        nxt_start = nxt["start"]
+
+        if nxt_start < curr_start:
+            # Regression: next sub starts BEFORE current sub
+            regression = curr_start - nxt_start
+            regressions.append({
+                "position": i + 1,
+                "prev_index": curr.get("index", i),
+                "curr_index": nxt.get("index", i + 1),
+                "prev_start": curr_start,
+                "curr_start": nxt_start,
+                "regression_sec": round(regression, 3),
+            })
+            max_regression = max(max_regression, regression)
+        elif nxt_start < curr_end:
+            # Overlap: starts are monotonic but time ranges intersect
+            overlap_sec = curr_end - nxt_start
+            overlaps.append({
+                "position": i + 1,
+                "prev_index": curr.get("index", i),
+                "curr_index": nxt.get("index", i + 1),
+                "prev_start": curr_start,
+                "curr_start": nxt_start,
+                "overlap_sec": round(overlap_sec, 3),
+            })
+            total_overlap += overlap_sec
+
+    return {
+        "is_monotonic": len(regressions) == 0,
+        "regressions": regressions,
+        "regression_count": len(regressions),
+        "max_regression_sec": round(max_regression, 3),
+        "overlaps": overlaps,
+        "overlap_count": len(overlaps),
+        "total_overlap_sec": round(total_overlap, 3),
+    }
+
+
 def compute_timing_offsets(
     matched_pairs: List[Tuple[dict, dict]],
 ) -> dict:
