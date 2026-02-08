@@ -7,6 +7,7 @@ where word boundaries are ambiguous.
 Timing accuracy uses IoU (Intersection over Union) of matched subtitle time ranges.
 """
 
+import re
 import unicodedata
 from typing import List, Tuple
 
@@ -15,16 +16,26 @@ from typing import List, Tuple
 # Text normalization (pre-CER)
 # ---------------------------------------------------------------------------
 
+# Matches parenthesized speaker labels in Netflix/broadcast subtitles.
+# Handles both fullwidth （…） and halfwidth (...) parentheses.
+# Examples: （佐藤）, (男性), （ナレーション）
+_SPEAKER_LABEL_RE = re.compile(r"[（(][^）)]*[）)]")
+
+
 def normalize_text(text: str) -> str:
     """
     Normalize text for CER comparison.
 
-    - Strip whitespace
     - Normalize fullwidth/halfwidth forms (NFKC)
+    - Strip parenthesized speaker labels — e.g. （佐藤）, (男性)
+      Common in Netflix/broadcast ground-truth subs but absent in ASR output.
+    - Collapse whitespace (including line breaks in multi-line subs)
     - Remove common punctuation that doesn't affect meaning
     """
     text = unicodedata.normalize("NFKC", text)
-    # Remove whitespace
+    # Strip parenthesized speaker labels before character-level cleanup
+    text = _SPEAKER_LABEL_RE.sub("", text)
+    # Remove whitespace (including \n line breaks in multi-line subs)
     text = "".join(text.split())
     # Remove punctuation that varies between transcription systems
     remove_chars = set("。、！？「」『』（）()…・〜～.,!?\"' ")
