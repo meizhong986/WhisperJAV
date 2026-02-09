@@ -362,6 +362,9 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
     "qwen_max_group_duration": 29.0,
+    "qwen_stepdown": False,
+    "qwen_stepdown_initial_group": 30.0,
+    "qwen_stepdown_fallback_group": 8.0,
 }
 
 
@@ -394,6 +397,9 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "repetition_penalty": "qwen_repetition_penalty",
         "max_tokens_per_audio_second": "qwen_max_tokens_per_second",
         "max_group_duration": "qwen_max_group_duration",
+        "stepdown": "qwen_stepdown",
+        "stepdown_initial_group": "qwen_stepdown_initial_group",
+        "stepdown_fallback_group": "qwen_stepdown_fallback_group",
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -874,6 +880,9 @@ def _build_pipeline(
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
             "segmenter_max_group_duration": qwen_defaults.get("qwen_max_group_duration", 29.0),
+            "stepdown_enabled": qwen_defaults.get("qwen_stepdown", False),
+            "stepdown_initial_group": qwen_defaults.get("qwen_stepdown_initial_group", 30.0),
+            "stepdown_fallback_group": qwen_defaults.get("qwen_stepdown_fallback_group", 8.0),
         }
         logger.debug(
             "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",

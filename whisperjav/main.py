@@ -464,6 +464,17 @@ def parse_arguments():
                            help="Speech segmentation backend for VAD-based chunking (default: ten)")
     qwen_group.add_argument("--qwen-max-group-duration", type=float, default=29.0,
                            help="Max duration (seconds) for VAD segment grouping (default: 29.0)")
+    # Adaptive Step-Down (v1.8.10+)
+    qwen_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
+                           action="store_true", default=False,
+                           help="Enable adaptive step-down: try 30s groups first, "
+                                "retry collapsed groups at 8s")
+    qwen_group.add_argument("--no-qwen-stepdown", dest="qwen_stepdown",
+                           action="store_false")
+    qwen_group.add_argument("--qwen-stepdown-initial-group", type=float, default=30.0,
+                           help="Tier 1 group duration for step-down (default: 30.0)")
+    qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=8.0,
+                           help="Tier 2 fallback group duration for step-down (default: 8.0)")
     qwen_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_true", default=True,
                            help="Apply Japanese-specific subtitle regrouping (default: enabled)")
@@ -824,6 +835,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Speech segmentation / VAD
             speech_segmenter=getattr(args, 'qwen_segmenter', 'none'),
             segmenter_max_group_duration=getattr(args, 'qwen_max_group_duration', 29.0),
+            # Adaptive Step-Down (v1.8.10+)
+            stepdown_enabled=getattr(args, 'qwen_stepdown', False),
+            stepdown_initial_group=getattr(args, 'qwen_stepdown_initial_group', 30.0),
+            stepdown_fallback_group=getattr(args, 'qwen_stepdown_fallback_group', 8.0),
             # Qwen ASR
             model_id=getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
             device=getattr(args, 'qwen_device', 'auto'),

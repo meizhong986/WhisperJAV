@@ -19,6 +19,51 @@ from ..base import SpeechSegment, SegmentationResult
 logger = logging.getLogger("whisperjav")
 
 
+def group_segments(
+    segments: List[SpeechSegment],
+    max_group_duration_s: float = 29.0,
+    chunk_threshold_s: float = 1.0,
+) -> List[List[SpeechSegment]]:
+    """Group speech segments by time gaps and max duration.
+
+    Standalone function for re-grouping without re-running VAD.
+    Used by adaptive step-down to create Tier 1 (30s) and Tier 2 (8s)
+    groups from the same raw segments.
+
+    Args:
+        segments: List of SpeechSegment objects from VAD.
+        max_group_duration_s: Maximum duration for a group in seconds.
+        chunk_threshold_s: Gap threshold for splitting groups in seconds.
+
+    Returns:
+        List of groups, where each group is a list of SpeechSegment objects.
+    """
+    if not segments:
+        return []
+
+    groups: List[List[SpeechSegment]] = [[]]
+
+    for i, segment in enumerate(segments):
+        if i > 0:
+            prev_end = segments[i - 1].end_sec
+            gap = segment.start_sec - prev_end
+
+            # Check if adding this segment would exceed max group duration
+            would_exceed_max = False
+            if groups[-1]:
+                group_start = groups[-1][0].start_sec
+                potential_duration = segment.end_sec - group_start
+                would_exceed_max = potential_duration > max_group_duration_s
+
+            # Start new group if gap too large OR would exceed max duration
+            if gap > chunk_threshold_s or would_exceed_max:
+                groups.append([])
+
+        groups[-1].append(segment)
+
+    return groups
+
+
 class TenSpeechSegmenter:
     """
     TEN Framework VAD speech segmentation backend.
@@ -315,33 +360,9 @@ class TenSpeechSegmenter:
     ) -> List[List[SpeechSegment]]:
         """Group segments based on time gaps.
 
-        Groups are split if the gap exceeds chunk_threshold_s OR if adding
-        a segment would cause the group duration to exceed max_group_duration_s.
+        Delegates to the standalone group_segments() function.
         """
-        if not segments:
-            return []
-
-        groups: List[List[SpeechSegment]] = [[]]
-
-        for i, segment in enumerate(segments):
-            if i > 0:
-                prev_end = segments[i - 1].end_sec
-                gap = segment.start_sec - prev_end
-
-                # Check if adding this segment would exceed max group duration
-                would_exceed_max = False
-                if groups[-1]:
-                    group_start = groups[-1][0].start_sec
-                    potential_duration = segment.end_sec - group_start
-                    would_exceed_max = potential_duration > self.max_group_duration_s
-
-                # Start new group if gap too large OR would exceed max duration
-                if gap > self.chunk_threshold_s or would_exceed_max:
-                    groups.append([])
-
-            groups[-1].append(segment)
-
-        return groups
+        return group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s)
 
     def _load_audio(
         self,

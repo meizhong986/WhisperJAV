@@ -29,6 +29,7 @@ from .base import (
     SegmentationResult,
     SpeechSegmenter,
 )
+from .backends.ten import group_segments
 from .factory import SpeechSegmenterFactory
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     "SegmentationResult",
     "SpeechSegmenter",
     "SpeechSegmenterFactory",
+    "group_segments",
 ]
