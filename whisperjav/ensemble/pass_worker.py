@@ -352,7 +352,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_attn": "auto",
     "qwen_enhancer": "none",
     "qwen_enhancer_model": None,
-    "qwen_segmenter": "none",
+    "qwen_segmenter": "ten",
     "qwen_japanese_postprocess": True,
     "qwen_postprocess_preset": "high_moan",
     "qwen_input_mode": "vad_slicing",
@@ -362,7 +362,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
     "qwen_max_group_duration": 29.0,
-    "qwen_stepdown": False,
+    "qwen_stepdown": True,
     "qwen_stepdown_initial_group": 30.0,
     "qwen_stepdown_fallback_group": 8.0,
 }

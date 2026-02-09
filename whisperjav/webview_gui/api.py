@@ -1926,7 +1926,7 @@ class WhisperJAVAPI:
                         "type": "checkbox",
                         "label": "Adaptive Step-Down",
                         "description": "Try 30s context groups first, retry collapsed at 8s",
-                        "default": False,
+                        "default": True,
                     },
                     "stepdown_initial_group": {
                         "type": "slider",

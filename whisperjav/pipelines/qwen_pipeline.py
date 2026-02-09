@@ -176,7 +176,7 @@ class QwenPipeline(BasePipeline):
         assembly_cleaner: bool = True,  # Enable/disable pre-alignment text cleaning
 
         # Adaptive Step-Down (v1.8.10+)
-        stepdown_enabled: bool = False,
+        stepdown_enabled: bool = True,
         stepdown_initial_group: float = 30.0,
         stepdown_fallback_group: float = 8.0,
 

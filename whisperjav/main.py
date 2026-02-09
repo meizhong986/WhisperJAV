@@ -466,11 +466,12 @@ def parse_arguments():
                            help="Max duration (seconds) for VAD segment grouping (default: 29.0)")
     # Adaptive Step-Down (v1.8.10+)
     qwen_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
-                           action="store_true", default=False,
-                           help="Enable adaptive step-down: try 30s groups first, "
-                                "retry collapsed groups at 8s")
+                           action="store_true", default=True,
+                           help="Adaptive step-down: try 30s groups first, "
+                                "retry collapsed groups at 8s (default: enabled)")
     qwen_group.add_argument("--no-qwen-stepdown", dest="qwen_stepdown",
-                           action="store_false")
+                           action="store_false",
+                           help="Disable adaptive step-down")
     qwen_group.add_argument("--qwen-stepdown-initial-group", type=float, default=30.0,
                            help="Tier 1 group duration for step-down (default: 30.0)")
     qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=8.0,
