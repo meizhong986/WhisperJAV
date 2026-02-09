@@ -1888,6 +1888,41 @@ class WhisperJAVAPI:
                         "default": "semantic"
                     },
                 },
+                "context": {
+                    "context": {
+                        "type": "textarea",
+                        "label": "Context Hints",
+                        "description": "Actress names, terminology, studio name. Improves transcription accuracy.",
+                        "default": "",
+                        "placeholder": "actress names, terminology..."
+                    },
+                    "timestamp_mode": {
+                        "type": "dropdown",
+                        "label": "Timestamp Mode",
+                        "description": "How word timestamps are resolved from aligner output.",
+                        "options": [
+                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback (Recommended)"},
+                            {"value": "aligner_interpolation", "label": "Aligner + Interpolation"},
+                            {"value": "aligner_only", "label": "Aligner Only"},
+                            {"value": "vad_only", "label": "VAD Only"},
+                        ],
+                        "default": "aligner_vad_fallback"
+                    },
+                    "repetition_penalty": {
+                        "type": "slider",
+                        "label": "Repetition Penalty",
+                        "description": "Penalizes repeated tokens during generation. Higher = less repetition.",
+                        "min": 0.8, "max": 2.0, "step": 0.05,
+                        "default": 1.1
+                    },
+                    "max_tokens_per_audio_second": {
+                        "type": "slider",
+                        "label": "Max Tokens per Audio Second",
+                        "description": "Dynamic token budget for generation safety. Prevents runaway generation.",
+                        "min": 5.0, "max": 40.0, "step": 1.0,
+                        "default": 20.0
+                    },
+                },
             }
         }
 
@@ -2175,9 +2210,12 @@ class WhisperJAVAPI:
             # else: minimal args - backend uses model defaults
         elif pass1.get('isQwen'):
             # Qwen pass: no sensitivity, handle Qwen params
-            if pass1.get('customized') and pass1.get('params'):
-                args += ["--pass1-qwen-params", json.dumps(pass1['params'])]
-            # else: minimal args - backend uses model defaults
+            # Always inject inputMode from prominent selector (even when not customized)
+            qwen1_params = dict(pass1.get('params') or {}) if pass1.get('customized') else {}
+            if pass1.get('inputMode'):
+                qwen1_params['input_mode'] = pass1['inputMode']
+            if qwen1_params:
+                args += ["--pass1-qwen-params", json.dumps(qwen1_params)]
         else:
             # Legacy pass: use sensitivity
             args += ["--pass1-sensitivity", pass1.get('sensitivity', 'balanced')]
@@ -2237,9 +2275,12 @@ class WhisperJAVAPI:
                 # else: minimal args - backend uses model defaults
             elif pass2.get('isQwen'):
                 # Qwen pass: no sensitivity, handle Qwen params
-                if pass2.get('customized') and pass2.get('params'):
-                    args += ["--pass2-qwen-params", json.dumps(pass2['params'])]
-                # else: minimal args - backend uses model defaults
+                # Always inject inputMode from prominent selector (even when not customized)
+                qwen2_params = dict(pass2.get('params') or {}) if pass2.get('customized') else {}
+                if pass2.get('inputMode'):
+                    qwen2_params['input_mode'] = pass2['inputMode']
+                if qwen2_params:
+                    args += ["--pass2-qwen-params", json.dumps(qwen2_params)]
             else:
                 # Legacy pass: use sensitivity
                 args += ["--pass2-sensitivity", pass2.get('sensitivity', 'balanced')]

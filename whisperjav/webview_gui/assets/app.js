@@ -239,6 +239,12 @@ const QwenManager = {
         postprocess_preset: 'high_moan',
         // Scene detection (from main dropdown)
         scene: 'semantic',
+        // Input mode and context (v1.8.9+)
+        input_mode: 'vad_slicing',
+        context: '',
+        timestamp_mode: 'aligner_vad_fallback',
+        repetition_penalty: 1.1,
+        max_tokens_per_audio_second: 20.0,
     },
 
     getParams() {
@@ -1111,6 +1117,7 @@ const EnsembleManager = {
             params: null,  // null = use defaults, object = full custom config
             isTransformers: false,  // Track if using Transformers pipeline
             isQwen: false,  // Track if using Qwen3-ASR pipeline
+            inputMode: 'vad_slicing',  // Qwen input mode (assembly/context_aware/vad_slicing)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         pass2: {
@@ -1125,6 +1132,7 @@ const EnsembleManager = {
             params: null,
             isTransformers: false,  // Fidelity is a legacy pipeline
             isQwen: false,  // Track if using Qwen3-ASR pipeline
+            inputMode: 'vad_slicing',  // Qwen input mode (assembly/context_aware/vad_slicing)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'smart_merge',
@@ -1180,6 +1188,16 @@ const EnsembleManager = {
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = this.state.pass2.pipeline === 'qwen';
 
+        // Sync input mode for Qwen passes
+        if (this.state.pass1.isQwen) {
+            const im1 = document.getElementById('pass1-input-mode');
+            if (im1) this.state.pass1.inputMode = im1.value;
+        }
+        if (this.state.pass2.isQwen) {
+            const im2 = document.getElementById('pass2-input-mode');
+            if (im2) this.state.pass2.inputMode = im2.value;
+        }
+
         // Pass 2 enable/disable
         document.getElementById('pass2-enabled').addEventListener('change', (e) => {
             this.state.pass2.enabled = e.target.checked;
@@ -1199,6 +1217,14 @@ const EnsembleManager = {
         });
         document.getElementById('pass2-sensitivity').addEventListener('change', (e) => {
             this.handleSensitivityChange('pass2', e.target.value, e.target);
+        });
+
+        // Input mode event handlers (Qwen-specific)
+        document.getElementById('pass1-input-mode')?.addEventListener('change', (e) => {
+            this.state.pass1.inputMode = e.target.value;
+        });
+        document.getElementById('pass2-input-mode')?.addEventListener('change', (e) => {
+            this.state.pass2.inputMode = e.target.value;
         });
 
         // New dropdown event handlers - Pass 1
@@ -1374,10 +1400,27 @@ const EnsembleManager = {
         // Qwen DOES use segmenter as a post-ASR VAD filter (--qwen-segmenter)
         const disableSegmenter = passState.isTransformers;
 
+        // Input Mode selector: shown for Qwen, hidden for others
+        const inputModeSelect = document.getElementById(`${passKey}-input-mode`);
+
         if (disableSensitivity) {
             const pipelineName = passState.isTransformers ? 'Transformers' : 'Qwen3-ASR';
-            sensitivitySelect.disabled = true;
-            sensitivitySelect.title = `Sensitivity not applicable for ${pipelineName} mode`;
+
+            if (passState.isQwen && inputModeSelect) {
+                // Qwen: hide sensitivity, show input mode selector
+                sensitivitySelect.style.display = 'none';
+                sensitivitySelect.disabled = true;
+                inputModeSelect.style.display = '';
+                inputModeSelect.disabled = isPass2Disabled;
+                inputModeSelect.title = 'Audio chunking strategy for Qwen3-ASR';
+            } else {
+                // Transformers: just disable sensitivity
+                sensitivitySelect.disabled = true;
+                sensitivitySelect.title = `Sensitivity not applicable for ${pipelineName} mode`;
+                if (inputModeSelect) {
+                    inputModeSelect.style.display = 'none';
+                }
+            }
 
             // Set sensitivity to 'none' for visual clarity (if option exists)
             if (sensitivitySelect.querySelector('option[value="none"]')) {
@@ -1386,8 +1429,12 @@ const EnsembleManager = {
             }
         } else {
             // Re-enable sensitivity (unless pass2 is disabled)
+            sensitivitySelect.style.display = '';
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = '';
+            if (inputModeSelect) {
+                inputModeSelect.style.display = 'none';
+            }
         }
 
         if (disableSegmenter) {
@@ -1439,10 +1486,12 @@ const EnsembleManager = {
         document.getElementById('customize-pass2').disabled = !enabled;
         document.getElementById('merge-strategy').disabled = !enabled;
 
-        // Sensitivity and Segmenter handled by updateRowGreyingState (may be additionally disabled for Transformers)
+        // Sensitivity, Input Mode, and Segmenter handled by updateRowGreyingState (may be additionally disabled for Transformers)
         if (!enabled) {
             document.getElementById('pass2-sensitivity').disabled = true;
             document.getElementById('pass2-segmenter').disabled = true;
+            const im2 = document.getElementById('pass2-input-mode');
+            if (im2) im2.disabled = true;
         }
 
         // Visual feedback - grey out entire row
@@ -1737,6 +1786,12 @@ const EnsembleManager = {
                 const tabEl = document.getElementById(`tab-${tab}`);
                 if (tabEl) tabEl.innerHTML = '';
             });
+
+            // Hide Context tab (Qwen-only)
+            const contextTab = document.querySelector('[data-tab="context"]');
+            if (contextTab) contextTab.style.display = 'none';
+            const contextPanel = document.getElementById('tab-context');
+            if (contextPanel) contextPanel.innerHTML = '';
 
             // Get current model settings
             const currentModel = passState.customized && passState.params.model_name
@@ -2462,6 +2517,12 @@ const EnsembleManager = {
             }
         });
 
+        // Hide Context tab (Qwen-only)
+        const contextTab = document.querySelector('[data-tab="context"]');
+        if (contextTab) contextTab.style.display = 'none';
+        const contextPanel = document.getElementById('tab-context');
+        if (contextPanel) contextPanel.innerHTML = '';
+
         // Generate Model tab
         this.generateTransformersModelTab('tab-model', schema.model, currentValues);
 
@@ -2723,11 +2784,12 @@ const EnsembleManager = {
             'quality': 'Quality',
             'segmenter': 'Aligner',
             'enhancer': 'Post-Process',
-            'scene': 'Scene'
+            'scene': 'Scene',
+            'context': 'Context'
         };
 
         // Clear all tab panels and update labels
-        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (panel) panel.innerHTML = '';
@@ -2752,6 +2814,9 @@ const EnsembleManager = {
 
         // Generate Scene tab
         this.generateQwenSceneTab('tab-scene', schema.scene, currentValues);
+
+        // Generate Context & Safety tab
+        this.generateQwenContextTab('tab-context', schema.context, currentValues);
 
         // Reset to first tab
         this.switchModalTab('model');
@@ -2935,6 +3000,62 @@ const EnsembleManager = {
         sceneControl.appendChild(noteDiv);
 
         container.appendChild(sceneControl);
+    },
+
+    generateQwenContextTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Context hints textarea
+        const contextDef = schemaSection.context;
+        const contextControl = document.createElement('div');
+        contextControl.className = 'param-control';
+        contextControl.dataset.param = 'context';
+
+        const contextLabel = document.createElement('label');
+        contextLabel.textContent = contextDef.label;
+        contextControl.appendChild(contextLabel);
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'param-text form-control';
+        textarea.id = 'hf-context';
+        textarea.rows = 3;
+        textarea.placeholder = contextDef.placeholder || '';
+        textarea.value = currentValues.context || contextDef.default || '';
+        contextControl.appendChild(textarea);
+
+        const contextDesc = document.createElement('p');
+        contextDesc.className = 'param-description';
+        contextDesc.textContent = contextDef.description;
+        contextControl.appendChild(contextDesc);
+
+        container.appendChild(contextControl);
+
+        // Timestamp Mode dropdown
+        const tsDef = schemaSection.timestamp_mode;
+        container.appendChild(this.createTransformersDropdown(
+            'timestamp_mode', tsDef.label,
+            tsDef.options,
+            currentValues.timestamp_mode || tsDef.default,
+            tsDef.description
+        ));
+
+        // Repetition Penalty slider
+        const rpDef = schemaSection.repetition_penalty;
+        container.appendChild(this.createTransformersSlider(
+            'repetition_penalty', rpDef.label,
+            rpDef.min, rpDef.max, rpDef.step,
+            currentValues.repetition_penalty ?? rpDef.default,
+            rpDef.description
+        ));
+
+        // Max Tokens per Audio Second slider
+        const mtDef = schemaSection.max_tokens_per_audio_second;
+        container.appendChild(this.createTransformersSlider(
+            'max_tokens_per_audio_second', mtDef.label,
+            mtDef.min, mtDef.max, mtDef.step,
+            currentValues.max_tokens_per_audio_second ?? mtDef.default,
+            mtDef.description
+        ));
     },
 
     generateModelTab(tabId, currentModel, currentDevice, pipeline) {
@@ -3300,8 +3421,8 @@ const EnsembleManager = {
         const fullParams = {};
         const validationWarnings = [];
 
-        // Collect ALL values from all tab panels (new structure: model, quality, segmenter, enhancer, scene)
-        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
+        // Collect ALL values from all tab panels (includes context tab for Qwen)
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
@@ -3588,6 +3709,12 @@ const EnsembleManager = {
             return;
         }
 
+        // Handle Qwen separately
+        if (passState.isQwen) {
+            this.resetQwenToDefaults(passKey);
+            return;
+        }
+
         // Use stored defaults from openCustomize
         if (!this._currentDefaults) {
             ErrorHandler.show('Error', 'No defaults available');
@@ -3730,6 +3857,54 @@ const EnsembleManager = {
         this.updateBadges();
     },
 
+    resetQwenToDefaults(passKey) {
+        // Reset Qwen controls using QwenManager defaults
+        const defaults = QwenManager.defaults || {};
+
+        // Reset all controls in all tabs (includes context tab)
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (!panel) return;
+
+            panel.querySelectorAll('.param-control').forEach(control => {
+                const paramName = control.dataset.param;
+                const defaultValue = defaults[paramName];
+
+                const checkbox = control.querySelector('.param-checkbox');
+                const slider = control.querySelector('.param-slider');
+                const number = control.querySelector('.param-number');
+                const text = control.querySelector('.param-text');
+                const select = control.querySelector('.param-select');
+
+                if (checkbox && defaultValue !== undefined) {
+                    checkbox.checked = defaultValue;
+                } else if (slider && defaultValue !== undefined) {
+                    slider.value = defaultValue;
+                    const numInput = control.querySelector('.param-number');
+                    if (numInput) numInput.value = defaultValue;
+                    const valueDisplay = slider.parentElement?.querySelector('.slider-value');
+                    if (valueDisplay) valueDisplay.textContent = defaultValue;
+                } else if (number && defaultValue !== undefined) {
+                    number.value = defaultValue;
+                } else if (text) {
+                    text.value = defaultValue || '';
+                } else if (select && defaultValue !== undefined) {
+                    select.value = defaultValue;
+                }
+            });
+        });
+
+        // Clear customized state
+        this.state[passKey].params = null;
+        this.state[passKey].customized = false;
+
+        const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+        ConsoleManager.log(`Reset ${passLabel} Qwen3-ASR parameters to defaults`, 'info');
+
+        this.updateBadges();
+    },
+
     closeModal() {
         try {
             const modal = document.getElementById('customizeModal');
@@ -3778,7 +3953,8 @@ const EnsembleManager = {
                 customized: this.state.pass1.customized,
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
                 isTransformers: this.state.pass1.isTransformers,
-                isQwen: this.state.pass1.isQwen
+                isQwen: this.state.pass1.isQwen,
+                inputMode: this.state.pass1.isQwen ? this.state.pass1.inputMode : null
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
@@ -3792,7 +3968,8 @@ const EnsembleManager = {
                 customized: this.state.pass2.customized,
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
                 isTransformers: this.state.pass2.isTransformers,
-                isQwen: this.state.pass2.isQwen
+                isQwen: this.state.pass2.isQwen,
+                inputMode: this.state.pass2.isQwen ? this.state.pass2.inputMode : null
             },
             merge_strategy: this.state.mergeStrategy,
             source_language: document.getElementById('source-language').value,

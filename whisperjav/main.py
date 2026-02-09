@@ -814,7 +814,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             progress_display=progress,
             subs_language=args.subs_language,
             # Context-Aware Chunking (v1.8.7+)
-            qwen_input_mode=getattr(args, 'qwen_input_mode', 'context_aware'),
+            qwen_input_mode=getattr(args, 'qwen_input_mode', 'vad_slicing'),
             qwen_safe_chunking=getattr(args, 'qwen_safe_chunking', True),
             # Scene detection
             scene_detector=getattr(args, 'qwen_scene', 'none'),

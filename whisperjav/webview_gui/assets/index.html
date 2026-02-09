@@ -380,6 +380,11 @@
                                             <option value="balanced">Balanced</option>
                                             <option value="conservative">Conservative</option>
                                         </select>
+                                        <select id="pass1-input-mode" class="form-select compact" style="display: none;" title="Audio chunking strategy for Qwen3-ASR">
+                                            <option value="vad_slicing" selected>VAD Slicing</option>
+                                            <option value="context_aware">Context Aware</option>
+                                            <option value="assembly">Assembly</option>
+                                        </select>
                                     </div>
                                     <div class="col-separator"></div>
                                     <div class="col-scene">
@@ -520,6 +525,11 @@
                                             <option value="aggressive">Aggressive</option>
                                             <option value="balanced">Balanced</option>
                                             <option value="conservative" selected>Conservative</option>
+                                        </select>
+                                        <select id="pass2-input-mode" class="form-select compact" style="display: none;" title="Audio chunking strategy for Qwen3-ASR" disabled>
+                                            <option value="vad_slicing" selected>VAD Slicing</option>
+                                            <option value="context_aware">Context Aware</option>
+                                            <option value="assembly">Assembly</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -926,6 +936,7 @@
                     <button class="modal-tab" data-tab="segmenter">Segmenter</button>
                     <button class="modal-tab" data-tab="enhancer">Enhancer</button>
                     <button class="modal-tab" data-tab="scene">Scene</button>
+                    <button class="modal-tab" data-tab="context" style="display: none;">Context</button>
                 </div>
                 <!-- Tab Panels -->
                 <div class="modal-tab-content">
@@ -943,6 +954,9 @@
                     </div>
                     <div id="tab-scene" class="modal-tab-panel">
                         <!-- Scene detection: method and parameters -->
+                    </div>
+                    <div id="tab-context" class="modal-tab-panel">
+                        <!-- Context hints and generation safety (Qwen only) -->
                     </div>
                 </div>
             </div>

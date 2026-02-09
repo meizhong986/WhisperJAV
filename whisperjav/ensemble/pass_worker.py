@@ -355,6 +355,13 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_segmenter": "none",
     "qwen_japanese_postprocess": True,
     "qwen_postprocess_preset": "high_moan",
+    "qwen_input_mode": "vad_slicing",
+    "qwen_safe_chunking": True,
+    "qwen_timestamp_mode": "aligner_vad_fallback",
+    "qwen_assembly_cleaner": True,
+    "qwen_repetition_penalty": 1.1,
+    "qwen_max_tokens_per_second": 20.0,
+    "qwen_max_group_duration": 29.0,
 }
 
 
@@ -380,6 +387,13 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "attn_implementation": "qwen_attn",
         "japanese_postprocess": "qwen_japanese_postprocess",
         "postprocess_preset": "qwen_postprocess_preset",
+        "input_mode": "qwen_input_mode",
+        "safe_chunking": "qwen_safe_chunking",
+        "timestamp_mode": "qwen_timestamp_mode",
+        "assembly_cleaner": "qwen_assembly_cleaner",
+        "repetition_penalty": "qwen_repetition_penalty",
+        "max_tokens_per_audio_second": "qwen_max_tokens_per_second",
+        "max_group_duration": "qwen_max_group_duration",
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -853,6 +867,13 @@ def _build_pipeline(
             "speech_segmenter": qwen_defaults.get("qwen_segmenter", "none"),
             "japanese_postprocess": qwen_defaults.get("qwen_japanese_postprocess", True),
             "postprocess_preset": qwen_defaults.get("qwen_postprocess_preset", "high_moan"),
+            "qwen_input_mode": qwen_defaults.get("qwen_input_mode", "vad_slicing"),
+            "qwen_safe_chunking": qwen_defaults.get("qwen_safe_chunking", True),
+            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "aligner_vad_fallback"),
+            "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
+            "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
+            "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
+            "segmenter_max_group_duration": qwen_defaults.get("qwen_max_group_duration", 29.0),
         }
         logger.debug(
             "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",
