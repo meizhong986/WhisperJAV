@@ -1122,7 +1122,7 @@ const EnsembleManager = {
         },
         pass2: {
             enabled: false,
-            pipeline: 'fidelity',
+            pipeline: 'qwen',
             sensitivity: 'aggressive',
             sceneDetector: 'auditok',
             speechEnhancer: 'none',
@@ -1130,8 +1130,8 @@ const EnsembleManager = {
             model: 'turbo',
             customized: false,
             params: null,
-            isTransformers: false,  // Fidelity is a legacy pipeline
-            isQwen: false,  // Track if using Qwen3-ASR pipeline
+            isTransformers: false,
+            isQwen: true,  // Default pipeline is Qwen3-ASR
             inputMode: 'vad_slicing',  // Qwen input mode (assembly/context_aware/vad_slicing)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },

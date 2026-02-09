@@ -2286,7 +2286,7 @@ class WhisperJAVAPI:
         # Pass 2 configuration
         pass2 = config.get('pass2', {})
         if pass2.get('enabled', False):
-            args += ["--pass2-pipeline", pass2.get('pipeline', 'fidelity')]
+            args += ["--pass2-pipeline", pass2.get('pipeline', 'qwen')]
 
             if pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
