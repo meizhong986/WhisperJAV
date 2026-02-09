@@ -1048,7 +1048,12 @@ class QwenPipeline(BasePipeline):
             group_audio = audio_data[start_sample:end_sample]
 
             # Write to temp WAV (QwenASR requires file paths)
-            region_stem = f"{scene_path.stem}_region_{group_idx:04d}"
+            # Include tier tag in filename to avoid T1/T2 collisions
+            tag_suffix = tag.strip().replace("[", "").replace("]", "").lower()
+            if tag_suffix:
+                region_stem = f"{scene_path.stem}_region_{tag_suffix}_{group_idx:04d}"
+            else:
+                region_stem = f"{scene_path.stem}_region_{group_idx:04d}"
             region_path = speech_regions_dir / f"{region_stem}.wav"
             sf.write(str(region_path), group_audio, sr)
 
@@ -1108,7 +1113,7 @@ class QwenPipeline(BasePipeline):
             if self.timestamp_mode == TimestampMode.VAD_ONLY:
                 self._apply_vad_only_timestamps(result, group_duration)
             elif self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
-                interp = self._apply_timestamp_interpolation(result)
+                interp = self._apply_timestamp_interpolation(result, group_duration)
                 if interp:
                     _diag["total_fallback_applied"] += interp
                     _diag["interp_count"] += interp
@@ -1118,8 +1123,31 @@ class QwenPipeline(BasePipeline):
                     _diag["total_fallback_applied"] += fb
                     _diag["vad_fallback_count"] += fb
 
-            # Offset timestamps by group start
+            # ── Clamp to group bounds (region-relative: 0 to group_duration) ──
+            # Prevents interpolation overflow or aligner drift from producing
+            # timestamps beyond the group's audio slice.
+            for seg in result.segments:
+                seg.start = max(0.0, min(seg.start, group_duration))
+                seg.end = max(seg.start, min(seg.end, group_duration))
+                if hasattr(seg, 'words') and seg.words:
+                    for word in seg.words:
+                        word.start = max(0.0, min(word.start, group_duration))
+                        word.end = max(word.start, min(word.end, group_duration))
+
+            # Offset timestamps from group-relative to scene-relative
             self._offset_result_timestamps(result, group_start_sec)
+
+            # ── Clamp to scene bounds (scene-relative: 0 to scene_duration) ──
+            # Safety net: after offset, ensure no timestamp exceeds scene boundary.
+            if scene_duration_sec > 0:
+                for seg in result.segments:
+                    seg.start = max(0.0, min(seg.start, scene_duration_sec))
+                    seg.end = max(seg.start, min(seg.end, scene_duration_sec))
+                    if hasattr(seg, 'words') and seg.words:
+                        for word in seg.words:
+                            word.start = max(0.0, min(word.start, scene_duration_sec))
+                            word.end = max(word.start, min(word.end, scene_duration_sec))
+
             return result, status
 
         # ==================================================================
@@ -1232,6 +1260,12 @@ class QwenPipeline(BasePipeline):
                     combined_result = result
                 else:
                     combined_result.segments.extend(result.segments)
+
+        # Ensure all segments are in chronological order (defensive sort).
+        # The step-down path sorts explicitly; this covers the standard path
+        # and acts as a safety net for any edge cases.
+        if combined_result and combined_result.segments:
+            combined_result.segments.sort(key=lambda s: s.start)
 
         if combined_result and combined_result.segments:
             logger.debug(
@@ -1815,6 +1849,7 @@ class QwenPipeline(BasePipeline):
     @staticmethod
     def _apply_timestamp_interpolation(
         result: stable_whisper.WhisperResult,
+        group_duration: float = 0.0,
     ) -> int:
         """
         Interpolate timestamps for segments where the aligner returned NULL.
@@ -1834,11 +1869,14 @@ class QwenPipeline(BasePipeline):
         Edge cases:
             - Leading NULLs (no previous anchor): Use 0.0 as start
             - Trailing NULLs (no next anchor): Use last anchor's end as start,
-              estimate duration from character count
+              estimate duration from character count, capped to group_duration
             - All NULLs (total aligner failure): Distribute across full result
 
         Args:
             result: WhisperResult with segments to process
+            group_duration: Duration of the VAD group in seconds (0 = no cap).
+                Used to prevent trailing gap interpolation from exceeding the
+                group's time boundary.
 
         Returns:
             Number of segments that received interpolated timestamps
@@ -1922,9 +1960,22 @@ class QwenPipeline(BasePipeline):
 
             if trailing_indices:
                 trailing_start = segments[anchors[-1]].end
-                # Estimate trailing duration: 0.5s per character (conservative)
+                # Estimate trailing duration: ~50ms per character (conservative)
                 total_trailing_chars = sum(len(segments[i].text.strip()) for i in trailing_indices)
-                estimated_duration = max(0.5, total_trailing_chars * 0.05)  # ~50ms per char
+                estimated_duration = max(0.5, total_trailing_chars * 0.05)
+
+                # Cap to group_duration to prevent overflow beyond the group boundary
+                if group_duration > 0:
+                    max_trailing = max(0.0, group_duration - trailing_start)
+                    if estimated_duration > max_trailing:
+                        logger.debug(
+                            "Interpolation: trailing gap capped from %.2fs to %.2fs "
+                            "(group_duration=%.2fs, trailing_start=%.2fs)",
+                            estimated_duration, max_trailing,
+                            group_duration, trailing_start,
+                        )
+                        estimated_duration = max(0.1, max_trailing)
+
                 interpolate_gap(trailing_indices, trailing_start, trailing_start + estimated_duration)
 
         return interpolated_count
