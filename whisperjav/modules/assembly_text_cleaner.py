@@ -58,6 +58,12 @@ class PhraseRepetitionConfig:
     # Sentence-level dedup: if the exact same sentence appears >N times, reduce
     max_sentence_repeats: int = 2  # Keep at most N identical sentences
 
+    # Recursive pattern repetition (Stage 1c): catches 2-20 char patterns
+    # that the 2-8 char regex in Stage 1a misses
+    recursive_enabled: bool = True
+    recursive_thresh: int = 10        # ≥10 consecutive repetitions triggers collapse
+    recursive_max_pattern_len: int = 20  # Scan for patterns up to 20 chars wide
+
 
 @dataclass
 class CharFloodConfig:
@@ -127,6 +133,63 @@ class AssemblyCleanerConfig:
     whitespace: WhitespaceConfig = field(
         default_factory=WhitespaceConfig,
     )
+
+
+# ---------------------------------------------------------------------------
+# Standalone helper: Recursive pattern repetition collapse
+# ---------------------------------------------------------------------------
+
+def fix_pattern_repeats(text: str, thresh: int = 10, max_len: int = 20) -> str:
+    """
+    Recursive pattern repetition collapse (language-agnostic).
+
+    Scans for any substring of length 1..max_len that repeats >= thresh times
+    consecutively, collapses to a single occurrence, then recursively processes
+    the remainder.
+
+    Ported from Qwen3-ASR Toolkit's algorithmic sanitizer.
+
+    Args:
+        text: Input text to clean.
+        thresh: Minimum consecutive repetitions to trigger collapse.
+        max_len: Maximum pattern length to scan (characters).
+
+    Returns:
+        Cleaned text with excessive repetitions collapsed.
+    """
+    if not text:
+        return text
+
+    result_parts: list = []
+    pos = 0
+    length = len(text)
+
+    while pos < length:
+        best_pattern_len = 0
+        best_repeat_count = 0
+
+        # Scan for longest pattern with most repeats at current position
+        for plen in range(1, min(max_len, length - pos) + 1):
+            pattern = text[pos:pos + plen]
+            count = 1
+            check_pos = pos + plen
+            while check_pos + plen <= length and text[check_pos:check_pos + plen] == pattern:
+                count += 1
+                check_pos += plen
+
+            if count >= thresh and count > best_repeat_count:
+                best_pattern_len = plen
+                best_repeat_count = count
+
+        if best_repeat_count >= thresh:
+            # Collapse: keep single occurrence, skip the rest
+            result_parts.append(text[pos:pos + best_pattern_len])
+            pos += best_pattern_len * best_repeat_count
+        else:
+            result_parts.append(text[pos])
+            pos += 1
+
+    return "".join(result_parts)
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +356,7 @@ class AssemblyTextCleaner:
         Preserves punctuation between phrases for nagisa tokenization.
         """
         cfg = self.config.phrase_repetition
-        stats = {"modifications": 0, "consecutive_reductions": 0, "sentence_dedup": 0}
+        stats = {"modifications": 0, "consecutive_reductions": 0, "sentence_dedup": 0, "recursive_reductions": 0}
 
         original = text
 
@@ -346,12 +409,24 @@ class AssemblyTextCleaner:
                 stats["sentence_dedup"] = dropped
                 stats["modifications"] += 1
 
+        # --- 1c: Recursive pattern repetition (catches 2-20 char patterns) ---
+        if cfg.recursive_enabled:
+            new_text = fix_pattern_repeats(
+                text, cfg.recursive_thresh, cfg.recursive_max_pattern_len,
+            )
+            if new_text != text:
+                stats["recursive_reductions"] = stats.get("recursive_reductions", 0) + 1
+                stats["modifications"] += 1
+                text = new_text
+
         if text != original:
             logger.debug(
                 "Stage 1 (phrase_repetition): %d->%d chars, "
-                "%d consecutive reductions, %d sentences deduped",
+                "%d consecutive reductions, %d sentences deduped, "
+                "%d recursive reductions",
                 len(original), len(text),
                 stats["consecutive_reductions"], stats["sentence_dedup"],
+                stats.get("recursive_reductions", 0),
             )
 
         return text, stats
