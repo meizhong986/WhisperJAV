@@ -435,8 +435,8 @@ def parse_arguments():
                            help="Maximum inference batch size (default: 1 for accuracy)")
     qwen_group.add_argument("--qwen-max-tokens", type=int, default=4096,
                            help="Maximum tokens to generate (default: 4096, supports ~10 min audio)")
-    qwen_group.add_argument("--qwen-language", type=str, default=None,
-                           help="Language code (e.g., 'ja', 'en') or None for auto-detect (default: auto)")
+    qwen_group.add_argument("--qwen-language", type=str, default="Japanese",
+                           help="Language for ASR (default: Japanese). Use 'auto' for auto-detect")
     qwen_group.add_argument("--qwen-timestamps", type=str, default="word",
                            choices=["word", "none"],
                            help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word)")
@@ -830,7 +830,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             dtype=getattr(args, 'qwen_dtype', 'auto'),
             batch_size=getattr(args, 'qwen_batch_size', 1),
             max_new_tokens=getattr(args, 'qwen_max_tokens', 4096),
-            language=getattr(args, 'qwen_language', None),
+            language=(lambda _l: None if _l in (None, "auto", "") else _l)(getattr(args, 'qwen_language', 'Japanese')),
             timestamps=getattr(args, 'qwen_timestamps', 'word'),
             aligner_id=getattr(args, 'qwen_aligner', 'Qwen/Qwen3-ForcedAligner-0.6B'),
             context=getattr(args, 'qwen_context', ''),

@@ -158,7 +158,7 @@ class QwenPipeline(BasePipeline):
         dtype: str = "auto",
         batch_size: int = 1,
         max_new_tokens: int = 4096,
-        language: Optional[str] = None,
+        language: str = "Japanese",
         timestamps: str = "word",
         aligner_id: str = "Qwen/Qwen3-ForcedAligner-0.6B",
         context: str = "",

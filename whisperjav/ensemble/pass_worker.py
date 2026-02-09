@@ -343,7 +343,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_dtype": "auto",
     "qwen_batch_size": 1,
     "qwen_max_tokens": 4096,
-    "qwen_language": None,  # None = auto-detect
+    "qwen_language": "Japanese",  # WhisperJAV is purpose-built for Japanese
     "qwen_timestamps": "word",
     "qwen_aligner": "Qwen/Qwen3-ForcedAligner-0.6B",
     "qwen_scene": "semantic",
@@ -855,7 +855,7 @@ def _build_pipeline(
             "dtype": qwen_defaults.get("qwen_dtype", "auto"),
             "batch_size": qwen_defaults.get("qwen_batch_size", 1),
             "max_new_tokens": qwen_defaults.get("qwen_max_tokens", 4096),
-            "language": qwen_defaults.get("qwen_language", None),
+            "language": (lambda _l: None if _l in (None, "null", "") else _l)(qwen_defaults.get("qwen_language", "Japanese")),
             "timestamps": qwen_defaults.get("qwen_timestamps", "word"),
             "aligner_id": qwen_defaults.get("qwen_aligner", "Qwen/Qwen3-ForcedAligner-0.6B"),
             "scene_detector": qwen_defaults.get("qwen_scene", "none"),

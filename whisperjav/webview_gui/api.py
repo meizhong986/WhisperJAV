@@ -1835,12 +1835,12 @@ class WhisperJAVAPI:
                         "type": "dropdown",
                         "label": "Language",
                         "options": [
+                            {"value": "Japanese", "label": "Japanese"},
+                            {"value": "English", "label": "English"},
+                            {"value": "Chinese", "label": "Chinese"},
                             {"value": "null", "label": "Auto-detect"},
-                            {"value": "ja", "label": "Japanese"},
-                            {"value": "en", "label": "English"},
-                            {"value": "zh", "label": "Chinese"},
                         ],
-                        "default": "null"
+                        "default": "Japanese"
                     },
                 },
                 "aligner": {
