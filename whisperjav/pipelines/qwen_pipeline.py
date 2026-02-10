@@ -1096,9 +1096,19 @@ class QwenPipeline(BasePipeline):
 
             # ── Apply recovery (if collapsed) + timestamp resolution + offset ──
             if status == "COLLAPSED":
+                # Extract group-relative VAD regions for Strategy C recovery.
+                # group[] contains SpeechSegments with scene-relative times;
+                # offset to group-relative (0-based) for the redistributor.
+                group_speech_regions = [
+                    (seg.start_sec - group_start_sec,
+                     seg.end_sec - group_start_sec)
+                    for seg in group
+                ]
                 corrected_words = redistribute_collapsed_words(
-                    words, group_duration,
+                    words, group_duration, group_speech_regions,
                 )
+                strategy = ("VAD-GUIDED" if group_speech_regions
+                            else "PROPORTIONAL")
                 result = self._reconstruct_from_words(
                     corrected_words, region_path,
                 )
@@ -1106,8 +1116,9 @@ class QwenPipeline(BasePipeline):
                 _diag["recoveries"] += 1
                 logger.warning(
                     "[SENTINEL]%s Speech region %d/%d: Alignment collapse "
-                    "recovered (PROPORTIONAL)",
+                    "recovered (%s, %d VAD regions)",
                     tag, group_idx + 1, total_groups,
+                    strategy, len(group_speech_regions),
                 )
 
             # ── Timestamp resolution ──
@@ -1300,7 +1311,7 @@ class QwenPipeline(BasePipeline):
                     "status": "COLLAPSED" if _diag["collapses"] > 0 else "OK",
                     "assessment": None,
                     "recovery": {
-                        "strategy": "proportional",
+                        "strategy": "vad_guided",
                         "groups_recovered": _diag["recoveries"],
                     } if _diag["recoveries"] > 0 else None,
                 },
