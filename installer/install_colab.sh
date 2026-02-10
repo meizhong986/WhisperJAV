@@ -266,7 +266,7 @@ info "This includes all dependencies (whisper, stable-ts, faster-whisper, etc.).
 # Install opencv-python-headless explicitly for safety
 venv_pip "opencv-python-headless"
 
-if ! venv_pip "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}#egg=whisperjav[cli,enhance,translate,huggingface,analysis,compatibility]"; then
+if ! venv_pip "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}#egg=whisperjav[cli,enhance,translate,huggingface,qwen,analysis,compatibility]"; then
     error "WhisperJAV installation failed"
     exit 1
 fi

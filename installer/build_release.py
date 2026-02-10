@@ -180,6 +180,7 @@ class ReleaseBuilder:
             "translate",
             "enhance",
             "huggingface",
+            "qwen",
             "analysis",
             "compatibility",
         ]

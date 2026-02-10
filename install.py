@@ -706,6 +706,11 @@ def _get_huggingface_deps_from_registry() -> list:
     return _get_packages_for_step([Extra.HUGGINGFACE])
 
 
+def _get_qwen_deps_from_registry() -> list:
+    """Get Qwen3-ASR package specs from registry."""
+    return _get_packages_for_step([Extra.QWEN])
+
+
 def _get_translate_deps_from_registry() -> list:
     """Get translation package specs from registry."""
     return _get_packages_for_step([Extra.TRANSLATE])
@@ -1260,6 +1265,11 @@ def main():
     hf_deps = _get_huggingface_deps_from_registry()
     if hf_deps:
         run_pip(executor, ["install"] + hf_deps, "Install HuggingFace packages")
+
+    # Qwen3-ASR (from registry) - depends on transformers, install after HuggingFace
+    qwen_deps = _get_qwen_deps_from_registry()
+    if qwen_deps:
+        run_pip(executor, ["install"] + qwen_deps, "Install Qwen3-ASR packages")
 
     # Translation (from registry) - pysubtrans requires Python 3.10+
     translate_deps = _get_translate_deps_from_registry()
