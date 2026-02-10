@@ -8,7 +8,7 @@
     <img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"/>
   </a>
   <br>
-  <img src="https://img.shields.io/badge/version-1.8.2-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.8.3-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.10--3.12-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
@@ -81,7 +81,27 @@ whisperjav /path/to/media_folder --output-dir ./subtitles
 
 ## Features
 
-### Processing Modes
+### Qwen3-ASR Pipeline (New in v1.8.3 — Preview)
+
+A new ASR engine based on [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR), available as an alternative to Whisper. It uses a Qwen language model for text generation and a separate forced aligner for word-level timestamps.
+
+The Qwen pipeline supports three ways to process your audio:
+
+| Mode | How It Works | Best For |
+|------|-------------|----------|
+| **Assembly** | Generates text first, then aligns timestamps in a separate pass. Batches scenes up to 120s. | Most content. Decoupled design means each step can be optimized independently. |
+| **Context-Aware** | Runs ASR and alignment together on full scenes (30-90s). | When you need the model to "see" more context around each utterance. |
+| **VAD Slicing** (default) | Coupled ASR+alignment with a step-wise fallback system. If the aligner collapses, it falls back to VAD-based grouping (up to 29s). | More detail, less context. |
+
+Access it via the CLI (`--mode qwen`) or the Ensemble tab in the GUI.
+
+**Known limitations (work in progress):**
+- **Timestamps** — The forced aligner sometimes drifts, especially on long scenes with background music. Assembly mode mitigates this with tighter scene boundaries (120s max), but it's not as precise as we want.
+- **Hallucination** — The Qwen model can hallucinate during piano music and moans. Japanese post-processing catches some of these, but it's not fully solved. Other languages don't have that post-processing yet.
+- **vLLM backend** — Current implementation uses transformers. The Assembly mode is architecturally ready for vLLM (the text generation step can be swapped), but the integration isn't built yet.
+- **MPS (Apple Silicon)** — The Qwen pipeline currently runs on CPU on Macs. The underlying `transformers` library supports MPS, but the forced aligner doesn't detect it yet.
+
+### Processing Modes (Whisper)
 
 | Mode | Backend | Scene Detection | VAD | Best For |
 |------|---------|-----------------|-----|----------|
@@ -264,7 +284,9 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Installation
 
-Find your situation below and follow the guide.
+> **v1.8.3 introduces new dependencies from the Qwen3-ASR ecosystem which is prone to version conflicts.** A `--wheel-only` upgrade won't be enough — you'll be missing packages that the Qwen pipeline needs. We recommend a full install. It takes longer, but it avoids half-working states where Whisper pipelines work but Qwen silently fails because a dependency is missing.
+
+Recommended: Uninstall the old version first (Settings > Apps > WhisperJAV on Windows), then install fresh. Your models and output files are stored separately and won't be lost.
 
 ---
 
@@ -273,9 +295,9 @@ Find your situation below and follow the guide.
 | Your Situation | Go To |
 |----------------|-------|
 | **New user on Windows** wanting GUI | [Windows Standalone Installer](#windows-standalone-installer) |
-| **Already have v1.8.x** and want to update | [Upgrading from v1.8.x](#upgrading-from-v18x) |
-| **Have v1.7.x or earlier** | [Upgrading from v1.7.x or Earlier](#upgrading-from-v17x-or-earlier) |
-| **Linux or macOS user** | [Linux](#linux-ubuntudebian) or [macOS](#macos-apple-silicon--intel) |
+| **Developer on Windows** | [Windows Source Install](#windows-source-install) |
+| **macOS user** | [macOS (Apple Silicon)](#macos-apple-silicon) |
+| **Linux user** | [Linux](#linux-ubuntu-debian-fedora-arch) |
 | **Colab or Kaggle** | [Cloud Notebooks](#google-colab--kaggle) |
 | **Developer or expert** wanting pip | [Expert Installation](#expert-installation) |
 
@@ -283,182 +305,132 @@ Find your situation below and follow the guide.
 
 ### Windows Standalone Installer
 
-The standalone installer provides a complete, self-contained WhisperJAV environment with GUI. No Python knowledge required.
+The easiest way. No Python knowledge needed.
 
-**Download:** [**WhisperJAV-1.8.2-Windows-x86_64.exe**](https://github.com/meizhong986/WhisperJAV/releases/latest)
+**Download:** [**WhisperJAV-1.8.3-Windows-x86_64.exe**](https://github.com/meizhong986/WhisperJAV/releases/latest)
 
-**Steps:**
-1. Download the `.exe` file from the link above
-2. Double-click to run (no admin rights needed)
-3. Follow the on-screen prompts
-4. Launch from the Desktop shortcut when complete
+1. **Download** the `.exe` from the link above
+2. **Run the installer.** No admin rights required. Installs to `%LOCALAPPDATA%\WhisperJAV`.
+3. **Wait 10-20 minutes.** It downloads and configures Python, PyTorch, FFmpeg, and all dependencies.
+4. **Launch** from the Desktop shortcut.
+5. **First run** downloads models (~3 GB, another several minutes).
 
-**What gets installed:**
-- Python 3.10 (bundled, does not affect your system Python)
-- FFmpeg for audio/video processing
-- PyTorch with CUDA support (auto-detected)
-- All WhisperJAV dependencies
-
-**Timing:**
-- Installation: 10-20 minutes (depends on internet speed)
-- First transcription: Additional 5-10 minutes for AI model download (~3GB)
-
-**Location:** `%LOCALAPPDATA%\WhisperJAV` (typically `C:\Users\YourName\AppData\Local\WhisperJAV`)
+**GPU auto-detection:** The installer checks your NVIDIA driver version and picks the right PyTorch:
+- Driver 570+ gets CUDA 12.8 (optimal for RTX 20/30/40/50-series)
+- Driver 450-569 gets CUDA 11.8 (broad compatibility)
+- No NVIDIA GPU gets CPU-only mode
 
 ---
 
-### Upgrading from v1.8.x
+### Windows Source Install
 
-If you have v1.8.0, v1.8.1, or any 1.8.x version, you can upgrade in place.
+For people who manage their own Python environments.
 
-#### Windows GUI Users
+**Prerequisites:** Python 3.10-3.12, Git, FFmpeg in PATH.
 
-Open Command Prompt and run:
 ```batch
-"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+
+:: Full automated install (auto-detects GPU)
+installer\install_windows.bat
+
+:: Or with options:
+installer\install_windows.bat --cpu-only        :: Force CPU
+installer\install_windows.bat --cuda118         :: Force CUDA 11.8
+installer\install_windows.bat --cuda128         :: Force CUDA 12.8
+installer\install_windows.bat --local-llm       :: Include local LLM translation
 ```
 
-Or from the WhisperJAV environment:
-```batch
-whisperjav-upgrade
-```
+The installer runs in 5 phases: PyTorch first (with GPU detection), then scientific stack, Whisper packages, audio/CLI tools, and optional extras. This order matters — PyTorch must be installed before anything that depends on it, or you end up with CPU-only wheels.
 
-The upgrade tool will:
-1. Create a rollback snapshot (in case you need to revert)
-2. Download and install the new version
-3. Update your desktop shortcut
-
-**Rollback if needed:**
-```batch
-whisperjav-upgrade --rollback
-```
-
-#### Linux / macOS / Expert Users
-
-From your WhisperJAV virtual environment:
-```bash
-source whisperjav-env/bin/activate
-whisperjav-upgrade
-```
-
-Or upgrade specific components only:
-```bash
-whisperjav-upgrade --extras cli,translate
-```
-
-**Available extras:** `cli`, `gui`, `translate`, `llm`, `enhance`, `huggingface`, `analysis`, `all`
+For the full walkthrough, see [docs/guides/installation_windows_python.md](docs/guides/installation_windows_python.md).
 
 ---
 
-### Upgrading from v1.7.x or Earlier
+### macOS (Apple Silicon)
 
-Version 1.8.x has breaking dependency changes. A clean installation is required.
-
-#### Windows GUI Users
-
-1. **Uninstall v1.7.x:**
-   - Open **Settings** → **Apps** → Search "WhisperJAV" → **Uninstall**
-   - Or run: `%LOCALAPPDATA%\WhisperJAV\Uninstall-WhisperJAV.exe`
-
-2. **Install v1.8.2:** Download and run the [new installer](#windows-standalone-installer)
-
-#### Linux / macOS Users
-
-1. **Remove the old environment:**
-   ```bash
-   rm -rf whisperjav-env
-   ```
-
-2. **Re-run the installer:**
-   ```bash
-   cd whisperjav
-   git pull
-   ./installer/install_linux.sh
-   ```
-
-**What is preserved across upgrades:**
-- AI models: `~/.cache/huggingface/` (Linux/Mac) or `%USERPROFILE%\.cache\huggingface\` (Windows)
-- Your transcription output files
-- Any files outside the installation directory
-
----
-
-### macOS (Apple Silicon & Intel)
-
-#### Prerequisites
-
+**Prerequisites:**
 ```bash
-# Install Xcode Command Line Tools
-xcode-select --install
-
-# Install Homebrew (if not already installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install required tools
-brew install python@3.11 ffmpeg git
+xcode-select --install                    # Xcode Command Line Tools
+brew install python@3.12 ffmpeg git       # Or python@3.11
 ```
 
-#### Installation
-
+**Install:**
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
-chmod +x installer/install_linux.sh
-./installer/install_linux.sh
+
+# Create a virtual environment (required for Homebrew Python)
+python3 -m venv ~/venvs/whisperjav
+source ~/venvs/whisperjav/bin/activate
+
+# Run the macOS installer
+chmod +x installer/install_mac.sh
+./installer/install_mac.sh
 ```
 
-**With local LLM support (builds llama-cpp with Metal):**
-```bash
-./installer/install_linux.sh --local-llm-build
-```
+**GPU acceleration:** Apple Silicon (M1/M2/M3/M4/M5) gets MPS acceleration automatically for Whisper pipelines. Use `--mode transformers` for best performance. The `balanced`, `fast`, and `faster` modes use CTranslate2 which doesn't support MPS, so those fall back to CPU.
 
-**Notes:**
-- Apple Silicon (M1/M2/M3/M4): Uses MPS acceleration automatically
-- Intel Macs: CPU-only mode, significantly slower than Apple Silicon
+**Qwen pipeline on Mac:** Currently runs on CPU only. The forced aligner doesn't detect MPS yet. This is a known limitation we plan to fix.
+
+**Intel Macs:** CPU-only. No GPU acceleration available.
+
+For the full walkthrough, see [docs/guides/installation_mac_apple_silicon.md](docs/guides/installation_mac_apple_silicon.md).
 
 ---
 
-### Linux (Ubuntu/Debian)
+### Linux (Ubuntu, Debian, Fedora, Arch)
 
-#### Prerequisites
+**1. Install system packages first** — these can't come from pip:
 
 ```bash
+# Ubuntu / Debian
 sudo apt-get update
-sudo apt-get install -y python3-dev python3-pip python3-venv build-essential ffmpeg libsndfile1 git
+sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
+    build-essential ffmpeg git libsndfile1 libsndfile1-dev
+
+# Fedora / RHEL
+sudo dnf install -y python3 python3-pip python3-devel gcc gcc-c++ \
+    ffmpeg git libsndfile libsndfile-devel
+
+# Arch
+sudo pacman -S --noconfirm python python-pip base-devel ffmpeg git libsndfile
 ```
 
-For Fedora/RHEL:
-```bash
-sudo dnf install python3-devel gcc ffmpeg libsndfile git
-```
+For the GUI, you'll also need WebKit2GTK (`libwebkit2gtk-4.0-dev` on Ubuntu, `webkit2gtk4.0-devel` on Fedora).
 
-#### Installation
+**2. Install WhisperJAV:**
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
+
+# Recommended: use the install script
 chmod +x installer/install_linux.sh
 ./installer/install_linux.sh
+
+# With options:
+./installer/install_linux.sh --cpu-only
+./installer/install_linux.sh --local-llm
 ```
 
-**Options:**
-```bash
-./installer/install_linux.sh --cpu-only        # Force CPU mode (no CUDA)
-./installer/install_linux.sh --local-llm       # Include local LLM support
-```
+**NVIDIA GPU:** You need the NVIDIA driver (450+ or 570+) but NOT the CUDA Toolkit — PyTorch bundles its own CUDA runtime.
 
-**NVIDIA GPU users:** The installer auto-detects CUDA. Ensure you have recent NVIDIA drivers installed (version 525+).
+**PEP 668 note:** If your distro's Python is "externally managed" (Ubuntu 24.04+, Fedora 38+), you'll need a virtual environment. The install script detects this and tells you what to do.
+
+For the full walkthrough including Colab/Kaggle setup, headless servers, and systemd services, see [docs/guides/installation_linux.md](docs/guides/installation_linux.md).
 
 ---
 
 ### Google Colab / Kaggle
 
-No local installation required. Use these notebooks directly:
+The notebooks are not updated yet for v1.8.3.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb)
 [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb)
 
-The notebooks handle all installation automatically. Free GPU runtime is available on both platforms.
+If you run into issues, please open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info, the console log, and the error output.
 
 ---
 
@@ -466,7 +438,7 @@ The notebooks handle all installation automatically. Free GPU runtime is availab
 
 For users comfortable with Python package management. Choose the components you need.
 
-#### Modular Installation (New in v1.8.2)
+#### Modular Installation
 
 WhisperJAV supports modular extras. Install only what you need:
 
@@ -568,8 +540,8 @@ installer\install_windows.bat --dev
 | **GPU** | None (CPU works) | NVIDIA RTX 2060+ or Apple Silicon |
 
 **GPU Support:**
-- NVIDIA: CUDA 11.8 or 12.x (Windows, Linux)
-- Apple Silicon: MPS acceleration (M1/M2/M3/M4)
+- NVIDIA: CUDA 11.8 or 12.8 (Windows, Linux)
+- Apple Silicon: MPS acceleration for Whisper (M1/M2/M3/M4/M5). Qwen pipeline is CPU-only on Mac for now.
 - AMD ROCm: Experimental (Linux only)
 - CPU fallback: Works on all platforms, 5-10x slower
 
@@ -670,6 +642,7 @@ MIT License. See [LICENSE](LICENSE) file.
 ## Acknowledgments
 
 - [OpenAI Whisper](https://github.com/openai/whisper) - The underlying ASR model
+- [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) - Qwen-based ASR with forced alignment
 - [stable-ts](https://github.com/jianfch/stable-ts) - Timestamp refinement
 - [faster-whisper](https://github.com/guillaumekln/faster-whisper) - Optimized CTranslate2 inference
 - [HuggingFace Transformers](https://github.com/huggingface/transformers) - Transformers pipeline backend
