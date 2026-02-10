@@ -669,7 +669,7 @@ class QwenPipeline(BasePipeline):
                         # Build per-scene diagnostics
                         _total_segs = len(result.segments) if result and result.segments else 0
                         self._scene_diagnostics[idx] = {
-                            "schema_version": "1.0.0",
+                            "schema_version": "1.1.0",
                             "scene_index": idx,
                             "scene_start_sec": start_sec,
                             "scene_end_sec": end_sec,
@@ -754,7 +754,7 @@ class QwenPipeline(BasePipeline):
                         # Build per-scene diagnostics (fallback path)
                         _total_segs = len(result.segments) if result and result.segments else 0
                         self._scene_diagnostics[idx] = {
-                            "schema_version": "1.0.0",
+                            "schema_version": "1.1.0",
                             "scene_index": idx,
                             "scene_start_sec": start_sec,
                             "scene_end_sec": end_sec,
@@ -1014,15 +1014,19 @@ class QwenPipeline(BasePipeline):
             # Step-down specific
             "tier1_groups": 0, "tier1_accepted": 0, "tier1_collapsed": 0,
             "tier2_groups": 0, "tier2_accepted": 0, "tier2_collapsed": 0,
+            # Per-group detail records (v1.1.0 analytics)
+            "group_details": [],
         }
 
         def _transcribe_group(group, group_idx, total_groups, tag="",
-                              skip_recovery_on_collapse=False):
+                              skip_recovery_on_collapse=False, tier=0):
             """Transcribe a single VAD group.
 
             Args:
                 skip_recovery_on_collapse: If True, return early on COLLAPSED
                     without applying recovery (for step-down Tier 1 deferral).
+                tier: Step-down tier (0=standard, 1=Tier 1, 2=Tier 2).
+                    Used only for per-group analytics records.
 
             Returns:
                 (result, assessment_status) where result is a WhisperResult
@@ -1036,11 +1040,28 @@ class QwenPipeline(BasePipeline):
             group_end_sec = group[-1].end_sec
             group_duration = group_end_sec - group_start_sec
 
+            # Per-group detail record for analytics (v1.1.0).
+            # Built progressively, appended to _diag at every exit point.
+            _detail = {
+                "tier": tier,
+                "group_index": group_idx,
+                "time_range": [round(group_start_sec, 3),
+                               round(group_end_sec, 3)],
+                "duration_sec": round(group_duration, 3),
+                "segments_in_group": len(group),
+                "outcome": "skipped",
+                "sentinel_status": None,
+                "sentinel_triggers": [],
+                "assessment_snapshot": None,
+                "subs_produced": 0,
+            }
+
             if group_duration < 0.1:
                 logger.debug(
                     "Phase 5%s: Skipping speech region %d/%d (%.3fs < 0.1s)",
                     tag, group_idx + 1, total_groups, group_duration,
                 )
+                _diag["group_details"].append(_detail)
                 return None, None
 
             # Slice audio for this speech group
@@ -1076,9 +1097,11 @@ class QwenPipeline(BasePipeline):
                     "Phase 5%s: Speech region %d/%d transcription failed: %s",
                     tag, group_idx + 1, total_groups, e,
                 )
+                _diag["group_details"].append(_detail)
                 return None, None
 
             if result is None or not result.segments:
+                _diag["group_details"].append(_detail)
                 return None, None
 
             # ── Alignment Sentinel: detect collapsed timestamps ──
@@ -1086,12 +1109,28 @@ class QwenPipeline(BasePipeline):
             assessment = assess_alignment_quality(words, group_duration)
             status = assessment["status"]
 
+            # Update detail record with assessment (v1.1.0)
+            _detail["sentinel_status"] = status
+            _detail["sentinel_triggers"] = assessment.get("triggers", [])
+            _detail["assessment_snapshot"] = {
+                "word_count": assessment.get("word_count", 0),
+                "char_count": assessment.get("char_count", 0),
+                "coverage_ratio": round(assessment.get("coverage_ratio", 0.0), 4),
+                "aggregate_cps": round(assessment.get("aggregate_cps", 0.0), 1),
+                "zero_position_ratio": round(
+                    assessment.get("zero_position_ratio", 0.0), 4),
+                "degenerate_ratio": round(
+                    assessment.get("degenerate_ratio", 0.0), 4),
+            }
+
             if status == "COLLAPSED":
                 _diag["collapses"] += 1
                 self._sentinel_stats["alignment_collapses"] += 1
 
                 if skip_recovery_on_collapse:
                     # Caller will handle re-grouping (step-down Tier 2)
+                    _detail["outcome"] = "collapsed_deferred"
+                    _diag["group_details"].append(_detail)
                     return None, "COLLAPSED"
 
             # ── Apply recovery (if collapsed) + timestamp resolution + offset ──
@@ -1120,6 +1159,17 @@ class QwenPipeline(BasePipeline):
                     tag, group_idx + 1, total_groups,
                     strategy, len(group_speech_regions),
                 )
+
+                # Update detail record with recovery info (v1.1.0)
+                _strategy_key = "vad_guided" if group_speech_regions else "proportional"
+                _detail["outcome"] = f"recovered_{_strategy_key}"
+                _detail["recovery"] = {
+                    "strategy": _strategy_key,
+                    "speech_regions_count": len(group_speech_regions),
+                    "words_redistributed": len(corrected_words),
+                }
+            else:
+                _detail["outcome"] = "accepted"
 
             # ── Timestamp resolution ──
             if self.timestamp_mode == TimestampMode.VAD_ONLY:
@@ -1164,6 +1214,12 @@ class QwenPipeline(BasePipeline):
                         seg.start = max(0.0, min(seg.start, scene_duration_sec))
                         seg.end = max(seg.start, min(seg.end, scene_duration_sec))
 
+            # Finalize detail record (v1.1.0)
+            _detail["subs_produced"] = (
+                len(result.segments) if result and result.segments else 0
+            )
+            _diag["group_details"].append(_detail)
+
             return result, status
 
         # ==================================================================
@@ -1191,7 +1247,7 @@ class QwenPipeline(BasePipeline):
             for group_idx, group in enumerate(tier1_groups):
                 result, status = _transcribe_group(
                     group, group_idx, len(tier1_groups), " [T1]",
-                    skip_recovery_on_collapse=True,
+                    skip_recovery_on_collapse=True, tier=1,
                 )
 
                 if status == "COLLAPSED":
@@ -1228,6 +1284,7 @@ class QwenPipeline(BasePipeline):
                 for group_idx, group in enumerate(tier2_groups):
                     result, status = _transcribe_group(
                         group, group_idx, len(tier2_groups), " [T2]",
+                        tier=2,
                     )
                     if result is None:
                         continue
@@ -1301,7 +1358,7 @@ class QwenPipeline(BasePipeline):
             _total_segs = len(combined_result.segments) if combined_result and combined_result.segments else 0
             _aligner_native = max(0, _total_segs - _diag["interp_count"] - _diag["vad_fallback_count"])
             self._scene_diagnostics[scene_idx] = {
-                "schema_version": "1.0.0",
+                "schema_version": "1.1.0",
                 "scene_index": scene_idx,
                 "scene_start_sec": scene_start_sec,
                 "scene_end_sec": scene_end_sec,
@@ -1334,6 +1391,8 @@ class QwenPipeline(BasePipeline):
                     {"start": round(s.start_sec, 3), "end": round(s.end_sec, 3)}
                     for s in seg_result.segments
                 ],
+                # Per-group detail records (v1.1.0 analytics)
+                "group_details": _diag["group_details"],
             }
 
         return combined_result
@@ -1673,7 +1732,7 @@ class QwenPipeline(BasePipeline):
             _raw_chars = len(raw_texts[idx]) if idx < len(raw_texts) and raw_texts[idx] else 0
             _clean_chars = len(clean_texts[idx]) if idx < len(clean_texts) and clean_texts[idx] else 0
             _assembly_diagnostics[idx] = {
-                "schema_version": "1.0.0",
+                "schema_version": "1.1.0",
                 "scene_index": idx,
                 "scene_start_sec": start_sec,
                 "scene_end_sec": end_sec,

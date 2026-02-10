@@ -124,22 +124,27 @@ def assess_alignment_quality(
 
     # Detection logic (V2 — span + distribution)
     collapsed = False
-    reason = []
+    reason = []       # Verbose strings for logging
+    triggers = []     # Short identifiers for analytics (v1.1.0)
 
     if coverage_ratio < _COVERAGE_RATIO_THRESHOLD:
         collapsed = True
+        triggers.append("coverage")
         reason.append(f"coverage={coverage_ratio:.3f}<{_COVERAGE_RATIO_THRESHOLD}")
 
     if aggregate_cps > _AGGREGATE_CPS_THRESHOLD:
         collapsed = True
+        triggers.append("cps")
         reason.append(f"CPS={aggregate_cps:.1f}>{_AGGREGATE_CPS_THRESHOLD}")
 
     if word_span_sec < _WORD_SPAN_THRESHOLD:
         collapsed = True
+        triggers.append("span")
         reason.append(f"span={word_span_sec:.3f}s<{_WORD_SPAN_THRESHOLD}s")
 
     if zero_position_ratio > _ZERO_POSITION_RATIO_THRESHOLD:
         collapsed = True
+        triggers.append("zero_position")
         reason.append(
             f"zero_pos={zero_position_count}/{word_count}"
             f" ({zero_position_ratio:.0%})>{_ZERO_POSITION_RATIO_THRESHOLD:.0%}"
@@ -147,10 +152,14 @@ def assess_alignment_quality(
 
     if degenerate_ratio > _DEGENERATE_RATIO_THRESHOLD:
         collapsed = True
+        triggers.append("degenerate")
         reason.append(
             f"degenerate={degenerate_count}/{word_count}"
             f" ({degenerate_ratio:.0%})>{_DEGENERATE_RATIO_THRESHOLD:.0%}"
         )
+
+    # Analytics: always include triggers list (empty if OK)
+    result["triggers"] = triggers
 
     if collapsed:
         result["status"] = "COLLAPSED"
