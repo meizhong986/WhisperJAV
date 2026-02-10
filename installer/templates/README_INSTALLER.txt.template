@@ -23,31 +23,31 @@ WHAT'S NEW IN v{{VERSION}}
 -------------------------------------------------------------------------------
 Version {{VERSION}} brings major improvements across 5 key areas:
 
-1. MULTI-PLATFORM GPU SUPPORT (NEW)
-   - Apple Silicon Macs (M1/M2/M3/M4/M5) with native GPU acceleration
-   - NVIDIA Blackwell architecture (RTX 50-series) support
-   - Automatic device detection for best performance
+1. QWEN3-ASR PIPELINE (NEW)
+   - New Qwen3-based ASR engine with three input modes:
+     Assembly (decoupled text + alignment), Context-Aware, and VAD-Slicing
+   - ForcedAligner for precise word-level timestamps
+   - Generation safety: repetition penalty + dynamic token budgets
 
-2. RESUME TRANSLATION FEATURE (NEW)
-   - Never lose translation progress - auto-save after each batch
-   - Resume interrupted translations without re-translating
-   - Saves API costs by preserving completed work
+2. ADAPTIVE STEP-DOWN ARCHITECTURE (NEW)
+   - Tier 1/Tier 2 grouping with automatic fallback
+   - Tighter scene/group boundaries for improved accuracy
+   - Proportional timing fallback for alignment failures
 
-3. MULTI-LANGUAGE SUPPORT (EXPERIMENTAL)
-   - Chinese (中文) and Korean (한국어) transcription
-   - Selectable source language in GUI
-   - Optimized for Japanese, basic support for others
+3. PIPELINE ANALYTICS & HEALTH CHECK (NEW)
+   - Real-time health metrics during pipeline execution
+   - Per-group diagnostic detail records
+   - Structured metadata for benchmarking and comparison
 
-4. GUI IMPROVEMENTS
-   - Clearer language selection options
-   - CPU mode acceptance checkbox (skip GPU warnings)
-   - Fixed UI scrolling performance
-   - Enhanced drag & drop support
+4. ALIGNMENT SENTINEL (NEW)
+   - Automatic detection of collapsed/degenerate word timestamps
+   - VAD-guided redistribution (Strategy C) for recovery
+   - Cluster collapse detection via degenerate-ratio check
 
-5. CRITICAL BUG FIXES
-   - Windows UTF-8 encoding fix (Japanese filenames work correctly)
-   - CUDA version detection fix (accurate GPU detection)
-   - UI scrolling performance improvements
+5. ENSEMBLE PIPELINE & GUI
+   - Multi-pass processing with configurable pipeline combinations
+   - Improved ensemble defaults and pass configuration in GUI
+   - Streamlined CUDA driver detection (2-tier: cu118/cu128)
 
 For detailed release notes, see RELEASE_NOTES_v{{VERSION}}.md
 
@@ -114,10 +114,8 @@ CUDA GPU ACCELERATION:
   The installer automatically detects your NVIDIA driver's CUDA version and
   installs the best matching PyTorch build for optimal performance:
 
-  - CUDA 11.8 - 12.0: PyTorch with CUDA 11.8 support
-  - CUDA 12.1 - 12.3: PyTorch with CUDA 12.1 support
-  - CUDA 12.4 - 12.7: PyTorch with CUDA 12.4 support
-  - CUDA 12.8+:       PyTorch with CUDA 12.4+ (Blackwell support)
+  - Driver 450+: PyTorch with CUDA 11.8 support (broad compatibility)
+  - Driver 570+: PyTorch with CUDA 12.8 support (RTX 50-series, optimal)
 
   This ensures you get the best possible GPU acceleration for your hardware
   while maintaining compatibility with your driver version.
@@ -331,15 +329,15 @@ with detailed information about your system and the problem.
 VERSION INFORMATION
 -------------------------------------------------------------------------------
 WhisperJAV Version: {{VERSION}}
-Release Date: November 2025
+Release Date: February 2026
 Installer Version: v{{VERSION}} (conda-constructor)
 
 Key Changes in {{VERSION}}:
-  - Multi-platform GPU support (Apple Silicon, Blackwell)
-  - Resume translation feature (auto-save progress)
-  - Multi-language support (Chinese, Korean - experimental)
-  - GUI improvements (language selection, CPU mode checkbox)
-  - Critical bug fixes (UTF-8 encoding, CUDA detection, UI scrolling)
+  - Qwen3-ASR pipeline (assembly, context-aware, VAD-slicing modes)
+  - Adaptive step-down architecture (Tier 1/Tier 2 grouping with fallback)
+  - Pipeline analytics and health check system
+  - Alignment sentinel for collapse detection and recovery
+  - Ensemble pipeline with multi-pass processing
 
 Previous Major Changes (1.5.1):
   - Complete PyWebView GUI takeover - modern, responsive web interface
@@ -357,6 +355,6 @@ LICENSE
 WhisperJAV is released under the MIT License.
 See LICENSE.txt in the installation directory for details.
 
-Copyright (c) 2025 MeiZhong and contributors
+Copyright (c) 2025-2026 MeiZhong and contributors
 
 ===============================================================================
