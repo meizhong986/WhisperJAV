@@ -53,6 +53,7 @@ test_output/
 docs/
 .docs/
 !docs/known_issues/
+!docs/release/
 .plan/
 temp/
 output/

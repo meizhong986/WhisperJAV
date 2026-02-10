@@ -1,6 +1,0 @@
-WhisperJAV Installation Log
-Started: 2026-01-28 14:00:07
-================================================================================
-
-[14:00:07]   Checking for Visual C++ Redistributable...
-[14:00:07]   [OK] Visual C++ Redistributable detected
