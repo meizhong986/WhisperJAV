@@ -113,8 +113,19 @@ check_venv_requirement() {
 # Main Execution
 # ==============================================================================
 
+# Detect macOS and redirect to dedicated installer
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    echo -e "${YELLOW}macOS detected. Please use the dedicated macOS installer:${NC}"
+    echo "  chmod +x installer/install_mac.sh"
+    echo "  ./installer/install_mac.sh"
+    echo ""
+    echo "Or run install.py directly:"
+    echo "  python3 install.py $@"
+    exit 1
+fi
+
 echo "============================================================"
-echo "  WhisperJAV Installation (via install.py)"
+echo "  WhisperJAV Linux Installation (via install.py)"
 echo "============================================================"
 echo ""
 
