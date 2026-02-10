@@ -1124,10 +1124,10 @@ const EnsembleManager = {
             enabled: false,
             pipeline: 'qwen',
             sensitivity: 'aggressive',
-            sceneDetector: 'auditok',
+            sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'silero',  // Silero v4.0
-            model: 'turbo',
+            speechSegmenter: 'ten',  // TEN VAD (matches Qwen pipeline defaults)
+            model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
             isTransformers: false,
@@ -1188,14 +1188,16 @@ const EnsembleManager = {
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = this.state.pass2.pipeline === 'qwen';
 
-        // Sync input mode for Qwen passes
+        // Sync input mode and model options for Qwen passes
         if (this.state.pass1.isQwen) {
             const im1 = document.getElementById('pass1-input-mode');
             if (im1) this.state.pass1.inputMode = im1.value;
+            this.swapModelOptions('pass1', 'qwen');
         }
         if (this.state.pass2.isQwen) {
             const im2 = document.getElementById('pass2-input-mode');
             if (im2) this.state.pass2.inputMode = im2.value;
+            this.swapModelOptions('pass2', 'qwen');
         }
 
         // Pass 2 enable/disable
@@ -1328,9 +1330,9 @@ const EnsembleManager = {
                 passState.isQwen = isQwen;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
-                // Swap model options if pipeline type changed
                 if (oldType !== newType) {
                     this.swapModelOptions(passKey, newType);
+                    this.applyPipelinePresets(passKey, newType);
                 }
             } else {
                 // Revert selection
@@ -1341,10 +1343,29 @@ const EnsembleManager = {
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
             this.updateRowGreyingState(passKey);
-            // Swap model options if pipeline type changed
             if (oldType !== newType) {
                 this.swapModelOptions(passKey, newType);
+                this.applyPipelinePresets(passKey, newType);
             }
+        }
+    },
+
+    // Set scene detector and segmenter to appropriate defaults for the pipeline type
+    applyPipelinePresets(passKey, pipelineType) {
+        const sceneSelect = document.getElementById(`${passKey}-scene`);
+        const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
+
+        if (pipelineType === 'qwen') {
+            sceneSelect.value = 'semantic';
+            segmenterSelect.value = 'ten';
+            this.state[passKey].sceneDetector = 'semantic';
+            this.state[passKey].speechSegmenter = 'ten';
+        } else {
+            // Legacy / Transformers defaults
+            sceneSelect.value = 'auditok';
+            segmenterSelect.value = 'silero';
+            this.state[passKey].sceneDetector = 'auditok';
+            this.state[passKey].speechSegmenter = 'silero';
         }
     },
 
