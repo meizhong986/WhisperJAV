@@ -112,7 +112,7 @@ class PreflightChecker:
         version = sys.version_info
         version_str = f"{version.major}.{version.minor}.{version.micro}"
         
-        if version >= (3, 9) and version < (3, 13):
+        if version >= (3, 10) and version < (3, 13):
             self.results.append(CheckResult(
                 name="Python Version",
                 status=CheckStatus.PASS,
@@ -123,7 +123,7 @@ class PreflightChecker:
                 name="Python Version",
                 status=CheckStatus.FAIL,
                 message=f"Python {version_str} is not supported",
-                details=["Supported versions: 3.9, 3.10, 3.11, 3.12 (3.13+ breaks openai-whisper)"],
+                details=["Supported versions: 3.10, 3.11, 3.12 (3.13+ breaks openai-whisper)"],
                 fatal=True
             ))
     
