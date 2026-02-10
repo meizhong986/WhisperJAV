@@ -376,10 +376,10 @@ __version_info__ = {{
             for whl in dist_dir.glob("*.whl"):
                 whl.unlink()
 
-        # Build wheel
+        # Build wheel (PEP 517 via python -m build)
         try:
             result = subprocess.run(
-                [sys.executable, "setup.py", "bdist_wheel"],
+                [sys.executable, "-m", "build", "--wheel"],
                 cwd=self.project_root,
                 capture_output=True,
                 text=True
