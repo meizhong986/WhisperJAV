@@ -32,6 +32,7 @@ _COVERAGE_RATIO_THRESHOLD = 0.05     # Words covering <5% of scene = collapsed
 _AGGREGATE_CPS_THRESHOLD = 50.0      # Physically impossible speech rate
 _WORD_SPAN_THRESHOLD = 0.5           # Sub-500ms with substantial text
 _ZERO_POSITION_RATIO_THRESHOLD = 0.10  # >10% words at (0.0, 0.0) = collapsed
+_DEGENERATE_RATIO_THRESHOLD = 0.40    # >40% words with start==end = cluster collapse
 
 # Recovery parameters
 _TARGET_CPS = 10.0  # Japanese conversational speed (~10 chars/sec)
@@ -91,15 +92,26 @@ def assess_alignment_quality(
     coverage_ratio = word_span_sec / scene_duration_sec if scene_duration_sec > 0 else 0.0
     aggregate_cps = char_count / word_span_sec if word_span_sec > 0 else float("inf")
 
-    # V2: Distribution-aware check — count words with no position data.
-    # The aligner returns null for words it can't place; merge converts
-    # null → 0.0.  A single stray timestamp at the tail can make span
-    # metrics look healthy while 98% of words are actually unplaced.
+    # V2: Distribution-aware checks.
+    #
+    # Check 1 — Null-position: aligner returned null → merge wrote (0.0, 0.0).
+    # A single stray timestamp at the tail can make span metrics look healthy
+    # while 98% of words are actually unplaced.
     zero_position_count = sum(
         1 for w in words
         if w.get("start", 0.0) == 0.0 and w.get("end", 0.0) == 0.0
     )
     zero_position_ratio = zero_position_count / word_count
+
+    # Check 2 — Cluster collapse at non-zero positions: the aligner produced
+    # timestamps but many words share the same (start == end) point.  Japanese
+    # particles naturally produce ~12-24% zero-duration words; cluster collapse
+    # pushes this to 60%+.  Threshold 40% separates the two cleanly.
+    degenerate_count = sum(
+        1 for w in words
+        if w.get("start", 0.0) == w.get("end", 0.0)
+    )
+    degenerate_ratio = degenerate_count / word_count
 
     result["word_span_sec"] = word_span_sec
     result["coverage_ratio"] = coverage_ratio
@@ -107,6 +119,8 @@ def assess_alignment_quality(
     result["anchor_sec"] = first_start
     result["zero_position_count"] = zero_position_count
     result["zero_position_ratio"] = zero_position_ratio
+    result["degenerate_count"] = degenerate_count
+    result["degenerate_ratio"] = degenerate_ratio
 
     # Detection logic (V2 — span + distribution)
     collapsed = False
@@ -129,6 +143,13 @@ def assess_alignment_quality(
         reason.append(
             f"zero_pos={zero_position_count}/{word_count}"
             f" ({zero_position_ratio:.0%})>{_ZERO_POSITION_RATIO_THRESHOLD:.0%}"
+        )
+
+    if degenerate_ratio > _DEGENERATE_RATIO_THRESHOLD:
+        collapsed = True
+        reason.append(
+            f"degenerate={degenerate_count}/{word_count}"
+            f" ({degenerate_ratio:.0%})>{_DEGENERATE_RATIO_THRESHOLD:.0%}"
         )
 
     if collapsed:
