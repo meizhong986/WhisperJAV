@@ -178,7 +178,7 @@ class QwenPipeline(BasePipeline):
         # Adaptive Step-Down (v1.8.10+)
         stepdown_enabled: bool = True,
         stepdown_initial_group: float = 30.0,
-        stepdown_fallback_group: float = 8.0,
+        stepdown_fallback_group: float = 6.0,
 
         # Generation safety controls (v1.8.9+)
         repetition_penalty: float = 1.1,              # Pipeline default: conservative penalty for JAV
@@ -405,12 +405,15 @@ class QwenPipeline(BasePipeline):
                         os.getpid(),
                     )
                 else:
-                    # Context-aware / VAD modes: tighter boundaries
-                    scene_detector_kwargs["min_duration"] = 30  # seconds
+                    # Context-aware / VAD modes: allow shorter scenes so the
+                    # detector can split at natural silence boundaries closer
+                    # to 15s.  Combined with step-down (Tier 1 30s → Tier 2 6s)
+                    # this gives the aligner the best chance per group.
+                    scene_detector_kwargs["min_duration"] = 12  # seconds
                     scene_detector_kwargs["max_duration"] = 90  # seconds
                     logger.info(
                         "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
-                        "(min=30s, max=90s)",
+                        "(min=12s, max=90s)",
                         os.getpid(),
                     )
 
@@ -1797,9 +1800,10 @@ class QwenPipeline(BasePipeline):
         and end=0.0 (from merge_master_with_timestamps). After stable-ts
         regrouping, these become segments with start=0.0 and end=0.0.
 
-        This method detects such segments and assigns the VAD group's duration
-        as a coarse but correct timestamp.  The text is real (ASR produced it),
-        and the timing is approximate (speech occurred within the VAD window).
+        This method detects such segments and distributes them proportionally
+        by character count across the group duration.  The text is real (ASR
+        produced it), and the timing is approximate but evenly spread — much
+        better than stacking all segments at the same timestamp.
 
         Timestamps at this point are region-relative (0-based).  The caller
         applies _offset_result_timestamps() afterward to shift to scene time.
@@ -1818,14 +1822,35 @@ class QwenPipeline(BasePipeline):
         if not result or not result.segments:
             return 0
 
-        fallback_count = 0
-        for seg in result.segments:
-            if seg.end <= 0.0:
-                seg.start = 0.0
-                seg.end = group_duration
-                fallback_count += 1
+        # Collect segments needing fallback
+        fallback_segs = [seg for seg in result.segments if seg.end <= 0.0]
+        if not fallback_segs:
+            return 0
 
-        return fallback_count
+        # Proportional distribution by character count
+        total_chars = sum(len(seg.text.strip()) or 1 for seg in fallback_segs)
+        cumulative = 0
+        for seg in fallback_segs:
+            seg_chars = len(seg.text.strip()) or 1
+            frac_start = cumulative / total_chars
+            frac_end = (cumulative + seg_chars) / total_chars
+            if hasattr(seg, 'words') and seg.words:
+                # Word-only assignment (avoid double-offset via property setters)
+                word_total = sum(len(w.word) or 1 for w in seg.words)
+                w_cum = 0
+                seg_span = (frac_end - frac_start) * group_duration
+                seg_base = frac_start * group_duration
+                for w in seg.words:
+                    w_chars = len(w.word) or 1
+                    w.start = seg_base + (w_cum / word_total) * seg_span
+                    w.end = seg_base + ((w_cum + w_chars) / word_total) * seg_span
+                    w_cum += w_chars
+            else:
+                seg.start = frac_start * group_duration
+                seg.end = frac_end * group_duration
+            cumulative += seg_chars
+
+        return len(fallback_segs)
 
     @staticmethod
     def _apply_vad_only_timestamps(

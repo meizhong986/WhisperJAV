@@ -1940,7 +1940,7 @@ class WhisperJAVAPI:
                         "label": "Tier 2 Duration (s)",
                         "description": "Tight fallback group duration for step-down Tier 2.",
                         "min": 4.0, "max": 15.0, "step": 1.0,
-                        "default": 8.0,
+                        "default": 6.0,
                     },
                 },
             }

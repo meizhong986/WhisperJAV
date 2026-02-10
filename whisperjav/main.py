@@ -474,8 +474,8 @@ def parse_arguments():
                            help="Disable adaptive step-down")
     qwen_group.add_argument("--qwen-stepdown-initial-group", type=float, default=30.0,
                            help="Tier 1 group duration for step-down (default: 30.0)")
-    qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=8.0,
-                           help="Tier 2 fallback group duration for step-down (default: 8.0)")
+    qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=6.0,
+                           help="Tier 2 fallback group duration for step-down (default: 6.0)")
     qwen_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_true", default=True,
                            help="Apply Japanese-specific subtitle regrouping (default: enabled)")
@@ -839,7 +839,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Adaptive Step-Down (v1.8.10+)
             stepdown_enabled=getattr(args, 'qwen_stepdown', False),
             stepdown_initial_group=getattr(args, 'qwen_stepdown_initial_group', 30.0),
-            stepdown_fallback_group=getattr(args, 'qwen_stepdown_fallback_group', 8.0),
+            stepdown_fallback_group=getattr(args, 'qwen_stepdown_fallback_group', 6.0),
             # Qwen ASR
             model_id=getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
             device=getattr(args, 'qwen_device', 'auto'),

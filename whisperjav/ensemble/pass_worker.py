@@ -364,7 +364,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_max_group_duration": 29.0,
     "qwen_stepdown": True,
     "qwen_stepdown_initial_group": 30.0,
-    "qwen_stepdown_fallback_group": 8.0,
+    "qwen_stepdown_fallback_group": 6.0,
 }
 
 
@@ -882,7 +882,7 @@ def _build_pipeline(
             "segmenter_max_group_duration": qwen_defaults.get("qwen_max_group_duration", 29.0),
             "stepdown_enabled": qwen_defaults.get("qwen_stepdown", False),
             "stepdown_initial_group": qwen_defaults.get("qwen_stepdown_initial_group", 30.0),
-            "stepdown_fallback_group": qwen_defaults.get("qwen_stepdown_fallback_group", 8.0),
+            "stepdown_fallback_group": qwen_defaults.get("qwen_stepdown_fallback_group", 6.0),
         }
         logger.debug(
             "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",
