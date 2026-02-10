@@ -879,25 +879,23 @@ class QwenPipeline(BasePipeline):
         # ==============================================================
         # PHASE 8: SANITISATION
         # ==============================================================
-        logger.info("[QwenPipeline PID %s] Phase 8: Sanitising output", os.getpid())
+        # NOTE: The legacy WhisperJAV sanitizer (SubtitleSanitizer + TimingAdjuster)
+        # was designed for Whisper's artefacts and hallucination patterns.
+        # For Qwen pipeline, Phase 8 is bypassed until a Qwen-specific
+        # sanitizer is implemented.  The stitched SRT from Phase 7 is used
+        # as the final output directly.
+        logger.info("[QwenPipeline PID %s] Phase 8: Skipped (legacy sanitizer disabled for Qwen)", os.getpid())
         phase8_start = time.time()
 
         final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
 
         if num_subtitles > 0:
-            processed_path, stats = self.postprocessor.process(stitched_srt_path, final_srt_path)
-
-            # Copy sanitized output to the final named path (sanitizer writes
-            # next to input as *.sanitized.srt; we need the canonical name)
-            if processed_path != final_srt_path:
-                shutil.copy2(processed_path, final_srt_path)
-                logger.debug("Copied final SRT from %s to %s", processed_path, final_srt_path)
-
+            shutil.copy2(stitched_srt_path, final_srt_path)
+            stats = {"total_subtitles": num_subtitles, "sanitizer_skipped": True}
+            processed_path = final_srt_path
             logger.info(
-                "[QwenPipeline PID %s] Phase 8: %d subtitles, %d hallucinations removed",
-                os.getpid(),
-                stats.get("total_subtitles", 0),
-                stats.get("removed_hallucinations", 0),
+                "[QwenPipeline PID %s] Phase 8: %d subtitles passed through (no sanitization)",
+                os.getpid(), num_subtitles,
             )
         else:
             # Copy empty stitched file as final output
@@ -1126,13 +1124,16 @@ class QwenPipeline(BasePipeline):
             # ── Clamp to group bounds (region-relative: 0 to group_duration) ──
             # Prevents interpolation overflow or aligner drift from producing
             # timestamps beyond the group's audio slice.
+            # Operate on words only (not segment properties) because stable-ts
+            # Segment.start/.end setters propagate to underlying words.
             for seg in result.segments:
-                seg.start = max(0.0, min(seg.start, group_duration))
-                seg.end = max(seg.start, min(seg.end, group_duration))
                 if hasattr(seg, 'words') and seg.words:
                     for word in seg.words:
                         word.start = max(0.0, min(word.start, group_duration))
                         word.end = max(word.start, min(word.end, group_duration))
+                else:
+                    seg.start = max(0.0, min(seg.start, group_duration))
+                    seg.end = max(seg.start, min(seg.end, group_duration))
 
             # Offset timestamps from group-relative to scene-relative
             self._offset_result_timestamps(result, group_start_sec)
@@ -1141,12 +1142,13 @@ class QwenPipeline(BasePipeline):
             # Safety net: after offset, ensure no timestamp exceeds scene boundary.
             if scene_duration_sec > 0:
                 for seg in result.segments:
-                    seg.start = max(0.0, min(seg.start, scene_duration_sec))
-                    seg.end = max(seg.start, min(seg.end, scene_duration_sec))
                     if hasattr(seg, 'words') and seg.words:
                         for word in seg.words:
                             word.start = max(0.0, min(word.start, scene_duration_sec))
                             word.end = max(word.start, min(word.end, scene_duration_sec))
+                    else:
+                        seg.start = max(0.0, min(seg.start, scene_duration_sec))
+                        seg.end = max(seg.start, min(seg.end, scene_duration_sec))
 
             return result, status
 
@@ -1722,16 +1724,20 @@ class QwenPipeline(BasePipeline):
         """
         Offset all timestamps in a WhisperResult by offset_sec.
 
-        Same principle as WhisperProASR._process_segments() adding start_sec
-        to each segment's start/end values.
+        Uses word-level operations only when the segment has words,
+        because stable-ts Segment.start/.end are properties whose setters
+        propagate to words[0].start / words[-1].end.  Setting both the
+        segment property AND the word attribute would double-offset the
+        first/last word.
         """
         for seg in result.segments:
-            seg.start += offset_sec
-            seg.end += offset_sec
             if hasattr(seg, 'words') and seg.words:
                 for word in seg.words:
                     word.start += offset_sec
                     word.end += offset_sec
+            else:
+                seg.start += offset_sec
+                seg.end += offset_sec
 
     # ------------------------------------------------------------------
     # Sentinel reconstruction helper (shared by assembly + coupled modes)
