@@ -1,4 +1,20 @@
-# WhisperJAV Requirements
+# ============================================================================
+# DEPRECATED: This file is maintained for reference only.
+#
+# The authoritative dependency definitions are in:
+#   - pyproject.toml (extras-based, pip install whisperjav[all])
+#   - whisperjav/installer/core/registry.py (single source of truth)
+#
+# For installation, use one of:
+#   - installer/install_linux.sh (Linux)
+#   - installer/install_mac.sh (macOS)
+#   - installer/install_windows.bat (Windows)
+#   - python install.py (all platforms, direct)
+#
+# This file may be out of date. Do not rely on it for installation.
+# ============================================================================
+
+# WhisperJAV Requirements (legacy reference)
 # ========================================
 
 # Git-based dependencies (from main branches)
