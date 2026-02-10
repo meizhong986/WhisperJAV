@@ -930,6 +930,25 @@ class QwenPipeline(BasePipeline):
         }
 
         # ==============================================================
+        # PHASE 9: ANALYTICS
+        # ==============================================================
+        try:
+            from whisperjav.modules.pipeline_analytics import (
+                compute_analytics, print_summary, save_analytics,
+            )
+            analytics = compute_analytics(
+                raw_subs_dir, final_srt_path, title=media_basename,
+            )
+            print_summary(analytics, title=media_basename)
+
+            # Save analytics JSON alongside the final SRT
+            analytics_path = final_srt_path.with_suffix(".analytics.json")
+            save_analytics(analytics, analytics_path)
+            master_metadata["output_files"]["analytics"] = str(analytics_path)
+        except Exception as e:
+            logger.debug("Phase 9: Analytics failed (non-fatal): %s", e)
+
+        # ==============================================================
         # COMPLETE
         # ==============================================================
         total_time = time.time() - pipeline_start
