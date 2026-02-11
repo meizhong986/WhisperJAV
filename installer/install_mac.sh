@@ -256,6 +256,45 @@ if [[ $EXIT_CODE -ne 0 ]]; then
     echo "  Check the output above for error details."
     echo "  For help: python3 install.py --help"
     echo ""
+    exit $EXIT_CODE
 fi
 
-exit $EXIT_CODE
+# ==============================================================================
+# macOS Post-Install: Verify GUI and give guidance
+# ==============================================================================
+
+echo ""
+echo -e "${CYAN}============================================================${NC}"
+echo -e "${CYAN}  macOS Post-Install Check${NC}"
+echo -e "${CYAN}============================================================${NC}"
+echo ""
+
+# Verify pywebview installed correctly
+if python3 -c "import webview" 2>/dev/null; then
+    echo -e "${GREEN}  GUI: ready${NC}"
+    echo "  pywebview is installed. The GUI uses macOS WebKit — no"
+    echo "  additional downloads or runtimes needed."
+    echo ""
+    echo "  Launch the GUI with:"
+    echo -e "    ${GREEN}whisperjav-gui${NC}"
+else
+    echo -e "${YELLOW}  GUI: pywebview did not install successfully${NC}"
+    echo ""
+    echo "  The GUI needs pywebview, which uses macOS WebKit (built-in)."
+    echo "  Try installing it manually:"
+    echo "    pip install pywebview"
+    echo ""
+    echo "  If that fails, check that Xcode CLI Tools are installed:"
+    echo "    xcode-select --install"
+    echo ""
+    echo "  You can still use WhisperJAV via the command line:"
+    echo "    whisperjav video.mp4 --mode balanced"
+fi
+
+echo ""
+echo -e "${GREEN}============================================================${NC}"
+echo -e "${GREEN}  Installation complete!${NC}"
+echo -e "${GREEN}============================================================${NC}"
+echo ""
+
+exit 0

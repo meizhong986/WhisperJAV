@@ -47,6 +47,13 @@ def _check_gui_dependencies():
         if is_windows():
             print("Note: On Windows, WebView2 runtime is also required.")
             print("Download from: https://developer.microsoft.com/en-us/microsoft-edge/webview2/")
+        elif sys.platform == "darwin":
+            print("On macOS, the GUI uses WebKit which is built into the OS.")
+            print("You just need the Python binding. Install it with:")
+            print("  pip install pywebview")
+            print()
+            print("If you installed from source, re-run the installer:")
+            print("  ./installer/install_mac.sh")
         sys.exit(1)
 
 _check_gui_dependencies()
