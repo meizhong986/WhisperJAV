@@ -53,8 +53,11 @@ spec:
   min_silence_duration_ms: 100  # Not implemented - reserved for future use
 
   # --- Segment Padding ---
-  # Padding extends segment boundaries to capture speech onset/offset
-  start_pad_ms: 100  # Shift segment start earlier by 100ms
+  # end_pad extends segment end to capture trailing speech.
+  # start_pad is set to 0 because TEN's 16ms frame already captures the speech
+  # onset, and pre-speech padding causes ~Nms timestamp drift in Whisper/ASR
+  # (Whisper can't reliably detect short pre-speech silence). See #163.
+  start_pad_ms: 0
   end_pad_ms: 200    # Shift segment end later by 200ms
 
   # --- Segment Grouping ---
@@ -70,7 +73,7 @@ presets:
     threshold: 0.5
     min_speech_duration_ms: 150
     min_silence_duration_ms: 150
-    start_pad_ms: 50
+    start_pad_ms: 0
     end_pad_ms: 100
 
   # Balanced: Default settings for general use
@@ -82,7 +85,7 @@ presets:
     threshold: 0.10
     min_speech_duration_ms: 50
     min_silence_duration_ms: 50
-    start_pad_ms: 150
+    start_pad_ms: 0
     end_pad_ms: 300
 
 # =============================================================================

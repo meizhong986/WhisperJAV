@@ -58,7 +58,7 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
-from whisperjav.pipelines.balanced_pipeline import BalancedPipeline, safe_cleanup_immortal_asr
+from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
 from whisperjav.__version__ import __version__
@@ -972,13 +972,16 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             except Exception as cleanup_error:
                 logger.error(f"Error during pipeline cleanup: {cleanup_error}")
 
-        # For balanced pipeline: attempt controlled cleanup of immortal ASR reference
-        # This triggers ctranslate2 destructor NOW (in controlled context) rather than
-        # during Python shutdown (where it crashes with 0xC0000409)
-        try:
-            safe_cleanup_immortal_asr()
-        except Exception as e:
-            logger.debug(f"safe_cleanup_immortal_asr raised exception (non-fatal): {e}")
+        # NOTE: safe_cleanup_immortal_asr() is intentionally NOT called here.
+        # The ctranslate2 C++ destructor crashes with 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN)
+        # even during "controlled" cleanup — this is a native Windows structured exception
+        # that Python's try/except CANNOT catch. If the crash occurs here, os._exit(0) in
+        # main() never executes, and the user sees exit code 3221226505.
+        #
+        # The correct fix: skip ALL destructor-triggering cleanup. The nuclear exit
+        # (os._exit(0)) in main() terminates the process cleanly, and the OS kernel
+        # reclaims all GPU memory. No resource leak, no crash.
+        # See: https://github.com/meizhong986/WhisperJAV/issues/125
 
         progress.close()
     

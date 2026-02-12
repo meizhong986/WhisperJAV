@@ -490,6 +490,24 @@ def _setup_pytorch_cuda_dll_paths() -> bool:
                     os.environ["PATH"] = f"{torch_lib};{existing_path}"
                     logger.debug(f"Added PyTorch lib to PATH for subprocesses: {torch_lib}")
 
+                # 3. CRITICAL for subprocess DLL resolution (Python 3.8+):
+                # Python 3.8+ doesn't search PATH for DLL dependencies, only
+                # directories added via os.add_dll_directory(). Our add_dll_directory
+                # calls above DON'T carry over to the subprocess.
+                #
+                # llama-cpp-python's _ctypes_extensions.py checks {CUDA_PATH}/lib/
+                # for CUDA DLLs. By setting CUDA_PATH to torch's root directory,
+                # the subprocess will find PyTorch's CUDA libs at {torch_dir}/lib/*.dll
+                # via llama_cpp's own mechanism.
+                #
+                # Only set if CUDA_PATH is not already set (don't override CUDA Toolkit).
+                # See: https://github.com/meizhong986/WhisperJAV/issues/162
+                torch_dir = os.path.dirname(torch.__file__)  # e.g., .../site-packages/torch
+                if not os.environ.get("CUDA_PATH"):
+                    os.environ["CUDA_PATH"] = torch_dir
+                    logger.debug(f"Set CUDA_PATH={torch_dir} (enables llama_cpp subprocess to find CUDA DLLs via {{CUDA_PATH}}/lib/)")
+                    paths_added.append(f"CUDA_PATH → PyTorch: {torch_dir}")
+
                 paths_added.append(f"PyTorch lib: {torch_lib}")
                 logger.debug(f"Added PyTorch CUDA libs to DLL path: {torch_lib}")
                 logger.debug(f"Found CUDA DLLs in PyTorch: {cuda_dlls[:3]}...")  # Log first 3
@@ -1778,6 +1796,38 @@ def start_local_server(
     print(f"[LOCAL-LLM]   Model path: {model_path}", file=sys.stderr)
     print(f"[LOCAL-LLM]   Model size: {model_path.stat().st_size / (1024**3):.2f} GB", file=sys.stderr)
     logger.info(f"Starting local server with {model_path.name}...")
+
+    # =========================================================================
+    # PRE-VALIDATION: Verify subprocess can import llama_cpp
+    # =========================================================================
+    # The main process import may succeed (our os.add_dll_directory helps) but
+    # the subprocess needs CUDA DLLs discoverable via environment variables
+    # (CUDA_PATH, PATH) since os.add_dll_directory doesn't carry over.
+    # This quick check catches DLL issues BEFORE waiting for the full server.
+    if sys.platform == "win32":
+        try:
+            pre_check = subprocess.run(
+                [sys.executable, "-c", "import llama_cpp"],
+                capture_output=True, text=True, timeout=30
+            )
+            if pre_check.returncode != 0:
+                stderr_text = pre_check.stderr.strip()
+                logger.warning(f"Subprocess llama_cpp import failed: {stderr_text[:200]}")
+                # Provide targeted diagnostics
+                diagnosis = _diagnose_dll_failure(stderr_text)
+                raise RuntimeError(
+                    f"llama-cpp-python loads in the main process but fails in a subprocess.\n"
+                    f"This means CUDA DLLs are not discoverable by the server process.\n\n"
+                    f"Subprocess error:\n{stderr_text[:300]}\n\n"
+                    f"{diagnosis}"
+                )
+            logger.debug("Subprocess llama_cpp import pre-check: OK")
+        except subprocess.TimeoutExpired:
+            logger.warning("Subprocess llama_cpp import pre-check timed out (30s) — proceeding anyway")
+        except RuntimeError:
+            raise  # Re-raise our own RuntimeError
+        except Exception as e:
+            logger.debug(f"Subprocess pre-check failed (non-fatal): {e}")
 
     # Find free port
     port = _find_free_port()

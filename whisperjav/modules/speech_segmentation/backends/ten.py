@@ -87,7 +87,7 @@ class TenSpeechSegmenter:
         min_silence_duration_ms: int = 100,
         chunk_threshold_s: Optional[float] = 1.0,
         max_group_duration_s: Optional[float] = None,
-        start_pad_ms: int = 100,
+        start_pad_ms: int = 0,
         end_pad_ms: int = 200,
         **kwargs
     ):
@@ -104,7 +104,9 @@ class TenSpeechSegmenter:
             max_group_duration_s: Maximum duration for a segment group (seconds).
                 Groups are split if adding a segment would exceed this limit.
                 Default 29s to stay within Whisper's 30s context window.
-            start_pad_ms: Milliseconds to pad before segment start (shifts start earlier)
+            start_pad_ms: Milliseconds to pad before segment start (shifts start earlier).
+                Default 0: TEN's 16ms frame already captures the onset, and pre-speech
+                padding causes proportional timestamp drift in ASR. See #163.
             end_pad_ms: Milliseconds to pad after segment end (shifts end later)
             **kwargs: Additional parameters for backward compatibility
                 - chunk_threshold: Legacy alias for chunk_threshold_s

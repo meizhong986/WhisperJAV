@@ -105,6 +105,7 @@ class SegmentationResult:
                 - end: int (samples at 16kHz)
                 - start_sec: float
                 - end_sec: float
+                - metadata: Dict (backend-specific, e.g. raw_start/raw_end for TEN)
         """
         legacy_groups = []
         for group in self.groups:
@@ -115,6 +116,7 @@ class SegmentationResult:
                     "end": seg.end_sample,
                     "start_sec": seg.start_sec,
                     "end_sec": seg.end_sec,
+                    "metadata": seg.metadata,
                 })
             legacy_groups.append(legacy_group)
         return legacy_groups

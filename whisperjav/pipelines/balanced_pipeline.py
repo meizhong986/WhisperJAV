@@ -41,8 +41,8 @@ from whisperjav.modules.speech_enhancement import (
 # Python shutdown. This is a known upstream issue in ctranslate2/faster-whisper.
 #
 # Solution: Store ASR reference here to prevent garbage collection during normal
-# execution. Before process exit, call safe_cleanup_immortal_asr() to attempt
-# controlled cleanup, then use os._exit(0) to skip Python's shutdown sequence.
+# execution. The nuclear exit (os._exit(0)) in main() terminates the process
+# without running Python's shutdown sequence — the OS reclaims all memory.
 #
 # References:
 # - https://github.com/SYSTRAN/faster-whisper/issues/1293
@@ -54,65 +54,37 @@ _IMMORTAL_ASR_REFERENCE = None
 
 def safe_cleanup_immortal_asr() -> bool:
     """
-    Attempt controlled cleanup of the immortal ASR reference before process exit.
+    Clear the immortal ASR reference. Does NOT trigger destructors.
 
-    This function tries to properly release GPU memory by calling the ASR's cleanup
-    method during controlled execution (where we can catch exceptions), rather than
-    letting the destructor run during Python's unsafe shutdown sequence.
+    IMPORTANT: This function intentionally does NOT call cleanup(), del, or gc.collect()
+    on the ASR model. The ctranslate2 C++ destructor crashes with 0xC0000409
+    (STATUS_STACK_BUFFER_OVERRUN) on Windows — a native structured exception that
+    Python's try/except CANNOT catch. Even "controlled" cleanup triggers this crash.
+
+    The correct approach is to skip all destructor-triggering operations and rely on
+    os._exit(0) (nuclear exit) to terminate the process. The OS kernel reclaims all
+    GPU memory when the process dies. No resource leak, no crash.
+
+    This function exists for backwards compatibility. Callers should use os._exit(0)
+    instead of attempting ASR cleanup.
+
+    See: https://github.com/meizhong986/WhisperJAV/issues/125
 
     Returns:
-        True if cleanup was attempted (regardless of success), False if no cleanup needed.
-
-    Note:
-        Even if this function raises an exception internally, it catches and logs it.
-        The caller should still call os._exit(0) afterward to prevent the destructor
-        from running during Python shutdown.
+        True if reference was held, False if already None.
     """
     global _IMMORTAL_ASR_REFERENCE
 
     if _IMMORTAL_ASR_REFERENCE is None:
         return False
 
-    try:
-        logger.debug("Attempting controlled cleanup of immortal ASR reference...")
-
-        # Step 1: Call the ASR's cleanup method if it exists
-        if hasattr(_IMMORTAL_ASR_REFERENCE, 'cleanup'):
-            try:
-                _IMMORTAL_ASR_REFERENCE.cleanup()
-                logger.debug("ASR cleanup() called successfully")
-            except Exception as e:
-                logger.warning(f"ASR cleanup() raised exception (continuing): {e}")
-
-        # Step 2: Clear the reference
-        _IMMORTAL_ASR_REFERENCE = None
-
-        # Step 3: CUDA synchronization and cache clear
-        try:
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-                torch.cuda.empty_cache()
-                logger.debug("CUDA synchronized and cache cleared")
-        except Exception as e:
-            logger.warning(f"CUDA cleanup raised exception (continuing): {e}")
-
-        # Step 4: Force garbage collection to trigger any remaining destructors
-        # in a controlled context where we can catch exceptions
-        try:
-            import gc
-            gc.collect()
-        except Exception as e:
-            logger.warning(f"gc.collect() raised exception (continuing): {e}")
-
-        logger.debug("Immortal ASR cleanup completed")
-        return True
-
-    except Exception as e:
-        logger.warning(f"safe_cleanup_immortal_asr() failed (non-fatal): {e}")
-        # Clear reference anyway to prevent double-cleanup attempts
-        _IMMORTAL_ASR_REFERENCE = None
-        return True
+    # Do NOT call cleanup(), del, or gc.collect() — these trigger the native crash.
+    # Just clear the Python reference. The nuclear exit (os._exit) handles the rest.
+    logger.debug(
+        "Immortal ASR reference cleared (destructor skipped — nuclear exit will handle)"
+    )
+    _IMMORTAL_ASR_REFERENCE = None
+    return True
 
 
 class BalancedPipeline(BasePipeline):
