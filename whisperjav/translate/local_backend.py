@@ -23,7 +23,7 @@ Usage:
 
     # Programmatic
     from whisperjav.translate.local_backend import start_local_server, stop_local_server
-    api_base, port = start_local_server(model="auto")
+    api_base, port, diagnostics = start_local_server(model="auto")
     # ... use api_base with OpenAI-compatible client ...
     stop_local_server()
 """
@@ -426,6 +426,39 @@ def _check_vc_runtime_installed() -> bool:
         return False
     except Exception:
         return True  # Assume OK if we can't check
+
+
+def _check_cpu_avx2_support() -> bool:
+    """
+    Check if CPU supports AVX2 instructions.
+
+    Our prebuilt llama-cpp-python wheels are compiled with AVX2 optimization.
+    CPUs without AVX2 will crash with STATUS_ILLEGAL_INSTRUCTION (0xC000001D)
+    when trying to load the native library.
+
+    Returns:
+        True if AVX2 is supported or if detection is not possible.
+        False if AVX2 is definitively not supported.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            # PF_AVX2_INSTRUCTIONS_AVAILABLE = 40
+            # Available on Windows 10+ / Server 2016+
+            return bool(kernel32.IsProcessorFeaturePresent(40))
+        except Exception:
+            return True  # Can't check, assume OK
+    elif sys.platform == "linux":
+        try:
+            with open('/proc/cpuinfo', 'r') as f:
+                cpuinfo = f.read().lower()
+            return 'avx2' in cpuinfo
+        except Exception:
+            return True  # Can't check, assume OK
+    else:
+        # macOS uses Metal, AVX2 not relevant for Apple Silicon
+        return True
 
 
 # Track whether we've already set up library paths (avoid redundant calls)
@@ -1551,22 +1584,20 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
             time.sleep(0.5)
 
     # =========================================================================
-    # Phase 2: Verify inference works AND measure speed
+    # Phase 2: Verify inference works (model loading request)
     # =========================================================================
     # This is critical - /v1/models responds before the model is loaded.
-    # We need a real inference request to verify CUDA works AND measure speed.
-    # Using 20 tokens gives a meaningful speed measurement while staying fast.
+    # We need a real inference request to verify CUDA works.
+    # First request triggers lazy model loading — its speed includes load time.
     completions_url = f"http://localhost:{port}/v1/completions"
 
-    # Request enough tokens to get meaningful speed measurement
-    # 20 tokens takes ~0.5-2s on GPU, ~5-20s on CPU - enough to differentiate
     test_payload = json.dumps({
         "prompt": "Count from 1 to 10:",
         "max_tokens": 20,
         "temperature": 0.0
     }).encode('utf-8')
 
-    logger.info("Verifying model loads and measuring inference speed...")
+    logger.info("Verifying model loads correctly (first inference triggers model loading)...")
 
     # Allow up to 120s for model loading on first inference
     # Large models (8B+) can take 30-60s to load into GPU memory
@@ -1586,28 +1617,72 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
 
         with urllib.request.urlopen(req, timeout=inference_timeout) as response:
             if response.status == 200:
-                # Read and parse response for speed measurement
-                inference_elapsed = time.time() - inference_start
-                response_body = response.read().decode('utf-8', errors='replace')
-
-                # Parse response to get actual token count
+                load_elapsed = time.time() - inference_start
+                # Parse first response for fallback speed estimate
+                first_response_body = response.read().decode('utf-8', errors='replace')
+                first_tokens = 0
                 try:
-                    response_data = json.loads(response_body)
-                    usage = response_data.get('usage', {})
-                    completion_tokens = usage.get('completion_tokens', 0)
+                    first_data = json.loads(first_response_body)
+                    first_tokens = first_data.get('usage', {}).get('completion_tokens', 0)
+                except Exception:
+                    pass
 
-                    if completion_tokens > 0 and inference_elapsed > 0:
-                        # Calculate tokens per second
-                        # Note: First request includes model loading time, so this
-                        # is a lower bound. Real inference may be faster.
-                        diagnostics.inference_speed_tps = completion_tokens / inference_elapsed
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    # Fall back to rough estimate based on max_tokens
-                    if inference_elapsed > 0:
-                        diagnostics.inference_speed_tps = 20.0 / inference_elapsed
+                # Set first-inference speed as fallback (includes model load time)
+                if first_tokens > 0 and load_elapsed > 0:
+                    diagnostics.inference_speed_tps = first_tokens / load_elapsed
+                elif load_elapsed > 0:
+                    diagnostics.inference_speed_tps = 20.0 / load_elapsed
+
+                logger.info(f"Model loaded and first inference completed ({load_elapsed:.1f}s)")
+
+                # =============================================================
+                # Phase 3: Measure steady-state inference speed
+                # =============================================================
+                # The first request includes model loading overhead (can be 10-30s).
+                # A second request measures true inference speed, which is what
+                # determines whether translation batches will succeed or timeout.
+                logger.info("Measuring steady-state inference speed...")
+
+                speed_payload = json.dumps({
+                    "prompt": "Translate this: Hello, how are you?",
+                    "max_tokens": 30,
+                    "temperature": 0.0
+                }).encode('utf-8')
+
+                try:
+                    speed_req = urllib.request.Request(
+                        completions_url,
+                        data=speed_payload,
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+
+                    speed_start = time.time()
+                    with urllib.request.urlopen(speed_req, timeout=60) as speed_response:
+                        if speed_response.status == 200:
+                            speed_elapsed = time.time() - speed_start
+                            speed_body = speed_response.read().decode('utf-8', errors='replace')
+
+                            try:
+                                speed_data = json.loads(speed_body)
+                                speed_tokens = speed_data.get('usage', {}).get('completion_tokens', 0)
+
+                                if speed_tokens > 0 and speed_elapsed > 0:
+                                    diagnostics.inference_speed_tps = speed_tokens / speed_elapsed
+                                    logger.info(
+                                        f"Steady-state speed: {diagnostics.inference_speed_tps:.1f} tokens/sec "
+                                        f"({speed_tokens} tokens in {speed_elapsed:.1f}s)"
+                                    )
+                            except (json.JSONDecodeError, KeyError, TypeError):
+                                if speed_elapsed > 0:
+                                    diagnostics.inference_speed_tps = 30.0 / speed_elapsed
+
+                except Exception as e:
+                    # Phase 3 failed — keep first-inference estimate (already set above)
+                    logger.debug(f"Steady-state speed measurement failed, using first-inference estimate: {e}")
 
                 total_time = time.time() - start_time
-                logger.info(f"Server ready and inference verified ({total_time:.1f}s total)")
+                logger.info(f"Server ready and speed measured ({total_time:.1f}s total)")
                 return True, None, diagnostics
 
     except urllib.error.HTTPError as e:
@@ -1722,11 +1797,222 @@ def _check_existing_llama_servers() -> list:
     return found
 
 
+# Speed thresholds for server viability assessment (tokens per second)
+# Based on PySubtrans Custom Server default timeout of 300s and typical
+# translation batch of ~2000 output tokens (30 subtitles × ~65 tokens each).
+_SPEED_GOOD = 10.0      # Full GPU — batches complete well within timeout
+_SPEED_MARGINAL = 2.0   # Partial GPU or small GPU — warn but proceed
+# Below _SPEED_MARGINAL: guaranteed timeouts, stop and diagnose
+
+
+def _assess_server_viability(
+    diagnostics: ServerDiagnostics,
+    n_gpu_layers: int,
+) -> None:
+    """
+    Assess whether the local LLM server is viable for translation.
+
+    Uses the measured inference speed and GPU offload status to determine
+    if translation will succeed or is doomed to timeout. Prints a consolidated
+    diagnostic report and raises RuntimeError if the server is too slow.
+
+    Speed classification (based on PySubtrans 300s timeout, ~2000 tokens/batch):
+    - >= 10 tps: Good — batches complete in ~3 minutes, well within timeout
+    -  2-10 tps: Marginal — warn with time estimate, let user proceed
+    -   < 2 tps: Unusable — a single batch would take 15+ minutes, guaranteed timeout
+
+    Args:
+        diagnostics: ServerDiagnostics with measured steady-state speed
+        n_gpu_layers: Requested GPU layers (-1=all, 0=CPU, >0=specific)
+
+    Raises:
+        RuntimeError: If server is too slow to be practically usable
+    """
+    tps = diagnostics.inference_speed_tps
+    gpu_expected = n_gpu_layers != 0
+    gpu_got = diagnostics.gpu_layers_loaded > 0
+
+    # =========================================================================
+    # Determine WHY performance is what it is
+    # =========================================================================
+    cause = None
+    if gpu_expected and not gpu_got:
+        cause = "gpu_requested_not_used"
+    elif gpu_expected and gpu_got and diagnostics.gpu_offload_percent < 100:
+        cause = "partial_gpu_offload"
+    elif not gpu_expected:
+        cause = "cpu_mode_explicit"
+    # else: full GPU, performance is what it is
+
+    # =========================================================================
+    # Estimate translation time
+    # =========================================================================
+    # Conservative estimate: 30 subtitles/batch × ~65 tokens/subtitle = ~2000 tokens/batch
+    tokens_per_batch = 2000
+    # Typical file: 500 subtitles → ~17 batches at batch_size=30
+    typical_batches = 17
+    typical_total_tokens = tokens_per_batch * typical_batches
+
+    if tps > 0:
+        batch_time_s = tokens_per_batch / tps
+        total_time_s = typical_total_tokens / tps
+    else:
+        batch_time_s = float('inf')
+        total_time_s = float('inf')
+
+    # =========================================================================
+    # Print consolidated assessment
+    # =========================================================================
+    print("")
+    print("=" * 60)
+    print("  LOCAL LLM SERVER ASSESSMENT")
+    print("=" * 60)
+
+    # GPU status line
+    if diagnostics.is_gpu_accelerated:
+        if diagnostics.gpu_offload_percent >= 100:
+            print(f"  GPU: {diagnostics.gpu_layers_loaded} layers on CUDA (full offload)")
+        else:
+            print(f"  GPU: {diagnostics.gpu_layers_loaded}/{diagnostics.total_layers} layers "
+                  f"({diagnostics.gpu_offload_percent:.0f}% offload)")
+        if diagnostics.vram_used_gb > 0:
+            print(f"  VRAM: {diagnostics.vram_used_gb:.1f} GB")
+    else:
+        print(f"  GPU: NOT USED (CPU only)")
+
+    # Speed line
+    if tps > 0:
+        print(f"  Speed: {tps:.1f} tokens/sec")
+    else:
+        print(f"  Speed: could not measure")
+
+    # Time estimate
+    if tps > 0:
+        if batch_time_s < 60:
+            print(f"  Estimated per batch: ~{batch_time_s:.0f} seconds")
+        else:
+            print(f"  Estimated per batch: ~{batch_time_s / 60:.1f} minutes")
+
+        if total_time_s < 3600:
+            print(f"  Estimated for typical file (500 lines): ~{total_time_s / 60:.0f} minutes")
+        else:
+            print(f"  Estimated for typical file (500 lines): ~{total_time_s / 3600:.1f} hours")
+
+    print("")
+
+    # =========================================================================
+    # Classify and act
+    # =========================================================================
+    if tps >= _SPEED_GOOD:
+        # Good speed — brief confirmation
+        print("  Status: READY")
+        print("=" * 60)
+        print("")
+        logger.info(f"Server viable: {tps:.1f} tps, {diagnostics.get_status_summary()}")
+        return
+
+    if tps >= _SPEED_MARGINAL:
+        # Marginal — warn but proceed
+        print("  Status: SLOW — translation will work but take longer")
+        print("")
+
+        if cause == "partial_gpu_offload":
+            print(f"  Only {diagnostics.gpu_offload_percent:.0f}% of model layers are on GPU.")
+            print("  Try a smaller model to fit entirely in VRAM:")
+            print("    --translate-model llama-3b")
+        elif cause == "cpu_mode_explicit":
+            print("  Running in explicit CPU mode (--translate-gpu-layers 0).")
+            print("  CPU inference is significantly slower than GPU.")
+        else:
+            print("  Consider using a smaller model for faster results:")
+            print("    --translate-model llama-3b")
+
+        print("")
+        print("=" * 60)
+        print("")
+        logger.warning(f"Server marginal: {tps:.1f} tps, cause={cause}")
+        return
+
+    # =========================================================================
+    # UNUSABLE — stop and diagnose
+    # =========================================================================
+    # Below _SPEED_MARGINAL tps, a single batch would exceed PySubtrans's
+    # 300s timeout. Translation is guaranteed to fail.
+    print("  " + "!" * 56)
+    print("  Status: TOO SLOW — translation will fail with timeouts")
+    print("  " + "!" * 56)
+    print("")
+
+    if tps > 0:
+        print(f"  At {tps:.1f} tokens/sec, each batch would take ~{batch_time_s / 60:.0f} minutes.")
+        print(f"  The translation client times out after 5 minutes per request.")
+        print(f"  Translation is guaranteed to fail.")
+    else:
+        print("  Inference speed could not be measured (likely stuck).")
+
+    print("")
+
+    # Diagnose WHY
+    if cause == "gpu_requested_not_used":
+        print("  ROOT CAUSE: GPU was requested but no layers loaded on GPU.")
+        print("")
+        print("  This usually means:")
+        print("    1. llama-cpp-python was installed without CUDA support")
+        print("       Fix: pip uninstall llama-cpp-python")
+        print("            Then re-run translation (auto-downloads correct wheel)")
+        print("")
+        print("    2. CUDA version mismatch (wheel built for different CUDA)")
+        print("       Fix: Check 'nvidia-smi' for your CUDA version")
+        print("            Reinstall matching wheel")
+        print("")
+        print("    3. Insufficient GPU memory for this model")
+        print("       Fix: --translate-model llama-3b")
+        print("")
+        print("    4. GPU in use by another process")
+        print("       Fix: Close other GPU applications")
+    elif cause == "partial_gpu_offload":
+        print(f"  ROOT CAUSE: Only {diagnostics.gpu_offload_percent:.0f}% of model on GPU.")
+        print("  The rest runs on CPU, creating a bottleneck.")
+        print("")
+        print("  Fix: Use a smaller model that fits entirely in VRAM:")
+        print("    --translate-model llama-3b")
+    elif cause == "cpu_mode_explicit":
+        print("  ROOT CAUSE: Explicit CPU mode (--translate-gpu-layers 0).")
+        print("  CPU inference with this model is too slow for translation.")
+        print("")
+        print("  Options:")
+        print("    1. Enable GPU: Remove --translate-gpu-layers 0")
+        print("    2. Use cloud provider: --provider deepseek")
+    else:
+        print("  ROOT CAUSE: Unknown — GPU is active but inference is very slow.")
+        print("")
+        print("  Possible causes:")
+        print("    - CUDA version mismatch (wrong GPU kernels)")
+        print("    - Thermal throttling")
+        print("    - GPU driver issue")
+
+    print("")
+    print("  ALTERNATIVES:")
+    print("    - Use cloud translation: --provider deepseek")
+    print("    - Use smaller model: --translate-model llama-3b")
+    print("")
+    print("=" * 60)
+    print("")
+
+    logger.error(f"Server unusable: {tps:.1f} tps, cause={cause}")
+
+    raise RuntimeError(
+        f"Local LLM server is too slow for translation ({tps:.1f} tokens/sec). "
+        f"Each batch would take ~{batch_time_s / 60:.0f} minutes, exceeding the 5-minute timeout. "
+        f"See diagnostic output above for root cause and fixes."
+    )
+
+
 def start_local_server(
     model: str = "auto",
     n_gpu_layers: int = -1,
     n_ctx: int = 8192
-) -> Tuple[str, int]:
+) -> Tuple[str, int, ServerDiagnostics]:
     """
     Start the local LLM server.
 
@@ -1736,10 +2022,11 @@ def start_local_server(
         n_ctx: Context window size
 
     Returns:
-        Tuple of (api_base_url, port)
+        Tuple of (api_base_url, port, diagnostics)
 
     Raises:
-        RuntimeError: If server fails to start or llama-cpp-python unavailable
+        RuntimeError: If server fails to start, llama-cpp-python unavailable,
+            CPU doesn't support AVX2, or inference speed is too slow
     """
     global _server_process, _server_port, _server_stderr_path
 
@@ -1798,8 +2085,30 @@ def start_local_server(
     logger.info(f"Starting local server with {model_path.name}...")
 
     # =========================================================================
-    # PRE-VALIDATION: Verify subprocess can import llama_cpp
+    # PRE-VALIDATION: CPU capability check + subprocess import verification
     # =========================================================================
+
+    # Step 1: Check AVX2 support BEFORE trying to load llama_cpp
+    # Our prebuilt wheels require AVX2. Without it, the process crashes with
+    # STATUS_ILLEGAL_INSTRUCTION (0xC000001D) — a cryptic error for users.
+    if not _check_cpu_avx2_support():
+        raise RuntimeError(
+            "\n" + "!" * 60 + "\n"
+            "  CPU DOES NOT SUPPORT AVX2 INSTRUCTIONS\n"
+            "!" * 60 + "\n\n"
+            "The prebuilt llama-cpp-python wheel requires AVX2 instructions,\n"
+            "but your CPU does not support them.\n\n"
+            "Options:\n"
+            "  1. Build llama-cpp-python from source (compiles for your CPU):\n"
+            "     pip uninstall llama-cpp-python\n"
+            "     CMAKE_ARGS=\"-DGGML_CUDA=on\" pip install llama-cpp-python --no-binary llama-cpp-python\n\n"
+            "  2. Use cloud translation providers instead:\n"
+            "     whisperjav-translate -i file.srt --provider deepseek\n\n"
+            "Note: Building from source requires CMake and a C++ compiler.\n"
+            "On Windows, install Visual Studio Build Tools first."
+        )
+
+    # Step 2: Verify subprocess can import llama_cpp
     # The main process import may succeed (our os.add_dll_directory helps) but
     # the subprocess needs CUDA DLLs discoverable via environment variables
     # (CUDA_PATH, PATH) since os.add_dll_directory doesn't carry over.
@@ -1813,7 +2122,34 @@ def start_local_server(
             if pre_check.returncode != 0:
                 stderr_text = pre_check.stderr.strip()
                 logger.warning(f"Subprocess llama_cpp import failed: {stderr_text[:200]}")
-                # Provide targeted diagnostics
+
+                # Check for STATUS_ILLEGAL_INSTRUCTION (AVX2 mismatch)
+                # Exit code -1073741795 = 0xC000001D (signed 32-bit)
+                is_illegal_instruction = (
+                    pre_check.returncode == -1073741795
+                    or "0xc000001d" in stderr_text.lower()
+                    or "illegal instruction" in stderr_text.lower()
+                )
+
+                if is_illegal_instruction:
+                    raise RuntimeError(
+                        "\n" + "!" * 60 + "\n"
+                        "  CPU INSTRUCTION INCOMPATIBILITY (AVX2)\n"
+                        "!" * 60 + "\n\n"
+                        "The prebuilt llama-cpp-python crashed with an illegal instruction error.\n"
+                        "This means the binary was compiled for CPU features your processor\n"
+                        "does not support (most likely AVX2).\n\n"
+                        f"Error code: {pre_check.returncode} (STATUS_ILLEGAL_INSTRUCTION)\n\n"
+                        "Options:\n"
+                        "  1. Build llama-cpp-python from source (compiles for your CPU):\n"
+                        "     pip uninstall llama-cpp-python\n"
+                        "     CMAKE_ARGS=\"-DGGML_CUDA=on\" pip install llama-cpp-python "
+                        "--no-binary llama-cpp-python\n\n"
+                        "  2. Use cloud translation providers instead:\n"
+                        "     whisperjav-translate -i file.srt --provider deepseek\n"
+                    )
+
+                # General DLL/loading failure
                 diagnosis = _diagnose_dll_failure(stderr_text)
                 raise RuntimeError(
                     f"llama-cpp-python loads in the main process but fails in a subprocess.\n"
@@ -1987,80 +2323,24 @@ def start_local_server(
             diagnostics = ServerDiagnostics()
 
     # =========================================================================
-    # CRITICAL CHECK: Verify GPU was used when expected
+    # Viability assessment — stop doomed translations before they start
     # =========================================================================
-    # If user requested GPU (n_gpu_layers != 0) but no layers on GPU, that's a problem
-    gpu_expected = n_gpu_layers != 0  # -1 means "all", any positive means "some"
-    gpu_got = diagnostics.gpu_layers_loaded > 0
-
-    if gpu_expected and not gpu_got:
-        # This is the ROOT CAUSE of silent CPU fallback!
-        print("")
-        print("!" * 60)
-        print("  CRITICAL: GPU REQUESTED BUT NOT USED")
-        print("!" * 60)
-        print("")
-        print(f"  You requested GPU mode (n_gpu_layers={n_gpu_layers})")
-        print(f"  But the model loaded with 0 layers on GPU (CPU only)")
-        print("")
-        print("  This will cause EXTREMELY SLOW translation (10-50x slower)")
-        print("  and likely timeout errors.")
-        print("")
-        print("  Possible causes:")
-        print("    1. llama-cpp-python was installed without CUDA support")
-        print("       Fix: pip uninstall llama-cpp-python && reinstall with CUDA wheel")
-        print("")
-        print("    2. CUDA version mismatch (wheel built for different CUDA)")
-        print("       Fix: Check nvidia-smi and install matching wheel")
-        print("")
-        print("    3. Insufficient GPU memory for this model")
-        print("       Fix: Use smaller model (--translate-model llama-3b)")
-        print("")
-        print("    4. GPU in use by another process")
-        print("       Fix: Close other GPU applications")
-        print("")
-        print("  To explicitly use CPU mode without this warning:")
-        print("    --translate-gpu-layers 0")
-        print("")
-        print("!" * 60)
-
-        # Also log for programmatic access
-        logger.error(
-            f"GPU requested (n_gpu_layers={n_gpu_layers}) but model loaded on CPU. "
-            "Translation will be very slow and may timeout."
-        )
-
-    # Report diagnostics to console - THIS IS CRITICAL FOR USER VISIBILITY
-    print("")
-    print("=" * 60)
-    print("  LOCAL LLM SERVER STATUS")
-    print("=" * 60)
-    print(f"  {diagnostics.get_status_summary()}")
-
-    # Show warnings prominently
-    warnings = diagnostics.get_warnings()
-    if warnings:
-        print("")
-        print("  " + "!" * 56)
-        print("  WARNINGS:")
-        for warning in warnings:
-            # Wrap warning text for console
-            for line in warning.split('. '):
-                print(f"    - {line.strip()}")
-        print("  " + "!" * 56)
-
-    print("=" * 60)
-    print("")
-
-    # Also log for programmatic access
-    logger.info(f"Server diagnostics: {diagnostics.get_status_summary()}")
-    for warning in warnings:
-        logger.warning(warning)
+    # This replaces the old GPU check + status + warnings blocks with a single
+    # consolidated assessment that classifies speed, diagnoses root cause,
+    # and raises RuntimeError if the server is too slow.
+    # On success, it prints a brief status. On failure, it prints a detailed
+    # diagnosis with actionable fixes.
+    try:
+        _assess_server_viability(diagnostics, n_gpu_layers)
+    except RuntimeError:
+        # Viability check failed — stop the server before re-raising
+        stop_local_server()
+        raise
 
     api_base = f"http://127.0.0.1:{port}/v1"
     logger.info(f"Local server ready at {api_base}")
 
-    return api_base, port
+    return api_base, port, diagnostics
 
 
 def stop_local_server():

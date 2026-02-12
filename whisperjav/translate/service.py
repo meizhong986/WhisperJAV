@@ -345,12 +345,14 @@ def translate_with_config(
             # Start local LLM server
             print(f"[SERVICE] Starting local LLM server...", file=sys.stderr)
             try:
-                api_base, server_port = start_local_server(
+                api_base, server_port, server_diagnostics = start_local_server(
                     model=resolved_model,
                     n_gpu_layers=n_gpu_layers
                 )
                 print(f"[SERVICE]   Server started at: {api_base}", file=sys.stderr)
                 print(f"[SERVICE]   Port: {server_port}", file=sys.stderr)
+                if server_diagnostics.inference_speed_tps > 0:
+                    print(f"[SERVICE]   Inference speed: {server_diagnostics.inference_speed_tps:.1f} tokens/sec", file=sys.stderr)
             except Exception as e:
                 print(f"[SERVICE]   ERROR: Failed to start local server: {e}", file=sys.stderr)
                 raise TranslationError(f"Failed to start local server: {e}")

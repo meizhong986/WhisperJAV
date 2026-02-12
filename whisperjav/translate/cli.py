@@ -496,8 +496,10 @@ def main():
                     print(f"[CLI]   Model: {model}", file=sys.stderr)
                     print(f"[CLI]   GPU layers: {n_gpu_layers} (-1=all, 0=CPU)", file=sys.stderr)
                     try:
-                        api_base, server_port = start_local_server(model=model, n_gpu_layers=n_gpu_layers)
+                        api_base, server_port, server_diagnostics = start_local_server(model=model, n_gpu_layers=n_gpu_layers)
                         print(f"[CLI]   Server ready at: {api_base}", file=sys.stderr)
+                        if server_diagnostics.inference_speed_tps > 0:
+                            print(f"[CLI]   Inference speed: {server_diagnostics.inference_speed_tps:.1f} tokens/sec", file=sys.stderr)
                     except Exception as e:
                         print(f"[CLI] ERROR: Failed to start local server: {e}", file=sys.stderr)
                         sys.exit(1)
