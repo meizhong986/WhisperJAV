@@ -201,7 +201,10 @@ def main():
 
     # Required arguments
     parser.add_argument('-i', '--input', nargs='+', required=True,
-                        help="Input subtitle file(s) or directory (.srt). Supports: -i file.srt, -i dir/, -i a.srt b.srt")
+                        help='Input subtitle file(s), directory, or glob pattern (.srt). '
+                             'Supports: -i file.srt, -i dir/, -i "*.srt", -i a.srt b.srt')
+    parser.add_argument('--recursive', '-r', action='store_true',
+                        help="Search directories recursively for .srt files")
 
     # Core translation options
     translation_group = parser.add_argument_group("Translation Options")
@@ -365,25 +368,57 @@ def main():
             print(f"Default settings created at: {get_settings_path()}")
         return
 
-    # Validate and collect input files (supports multiple inputs, directories, and mixed)
+    # Validate and collect input files (supports files, directories, and glob patterns)
+    import glob as glob_module
+
     files_to_process = []
+    seen_paths = set()  # Deduplication via resolved paths
+
     for input_item in args.input:
+        input_str = str(input_item)
+
+        # 1. Glob pattern detection (contains * or ?)
+        if '*' in input_str or '?' in input_str:
+            matched = sorted(glob_module.glob(input_str, recursive=True))
+            srt_matched = [Path(f) for f in matched if f.lower().endswith('.srt')]
+            if not srt_matched:
+                print(f"Warning: No .srt files matched pattern: {input_item}", file=sys.stderr)
+            else:
+                for f in srt_matched:
+                    resolved = f.resolve()
+                    if resolved not in seen_paths:
+                        seen_paths.add(resolved)
+                        files_to_process.append(f)
+                print(f"Matched {len(srt_matched)} SRT files for: {input_item}", file=sys.stderr)
+            continue
+
+        # 2. Existing path-based handling
         input_arg = Path(input_item)
         if not input_arg.exists():
             print(f"Error: Input not found: {input_arg}", file=sys.stderr)
             sys.exit(1)
 
         if input_arg.is_dir():
-            # Directory: glob for .srt files
-            srt_files = sorted(list(input_arg.glob("*.srt")))
+            # Directory: glob for .srt files (shallow or recursive)
+            glob_method = input_arg.rglob if getattr(args, 'recursive', False) else input_arg.glob
+            srt_files = sorted(list(glob_method("*.srt")))
             if not srt_files:
-                print(f"Warning: No .srt files found in directory: {input_arg}", file=sys.stderr)
+                depth = "recursively in" if getattr(args, 'recursive', False) else "in"
+                print(f"Warning: No .srt files found {depth}: {input_arg}", file=sys.stderr)
             else:
-                files_to_process.extend(srt_files)
-                print(f"Found {len(srt_files)} SRT files in {input_arg}", file=sys.stderr)
+                for f in srt_files:
+                    resolved = f.resolve()
+                    if resolved not in seen_paths:
+                        seen_paths.add(resolved)
+                        files_to_process.append(f)
+                depth_note = " (recursive)" if getattr(args, 'recursive', False) else ""
+                print(f"Found {len(srt_files)} SRT files in {input_arg}{depth_note}", file=sys.stderr)
         else:
             # Single file
-            files_to_process.append(input_arg)
+            resolved = input_arg.resolve()
+            if resolved not in seen_paths:
+                seen_paths.add(resolved)
+                files_to_process.append(input_arg)
 
     if not files_to_process:
         print("Error: No valid .srt files to process", file=sys.stderr)
@@ -481,7 +516,9 @@ def main():
 
         try:
             if not args.no_progress:
-                print(f"[{i+1}/{len(files_to_process)}] Translating {input_path.name} from {source_lang} to {target_lang}...", file=sys.stderr)
+                if i > 0 and len(files_to_process) > 1:
+                    print(file=sys.stderr)  # Blank line between files in batch
+                print(f"Translating [{i+1}/{len(files_to_process)}]: {input_path.name}", file=sys.stderr)
                 if i == 0:  # Only print provider info once
                     print(f"Provider: {provider_name} ({model})", file=sys.stderr)
 

@@ -312,6 +312,9 @@ class WhisperJAVAPI:
         }
         lang_code = lang_codes.get(source_language, 'ja')
 
+        # Detect "source" sentinel: output next to each input video
+        output_to_source = isinstance(output_dir, str) and output_dir.lower().strip() == "source"
+
         expected_files = []
         for input_path in inputs:
             # Get base name without extension
@@ -325,8 +328,11 @@ class WhisperJAVAPI:
             else:
                 output_name = f"{input_name}.srt"
 
-            output_path = Path(output_dir) / output_name
-            expected_files.append(str(output_path))
+            if output_to_source:
+                file_output_path = Path(input_path).parent / output_name
+            else:
+                file_output_path = Path(output_dir) / output_name
+            expected_files.append(str(file_output_path))
 
         return expected_files
 

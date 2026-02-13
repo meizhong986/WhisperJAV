@@ -331,6 +331,19 @@ body {
 /* ============================================================
    Destination Section - Output Control
    ============================================================ */
+.output-source-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: var(--text-primary);
+}
+
+.output-source-toggle input[type="checkbox"] {
+    margin: 0;
+}
+
 .output-control {
     display: flex;
     align-items: center;

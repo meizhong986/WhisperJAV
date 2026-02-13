@@ -246,7 +246,9 @@ def parse_arguments():
 
     # Path and logging
     path_group = parser.add_argument_group("Path and Logging Options")
-    path_group.add_argument("--output-dir", default="./output", help="Output directory")
+    path_group.add_argument("--output-dir", default="source",
+                           help='Output directory. "source" (default) saves SRT next to each input video. '
+                                'Specify a path to use a fixed output directory.')
     path_group.add_argument("--temp-dir", default=None, help="Temporary directory")
     path_group.add_argument("--keep-temp", action="store_true", help="Keep temporary files")
     path_group.add_argument("--skip-existing", action="store_true",
@@ -765,8 +767,11 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         unified_manager.total_files = len(media_files)  # Store for reference
         progress = ProgressDisplayAdapter(unified_manager)
     
+    # Detect "source" sentinel: save SRT next to each input video
+    output_to_source = args.output_dir.lower().strip() == "source"
+
     pipeline_args = {
-        "output_dir": args.output_dir,
+        "output_dir": str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir,
         "temp_dir": args.temp_dir,
         "keep_temp_files": args.keep_temp,
         "save_metadata_json": getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
@@ -794,8 +799,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     elif args.mode == "transformers":
         # HuggingFace Transformers pipeline with dedicated --hf-* arguments
         from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
+        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         pipeline = TransformersPipeline(
-            output_dir=args.output_dir,
+            output_dir=initial_output_dir,
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp,
             save_metadata_json=getattr(args, 'debug', False),  # --debug enables metadata JSON preservation
@@ -818,8 +824,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     elif args.mode == "qwen":
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         pipeline = QwenPipeline(
-            output_dir=args.output_dir,
+            output_dir=initial_output_dir,
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp,
             save_metadata_json=getattr(args, 'debug', False),
@@ -884,12 +891,22 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
             # Check if output already exists (--skip-existing)
             if getattr(args, 'skip_existing', False):
-                expected_output = Path(args.output_dir) / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+                if output_to_source:
+                    expected_dir = Path(file_path_str).parent
+                else:
+                    expected_dir = Path(args.output_dir)
+                expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
                 if expected_output.exists():
                     logger.info(f"Skipping (output exists): {file_name}")
                     skipped_count += 1
                     all_stats.append({"file": file_path_str, "status": "skipped", "reason": "output_exists"})
                     continue
+
+            # Per-file output directory override for "source" mode
+            if output_to_source:
+                per_file_dir = Path(file_path_str).parent
+                pipeline.output_dir = per_file_dir
+                per_file_dir.mkdir(parents=True, exist_ok=True)
 
             progress.set_current_file(file_path_str, i)
 
@@ -1041,8 +1058,11 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     # Map language name to Whisper language code
     language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
 
+    # Detect "source" sentinel for async mode
+    output_to_source = args.output_dir.lower().strip() == "source"
+
     # Update resolved config with runtime options
-    resolved_config['output_dir'] = args.output_dir
+    resolved_config['output_dir'] = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
     resolved_config['temp_dir'] = args.temp_dir
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
@@ -1086,7 +1106,11 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         for media_info in media_files:
             file_path_str = media_info.get('path', 'Unknown File')
             media_basename = media_info.get('basename', Path(file_path_str).stem)
-            expected_output = Path(args.output_dir) / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+            if output_to_source:
+                expected_dir = Path(file_path_str).parent
+            else:
+                expected_dir = Path(args.output_dir)
+            expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
             if expected_output.exists():
                 logger.info(f"Skipping (output exists): {Path(file_path_str).name}")
                 skipped_files.append(file_path_str)
@@ -1562,8 +1586,14 @@ def main():
                 }
 
             # Create orchestrator
+            # Note: Ensemble mode does not support per-file "source" output dir.
+            # If "source" is specified, use first file's parent as output_dir.
+            ensemble_output_dir = args.output_dir
+            if args.output_dir.lower().strip() == "source":
+                ensemble_output_dir = str(Path(media_files[0]['path']).parent)
+                logger.info(f"Source output mode: ensemble outputs will go to {ensemble_output_dir}")
             orchestrator = EnsembleOrchestrator(
-                output_dir=args.output_dir,
+                output_dir=ensemble_output_dir,
                 temp_dir=args.temp_dir,
                 keep_temp_files=args.keep_temp,
                 save_metadata_json=getattr(args, 'debug', False),  # --debug enables metadata JSON preservation

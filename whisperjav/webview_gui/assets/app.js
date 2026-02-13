@@ -42,16 +42,27 @@ const AppState = {
 
     async loadDefaultOutputDir() {
         try {
-            // Call API to get default output directory
+            // Call API to get default output directory (used when "source" mode is unchecked)
             const defaultDir = await pywebview.api.get_default_output_dir();
-            this.outputDir = defaultDir;
-            document.getElementById('outputDir').value = defaultDir;
+            this._fallbackOutputDir = defaultDir;
+
+            // Default: source mode (save next to video)
+            const sourceCheckbox = document.getElementById('outputToSource');
+            if (sourceCheckbox && sourceCheckbox.checked) {
+                this.outputDir = 'source';
+                document.getElementById('outputDir').value = 'source';
+                document.getElementById('outputDir').disabled = true;
+                document.getElementById('browseOutputBtn').disabled = true;
+            } else {
+                this.outputDir = defaultDir;
+                document.getElementById('outputDir').value = defaultDir;
+            }
         } catch (error) {
             console.error('Failed to load default output directory:', error);
-            // Fallback to hardcoded default
-            this.outputDir = 'C:\\Users\\Documents\\WhisperJAV\\output';
-            document.getElementById('outputDir').value = this.outputDir;
-            ConsoleManager.log('Using fallback output directory', 'warning');
+            this._fallbackOutputDir = 'C:\\Users\\Documents\\WhisperJAV\\output';
+            this.outputDir = 'source';
+            document.getElementById('outputDir').value = 'source';
+            ConsoleManager.log('Using source output mode (default)', 'warning');
         }
     }
 };
@@ -1043,10 +1054,39 @@ const ProcessManager = {
 // Directory Controls (Real API Integration)
 // ============================================================
 const DirectoryControls = {
+    _savedOutputDir: '',  // Stores previous output dir when source mode is toggled on
+
     init() {
         document.getElementById('browseOutputBtn').addEventListener('click', () => this.browseOutput());
         document.getElementById('openOutputBtn').addEventListener('click', () => this.openOutput());
         document.getElementById('browseTempBtn').addEventListener('click', () => this.browseTemp());
+
+        // "Save next to source video" checkbox toggle
+        const sourceCheckbox = document.getElementById('outputToSource');
+        sourceCheckbox.addEventListener('change', () => this.toggleSourceOutput(sourceCheckbox.checked));
+    },
+
+    toggleSourceOutput(enabled) {
+        const outputDirInput = document.getElementById('outputDir');
+        const browseBtn = document.getElementById('browseOutputBtn');
+
+        if (enabled) {
+            // Save current value and switch to "source" sentinel
+            this._savedOutputDir = outputDirInput.value;
+            outputDirInput.value = 'source';
+            AppState.outputDir = 'source';
+            outputDirInput.disabled = true;
+            browseBtn.disabled = true;
+        } else {
+            // Restore previous output directory (prefer saved, then fallback)
+            const restoreDir = this._savedOutputDir && this._savedOutputDir !== 'source'
+                ? this._savedOutputDir
+                : (AppState._fallbackOutputDir || AppState.outputDir);
+            outputDirInput.value = restoreDir;
+            AppState.outputDir = restoreDir;
+            outputDirInput.disabled = false;
+            browseBtn.disabled = false;
+        }
     },
 
     async browseOutput() {
