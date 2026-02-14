@@ -2689,6 +2689,9 @@ class WhisperJAVAPI:
             self._translate_status = "idle"
             self._translate_log_queue: queue.Queue = queue.Queue()
             self._translate_thread: Optional[threading.Thread] = None
+            self._translate_files_total = 0
+            self._translate_files_completed = 0
+            self._translate_current_file = None
 
     def get_translation_providers(self) -> Dict[str, Any]:
         """
@@ -2859,6 +2862,28 @@ class WhisperJAVAPI:
             return {"success": True, "paths": list(result)}
         return {"success": False, "message": "No files selected"}
 
+    def select_srt_folder(self) -> Dict[str, Any]:
+        """
+        Open folder dialog and find .srt files in the selected folder.
+
+        Returns:
+            dict: Found SRT file paths from the selected folder
+        """
+        windows = webview.windows
+        if not windows:
+            return {"success": False, "message": "No active window"}
+
+        window = windows[0]
+        result = window.create_file_dialog(FileDialog.FOLDER)
+
+        if result and len(result) > 0:
+            folder = Path(result[0])
+            srt_files = sorted(str(f) for f in folder.glob("*.srt"))
+            if srt_files:
+                return {"success": True, "paths": srt_files, "folder": result[0]}
+            return {"success": False, "message": "No .srt files found in selected folder"}
+        return {"success": False, "message": "No folder selected"}
+
     def start_translation(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Start translation process.
@@ -2884,6 +2909,11 @@ class WhisperJAVAPI:
         if self._translate_process is not None:
             return {"success": False, "error": "Translation already in progress"}
 
+        # Reset progress tracking
+        self._translate_files_total = 0
+        self._translate_files_completed = 0
+        self._translate_current_file = None
+
         try:
             # Build CLI arguments
             # Use -u flag for unbuffered stdout/stderr - critical for real-time streaming
@@ -2902,8 +2932,12 @@ class WhisperJAVAPI:
             args.extend(["--provider", provider])
 
             # Target language
-            target = options.get('target', 'english')
+            target = options.get('target_language', options.get('target', 'english'))
             args.extend(["--target", target])
+
+            # Source language
+            source = options.get('source_language', 'japanese')
+            args.extend(["--source", source])
 
             # Optional arguments
             if options.get('model'):
@@ -2914,16 +2948,22 @@ class WhisperJAVAPI:
                 args.extend(["--tone", options['tone']])
             if options.get('movie_title'):
                 args.extend(["--movie-title", options['movie_title']])
-            if options.get('actress'):
-                args.extend(["--actress", options['actress']])
-            if options.get('movie_plot'):
-                args.extend(["--movie-plot", options['movie_plot']])
+            # Names field (multi-line) → --actress CLI arg
+            if options.get('names'):
+                args.extend(["--actress", options['names']])
+            if options.get('movie_plot') or options.get('plot'):
+                args.extend(["--movie-plot", options.get('movie_plot') or options['plot']])
             if options.get('endpoint'):
                 args.extend(["--endpoint", options['endpoint']])
             if options.get('rate_limit'):
                 args.extend(["--rate-limit", str(options['rate_limit'])])
+            if options.get('scene_threshold'):
+                args.extend(["--scene-threshold", str(options['scene_threshold'])])
+            if options.get('max_batch_size'):
+                args.extend(["--max-batch-size", str(options['max_batch_size'])])
+            if options.get('max_retries'):
+                args.extend(["--max-retries", str(options['max_retries'])])
             if options.get('output_dir'):
-                # Note: CLI uses -o for output, but for batch mode it's a directory
                 args.extend(["-o", options['output_dir']])
 
             # Start process with unbuffered output for real-time streaming
@@ -2961,11 +3001,20 @@ class WhisperJAVAPI:
             return {"success": False, "error": str(e)}
 
     def _stream_translation_output(self):
-        """Background thread to stream translation output."""
+        """Background thread to stream translation output and parse progress."""
+        import re
         try:
             if self._translate_process and self._translate_process.stdout:
                 for line in self._translate_process.stdout:
                     self._translate_log_queue.put(line)
+                    # Parse progress: "Translating [1/3]: file_a.srt"
+                    m = re.search(r'Translating \[(\d+)/(\d+)\]:\s+(.+)', line)
+                    if m:
+                        self._translate_files_total = int(m.group(2))
+                        self._translate_current_file = m.group(3).strip()
+                    # Parse completion: "Complete: file_a.english.srt"
+                    if 'Complete:' in line:
+                        self._translate_files_completed += 1
         except Exception as e:
             self._translate_log_queue.put(f"\n[ERROR] {e}\n")
         finally:
@@ -3029,8 +3078,16 @@ class WhisperJAVAPI:
                         self._translate_status = "error"
                         self._translate_log_queue.put(f"\n[ERROR] Exit code: {exit_code}\n")
 
+        files_total = getattr(self, '_translate_files_total', 0)
+        files_completed = getattr(self, '_translate_files_completed', 0)
+        progress = int(100 * files_completed / max(files_total, 1)) if files_total > 0 else 0
+
         return {
             "status": self._translate_status,
+            "progress": progress,
+            "current_file": getattr(self, '_translate_current_file', None),
+            "files_completed": files_completed,
+            "files_total": files_total,
             "has_logs": not self._translate_log_queue.empty()
         }
 

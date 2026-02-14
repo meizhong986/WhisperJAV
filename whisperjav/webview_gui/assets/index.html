@@ -171,6 +171,16 @@
                         >
                             Ensemble Mode
                         </button>
+                        <button
+                            class="tab-button"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="tab4-panel"
+                            id="tab4-button"
+                            data-tab="tab4"
+                        >
+                            AI SRT Translate
+                        </button>
                     </div>
 
                     <!-- Tab Content -->
@@ -687,6 +697,153 @@
                                         <button type="button" class="btn btn-secondary btn-compact" id="ensembleTranslateSettingsBtn" title="Translation Settings">
                                             Translation Settings
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 4: SRT Translate -->
+                        <div
+                            class="tab-panel"
+                            id="tab4-panel"
+                            role="tabpanel"
+                            aria-labelledby="tab4-button"
+                        >
+                            <div class="translator-container">
+                                <!-- NOTE: File input uses the shared SOURCE section above.
+                                     When this tab is active, Add File(s) filters for .srt files
+                                     and Add Folder scans for .srt files in the selected folder. -->
+
+                                <!-- Row 1: Provider + Model + Override/Custom Model -->
+                                <div class="translator-section translator-compact-section">
+                                    <div class="translator-provider-grid">
+                                        <div class="form-group">
+                                            <label for="translatorProvider" class="form-label">Provider:</label>
+                                            <select id="translatorProvider" class="form-select">
+                                                <option value="local">Local LLM</option>
+                                                <option value="deepseek">DeepSeek</option>
+                                                <option value="gemini">Gemini</option>
+                                                <option value="claude">Claude</option>
+                                                <option value="gpt">GPT</option>
+                                                <option value="openrouter">OpenRouter</option>
+                                                <option value="glm">GLM (Zhipu AI)</option>
+                                                <option value="groq">Groq</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorModel" class="form-label">Model:</label>
+                                            <select id="translatorModel" class="form-select">
+                                                <option value="">Default</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorCustomModel" class="form-label">Override/Custom Model:</label>
+                                            <input type="text" id="translatorCustomModel" class="form-input" placeholder="Optional model override">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Row 2: API Key + Test Connection -->
+                                <div class="translator-section translator-compact-section">
+                                    <div class="translator-apikey-row">
+                                        <div class="form-group translator-api-key-group">
+                                            <label for="translatorApiKey" class="form-label">API Key:</label>
+                                            <div class="input-with-status">
+                                                <input type="password" id="translatorApiKey" class="form-input" placeholder="Enter API key or use environment variable">
+                                                <span id="translatorApiStatus" class="api-status"></span>
+                                            </div>
+                                        </div>
+                                        <div class="form-group translator-test-btn-group">
+                                            <button type="button" class="btn btn-secondary" id="translatorTestConnection">Test Connection</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Row 3: Source Language + Target Language + Tone -->
+                                <div class="translator-section translator-compact-section">
+                                    <div class="translator-settings-grid">
+                                        <div class="form-group">
+                                            <label for="translatorSourceLang" class="form-label">Source Language:</label>
+                                            <select id="translatorSourceLang" class="form-select">
+                                                <option value="japanese" selected>Japanese</option>
+                                                <option value="korean">Korean</option>
+                                                <option value="chinese">Chinese</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorTargetLang" class="form-label">Target Language:</label>
+                                            <select id="translatorTargetLang" class="form-select">
+                                                <option value="english" selected>English</option>
+                                                <option value="chinese">Chinese</option>
+                                                <option value="indonesian">Indonesian</option>
+                                                <option value="spanish">Spanish</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorTone" class="form-label">Tone/Style:</label>
+                                            <select id="translatorTone" class="form-select">
+                                                <option value="standard" selected>Standard</option>
+                                                <option value="pornify">Adult/Explicit</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Advanced Settings (collapsible, includes movie context) -->
+                                <details class="translator-section translator-advanced-section">
+                                    <summary class="collapsible-header">
+                                        <span class="collapse-icon">▶</span>
+                                        Advanced Settings
+                                    </summary>
+                                    <div class="translator-advanced-grid">
+                                        <div class="form-group">
+                                            <label for="translatorMovieTitle" class="form-label">Movie Title:</label>
+                                            <input type="text" id="translatorMovieTitle" class="form-input" placeholder="e.g., ABC-123">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorNames" class="form-label">Names (one per line):</label>
+                                            <textarea id="translatorNames" class="form-textarea" rows="2" placeholder="Character/actress names"></textarea>
+                                        </div>
+                                        <div class="form-group" style="grid-column: span 2;">
+                                            <label for="translatorPlot" class="form-label">Plot Summary:</label>
+                                            <textarea id="translatorPlot" class="form-textarea" rows="2" placeholder="Brief plot description for context..."></textarea>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorSceneThreshold" class="form-label">Scene Threshold (sec):</label>
+                                            <input type="number" id="translatorSceneThreshold" class="form-input" value="60" min="1" max="300">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorMaxBatchSize" class="form-label">Max Batch Size:</label>
+                                            <input type="number" id="translatorMaxBatchSize" class="form-input" value="30" min="1" max="100">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorMaxRetries" class="form-label">Max Retries:</label>
+                                            <input type="number" id="translatorMaxRetries" class="form-input" value="3" min="1" max="10">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="translatorRateLimit" class="form-label">Rate Limit (req/min):</label>
+                                            <input type="number" id="translatorRateLimit" class="form-input" placeholder="No limit" min="1" max="1000">
+                                        </div>
+                                        <div class="form-group" style="grid-column: span 2;">
+                                            <label for="translatorCustomEndpoint" class="form-label">Custom Endpoint URL:</label>
+                                            <input type="text" id="translatorCustomEndpoint" class="form-input" placeholder="https://api.example.com/v1 (for OpenAI-compatible APIs)">
+                                        </div>
+                                    </div>
+                                </details>
+
+                                <!-- Progress + Controls -->
+                                <div class="translator-section translator-progress-section">
+                                    <div class="translator-progress-container">
+                                        <div class="translator-progress-bar">
+                                            <div class="translator-progress-fill" id="translatorProgressFill"></div>
+                                        </div>
+                                        <span class="translator-status-label" id="translatorStatusLabel">Idle</span>
+                                    </div>
+                                </div>
+                                <div class="translator-controls-section">
+                                    <div class="translator-button-group">
+                                        <button type="button" class="btn btn-primary btn-lg" id="translatorStartBtn" disabled>Start</button>
+                                        <button type="button" class="btn btn-secondary btn-lg" id="translatorCancelBtn" disabled>Cancel</button>
                                     </div>
                                 </div>
                             </div>

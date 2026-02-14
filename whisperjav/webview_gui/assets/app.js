@@ -98,6 +98,12 @@ const TabManager = {
 
         // Update state
         AppState.activeTab = tabId;
+
+        // Hide main Run Controls when SRT Translate tab is active (it has its own controls)
+        const runSection = document.querySelector('.run-section');
+        if (runSection) {
+            runSection.style.display = (tabId === 'tab4') ? 'none' : '';
+        }
     },
 
     handleKeyboard(e) {
@@ -542,13 +548,17 @@ const FileListManager = {
         }
     },
 
-    // Real API methods
+    // Real API methods — tab-aware: SRT Translate tab uses .srt file filters
     async addFiles() {
         const btn = document.getElementById('addFilesBtn');
         UIHelpers.showLoadingState(btn, true);
 
         try {
-            const result = await pywebview.api.select_files();
+            // When SRT Translate tab is active, filter for .srt files
+            const isSrtMode = AppState.activeTab === 'tab4';
+            const result = isSrtMode
+                ? await pywebview.api.select_srt_files()
+                : await pywebview.api.select_files();
 
             if (result.success && result.paths && result.paths.length > 0) {
                 // Add selected files (avoid duplicates)
@@ -559,7 +569,8 @@ const FileListManager = {
                 });
 
                 this.render();
-                ConsoleManager.log(`Added ${result.paths.length} file(s)`, 'info');
+                const label = isSrtMode ? 'SRT file(s)' : 'file(s)';
+                ConsoleManager.log(`Added ${result.paths.length} ${label}`, 'info');
             }
             // If cancelled, result.success will be false but no error message needed
         } catch (error) {
@@ -574,16 +585,30 @@ const FileListManager = {
         UIHelpers.showLoadingState(btn, true);
 
         try {
-            const result = await pywebview.api.select_folder();
-
-            if (result.success && result.path) {
-                // Add folder (avoid duplicates)
-                if (!AppState.selectedFiles.includes(result.path)) {
-                    AppState.selectedFiles.push(result.path);
+            // When SRT Translate tab is active, scan folder for .srt files
+            if (AppState.activeTab === 'tab4') {
+                const result = await pywebview.api.select_srt_folder();
+                if (result.success && result.paths && result.paths.length > 0) {
+                    result.paths.forEach(filePath => {
+                        if (!AppState.selectedFiles.includes(filePath)) {
+                            AppState.selectedFiles.push(filePath);
+                        }
+                    });
+                    this.render();
+                    ConsoleManager.log(`Added ${result.paths.length} SRT file(s) from folder`, 'info');
+                } else if (result.message) {
+                    ConsoleManager.log(result.message, 'warning');
                 }
-
-                this.render();
-                ConsoleManager.log(`Added folder: ${result.path}`, 'info');
+            } else {
+                const result = await pywebview.api.select_folder();
+                if (result.success && result.path) {
+                    // Add folder (avoid duplicates)
+                    if (!AppState.selectedFiles.includes(result.path)) {
+                        AppState.selectedFiles.push(result.path);
+                    }
+                    this.render();
+                    ConsoleManager.log(`Added folder: ${result.path}`, 'info');
+                }
             }
             // If cancelled, result.success will be false but no error message needed
         } catch (error) {
@@ -643,6 +668,12 @@ const FormManager = {
 
         // Disable start button if no files selected or process running
         startBtn.disabled = !hasFiles || AppState.isRunning;
+
+        // Also update the SRT Translate tab's Start button (shared file list)
+        const translatorStartBtn = document.getElementById('translatorStartBtn');
+        if (translatorStartBtn) {
+            translatorStartBtn.disabled = !hasFiles || (TranslatorManager.state && TranslatorManager.state.isRunning);
+        }
 
         return hasFiles;
     },
@@ -1105,11 +1136,21 @@ const DirectoryControls = {
     },
 
     async openOutput() {
-        const path = document.getElementById('outputDir').value;
+        let path = document.getElementById('outputDir').value;
 
         if (!path) {
             ErrorHandler.showWarning('No Output Directory', 'Please specify an output directory first.');
             return;
+        }
+
+        // "source" is a sentinel meaning "save next to source file" —
+        // resolve to the parent directory of the first selected file
+        if (path === 'source' && AppState.selectedFiles.length > 0) {
+            const firstFile = AppState.selectedFiles[0];
+            const lastSlash = Math.max(firstFile.lastIndexOf('/'), firstFile.lastIndexOf('\\'));
+            if (lastSlash > 0) {
+                path = firstFile.substring(0, lastSlash);
+            }
         }
 
         try {
@@ -4225,14 +4266,21 @@ const EnsembleManager = {
 const RunControls = {
     init() {
         document.getElementById('startBtn').addEventListener('click', () => {
-            // Check if in Ensemble mode
-            if (AppState.activeTab === 'tab3') {
+            if (AppState.activeTab === 'tab4') {
+                TranslatorManager.startTranslation();
+            } else if (AppState.activeTab === 'tab3') {
                 EnsembleManager.startProcessing();
             } else {
                 ProcessManager.start();
             }
         });
-        document.getElementById('cancelBtn').addEventListener('click', () => ProcessManager.cancel());
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            if (AppState.activeTab === 'tab4') {
+                TranslatorManager.cancelTranslation();
+            } else {
+                ProcessManager.cancel();
+            }
+        });
     }
 };
 
@@ -4951,9 +4999,8 @@ const UpdateCheckManager = {
 // Translator Manager (Tab 4 - Standalone Translation)
 // ============================================================
 const TranslatorManager = {
-    // State
+    // State — file input uses shared AppState.selectedFiles via the SOURCE section
     state: {
-        files: [],           // {path, name, status: pending|translating|completed|error}
         isRunning: false,
         progress: 0,
         currentFile: null
@@ -4972,11 +5019,6 @@ const TranslatorManager = {
     },
 
     init() {
-        // Bind file action buttons
-        document.getElementById('translatorAddFiles')?.addEventListener('click', () => this.addFiles());
-        document.getElementById('translatorRemoveSelected')?.addEventListener('click', () => this.removeSelected());
-        document.getElementById('translatorClearFiles')?.addEventListener('click', () => this.clearFiles());
-
         // Bind provider change
         document.getElementById('translatorProvider')?.addEventListener('change', (e) => {
             this.updateModelOptions(e.target.value);
@@ -4998,133 +5040,24 @@ const TranslatorManager = {
     },
 
     /**
-     * Open file dialog to add SRT files
+     * Update Start/Cancel button states.
+     * Called by FormManager.validateForm() when shared file list changes.
      */
-    async addFiles() {
-        try {
-            const result = await pywebview.api.select_srt_files();
-            if (result.success && result.files && result.files.length > 0) {
-                // Add files that aren't already in the list
-                result.files.forEach(filePath => {
-                    if (!this.state.files.some(f => f.path === filePath)) {
-                        const name = filePath.split(/[\\/]/).pop();
-                        this.state.files.push({
-                            path: filePath,
-                            name: name,
-                            status: 'pending'
-                        });
-                    }
-                });
-                this.renderFileList();
-                this.updateButtonStates();
-            }
-        } catch (error) {
-            console.error('Error selecting files:', error);
-            ConsoleManager.log(`Error selecting files: ${error.message}`, 'error');
-        }
+    updateButtons() {
+        const hasFiles = AppState.selectedFiles.length > 0;
+        const startBtn = document.getElementById('translatorStartBtn');
+        const cancelBtn = document.getElementById('translatorCancelBtn');
+
+        if (startBtn) startBtn.disabled = !hasFiles || this.state.isRunning;
+        if (cancelBtn) cancelBtn.disabled = !this.state.isRunning;
     },
 
-    /**
-     * Remove selected files from the list
-     */
-    removeSelected() {
-        const checkboxes = document.querySelectorAll('#translatorFileList input[type="checkbox"]:checked');
-        const pathsToRemove = new Set();
-        checkboxes.forEach(cb => pathsToRemove.add(cb.dataset.path));
-        this.state.files = this.state.files.filter(f => !pathsToRemove.has(f.path));
-        this.renderFileList();
-        this.updateButtonStates();
-    },
+    // ---- Provider & model ----
 
-    /**
-     * Clear all files from the list
-     */
-    clearFiles() {
-        this.state.files = [];
-        this.renderFileList();
-        this.updateButtonStates();
-    },
-
-    /**
-     * Render the file list
-     */
-    renderFileList() {
-        const container = document.getElementById('translatorFileList');
-        if (!container) return;
-
-        if (this.state.files.length === 0) {
-            container.innerHTML = `
-                <div class="translator-empty-state">
-                    <span class="empty-icon">📄</span>
-                    <p>No SRT files selected</p>
-                    <p class="empty-hint">Click "Add Files" to select subtitle files for translation</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = this.state.files.map((file, index) => `
-            <div class="translator-file-item" data-index="${index}">
-                <input type="checkbox" data-path="${file.path}">
-                <span class="translator-file-name" title="${file.path}">${file.name}</span>
-                <span class="translator-file-status ${file.status}">${this.formatStatus(file.status)}</span>
-            </div>
-        `).join('');
-
-        // Bind click handlers for selection
-        container.querySelectorAll('.translator-file-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                if (e.target.tagName !== 'INPUT') {
-                    const checkbox = item.querySelector('input[type="checkbox"]');
-                    checkbox.checked = !checkbox.checked;
-                    this.updateButtonStates();
-                }
-            });
-        });
-
-        // Bind checkbox change handlers
-        container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-            cb.addEventListener('change', () => this.updateButtonStates());
-        });
-    },
-
-    /**
-     * Format status for display
-     */
-    formatStatus(status) {
-        const map = {
-            pending: 'Pending',
-            translating: 'Translating...',
-            completed: 'Done',
-            error: 'Error'
-        };
-        return map[status] || status;
-    },
-
-    /**
-     * Update button states based on current state
-     */
-    updateButtonStates() {
-        const hasFiles = this.state.files.length > 0;
-        const hasSelected = document.querySelectorAll('#translatorFileList input[type="checkbox"]:checked').length > 0;
-
-        document.getElementById('translatorRemoveSelected').disabled = !hasSelected || this.state.isRunning;
-        document.getElementById('translatorClearFiles').disabled = !hasFiles || this.state.isRunning;
-        document.getElementById('translatorStartBtn').disabled = !hasFiles || this.state.isRunning;
-        document.getElementById('translatorCancelBtn').disabled = !this.state.isRunning;
-
-        // Disable add files during translation
-        document.getElementById('translatorAddFiles').disabled = this.state.isRunning;
-    },
-
-    /**
-     * Update model dropdown options based on provider
-     */
     updateModelOptions(provider) {
         const modelSelect = document.getElementById('translatorModel');
         if (!modelSelect) return;
 
-        // Display labels for local models (show VRAM requirements)
         const localModelLabels = {
             'gemma-9b': 'gemma-9b (8GB)',
             'llama-8b': 'llama-8b (6GB)',
@@ -5140,9 +5073,6 @@ const TranslatorManager = {
             }).join('');
     },
 
-    /**
-     * Update API key status indicator
-     */
     async updateApiKeyStatus(provider) {
         const statusEl = document.getElementById('translatorApiStatus');
         if (!statusEl) return;
@@ -5150,7 +5080,8 @@ const TranslatorManager = {
         try {
             const result = await pywebview.api.get_translation_providers();
             if (result.success) {
-                const providerInfo = result.providers.find(p => p.name === provider);
+                // FIX: compare against .id (lowercase), not .name (capitalized)
+                const providerInfo = result.providers.find(p => p.id === provider);
                 if (providerInfo) {
                     if (providerInfo.has_api_key) {
                         statusEl.textContent = 'Configured';
@@ -5167,9 +5098,6 @@ const TranslatorManager = {
         }
     },
 
-    /**
-     * Test provider connection
-     */
     async testConnection() {
         const provider = document.getElementById('translatorProvider')?.value;
         const apiKey = document.getElementById('translatorApiKey')?.value || null;
@@ -5204,20 +5132,21 @@ const TranslatorManager = {
         }
     },
 
-    /**
-     * Collect translation options from form
-     */
+    // ---- Translation options & execution ----
+
     collectOptions() {
         return {
-            input_files: this.state.files.map(f => f.path),
+            // Uses shared file list from SOURCE section (AppState.selectedFiles)
+            inputs: AppState.selectedFiles,
             provider: document.getElementById('translatorProvider')?.value || 'deepseek',
-            model: document.getElementById('translatorModel')?.value ||
-                   document.getElementById('translatorCustomModel')?.value || null,
+            model: document.getElementById('translatorCustomModel')?.value ||
+                   document.getElementById('translatorModel')?.value || null,
             source_language: document.getElementById('translatorSourceLang')?.value || 'japanese',
             target_language: document.getElementById('translatorTargetLang')?.value || 'english',
             tone: document.getElementById('translatorTone')?.value || 'standard',
             movie_title: document.getElementById('translatorMovieTitle')?.value || null,
-            actress: document.getElementById('translatorActress')?.value || null,
+            // Renamed: actress → names (multi-line textarea)
+            names: document.getElementById('translatorNames')?.value || null,
             plot: document.getElementById('translatorPlot')?.value || null,
             scene_threshold: parseFloat(document.getElementById('translatorSceneThreshold')?.value) || 60,
             max_batch_size: parseInt(document.getElementById('translatorMaxBatchSize')?.value) || 30,
@@ -5229,12 +5158,9 @@ const TranslatorManager = {
         };
     },
 
-    /**
-     * Start translation
-     */
     async startTranslation() {
-        if (this.state.files.length === 0) {
-            ErrorHandler.show('No Files', 'Please add SRT files to translate.');
+        if (AppState.selectedFiles.length === 0) {
+            ErrorHandler.show('No Files', 'Add SRT files in the Source section above, then start translation.');
             return;
         }
 
@@ -5242,13 +5168,9 @@ const TranslatorManager = {
 
         try {
             this.state.isRunning = true;
-            this.updateButtonStates();
+            this.updateButtons();
             this.setProgress(0);
             this.setStatus('Starting...');
-
-            // Mark all files as pending
-            this.state.files.forEach(f => f.status = 'pending');
-            this.renderFileList();
 
             const result = await pywebview.api.start_translation(options);
 
@@ -5262,38 +5184,39 @@ const TranslatorManager = {
             ConsoleManager.log(`Translation error: ${error.message}`, 'error');
             ErrorHandler.show('Translation Error', error.message);
             this.state.isRunning = false;
-            this.updateButtonStates();
+            this.updateButtons();
             this.setStatus('Error');
         }
     },
 
-    /**
-     * Cancel translation
-     */
     async cancelTranslation() {
         try {
             await pywebview.api.cancel_translation();
             ConsoleManager.log('Translation cancelled', 'warning');
             this.stopStatusPolling();
             this.state.isRunning = false;
-            this.updateButtonStates();
+            this.updateButtons();
             this.setStatus('Cancelled');
         } catch (error) {
             console.error('Error cancelling translation:', error);
         }
     },
 
-    /**
-     * Start polling for translation status
-     */
+    // ---- Status polling ----
+
     startStatusPolling() {
         this.statusInterval = setInterval(async () => {
             try {
                 const status = await pywebview.api.get_translation_status();
 
-                // Update progress
+                // Update progress from backend
                 if (status.progress !== undefined) {
                     this.setProgress(status.progress);
+                }
+
+                // Update current file display
+                if (status.current_file) {
+                    this.setStatus(`Translating: ${status.current_file}`);
                 }
 
                 // Fetch logs
@@ -5302,9 +5225,7 @@ const TranslatorManager = {
                 if (status.status === 'completed') {
                     this.stopStatusPolling();
                     this.state.isRunning = false;
-                    this.state.files.forEach(f => f.status = 'completed');
-                    this.renderFileList();
-                    this.updateButtonStates();
+                    this.updateButtons();
                     this.setProgress(100);
                     this.setStatus('Completed');
                     ConsoleManager.log('Translation completed successfully', 'success');
@@ -5312,13 +5233,13 @@ const TranslatorManager = {
                 } else if (status.status === 'error') {
                     this.stopStatusPolling();
                     this.state.isRunning = false;
-                    this.updateButtonStates();
+                    this.updateButtons();
                     this.setStatus(`Error: ${status.error || 'Unknown'}`);
                     ConsoleManager.log(`Translation error: ${status.error}`, 'error');
                 } else if (status.status === 'cancelled') {
                     this.stopStatusPolling();
                     this.state.isRunning = false;
-                    this.updateButtonStates();
+                    this.updateButtons();
                     this.setStatus('Cancelled');
                 }
             } catch (error) {
@@ -5327,9 +5248,6 @@ const TranslatorManager = {
         }, 1000);
     },
 
-    /**
-     * Stop status polling
-     */
     stopStatusPolling() {
         if (this.statusInterval) {
             clearInterval(this.statusInterval);
@@ -5337,9 +5255,6 @@ const TranslatorManager = {
         }
     },
 
-    /**
-     * Fetch and display translation logs
-     */
     async fetchLogs() {
         try {
             const logs = await pywebview.api.get_translation_logs();
@@ -5356,9 +5271,6 @@ const TranslatorManager = {
         }
     },
 
-    /**
-     * Set progress bar value
-     */
     setProgress(percent) {
         this.state.progress = percent;
         const fill = document.getElementById('translatorProgressFill');
@@ -5367,9 +5279,6 @@ const TranslatorManager = {
         }
     },
 
-    /**
-     * Set status label
-     */
     setStatus(text) {
         const label = document.getElementById('translatorStatusLabel');
         if (label) {
