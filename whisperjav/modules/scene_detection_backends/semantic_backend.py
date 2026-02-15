@@ -134,12 +134,21 @@ class SemanticSceneDetector:
         Raises:
             SceneDetectionError: If the adapter fails
         """
+        import soundfile as sf
+
         start_time = time.time()
 
         if self._adapter is None:
             raise SceneDetectionError(
                 "Semantic adapter not initialized."
             )
+
+        # Get actual audio duration from file header (lightweight, no full load)
+        try:
+            audio_info = sf.info(str(audio_path))
+            audio_duration = audio_info.duration
+        except Exception:
+            audio_duration = 0.0
 
         try:
             # Delegate to existing adapter
@@ -184,7 +193,7 @@ class SemanticSceneDetector:
         return SceneDetectionResult(
             scenes=scenes,
             method=self.name,
-            audio_duration_sec=sum(s.duration_sec for s in scenes) if scenes else 0.0,
+            audio_duration_sec=audio_duration,
             parameters=parameters,
             processing_time_sec=processing_time,
         )

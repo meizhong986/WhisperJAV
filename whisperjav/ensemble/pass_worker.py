@@ -1175,10 +1175,10 @@ def _apply_gui_overrides(
             resolved_config["features"] = {}
 
         if scene_detector == "none":
-            # Disable scene detection
-            # Use empty dict with enabled=False instead of None to avoid TypeError
-            # when balanced_pipeline.py does SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
-            resolved_config["features"]["scene_detection"] = {"enabled": False}
+            # Route through NullSceneDetector — the "method" key is what
+            # SceneDetectorFactory.create_from_legacy_kwargs() pops to select
+            # the backend.  Without it, the factory defaults to "auditok".
+            resolved_config["features"]["scene_detection"] = {"method": "none"}
             if "workflow" in resolved_config and "features" in resolved_config["workflow"]:
                 resolved_config["workflow"]["features"]["scene_detection"] = False
             logger.debug("Pass %s: Disabled scene detection", pass_number)
