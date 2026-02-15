@@ -12,7 +12,7 @@ from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.faster_whisper_pro_asr import FasterWhisperProASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
 
-from whisperjav.modules.scene_detection import DynamicSceneDetector
+from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
@@ -164,7 +164,7 @@ class BalancedPipeline(BasePipeline):
         # Enhancement ALWAYS runs (even "none" backend does 48kHz→16kHz resampling)
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
-        self.scene_detector = DynamicSceneDetector(**scene_opts)
+        self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
 
         # ASR CONFIG (model created lazily on first process() call)
         self._asr_config = {
@@ -284,42 +284,20 @@ class BalancedPipeline(BasePipeline):
 
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
-            scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+            detection_result = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+            scene_paths = detection_result.to_legacy_tuples()
 
-            # Use the new data contract method if available (DynamicSceneDetector)
-            if hasattr(self.scene_detector, 'get_detection_metadata'):
-                detection_meta = self.scene_detector.get_detection_metadata()
-                # Build scenes_detected with full path info
-                master_metadata["scenes_detected"] = []
-                for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
-                    scene_info = {
-                        "scene_index": idx, "filename": scene_path.name,
-                        "start_time_seconds": round(start_time_sec, 3),
-                        "end_time_seconds": round(end_time_sec, 3),
-                        "duration_seconds": round(duration_sec, 3), "path": str(scene_path),
-                        # Add detection_pass from the data contract
-                        "detection_pass": detection_meta["scenes_detected"][idx].get("detection_pass") if idx < len(detection_meta["scenes_detected"]) else None
-                    }
-                    master_metadata["scenes_detected"].append(scene_info)
-                # Include VAD segments if available (Silero method)
-                if detection_meta.get("vad_segments"):
-                    master_metadata["vad_segments"] = detection_meta["vad_segments"]
-                    master_metadata["vad_method"] = detection_meta.get("vad_method")
-                    master_metadata["vad_params"] = detection_meta.get("vad_params")
-                # Include coarse boundaries (Pass 1 scene boundaries before splitting)
-                if detection_meta.get("coarse_boundaries"):
-                    master_metadata["coarse_boundaries"] = detection_meta["coarse_boundaries"]
-            else:
-                # Fallback for legacy scene detectors (SceneDetector, AdaptiveSceneDetector)
-                master_metadata["scenes_detected"] = []
-                for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
-                    scene_info = {
-                        "scene_index": idx, "filename": scene_path.name,
-                        "start_time_seconds": round(start_time_sec, 3),
-                        "end_time_seconds": round(end_time_sec, 3),
-                        "duration_seconds": round(duration_sec, 3), "path": str(scene_path)
-                    }
-                    master_metadata["scenes_detected"].append(scene_info)
+            # Extract structured metadata from detection result
+            detection_meta = detection_result.to_metadata_dict()
+            master_metadata["scenes_detected"] = detection_meta["scenes_detected"]
+            # Include VAD segments if available (Silero method)
+            if detection_meta.get("vad_segments"):
+                master_metadata["vad_segments"] = detection_meta["vad_segments"]
+                master_metadata["vad_method"] = detection_meta.get("vad_method")
+                master_metadata["vad_params"] = detection_meta.get("vad_params")
+            # Include coarse boundaries (Pass 1 scene boundaries before splitting)
+            if detection_meta.get("coarse_boundaries"):
+                master_metadata["coarse_boundaries"] = detection_meta["coarse_boundaries"]
             master_metadata["summary"]["total_scenes_detected"] = len(scene_paths)
             self.metadata_manager.update_processing_stage(
                 master_metadata, "scene_detection", "completed",
@@ -327,7 +305,7 @@ class BalancedPipeline(BasePipeline):
 
             # Trace scene detection
             self.tracer.emit_scene_detection(
-                method=getattr(self.scene_detector, 'method', 'auditok'),
+                method=self.scene_detector.name,
                 params=self.scene_detection_params,
                 scenes_found=len(scene_paths),
                 scene_stats={

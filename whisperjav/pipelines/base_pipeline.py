@@ -139,6 +139,15 @@ class BasePipeline(ABC):
         # This triggers native destructors during controlled execution,
         # which is SAFER than letting them run during interpreter shutdown.
 
+        # Clean up scene detector if present
+        if hasattr(self, 'scene_detector') and self.scene_detector:
+            try:
+                if hasattr(self.scene_detector, 'cleanup'):
+                    self.scene_detector.cleanup()
+                self.scene_detector = None
+            except Exception as e:
+                logger.warning(f"Scene detector cleanup failed (non-fatal): {e}")
+
         # Clean up speech enhancer if present (may have GPU models)
         if hasattr(self, 'speech_enhancer') and self.speech_enhancer:
             try:

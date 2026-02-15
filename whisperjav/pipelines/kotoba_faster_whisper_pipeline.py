@@ -20,7 +20,7 @@ from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.kotoba_faster_whisper_asr import KotobaFasterWhisperASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor
-from whisperjav.modules.scene_detection import DynamicSceneDetector
+from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 from whisperjav.utils.progress_display import DummyProgress
@@ -130,10 +130,9 @@ class KotobaFasterWhisperPipeline(BasePipeline):
         self.audio_extractor = AudioExtractor()
 
         # Scene detector (ALWAYS enabled)
-        # Remove 'method' from scene_opts to prevent duplicate kwarg if present
-        # (SileroSceneDetectionOptions.model_dump() includes method="silero")
-        scene_opts.pop("method", None)
-        self.scene_detector = DynamicSceneDetector(method=self.scene_method, **scene_opts)
+        # Ensure scene_opts uses the CLI-specified method (overrides any preset default)
+        scene_opts["method"] = self.scene_method
+        self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
 
         # Kotoba ASR with internal VAD
         self.asr = KotobaFasterWhisperASR(
@@ -273,7 +272,8 @@ class KotobaFasterWhisperPipeline(BasePipeline):
 
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
-            scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+            detection_result = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+            scene_paths = detection_result.to_legacy_tuples()
 
             # Fallback: if scene detection returns zero scenes, use entire audio as single scene
             if not scene_paths:

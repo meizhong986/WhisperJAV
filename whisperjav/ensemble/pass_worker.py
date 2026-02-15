@@ -177,8 +177,8 @@ FEATURE_PARAMS = {
     "post_processing",
 }
 
-# Scene detection params - routed to features.scene_detection for DynamicSceneDetector
-# These match the kwargs expected by DynamicSceneDetector.__init__()
+# Scene detection params - routed to features.scene_detection for SceneDetectorFactory
+# These match the kwargs expected by SceneDetectorFactory.create_from_legacy_kwargs()
 SCENE_DETECTION_PARAMS = {
     # Core options
     "max_duration_s",
@@ -1177,7 +1177,7 @@ def _apply_gui_overrides(
         if scene_detector == "none":
             # Disable scene detection
             # Use empty dict with enabled=False instead of None to avoid TypeError
-            # when balanced_pipeline.py does DynamicSceneDetector(**scene_opts)
+            # when balanced_pipeline.py does SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
             resolved_config["features"]["scene_detection"] = {"enabled": False}
             if "workflow" in resolved_config and "features" in resolved_config["workflow"]:
                 resolved_config["workflow"]["features"]["scene_detection"] = False

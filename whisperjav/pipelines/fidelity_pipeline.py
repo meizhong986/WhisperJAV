@@ -12,7 +12,7 @@ from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.whisper_pro_asr import WhisperProASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
 
-from whisperjav.modules.scene_detection import DynamicSceneDetector
+from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
@@ -109,7 +109,7 @@ class FidelityPipeline(BasePipeline):
 
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
-        self.scene_detector = DynamicSceneDetector(**scene_opts)
+        self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
 
         # ASR CONFIG (model created in process() after enhancement cleanup)
         self._asr_config = {
@@ -188,8 +188,9 @@ class FidelityPipeline(BasePipeline):
             
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
-            scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
-            
+            detection_result = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+            scene_paths = detection_result.to_legacy_tuples()
+
             master_metadata["scenes_detected"] = []
             for idx, (scene_path, start_time_sec, end_time_sec, duration_sec) in enumerate(scene_paths):
                 scene_info = {

@@ -12,7 +12,7 @@ from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.stable_ts_asr import StableTSASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
 
-from whisperjav.modules.scene_detection import DynamicSceneDetector
+from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
@@ -91,7 +91,7 @@ class FastPipeline(BasePipeline):
 
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor()
-        self.scene_detector = DynamicSceneDetector(**scene_opts)
+        self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
 
 
         # Pass structured config to StableTSASR
@@ -188,7 +188,8 @@ class FastPipeline(BasePipeline):
             
             scenes_dir = self.temp_dir / "scenes"
             scenes_dir.mkdir(exist_ok=True)
-            scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+            detection_result = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+            scene_paths = detection_result.to_legacy_tuples()
             logger.debug(f"Detected {len(scene_paths)} scenes")
             
             master_metadata["scenes_detected"] = []
@@ -213,7 +214,7 @@ class FastPipeline(BasePipeline):
 
             # Trace scene detection
             self.tracer.emit_scene_detection(
-                method=getattr(self.scene_detector, 'method', 'auditok'),
+                method=self.scene_detector.name,
                 params=self.scene_detection_params,
                 scenes_found=len(scene_paths),
                 scene_stats={

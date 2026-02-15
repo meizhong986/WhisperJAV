@@ -44,7 +44,7 @@ from whisperjav.modules.speech_enhancement import (
 )
 
 # Lazy imports to avoid loading heavy modules until needed:
-#   - DynamicSceneDetector (from whisperjav.modules.scene_detection)
+#   - SceneDetectorFactory (from whisperjav.modules.scene_detection_backends)
 #   - QwenASR (from whisperjav.modules.qwen_asr)
 #   - SpeechSegmenterFactory (from whisperjav.modules.speech_segmentation)
 #   - torch (for CUDA cleanup)
@@ -378,51 +378,48 @@ class QwenPipeline(BasePipeline):
         scenes_dir = self.temp_dir / "scenes"
         scenes_dir.mkdir(exist_ok=True)
 
-        if self.scene_method == "none":
-            # No scene detection — treat full audio as a single scene
-            scene_paths = [(extracted_audio, 0.0, duration, duration)]
-            logger.info("[QwenPipeline PID %s] Phase 2: Scene detection disabled, using full audio as single scene", os.getpid())
-        else:
-            from whisperjav.modules.scene_detection import DynamicSceneDetector
+        from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
-            # Configure scene detector parameters
-            scene_detector_kwargs = {"method": self.scene_method}
+        # Configure scene detector parameters
+        scene_detector_kwargs = {"method": self.scene_method}
 
-            # === Safe Chunking Override (v1.8.7+) ===
-            # When safe_chunking is True, enforce scene boundaries.
-            # Assembly mode uses wider windows (up to 120s) to preserve LALM
-            # context while staying under the ForcedAligner 180s hard limit.
-            # Other modes use tighter windows (30-90s).
-            if self.safe_chunking:
-                if self.input_mode == InputMode.ASSEMBLY:
-                    # Assembly mode: wider scenes for LALM context, but strictly
-                    # under the aligner's 180s limit (120s gives safe headroom)
-                    scene_detector_kwargs["min_duration"] = 30   # seconds
-                    scene_detector_kwargs["max_duration"] = 120  # seconds
-                    logger.info(
-                        "[QwenPipeline PID %s] Phase 2: Assembly safe chunking "
-                        "(min=30s, max=120s, aligner limit=180s)",
-                        os.getpid(),
-                    )
-                else:
-                    # Context-aware / VAD modes: allow shorter scenes so the
-                    # detector can split at natural silence boundaries closer
-                    # to 15s.  Combined with step-down (Tier 1 30s → Tier 2 6s)
-                    # this gives the aligner the best chance per group.
-                    scene_detector_kwargs["min_duration"] = 12  # seconds
-                    scene_detector_kwargs["max_duration"] = 90  # seconds
-                    logger.info(
-                        "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
-                        "(min=12s, max=90s)",
-                        os.getpid(),
-                    )
+        # === Safe Chunking Override (v1.8.7+) ===
+        # When safe_chunking is True, enforce scene boundaries.
+        # Assembly mode uses wider windows (up to 120s) to preserve LALM
+        # context while staying under the ForcedAligner 180s hard limit.
+        # Other modes use tighter windows (30-90s).
+        if self.safe_chunking:
+            if self.input_mode == InputMode.ASSEMBLY:
+                # Assembly mode: wider scenes for LALM context, but strictly
+                # under the aligner's 180s limit (120s gives safe headroom)
+                scene_detector_kwargs["min_duration"] = 30   # seconds
+                scene_detector_kwargs["max_duration"] = 120  # seconds
+                logger.info(
+                    "[QwenPipeline PID %s] Phase 2: Assembly safe chunking "
+                    "(min=30s, max=120s, aligner limit=180s)",
+                    os.getpid(),
+                )
+            else:
+                # Context-aware / VAD modes: allow shorter scenes so the
+                # detector can split at natural silence boundaries closer
+                # to 15s.  Combined with step-down (Tier 1 30s → Tier 2 6s)
+                # this gives the aligner the best chance per group.
+                scene_detector_kwargs["min_duration"] = 12  # seconds
+                scene_detector_kwargs["max_duration"] = 90  # seconds
+                logger.info(
+                    "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
+                    "(min=12s, max=90s)",
+                    os.getpid(),
+                )
 
-            scene_detector = DynamicSceneDetector(**scene_detector_kwargs)
-            scene_paths = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
-            logger.info(
-                "[QwenPipeline PID %s] Phase 2: Detected %d scenes (method=%s)",
-                os.getpid(), len(scene_paths), self.scene_method,
-            )
+        scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_detector_kwargs)
+        result = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+        scene_paths = result.to_legacy_tuples()
+        scene_detector.cleanup()
+        logger.info(
+            "[QwenPipeline PID %s] Phase 2: Detected %d scenes (method=%s)",
+            os.getpid(), len(scene_paths), self.scene_method,
+        )
 
         master_metadata["stages"]["scene_detection"] = {
             "method": self.scene_method,

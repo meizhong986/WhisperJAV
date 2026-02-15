@@ -240,8 +240,8 @@ class TransformersPipeline(BasePipeline):
         # Scene detector (only if enabled)
         self.scene_detector = None
         if self.scene_method != "none":
-            from whisperjav.modules.scene_detection import DynamicSceneDetector
-            self.scene_detector = DynamicSceneDetector(method=self.scene_method)
+            from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
+            self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(method=self.scene_method)
 
         # ASR CONFIG based on backend (model created in process() after enhancement cleanup)
         if asr_backend == "qwen":
@@ -596,7 +596,8 @@ class TransformersPipeline(BasePipeline):
 
                 scenes_dir = self.temp_dir / "scenes"
                 scenes_dir.mkdir(exist_ok=True)
-                scene_paths = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+                detection_result = self.scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
+                scene_paths = detection_result.to_legacy_tuples()
 
                 if not scene_paths:
                     logger.warning("Scene detection produced zero scenes. Processing full audio.")
@@ -911,5 +912,5 @@ class TransformersPipeline(BasePipeline):
         inside process() and are destroyed immediately after use. This cleanup() method
         only handles non-GPU resources and delegates to parent.
         """
-        # Delegate to parent for any remaining cleanup (CUDA cache clear, etc.)
+        # Delegate to parent for any remaining cleanup (scene detector, CUDA cache clear, etc.)
         super().cleanup()
