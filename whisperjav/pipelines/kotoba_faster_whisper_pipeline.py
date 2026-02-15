@@ -130,6 +130,9 @@ class KotobaFasterWhisperPipeline(BasePipeline):
         self.audio_extractor = AudioExtractor()
 
         # Scene detector (ALWAYS enabled)
+        # Remove 'method' from scene_opts to prevent duplicate kwarg if present
+        # (SileroSceneDetectionOptions.model_dump() includes method="silero")
+        scene_opts.pop("method", None)
         self.scene_detector = DynamicSceneDetector(method=self.scene_method, **scene_opts)
 
         # Kotoba ASR with internal VAD

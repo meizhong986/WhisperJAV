@@ -12,8 +12,6 @@ from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.faster_whisper_pro_asr import FasterWhisperProASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
 
-from whisperjav.modules.scene_detection import SceneDetector
-from whisperjav.modules.scene_detection import AdaptiveSceneDetector
 from whisperjav.modules.scene_detection import DynamicSceneDetector
 
 from whisperjav.modules.srt_stitching import SRTStitcher
