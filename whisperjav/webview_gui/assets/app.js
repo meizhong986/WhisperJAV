@@ -2367,6 +2367,8 @@ const EnsembleManager = {
 
     /**
      * Generate Scene tab - loads backend-specific parameters from API.
+     * The dropdown selector is rendered once; backend-specific content below it
+     * is rebuilt via _renderSceneBackendContent() on dropdown change.
      */
     async generateSceneTab(tabId, backend, currentValues) {
         const container = document.getElementById(tabId);
@@ -2404,57 +2406,94 @@ const EnsembleManager = {
             selectorDiv.appendChild(select);
             container.appendChild(selectorDiv);
 
-            // Load and show backend-specific parameters
-            const result = await pywebview.api.get_scene_detector_schema(backend);
+            // Content container for backend-specific params (rebuilt on change)
+            const contentDiv = document.createElement('div');
+            contentDiv.id = 'scene-backend-content';
+            container.appendChild(contentDiv);
 
-            if (!result.success) {
-                const error = document.createElement('p');
-                error.className = 'tab-error';
-                error.textContent = `Failed to load scene detector schema: ${result.error}`;
-                container.appendChild(error);
-                return;
-            }
+            // Render initial backend content
+            await this._renderSceneBackendContent(contentDiv, backend, currentValues);
 
-            // Description
-            if (result.description) {
-                const desc = document.createElement('p');
-                desc.className = 'backend-desc';
-                desc.textContent = result.description;
-                container.appendChild(desc);
-            }
-
-            // Info message for "none" backend
-            if (result.info_message) {
-                const info = document.createElement('div');
-                info.className = 'backend-info';
-                info.innerHTML = `<p>${result.info_message}</p>`;
-                container.appendChild(info);
-            }
-
-            // Parameters
-            const parameters = result.parameters || {};
-            const defaults = result.defaults || {};
-
-            if (Object.keys(parameters).length > 0) {
-                const paramsDiv = document.createElement('div');
-                paramsDiv.className = 'scene-params';
-                paramsDiv.id = 'scene-params-container';
-
-                for (const [paramName, paramSchema] of Object.entries(parameters)) {
-                    const defaultValue = defaults[paramName];
-                    const currentValue = currentValues[paramName] !== undefined
-                        ? currentValues[paramName]
-                        : defaultValue;
-
-                    const control = this.generateSchemaControl(paramName, paramSchema, currentValue, defaultValue);
-                    paramsDiv.appendChild(control);
-                }
-
-                container.appendChild(paramsDiv);
-            }
+            // Re-render when user switches backend
+            select.addEventListener('change', async () => {
+                await this._renderSceneBackendContent(contentDiv, select.value, currentValues);
+            });
 
         } catch (error) {
             container.innerHTML = `<p class="tab-error">Error loading scene detector parameters: ${error}</p>`;
+        }
+    },
+
+    /**
+     * Render backend-specific content for the Scene tab.
+     * Called on initial load and when the dropdown changes.
+     */
+    async _renderSceneBackendContent(contentDiv, backend, currentValues) {
+        contentDiv.innerHTML = '';
+
+        const result = await pywebview.api.get_scene_detector_schema(backend);
+
+        if (!result.success) {
+            contentDiv.innerHTML = `<p class="tab-error">Failed to load scene detector schema: ${result.error}</p>`;
+            return;
+        }
+
+        // Backend header (matches segmenter/enhancer tab pattern)
+        const header = document.createElement('div');
+        header.className = 'backend-header';
+        header.innerHTML = `
+            <h4>${result.display_name || backend}</h4>
+            <p class="backend-desc">${result.description || ''}</p>
+        `;
+        contentDiv.appendChild(header);
+
+        // Info message for "none" backend
+        if (result.info_message) {
+            const info = document.createElement('div');
+            info.className = 'backend-info';
+            info.innerHTML = `<p>${result.info_message}</p>`;
+            contentDiv.appendChild(info);
+        }
+
+        // Parameters with grouped rendering
+        const parameters = result.parameters || {};
+        const defaults = result.defaults || {};
+
+        if (Object.keys(parameters).length === 0) {
+            if (!result.info_message) {
+                contentDiv.innerHTML += '<p class="tab-empty">No configurable parameters for this detector.</p>';
+            }
+            return;
+        }
+
+        // Group parameters if groups are provided (matches segmenter tab pattern)
+        const groups = result.groups || { general: Object.keys(parameters) };
+
+        for (const [groupName, paramNames] of Object.entries(groups)) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'param-group';
+
+            if (groupName !== 'general') {
+                const groupHeader = document.createElement('h5');
+                groupHeader.className = 'param-group-title';
+                groupHeader.textContent = groupName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                groupDiv.appendChild(groupHeader);
+            }
+
+            for (const paramName of paramNames) {
+                const paramSchema = parameters[paramName];
+                if (!paramSchema) continue;
+
+                const defaultValue = defaults[paramName];
+                const currentValue = currentValues[paramName] !== undefined
+                    ? currentValues[paramName]
+                    : defaultValue;
+
+                const control = this.generateSchemaControl(paramName, paramSchema, currentValue, defaultValue);
+                groupDiv.appendChild(control);
+            }
+
+            contentDiv.appendChild(groupDiv);
         }
     },
 

@@ -217,6 +217,13 @@ SCENE_DETECTION_PARAMS = {
     "silero_max_speech_s",
     "silero_min_silence_at_max",
     "silero_speech_pad_ms",
+    # Semantic clustering options (for semantic scene detection)
+    "min_duration",
+    "max_duration",
+    "snap_window",
+    "clustering_threshold",
+    "sample_rate",
+    "visualize",
 }
 
 # Map pipeline names to their ASR backends for param validation

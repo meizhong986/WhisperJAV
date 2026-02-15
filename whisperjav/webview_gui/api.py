@@ -1195,16 +1195,11 @@ class WhisperJAVAPI:
         Get parameter schema for a scene detector backend.
 
         Args:
-            backend: Detector name (auditok, silero, none)
+            backend: Detector name (auditok, silero, semantic, none)
 
         Returns:
             Schema dict with parameters
         """
-        yaml_files = {
-            "auditok": "auditok-scene-detection.yaml",
-            "silero": "silero-scene-detection.yaml",
-        }
-
         if backend == "none":
             return {
                 "success": True,
@@ -1217,12 +1212,8 @@ class WhisperJAVAPI:
                                "This may cause issues with long files (>30 minutes).",
             }
 
-        yaml_file = yaml_files.get(backend)
-        if not yaml_file:
-            return {
-                "success": False,
-                "error": f"Unknown scene detector: {backend}"
-            }
+        # Dynamic lookup via naming convention: {backend}-scene-detection.yaml
+        yaml_file = f"{backend}-scene-detection.yaml"
 
         try:
             config = self._load_tool_yaml(yaml_file)
@@ -1261,16 +1252,13 @@ class WhisperJAVAPI:
         try:
             from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
             from whisperjav.modules.speech_enhancement import SpeechEnhancerFactory
+            from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
             return {
                 "success": True,
                 "segmenters": SpeechSegmenterFactory.get_available_backends(),
                 "enhancers": SpeechEnhancerFactory.get_available_backends(),
-                "scene_detectors": [
-                    {"name": "auditok", "display_name": "Auditok (Energy-based)", "available": True},
-                    {"name": "silero", "display_name": "Silero (Neural VAD)", "available": True},
-                    {"name": "none", "display_name": "None (Skip)", "available": True},
-                ],
+                "scene_detectors": SceneDetectorFactory.get_available_backends(),
             }
         except Exception as e:
             return {
