@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
 """
-Audio scene detection module using a multi-feature, adaptive approach.
-This version incorporates a two-pass strategy, Auditok coarse, STFT, DRC, onset-based
-recovery, and metadata output.
+DEPRECATED: Legacy scene detection module.
 
-==============================================================================
-Audio scene detection using a two-pass strategy:
-  Pass 1 (Coarse): Auditok finds natural chapter boundaries via long silences
-  Pass 2 (Fine):   Auditok or Silero chunks each chapter to consumer's max_duration
+DynamicSceneDetector is deprecated. Use SceneDetectorFactory from
+whisperjav.modules.scene_detection_backends instead:
 
-Active class: DynamicSceneDetector (supports methods: auditok, silero, semantic)
-Utility: load_audio_unified() — audio loading for all backends
+    from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
+    detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+    result = detector.detect_scenes(audio_path, output_dir, basename)
+    scene_paths = result.to_legacy_tuples()
 
-UPSTREAM USAGE:
-- balanced_pipeline.py, fast_pipeline.py, fidelity_pipeline.py
-- kotoba_faster_whisper_pipeline.py, transformers_pipeline.py
-- qwen_pipeline.py, ensemble/pass_worker.py
+load_audio_unified() is re-exported from its new canonical location at
+whisperjav.modules.scene_detection_backends.utils.
 
-Last updated: 2026-02-14 (Phase 0 cleanup: removed legacy SceneDetector,
-AdaptiveSceneDetector, analyze_scene_metadata)
-==============================================================================
+This module will be removed in a future version.
 """
 import logging
 from pathlib import Path
@@ -37,60 +31,9 @@ from scipy.signal import butter, filtfilt
 from whisperjav.utils.logger import logger
 
 
-def load_audio_unified(audio_path: Path, target_sr: Optional[int] = None, force_mono: bool = True) -> Tuple[np.ndarray, int]:
-    """
-    Unified audio loading function used by all scene detectors.
-    Provides consistent audio format and sample rate handling.
-    
-    Args:
-        audio_path: Path to audio file
-        target_sr: Target sample rate (None = preserve original)
-        force_mono: Convert to mono if stereo
-        
-    Returns:
-        Tuple of (audio_data, sample_rate)
-    """
-    try:
-        # Use soundfile for consistent loading with optional resampling
-        audio_data, sample_rate = sf.read(str(audio_path), dtype='float32', always_2d=False)
-        
-        # Convert stereo to mono efficiently if needed
-        if force_mono and audio_data.ndim > 1:
-            logger.debug("Converting stereo to mono")
-            audio_data = np.mean(audio_data, axis=1)
-        
-        # Resample if target sample rate specified
-        if target_sr is not None and sample_rate != target_sr:
-            logger.debug(f"Resampling from {sample_rate}Hz to {target_sr}Hz")
-            audio_data = librosa.resample(audio_data, orig_sr=sample_rate, target_sr=target_sr)
-            sample_rate = target_sr
-            
-        logger.debug(f"Audio loaded: {len(audio_data)/sample_rate:.1f}s @ {sample_rate}Hz, {'mono' if audio_data.ndim == 1 else 'stereo'}")
-        return audio_data, sample_rate
-        
-    # H2: Specific exception handling with actionable guidance
-    except sf.SoundFileError as e:
-        file_size_mb = audio_path.stat().st_size / 1024 / 1024 if audio_path.exists() else 0
-        logger.error(
-            f"SoundFile cannot read {audio_path}: {e}\n"
-            f"  File size: {file_size_mb:.1f} MB\n"
-            f"  Suggestion: Verify file integrity, try converting with ffmpeg:\n"
-            f"    ffmpeg -i \"{audio_path}\" -acodec pcm_s16le output.wav"
-        )
-        raise
-    except MemoryError as e:
-        file_size_mb = audio_path.stat().st_size / 1024 / 1024 if audio_path.exists() else 0
-        logger.error(
-            f"Out of memory loading {audio_path} ({file_size_mb:.1f} MB): {e}\n"
-            f"  Suggestion: Close other applications or use smaller files"
-        )
-        raise
-    except FileNotFoundError as e:
-        logger.error(f"Audio file not found: {audio_path}")
-        raise
-    except Exception as e:
-        logger.error(f"Failed to load audio {audio_path}: {type(e).__name__}: {e}")
-        raise
+# Re-export from canonical location for backward compatibility.
+# Moved to scene_detection_backends.utils in Phase 4 of Sprint 3 refactoring.
+from whisperjav.modules.scene_detection_backends.utils import load_audio_unified  # noqa: F401
 
 
 # Try to import auditok for the coarse-splitting pass
@@ -106,11 +49,16 @@ except ImportError:
 
 class DynamicSceneDetector:
     """
-    Handles audio scene detection using a two-pass strategy with optional
-    assistive processing for improved accuracy on challenging audio.
+    DEPRECATED: Use SceneDetectorFactory instead.
 
-    This class is designed as a drop-in replacement for the original SceneDetector,
-    maintaining the same public interface while offering more robust internal logic.
+    .. deprecated::
+        DynamicSceneDetector is deprecated since Sprint 3 refactoring.
+        Use ``SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)``
+        from ``whisperjav.modules.scene_detection_backends`` instead.
+
+    Legacy two-pass scene detector with 42+ parameters. Replaced by
+    Protocol-based backends (AuditokSceneDetector, SileroSceneDetector,
+    SemanticSceneDetector, NullSceneDetector) accessible via factory.
     """
 
     def __init__(self,
@@ -158,6 +106,17 @@ class DynamicSceneDetector:
         """
         Initialize the dynamic audio scene detector.
         """
+        import warnings
+        warnings.warn(
+            "DynamicSceneDetector is deprecated. Use SceneDetectorFactory from "
+            "whisperjav.modules.scene_detection_backends instead:\n"
+            "  factory = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)\n"
+            "  result = factory.detect_scenes(audio_path, output_dir, basename)\n"
+            "  scene_paths = result.to_legacy_tuples()",
+            FutureWarning,
+            stacklevel=2,
+        )
+
         if not AUDITOK_AVAILABLE:
             raise ImportError("The 'auditok' library is required for DynamicSceneDetector.")
 

@@ -2,25 +2,105 @@
 Shared utilities for scene detection backends.
 
 Contains common operations used across multiple backends:
+- Audio loading (load_audio_unified)
 - WAV file saving (save_scene_wav)
 - Brute-force time-based splitting (brute_force_split)
-
-Audio loading:
-    Backends should use load_audio_unified() from
-    whisperjav.modules.scene_detection for audio loading.
-    It will be moved here in Phase 4 cleanup.
 """
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Tuple
 
+import librosa
 import numpy as np
 import soundfile as sf
 
 from .base import SceneInfo
 
 logger = logging.getLogger("whisperjav")
+
+
+def load_audio_unified(
+    audio_path: Path,
+    target_sr: Optional[int] = None,
+    force_mono: bool = True,
+) -> Tuple[np.ndarray, int]:
+    """
+    Unified audio loading function used by all scene detectors.
+
+    Provides consistent audio format and sample rate handling.
+
+    Args:
+        audio_path: Path to audio file
+        target_sr: Target sample rate (None = preserve original)
+        force_mono: Convert to mono if stereo
+
+    Returns:
+        Tuple of (audio_data, sample_rate)
+
+    Raises:
+        sf.SoundFileError: If file cannot be decoded
+        MemoryError: If file is too large
+        FileNotFoundError: If file doesn't exist
+    """
+    try:
+        audio_data, sample_rate = sf.read(
+            str(audio_path), dtype='float32', always_2d=False
+        )
+
+        # Convert stereo to mono efficiently if needed
+        if force_mono and audio_data.ndim > 1:
+            logger.debug("Converting stereo to mono")
+            audio_data = np.mean(audio_data, axis=1)
+
+        # Resample if target sample rate specified
+        if target_sr is not None and sample_rate != target_sr:
+            logger.debug(
+                f"Resampling from {sample_rate}Hz to {target_sr}Hz"
+            )
+            audio_data = librosa.resample(
+                audio_data, orig_sr=sample_rate, target_sr=target_sr
+            )
+            sample_rate = target_sr
+
+        logger.debug(
+            f"Audio loaded: {len(audio_data)/sample_rate:.1f}s "
+            f"@ {sample_rate}Hz, "
+            f"{'mono' if audio_data.ndim == 1 else 'stereo'}"
+        )
+        return audio_data, sample_rate
+
+    except sf.SoundFileError as e:
+        file_size_mb = (
+            audio_path.stat().st_size / 1024 / 1024
+            if audio_path.exists() else 0
+        )
+        logger.error(
+            f"SoundFile cannot read {audio_path}: {e}\n"
+            f"  File size: {file_size_mb:.1f} MB\n"
+            f"  Suggestion: Verify file integrity, try converting with ffmpeg:\n"
+            f'    ffmpeg -i "{audio_path}" -acodec pcm_s16le output.wav'
+        )
+        raise
+    except MemoryError as e:
+        file_size_mb = (
+            audio_path.stat().st_size / 1024 / 1024
+            if audio_path.exists() else 0
+        )
+        logger.error(
+            f"Out of memory loading {audio_path} ({file_size_mb:.1f} MB): {e}\n"
+            f"  Suggestion: Close other applications or use smaller files"
+        )
+        raise
+    except FileNotFoundError:
+        logger.error(f"Audio file not found: {audio_path}")
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to load audio {audio_path}: "
+            f"{type(e).__name__}: {e}"
+        )
+        raise
 
 
 def save_scene_wav(

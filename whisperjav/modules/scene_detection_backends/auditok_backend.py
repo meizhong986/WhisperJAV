@@ -348,7 +348,7 @@ class AuditokSceneDetector:
         No resampling — auditok handles any sample rate natively.
         """
         try:
-            from whisperjav.modules.scene_detection import load_audio_unified
+            from .utils import load_audio_unified
             audio_data, sample_rate = load_audio_unified(
                 audio_path, target_sr=None, force_mono=self._config.force_mono
             )

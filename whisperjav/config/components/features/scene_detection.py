@@ -346,11 +346,26 @@ class AuditokSceneDetection(FeatureComponent):
     # === Schema ===
     Options = AuditokSceneDetectionOptions
 
-    # === Presets - v1 has NO sensitivity presets, all identical to defaults ===
+    # === Presets ===
+    # Conservative: fewer, larger scenes — need longer silences to split.
+    # Balanced: defaults.
+    # Aggressive: more, smaller scenes — split on shorter silences.
     presets = {
-        "conservative": AuditokSceneDetectionOptions(),
+        "conservative": AuditokSceneDetectionOptions(
+            min_duration_s=1.0,
+            pass1_max_silence_s=4.0,
+            pass1_energy_threshold=40,
+            pass2_max_silence_s=2.5,
+            pass2_energy_threshold=45,
+        ),
         "balanced": AuditokSceneDetectionOptions(),
-        "aggressive": AuditokSceneDetectionOptions(),
+        "aggressive": AuditokSceneDetectionOptions(
+            min_duration_s=0.1,
+            pass1_max_silence_s=1.5,
+            pass1_energy_threshold=25,
+            pass2_max_silence_s=1.0,
+            pass2_energy_threshold=30,
+        ),
     }
 
 
@@ -371,9 +386,26 @@ class SileroSceneDetection(FeatureComponent):
     # === Schema ===
     Options = SileroSceneDetectionOptions
 
-    # === Presets - v1 has NO sensitivity presets, all identical to defaults ===
+    # === Presets ===
+    # Conservative: fewer scenes — higher VAD threshold, longer required silences.
+    # Balanced: defaults.
+    # Aggressive: more scenes — lower VAD threshold, shorter silences trigger split.
     presets = {
-        "conservative": SileroSceneDetectionOptions(),
+        "conservative": SileroSceneDetectionOptions(
+            min_duration_s=1.0,
+            pass1_max_silence_s=4.0,
+            pass1_energy_threshold=40,
+            silero_threshold=0.12,
+            silero_min_silence_ms=2500,
+            silero_speech_pad_ms=300,
+        ),
         "balanced": SileroSceneDetectionOptions(),
-        "aggressive": SileroSceneDetectionOptions(),
+        "aggressive": SileroSceneDetectionOptions(
+            min_duration_s=0.1,
+            pass1_max_silence_s=1.5,
+            pass1_energy_threshold=25,
+            silero_threshold=0.05,
+            silero_min_silence_ms=1200,
+            silero_speech_pad_ms=150,
+        ),
     }
