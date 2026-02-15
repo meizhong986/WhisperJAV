@@ -178,7 +178,7 @@ FEATURE_PARAMS = {
 }
 
 # Scene detection params - routed to features.scene_detection for SceneDetectorFactory
-# These match the kwargs expected by SceneDetectorFactory.create_from_legacy_kwargs()
+# These match the kwargs expected by SceneDetectorFactory.safe_create_from_legacy_kwargs()
 SCENE_DETECTION_PARAMS = {
     # Core options
     "max_duration_s",
@@ -208,7 +208,7 @@ SCENE_DETECTION_PARAMS = {
     "brute_force_fallback",
     "brute_force_chunk_s",
     "pad_edges_s",
-    "fade_ms",
+    # fade_ms: REMOVED — dead feature, not implemented by any backend
     # Silero VAD options (for silero scene detection)
     "silero_threshold",
     "silero_neg_threshold",
@@ -1176,7 +1176,7 @@ def _apply_gui_overrides(
 
         if scene_detector == "none":
             # Route through NullSceneDetector — the "method" key is what
-            # SceneDetectorFactory.create_from_legacy_kwargs() pops to select
+            # SceneDetectorFactory.safe_create_from_legacy_kwargs() pops to select
             # the backend.  Without it, the factory defaults to "auditok".
             resolved_config["features"]["scene_detection"] = {"method": "none"}
             if "workflow" in resolved_config and "features" in resolved_config["workflow"]:

@@ -96,7 +96,9 @@ class SemanticSceneDetector:
             logger.info("SemanticSceneDetector initialized")
 
         except ImportError as e:
-            raise SceneDetectionError(
+            # Let ImportError propagate naturally so the factory's fallback
+            # logic can catch it and retry with a different backend (H6 fix).
+            raise ImportError(
                 "Semantic method selected but dependencies not available. "
                 "Ensure 'semantic_audio_clustering' module is installed. "
                 f"Fall back to --scene-detection-method auditok. Error: {e}"

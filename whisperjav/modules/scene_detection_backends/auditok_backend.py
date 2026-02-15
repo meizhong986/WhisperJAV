@@ -47,7 +47,7 @@ class AuditokSceneConfig:
     """
     # Core segment bounds
     max_duration: float = 29.0
-    min_duration: float = 0.3
+    min_duration: float = 0.2
 
     # Pass 1: Coarse — find natural chapter boundaries
     pass1_min_duration: float = 0.3
@@ -149,19 +149,8 @@ class AuditokSceneDetector:
         Handles _s suffix aliases (e.g., max_duration_s → max_duration).
         Unknown keys are silently ignored for backward compatibility.
         """
-        def _get(key: str, default):
-            """Get value, checking _s suffixed alias first."""
-            s_key = f"{key}_s" if not key.endswith("_s") else key
-            base_key = key.rstrip("_s") if key.endswith("_s") else key
-            # _s suffix takes precedence (more specific)
-            if s_key in kwargs:
-                return type(default)(kwargs[s_key])
-            if base_key in kwargs:
-                return type(default)(kwargs[base_key])
-            return default
-
         max_duration = float(kwargs.get("max_duration_s", kwargs.get("max_duration", 29.0)))
-        min_duration = float(kwargs.get("min_duration_s", kwargs.get("min_duration", 0.3)))
+        min_duration = float(kwargs.get("min_duration_s", kwargs.get("min_duration", 0.2)))
 
         # Pass 1 — fall back to legacy top-level names
         legacy_max_silence = float(kwargs.get("max_silence", 1.8))

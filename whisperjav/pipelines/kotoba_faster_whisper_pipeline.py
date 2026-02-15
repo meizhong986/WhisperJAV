@@ -132,7 +132,7 @@ class KotobaFasterWhisperPipeline(BasePipeline):
         # Scene detector (ALWAYS enabled)
         # Ensure scene_opts uses the CLI-specified method (overrides any preset default)
         scene_opts["method"] = self.scene_method
-        self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+        self.scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_opts)
 
         # Kotoba ASR with internal VAD
         self.asr = KotobaFasterWhisperASR(

@@ -412,7 +412,7 @@ class QwenPipeline(BasePipeline):
                     os.getpid(),
                 )
 
-        scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_detector_kwargs)
+        scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_detector_kwargs)
         result = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
         scene_paths = result.to_legacy_tuples()
         scene_detector.cleanup()
@@ -421,11 +421,18 @@ class QwenPipeline(BasePipeline):
             os.getpid(), len(scene_paths), self.scene_method,
         )
 
+        # Store full scene detection metadata (matching balanced/fidelity pattern)
+        detection_meta = result.to_metadata_dict()
         master_metadata["stages"]["scene_detection"] = {
             "method": self.scene_method,
             "scenes_detected": len(scene_paths),
             "time_sec": time.time() - phase2_start,
         }
+        # Include structured per-scene data for diagnostics/benchmarking
+        if detection_meta.get("scenes_detected"):
+            master_metadata["scenes_detected"] = detection_meta["scenes_detected"]
+        if detection_meta.get("coarse_boundaries"):
+            master_metadata["coarse_boundaries"] = detection_meta["coarse_boundaries"]
 
         # ==============================================================
         # PHASE 3: SPEECH ENHANCEMENT (optional, VRAM Block 1)

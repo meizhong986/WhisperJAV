@@ -127,7 +127,8 @@ class AuditokSceneDetectionConfig(BaseConfig):
     )
     fade_ms: int = Field(
         default=0,
-        description="Fade duration in milliseconds."
+        description="DEPRECATED: Not implemented by any backend.",
+        deprecated=True,
     )
 
 
@@ -274,7 +275,8 @@ class SileroSceneDetectionConfig(BaseConfig):
     )
     fade_ms: int = Field(
         default=0,
-        description="Fade duration in milliseconds."
+        description="DEPRECATED: Not implemented by any backend.",
+        deprecated=True,
     )
 
 

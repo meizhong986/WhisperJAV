@@ -150,7 +150,8 @@ class AuditokSceneDetectionOptions(BaseModel):
     fade_ms: int = Field(
         0,
         ge=0, le=1000,
-        description="Fade duration at segment edges in milliseconds."
+        description="DEPRECATED: Not implemented by any backend. Accepted for backward compatibility only.",
+        deprecated=True,
     )
 
 
@@ -325,7 +326,8 @@ class SileroSceneDetectionOptions(BaseModel):
     fade_ms: int = Field(
         0,
         ge=0, le=1000,
-        description="Fade duration at segment edges in milliseconds."
+        description="DEPRECATED: Not implemented by any backend. Accepted for backward compatibility only.",
+        deprecated=True,
     )
 
 

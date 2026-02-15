@@ -441,7 +441,7 @@ class SemanticClusteringAdapter:
                 "start_time_seconds": round(start_sec, 3),
                 "end_time_seconds": round(end_sec, 3),
                 "duration_seconds": round(duration, 3),
-                "detection_pass": 1,  # Semantic is single-pass
+                "detection_pass": 0,  # Semantic is single-pass (0 = no pass distinction)
                 "filename": scene_filename,
                 "context": segment.get("context", {}),
                 "asr_prompt": segment.get("asr_prompt", ""),

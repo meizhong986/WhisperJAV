@@ -11,9 +11,10 @@ See docs/sprint3_scene_detection_refactor.md for the full design.
 import importlib
 import importlib.util
 import logging
-from typing import Any, Dict, List, Tuple, Type
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Type
 
-from .base import SceneDetector, SceneDetectionError
+from .base import SceneDetectionResult, SceneDetector, SceneDetectionError
 
 logger = logging.getLogger("whisperjav")
 
@@ -236,3 +237,178 @@ class SceneDetectorFactory:
         )
 
         return SceneDetectorFactory.create(method, **kwargs)
+
+    @staticmethod
+    def safe_create(
+        name: str,
+        fallback: str = "auditok",
+        **kwargs,
+    ) -> "SafeSceneDetector":
+        """
+        Create a scene detector with construction fallback and detection safety.
+
+        If the requested backend fails to construct (ImportError, RuntimeError),
+        falls back to the fallback backend with a clear warning.
+
+        The returned SafeSceneDetector wraps detect_scenes() with:
+        - SceneDetectionError → clear, actionable error message
+        - Empty results (silent audio) → full-audio single scene
+        - Excessive results (500+) → warning, proceed normally
+
+        Args:
+            name: Backend name ('auditok', 'silero', 'semantic', 'none')
+            fallback: Backend to use if primary fails (default: 'auditok')
+            **kwargs: Backend-specific parameters
+
+        Returns:
+            SafeSceneDetector wrapping the created backend
+        """
+        try:
+            detector = SceneDetectorFactory.create(name, **kwargs)
+            return SafeSceneDetector(detector, name)
+        except (ImportError, RuntimeError, SceneDetectionError) as e:
+            if name == fallback:
+                # Fallback IS the primary — nothing else to try
+                raise
+            logger.warning(
+                "Scene detector '%s' failed to initialize: %s. "
+                "Falling back to '%s'.",
+                name, e, fallback,
+            )
+            detector = SceneDetectorFactory.create(fallback, **kwargs)
+            return SafeSceneDetector(detector, fallback)
+
+    @staticmethod
+    def safe_create_from_legacy_kwargs(**kwargs) -> "SafeSceneDetector":
+        """
+        Create a safe scene detector from DynamicSceneDetector-style kwargs.
+
+        Same as create_from_legacy_kwargs but returns a SafeSceneDetector
+        with construction fallback and detection safety.
+
+        Args:
+            **kwargs: All kwargs that would be passed to DynamicSceneDetector.
+                      'method' key selects the backend (default: 'auditok').
+
+        Returns:
+            SafeSceneDetector wrapping the created backend
+        """
+        method = kwargs.pop("method", "auditok")
+
+        logger.debug(
+            "Creating safe scene detector from legacy kwargs: method=%s, "
+            "kwargs_keys=%s",
+            method, list(kwargs.keys()),
+        )
+
+        return SceneDetectorFactory.safe_create(
+            method, fallback="auditok", **kwargs
+        )
+
+
+class SafeSceneDetector:
+    """
+    Wraps a SceneDetector with comprehensive error handling.
+
+    Provides safety for both construction failures (via factory) and
+    runtime detection issues:
+
+    - SceneDetectionError → re-raises with clear, actionable message
+    - Empty results (silent audio) → falls back to full-audio single scene
+    - Excessive scene count (500+) → logs warning, proceeds normally
+
+    Created via SceneDetectorFactory.safe_create() or
+    SceneDetectorFactory.safe_create_from_legacy_kwargs().
+
+    Implements the same interface as SceneDetector so it can be used
+    as a drop-in replacement in all pipelines.
+    """
+
+    # Threshold for warning about excessive scene count
+    EXCESSIVE_SCENE_THRESHOLD = 500
+
+    def __init__(self, detector: SceneDetector, active_method: str):
+        self._detector = detector
+        self._active_method = active_method
+
+    @property
+    def name(self) -> str:
+        """Delegate to wrapped detector."""
+        return self._detector.name
+
+    @property
+    def display_name(self) -> str:
+        """Delegate to wrapped detector."""
+        return self._detector.display_name
+
+    def detect_scenes(
+        self,
+        audio_path: Path,
+        output_dir: Path,
+        media_basename: str,
+        **kwargs,
+    ) -> SceneDetectionResult:
+        """
+        Detect scenes with comprehensive error handling.
+
+        Safety behaviors:
+        - SceneDetectionError from corrupt audio or backend crash is
+          re-raised with a clear, actionable message for the user.
+        - Empty results (no speech detected) trigger a fallback to
+          NullSceneDetector, returning the full audio as a single scene.
+        - 500+ scenes trigger a warning but processing continues.
+
+        Args:
+            audio_path: Path to the input audio file
+            output_dir: Directory to save scene WAV files
+            media_basename: Base name for output files
+
+        Returns:
+            SceneDetectionResult guaranteed to have at least one scene
+        """
+        try:
+            result = self._detector.detect_scenes(
+                audio_path, output_dir, media_basename, **kwargs
+            )
+        except SceneDetectionError as e:
+            # User wants: corrupt audio / backend crash → ERROR with clear message
+            raise SceneDetectionError(
+                f"Scene detection failed for '{audio_path.name}': {e}\n"
+                f"Check that the audio file is valid and not corrupt. "
+                f"If the problem persists, try --scene-detection-method auditok"
+            ) from e
+
+        # Empty results → fall back to full audio as one scene
+        if not result.scenes:
+            logger.warning(
+                "Scene detection (%s) found no speech in '%s' — "
+                "treating full audio as single scene.",
+                self._active_method, audio_path.name,
+            )
+            from .none_backend import NullSceneDetector
+
+            null_detector = NullSceneDetector()
+            result = null_detector.detect_scenes(
+                audio_path, output_dir, media_basename
+            )
+
+        # Excessive scene count → warn but proceed
+        if result.num_scenes >= self.EXCESSIVE_SCENE_THRESHOLD:
+            logger.warning(
+                "Scene detection produced %d scenes for '%s'. "
+                "This is unusually high and may indicate noisy audio "
+                "or overly aggressive detection settings.",
+                result.num_scenes, audio_path.name,
+            )
+
+        return result
+
+    def cleanup(self) -> None:
+        """Delegate cleanup to wrapped detector."""
+        self._detector.cleanup()
+
+    def __repr__(self) -> str:
+        return (
+            f"SafeSceneDetector(method={self._active_method}, "
+            f"detector={self._detector!r})"
+        )

@@ -164,7 +164,7 @@ class BalancedPipeline(BasePipeline):
         # Enhancement ALWAYS runs (even "none" backend does 48kHz→16kHz resampling)
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
-        self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+        self.scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_opts)
 
         # ASR CONFIG (model created lazily on first process() call)
         self._asr_config = {

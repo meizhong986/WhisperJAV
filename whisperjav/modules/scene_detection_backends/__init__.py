@@ -45,7 +45,7 @@ from .base import (
     SceneDetector,
     SceneInfo,
 )
-from .factory import SceneDetectorFactory
+from .factory import SafeSceneDetector, SceneDetectorFactory
 from .utils import load_audio_unified
 
 if TYPE_CHECKING:
@@ -57,6 +57,7 @@ __all__ = [
     "SceneDetector",
     "SceneDetectionError",
     "SceneDetectorFactory",
+    "SafeSceneDetector",
     "load_audio_unified",
     "SemanticClusteringAdapter",
 ]

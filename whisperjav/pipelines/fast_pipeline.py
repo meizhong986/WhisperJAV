@@ -91,7 +91,7 @@ class FastPipeline(BasePipeline):
 
         # Instantiate modules with V3 structured config
         self.audio_extractor = AudioExtractor()
-        self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+        self.scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_opts)
 
 
         # Pass structured config to StableTSASR

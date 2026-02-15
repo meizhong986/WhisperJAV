@@ -241,7 +241,7 @@ class TransformersPipeline(BasePipeline):
         self.scene_detector = None
         if self.scene_method != "none":
             from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
-            self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(method=self.scene_method)
+            self.scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(method=self.scene_method)
 
         # ASR CONFIG based on backend (model created in process() after enhancement cleanup)
         if asr_backend == "qwen":
