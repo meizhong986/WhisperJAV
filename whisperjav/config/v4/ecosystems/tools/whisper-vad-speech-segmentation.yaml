@@ -4,6 +4,10 @@
 # Speech segmentation using Whisper transcription timestamps.
 # Leverages Whisper's semantic understanding for robust speech detection.
 # Works well on low SNR audio where traditional VADs fail.
+#
+# Model variant is selected via the backend dropdown (whisper-vad, whisper-vad-tiny,
+# etc.), not a parameter. Detection thresholds (no_speech_threshold, logprob_threshold)
+# are set via the Provider tab as they share parameter names with the ASR engine.
 # =============================================================================
 
 schemaVersion: v1
@@ -16,7 +20,9 @@ metadata:
     Speech segmentation using Whisper model as neural VAD.
     Transcription segments become speech regions, leveraging Whisper's
     deep semantic understanding for robust detection on difficult audio.
-    Proven approach: Used by WhisperX, WhisperSeg (ICASSP 2024).
+    Model variant is selected via the backend dropdown. Detection thresholds
+    (no_speech_threshold, logprob_threshold) are set via the Provider tab
+    as they share parameter names with the ASR engine.
   version: "1.0.0"
   tags:
     - speech-segmentation
@@ -47,25 +53,26 @@ contract:
 # =============================================================================
 spec:
   # --- Model Variant ---
-  # whisper-vad: Small model, good balance (~500MB)
-  # whisper-vad-tiny: Fastest (~75MB)
-  # whisper-vad-base: Fast with decent accuracy (~150MB)
-  # whisper-vad-medium: Most accurate (~1.5GB)
+  # Controlled by factory name (whisper-vad, whisper-vad-tiny, etc.), not this param.
+  # Kept in spec for direct API/CLI use.
   variant: "whisper-vad"
 
   # --- Detection Parameters ---
+  # These collide with PROVIDER_PARAMS_COMMON and route to ASR, not segmenter.
+  # Kept in spec for direct API/CLI use but hidden from GUI.
   no_speech_threshold: 0.6
   logprob_threshold: -1.0
   language: "ja"
 
   # --- Processing ---
-  compute_type: "float16"
+  compute_type: "auto"  # Match code default; "auto" selects best for hardware
   device: "auto"
   cache_results: true
 
   # --- Segment Filtering/Grouping ---
   chunk_threshold_s: 2.5
   min_speech_duration_ms: 100
+  max_group_duration_s: 29.0  # Upper bound to stay within Whisper's 30s context window
 
 # =============================================================================
 # Sensitivity Presets
@@ -91,46 +98,22 @@ presets:
 # =============================================================================
 # GUI Hints
 # =============================================================================
+# Only functional, routable parameters are exposed here.
+# Removed from GUI (collision with other routing categories or factory-controlled):
+#   - variant: controlled by factory name (whisper-vad, whisper-vad-tiny, etc.)
+#   - no_speech_threshold: collides with PROVIDER_PARAMS_COMMON, routes to ASR
+#   - logprob_threshold: collides with PROVIDER_PARAMS_COMMON, routes to ASR
+#   - language: collides with DECODER_PARAMS, routes to ASR
+#   - compute_type: handled at pass level, no segmenter routing path
 gui:
-  variant:
-    widget: dropdown
-    label: "Model Size"
-    description: "Whisper model variant for VAD (larger = more accurate, slower)"
-    options:
-      - "whisper-vad-tiny"
-      - "whisper-vad-base"
-      - "whisper-vad"
-      - "whisper-vad-medium"
-    group: model
-
-  no_speech_threshold:
+  chunk_threshold_s:
     widget: slider
-    label: "No Speech Threshold"
-    description: "Probability threshold for 'no speech' detection (higher = stricter)"
-    min: 0.3
-    max: 0.9
-    step: 0.05
-    group: detection
-
-  logprob_threshold:
-    widget: slider
-    label: "Log Probability Threshold"
-    description: "Filter segments with avg_logprob below this (more negative = less filtering)"
-    min: -2.0
-    max: 0.0
-    step: 0.1
-    group: detection
-
-  language:
-    widget: dropdown
-    label: "Language"
-    description: "Target language for transcription"
-    options:
-      - "ja"
-      - "en"
-      - "zh"
-      - "ko"
-    group: detection
+    label: "Group Gap Threshold (s)"
+    description: "Maximum gap to group consecutive segments"
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    group: filters
 
   min_speech_duration_ms:
     widget: spinner
@@ -141,29 +124,20 @@ gui:
     step: 10
     group: filters
 
-  chunk_threshold_s:
+  max_group_duration_s:
     widget: slider
-    label: "Group Gap Threshold (s)"
-    description: "Maximum gap to group consecutive segments"
-    min: 1.0
-    max: 10.0
-    step: 0.5
+    label: "Max Group Duration"
+    description: "Maximum duration for grouped segments (Whisper 30s context limit)"
+    min: 10
+    max: 60
+    step: 1
+    unit: "s"
     group: filters
 
   cache_results:
     widget: toggle
     label: "Cache Results"
     description: "Save transcription for potential reuse by ASR"
-    group: processing
-
-  compute_type:
-    widget: dropdown
-    label: "Compute Type"
-    description: "GPU compute precision (float16 fastest, int8 smallest)"
-    options:
-      - "float16"
-      - "int8"
-      - "float32"
     group: processing
 
 # =============================================================================

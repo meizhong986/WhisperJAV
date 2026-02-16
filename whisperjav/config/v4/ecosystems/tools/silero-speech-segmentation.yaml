@@ -3,6 +3,9 @@
 # =============================================================================
 # Neural VAD using Silero model for speech boundary detection.
 # High-quality detection with sensitivity presets for different use cases.
+#
+# Version is selected via the backend dropdown (Silero v4.0 vs v3.1), not a
+# parameter. Defaults shown are for v4.0.
 # =============================================================================
 
 schemaVersion: v1
@@ -14,7 +17,8 @@ metadata:
   description: |
     Speech segmentation using Silero VAD neural network.
     Fast, accurate voice activity detection with configurable sensitivity.
-    Supports version 4.0 (default) and 3.1 for backward compatibility.
+    Version is selected via the backend dropdown (Silero v4.0 vs v3.1),
+    not a parameter. Defaults shown are for v4.0.
   version: "1.0.0"
   tags:
     - speech-segmentation
@@ -41,16 +45,12 @@ contract:
 # Tool Parameters (Balanced preset as default)
 # =============================================================================
 spec:
-  # --- Model Version ---
-  version: "v4.0"  # v4.0 (default) or v3.1 for backward compatibility
-
   # --- Core VAD Parameters ---
-  vad.threshold: 0.18
-  vad.neg_threshold: 0.15
-  vad.min_speech_duration_ms: 100
-  vad.max_speech_duration_s: 11.0
-  vad.min_silence_duration_ms: 300
-  vad.speech_pad_ms: 400
+  # Keys are flat (no "vad." prefix) to match the routing layer (SEGMENTER_PARAMS)
+  threshold: 0.18
+  min_speech_duration_ms: 100
+  min_silence_duration_ms: 300
+  speech_pad_ms: 400
 
   # --- Segment Grouping ---
   chunk_threshold_s: 2.5
@@ -63,12 +63,10 @@ presets:
   # Conservative: Higher thresholds, fewer false positives
   # Best for: Clean audio, clear speech, minimal background noise
   conservative:
-    vad.threshold: 0.35
-    vad.neg_threshold: 0.3
-    vad.min_speech_duration_ms: 150
-    vad.max_speech_duration_s: 9.0
-    vad.min_silence_duration_ms: 300
-    vad.speech_pad_ms: 400
+    threshold: 0.35
+    min_speech_duration_ms: 150
+    min_silence_duration_ms: 300
+    speech_pad_ms: 400
 
   # Balanced: Default settings for general use
   # Best for: Mixed content, typical audio quality
@@ -77,27 +75,21 @@ presets:
   # Aggressive: Lower thresholds, maximum detail capture
   # Best for: Difficult audio, soft speech, noisy backgrounds
   aggressive:
-    vad.threshold: 0.05
-    vad.neg_threshold: 0.1
-    vad.min_speech_duration_ms: 30
-    vad.max_speech_duration_s: 14.0
-    vad.min_silence_duration_ms: 300
-    vad.speech_pad_ms: 600
+    threshold: 0.05
+    min_speech_duration_ms: 30
+    min_silence_duration_ms: 300
+    speech_pad_ms: 600
 
 # =============================================================================
 # GUI Hints
 # =============================================================================
+# Only functional, routable parameters are exposed here.
+# Removed from GUI (not passed to Silero API by backend code):
+#   - neg_threshold: stored but excluded from Silero API call (silero.py lines 266-274)
+#   - max_speech_duration_s: stored but excluded from Silero API call
+#   - version: controlled by factory name (silero vs silero-v3.1), not a parameter
 gui:
-  version:
-    widget: dropdown
-    label: "Model Version"
-    description: "Silero VAD model version (v4.0 recommended)"
-    options:
-      - "v4.0"
-      - "v3.1"
-    group: model
-
-  vad.threshold:
+  threshold:
     widget: slider
     label: "Speech Threshold"
     description: "Probability threshold to detect speech (lower = more sensitive)"
@@ -106,16 +98,7 @@ gui:
     step: 0.01
     group: detection
 
-  vad.neg_threshold:
-    widget: slider
-    label: "Negative Threshold"
-    description: "Threshold for speech deactivation (lower = extend speech)"
-    min: 0.01
-    max: 0.5
-    step: 0.01
-    group: detection
-
-  vad.min_speech_duration_ms:
+  min_speech_duration_ms:
     widget: spinner
     label: "Min Speech Duration (ms)"
     description: "Minimum speech segment duration to keep"
@@ -124,16 +107,7 @@ gui:
     step: 10
     group: filters
 
-  vad.max_speech_duration_s:
-    widget: slider
-    label: "Max Speech Duration (s)"
-    description: "Maximum speech segment duration before split"
-    min: 5.0
-    max: 30.0
-    step: 0.5
-    group: filters
-
-  vad.min_silence_duration_ms:
+  min_silence_duration_ms:
     widget: spinner
     label: "Min Silence Duration (ms)"
     description: "Minimum silence duration to trigger split"
@@ -142,7 +116,7 @@ gui:
     step: 50
     group: filters
 
-  vad.speech_pad_ms:
+  speech_pad_ms:
     widget: spinner
     label: "Speech Padding (ms)"
     description: "Padding added around detected speech segments"

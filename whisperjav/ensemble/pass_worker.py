@@ -82,14 +82,25 @@ DECODER_PARAMS = {
     "max_initial_timestamp",
 }
 
-# VAD params - used by Silero VAD, not passed to Whisper
-VAD_PARAMS = {
+# Segmenter params - routed to speech segmentation backends, not passed to Whisper ASR
+# Covers all backends: Silero, TEN, Whisper VAD, and shared grouping params
+SEGMENTER_PARAMS = {
+    # Core VAD (Silero, shared)
     "threshold",
-    "neg_threshold",
+    "neg_threshold",           # Keep for CLI backward compat (not in GUI)
     "min_speech_duration_ms",
-    "max_speech_duration_s",
+    "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
     "min_silence_duration_ms",
     "speech_pad_ms",
+    # Grouping (shared across backends)
+    "chunk_threshold_s",
+    "max_group_duration_s",
+    # TEN-specific
+    "hop_size",
+    "start_pad_ms",
+    "end_pad_ms",
+    # Whisper VAD-specific
+    "cache_results",
 }
 
 # Provider params - common transcriber options shared by all backends
@@ -861,6 +872,15 @@ def _build_pipeline(
         if pass_config.get("speech_segmenter"):
             qwen_defaults["qwen_segmenter"] = pass_config["speech_segmenter"]
             logger.debug("Pass %s: Override qwen_segmenter = %s", pass_number, pass_config["speech_segmenter"])
+        # Extract segmenter-relevant params from custom params for Qwen pipeline
+        # (Qwen bypasses apply_custom_params(); segmenter params must be forwarded explicitly)
+        segmenter_config = {}
+        if pass_config.get("params"):
+            for key, value in pass_config["params"].items():
+                if key in SEGMENTER_PARAMS:
+                    segmenter_config[key] = value
+                    logger.debug("Pass %s: Qwen segmenter_config[%s] = %s", pass_number, key, value)
+
         # Map qwen_* prefixed params to QwenPipeline's parameter names
         qwen_pipeline_params = {
             "model_id": qwen_defaults.get("qwen_model_id", "Qwen/Qwen3-ASR-1.7B"),
@@ -890,6 +910,7 @@ def _build_pipeline(
             "stepdown_enabled": qwen_defaults.get("qwen_stepdown", False),
             "stepdown_initial_group": qwen_defaults.get("qwen_stepdown_initial_group", 30.0),
             "stepdown_fallback_group": qwen_defaults.get("qwen_stepdown_fallback_group", 6.0),
+            "segmenter_config": segmenter_config if segmenter_config else None,
         }
         logger.debug(
             "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",
@@ -1037,7 +1058,7 @@ def apply_custom_params(
         if is_v3_config:
             # V3 structure: params["asr"] contains all ASR params
             asr_params = params["asr"]
-            if key in VAD_PARAMS:
+            if key in SEGMENTER_PARAMS:
                 # VAD params need special handling in V3
                 if "vad" not in params:
                     params["vad"] = {}
@@ -1062,7 +1083,7 @@ def apply_custom_params(
             if key in DECODER_PARAMS:
                 decoder_params[key] = value
                 logger.debug("Pass %s: Set decoder.%s", pass_number, key)
-            elif key in VAD_PARAMS:
+            elif key in SEGMENTER_PARAMS:
                 vad_params[key] = value
                 logger.debug("Pass %s: Set vad.%s", pass_number, key)
             elif key in valid_provider_params:

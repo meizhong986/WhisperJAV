@@ -151,6 +151,7 @@ class QwenPipeline(BasePipeline):
         # Speech segmentation / VAD (Phase 4)
         speech_segmenter: str = "ten",  # Default to TEN backend for VAD
         segmenter_max_group_duration: float = 29.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
+        segmenter_config: Optional[Dict[str, Any]] = None,  # GUI/CLI custom segmenter params
 
         # Qwen ASR (Phase 5)
         model_id: str = "Qwen/Qwen3-ASR-1.7B",
@@ -226,6 +227,7 @@ class QwenPipeline(BasePipeline):
         # Speech segmentation config
         self.segmenter_backend = speech_segmenter
         self.segmenter_max_group_duration = segmenter_max_group_duration
+        self.segmenter_config = segmenter_config or {}
 
         # Adaptive Step-Down config (v1.8.10+)
         self.stepdown_enabled = stepdown_enabled
@@ -480,9 +482,11 @@ class QwenPipeline(BasePipeline):
             phase4_start = time.time()
 
             from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
+            segmenter_kwargs = {"max_group_duration_s": self.segmenter_max_group_duration}
+            segmenter_kwargs.update(self.segmenter_config)
             segmenter = SpeechSegmenterFactory.create(
                 self.segmenter_backend,
-                max_group_duration_s=self.segmenter_max_group_duration,
+                **segmenter_kwargs,
             )
 
             for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
