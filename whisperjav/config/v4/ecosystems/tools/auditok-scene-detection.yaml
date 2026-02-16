@@ -170,9 +170,18 @@ gui:
     group: pass2
 
   brute_force_fallback:
-    widget: checkbox
+    widget: toggle
     label: "Brute Force Fallback"
-    description: "Use fixed chunking as fallback"
+    description: "Use fixed chunking as fallback when scene detection fails"
+    group: fallback
+
+  brute_force_chunk_s:
+    widget: number
+    label: "Fallback Chunk Size"
+    description: "Fixed chunk size in seconds when brute force fallback is active"
+    min: 10
+    max: 120
+    step: 1
     group: fallback
 
 # Implementation provider
