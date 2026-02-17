@@ -178,10 +178,16 @@ class Qwen3ForcedAlignerAdapter:
                 )
                 continue
 
-            # Extract timestamps from aligner result
-            timestamps = getattr(raw, "timestamps", None)
+            # Extract word-level items from ForcedAlignResult.
+            # ForcedAlignResult.items is a List[ForcedAlignItem], each with
+            # .text, .start_time, .end_time — exactly what merge_master_with_timestamps expects.
+            timestamps = getattr(raw, "items", None)
             if timestamps is None:
-                timestamps = raw if isinstance(raw, list) else []
+                # Fallback: try iterating (ForcedAlignResult supports __iter__)
+                try:
+                    timestamps = list(raw)
+                except TypeError:
+                    timestamps = []
 
             # Merge master text (with punctuation) + aligner timestamps
             word_dicts = merge_master_with_timestamps(master_text, timestamps)
