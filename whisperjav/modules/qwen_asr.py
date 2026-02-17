@@ -982,6 +982,7 @@ class QwenASR:
             # Reload model with smaller batch
             self.unload_model()
             self.load_model()
+            qwen_model = self.model  # C1 fix: update closure reference to new model
 
             # Retry
             result = stable_whisper.transcribe_any(

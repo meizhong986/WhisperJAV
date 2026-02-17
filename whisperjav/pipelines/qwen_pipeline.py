@@ -212,8 +212,8 @@ class QwenPipeline(BasePipeline):
             )
             self.input_mode = InputMode.CONTEXT_AWARE
 
-        # Safe chunking: when True, enforces 150-210s scene boundaries to stay
-        # within ForcedAligner's 300s architectural limit
+        # Safe chunking: when True, enforces scene boundaries to stay
+        # within ForcedAligner's 180s architectural limit
         self.safe_chunking = qwen_safe_chunking
 
         # Scene detection config
@@ -263,7 +263,7 @@ class QwenPipeline(BasePipeline):
             "aligner_id": aligner_id,
             "context": self._resolve_context(context, context_file),
             "attn_implementation": attn_implementation,
-            "japanese_postprocess": japanese_postprocess,
+            "japanese_postprocess": False,  # C2 fix: Qwen3 uses AssemblyTextCleaner, not JapanesePostProcessor
             "postprocess_preset": postprocess_preset,
             "repetition_penalty": repetition_penalty,
             "max_tokens_per_audio_second": max_tokens_per_audio_second,
@@ -464,9 +464,8 @@ class QwenPipeline(BasePipeline):
         # ==============================================================
         # PHASE 2: SCENE DETECTION (optional, default: none)
         # ==============================================================
-        # When safe_chunking is enabled, enforce 150-210s scene boundaries
-        # to stay within the ForcedAligner's 300s architectural limit while
-        # providing enough context for the LALM (3 minutes = sweet spot).
+        # When safe_chunking is enabled, enforce scene boundaries
+        # to stay within the ForcedAligner's 180s architectural limit.
         logger.info(
             "[QwenPipeline PID %s] Phase 2: Scene detection (method=%s, safe_chunking=%s)",
             os.getpid(), self.scene_method, self.safe_chunking,
