@@ -363,39 +363,73 @@ class DecoupledSubtitlePipeline:
                 audio_paths = frame_audio_paths[scene_idx]
                 texts = scene_texts[scene_idx]
 
-                frame_alignments: list[list[dict[str, Any]]] = []
+                # Separate frames that need alignment from empty ones
+                batch_indices: list[int] = []
+                batch_audio_paths: list[Path] = []
+                batch_texts: list[str] = []
+                batch_durations: list[float] = []
 
-                # Align each frame individually (frame-relative coordinates)
                 for frame_idx, (frame, audio_path, text) in enumerate(zip(frames, audio_paths, texts)):
-                    if not text.strip():
-                        frame_alignments.append([])
-                        continue
+                    if text.strip():
+                        batch_indices.append(frame_idx)
+                        batch_audio_paths.append(audio_path)
+                        batch_texts.append(text)
+                        batch_durations.append(frame.duration)
 
+                # Initialize all frames as empty
+                frame_alignments: list[list[dict[str, Any]]] = [[] for _ in frames]
+
+                if batch_indices:
                     try:
-                        align_result = self.aligner.align(
-                            audio_path=audio_path,
-                            text=text,
+                        # Batch align all non-empty frames for this scene
+                        batch_results = self.aligner.align_batch(
+                            audio_paths=batch_audio_paths,
+                            texts=batch_texts,
                             language=self.language,
-                            audio_durations=[frame.duration],
+                            audio_durations=batch_durations,
                         )
-                        # Convert WordTimestamp objects to dicts
-                        word_dicts = [
-                            {
-                                "word": w.word,
-                                "start": w.start,
-                                "end": w.end,
-                            }
-                            for w in align_result.words
-                        ]
-                        frame_alignments.append(word_dicts)
+                        # Unpack results back to per-frame positions
+                        for i, frame_idx in enumerate(batch_indices):
+                            word_dicts = [
+                                {
+                                    "word": w.word,
+                                    "start": w.start,
+                                    "end": w.end,
+                                }
+                                for w in batch_results[i].words
+                            ]
+                            frame_alignments[frame_idx] = word_dicts
                     except Exception:
-                        logger.error(
-                            "[DecoupledPipeline] Alignment failed for scene %d frame %d",
+                        # Batch failed — fall back to per-frame alignment
+                        logger.warning(
+                            "[DecoupledPipeline] Batch alignment failed for scene %d, falling back to per-frame",
                             scene_idx,
-                            frame_idx,
                             exc_info=True,
                         )
-                        frame_alignments.append([])
+                        for i, frame_idx in enumerate(batch_indices):
+                            try:
+                                align_result = self.aligner.align(
+                                    audio_path=batch_audio_paths[i],
+                                    text=batch_texts[i],
+                                    language=self.language,
+                                    audio_durations=[batch_durations[i]],
+                                )
+                                word_dicts = [
+                                    {
+                                        "word": w.word,
+                                        "start": w.start,
+                                        "end": w.end,
+                                    }
+                                    for w in align_result.words
+                                ]
+                                frame_alignments[frame_idx] = word_dicts
+                            except Exception:
+                                logger.error(
+                                    "[DecoupledPipeline] Alignment failed for scene %d frame %d",
+                                    scene_idx,
+                                    frame_idx,
+                                    exc_info=True,
+                                )
 
                 scene_alignments.append(frame_alignments)
 
@@ -489,10 +523,14 @@ class DecoupledSubtitlePipeline:
                     sentinel_status = "N/A"
 
                 # Hardening (shared by all paths)
+                # Resolve per-scene speech regions for VAD_ONLY mode
+                per_scene_regions = self._get_speech_regions(
+                    scene_idx, frame_speech_regions, scene_speech_regions,
+                )
                 config = HardeningConfig(
                     timestamp_mode=self.hardening_config.timestamp_mode,
                     scene_duration_sec=duration,
-                    speech_regions=self.hardening_config.speech_regions,
+                    speech_regions=per_scene_regions,
                 )
                 hardening_diag = harden_scene_result(result, config)
 
