@@ -31,17 +31,16 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import stable_whisper
 
-from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
-from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
-from whisperjav.modules.srt_stitching import SRTStitcher
-from whisperjav.utils.logger import logger
-
 from whisperjav.modules.speech_enhancement import (
+    SCENE_EXTRACTION_SR,
     create_enhancer_direct,
     enhance_scenes,
-    SCENE_EXTRACTION_SR,
 )
+from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
+from whisperjav.modules.srt_stitching import SRTStitcher
+from whisperjav.pipelines.base_pipeline import BasePipeline
+from whisperjav.utils.logger import logger
 
 # Lazy imports to avoid loading heavy modules until needed:
 #   - SceneDetectorFactory (from whisperjav.modules.scene_detection_backends)
@@ -280,12 +279,31 @@ class QwenPipeline(BasePipeline):
         self.stitcher = SRTStitcher()
         self.postprocessor = SRTPostProcessor(language=self.lang_code)
 
+        # Decoupled Subtitle Pipeline (assembly mode only, ADR-006)
+        # Components are lightweight — no model loading until process() time
+        self._subtitle_pipeline = None
+        if self.input_mode == InputMode.ASSEMBLY:
+            self._subtitle_pipeline = self._build_subtitle_pipeline()
+
         logger.debug(
             "[QwenPipeline PID %s] Initialized (model=%s, input_mode=%s, safe_chunking=%s, "
             "scene=%s, enhancer=%s, segmenter=%s, timestamps=%s)",
             os.getpid(), model_id, self.input_mode.value, self.safe_chunking,
             scene_detector, speech_enhancer, speech_segmenter, self.timestamp_mode.value,
         )
+
+    def cleanup(self):
+        """Release pipeline resources including the subtitle pipeline orchestrator."""
+        # Clean up DecoupledSubtitlePipeline components
+        if self._subtitle_pipeline is not None:
+            try:
+                self._subtitle_pipeline.cleanup()
+            except Exception as e:
+                logger.warning("Subtitle pipeline cleanup failed (non-fatal): %s", e)
+            self._subtitle_pipeline = None
+
+        # Delegate to base class (handles scene_detector, enhancer, asr, CUDA)
+        super().cleanup()
 
     def get_mode_name(self) -> str:
         return "qwen"
@@ -309,6 +327,84 @@ class QwenPipeline(BasePipeline):
             except Exception as e:
                 logger.warning(f"Failed to load context file '{context_file}': {e}")
         return "\n".join(parts)
+
+    # ------------------------------------------------------------------
+    # Decoupled Subtitle Pipeline construction (ADR-006)
+    # ------------------------------------------------------------------
+
+    def _build_subtitle_pipeline(self):
+        """
+        Construct the DecoupledSubtitlePipeline for assembly mode.
+
+        Components are lightweight wrappers — no models are loaded until
+        the orchestrator calls load() during process_scenes().  This is
+        safe to call in __init__().
+        """
+        from whisperjav.modules.assembly_text_cleaner import AssemblyCleanerConfig
+        from whisperjav.modules.subtitle_pipeline.aligners.factory import TextAlignerFactory
+        from whisperjav.modules.subtitle_pipeline.cleaners.factory import TextCleanerFactory
+        from whisperjav.modules.subtitle_pipeline.framers.factory import TemporalFramerFactory
+        from whisperjav.modules.subtitle_pipeline.generators.factory import TextGeneratorFactory
+        from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline
+        from whisperjav.modules.subtitle_pipeline.types import (
+            HardeningConfig,
+        )
+        from whisperjav.modules.subtitle_pipeline.types import (
+            TimestampMode as NewTimestampMode,
+        )
+
+        cfg = self._asr_config
+
+        # TemporalFramer: full-scene (assembly processes entire scenes)
+        framer = TemporalFramerFactory.create("full-scene")
+
+        # TextGenerator: Qwen3 text-only mode
+        generator = TextGeneratorFactory.create(
+            "qwen3",
+            model_id=cfg["model_id"],
+            device=cfg["device"],
+            dtype=cfg["dtype"],
+            batch_size=cfg["batch_size"],
+            max_new_tokens=cfg["max_new_tokens"],
+            language=cfg["language"],
+            repetition_penalty=cfg["repetition_penalty"],
+            max_tokens_per_audio_second=cfg["max_tokens_per_audio_second"],
+            attn_implementation=cfg["attn_implementation"],
+        )
+
+        # TextCleaner: Qwen3 assembly cleaner (or passthrough if disabled)
+        if self.assembly_cleaner_enabled:
+            cleaner_config = AssemblyCleanerConfig(enabled=True)
+            cleaner = TextCleanerFactory.create(
+                "qwen3",
+                config=cleaner_config,
+                language=cfg.get("language", "ja"),
+            )
+        else:
+            cleaner = TextCleanerFactory.create("passthrough")
+
+        # TextAligner: Qwen3 ForcedAligner (or None if timestamps disabled)
+        aligner = None
+        if cfg.get("use_aligner", True):
+            aligner = TextAlignerFactory.create(
+                "qwen3",
+                aligner_id=cfg["aligner_id"],
+                device=cfg["device"],
+                dtype=cfg["dtype"],
+                language=cfg["language"],
+            )
+
+        # Map old TimestampMode enum to new
+        new_ts_mode = NewTimestampMode(self.timestamp_mode.value)
+
+        return DecoupledSubtitlePipeline(
+            framer=framer,
+            generator=generator,
+            cleaner=cleaner,
+            aligner=aligner,
+            hardening_config=HardeningConfig(timestamp_mode=new_ts_mode),
+            language=cfg.get("language", "ja"),
+        )
 
     # ------------------------------------------------------------------
     # Main processing
@@ -539,28 +635,68 @@ class QwenPipeline(BasePipeline):
 
         if self.input_mode == InputMode.ASSEMBLY:
             # ==============================================================
-            # ASSEMBLY MODE: Decoupled Assembly Line (v1.8.8+)
+            # ASSEMBLY MODE via DecoupledSubtitlePipeline (ADR-006)
             # ==============================================================
-            # Batch(ASR text-only) → Sanitize → VRAM Swap → Batch(Align)
-            # → Merge+Reconstruct WhisperResult
-            #
-            # Benefits over coupled modes:
-            #   - Higher batch_size (ASR-only needs ~3.4GB vs ~4.6GB coupled)
-            #   - Mid-pipeline hallucination removal prevents aligner NULLs
-            #   - Creates vLLM integration socket (aligner is PyTorch-only)
+            # Orchestrator handles the full decoupled flow:
+            #   Frame → Generate → Clean → VRAM Swap → Align → Sentinel
+            #   → Reconstruct → Harden
             # ==============================================================
-            scene_results = self._phase5_assembly(
-                scene_paths=scene_paths,
-                raw_subs_dir=raw_subs_dir,
-                speech_regions_per_scene=speech_regions_per_scene,
+
+            # Set artifacts directory for debug output
+            self._subtitle_pipeline.artifacts_dir = raw_subs_dir
+
+            # Prepare orchestrator inputs from scene_paths tuples
+            orch_audio_paths = [Path(sp[0]) for sp in scene_paths]
+            orch_durations = [sp[3] for sp in scene_paths]
+
+            # Convert Phase 4 speech regions: {idx: SegmentationResult} → List[List[Tuple]]
+            orch_speech_regions = None
+            if speech_regions_per_scene:
+                orch_speech_regions = []
+                for idx in range(len(scene_paths)):
+                    if idx in speech_regions_per_scene:
+                        seg_result = speech_regions_per_scene[idx]
+                        orch_speech_regions.append(
+                            [(s.start_sec, s.end_sec) for s in seg_result.segments]
+                        )
+                    else:
+                        orch_speech_regions.append([])
+
+            # Run orchestrator
+            orch_results = self._subtitle_pipeline.process_scenes(
+                scene_audio_paths=orch_audio_paths,
+                scene_durations=orch_durations,
+                scene_speech_regions=orch_speech_regions,
             )
+
+            # Convert to Phase 6 format: (WhisperResult, scene_idx)
+            for idx, (result, _diag) in enumerate(orch_results):
+                scene_results.append((result, idx))
+
+            # Map orchestrator sentinel stats → existing format
+            orch_stats = self._subtitle_pipeline.sentinel_stats
+            self._sentinel_stats = {
+                "alignment_collapses": orch_stats.get("collapsed_scenes", 0),
+                "alignment_recoveries": orch_stats.get("recovered_scenes", 0),
+            }
+
+            # Save per-scene diagnostics JSON
+            for idx, (_result, diag) in enumerate(orch_results):
+                try:
+                    diag_path = raw_subs_dir / f"scene_{idx:04d}_diagnostics.json"
+                    diag_path.write_text(
+                        json.dumps(diag, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                except Exception:
+                    pass
         else:
             # ==============================================================
             # COUPLED MODES: Context-Aware / VAD Slicing
             # ==============================================================
             from whisperjav.modules.alignment_sentinel import (
-                extract_words_from_result,
                 assess_alignment_quality,
+                extract_words_from_result,
                 redistribute_collapsed_words,
             )
 
@@ -942,7 +1078,9 @@ class QwenPipeline(BasePipeline):
         # ==============================================================
         try:
             from whisperjav.modules.pipeline_analytics import (
-                compute_analytics, print_summary, save_analytics,
+                compute_analytics,
+                print_summary,
+                save_analytics,
             )
             analytics = compute_analytics(
                 raw_subs_dir, final_srt_path, title=media_basename,
@@ -1017,11 +1155,12 @@ class QwenPipeline(BasePipeline):
         Returns:
             Combined WhisperResult with all speech regions, or None if empty.
         """
-        import soundfile as sf
         import numpy as np
+        import soundfile as sf
+
         from whisperjav.modules.alignment_sentinel import (
-            extract_words_from_result,
             assess_alignment_quality,
+            extract_words_from_result,
             redistribute_collapsed_words,
         )
 
@@ -1461,14 +1600,15 @@ class QwenPipeline(BasePipeline):
             List of (WhisperResult, scene_index) tuples matching the
             contract expected by Phase 6.
         """
-        from whisperjav.modules.qwen_asr import QwenASR, merge_master_with_timestamps
-        from whisperjav.modules.assembly_text_cleaner import (
-            AssemblyTextCleaner, AssemblyCleanerConfig,
-        )
         from whisperjav.modules.alignment_sentinel import (
             assess_alignment_quality,
             redistribute_collapsed_words,
         )
+        from whisperjav.modules.assembly_text_cleaner import (
+            AssemblyCleanerConfig,
+            AssemblyTextCleaner,
+        )
+        from whisperjav.modules.qwen_asr import QwenASR, merge_master_with_timestamps
 
         n_scenes = len(scene_paths)
         user_context = self._asr_config.get("context", "")
