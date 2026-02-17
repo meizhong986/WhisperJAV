@@ -479,11 +479,11 @@ def parse_arguments():
     qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=6.0,
                            help="Tier 2 fallback group duration for step-down (default: 6.0)")
     qwen_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
-                           action="store_true", default=True,
-                           help="Apply Japanese-specific subtitle regrouping (default: enabled)")
+                           action="store_true", default=False,
+                           help="[DEPRECATED] No effect — Qwen3 uses AssemblyTextCleaner instead")
     qwen_group.add_argument("--no-qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_false",
-                           help="Disable Japanese-specific subtitle regrouping")
+                           help="[DEPRECATED] Already disabled by default for Qwen3")
     qwen_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
                            choices=["default", "high_moan", "narrative"],
                            help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
@@ -862,7 +862,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Timestamp resolution
             timestamp_mode=getattr(args, 'qwen_timestamp_mode', 'aligner_interpolation'),
             # Japanese post-processing
-            japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', True),
+            japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', False),
             postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),
             # Assembly text cleaner
             assembly_cleaner=getattr(args, 'qwen_assembly_cleaner', True),

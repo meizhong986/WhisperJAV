@@ -1855,8 +1855,8 @@ class WhisperJAVAPI:
                 "postprocess": {
                     "japanese_postprocess": {
                         "type": "checkbox",
-                        "label": "Japanese Post-processing",
-                        "default": True
+                        "label": "Japanese Post-processing (deprecated, no effect for Qwen3)",
+                        "default": False
                     },
                     "postprocess_preset": {
                         "type": "dropdown",

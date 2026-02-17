@@ -252,7 +252,7 @@ const QwenManager = {
         use_aligner: true,
         aligner_id: 'Qwen/Qwen3-ForcedAligner-0.6B',
         // Post-processing
-        japanese_postprocess: true,
+        japanese_postprocess: false,
         postprocess_preset: 'high_moan',
         // Scene detection (from main dropdown)
         scene: 'semantic',
