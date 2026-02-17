@@ -243,10 +243,6 @@ class QwenPipeline(BasePipeline):
             )
             self.timestamp_mode = TimestampMode.ALIGNER_WITH_INTERPOLATION
 
-        # Cross-scene context propagation (disabled for MVP; structure retained
-        # for future enablement once quality gates are in place)
-        self.cross_scene_context = False
-
         # Assembly text cleaner toggle (for --qwen-assembly-cleaner on|off)
         self.assembly_cleaner_enabled = assembly_cleaner
 
@@ -702,9 +698,7 @@ class QwenPipeline(BasePipeline):
             asr = QwenASR(**self._asr_config)
 
             # Context biasing: user context applies to first scene only (MVP).
-            # Cross-scene propagation is gated by self.cross_scene_context flag.
             user_context = self._asr_config.get("context", "")
-            previous_tail = ""
 
             # Sentinel tracking — instance-level so _transcribe_speech_regions()
             # can also accumulate stats (same contract as assembly mode)
@@ -724,16 +718,8 @@ class QwenPipeline(BasePipeline):
                 )
 
                 try:
-                    # Assemble per-scene context
-                    if self.cross_scene_context:
-                        if previous_tail and user_context:
-                            scene_context = f"{user_context}\n{previous_tail}"
-                        elif previous_tail:
-                            scene_context = previous_tail
-                        else:
-                            scene_context = user_context
-                    else:
-                        scene_context = user_context if idx == 0 else ""
+                    # Context biasing: user context for first scene only (MVP)
+                    scene_context = user_context if idx == 0 else ""
 
                     # === Input Mode Branching ===
                     if self.input_mode == InputMode.CONTEXT_AWARE:
@@ -913,10 +899,6 @@ class QwenPipeline(BasePipeline):
 
                     segment_count = len(result.segments) if result and result.segments else 0
                     scene_results.append((result, idx))
-
-                    if self.cross_scene_context and result and result.segments:
-                        tail_segments = result.segments[-2:] if len(result.segments) >= 2 else result.segments
-                        previous_tail = " ".join(seg.text.strip() for seg in tail_segments if seg.text.strip())
 
                     if segment_count == 0:
                         logger.info(f"Phase 5: Scene {scene_num} produced 0 segments (may be non-speech audio)")
@@ -1625,10 +1607,7 @@ class QwenPipeline(BasePipeline):
         # Build per-scene context list (MVP: user context for scene 0 only)
         contexts = []
         for idx in range(n_scenes):
-            if self.cross_scene_context:
-                contexts.append(user_context)  # all scenes get user context
-            else:
-                contexts.append(user_context if idx == 0 else "")
+            contexts.append(user_context if idx == 0 else "")
 
         # Collect audio paths and durations for batch API
         audio_paths = [sp[0] for sp in scene_paths]
@@ -2247,70 +2226,3 @@ class QwenPipeline(BasePipeline):
 
         return interpolated_count
 
-    # ------------------------------------------------------------------
-    # Post-ASR VAD filter (DEPRECATED — replaced by pre-ASR segmentation
-    # above; retained for reference only, no longer called)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _apply_vad_filter(
-        result: stable_whisper.WhisperResult,
-        seg_result,
-        min_overlap_ratio: float = 0.3,
-    ) -> stable_whisper.WhisperResult:
-        """
-        Filter ASR segments by overlap with VAD speech regions.
-
-        DEPRECATED: Replaced by _transcribe_speech_regions() which does
-        pre-ASR segmentation (the correct pipeline flow).
-
-        Keeps only ASR segments that overlap sufficiently with detected speech.
-        Same pattern as TransformersPipeline.
-
-        Args:
-            result: WhisperResult from QwenASR
-            seg_result: SegmentationResult from SpeechSegmenter
-            min_overlap_ratio: Minimum overlap ratio to keep a segment
-
-        Returns:
-            Filtered WhisperResult (modified in-place)
-        """
-        if not seg_result.segments or not result.segments:
-            return result
-
-        speech_regions = [(s.start_sec, s.end_sec) for s in seg_result.segments]
-
-        segments_to_remove = []
-        for seg in result.segments:
-            seg_start = seg.start
-            seg_end = seg.end
-            seg_duration = seg_end - seg_start
-            if seg_duration <= 0:
-                continue
-
-            # Calculate overlap with any speech region
-            max_overlap = 0.0
-            for sp_start, sp_end in speech_regions:
-                overlap_start = max(seg_start, sp_start)
-                overlap_end = min(seg_end, sp_end)
-                overlap = max(0.0, overlap_end - overlap_start)
-                max_overlap = max(max_overlap, overlap)
-
-            overlap_ratio = max_overlap / seg_duration
-            if overlap_ratio < min_overlap_ratio:
-                segments_to_remove.append(seg)
-
-        if segments_to_remove:
-            original_count = len(result.segments)
-            for seg in segments_to_remove:
-                try:
-                    result.remove_segment(seg)
-                except (ValueError, AttributeError):
-                    pass  # Segment may already be removed or method differs
-            filtered_count = len(result.segments)
-            logger.debug(
-                "VAD filter: %d -> %d segments (removed %d non-speech)",
-                original_count, filtered_count, original_count - filtered_count,
-            )
-
-        return result
