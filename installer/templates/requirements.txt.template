@@ -1,98 +1,68 @@
 # WhisperJAV v{{VERSION}} Requirements
 # ================================
+# FALLBACK template - used only if pyproject.toml parsing fails.
+# The primary path generates requirements.txt from pyproject.toml.
 #
-# This file lists all Python dependencies for WhisperJAV.
-# PyTorch is installed separately in post_install_v{{VERSION}}.py
-# with CUDA version detection.
+# Extras included: cli, gui, translate, enhance, huggingface, qwen, analysis, compatibility
+#
+# Note: The following are installed separately in post_install_v{{VERSION}}.py:
+# - Phase 3: PyTorch (CUDA version detected at install time)
+# - Phase 3.5: Git-based packages (require git, benefit from retry logic):
+#   - openai-whisper (core ASR)
+#   - stable-ts (WhisperJAV fork for Japanese)
+#   - ffmpeg-python (audio/video processing)
+#   - clearvoice (speech enhancement)
 #
 # Installation: pip install -r requirements_v{{VERSION}}.txt
 
-# ----------------------------------------
-# Core Whisper Dependencies
-# ----------------------------------------
-# Git-based installs from main branches
-openai-whisper @ git+https://github.com/openai/whisper@main
-stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main
-
-# Whisper variants
+accelerate>=0.26.0
+addict
+aiofiles
+auditok
+av>=13.0.0
+bs-roformer-infer
+colorama
+datasets>=2.14.0,<4.0
 faster-whisper>=1.1.0
-
-# ----------------------------------------
-# Audio and Signal Processing
-# ----------------------------------------
-ffmpeg-python         # FFmpeg Python bindings
-soundfile             # Audio file I/O
-auditok               # Voice Activity Detection (VAD)
-silero-vad>=6.0       # Silero VAD for scene detection
-ten-vad               # TEN Framework VAD for speech segmentation
-librosa>=0.10.0       # Audio analysis
-pyloudnorm            # Audio normalization
-
-# ----------------------------------------
-# GUI Framework (PyWebView)
-# ----------------------------------------
-pywebview>=5.0.0      # Modern web-based GUI framework
-pythonnet>=3.0        # Required for WebView2 backend on Windows
-pywin32>=305; platform_system=="Windows"  # Windows COM support for shortcuts
-
-# ----------------------------------------
-# Scientific Computing
-# ----------------------------------------
-numpy>=1.26.0,<2.0    # Array operations (NumPy 1.26.x for pyvideotrans compatibility)
-scipy>=1.10.1         # Signal processing
-scikit-learn>=1.3.0   # Clustering for semantic scene detection
-matplotlib            # Plotting (for diagnostics)
-
-# ----------------------------------------
-# Subtitle Processing
-# ----------------------------------------
-pysrt                 # SRT file parsing
-srt                   # SRT utilities
-
-# ----------------------------------------
-# Translation (requires Python 3.10+)
-# ----------------------------------------
-pysubtrans>=1.5.0     # AI-powered subtitle translation (lowercase PyPI name)
-openai>=1.35.0        # Required for GPT provider in pysubtrans
-google-genai>=1.39.0  # Required for Gemini provider in pysubtrans
-
-# ----------------------------------------
-# HuggingFace Transformers Pipeline
-# ----------------------------------------
-huggingface-hub>=0.25.0  # Hugging Face cache management (faster-whisper models)
-transformers>=4.40.0     # HuggingFace Transformers for ASR pipeline (kotoba-whisper)
-accelerate>=0.26.0       # Efficient model loading for Transformers
-
-# ----------------------------------------
-# Utilities
-# ----------------------------------------
-tqdm                  # Progress bars
-aiofiles              # Async file I/O
-jsonschema            # Config validation
-Pillow                # Image processing
-colorama              # Colored console output
-requests              # HTTP requests
-pydub                 # Audio processing (scene detection)
-regex                 # Advanced regex for Japanese text processing
-psutil>=5.9.0         # Process management and cleanup
-
-# ----------------------------------------
-# Configuration System
-# ----------------------------------------
-pydantic>=2.0,<3.0    # Data validation (used in config schemas)
-PyYAML>=6.0           # YAML config file parsing
-
-# ----------------------------------------
-# Optional: Performance Optimization
-# ----------------------------------------
-numba>=0.58.0         # JIT compilation for speedups
-
-# ----------------------------------------
-# pyvideotrans Compatibility (Phase 1)
-# ----------------------------------------
-av>=13.0.0            # Video container handling (PyAV)
-imageio>=2.31.0       # Image/video I/O
-imageio-ffmpeg>=0.4.9 # FFmpeg backend for imageio
-httpx>=0.27.0         # Modern async HTTP client
-websockets>=13.0      # WebSocket support for streaming APIs
-soxr>=0.3.0           # High-quality audio resampling
+google-genai>=1.39.0
+hf_xet
+httpx>=0.27.0
+huggingface-hub>=0.25.0
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.9
+jsonschema
+librosa>=0.10.0
+matplotlib
+modelscope>=1.20
+numba>=0.58.0
+numpy>=1.26.0,<2.0
+onnxruntime>=1.16.0
+openai>=1.35.0
+oss2
+packaging
+Pillow
+psutil>=5.9.0
+pydantic>=2.0,<3.0
+pydub
+pyloudnorm
+pysrt
+pysubtrans>=1.5.0
+pythonnet>=3.0; sys_platform == 'win32'
+pywebview>=5.0.0
+pywin32>=305; sys_platform == 'win32'
+PyYAML>=6.0
+qwen-asr>=0.0.6
+regex
+requests
+scikit-learn>=1.3.0
+scipy>=1.10.1
+silero-vad>=6.0
+simplejson
+sortedcontainers
+soundfile
+soxr>=0.3.0
+srt
+ten-vad
+tqdm
+transformers>=4.40.0
+websockets>=13.0
