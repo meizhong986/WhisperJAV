@@ -28,11 +28,14 @@ from whisperjav.ensemble.pass_worker import (
     prepare_transformers_params,
     get_valid_provider_params,
     DECODER_PARAMS,
-    VAD_PARAMS,
+    SEGMENTER_PARAMS,
     FEATURE_PARAMS,
     MODEL_PARAMS,
     PIPELINE_BACKENDS,
 )
+
+# Backward-compat alias (renamed in Sprint 3 scene detection refactor)
+VAD_PARAMS = SEGMENTER_PARAMS
 from whisperjav.config.legacy import resolve_legacy_pipeline
 
 
@@ -696,7 +699,7 @@ class TestTransformersPipelineCustomParams:
 
         params = result['hf_params']
         # Defaults should be applied
-        assert params["hf_model_id"] == "kotoba-tech/kotoba-whisper-v2.2"
+        assert params["hf_model_id"] == "kotoba-tech/kotoba-whisper-bilingual-v1.0"
         assert params["hf_batch_size"] == 16
         assert params["hf_scene"] == "none"
 

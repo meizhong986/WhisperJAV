@@ -13,7 +13,7 @@ from whisperjav.ensemble.pass_worker import (
     get_valid_provider_params,
     prepare_transformers_params,
     DECODER_PARAMS,
-    VAD_PARAMS,
+    SEGMENTER_PARAMS,
     FEATURE_PARAMS,
     MODEL_PARAMS,
     PROVIDER_PARAMS_COMMON,
@@ -22,6 +22,9 @@ from whisperjav.ensemble.pass_worker import (
     PROVIDER_PARAMS_STABLE_TS,
     PIPELINE_BACKENDS,
 )
+
+# Backward-compat alias (renamed in Sprint 3 scene detection refactor)
+VAD_PARAMS = SEGMENTER_PARAMS
 
 
 # =============================================================================

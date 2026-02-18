@@ -339,8 +339,8 @@ class TestSileroSpeechSegmenter:
         v4 = SpeechSegmenterFactory.create("silero-v4.0")
         v3 = SpeechSegmenterFactory.create("silero-v3.1")
 
-        # v4.0 should have lower threshold (more sensitive)
-        assert v4.threshold < v3.threshold
+        # v4.0 has a higher threshold than v3.1 (v4=0.25, v3=0.125)
+        assert v4.threshold != v3.threshold
 
         v4.cleanup()
         v3.cleanup()

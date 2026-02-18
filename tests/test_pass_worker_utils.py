@@ -120,12 +120,29 @@ def test_run_pass_worker_removes_legacy_file_when_not_keeping_temp(tmp_path, mon
         language_code="ja",
     )
 
-    result = run_pass_worker(payload)
+    # run_pass_worker now uses the Drop-Box + Nuclear Exit pattern:
+    # results are pickled to result_file, then os._exit() is called.
+    # We must mock _write_dropbox_and_exit to capture results without killing the process.
+    import pickle
+    result_file = str(tmp_path / "result.pkl")
+    captured = {}
+
+    def mock_dropbox_exit(rf, result, tracer, exit_code):
+        with open(rf, 'wb') as f:
+            pickle.dump(result, f)
+        captured.update(result)
+
+    monkeypatch.setattr(
+        "whisperjav.ensemble.pass_worker._write_dropbox_and_exit",
+        mock_dropbox_exit,
+    )
+
+    run_pass_worker(payload, result_file)
 
     pass_file = output_dir / "sample.ja.pass1.srt"
     assert pass_file.exists(), "Pass-specific copy should exist"
     assert not legacy_file.exists(), "Legacy pipeline output should be removed"
-    assert result["results"][0]["srt_path"] == str(pass_file)
+    assert captured["results"][0]["srt_path"] == str(pass_file)
 
 
 def test_run_pass_worker_moves_legacy_file_even_when_keeping_temp(tmp_path, monkeypatch):
@@ -157,7 +174,20 @@ def test_run_pass_worker_moves_legacy_file_even_when_keeping_temp(tmp_path, monk
         language_code="ja",
     )
 
-    run_pass_worker(payload)
+    # Mock the Drop-Box exit to prevent os._exit() from killing the test runner
+    import pickle
+    result_file = str(tmp_path / "result.pkl")
+
+    def mock_dropbox_exit(rf, result, tracer, exit_code):
+        with open(rf, 'wb') as f:
+            pickle.dump(result, f)
+
+    monkeypatch.setattr(
+        "whisperjav.ensemble.pass_worker._write_dropbox_and_exit",
+        mock_dropbox_exit,
+    )
+
+    run_pass_worker(payload, result_file)
 
     pass_file = output_dir / "sample.ja.pass1.srt"
     assert pass_file.exists(), "Pass-specific file should exist"

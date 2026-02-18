@@ -8,7 +8,7 @@
     <img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"/>
   </a>
   <br>
-  <img src="https://img.shields.io/badge/version-1.8.3-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.8.4-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.10--3.12-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>

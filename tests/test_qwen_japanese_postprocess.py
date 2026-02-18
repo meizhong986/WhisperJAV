@@ -447,12 +447,12 @@ def test_cli_arguments():
     original_argv = sys.argv
 
     try:
-        # Test default (enabled)
+        # Test default (disabled — Qwen3 uses AssemblyTextCleaner, not JapanesePostProcessor)
         sys.argv = ["whisperjav", "test.mp4", "--mode", "qwen"]
         args = parse_arguments()
-        assert args.qwen_japanese_postprocess == True, \
-            "Default should be japanese_postprocess=True"
-        print("[PASS] Default: --qwen-japanese-postprocess is True")
+        assert args.qwen_japanese_postprocess == False, \
+            "Default should be japanese_postprocess=False (deprecated for Qwen3)"
+        print("[PASS] Default: --qwen-japanese-postprocess is False")
 
         # Test explicit enable
         sys.argv = ["whisperjav", "test.mp4", "--mode", "qwen", "--qwen-japanese-postprocess"]
