@@ -176,6 +176,11 @@ class DecoupledSubtitlePipeline:
             frame_audio_paths: Per-scene, per-frame temp WAV paths.
             frame_speech_regions: Per-scene speech regions from framer metadata.
         """
+        n_scenes = len(scene_audio_paths)
+        logger.info(
+            "[DecoupledPipeline] Step 1: Framing %d scenes", n_scenes,
+        )
+
         scene_frames: list[list[TemporalFrame]] = []
         frame_audio_paths: list[list[Path]] = []
         frame_speech_regions: list[Optional[list[list[tuple[float, float]]]]] = []
@@ -216,6 +221,12 @@ class DecoupledSubtitlePipeline:
                 scene_durations[scene_idx],
             )
 
+        total_frames = sum(len(f) for f in scene_frames)
+        logger.info(
+            "[DecoupledPipeline] Step 1: Complete — %d scenes, %d total frames",
+            n_scenes, total_frames,
+        )
+
         return scene_frames, frame_audio_paths, frame_speech_regions
 
     # -----------------------------------------------------------------------
@@ -236,7 +247,14 @@ class DecoupledSubtitlePipeline:
         Returns:
             scene_texts: Per-scene, per-frame cleaned text strings.
         """
+        import time as _time
+
         n_scenes = len(scene_frames)
+        logger.info(
+            "[DecoupledPipeline] Steps 2-4: Generating + cleaning text for %d scenes",
+            n_scenes,
+        )
+        step24_start = _time.monotonic()
 
         # Collect frames that need generation (no pre-existing text)
         needs_generation = False
@@ -259,6 +277,11 @@ class DecoupledSubtitlePipeline:
                 frames = scene_frames[scene_idx]
                 audio_paths = frame_audio_paths[scene_idx]
                 raw_texts = []
+
+                logger.info(
+                    "[DecoupledPipeline] Generating scene %d/%d (%.1fs audio)...",
+                    scene_idx + 1, n_scenes, scene_durations[scene_idx],
+                )
 
                 # Separate framer-provided and needs-generation frames
                 gen_indices = []
@@ -308,6 +331,19 @@ class DecoupledSubtitlePipeline:
                 raw_texts = [t if t is not None else "" for t in raw_texts]
                 scene_raw_texts.append(raw_texts)
 
+                # Per-scene generation result
+                scene_chars = sum(len(t) for t in raw_texts)
+                if scene_chars == 0:
+                    logger.info(
+                        "[DecoupledPipeline]   Scene %d/%d: empty (no text generated)",
+                        scene_idx + 1, n_scenes,
+                    )
+                else:
+                    logger.debug(
+                        "[DecoupledPipeline]   Scene %d/%d: %d chars",
+                        scene_idx + 1, n_scenes, scene_chars,
+                    )
+
                 # Save raw text artifacts
                 if self.artifacts_dir:
                     self._save_artifact(scene_idx, "raw", "\n---\n".join(raw_texts))
@@ -318,6 +354,7 @@ class DecoupledSubtitlePipeline:
                 self._safe_cuda_cleanup()
 
         # Phase 2: Cleaning
+        logger.info("[DecoupledPipeline] Cleaning %d scenes", n_scenes)
         scene_texts: list[list[str]] = []
         for scene_idx, raw_texts in enumerate(scene_raw_texts):
             clean_texts = self.cleaner.clean_batch(raw_texts)
@@ -326,6 +363,16 @@ class DecoupledSubtitlePipeline:
             # Save clean text artifacts
             if self.artifacts_dir:
                 self._save_artifact(scene_idx, "clean", "\n---\n".join(clean_texts))
+
+        # Step summary
+        total_raw_chars = sum(len(t) for texts in scene_raw_texts for t in texts)
+        total_clean_chars = sum(len(t) for texts in scene_texts for t in texts)
+        n_empty = sum(1 for texts in scene_texts if all(not t.strip() for t in texts))
+        elapsed = _time.monotonic() - step24_start
+        logger.info(
+            "[DecoupledPipeline] Steps 2-4: Complete — %d scenes, %d chars (%d removed by cleaning), %d empty (%.1fs)",
+            n_scenes, total_clean_chars, total_raw_chars - total_clean_chars, n_empty, elapsed,
+        )
 
         return scene_texts
 
@@ -353,7 +400,13 @@ class DecoupledSubtitlePipeline:
         if self.aligner is None:
             return None
 
+        import time as _time
+
         n_scenes = len(scene_frames)
+        logger.info(
+            "[DecoupledPipeline] Steps 5-7: Aligning %d scenes", n_scenes,
+        )
+        step57_start = _time.monotonic()
         scene_alignments: list[list[list[dict[str, Any]]]] = []
 
         self.aligner.load()
@@ -375,6 +428,12 @@ class DecoupledSubtitlePipeline:
                         batch_audio_paths.append(audio_path)
                         batch_texts.append(text)
                         batch_durations.append(frame.duration)
+
+                scene_chars = sum(len(t) for t in texts if t.strip())
+                logger.info(
+                    "[DecoupledPipeline] Aligning scene %d/%d (%.1fs audio, %d chars)...",
+                    scene_idx + 1, n_scenes, scene_durations[scene_idx], scene_chars,
+                )
 
                 # Initialize all frames as empty
                 frame_alignments: list[list[dict[str, Any]]] = [[] for _ in frames]
@@ -433,6 +492,12 @@ class DecoupledSubtitlePipeline:
 
                 scene_alignments.append(frame_alignments)
 
+                scene_words = sum(len(fa) for fa in frame_alignments)
+                logger.debug(
+                    "[DecoupledPipeline]   Scene %d/%d: %d words aligned",
+                    scene_idx + 1, n_scenes, scene_words,
+                )
+
                 # Save alignment artifacts
                 if self.artifacts_dir:
                     self._save_artifact(
@@ -445,6 +510,15 @@ class DecoupledSubtitlePipeline:
         finally:
             self.aligner.unload()
             self._safe_cuda_cleanup()
+
+        total_words = sum(
+            len(w) for fa_list in scene_alignments for w in fa_list
+        )
+        elapsed = _time.monotonic() - step57_start
+        logger.info(
+            "[DecoupledPipeline] Steps 5-7: Complete — %d scenes aligned, %d total words (%.1fs)",
+            n_scenes, total_words, elapsed,
+        )
 
         return scene_alignments
 
@@ -472,9 +546,16 @@ class DecoupledSubtitlePipeline:
             redistribute_collapsed_words,
         )
 
-        results: list[tuple[Any, dict[str, Any]]] = []
+        n_scenes = len(scene_frames)
+        logger.info(
+            "[DecoupledPipeline] Step 9: Reconstructing %d scenes", n_scenes,
+        )
 
-        for scene_idx in range(len(scene_frames)):
+        results: list[tuple[Any, dict[str, Any]]] = []
+        total_segments = 0
+        total_collapses = 0
+
+        for scene_idx in range(n_scenes):
             frames = scene_frames[scene_idx]
             texts = scene_texts[scene_idx]
             duration = scene_durations[scene_idx]
@@ -483,9 +564,14 @@ class DecoupledSubtitlePipeline:
             self.sentinel_stats["total_scenes"] += 1
 
             try:
+                word_count = 0
+                assessment = None
+                recovery_info = None
+
                 if scene_alignments is not None:
                     # Aligned workflow: merge frame-relative → scene-relative
                     all_words = self._merge_frame_words(frames, scene_alignments[scene_idx])
+                    word_count = len(all_words)
 
                     # Sentinel assessment
                     assessment = assess_alignment_quality(all_words, duration)
@@ -493,6 +579,16 @@ class DecoupledSubtitlePipeline:
 
                     if sentinel_status == "COLLAPSED":
                         self.sentinel_stats["collapsed_scenes"] += 1
+                        total_collapses += 1
+                        logger.warning(
+                            "[SENTINEL] Scene %d/%d: Alignment Collapse — "
+                            "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
+                            scene_idx + 1, n_scenes,
+                            assessment["coverage_ratio"] * 100,
+                            assessment["aggregate_cps"],
+                            assessment["char_count"],
+                            assessment["word_span_sec"],
+                        )
 
                         # Get speech regions for recovery
                         regions = self._get_speech_regions(scene_idx, frame_speech_regions, scene_speech_regions)
@@ -501,6 +597,10 @@ class DecoupledSubtitlePipeline:
                         self.sentinel_stats["recovered_scenes"] += 1
                         strategy = "vad_guided" if regions else "proportional"
                         self.sentinel_stats["recovery_strategies"][strategy] += 1
+                        recovery_info = {
+                            "strategy": strategy,
+                            "words_redistributed": len(corrected_words),
+                        }
 
                         # Reconstruct with suppress_silence=False (H3 fix)
                         result = reconstruct_from_words(corrected_words, audio_path, suppress_silence=False)
@@ -519,6 +619,7 @@ class DecoupledSubtitlePipeline:
                                     "end": frame.end,
                                 }
                             )
+                    word_count = len(words)
                     result = reconstruct_from_words(words, audio_path)
                     sentinel_status = "N/A"
 
@@ -534,12 +635,51 @@ class DecoupledSubtitlePipeline:
                 )
                 hardening_diag = harden_scene_result(result, config)
 
+                segment_count = len(result.segments) if result and result.segments else 0
+                total_segments += segment_count
+
+                # Per-scene progress
+                logger.info(
+                    "[DecoupledPipeline] Scene %d/%d: %d words → %d segments (sentinel: %s)",
+                    scene_idx + 1, n_scenes, word_count, segment_count, sentinel_status,
+                )
+
+                # Enriched diagnostics (v1.1.0 schema, matches coupled mode)
+                aligner_native_count = max(
+                    0,
+                    segment_count - hardening_diag.interpolated_count - hardening_diag.fallback_count,
+                )
+
+                # VAD regions for this scene (if available)
+                vad_regions = None
+                if per_scene_regions:
+                    vad_regions = [
+                        {"start": round(s, 3), "end": round(e, 3)}
+                        for s, e in per_scene_regions
+                    ]
+
                 diagnostics: dict[str, Any] = {
+                    "schema_version": "1.1.0",
                     "scene_idx": scene_idx,
+                    "scene_duration_sec": duration,
+                    "input_mode": "assembly",
                     "frame_count": len(frames),
+                    "word_count": word_count,
                     "sentinel_status": sentinel_status,
+                    "sentinel": {
+                        "status": sentinel_status,
+                        "assessment": assessment if sentinel_status != "N/A" else None,
+                        "recovery": recovery_info,
+                    },
                     "hardening": asdict(hardening_diag),
-                    "segment_count": (len(result.segments) if result and result.segments else 0),
+                    "timing_sources": {
+                        "aligner_native": aligner_native_count,
+                        "interpolated": hardening_diag.interpolated_count,
+                        "vad_fallback": hardening_diag.fallback_count,
+                        "total_segments": segment_count,
+                    },
+                    "segment_count": segment_count,
+                    "vad_regions": vad_regions,
                 }
 
                 # Save diagnostics artifact
@@ -561,6 +701,11 @@ class DecoupledSubtitlePipeline:
                     exc_info=True,
                 )
                 results.append((None, {"scene_idx": scene_idx, "error": str(e)}))
+
+        logger.info(
+            "[DecoupledPipeline] Step 9: Complete — %d scenes, %d total segments, %d collapses",
+            n_scenes, total_segments, total_collapses,
+        )
 
         return results
 

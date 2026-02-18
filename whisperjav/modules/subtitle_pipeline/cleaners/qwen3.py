@@ -73,4 +73,21 @@ class Qwen3TextCleaner:
         """
         cleaned_texts, all_stats = self._cleaner.clean_batch(texts)
         self._last_stats = all_stats
+
+        # Batch summary logging
+        n_items = len(texts)
+        raw_chars = sum(len(t) for t in texts)
+        clean_chars = sum(len(t) for t in cleaned_texts)
+        n_modified = sum(1 for r, c in zip(texts, cleaned_texts) if r != c)
+        if n_modified > 0:
+            logger.info(
+                "[Qwen3TextCleaner] Cleaned %d/%d items — %d → %d chars (-%d)",
+                n_modified, n_items, raw_chars, clean_chars, raw_chars - clean_chars,
+            )
+        else:
+            logger.debug(
+                "[Qwen3TextCleaner] Batch of %d items — no changes needed (%d chars)",
+                n_items, raw_chars,
+            )
+
         return cleaned_texts

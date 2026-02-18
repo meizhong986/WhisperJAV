@@ -524,6 +524,19 @@ class QwenPipeline(BasePipeline):
             os.getpid(), len(scene_paths), self.scene_method,
         )
 
+        # Scene duration statistics
+        if scene_paths:
+            durations = [sp[3] for sp in scene_paths]
+            logger.info(
+                "[QwenPipeline PID %s] Phase 2: Scene durations — "
+                "total %.0fs, range %.0f–%.0fs, mean %.0fs",
+                os.getpid(),
+                sum(durations),
+                min(durations),
+                max(durations),
+                sum(durations) / len(durations),
+            )
+
         # Store full scene detection metadata (matching balanced/fidelity pattern)
         detection_meta = result.to_metadata_dict()
         master_metadata["stages"]["scene_detection"] = {
@@ -695,6 +708,26 @@ class QwenPipeline(BasePipeline):
                     )
                 except Exception:
                     pass
+
+            # Assembly mode Phase 5 summary
+            n_success = sum(1 for r, _ in orch_results if r is not None and r.segments)
+            n_empty = sum(1 for r, _ in orch_results if r is not None and not r.segments)
+            n_failed = sum(1 for r, _ in orch_results if r is None)
+            _total_segs = sum(len(r.segments) for r, _ in orch_results if r is not None and r.segments)
+            logger.info("[QwenPipeline] Phase 5 assembly summary:")
+            logger.info(
+                "  Scenes:    %d success, %d empty, %d failed (of %d)",
+                n_success, n_empty, n_failed, len(orch_results),
+            )
+            logger.info(
+                "  Segments:  %d total (%.1f avg/scene)",
+                _total_segs, _total_segs / max(n_success, 1),
+            )
+            logger.info(
+                "  Sentinel:  %d collapses, %d recoveries",
+                orch_stats.get("collapsed_scenes", 0),
+                orch_stats.get("recovered_scenes", 0),
+            )
         else:
             # ==============================================================
             # COUPLED MODES: Context-Aware / VAD Slicing
