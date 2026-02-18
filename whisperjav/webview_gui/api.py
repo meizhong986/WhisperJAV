@@ -2912,8 +2912,8 @@ class WhisperJAVAPI:
             if not inputs:
                 return {"success": False, "error": "No input files specified"}
 
-            for inp in inputs:
-                args.extend(["-i", inp])
+            args.append("-i")
+            args.extend(inputs)
 
             # Provider
             provider = options.get('provider', 'deepseek')
