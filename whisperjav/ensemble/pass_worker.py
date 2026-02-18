@@ -379,10 +379,11 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_assembly_cleaner": True,
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
-    "qwen_max_group_duration": 29.0,
     "qwen_stepdown": True,
-    "qwen_stepdown_initial_group": 30.0,
-    "qwen_stepdown_fallback_group": 6.0,
+    # NOTE: qwen_max_group_duration, qwen_stepdown_initial_group, and
+    # qwen_stepdown_fallback_group are intentionally OMITTED here.
+    # QwenPipeline.__init__ owns these defaults.  Only include them in
+    # ensemble config when you want to override the pipeline's defaults.
 }
 
 
@@ -906,12 +907,16 @@ def _build_pipeline(
             "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
-            "segmenter_max_group_duration": qwen_defaults.get("qwen_max_group_duration", 29.0),
             "stepdown_enabled": qwen_defaults.get("qwen_stepdown", False),
-            "stepdown_initial_group": qwen_defaults.get("qwen_stepdown_initial_group", 30.0),
-            "stepdown_fallback_group": qwen_defaults.get("qwen_stepdown_fallback_group", 6.0),
             "segmenter_config": segmenter_config if segmenter_config else None,
         }
+        # Pipeline-owned defaults: only forward when ensemble config explicitly overrides
+        if "qwen_max_group_duration" in qwen_defaults:
+            qwen_pipeline_params["segmenter_max_group_duration"] = qwen_defaults["qwen_max_group_duration"]
+        if "qwen_stepdown_initial_group" in qwen_defaults:
+            qwen_pipeline_params["stepdown_initial_group"] = qwen_defaults["qwen_stepdown_initial_group"]
+        if "qwen_stepdown_fallback_group" in qwen_defaults:
+            qwen_pipeline_params["stepdown_fallback_group"] = qwen_defaults["qwen_stepdown_fallback_group"]
         logger.debug(
             "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",
             os.getpid(), pass_number,

@@ -27,7 +27,7 @@ import time
 from datetime import timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import stable_whisper
 
@@ -149,7 +149,7 @@ class QwenPipeline(BasePipeline):
 
         # Speech segmentation / VAD (Phase 4)
         speech_segmenter: str = "ten",  # Default to TEN backend for VAD
-        segmenter_max_group_duration: float = 29.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
+        segmenter_max_group_duration: float = 6.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
         segmenter_config: Optional[Dict[str, Any]] = None,  # GUI/CLI custom segmenter params
 
         # Qwen ASR (Phase 5)
@@ -179,7 +179,7 @@ class QwenPipeline(BasePipeline):
 
         # Adaptive Step-Down (v1.8.10+)
         stepdown_enabled: bool = True,
-        stepdown_initial_group: float = 30.0,
+        stepdown_initial_group: float = 6.0,
         stepdown_fallback_group: float = 6.0,
 
         # Generation safety controls (v1.8.9+)
@@ -487,31 +487,25 @@ class QwenPipeline(BasePipeline):
         scene_detector_kwargs = {"method": self.scene_method}
 
         # === Safe Chunking Override (v1.8.7+) ===
-        # When safe_chunking is True, enforce scene boundaries.
-        # Assembly mode uses wider windows (up to 120s) to preserve LALM
-        # context while staying under the ForcedAligner 180s hard limit.
-        # Other modes use tighter windows (30-90s).
+        # When safe_chunking is True, enforce scene boundaries to keep
+        # scenes within the Qwen ASR + ForcedAligner sweet spot.
+        # Tight scenes (12-48s) reduce timestamp drift and give the
+        # aligner shorter, more manageable audio to align.
         if self.safe_chunking:
             if self.input_mode == InputMode.ASSEMBLY:
-                # Assembly mode: wider scenes for LALM context, but strictly
-                # under the aligner's 180s limit (120s gives safe headroom)
-                scene_detector_kwargs["min_duration"] = 30   # seconds
-                scene_detector_kwargs["max_duration"] = 120  # seconds
+                scene_detector_kwargs["min_duration"] = 12  # seconds
+                scene_detector_kwargs["max_duration"] = 48  # seconds
                 logger.info(
                     "[QwenPipeline PID %s] Phase 2: Assembly safe chunking "
-                    "(min=30s, max=120s, aligner limit=180s)",
+                    "(min=12s, max=48s, aligner limit=180s)",
                     os.getpid(),
                 )
             else:
-                # Context-aware / VAD modes: allow shorter scenes so the
-                # detector can split at natural silence boundaries closer
-                # to 15s.  Combined with step-down (Tier 1 30s → Tier 2 6s)
-                # this gives the aligner the best chance per group.
                 scene_detector_kwargs["min_duration"] = 12  # seconds
-                scene_detector_kwargs["max_duration"] = 90  # seconds
+                scene_detector_kwargs["max_duration"] = 48  # seconds
                 logger.info(
                     "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
-                    "(min=12s, max=90s)",
+                    "(min=12s, max=48s)",
                     os.getpid(),
                 )
 
@@ -737,6 +731,14 @@ class QwenPipeline(BasePipeline):
                 extract_words_from_result,
                 redistribute_collapsed_words,
             )
+            from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
+            from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
+            from whisperjav.modules.subtitle_pipeline.types import (
+                HardeningConfig,
+            )
+            from whisperjav.modules.subtitle_pipeline.types import (
+                TimestampMode as SubtitleTimestampMode,
+            )
 
             asr = QwenASR(**self._asr_config)
 
@@ -778,7 +780,7 @@ class QwenPipeline(BasePipeline):
 
                         # Diagnostics tracking
                         _diag_sentinel = {"status": "N/A", "assessment": None, "recovery": None}
-                        _diag_interp_count = 0
+                        _hardening_diag = None
 
                         if result and result.segments:
                             # ── Alignment Sentinel: detect collapsed timestamps ──
@@ -813,8 +815,8 @@ class QwenPipeline(BasePipeline):
                                 corrected_words = redistribute_collapsed_words(
                                     words, dur_sec, vad_regions,
                                 )
-                                result = self._reconstruct_from_words(
-                                    corrected_words, scene_path,
+                                result = reconstruct_from_words(
+                                    corrected_words, scene_path, suppress_silence=False,
                                 )
                                 self._sentinel_stats["alignment_recoveries"] += 1
 
@@ -828,18 +830,17 @@ class QwenPipeline(BasePipeline):
                                     scene_num, len(scene_paths), recovery_method,
                                 )
 
-                            # Interpolation handles remaining null gaps in the
-                            # (possibly recovered) result
-                            if self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
-                                _diag_interp_count = self._apply_timestamp_interpolation(result)
-                                if _diag_interp_count:
-                                    logger.debug(
-                                        "Phase 5: Scene %d — interpolated timestamps for %d segments",
-                                        scene_num, _diag_interp_count,
-                                    )
+                            # ── Hardening: timestamp resolution + clamp + sort ──
+                            _harden_cfg = HardeningConfig(
+                                timestamp_mode=SubtitleTimestampMode(self.timestamp_mode.value),
+                                scene_duration_sec=dur_sec,
+                            )
+                            _hardening_diag = harden_scene_result(result, _harden_cfg)
 
                         # Build per-scene diagnostics
                         _total_segs = len(result.segments) if result and result.segments else 0
+                        _h_interp = _hardening_diag.interpolated_count if _hardening_diag else 0
+                        _h_fallback = _hardening_diag.fallback_count if _hardening_diag else 0
                         self._scene_diagnostics[idx] = {
                             "schema_version": "1.1.0",
                             "scene_index": idx,
@@ -849,9 +850,14 @@ class QwenPipeline(BasePipeline):
                             "input_mode": self.input_mode.value,
                             "sentinel": _diag_sentinel,
                             "timing_sources": {
-                                "aligner_native": max(0, _total_segs - _diag_interp_count),
-                                "interpolated": _diag_interp_count,
+                                "aligner_native": max(0, _total_segs - _h_interp - _h_fallback),
+                                "interpolated": _h_interp,
+                                "fallback": _h_fallback,
                                 "total_segments": _total_segs,
+                            },
+                            "hardening": {
+                                "clamped_count": _hardening_diag.clamped_count if _hardening_diag else 0,
+                                "sorted": _hardening_diag.sorted if _hardening_diag else False,
                             },
                             "vad_regions": vad_regions_data.get(idx, []),
                         }
@@ -884,6 +890,7 @@ class QwenPipeline(BasePipeline):
 
                         # Diagnostics tracking (fallback path)
                         _diag_sentinel = {"status": "N/A", "assessment": None, "recovery": None}
+                        _hardening_diag = None
 
                         # ── Alignment Sentinel: detect collapsed timestamps ──
                         if result and result.segments:
@@ -910,8 +917,8 @@ class QwenPipeline(BasePipeline):
                                 corrected_words = redistribute_collapsed_words(
                                     words, dur_sec,
                                 )
-                                result = self._reconstruct_from_words(
-                                    corrected_words, scene_path,
+                                result = reconstruct_from_words(
+                                    corrected_words, scene_path, suppress_silence=False,
                                 )
                                 self._sentinel_stats["alignment_recoveries"] += 1
                                 _diag_sentinel["recovery"] = {
@@ -923,8 +930,17 @@ class QwenPipeline(BasePipeline):
                                     scene_num, len(scene_paths),
                                 )
 
+                            # ── Hardening: timestamp resolution + clamp + sort ──
+                            _harden_cfg = HardeningConfig(
+                                timestamp_mode=SubtitleTimestampMode(self.timestamp_mode.value),
+                                scene_duration_sec=dur_sec,
+                            )
+                            _hardening_diag = harden_scene_result(result, _harden_cfg)
+
                         # Build per-scene diagnostics (fallback path)
                         _total_segs = len(result.segments) if result and result.segments else 0
+                        _h_interp = _hardening_diag.interpolated_count if _hardening_diag else 0
+                        _h_fallback = _hardening_diag.fallback_count if _hardening_diag else 0
                         self._scene_diagnostics[idx] = {
                             "schema_version": "1.1.0",
                             "scene_index": idx,
@@ -934,8 +950,14 @@ class QwenPipeline(BasePipeline):
                             "input_mode": "fallback",
                             "sentinel": _diag_sentinel,
                             "timing_sources": {
-                                "aligner_native": _total_segs,
+                                "aligner_native": max(0, _total_segs - _h_interp - _h_fallback),
+                                "interpolated": _h_interp,
+                                "fallback": _h_fallback,
                                 "total_segments": _total_segs,
+                            },
+                            "hardening": {
+                                "clamped_count": _hardening_diag.clamped_count if _hardening_diag else 0,
+                                "sorted": _hardening_diag.sorted if _hardening_diag else False,
                             },
                             "vad_regions": vad_regions_data.get(idx, []),
                         }
@@ -1187,6 +1209,14 @@ class QwenPipeline(BasePipeline):
             extract_words_from_result,
             redistribute_collapsed_words,
         )
+        from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
+        from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
+        from whisperjav.modules.subtitle_pipeline.types import (
+            HardeningConfig,
+        )
+        from whisperjav.modules.subtitle_pipeline.types import (
+            TimestampMode as SubtitleTimestampMode,
+        )
 
         # Read scene audio once
         audio_data, sr = sf.read(str(scene_path))
@@ -1323,7 +1353,7 @@ class QwenPipeline(BasePipeline):
                     _diag["group_details"].append(_detail)
                     return None, "COLLAPSED"
 
-            # ── Apply recovery (if collapsed) + timestamp resolution + offset ──
+            # ── Apply recovery (if collapsed) + hardening + offset ──
             if status == "COLLAPSED":
                 # Extract group-relative VAD regions for Strategy C recovery.
                 # group[] contains SpeechSegments with scene-relative times;
@@ -1338,8 +1368,8 @@ class QwenPipeline(BasePipeline):
                 )
                 strategy = ("VAD-GUIDED" if group_speech_regions
                             else "PROPORTIONAL")
-                result = self._reconstruct_from_words(
-                    corrected_words, region_path,
+                result = reconstruct_from_words(
+                    corrected_words, region_path, suppress_silence=False,
                 )
                 self._sentinel_stats["alignment_recoveries"] += 1
                 _diag["recoveries"] += 1
@@ -1361,33 +1391,20 @@ class QwenPipeline(BasePipeline):
             else:
                 _detail["outcome"] = "accepted"
 
-            # ── Timestamp resolution ──
-            if self.timestamp_mode == TimestampMode.VAD_ONLY:
-                self._apply_vad_only_timestamps(result, group_duration)
-            elif self.timestamp_mode == TimestampMode.ALIGNER_WITH_INTERPOLATION:
-                interp = self._apply_timestamp_interpolation(result, group_duration)
-                if interp:
-                    _diag["total_fallback_applied"] += interp
-                    _diag["interp_count"] += interp
-            elif self.timestamp_mode == TimestampMode.ALIGNER_WITH_VAD_FALLBACK:
-                fb = self._apply_vad_timestamp_fallback(result, group_duration)
-                if fb:
-                    _diag["total_fallback_applied"] += fb
-                    _diag["vad_fallback_count"] += fb
-
-            # ── Clamp to group bounds (region-relative: 0 to group_duration) ──
-            # Prevents interpolation overflow or aligner drift from producing
-            # timestamps beyond the group's audio slice.
-            # Operate on words only (not segment properties) because stable-ts
-            # Segment.start/.end setters propagate to underlying words.
-            for seg in result.segments:
-                if hasattr(seg, 'words') and seg.words:
-                    for word in seg.words:
-                        word.start = max(0.0, min(word.start, group_duration))
-                        word.end = max(word.start, min(word.end, group_duration))
-                else:
-                    seg.start = max(0.0, min(seg.start, group_duration))
-                    seg.end = max(seg.start, min(seg.end, group_duration))
+            # ── Hardening: timestamp resolution + clamp + sort ──
+            # Uses group_duration as "scene duration" since we're in
+            # group-relative coordinates at this point.
+            _harden_cfg = HardeningConfig(
+                timestamp_mode=SubtitleTimestampMode(self.timestamp_mode.value),
+                scene_duration_sec=group_duration,
+            )
+            _h_diag = harden_scene_result(result, _harden_cfg)
+            if _h_diag.interpolated_count:
+                _diag["total_fallback_applied"] += _h_diag.interpolated_count
+                _diag["interp_count"] += _h_diag.interpolated_count
+            if _h_diag.fallback_count:
+                _diag["total_fallback_applied"] += _h_diag.fallback_count
+                _diag["vad_fallback_count"] += _h_diag.fallback_count
 
             # Offset timestamps from group-relative to scene-relative
             self._offset_result_timestamps(result, group_start_sec)
@@ -1609,272 +1626,4 @@ class QwenPipeline(BasePipeline):
                 seg.start += offset_sec
                 seg.end += offset_sec
 
-    # ------------------------------------------------------------------
-    # Sentinel reconstruction helper (shared by assembly + coupled modes)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _reconstruct_from_words(
-        words: List[Dict],
-        audio_path,
-    ) -> stable_whisper.WhisperResult:
-        """
-        Reconstruct a WhisperResult from word dicts via transcribe_any.
-
-        Uses stable-ts's transcribe_any() with a pre-computed inference function
-        (Option A) to get proper sentence-level regrouping. This is the same
-        pattern used inline in assembly Step 8, extracted for reuse by both
-        assembly and coupled-mode sentinel recovery.
-
-        Args:
-            words: List of {'word': str, 'start': float, 'end': float} dicts.
-            audio_path: Path to the audio file (needed by transcribe_any for
-                        duration metadata, not re-transcribed).
-
-        Returns:
-            Reconstructed WhisperResult with sentence-level regrouping.
-        """
-        precomputed = words
-
-        def precomputed_inference(audio, **kwargs):
-            return [precomputed]
-
-        return stable_whisper.transcribe_any(
-            inference_func=precomputed_inference,
-            audio=str(audio_path),
-            audio_type='str',
-            regroup=True,
-            vad=False,
-            demucs=False,
-            suppress_silence=True,
-            suppress_word_ts=True,
-            verbose=False,
-        )
-
-    # ------------------------------------------------------------------
-    # Timestamp resolution helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _apply_vad_timestamp_fallback(
-        result: stable_whisper.WhisperResult,
-        group_duration: float,
-    ) -> int:
-        """
-        Apply VAD timestamp fallback for segments where the aligner returned null.
-
-        When the ForcedAligner fails to assign timestamps, words get start=0.0
-        and end=0.0 (from merge_master_with_timestamps). After stable-ts
-        regrouping, these become segments with start=0.0 and end=0.0.
-
-        This method detects such segments and distributes them proportionally
-        by character count across the group duration.  The text is real (ASR
-        produced it), and the timing is approximate but evenly spread — much
-        better than stacking all segments at the same timestamp.
-
-        Timestamps at this point are region-relative (0-based).  The caller
-        applies _offset_result_timestamps() afterward to shift to scene time.
-
-        Detection heuristic: seg.end <= 0.0 indicates aligner failure.
-        A legitimate segment at the start of a clip will have end > 0.0
-        (non-zero duration).
-
-        Args:
-            result: WhisperResult with region-relative timestamps
-            group_duration: Duration of the VAD group in seconds
-
-        Returns:
-            Number of segments that received fallback timestamps
-        """
-        if not result or not result.segments:
-            return 0
-
-        # Collect segments needing fallback
-        fallback_segs = [seg for seg in result.segments if seg.end <= 0.0]
-        if not fallback_segs:
-            return 0
-
-        # Proportional distribution by character count
-        total_chars = sum(len(seg.text.strip()) or 1 for seg in fallback_segs)
-        cumulative = 0
-        for seg in fallback_segs:
-            seg_chars = len(seg.text.strip()) or 1
-            frac_start = cumulative / total_chars
-            frac_end = (cumulative + seg_chars) / total_chars
-            if hasattr(seg, 'words') and seg.words:
-                # Word-only assignment (avoid double-offset via property setters)
-                word_total = sum(len(w.word) or 1 for w in seg.words)
-                w_cum = 0
-                seg_span = (frac_end - frac_start) * group_duration
-                seg_base = frac_start * group_duration
-                for w in seg.words:
-                    w_chars = len(w.word) or 1
-                    w.start = seg_base + (w_cum / word_total) * seg_span
-                    w.end = seg_base + ((w_cum + w_chars) / word_total) * seg_span
-                    w_cum += w_chars
-            else:
-                seg.start = frac_start * group_duration
-                seg.end = frac_end * group_duration
-            cumulative += seg_chars
-
-        return len(fallback_segs)
-
-    @staticmethod
-    def _apply_vad_only_timestamps(
-        result: stable_whisper.WhisperResult,
-        group_duration: float,
-    ) -> None:
-        """
-        Force VAD group timestamps on all segments, discarding aligner timestamps.
-
-        Used in VAD_ONLY mode where aligner timestamps are intentionally ignored
-        in favour of the speech segmenter's time boundaries.
-
-        All segments receive the full group time range (0 → group_duration).
-        After _offset_result_timestamps, this becomes group_start → group_end.
-
-        Args:
-            result: WhisperResult with region-relative timestamps
-            group_duration: Duration of the VAD group in seconds
-        """
-        if not result or not result.segments:
-            return
-
-        for seg in result.segments:
-            seg.start = 0.0
-            seg.end = group_duration
-
-    @staticmethod
-    def _apply_timestamp_interpolation(
-        result: stable_whisper.WhisperResult,
-        group_duration: float = 0.0,
-    ) -> int:
-        """
-        Interpolate timestamps for segments where the aligner returned NULL.
-
-        This is the new default for CONTEXT_AWARE mode (v1.8.7+). Instead of
-        snapping to coarse VAD boundaries, we mathematically fill gaps based
-        on character length between valid anchor timestamps.
-
-        Algorithm:
-            1. Identify "anchor" segments with valid timestamps (end > 0)
-            2. Identify "gap" segments between anchors with NULL timestamps (end <= 0)
-            3. For each gap:
-               - GapDuration = Start(NextAnchor) - End(PrevAnchor)
-               - TotalChars = sum of character lengths in gap segments
-               - Assign duration proportional to character length
-
-        Edge cases:
-            - Leading NULLs (no previous anchor): Use 0.0 as start
-            - Trailing NULLs (no next anchor): Use last anchor's end as start,
-              estimate duration from character count, capped to group_duration
-            - All NULLs (total aligner failure): Distribute across full result
-
-        Args:
-            result: WhisperResult with segments to process
-            group_duration: Duration of the VAD group in seconds (0 = no cap).
-                Used to prevent trailing gap interpolation from exceeding the
-                group's time boundary.
-
-        Returns:
-            Number of segments that received interpolated timestamps
-        """
-        if not result or not result.segments:
-            return 0
-
-        segments = result.segments
-        n = len(segments)
-        interpolated_count = 0
-
-        # Find all anchor indices (segments with valid timestamps)
-        anchors = []
-        for i, seg in enumerate(segments):
-            if seg.end > 0:
-                anchors.append(i)
-
-        # If no anchors at all, we can't interpolate - mark all as needing attention
-        if not anchors:
-            logger.debug("No anchor timestamps found, cannot interpolate")
-            return 0
-
-        # Process gaps between anchors
-        # Also handle leading gap (before first anchor) and trailing gap (after last anchor)
-
-        def interpolate_gap(gap_indices: List[int], start_time: float, end_time: float):
-            """Distribute time proportionally by character count."""
-            nonlocal interpolated_count
-
-            if not gap_indices:
-                return
-
-            # Calculate total characters in gap
-            total_chars = sum(len(segments[i].text.strip()) for i in gap_indices)
-            if total_chars == 0:
-                total_chars = len(gap_indices)  # Fallback: equal distribution
-
-            gap_duration = end_time - start_time
-            if gap_duration <= 0:
-                gap_duration = 0.5 * len(gap_indices)  # Fallback: 0.5s per segment
-
-            current_time = start_time
-            for idx in gap_indices:
-                seg = segments[idx]
-                seg_chars = len(seg.text.strip()) or 1
-                seg_duration = gap_duration * (seg_chars / total_chars)
-
-                seg.start = current_time
-                seg.end = current_time + seg_duration
-                current_time = seg.end
-                interpolated_count += 1
-
-        # Handle leading gap (segments before first anchor)
-        if anchors[0] > 0:
-            leading_indices = list(range(0, anchors[0]))
-            leading_end = segments[anchors[0]].start
-            interpolate_gap(leading_indices, 0.0, leading_end)
-
-        # Handle gaps between anchors
-        for i in range(len(anchors) - 1):
-            prev_anchor_idx = anchors[i]
-            next_anchor_idx = anchors[i + 1]
-
-            # Find gap indices between these anchors
-            gap_indices = []
-            for j in range(prev_anchor_idx + 1, next_anchor_idx):
-                if segments[j].end <= 0:
-                    gap_indices.append(j)
-
-            if gap_indices:
-                gap_start = segments[prev_anchor_idx].end
-                gap_end = segments[next_anchor_idx].start
-                interpolate_gap(gap_indices, gap_start, gap_end)
-
-        # Handle trailing gap (segments after last anchor)
-        if anchors[-1] < n - 1:
-            trailing_indices = []
-            for j in range(anchors[-1] + 1, n):
-                if segments[j].end <= 0:
-                    trailing_indices.append(j)
-
-            if trailing_indices:
-                trailing_start = segments[anchors[-1]].end
-                # Estimate trailing duration: ~50ms per character (conservative)
-                total_trailing_chars = sum(len(segments[i].text.strip()) for i in trailing_indices)
-                estimated_duration = max(0.5, total_trailing_chars * 0.05)
-
-                # Cap to group_duration to prevent overflow beyond the group boundary
-                if group_duration > 0:
-                    max_trailing = max(0.0, group_duration - trailing_start)
-                    if estimated_duration > max_trailing:
-                        logger.debug(
-                            "Interpolation: trailing gap capped from %.2fs to %.2fs "
-                            "(group_duration=%.2fs, trailing_start=%.2fs)",
-                            estimated_duration, max_trailing,
-                            group_duration, trailing_start,
-                        )
-                        estimated_duration = max(0.1, max_trailing)
-
-                interpolate_gap(trailing_indices, trailing_start, trailing_start + estimated_duration)
-
-        return interpolated_count
 

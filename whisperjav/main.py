@@ -464,20 +464,20 @@ def parse_arguments():
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1",
                                     "nemo", "nemo-lite", "whisper-vad", "ten"],
                            help="Speech segmentation backend for VAD-based chunking (default: ten)")
-    qwen_group.add_argument("--qwen-max-group-duration", type=float, default=29.0,
-                           help="Max duration (seconds) for VAD segment grouping (default: 29.0)")
+    qwen_group.add_argument("--qwen-max-group-duration", type=float, default=None,
+                           help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
     # Adaptive Step-Down (v1.8.10+)
     qwen_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
                            action="store_true", default=True,
-                           help="Adaptive step-down: try 30s groups first, "
-                                "retry collapsed groups at 8s (default: enabled)")
+                           help="Adaptive step-down: try initial groups first, "
+                                "retry collapsed groups at fallback size (default: enabled)")
     qwen_group.add_argument("--no-qwen-stepdown", dest="qwen_stepdown",
                            action="store_false",
                            help="Disable adaptive step-down")
-    qwen_group.add_argument("--qwen-stepdown-initial-group", type=float, default=30.0,
-                           help="Tier 1 group duration for step-down (default: 30.0)")
-    qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=6.0,
-                           help="Tier 2 fallback group duration for step-down (default: 6.0)")
+    qwen_group.add_argument("--qwen-stepdown-initial-group", type=float, default=None,
+                           help="Tier 1 group duration for step-down (pipeline default: 6.0)")
+    qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=None,
+                           help="Tier 2 fallback group duration for step-down (pipeline default: 6.0)")
     qwen_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_true", default=False,
                            help="[DEPRECATED] No effect — Qwen3 uses AssemblyTextCleaner instead")
@@ -825,51 +825,61 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
-        pipeline = QwenPipeline(
-            output_dir=initial_output_dir,
-            temp_dir=args.temp_dir,
-            keep_temp_files=args.keep_temp,
-            save_metadata_json=getattr(args, 'debug', False),
-            progress_display=progress,
-            subs_language=args.subs_language,
+        # Build Qwen kwargs — pipeline owns defaults for group duration
+        # and step-down params; CLI only forwards explicit user overrides.
+        qwen_kwargs = {
+            "output_dir": initial_output_dir,
+            "temp_dir": args.temp_dir,
+            "keep_temp_files": args.keep_temp,
+            "save_metadata_json": getattr(args, 'debug', False),
+            "progress_display": progress,
+            "subs_language": args.subs_language,
             # Context-Aware Chunking (v1.8.7+)
-            qwen_input_mode=getattr(args, 'qwen_input_mode', 'vad_slicing'),
-            qwen_safe_chunking=getattr(args, 'qwen_safe_chunking', True),
+            "qwen_input_mode": getattr(args, 'qwen_input_mode', 'vad_slicing'),
+            "qwen_safe_chunking": getattr(args, 'qwen_safe_chunking', True),
             # Scene detection
-            scene_detector=getattr(args, 'qwen_scene', 'none'),
+            "scene_detector": getattr(args, 'qwen_scene', 'none'),
             # Speech enhancement
-            speech_enhancer=getattr(args, 'qwen_enhancer', 'none'),
-            speech_enhancer_model=getattr(args, 'qwen_enhancer_model', None),
+            "speech_enhancer": getattr(args, 'qwen_enhancer', 'none'),
+            "speech_enhancer_model": getattr(args, 'qwen_enhancer_model', None),
             # Speech segmentation / VAD
-            speech_segmenter=getattr(args, 'qwen_segmenter', 'none'),
-            segmenter_max_group_duration=getattr(args, 'qwen_max_group_duration', 29.0),
+            "speech_segmenter": getattr(args, 'qwen_segmenter', 'none'),
             # Adaptive Step-Down (v1.8.10+)
-            stepdown_enabled=getattr(args, 'qwen_stepdown', False),
-            stepdown_initial_group=getattr(args, 'qwen_stepdown_initial_group', 30.0),
-            stepdown_fallback_group=getattr(args, 'qwen_stepdown_fallback_group', 6.0),
+            "stepdown_enabled": getattr(args, 'qwen_stepdown', False),
             # Qwen ASR
-            model_id=getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
-            device=getattr(args, 'qwen_device', 'auto'),
-            dtype=getattr(args, 'qwen_dtype', 'auto'),
-            batch_size=getattr(args, 'qwen_batch_size', 1),
-            max_new_tokens=getattr(args, 'qwen_max_tokens', 4096),
-            language=(lambda _l: None if _l in (None, "auto", "") else _l)(getattr(args, 'qwen_language', 'Japanese')),
-            timestamps=getattr(args, 'qwen_timestamps', 'word'),
-            aligner_id=getattr(args, 'qwen_aligner', 'Qwen/Qwen3-ForcedAligner-0.6B'),
-            context=getattr(args, 'qwen_context', ''),
-            context_file=getattr(args, 'qwen_context_file', None),
-            attn_implementation=getattr(args, 'qwen_attn', 'auto'),
+            "model_id": getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
+            "device": getattr(args, 'qwen_device', 'auto'),
+            "dtype": getattr(args, 'qwen_dtype', 'auto'),
+            "batch_size": getattr(args, 'qwen_batch_size', 1),
+            "max_new_tokens": getattr(args, 'qwen_max_tokens', 4096),
+            "language": (lambda _l: None if _l in (None, "auto", "") else _l)(getattr(args, 'qwen_language', 'Japanese')),
+            "timestamps": getattr(args, 'qwen_timestamps', 'word'),
+            "aligner_id": getattr(args, 'qwen_aligner', 'Qwen/Qwen3-ForcedAligner-0.6B'),
+            "context": getattr(args, 'qwen_context', ''),
+            "context_file": getattr(args, 'qwen_context_file', None),
+            "attn_implementation": getattr(args, 'qwen_attn', 'auto'),
             # Timestamp resolution
-            timestamp_mode=getattr(args, 'qwen_timestamp_mode', 'aligner_interpolation'),
+            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'aligner_interpolation'),
             # Japanese post-processing
-            japanese_postprocess=getattr(args, 'qwen_japanese_postprocess', False),
-            postprocess_preset=getattr(args, 'qwen_postprocess_preset', 'high_moan'),
+            "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
+            "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
             # Assembly text cleaner
-            assembly_cleaner=getattr(args, 'qwen_assembly_cleaner', True),
+            "assembly_cleaner": getattr(args, 'qwen_assembly_cleaner', True),
             # Generation safety controls (v1.8.9+)
-            repetition_penalty=getattr(args, 'qwen_repetition_penalty', 1.1),
-            max_tokens_per_audio_second=getattr(args, 'qwen_max_tokens_per_second', 20.0),
-        )
+            "repetition_penalty": getattr(args, 'qwen_repetition_penalty', 1.1),
+            "max_tokens_per_audio_second": getattr(args, 'qwen_max_tokens_per_second', 20.0),
+        }
+        # Pipeline-owned defaults: only forward when user explicitly sets a value
+        _max_grp = getattr(args, 'qwen_max_group_duration', None)
+        if _max_grp is not None:
+            qwen_kwargs["segmenter_max_group_duration"] = _max_grp
+        _sd_init = getattr(args, 'qwen_stepdown_initial_group', None)
+        if _sd_init is not None:
+            qwen_kwargs["stepdown_initial_group"] = _sd_init
+        _sd_fb = getattr(args, 'qwen_stepdown_fallback_group', None)
+        if _sd_fb is not None:
+            qwen_kwargs["stepdown_fallback_group"] = _sd_fb
+        pipeline = QwenPipeline(**qwen_kwargs)
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
     

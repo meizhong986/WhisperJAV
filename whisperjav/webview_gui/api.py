@@ -1919,15 +1919,15 @@ class WhisperJAVAPI:
                     "stepdown": {
                         "type": "checkbox",
                         "label": "Adaptive Step-Down",
-                        "description": "Try 30s context groups first, retry collapsed at 8s",
+                        "description": "Try initial groups first, retry collapsed at fallback size",
                         "default": True,
                     },
                     "stepdown_initial_group": {
                         "type": "slider",
                         "label": "Tier 1 Duration (s)",
-                        "description": "Context-rich group duration for step-down Tier 1.",
-                        "min": 15.0, "max": 60.0, "step": 5.0,
-                        "default": 30.0,
+                        "description": "Group duration for step-down Tier 1.",
+                        "min": 4.0, "max": 30.0, "step": 1.0,
+                        "default": 6.0,
                     },
                     "stepdown_fallback_group": {
                         "type": "slider",
