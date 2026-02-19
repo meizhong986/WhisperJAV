@@ -466,7 +466,7 @@ def parse_arguments():
                            help="Speech segmentation backend for VAD-based chunking (default: ten)")
     qwen_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
-    # Adaptive Step-Down (v1.8.10+)
+    # Adaptive Step-Down
     qwen_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
                            action="store_true", default=True,
                            help="Adaptive step-down: try initial groups first, "
@@ -488,7 +488,7 @@ def parse_arguments():
                            choices=["default", "high_moan", "narrative"],
                            help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
 
-    # Context-Aware Chunking (v1.8.7+)
+    # Context-Aware Chunking
     qwen_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default, decoupled generation+alignment, highest quality), "
@@ -522,7 +522,7 @@ def parse_arguments():
                            action="store_false",
                            help="Disable pre-alignment text cleaning (pass raw ASR text to aligner)")
 
-    # Generation safety controls (v1.8.9+)
+    # Generation safety controls
     qwen_group.add_argument("--qwen-repetition-penalty", type=float, default=1.1,
                            help="Repetition penalty for token generation (1.0=off, >1.0=penalize repeats; default: 1.1)")
     qwen_group.add_argument("--qwen-max-tokens-per-second", type=float, default=20.0,
@@ -846,7 +846,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "save_metadata_json": getattr(args, 'debug', False),
             "progress_display": progress,
             "subs_language": args.subs_language,
-            # Context-Aware Chunking (v1.8.7+)
+            # Context-Aware Chunking
             "qwen_input_mode": getattr(args, 'qwen_input_mode', 'assembly'),
             "qwen_safe_chunking": getattr(args, 'qwen_safe_chunking', True),
             # Scene detection
@@ -856,7 +856,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "speech_enhancer_model": getattr(args, 'qwen_enhancer_model', None),
             # Speech segmentation / VAD
             "speech_segmenter": getattr(args, 'qwen_segmenter', 'none'),
-            # Adaptive Step-Down (v1.8.10+)
+            # Adaptive Step-Down
             "stepdown_enabled": getattr(args, 'qwen_stepdown', False),
             # Qwen ASR
             "model_id": getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
@@ -880,7 +880,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "framer_srt_path": getattr(args, 'qwen_framer_srt_path', None),
             # Assembly text cleaner
             "assembly_cleaner": getattr(args, 'qwen_assembly_cleaner', True),
-            # Generation safety controls (v1.8.9+)
+            # Generation safety controls
             "repetition_penalty": getattr(args, 'qwen_repetition_penalty', 1.1),
             "max_tokens_per_audio_second": getattr(args, 'qwen_max_tokens_per_second', 20.0),
         }
