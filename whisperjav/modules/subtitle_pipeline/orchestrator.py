@@ -38,6 +38,8 @@ from whisperjav.modules.subtitle_pipeline.protocols import (
 from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
 from whisperjav.modules.subtitle_pipeline.types import (
     HardeningConfig,
+    SceneDiagnostics,
+    StepDownConfig,
     TemporalFrame,
 )
 from whisperjav.utils.logger import logger
@@ -67,6 +69,7 @@ class DecoupledSubtitlePipeline:
         artifacts_dir: Optional[Path] = None,
         language: str = "ja",
         context: str = "",
+        stepdown_config: Optional[StepDownConfig] = None,
     ):
         """
         Initialize the pipeline with protocol components.
@@ -81,6 +84,9 @@ class DecoupledSubtitlePipeline:
             artifacts_dir: Directory for debug artifacts (None = no artifacts).
             language: Language code for generation and alignment.
             context: User-provided context for ASR (cast names, terminology).
+            stepdown_config: Optional step-down retry config. When enabled
+                and alignment collapses on a scene, the orchestrator re-frames
+                with tighter grouping and retries generation + alignment.
         """
         self.framer = framer
         self.generator = generator
@@ -90,6 +96,7 @@ class DecoupledSubtitlePipeline:
         self.artifacts_dir = artifacts_dir
         self.language = language
         self.context = context
+        self.stepdown_config = stepdown_config
 
         # Sentinel stats accumulated across all scenes
         self.sentinel_stats: dict[str, Any] = {
@@ -111,6 +118,9 @@ class DecoupledSubtitlePipeline:
         """
         Process all scenes through the decoupled pipeline.
 
+        When step-down retry is enabled, collapsed scenes are automatically
+        retried with tighter temporal framing (Pass 2).
+
         Args:
             scene_audio_paths: Paths to per-scene audio files (WAV, 16kHz).
             scene_durations: Duration of each scene in seconds.
@@ -125,38 +135,153 @@ class DecoupledSubtitlePipeline:
             raise ValueError(f"scene_audio_paths ({n_scenes}) and scene_durations ({len(scene_durations)}) must match")
 
         logger.info(
-            "[DecoupledPipeline] Processing %d scenes (aligner=%s)",
+            "[DecoupledPipeline] Processing %d scenes (aligner=%s, step-down=%s)",
             n_scenes,
             "yes" if self.aligner else "none",
+            "enabled" if (self.stepdown_config and self.stepdown_config.enabled) else "disabled",
         )
 
-        try:
-            # Step 1: Temporal framing + audio slicing
-            scene_frames, frame_audio_paths, frame_speech_regions = self._step1_frame_and_slice(
-                scene_audio_paths, scene_durations
+        # --- Pass 1: Normal processing ---
+        results = self._run_pass(scene_audio_paths, scene_durations, scene_speech_regions)
+
+        # --- Identify collapsed scenes ---
+        collapsed_indices = [
+            i for i, (_result, diag) in enumerate(results)
+            if self._is_collapsed(diag)
+        ]
+
+        if not collapsed_indices:
+            return results
+
+        # --- Step-down decision ---
+        can_reframe = hasattr(self.framer, "reframe")
+        stepdown_enabled = (
+            self.stepdown_config is not None
+            and self.stepdown_config.enabled
+            and can_reframe
+        )
+
+        if stepdown_enabled:
+            logger.info(
+                "[DecoupledPipeline] Step-down: %d/%d scenes collapsed, "
+                "retrying with tighter framing (%.1fs max group)",
+                len(collapsed_indices), n_scenes,
+                self.stepdown_config.fallback_max_group_s,
             )
-
-            # Steps 2-4: Text generation + cleaning (with VRAM lifecycle)
-            scene_texts = self._step2_4_generate_and_clean(scene_frames, frame_audio_paths, scene_durations)
-
-            # Steps 5-7: Alignment (with VRAM lifecycle), if aligner present
-            scene_alignments = self._step5_7_align(scene_frames, frame_audio_paths, scene_texts, scene_durations)
-
-            # Step 9: Per-scene reconstruction + sentinel + hardening
-            results = self._step9_reconstruct_and_harden(
-                scene_frames,
-                scene_texts,
-                scene_alignments,
-                scene_audio_paths,
-                scene_durations,
-                frame_speech_regions,
-                scene_speech_regions,
+            retry_results = self._run_stepdown_pass(
+                collapsed_indices, scene_audio_paths,
+                scene_durations, scene_speech_regions,
             )
-
-        finally:
-            self._cleanup_temp_files()
+            # Replace Pass 1 results for retried scenes with Pass 2 results
+            for idx, retry_result in zip(collapsed_indices, retry_results):
+                _pass1_diag = results[idx][1]
+                _pass2_result, _pass2_diag = retry_result
+                # Annotate step-down outcome
+                improved = not self._is_collapsed(_pass2_diag)
+                _pass2_diag["stepdown"] = {
+                    "attempted": True,
+                    "enabled": True,
+                    "improved": improved,
+                    "pass1_sentinel": _pass1_diag.get("sentinel_status", "N/A"),
+                    "pass2_sentinel": _pass2_diag.get("sentinel_status", "N/A"),
+                    "fallback_max_group_s": self.stepdown_config.fallback_max_group_s,
+                }
+                if improved:
+                    results[idx] = retry_result
+                    logger.info(
+                        "[DecoupledPipeline] Step-down: Scene %d improved (was COLLAPSED → %s)",
+                        idx, _pass2_diag.get("sentinel_status", "?"),
+                    )
+                else:
+                    # Pass 2 also collapsed — keep Pass 2 result anyway
+                    # (proportional recovery was already applied in _step9)
+                    results[idx] = retry_result
+                    logger.warning(
+                        "[DecoupledPipeline] Step-down: Scene %d still collapsed after retry",
+                        idx,
+                    )
+        else:
+            # Step-down disabled or not available
+            if self.stepdown_config and not self.stepdown_config.enabled:
+                reason = "disabled by user configuration"
+            elif not can_reframe:
+                reason = "framer does not support reframing"
+            else:
+                reason = "not configured"
+            logger.warning(
+                "[DecoupledPipeline] %d/%d scenes collapsed but step-down retry is %s. "
+                "Proportional recovery applied.",
+                len(collapsed_indices), n_scenes, reason,
+            )
+            # Annotate diagnostics for collapsed scenes
+            for idx in collapsed_indices:
+                results[idx][1]["stepdown"] = {
+                    "attempted": False,
+                    "enabled": False if (self.stepdown_config and not self.stepdown_config.enabled) else None,
+                    "improved": False,
+                }
 
         return results
+
+    # -----------------------------------------------------------------------
+    # Pass execution (shared by Pass 1 and step-down Pass 2)
+    # -----------------------------------------------------------------------
+
+    def _run_pass(
+        self,
+        scene_audio_paths: list[Path],
+        scene_durations: list[float],
+        scene_speech_regions: Optional[list[list[tuple[float, float]]]] = None,
+        framer_override_max_group: Optional[float] = None,
+    ) -> list[tuple[Any, dict[str, Any]]]:
+        """Execute a single pass of the pipeline (framing → generation → alignment → hardening).
+
+        Args:
+            scene_audio_paths: Per-scene audio file paths.
+            scene_durations: Per-scene durations.
+            scene_speech_regions: Optional per-scene VAD speech regions.
+            framer_override_max_group: When set, calls framer.reframe()
+                with this max group duration instead of framer.frame().
+        """
+        try:
+            scene_frames, frame_audio_paths, frame_speech_regions = self._step1_frame_and_slice(
+                scene_audio_paths, scene_durations,
+                framer_override_max_group=framer_override_max_group,
+            )
+            scene_texts = self._step2_4_generate_and_clean(scene_frames, frame_audio_paths, scene_durations)
+            scene_alignments = self._step5_7_align(scene_frames, frame_audio_paths, scene_texts, scene_durations)
+            results = self._step9_reconstruct_and_harden(
+                scene_frames, scene_texts, scene_alignments,
+                scene_audio_paths, scene_durations,
+                frame_speech_regions, scene_speech_regions,
+            )
+        finally:
+            self._cleanup_temp_files()
+        return results
+
+    def _run_stepdown_pass(
+        self,
+        collapsed_indices: list[int],
+        scene_audio_paths: list[Path],
+        scene_durations: list[float],
+        scene_speech_regions: Optional[list[list[tuple[float, float]]]] = None,
+    ) -> list[tuple[Any, dict[str, Any]]]:
+        """Re-process collapsed scenes with tighter framing (step-down retry)."""
+        retry_audio_paths = [scene_audio_paths[i] for i in collapsed_indices]
+        retry_durations = [scene_durations[i] for i in collapsed_indices]
+        retry_speech_regions = (
+            [scene_speech_regions[i] for i in collapsed_indices]
+            if scene_speech_regions else None
+        )
+        return self._run_pass(
+            retry_audio_paths, retry_durations, retry_speech_regions,
+            framer_override_max_group=self.stepdown_config.fallback_max_group_s,
+        )
+
+    @staticmethod
+    def _is_collapsed(diag: dict[str, Any]) -> bool:
+        """Check if a scene's diagnostics indicate alignment collapse."""
+        return diag.get("sentinel_status") == "COLLAPSED"
 
     # -----------------------------------------------------------------------
     # Step 1: Temporal framing + audio slicing
@@ -166,6 +291,7 @@ class DecoupledSubtitlePipeline:
         self,
         scene_audio_paths: list[Path],
         scene_durations: list[float],
+        framer_override_max_group: Optional[float] = None,
     ) -> tuple[
         list[list[TemporalFrame]],
         list[list[Path]],
@@ -174,6 +300,10 @@ class DecoupledSubtitlePipeline:
         """
         Frame each scene and slice audio per frame into temp WAV files.
 
+        Args:
+            framer_override_max_group: When set and the framer supports
+                ``reframe()``, uses tighter grouping (step-down retry).
+
         Returns:
             scene_frames: Per-scene list of TemporalFrame objects.
             frame_audio_paths: Per-scene, per-frame temp WAV paths.
@@ -181,7 +311,8 @@ class DecoupledSubtitlePipeline:
         """
         n_scenes = len(scene_audio_paths)
         logger.info(
-            "[DecoupledPipeline] Step 1: Framing %d scenes", n_scenes,
+            "[DecoupledPipeline] Step 1: Framing %d scenes%s", n_scenes,
+            f" (reframe override={framer_override_max_group}s)" if framer_override_max_group else "",
         )
 
         scene_frames: list[list[TemporalFrame]] = []
@@ -192,8 +323,13 @@ class DecoupledSubtitlePipeline:
             # Load scene audio
             audio, sr = self._load_audio(audio_path)
 
-            # Run framer
-            framing_result = self.framer.frame(audio, sr)
+            # Run framer (or reframe for step-down)
+            if framer_override_max_group is not None and hasattr(self.framer, "reframe"):
+                framing_result = self.framer.reframe(
+                    audio, sr, max_group_duration_s=framer_override_max_group,
+                )
+            else:
+                framing_result = self.framer.frame(audio, sr)
             frames = framing_result.frames
             scene_frames.append(frames)
 
@@ -650,7 +786,7 @@ class DecoupledSubtitlePipeline:
                     scene_idx + 1, n_scenes, word_count, segment_count, sentinel_status,
                 )
 
-                # Enriched diagnostics (v1.1.0 schema, matches coupled mode)
+                # Canonical diagnostics (SceneDiagnostics v2.0.0)
                 aligner_native_count = max(
                     0,
                     segment_count - hardening_diag.interpolated_count - hardening_diag.fallback_count,
@@ -664,29 +800,26 @@ class DecoupledSubtitlePipeline:
                         for s, e in per_scene_regions
                     ]
 
-                diagnostics: dict[str, Any] = {
-                    "schema_version": "1.1.0",
-                    "scene_idx": scene_idx,
-                    "scene_duration_sec": duration,
-                    "input_mode": "assembly",
-                    "frame_count": len(frames),
-                    "word_count": word_count,
-                    "sentinel_status": sentinel_status,
-                    "sentinel": {
-                        "status": sentinel_status,
-                        "assessment": assessment if sentinel_status != "N/A" else None,
-                        "recovery": recovery_info,
-                    },
-                    "hardening": asdict(hardening_diag),
-                    "timing_sources": {
-                        "aligner_native": aligner_native_count,
-                        "interpolated": hardening_diag.interpolated_count,
-                        "vad_fallback": hardening_diag.fallback_count,
-                        "total_segments": segment_count,
-                    },
-                    "segment_count": segment_count,
-                    "vad_regions": vad_regions,
-                }
+                scene_diag = SceneDiagnostics(
+                    schema_version="2.0.0",
+                    scene_index=scene_idx,
+                    scene_duration_sec=duration,
+                    framer_backend=frames[0].source if frames else "",
+                    frame_count=len(frames),
+                    word_count=word_count,
+                    segment_count=segment_count,
+                    sentinel_status=sentinel_status,
+                    sentinel_triggers=assessment.get("triggers", []) if assessment else [],
+                    sentinel_recovery=recovery_info,
+                    timing_aligner_native=aligner_native_count,
+                    timing_interpolated=hardening_diag.interpolated_count,
+                    timing_vad_fallback=hardening_diag.fallback_count,
+                    timing_total_segments=segment_count,
+                    hardening_clamped=hardening_diag.clamped_count,
+                    hardening_sorted=hardening_diag.sorted,
+                    vad_regions=vad_regions,
+                )
+                diagnostics = asdict(scene_diag)
 
                 # Save diagnostics artifact
                 if self.artifacts_dir:
@@ -706,7 +839,12 @@ class DecoupledSubtitlePipeline:
                     e,
                     exc_info=True,
                 )
-                results.append((None, {"scene_idx": scene_idx, "error": str(e)}))
+                error_diag = SceneDiagnostics(
+                    scene_index=scene_idx,
+                    scene_duration_sec=scene_durations[scene_idx] if scene_idx < len(scene_durations) else 0.0,
+                    error=str(e),
+                )
+                results.append((None, asdict(error_diag)))
 
         logger.info(
             "[DecoupledPipeline] Step 9: Complete — %d scenes, %d total segments, %d collapses",

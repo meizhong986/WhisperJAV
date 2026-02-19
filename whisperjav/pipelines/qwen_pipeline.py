@@ -334,7 +334,7 @@ class QwenPipeline(BasePipeline):
         from whisperjav.modules.subtitle_pipeline.framers.factory import TemporalFramerFactory
         from whisperjav.modules.subtitle_pipeline.generators.factory import TextGeneratorFactory
         from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline
-        from whisperjav.modules.subtitle_pipeline.types import HardeningConfig
+        from whisperjav.modules.subtitle_pipeline.types import HardeningConfig, StepDownConfig
 
         cfg = self._asr_config
 
@@ -395,6 +395,14 @@ class QwenPipeline(BasePipeline):
                 language=cfg["language"],
             )
 
+        # Step-down retry config (uses existing Qwen pipeline params)
+        stepdown_cfg = None
+        if self.stepdown_enabled:
+            stepdown_cfg = StepDownConfig(
+                enabled=True,
+                fallback_max_group_s=self.stepdown_fallback_group,
+            )
+
         return DecoupledSubtitlePipeline(
             framer=framer,
             generator=generator,
@@ -403,6 +411,7 @@ class QwenPipeline(BasePipeline):
             hardening_config=HardeningConfig(timestamp_mode=self.timestamp_mode),
             language=cfg.get("language", "ja"),
             context=cfg.get("context", ""),
+            stepdown_config=stepdown_cfg,
         )
 
     # ------------------------------------------------------------------

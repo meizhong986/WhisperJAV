@@ -350,6 +350,15 @@ class DecoupledPipeline(BasePipeline):
         # TextAligner (may be "none" for aligner-free workflows)
         aligner = TextAlignerFactory.create(self.aligner_backend, **self.aligner_config)
 
+        from whisperjav.modules.subtitle_pipeline.types import StepDownConfig
+
+        stepdown_cfg = None
+        if self.stepdown_enabled:
+            stepdown_cfg = StepDownConfig(
+                enabled=True,
+                fallback_max_group_s=self.stepdown_fallback_group_s,
+            )
+
         return DecoupledSubtitlePipeline(
             framer=framer,
             generator=generator,
@@ -358,6 +367,7 @@ class DecoupledPipeline(BasePipeline):
             hardening_config=HardeningConfig(timestamp_mode=self.timestamp_mode),
             language=self.language,
             context=self.context,
+            stepdown_config=stepdown_cfg,
         )
 
     # ------------------------------------------------------------------

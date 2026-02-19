@@ -10,7 +10,8 @@ See docs/architecture/ADR-006-decoupled-subtitle-pipeline.md for full design.
 Public API:
     Types:      WordTimestamp, TemporalFrame, FramingResult,
                 TranscriptionResult, AlignmentResult,
-                TimestampMode, HardeningConfig, HardeningDiagnostics
+                TimestampMode, HardeningConfig, HardeningDiagnostics,
+                StepDownConfig, SceneDiagnostics
     Protocols:  TemporalFramer, TextGenerator, TextCleaner, TextAligner
     Functions:  harden_scene_result, reconstruct_from_words
 """
@@ -28,6 +29,8 @@ from whisperjav.modules.subtitle_pipeline.types import (
     FramingResult,
     HardeningConfig,
     HardeningDiagnostics,
+    SceneDiagnostics,
+    StepDownConfig,
     TemporalFrame,
     TimestampMode,
     TranscriptionResult,
@@ -44,6 +47,8 @@ __all__ = [
     "TimestampMode",
     "HardeningConfig",
     "HardeningDiagnostics",
+    "StepDownConfig",
+    "SceneDiagnostics",
     # Protocols
     "TemporalFramer",
     "TextGenerator",

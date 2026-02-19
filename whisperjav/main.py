@@ -573,6 +573,12 @@ def parse_arguments():
                                  choices=["aligner_interpolation", "aligner_vad_fallback",
                                           "aligner_only", "vad_only"],
                                  help="Timestamp resolution mode (default: aligner_interpolation)")
+    decoupled_group.add_argument("--no-step-down", dest="no_step_down",
+                                 action="store_true", default=False,
+                                 help="Disable step-down retry on alignment collapse. "
+                                      "Collapsed scenes use proportional recovery directly.")
+    decoupled_group.add_argument("--step-down-attempts", type=int, default=None,
+                                 help="Number of step-down retry attempts (0 = disabled, default: 1)")
 
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
@@ -897,6 +903,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             _pipeline_kwargs.setdefault("scene_detector", args.scene_detection_method)
         if getattr(args, 'speech_segmenter', None):
             _pipeline_kwargs.setdefault("speech_segmenter", args.speech_segmenter)
+
+        # Step-down CLI args: --no-step-down overrides --step-down-attempts
+        _no_sd = getattr(args, 'no_step_down', False)
+        _sd_attempts = getattr(args, 'step_down_attempts', None)
+        if _no_sd or _sd_attempts == 0:
+            _pipeline_kwargs["stepdown_enabled"] = False
+        elif _sd_attempts is not None and _sd_attempts > 0:
+            _pipeline_kwargs["stepdown_enabled"] = True
 
         # 3. Construct pipeline — DecoupledPipeline defaults fill anything not specified
         pipeline = DecoupledPipeline(

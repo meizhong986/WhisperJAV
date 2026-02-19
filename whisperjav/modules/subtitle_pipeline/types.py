@@ -145,6 +145,20 @@ class TimestampMode(str, Enum):
 
 
 @dataclass
+class StepDownConfig:
+    """Configuration for step-down retry on alignment collapse.
+
+    Step-down is OPTIONAL.  When disabled (enabled=False), the orchestrator
+    skips the retry pass and falls through to proportional recovery directly.
+    Users control this via --no-step-down or --step-down-attempts 0.
+    """
+
+    enabled: bool = True
+    fallback_max_group_s: float = 6.0
+    max_retries: int = 1
+
+
+@dataclass
 class HardeningConfig:
     """Configuration for the post-reconstruction hardening stage."""
 
@@ -163,3 +177,34 @@ class HardeningDiagnostics:
     clamped_count: int = 0
     sorted: bool = False
     timestamp_mode: str = ""
+
+
+@dataclass
+class SceneDiagnostics:
+    """Canonical per-scene diagnostics (schema 2.0.0).
+
+    Emitted by the orchestrator for every processed scene.  Provides
+    complete visibility into framing, alignment, sentinel recovery,
+    timestamp resolution, hardening, and step-down decisions.
+    """
+
+    schema_version: str = "2.0.0"
+    scene_index: int = 0
+    scene_duration_sec: float = 0.0
+    framer_backend: str = ""
+    frame_count: int = 0
+    word_count: int = 0
+    segment_count: int = 0
+    sentinel_status: str = "N/A"
+    sentinel_triggers: list = field(default_factory=list)
+    sentinel_recovery: Optional[dict] = None
+    timing_aligner_native: int = 0
+    timing_interpolated: int = 0
+    timing_vad_fallback: int = 0
+    timing_total_segments: int = 0
+    hardening_clamped: int = 0
+    hardening_sorted: bool = False
+    stepdown: Optional[dict] = None  # {"attempted": bool, "enabled": bool, "improved": bool}
+    vad_regions: Optional[list] = None
+    group_details: Optional[list] = None
+    error: Optional[str] = None

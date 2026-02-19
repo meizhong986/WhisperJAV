@@ -163,6 +163,41 @@ class VadGroupedFramer:
             },
         )
 
+    def reframe(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        max_group_duration_s: float,
+        **kwargs: Any,
+    ) -> FramingResult:
+        """Re-frame with tighter grouping parameters (for step-down retry).
+
+        Temporarily overrides ``max_group_duration_s`` and runs the same
+        VAD + grouping pipeline as :meth:`frame`.  The original setting is
+        restored on return.
+
+        Args:
+            audio: Scene audio array (mono, typically 16kHz).
+            sample_rate: Sample rate of the audio.
+            max_group_duration_s: Override for max group duration.
+        """
+        original = self._max_group
+        self._max_group = max_group_duration_s
+
+        # Force re-creation of the segmenter with the new max_group
+        old_segmenter = self._segmenter
+        self._segmenter = None
+
+        try:
+            result = self.frame(audio, sample_rate, **kwargs)
+            return result
+        finally:
+            # Restore original settings and segmenter
+            self._max_group = original
+            if self._segmenter is not None:
+                self._segmenter.cleanup()
+            self._segmenter = old_segmenter
+
     def cleanup(self) -> None:
         """Release the speech segmenter."""
         if self._segmenter is not None:
