@@ -138,6 +138,10 @@ class QwenPipeline(BasePipeline):
         qwen_input_mode: str = "vad_slicing",  # "vad_slicing" (default) or "context_aware"
         qwen_safe_chunking: bool = True,  # Enforce scene boundaries for context-aware mode
 
+        # Temporal framing for assembly mode (GAP-5)
+        qwen_framer: str = "full-scene",  # "full-scene", "vad-grouped", "srt-source"
+        framer_srt_path: Optional[str] = None,  # SRT file path (for srt-source framer)
+
         # Scene detection (Phase 2)
         # Default to "semantic" for context-aware mode - it has true MERGE logic
         # to guarantee min_duration is met (unlike auditok/silero which only filter)
@@ -217,6 +221,10 @@ class QwenPipeline(BasePipeline):
         # Safe chunking: when True, enforces scene boundaries to stay
         # within ForcedAligner's 180s architectural limit
         self.safe_chunking = qwen_safe_chunking
+
+        # Temporal framing for assembly mode (GAP-5)
+        self.framer_backend = qwen_framer
+        self.framer_srt_path = framer_srt_path
 
         # Scene detection config
         self.scene_method = scene_detector
@@ -361,8 +369,26 @@ class QwenPipeline(BasePipeline):
 
         cfg = self._asr_config
 
-        # TemporalFramer: full-scene (assembly processes entire scenes)
-        framer = TemporalFramerFactory.create("full-scene")
+        # TemporalFramer: selected by --qwen-framer (default: full-scene)
+        framer_kwargs = {}
+        if self.framer_backend == "vad-grouped":
+            framer_kwargs = {
+                "segmenter_backend": self.segmenter_backend,
+                "max_group_duration_s": self.segmenter_max_group_duration,
+                "segmenter_config": self.segmenter_config,
+            }
+        elif self.framer_backend == "srt-source":
+            if not self.framer_srt_path:
+                raise ValueError(
+                    "--qwen-framer srt-source requires --qwen-framer-srt-path"
+                )
+            framer_kwargs = {"srt_path": self.framer_srt_path}
+        elif self.framer_backend == "manual":
+            raise ValueError(
+                "--qwen-framer manual is only available via the Python API "
+                "(requires timestamps argument)"
+            )
+        framer = TemporalFramerFactory.create(self.framer_backend, **framer_kwargs)
 
         # TextGenerator: Qwen3 text-only mode
         generator = TextGeneratorFactory.create(

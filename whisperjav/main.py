@@ -502,6 +502,16 @@ def parse_arguments():
                            choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
                            help="Timestamp resolution: 'aligner_vad_fallback' (default, stable VAD boundaries), 'aligner_interpolation' (smooth interpolation), 'aligner_only' (no fallback), 'vad_only' (discard aligner)")
 
+    # Temporal framing for assembly mode (GAP-5)
+    qwen_group.add_argument("--qwen-framer", type=str, default="full-scene",
+                           choices=["full-scene", "vad-grouped", "srt-source", "manual"],
+                           help="Temporal framing strategy for assembly mode: "
+                                "'full-scene' (default, whole scene per frame), "
+                                "'vad-grouped' (VAD-based dialogue chunks), "
+                                "'srt-source' (use existing SRT boundaries)")
+    qwen_group.add_argument("--qwen-framer-srt-path", type=str, default=None,
+                           help="SRT file path for --qwen-framer srt-source")
+
     # Assembly text cleaner (pre-alignment cleaning in assembly mode)
     qwen_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_true", default=True,
@@ -863,6 +873,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
+            # Temporal framing for assembly mode (GAP-5)
+            "qwen_framer": getattr(args, 'qwen_framer', 'full-scene'),
+            "framer_srt_path": getattr(args, 'qwen_framer_srt_path', None),
             # Assembly text cleaner
             "assembly_cleaner": getattr(args, 'qwen_assembly_cleaner', True),
             # Generation safety controls (v1.8.9+)
