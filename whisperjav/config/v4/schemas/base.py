@@ -53,6 +53,7 @@ class ConfigKind(str, Enum):
     ECOSYSTEM = "Ecosystem"
     TOOL = "Tool"
     PRESET = "Preset"
+    PIPELINE = "Pipeline"
 
 
 # =============================================================================

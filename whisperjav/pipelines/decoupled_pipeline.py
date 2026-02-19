@@ -49,6 +49,105 @@ from whisperjav.utils.logger import logger
 #   - DecoupledSubtitlePipeline orchestrator
 
 
+# -- Component keys whose 'backend' field maps to a *_backend constructor param --
+_COMPONENT_KEYS = ("generator", "framer", "cleaner", "aligner")
+
+
+def load_pipeline_config(yaml_path: str) -> Dict[str, Any]:
+    """Load a YAML pipeline config and return DecoupledPipeline constructor kwargs.
+
+    The YAML format mirrors the ``pipeline:`` block in
+    ``config/v4/ecosystems/pipelines/decoupled.yaml``.  For each component
+    (generator, framer, cleaner, aligner) the ``backend`` key selects the
+    factory implementation and any remaining keys become that component's
+    config dict.
+
+    Returns:
+        Dict of kwargs suitable for ``DecoupledPipeline(**kwargs)``.
+
+    Raises:
+        FileNotFoundError: If *yaml_path* does not exist.
+        ValueError: If the YAML is malformed or has an unsupported kind.
+    """
+    import yaml  # lazy — only needed when --pipeline-config is used
+
+    path = Path(yaml_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Pipeline config not found: {yaml_path}")
+
+    with open(path, "r", encoding="utf-8") as fh:
+        raw = yaml.safe_load(fh)
+
+    if not isinstance(raw, dict):
+        raise ValueError(f"Pipeline config must be a YAML mapping, got {type(raw).__name__}")
+
+    # Validate kind (if present — plain YAML without v4 headers is also accepted)
+    kind = raw.get("kind")
+    if kind is not None and kind != "Pipeline":
+        raise ValueError(
+            f"Expected kind: Pipeline, got kind: {kind} in {yaml_path}"
+        )
+
+    pipeline_block = raw.get("pipeline", {})
+    if not isinstance(pipeline_block, dict):
+        raise ValueError("'pipeline' key must be a mapping")
+
+    kwargs: Dict[str, Any] = {}
+
+    # --- Component extraction ---
+    # Each component section: {backend: "name", **extra} →
+    #   *_backend = "name", *_config = {**extra}
+    for comp in _COMPONENT_KEYS:
+        section = pipeline_block.get(comp)
+        if section is None:
+            continue
+        if isinstance(section, str):
+            # Shorthand: ``generator: qwen3`` (backend only, no config)
+            kwargs[f"{comp}_backend"] = section
+            continue
+        if not isinstance(section, dict):
+            raise ValueError(f"pipeline.{comp} must be a string or mapping")
+        section = dict(section)  # shallow copy — don't mutate original
+        backend = section.pop("backend", None)
+        if backend is not None:
+            kwargs[f"{comp}_backend"] = backend
+        if section:
+            kwargs[f"{comp}_config"] = section
+
+    # --- Step-down extraction ---
+    stepdown = pipeline_block.get("stepdown")
+    if isinstance(stepdown, dict):
+        if "enabled" in stepdown:
+            kwargs["stepdown_enabled"] = bool(stepdown["enabled"])
+        if "fallback_group_s" in stepdown:
+            kwargs["stepdown_fallback_group_s"] = float(stepdown["fallback_group_s"])
+
+    # --- Flat scalar keys → constructor params ---
+    _SCALAR_MAP = {
+        "timestamp_mode": "timestamp_mode",
+        "language": "language",
+        "context": "context",
+        "context_file": "context_file",
+        "scene_detector": "scene_detector",
+        "scene_min_duration": "scene_min_duration",
+        "scene_max_duration": "scene_max_duration",
+        "speech_enhancer": "speech_enhancer",
+        "speech_enhancer_model": "speech_enhancer_model",
+        "speech_segmenter": "speech_segmenter",
+        "segmenter_max_group_duration": "segmenter_max_group_duration",
+        "subs_language": "subs_language",
+    }
+    for yaml_key, kwarg_name in _SCALAR_MAP.items():
+        val = pipeline_block.get(yaml_key)
+        if val is not None:
+            kwargs[kwarg_name] = val
+
+    logger.debug(
+        "[load_pipeline_config] Loaded %d kwargs from %s", len(kwargs), yaml_path
+    )
+    return kwargs
+
+
 class DecoupledPipeline(BasePipeline):
     """
     Configuration-driven pipeline using the DecoupledSubtitlePipeline orchestrator.

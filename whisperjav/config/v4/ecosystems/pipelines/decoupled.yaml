@@ -1,0 +1,122 @@
+# =============================================================================
+# Decoupled Pipeline — Default Configuration
+# =============================================================================
+# Model-agnostic pipeline using the DecoupledSubtitlePipeline orchestrator.
+# Component backends are selected by name via factory registries.
+#
+# Usage:
+#   whisperjav video.mp4 --pipeline-config path/to/this/file.yaml
+#
+#   CLI args override YAML values:
+#   whisperjav video.mp4 --pipeline-config decoupled.yaml --framer vad-grouped
+#
+# New models are deployed by registering a TextGenerator backend — no pipeline
+# code changes or YAML edits needed. Users select via generator.backend.
+#
+# See: docs/architecture/IMPL-001-subtitle-pipeline-convergence.md (Phase 2)
+# =============================================================================
+
+schemaVersion: v1
+kind: Pipeline
+
+metadata:
+  name: decoupled-default
+  displayName: "Decoupled Pipeline (Default)"
+  description: |
+    Default configuration for the model-agnostic decoupled pipeline.
+    Uses Qwen3-ASR for text generation and alignment, full-scene framing,
+    and aligner-based timestamp resolution with interpolation fallback.
+    Suitable for general-purpose Japanese subtitle generation.
+  version: "1.0.0"
+  tags:
+    - decoupled
+    - qwen3
+    - assembly
+    - model-agnostic
+
+# =============================================================================
+# Pipeline Configuration
+# =============================================================================
+# The 'pipeline' block maps directly to DecoupledPipeline constructor kwargs.
+#
+# For each component (generator, framer, cleaner, aligner):
+#   - 'backend' selects the factory-registered implementation
+#   - All other keys become the component's config dict
+#
+# Example: to override the generator's model_id:
+#   generator:
+#     backend: qwen3
+#     model_id: "my-org/custom-asr-model"
+# =============================================================================
+pipeline:
+  # --- Text Generator ---
+  # Produces raw text from audio frames. Register new backends in
+  # whisperjav/modules/subtitle_pipeline/generators/factory.py
+  generator:
+    backend: qwen3
+
+  # --- Temporal Framer ---
+  # Splits scenes into temporal frames for generation.
+  # Available: full-scene, vad-grouped, srt-source, manual
+  framer:
+    backend: full-scene
+
+  # --- Text Cleaner ---
+  # Post-processes generated text (removes hallucinations, normalizes).
+  # Available: qwen3, passthrough
+  cleaner:
+    backend: qwen3
+
+  # --- Text Aligner ---
+  # Produces word-level timestamps from text + audio.
+  # Available: qwen3, none (skip alignment)
+  aligner:
+    backend: qwen3
+
+  # --- Timestamp Resolution ---
+  # How word timestamps are resolved into subtitle timings.
+  # Options: aligner_interpolation (default), aligner_vad_fallback,
+  #          aligner_only, vad_only
+  timestamp_mode: aligner_interpolation
+
+  # --- Language ---
+  # Title-case language name passed to ASR and aligner.
+  language: Japanese
+
+  # --- Context ---
+  # Optional context string for ASR contextual biasing.
+  # Use for speaker names, domain terminology, character names, etc.
+  # context: "Speaker A is female, Speaker B is male"
+  # context_file: path/to/glossary.txt
+  context: ""
+
+  # --- Scene Detection ---
+  # Splits audio into processable scenes before ASR.
+  # Available: semantic (default for Qwen), auditok, silero, none
+  scene_detector: semantic
+  scene_min_duration: 12.0   # seconds
+  scene_max_duration: 48.0   # seconds
+
+  # --- Speech Enhancement ---
+  # Optional audio preprocessing before ASR.
+  # Available: none (default), clearvoice, bs-roformer
+  speech_enhancer: none
+  # speech_enhancer_model: null
+
+  # --- Speech Segmentation / VAD ---
+  # Groups speech segments within scenes for framing.
+  # Available: ten (default), silero, nemo, whisper-vad
+  speech_segmenter: ten
+  segmenter_max_group_duration: 6.0  # seconds
+
+  # --- Step-Down Retry (Phase 3 of IMPL-001) ---
+  # When alignment fails on a scene, retry with tighter temporal framing.
+  # Currently disabled — will be enabled in Phase 3.
+  stepdown:
+    enabled: false
+    fallback_group_s: 6.0
+
+  # --- Output ---
+  # Subtitle output language format.
+  # Options: native, romaji, direct-to-english
+  subs_language: native

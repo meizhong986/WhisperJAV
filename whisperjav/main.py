@@ -540,13 +540,18 @@ def parse_arguments():
                                  choices=["decoupled"],
                                  help="Use the generic decoupled pipeline with component selection. "
                                       "Overrides --mode when specified.")
-    decoupled_group.add_argument("--generator", type=str, default="qwen3",
+    decoupled_group.add_argument("--pipeline-config", type=str, default=None,
+                                 help="Path to a YAML pipeline config file. Provides defaults for all "
+                                      "decoupled pipeline options; CLI args override YAML values. "
+                                      "Implies --pipeline decoupled. "
+                                      "See config/v4/ecosystems/pipelines/decoupled.yaml for format.")
+    decoupled_group.add_argument("--generator", type=str, default=None,
                                  help="TextGenerator backend (default: qwen3)")
-    decoupled_group.add_argument("--framer", type=str, default="full-scene",
+    decoupled_group.add_argument("--framer", type=str, default=None,
                                  help="TemporalFramer backend: full-scene (default), vad-grouped, srt-source, manual")
-    decoupled_group.add_argument("--aligner", type=str, default="qwen3",
+    decoupled_group.add_argument("--aligner", type=str, default=None,
                                  help="TextAligner backend: qwen3 (default), none (skip alignment)")
-    decoupled_group.add_argument("--cleaner", type=str, default="qwen3",
+    decoupled_group.add_argument("--cleaner", type=str, default=None,
                                  help="TextCleaner backend: qwen3 (default), passthrough (skip cleaning)")
     decoupled_group.add_argument("--generator-config", type=str, default=None,
                                  help="JSON config for generator backend (e.g., "
@@ -558,13 +563,13 @@ def parse_arguments():
                                  help="JSON config for cleaner backend")
     decoupled_group.add_argument("--aligner-config", type=str, default=None,
                                  help="JSON config for aligner backend")
-    decoupled_group.add_argument("--context", type=str, default="",
+    decoupled_group.add_argument("--context", type=str, default=None,
                                  help="Context string for ASR (e.g., speaker names, domain terminology). "
                                       "Used with --pipeline decoupled.")
     decoupled_group.add_argument("--context-file", type=str, default=None,
                                  help="Path to text file with glossary/context terms for contextual biasing. "
                                       "Used with --pipeline decoupled.")
-    decoupled_group.add_argument("--timestamp-mode", type=str, default="aligner_interpolation",
+    decoupled_group.add_argument("--timestamp-mode", type=str, default=None,
                                  choices=["aligner_interpolation", "aligner_vad_fallback",
                                           "aligner_only", "vad_only"],
                                  help="Timestamp resolution mode (default: aligner_interpolation)")
@@ -838,55 +843,69 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     # --pipeline takes priority over --mode when specified
     if getattr(args, 'pipeline', None) == "decoupled":
         # Decoupled pipeline — model-agnostic, component-driven (IMPL-001 Phase 2)
-        from whisperjav.pipelines.decoupled_pipeline import DecoupledPipeline
+        from whisperjav.pipelines.decoupled_pipeline import (
+            DecoupledPipeline,
+            load_pipeline_config,
+        )
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
 
-        # Parse component JSON configs (if provided)
-        _component_configs = {}
+        # 1. Load YAML base config (if --pipeline-config supplied)
+        _pipeline_kwargs: Dict[str, Any] = {}
+        if getattr(args, 'pipeline_config', None):
+            try:
+                _pipeline_kwargs = load_pipeline_config(args.pipeline_config)
+            except (FileNotFoundError, ValueError) as e:
+                logger.error("Failed to load --pipeline-config: %s", e)
+                sys.exit(1)
+
+        # 2. Overlay explicit CLI args (non-None = explicitly set by user)
+        _CLI_TO_KWARG = {
+            "generator": "generator_backend",
+            "framer": "framer_backend",
+            "cleaner": "cleaner_backend",
+            "aligner": "aligner_backend",
+            "timestamp_mode": "timestamp_mode",
+            "context": "context",
+            "context_file": "context_file",
+        }
+        for _cli_name, _kwarg_name in _CLI_TO_KWARG.items():
+            _val = getattr(args, _cli_name, None)
+            if _val is not None:
+                _pipeline_kwargs[_kwarg_name] = _val
+
+        # Parse and overlay component JSON configs
         for _cfg_name in ("generator_config", "framer_config", "cleaner_config", "aligner_config"):
             _raw = getattr(args, _cfg_name, None)
             if _raw:
                 try:
-                    _component_configs[_cfg_name] = json.loads(_raw)
+                    _pipeline_kwargs[_cfg_name] = json.loads(_raw)
                 except json.JSONDecodeError as e:
                     logger.error("Invalid JSON in --%s: %s", _cfg_name.replace("_", "-"), e)
                     sys.exit(1)
 
-        # Language mapping: CLI uses lowercase, pipeline uses title case
+        # Bridge existing CLI args (only if not already set by YAML or explicit CLI args)
         _language_map = {
             "japanese": "Japanese", "korean": "Korean",
             "chinese": "Chinese", "english": "English",
         }
-        _language = _language_map.get(getattr(args, 'language', 'japanese'), 'Japanese')
+        _pipeline_kwargs.setdefault(
+            "language",
+            _language_map.get(getattr(args, 'language', 'japanese'), 'Japanese'),
+        )
+        _pipeline_kwargs.setdefault("subs_language", args.subs_language)
+        if getattr(args, 'scene_detection_method', None):
+            _pipeline_kwargs.setdefault("scene_detector", args.scene_detection_method)
+        if getattr(args, 'speech_segmenter', None):
+            _pipeline_kwargs.setdefault("speech_segmenter", args.speech_segmenter)
 
-        # Bridge existing CLI args for scene detection and speech segmenter
-        _scene_detector = getattr(args, 'scene_detection_method', None) or 'semantic'
-        _speech_segmenter = getattr(args, 'speech_segmenter', None) or 'ten'
-
+        # 3. Construct pipeline — DecoupledPipeline defaults fill anything not specified
         pipeline = DecoupledPipeline(
             output_dir=initial_output_dir,
             temp_dir=args.temp_dir,
             keep_temp_files=args.keep_temp,
             save_metadata_json=getattr(args, 'debug', False),
             progress_display=progress,
-            # Component backends
-            generator_backend=args.generator,
-            framer_backend=args.framer,
-            cleaner_backend=args.cleaner,
-            aligner_backend=args.aligner,
-            # Component configs
-            generator_config=_component_configs.get("generator_config"),
-            framer_config=_component_configs.get("framer_config"),
-            cleaner_config=_component_configs.get("cleaner_config"),
-            aligner_config=_component_configs.get("aligner_config"),
-            # Pipeline-level
-            timestamp_mode=getattr(args, 'timestamp_mode', 'aligner_interpolation'),
-            context=getattr(args, 'context', ''),
-            context_file=getattr(args, 'context_file', None),
-            language=_language,
-            scene_detector=_scene_detector,
-            speech_segmenter=_speech_segmenter,
-            subs_language=args.subs_language,
+            **_pipeline_kwargs,
         )
         effective_mode = "decoupled"
     elif args.mode == "faster":
@@ -1392,6 +1411,10 @@ def main():
 
     print_banner()
 
+    # --pipeline-config implies --pipeline decoupled
+    if getattr(args, 'pipeline_config', None) and getattr(args, 'pipeline', None) is None:
+        args.pipeline = "decoupled"
+
     # Validate --pipeline decoupled combinations
     if getattr(args, 'pipeline', None) == "decoupled":
         if getattr(args, 'ensemble', False):
@@ -1587,12 +1610,13 @@ def main():
         # Add decoupled pipeline component info when applicable
         if getattr(args, 'pipeline', None) == "decoupled":
             dump_data["decoupled_components"] = {
-                "generator": args.generator,
-                "framer": args.framer,
-                "cleaner": args.cleaner,
-                "aligner": args.aligner,
-                "timestamp_mode": getattr(args, 'timestamp_mode', 'aligner_interpolation'),
-                "context": getattr(args, 'context', ''),
+                "pipeline_config": getattr(args, 'pipeline_config', None),
+                "generator": getattr(args, 'generator', None),
+                "framer": getattr(args, 'framer', None),
+                "cleaner": getattr(args, 'cleaner', None),
+                "aligner": getattr(args, 'aligner', None),
+                "timestamp_mode": getattr(args, 'timestamp_mode', None),
+                "context": getattr(args, 'context', None),
                 "context_file": getattr(args, 'context_file', None),
             }
         try:
