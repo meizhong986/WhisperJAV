@@ -6,7 +6,7 @@ A single-purpose pipeline for Qwen3-ASR transcription following the
 "redundancy over reuse" principle. No backend switching, no conditionals
 for other ASR types.
 
-8-Phase Flow:
+9-Phase Flow:
     1. Audio Extraction (48kHz)
     2. Scene Detection (optional, default: none)
     3. Speech Enhancement (optional, VRAM Block 1)
@@ -15,11 +15,11 @@ for other ASR types.
     6. Scene SRT Generation (micro-subs)
     7. SRT Stitching
     8. Sanitisation
+    9. Analytics
 
 See: docs/architecture/ADR-004-dedicated-qwen-pipeline.md
 """
 
-import gc
 import json
 import os
 import shutil
@@ -39,6 +39,7 @@ from whisperjav.modules.speech_enhancement import (
 )
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
 from whisperjav.modules.srt_stitching import SRTStitcher
+from whisperjav.modules.subtitle_pipeline.types import TimestampMode
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.utils.logger import logger
 
@@ -46,7 +47,6 @@ from whisperjav.utils.logger import logger
 #   - SceneDetectorFactory (from whisperjav.modules.scene_detection_backends)
 #   - QwenASR (from whisperjav.modules.qwen_asr)
 #   - SpeechSegmenterFactory (from whisperjav.modules.speech_segmentation)
-#   - torch (for CUDA cleanup)
 
 
 class InputMode(Enum):
@@ -82,46 +82,11 @@ class InputMode(Enum):
     VAD_SLICING = "vad_slicing"
 
 
-class TimestampMode(Enum):
-    """
-    Controls how subtitle timestamps are resolved when VAD is active.
-
-    Bridges Phase 4 (Speech Segmentation) and Phase 5 (ASR) — each VAD group
-    has known time boundaries from the speech segmenter, and the ASR may also
-    produce word-level timestamps via the ForcedAligner. This mode controls
-    which source is used and how they interact.
-
-    Modes:
-        ALIGNER_WITH_INTERPOLATION (New Default):
-            Primary: aligner word timestamps → granular sentencing.
-            For NULL timestamps: mathematically interpolate based on character
-            length between valid anchor timestamps. Creates smooth, readable
-            subtitles instead of snapping to VAD boundaries.
-
-        ALIGNER_WITH_VAD_FALLBACK (Legacy):
-            Primary: aligner word timestamps → granular sentencing.
-            Fallback: VAD group boundaries for segments where aligner returned null.
-            Subtitles snap to coarse VAD boundaries when aligner fails.
-
-        ALIGNER_ONLY:
-            Aligner timestamps only. Segments with null timestamps keep zeros.
-            Use if you want to diagnose aligner failures without masking.
-
-        VAD_ONLY:
-            VAD group boundaries only. Aligner timestamps are discarded.
-            Use if the aligner is unreliable for a particular audio type.
-    """
-    ALIGNER_WITH_INTERPOLATION = "aligner_interpolation"
-    ALIGNER_WITH_VAD_FALLBACK = "aligner_vad_fallback"
-    ALIGNER_ONLY = "aligner_only"
-    VAD_ONLY = "vad_only"
-
-
 class QwenPipeline(BasePipeline):
     """
     Dedicated pipeline for Qwen3-ASR transcription.
 
-    Orchestrates the 8-phase flow using existing modules.
+    Orchestrates the 9-phase flow using existing modules.
     Follows the "redundancy over reuse" principle — no backend switching.
     """
 
@@ -133,7 +98,7 @@ class QwenPipeline(BasePipeline):
         keep_temp_files: bool = False,
         progress_display=None,
 
-        # === Input Mode Configuration (v1.8.7+) ===
+        # === Input Mode Configuration ===
         # Controls audio input strategy for Qwen3-ASR (LALM)
         qwen_input_mode: str = "assembly",  # "assembly" (default), "context_aware", or "vad_slicing"
         qwen_safe_chunking: bool = True,  # Enforce scene boundaries for context-aware mode
@@ -181,12 +146,12 @@ class QwenPipeline(BasePipeline):
         # Assembly text cleaner (Step 4 of assembly mode)
         assembly_cleaner: bool = True,  # Enable/disable pre-alignment text cleaning
 
-        # Adaptive Step-Down (v1.8.10+)
+        # Adaptive Step-Down
         stepdown_enabled: bool = True,
         stepdown_initial_group: float = 6.0,
         stepdown_fallback_group: float = 6.0,
 
-        # Generation safety controls (v1.8.9+)
+        # Generation safety controls
         repetition_penalty: float = 1.1,              # Pipeline default: conservative penalty for JAV
         max_tokens_per_audio_second: float = 20.0,    # Pipeline default: dynamic scaling enabled
 
@@ -247,7 +212,7 @@ class QwenPipeline(BasePipeline):
         self.segmenter_max_group_duration = segmenter_max_group_duration
         self.segmenter_config = segmenter_config or {}
 
-        # Adaptive Step-Down config (v1.8.10+)
+        # Adaptive Step-Down config
         self.stepdown_enabled = stepdown_enabled
         self.stepdown_initial_group = stepdown_initial_group
         self.stepdown_fallback_group = stepdown_fallback_group
@@ -369,12 +334,7 @@ class QwenPipeline(BasePipeline):
         from whisperjav.modules.subtitle_pipeline.framers.factory import TemporalFramerFactory
         from whisperjav.modules.subtitle_pipeline.generators.factory import TextGeneratorFactory
         from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline
-        from whisperjav.modules.subtitle_pipeline.types import (
-            HardeningConfig,
-        )
-        from whisperjav.modules.subtitle_pipeline.types import (
-            TimestampMode as NewTimestampMode,
-        )
+        from whisperjav.modules.subtitle_pipeline.types import HardeningConfig
 
         cfg = self._asr_config
 
@@ -435,15 +395,12 @@ class QwenPipeline(BasePipeline):
                 language=cfg["language"],
             )
 
-        # Map old TimestampMode enum to new
-        new_ts_mode = NewTimestampMode(self.timestamp_mode.value)
-
         return DecoupledSubtitlePipeline(
             framer=framer,
             generator=generator,
             cleaner=cleaner,
             aligner=aligner,
-            hardening_config=HardeningConfig(timestamp_mode=new_ts_mode),
+            hardening_config=HardeningConfig(timestamp_mode=self.timestamp_mode),
             language=cfg.get("language", "ja"),
             context=cfg.get("context", ""),
         )
@@ -454,7 +411,7 @@ class QwenPipeline(BasePipeline):
 
     def process(self, media_info: Dict) -> Dict:
         """
-        Process media file through the 8-phase Qwen pipeline.
+        Process media file through the 9-phase Qwen pipeline.
 
         Args:
             media_info: Dict with 'path', 'basename', 'type', 'duration', etc.
@@ -522,7 +479,7 @@ class QwenPipeline(BasePipeline):
         # Configure scene detector parameters
         scene_detector_kwargs = {"method": self.scene_method}
 
-        # === Safe Chunking Override (v1.8.7+) ===
+        # === Safe Chunking Override ===
         # When safe_chunking is True, enforce scene boundaries to keep
         # scenes within the Qwen ASR + ForcedAligner sweet spot.
         # Tight scenes (12-48s) reduce timestamp drift and give the
@@ -602,13 +559,8 @@ class QwenPipeline(BasePipeline):
         # VRAM Block 1 cleanup — release enhancer before loading ASR
         enhancer.cleanup()
         del enhancer
-        gc.collect()
-        try:
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+        from whisperjav.utils.gpu_utils import safe_cuda_cleanup
+        safe_cuda_cleanup()
 
         master_metadata["stages"]["enhancement"] = {
             "backend": self.enhancer_backend,
@@ -769,12 +721,7 @@ class QwenPipeline(BasePipeline):
             )
             from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
             from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
-            from whisperjav.modules.subtitle_pipeline.types import (
-                HardeningConfig,
-            )
-            from whisperjav.modules.subtitle_pipeline.types import (
-                TimestampMode as SubtitleTimestampMode,
-            )
+            from whisperjav.modules.subtitle_pipeline.types import HardeningConfig
 
             asr = QwenASR(**self._asr_config)
 
@@ -868,7 +815,7 @@ class QwenPipeline(BasePipeline):
 
                             # ── Hardening: timestamp resolution + clamp + sort ──
                             _harden_cfg = HardeningConfig(
-                                timestamp_mode=SubtitleTimestampMode(self.timestamp_mode.value),
+                                timestamp_mode=self.timestamp_mode,
                                 scene_duration_sec=dur_sec,
                             )
                             _hardening_diag = harden_scene_result(result, _harden_cfg)
@@ -968,7 +915,7 @@ class QwenPipeline(BasePipeline):
 
                             # ── Hardening: timestamp resolution + clamp + sort ──
                             _harden_cfg = HardeningConfig(
-                                timestamp_mode=SubtitleTimestampMode(self.timestamp_mode.value),
+                                timestamp_mode=self.timestamp_mode,
                                 scene_duration_sec=dur_sec,
                             )
                             _hardening_diag = harden_scene_result(result, _harden_cfg)
@@ -1013,13 +960,7 @@ class QwenPipeline(BasePipeline):
             # VRAM Block 2 cleanup (coupled modes)
             asr.cleanup()
             del asr
-            gc.collect()
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            except ImportError:
-                pass
+            safe_cuda_cleanup()
 
             # self._sentinel_stats already accumulated during the loop
             # (including from _transcribe_speech_regions() calls)
@@ -1247,12 +1188,7 @@ class QwenPipeline(BasePipeline):
         )
         from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
         from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
-        from whisperjav.modules.subtitle_pipeline.types import (
-            HardeningConfig,
-        )
-        from whisperjav.modules.subtitle_pipeline.types import (
-            TimestampMode as SubtitleTimestampMode,
-        )
+        from whisperjav.modules.subtitle_pipeline.types import HardeningConfig
 
         # Read scene audio once
         audio_data, sr = sf.read(str(scene_path))
@@ -1431,7 +1367,7 @@ class QwenPipeline(BasePipeline):
             # Uses group_duration as "scene duration" since we're in
             # group-relative coordinates at this point.
             _harden_cfg = HardeningConfig(
-                timestamp_mode=SubtitleTimestampMode(self.timestamp_mode.value),
+                timestamp_mode=self.timestamp_mode,
                 scene_duration_sec=group_duration,
             )
             _h_diag = harden_scene_result(result, _harden_cfg)
