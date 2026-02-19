@@ -66,6 +66,7 @@ class DecoupledSubtitlePipeline:
         hardening_config: HardeningConfig,
         artifacts_dir: Optional[Path] = None,
         language: str = "ja",
+        context: str = "",
     ):
         """
         Initialize the pipeline with protocol components.
@@ -79,6 +80,7 @@ class DecoupledSubtitlePipeline:
             hardening_config: Timestamp resolution and boundary config.
             artifacts_dir: Directory for debug artifacts (None = no artifacts).
             language: Language code for generation and alignment.
+            context: User-provided context for ASR (cast names, terminology).
         """
         self.framer = framer
         self.generator = generator
@@ -87,6 +89,7 @@ class DecoupledSubtitlePipeline:
         self.hardening_config = hardening_config
         self.artifacts_dir = artifacts_dir
         self.language = language
+        self.context = context
 
         # Sentinel stats accumulated across all scenes
         self.sentinel_stats: dict[str, Any] = {
@@ -297,9 +300,11 @@ class DecoupledSubtitlePipeline:
                 # Batch generate for frames without text
                 if gen_indices:
                     try:
+                        gen_contexts = [self.context] * len(gen_audio_paths) if self.context else None
                         gen_results = self.generator.generate_batch(
                             audio_paths=gen_audio_paths,
                             language=self.language,
+                            contexts=gen_contexts,
                             audio_durations=[frames[i].duration for i in gen_indices],
                         )
                         for i, gen_idx in enumerate(gen_indices):
@@ -316,6 +321,7 @@ class DecoupledSubtitlePipeline:
                                 result = self.generator.generate(
                                     audio_path=gen_audio_paths[i],
                                     language=self.language,
+                                    context=self.context if self.context else None,
                                 )
                                 raw_texts[gen_idx] = result.text
                             except Exception:

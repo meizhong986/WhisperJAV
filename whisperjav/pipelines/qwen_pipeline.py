@@ -410,6 +410,7 @@ class QwenPipeline(BasePipeline):
             aligner=aligner,
             hardening_config=HardeningConfig(timestamp_mode=new_ts_mode),
             language=cfg.get("language", "ja"),
+            context=cfg.get("context", ""),
         )
 
     # ------------------------------------------------------------------
