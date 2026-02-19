@@ -2505,6 +2505,17 @@ const EnsembleManager = {
         container.className = 'param-control';
         container.dataset.param = paramName;
 
+        // Infer original type from default value for proper type coercion on collection
+        if (defaultValue !== undefined && defaultValue !== null) {
+            if (typeof defaultValue === 'number') {
+                container.dataset.originalType = Number.isInteger(defaultValue) ? 'int' : 'float';
+            } else if (typeof defaultValue === 'boolean') {
+                container.dataset.originalType = 'bool';
+            } else {
+                container.dataset.originalType = 'str';
+            }
+        }
+
         const label = document.createElement('label');
         label.textContent = schema.label || paramName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         container.appendChild(label);
@@ -2558,7 +2569,7 @@ const EnsembleManager = {
             case 'number':
                 input = document.createElement('input');
                 input.type = 'number';
-                input.className = 'param-spinner';
+                input.className = 'param-number';
                 input.min = schema.min || 0;
                 input.max = schema.max || 100;
                 input.step = schema.step || 1;

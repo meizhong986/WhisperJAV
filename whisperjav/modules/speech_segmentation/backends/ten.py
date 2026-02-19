@@ -111,23 +111,23 @@ class TenSpeechSegmenter:
             **kwargs: Additional parameters for backward compatibility
                 - chunk_threshold: Legacy alias for chunk_threshold_s
         """
-        self.threshold = threshold
-        self.hop_size = hop_size
-        self.min_speech_duration_ms = min_speech_duration_ms
-        self.min_silence_duration_ms = min_silence_duration_ms
-        self.start_pad_ms = start_pad_ms
-        self.end_pad_ms = end_pad_ms
+        self.threshold = float(threshold)
+        self.hop_size = int(hop_size)
+        self.min_speech_duration_ms = int(min_speech_duration_ms)
+        self.min_silence_duration_ms = int(min_silence_duration_ms)
+        self.start_pad_ms = int(start_pad_ms)
+        self.end_pad_ms = int(end_pad_ms)
 
         # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
         if chunk_threshold_s is not None:
-            self.chunk_threshold_s = chunk_threshold_s
+            self.chunk_threshold_s = float(chunk_threshold_s)
         elif "chunk_threshold" in kwargs:
-            self.chunk_threshold_s = kwargs["chunk_threshold"]
+            self.chunk_threshold_s = float(kwargs["chunk_threshold"])
         else:
             self.chunk_threshold_s = 1.0  # Default for tighter grouping
 
         # Maximum group duration - prevents groups from exceeding Whisper's context window
-        self.max_group_duration_s = max_group_duration_s if max_group_duration_s is not None else 29.0
+        self.max_group_duration_s = float(max_group_duration_s) if max_group_duration_s is not None else 29.0
 
         # Lazy-loaded model
         self._model = None
