@@ -2224,10 +2224,10 @@ class WhisperJAVAPI:
             # else: minimal args - backend uses model defaults
         elif pass1.get('isQwen'):
             # Qwen pass: no sensitivity, handle Qwen params
-            # Always inject inputMode from prominent selector (even when not customized)
+            # Always inject framer from prominent selector (even when not customized)
             qwen1_params = dict(pass1.get('params') or {}) if pass1.get('customized') else {}
-            if pass1.get('inputMode'):
-                qwen1_params['input_mode'] = pass1['inputMode']
+            if pass1.get('framer'):
+                qwen1_params['framer'] = pass1['framer']
             if qwen1_params:
                 args += ["--pass1-qwen-params", json.dumps(qwen1_params)]
         else:
@@ -2289,10 +2289,10 @@ class WhisperJAVAPI:
                 # else: minimal args - backend uses model defaults
             elif pass2.get('isQwen'):
                 # Qwen pass: no sensitivity, handle Qwen params
-                # Always inject inputMode from prominent selector (even when not customized)
+                # Always inject framer from prominent selector (even when not customized)
                 qwen2_params = dict(pass2.get('params') or {}) if pass2.get('customized') else {}
-                if pass2.get('inputMode'):
-                    qwen2_params['input_mode'] = pass2['inputMode']
+                if pass2.get('framer'):
+                    qwen2_params['framer'] = pass2['framer']
                 if qwen2_params:
                     args += ["--pass2-qwen-params", json.dumps(qwen2_params)]
             else:

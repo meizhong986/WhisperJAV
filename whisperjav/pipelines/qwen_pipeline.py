@@ -51,31 +51,18 @@ from whisperjav.utils.logger import logger
 
 class InputMode(Enum):
     """
-    Controls how audio is chunked before being passed to the ASR.
+    Audio input mode for Qwen3-ASR pipeline.
 
-    The Qwen3-ASR model is a Large Audio-Language Model (LALM) designed for
-    long-form transcription. Tiny fragments strip context, causing hallucinations
-    which then cause the ForcedAligner to fail.
+    Since Phase 4 (strangulation), only ASSEMBLY is the active code path.
+    CONTEXT_AWARE and VAD_SLICING are retained as enum values for backward
+    compatibility — they are mapped to ASSEMBLY with appropriate framer
+    overrides in QwenPipeline.__init__.
 
     Modes:
-        ASSEMBLY (Decoupled Assembly Line):
-            Separates text generation from forced alignment into distinct
-            VRAM-exclusive phases. Flow:
-                Batch(ASR text-only) → Sanitize → VRAM Swap → Batch(Align)
-            Benefits: higher batch size (ASR-only needs less VRAM), mid-pipeline
-            hallucination removal prevents aligner NULL failures, and creates
-            the architectural socket for future vLLM integration.
-            Scene max duration enforced at 120s (aligner hard limit is 180s).
-
-        CONTEXT_AWARE:
-            Feeds full scenes (~30-90s chunks) directly to coupled ASR+Aligner.
-            Preserves LALM context. Good quality but limited to batch_size=1
-            because both models are loaded simultaneously.
-
-        VAD_SLICING:
-            Chops audio into VAD segments (up to ~29s groups via TEN).
-            Destroys LALM context but useful for regression testing or
-            when VAD-based filtering is specifically needed.
+        ASSEMBLY: The sole active mode. Decoupled text generation + forced
+            alignment via DecoupledSubtitlePipeline orchestrator.
+        CONTEXT_AWARE: Deprecated. Maps to ASSEMBLY + full-scene framer.
+        VAD_SLICING: Deprecated. Maps to ASSEMBLY + vad-grouped framer.
     """
     ASSEMBLY = "assembly"
     CONTEXT_AWARE = "context_aware"
@@ -171,9 +158,8 @@ class QwenPipeline(BasePipeline):
         # Progress display
         self.progress_display = progress_display
 
-        # === Context-Aware Chunking Configuration ===
-        # Input mode: controls whether to feed full scenes (context_aware) or
-        # tiny VAD fragments (vad_slicing) to the ASR
+        # === Input Mode Configuration ===
+        # Parse input mode — legacy modes are mapped to assembly configs
         try:
             self.input_mode = InputMode(qwen_input_mode)
         except ValueError:
@@ -183,14 +169,23 @@ class QwenPipeline(BasePipeline):
             )
             self.input_mode = InputMode.ASSEMBLY
 
-        # Deprecation warning for legacy coupled modes
-        if self.input_mode in (InputMode.CONTEXT_AWARE, InputMode.VAD_SLICING):
+        # Legacy mode mapping: both coupled modes → assembly with appropriate framer
+        if self.input_mode == InputMode.CONTEXT_AWARE:
             logger.warning(
-                "input_mode='%s' uses legacy coupled architecture. "
-                "For best quality, use input_mode='assembly' with --qwen-framer. "
-                "Coupled modes will be removed in a future release.",
-                self.input_mode.value,
+                "input_mode='context_aware' is deprecated and now maps to "
+                "assembly mode with full-scene framer. "
+                "Use --qwen-framer full-scene instead."
             )
+            self.input_mode = InputMode.ASSEMBLY
+            qwen_framer = "full-scene"  # Override framer to match legacy behavior
+        elif self.input_mode == InputMode.VAD_SLICING:
+            logger.warning(
+                "input_mode='vad_slicing' is deprecated and now maps to "
+                "assembly mode with vad-grouped framer. "
+                "Use --qwen-framer vad-grouped instead."
+            )
+            self.input_mode = InputMode.ASSEMBLY
+            qwen_framer = "vad-grouped"  # Override framer to match legacy behavior
 
         # Safe chunking: when True, enforces scene boundaries to stay
         # within ForcedAligner's 180s architectural limit
@@ -267,11 +262,9 @@ class QwenPipeline(BasePipeline):
         self.stitcher = SRTStitcher()
         self.postprocessor = SRTPostProcessor(language=self.lang_code)
 
-        # Decoupled Subtitle Pipeline (assembly mode only, ADR-006)
+        # Decoupled Subtitle Pipeline (ADR-006) — always constructed
         # Components are lightweight — no model loading until process() time
-        self._subtitle_pipeline = None
-        if self.input_mode == InputMode.ASSEMBLY:
-            self._subtitle_pipeline = self._build_subtitle_pipeline()
+        self._subtitle_pipeline = self._build_subtitle_pipeline()
 
         logger.debug(
             "[QwenPipeline PID %s] Initialized (model=%s, input_mode=%s, safe_chunking=%s, "
@@ -494,22 +487,13 @@ class QwenPipeline(BasePipeline):
         # Tight scenes (12-48s) reduce timestamp drift and give the
         # aligner shorter, more manageable audio to align.
         if self.safe_chunking:
-            if self.input_mode == InputMode.ASSEMBLY:
-                scene_detector_kwargs["min_duration"] = 12  # seconds
-                scene_detector_kwargs["max_duration"] = 48  # seconds
-                logger.info(
-                    "[QwenPipeline PID %s] Phase 2: Assembly safe chunking "
-                    "(min=12s, max=48s, aligner limit=180s)",
-                    os.getpid(),
-                )
-            else:
-                scene_detector_kwargs["min_duration"] = 12  # seconds
-                scene_detector_kwargs["max_duration"] = 48  # seconds
-                logger.info(
-                    "[QwenPipeline PID %s] Phase 2: Safe chunking enabled "
-                    "(min=12s, max=48s)",
-                    os.getpid(),
-                )
+            scene_detector_kwargs["min_duration"] = 12  # seconds
+            scene_detector_kwargs["max_duration"] = 48  # seconds
+            logger.info(
+                "[QwenPipeline PID %s] Phase 2: Safe chunking "
+                "(min=12s, max=48s, aligner limit=180s)",
+                os.getpid(),
+            )
 
         scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_detector_kwargs)
         result = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
@@ -619,14 +603,6 @@ class QwenPipeline(BasePipeline):
         else:
             logger.info("[QwenPipeline PID %s] Phase 4: Skipped (segmenter=none)", os.getpid())
 
-        # Collect VAD speech regions per scene for diagnostics (Phase 2)
-        vad_regions_data: Dict[int, list] = {}
-        for _v_idx, _v_seg in speech_regions_per_scene.items():
-            vad_regions_data[_v_idx] = [
-                {"start": round(s.start_sec, 3), "end": round(s.end_sec, 3)}
-                for s in _v_seg.segments
-            ]
-
         # ==============================================================
         # PHASE 5: ASR TRANSCRIPTION (VRAM Block 2)
         # ==============================================================
@@ -634,358 +610,89 @@ class QwenPipeline(BasePipeline):
                     os.getpid(), self.model_id, self.input_mode.value)
         phase5_start = time.time()
 
-        from whisperjav.modules.qwen_asr import QwenASR
-
         # Debug artifacts directory (master text, timestamps, merged words)
         raw_subs_dir = self.temp_dir / "raw_subs"
         raw_subs_dir.mkdir(exist_ok=True)
 
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
 
-        if self.input_mode == InputMode.ASSEMBLY:
-            # ==============================================================
-            # ASSEMBLY MODE via DecoupledSubtitlePipeline (ADR-006)
-            # ==============================================================
-            # Orchestrator handles the full decoupled flow:
-            #   Frame → Generate → Clean → VRAM Swap → Align → Sentinel
-            #   → Reconstruct → Harden
-            # ==============================================================
+        # ==============================================================
+        # ASSEMBLY MODE via DecoupledSubtitlePipeline (ADR-006)
+        # ==============================================================
+        # Orchestrator handles the full decoupled flow:
+        #   Frame → Generate → Clean → VRAM Swap → Align → Sentinel
+        #   → Reconstruct → Harden
+        # ==============================================================
 
-            # Set artifacts directory for debug output
-            self._subtitle_pipeline.artifacts_dir = raw_subs_dir
+        # Set artifacts directory for debug output
+        self._subtitle_pipeline.artifacts_dir = raw_subs_dir
 
-            # Prepare orchestrator inputs from scene_paths tuples
-            orch_audio_paths = [Path(sp[0]) for sp in scene_paths]
-            orch_durations = [sp[3] for sp in scene_paths]
+        # Prepare orchestrator inputs from scene_paths tuples
+        orch_audio_paths = [Path(sp[0]) for sp in scene_paths]
+        orch_durations = [sp[3] for sp in scene_paths]
 
-            # Convert Phase 4 speech regions: {idx: SegmentationResult} → List[List[Tuple]]
-            orch_speech_regions = None
-            if speech_regions_per_scene:
-                orch_speech_regions = []
-                for idx in range(len(scene_paths)):
-                    if idx in speech_regions_per_scene:
-                        seg_result = speech_regions_per_scene[idx]
-                        orch_speech_regions.append(
-                            [(s.start_sec, s.end_sec) for s in seg_result.segments]
-                        )
-                    else:
-                        orch_speech_regions.append([])
-
-            # Run orchestrator
-            orch_results = self._subtitle_pipeline.process_scenes(
-                scene_audio_paths=orch_audio_paths,
-                scene_durations=orch_durations,
-                scene_speech_regions=orch_speech_regions,
-            )
-
-            # Convert to Phase 6 format: (WhisperResult, scene_idx)
-            for idx, (result, _diag) in enumerate(orch_results):
-                scene_results.append((result, idx))
-
-            # Map orchestrator sentinel stats → existing format
-            orch_stats = self._subtitle_pipeline.sentinel_stats
-            self._sentinel_stats = {
-                "alignment_collapses": orch_stats.get("collapsed_scenes", 0),
-                "alignment_recoveries": orch_stats.get("recovered_scenes", 0),
-            }
-
-            # Save per-scene diagnostics JSON
-            for idx, (_result, diag) in enumerate(orch_results):
-                try:
-                    diag_path = raw_subs_dir / f"scene_{idx:04d}_diagnostics.json"
-                    diag_path.write_text(
-                        json.dumps(diag, ensure_ascii=False, indent=2),
-                        encoding="utf-8",
+        # Convert Phase 4 speech regions: {idx: SegmentationResult} → List[List[Tuple]]
+        orch_speech_regions = None
+        if speech_regions_per_scene:
+            orch_speech_regions = []
+            for idx in range(len(scene_paths)):
+                if idx in speech_regions_per_scene:
+                    seg_result = speech_regions_per_scene[idx]
+                    orch_speech_regions.append(
+                        [(s.start_sec, s.end_sec) for s in seg_result.segments]
                     )
-                except Exception:
-                    pass
+                else:
+                    orch_speech_regions.append([])
 
-            # Assembly mode Phase 5 summary
-            n_success = sum(1 for r, _ in orch_results if r is not None and r.segments)
-            n_empty = sum(1 for r, _ in orch_results if r is not None and not r.segments)
-            n_failed = sum(1 for r, _ in orch_results if r is None)
-            _total_segs = sum(len(r.segments) for r, _ in orch_results if r is not None and r.segments)
-            logger.info("[QwenPipeline] Phase 5 assembly summary:")
-            logger.info(
-                "  Scenes:    %d success, %d empty, %d failed (of %d)",
-                n_success, n_empty, n_failed, len(orch_results),
-            )
-            logger.info(
-                "  Segments:  %d total (%.1f avg/scene)",
-                _total_segs, _total_segs / max(n_success, 1),
-            )
-            logger.info(
-                "  Sentinel:  %d collapses, %d recoveries",
-                orch_stats.get("collapsed_scenes", 0),
-                orch_stats.get("recovered_scenes", 0),
-            )
-        else:
-            # ==============================================================
-            # COUPLED MODES: Context-Aware / VAD Slicing
-            # ==============================================================
-            from whisperjav.modules.alignment_sentinel import (
-                assess_alignment_quality,
-                extract_words_from_result,
-                redistribute_collapsed_words,
-            )
-            from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
-            from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
-            from whisperjav.modules.subtitle_pipeline.types import HardeningConfig
+        # Run orchestrator
+        orch_results = self._subtitle_pipeline.process_scenes(
+            scene_audio_paths=orch_audio_paths,
+            scene_durations=orch_durations,
+            scene_speech_regions=orch_speech_regions,
+        )
 
-            asr = QwenASR(**self._asr_config)
+        # Convert to Phase 6 format: (WhisperResult, scene_idx)
+        for idx, (result, _diag) in enumerate(orch_results):
+            scene_results.append((result, idx))
 
-            # Context biasing: user context applies to first scene only (MVP).
-            user_context = self._asr_config.get("context", "")
+        # Map orchestrator sentinel stats → existing format
+        orch_stats = self._subtitle_pipeline.sentinel_stats
+        self._sentinel_stats = {
+            "alignment_collapses": orch_stats.get("collapsed_scenes", 0),
+            "alignment_recoveries": orch_stats.get("recovered_scenes", 0),
+        }
 
-            # Sentinel tracking — instance-level so _transcribe_speech_regions()
-            # can also accumulate stats (same contract as assembly mode)
-            self._sentinel_stats = {
-                "alignment_collapses": 0,
-                "alignment_recoveries": 0,
-            }
-
-            # Per-scene diagnostics (Phase 2: pipeline metadata emission)
-            self._scene_diagnostics: Dict[int, dict] = {}
-
-            for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
-                scene_num = idx + 1
-                logger.info(
-                    "[QwenPipeline PID %s] Phase 5: Transcribing scene %d/%d (%.1fs)",
-                    os.getpid(), scene_num, len(scene_paths), dur_sec,
+        # Save per-scene diagnostics JSON
+        for idx, (_result, diag) in enumerate(orch_results):
+            try:
+                diag_path = raw_subs_dir / f"scene_{idx:04d}_diagnostics.json"
+                diag_path.write_text(
+                    json.dumps(diag, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
                 )
+            except Exception:
+                pass
 
-                try:
-                    # Context biasing: user context for first scene only (MVP)
-                    scene_context = user_context if idx == 0 else ""
-
-                    # === Input Mode Branching ===
-                    if self.input_mode == InputMode.CONTEXT_AWARE:
-                        logger.debug(
-                            "Phase 5: Scene %d — CONTEXT_AWARE mode, transcribing full scene (%.1fs)",
-                            scene_num, dur_sec,
-                        )
-                        result = asr.transcribe(
-                            scene_path,
-                            context=scene_context if scene_context else None,
-                            artifacts_dir=raw_subs_dir,
-                        )
-
-                        # Diagnostics tracking
-                        _diag_sentinel = {"status": "N/A", "assessment": None, "recovery": None}
-                        _hardening_diag = None
-
-                        if result and result.segments:
-                            # ── Alignment Sentinel: detect collapsed timestamps ──
-                            words = extract_words_from_result(result)
-                            assessment = assess_alignment_quality(words, dur_sec)
-                            _diag_sentinel = {
-                                "status": assessment["status"],
-                                "assessment": assessment,
-                                "recovery": None,
-                            }
-
-                            if assessment["status"] == "COLLAPSED":
-                                self._sentinel_stats["alignment_collapses"] += 1
-                                logger.warning(
-                                    "[SENTINEL] Scene %d/%d: Alignment Collapse — "
-                                    "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
-                                    scene_num, len(scene_paths),
-                                    assessment["coverage_ratio"] * 100,
-                                    assessment["aggregate_cps"],
-                                    assessment["char_count"],
-                                    assessment["word_span_sec"],
-                                )
-
-                                # VAD regions for this scene (if available from Phase 4)
-                                vad_regions = None
-                                if idx in speech_regions_per_scene:
-                                    vad_regions = [
-                                        (s.start_sec, s.end_sec)
-                                        for s in speech_regions_per_scene[idx].segments
-                                    ]
-
-                                corrected_words = redistribute_collapsed_words(
-                                    words, dur_sec, vad_regions,
-                                )
-                                result = reconstruct_from_words(
-                                    corrected_words, scene_path, suppress_silence=False,
-                                )
-                                self._sentinel_stats["alignment_recoveries"] += 1
-
-                                recovery_method = "VAD_RESCUE" if vad_regions else "PROPORTIONAL"
-                                _diag_sentinel["recovery"] = {
-                                    "strategy": "vad_guided" if vad_regions else "proportional",
-                                    "words_redistributed": len(corrected_words),
-                                }
-                                logger.info(
-                                    "[SENTINEL] Scene %d/%d: Recovered via %s",
-                                    scene_num, len(scene_paths), recovery_method,
-                                )
-
-                            # ── Hardening: timestamp resolution + clamp + sort ──
-                            _harden_cfg = HardeningConfig(
-                                timestamp_mode=self.timestamp_mode,
-                                scene_duration_sec=dur_sec,
-                            )
-                            _hardening_diag = harden_scene_result(result, _harden_cfg)
-
-                        # Build per-scene diagnostics
-                        _total_segs = len(result.segments) if result and result.segments else 0
-                        _h_interp = _hardening_diag.interpolated_count if _hardening_diag else 0
-                        _h_fallback = _hardening_diag.fallback_count if _hardening_diag else 0
-                        self._scene_diagnostics[idx] = {
-                            "schema_version": "1.1.0",
-                            "scene_index": idx,
-                            "scene_start_sec": start_sec,
-                            "scene_end_sec": end_sec,
-                            "scene_duration_sec": dur_sec,
-                            "input_mode": self.input_mode.value,
-                            "sentinel": _diag_sentinel,
-                            "timing_sources": {
-                                "aligner_native": max(0, _total_segs - _h_interp - _h_fallback),
-                                "interpolated": _h_interp,
-                                "fallback": _h_fallback,
-                                "total_segments": _total_segs,
-                            },
-                            "hardening": {
-                                "clamped_count": _hardening_diag.clamped_count if _hardening_diag else 0,
-                                "sorted": _hardening_diag.sorted if _hardening_diag else False,
-                            },
-                            "vad_regions": vad_regions_data.get(idx, []),
-                        }
-
-                    elif self.input_mode == InputMode.VAD_SLICING and idx in speech_regions_per_scene:
-                        logger.debug(
-                            "Phase 5: Scene %d — VAD_SLICING mode, transcribing %d speech regions",
-                            scene_num, len(speech_regions_per_scene[idx].groups),
-                        )
-                        result = self._transcribe_speech_regions(
-                            scene_path, speech_regions_per_scene[idx],
-                            asr=asr,
-                            context=scene_context if scene_context else None,
-                            artifacts_dir=raw_subs_dir,
-                            scene_idx=idx,
-                            scene_start_sec=start_sec,
-                            scene_end_sec=end_sec,
-                            scene_duration_sec=dur_sec,
-                        )
-                    else:
-                        logger.debug(
-                            "Phase 5: Scene %d — no VAD data, transcribing full scene (%.1fs)",
-                            scene_num, dur_sec,
-                        )
-                        result = asr.transcribe(
-                            scene_path,
-                            context=scene_context if scene_context else None,
-                            artifacts_dir=raw_subs_dir,
-                        )
-
-                        # Diagnostics tracking (fallback path)
-                        _diag_sentinel = {"status": "N/A", "assessment": None, "recovery": None}
-                        _hardening_diag = None
-
-                        # ── Alignment Sentinel: detect collapsed timestamps ──
-                        if result and result.segments:
-                            words = extract_words_from_result(result)
-                            assessment = assess_alignment_quality(words, dur_sec)
-                            _diag_sentinel = {
-                                "status": assessment["status"],
-                                "assessment": assessment,
-                                "recovery": None,
-                            }
-
-                            if assessment["status"] == "COLLAPSED":
-                                self._sentinel_stats["alignment_collapses"] += 1
-                                logger.warning(
-                                    "[SENTINEL] Scene %d/%d: Alignment Collapse — "
-                                    "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
-                                    scene_num, len(scene_paths),
-                                    assessment["coverage_ratio"] * 100,
-                                    assessment["aggregate_cps"],
-                                    assessment["char_count"],
-                                    assessment["word_span_sec"],
-                                )
-
-                                corrected_words = redistribute_collapsed_words(
-                                    words, dur_sec,
-                                )
-                                result = reconstruct_from_words(
-                                    corrected_words, scene_path, suppress_silence=False,
-                                )
-                                self._sentinel_stats["alignment_recoveries"] += 1
-                                _diag_sentinel["recovery"] = {
-                                    "strategy": "proportional",
-                                    "words_redistributed": len(corrected_words),
-                                }
-                                logger.info(
-                                    "[SENTINEL] Scene %d/%d: Recovered via PROPORTIONAL",
-                                    scene_num, len(scene_paths),
-                                )
-
-                            # ── Hardening: timestamp resolution + clamp + sort ──
-                            _harden_cfg = HardeningConfig(
-                                timestamp_mode=self.timestamp_mode,
-                                scene_duration_sec=dur_sec,
-                            )
-                            _hardening_diag = harden_scene_result(result, _harden_cfg)
-
-                        # Build per-scene diagnostics (fallback path)
-                        _total_segs = len(result.segments) if result and result.segments else 0
-                        _h_interp = _hardening_diag.interpolated_count if _hardening_diag else 0
-                        _h_fallback = _hardening_diag.fallback_count if _hardening_diag else 0
-                        self._scene_diagnostics[idx] = {
-                            "schema_version": "1.1.0",
-                            "scene_index": idx,
-                            "scene_start_sec": start_sec,
-                            "scene_end_sec": end_sec,
-                            "scene_duration_sec": dur_sec,
-                            "input_mode": "fallback",
-                            "sentinel": _diag_sentinel,
-                            "timing_sources": {
-                                "aligner_native": max(0, _total_segs - _h_interp - _h_fallback),
-                                "interpolated": _h_interp,
-                                "fallback": _h_fallback,
-                                "total_segments": _total_segs,
-                            },
-                            "hardening": {
-                                "clamped_count": _hardening_diag.clamped_count if _hardening_diag else 0,
-                                "sorted": _hardening_diag.sorted if _hardening_diag else False,
-                            },
-                            "vad_regions": vad_regions_data.get(idx, []),
-                        }
-
-                    segment_count = len(result.segments) if result and result.segments else 0
-                    scene_results.append((result, idx))
-
-                    if segment_count == 0:
-                        logger.info(f"Phase 5: Scene {scene_num} produced 0 segments (may be non-speech audio)")
-                    else:
-                        logger.debug(f"Phase 5: Scene {scene_num} produced {segment_count} segments")
-
-                except Exception as e:
-                    logger.warning(f"Phase 5: Scene {scene_num} failed: {e}, skipping")
-                    scene_results.append((None, idx))
-
-            # VRAM Block 2 cleanup (coupled modes)
-            asr.cleanup()
-            del asr
-            safe_cuda_cleanup()
-
-            # self._sentinel_stats already accumulated during the loop
-            # (including from _transcribe_speech_regions() calls)
-
-            # Save per-scene diagnostics JSON (Phase 2)
-            for _d_idx, _d_data in getattr(self, "_scene_diagnostics", {}).items():
-                try:
-                    diag_path = raw_subs_dir / f"scene_{_d_idx:04d}_diagnostics.json"
-                    diag_path.write_text(
-                        json.dumps(_d_data, ensure_ascii=False, indent=2),
-                        encoding="utf-8",
-                    )
-                except Exception:
-                    pass
-
-        # Sentinel stats (populated by both assembly and coupled modes)
+        # Phase 5 summary
+        n_success = sum(1 for r, _ in orch_results if r is not None and r.segments)
+        n_empty = sum(1 for r, _ in orch_results if r is not None and not r.segments)
+        n_failed = sum(1 for r, _ in orch_results if r is None)
+        _total_segs = sum(len(r.segments) for r, _ in orch_results if r is not None and r.segments)
+        logger.info("[QwenPipeline] Phase 5 assembly summary:")
+        logger.info(
+            "  Scenes:    %d success, %d empty, %d failed (of %d)",
+            n_success, n_empty, n_failed, len(orch_results),
+        )
+        logger.info(
+            "  Segments:  %d total (%.1f avg/scene)",
+            _total_segs, _total_segs / max(n_success, 1),
+        )
+        logger.info(
+            "  Sentinel:  %d collapses, %d recoveries",
+            orch_stats.get("collapsed_scenes", 0),
+            orch_stats.get("recovered_scenes", 0),
+        )
+        # Sentinel stats (populated by assembly mode orchestrator)
         sentinel_stats = getattr(self, "_sentinel_stats", {})
 
         master_metadata["stages"]["asr"] = {
@@ -1150,461 +857,5 @@ class QwenPipeline(BasePipeline):
 
         return master_metadata
 
-    # ------------------------------------------------------------------
-    # Pre-ASR speech region transcription (WhisperProASR pattern)
-    # ------------------------------------------------------------------
-
-    def _transcribe_speech_regions(
-        self,
-        scene_path: Path,
-        seg_result,
-        asr,
-        context: Optional[str] = None,
-        artifacts_dir: Optional[Path] = None,
-        scene_idx: Optional[int] = None,
-        scene_start_sec: float = 0.0,
-        scene_end_sec: float = 0.0,
-        scene_duration_sec: float = 0.0,
-    ) -> Optional[stable_whisper.WhisperResult]:
-        """
-        Transcribe individual speech regions from a scene.
-
-        Follows the WhisperProASR pattern: for each VAD group, slice the scene
-        audio to extract only the speech portion, transcribe that clip, and
-        offset timestamps back to scene-relative time.
-
-        When stepdown_enabled=True, uses a two-tier strategy:
-            Tier 1: Try context-rich groups (30s) for better ASR quality.
-            Tier 2: Re-group collapsed Tier 1 segments at tight (8s) groups.
-
-        Args:
-            scene_path: Path to scene WAV (16kHz mono, from Phase 3)
-            seg_result: SegmentationResult from Phase 4
-            asr: QwenASR instance
-            context: Optional context string for ASR
-            artifacts_dir: Optional dir for debug artifacts
-
-        Returns:
-            Combined WhisperResult with all speech regions, or None if empty.
-        """
-        import numpy as np
-        import soundfile as sf
-
-        from whisperjav.modules.alignment_sentinel import (
-            assess_alignment_quality,
-            extract_words_from_result,
-            redistribute_collapsed_words,
-        )
-        from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
-        from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
-        from whisperjav.modules.subtitle_pipeline.types import HardeningConfig
-
-        # Read scene audio once
-        audio_data, sr = sf.read(str(scene_path))
-        if audio_data.ndim > 1:
-            audio_data = np.mean(audio_data, axis=1)
-
-        speech_regions_dir = self.temp_dir / "speech_regions"
-        speech_regions_dir.mkdir(exist_ok=True)
-
-        # Per-scene diagnostics accumulators
-        _diag = {
-            "collapses": 0, "recoveries": 0,
-            "interp_count": 0, "vad_fallback_count": 0,
-            "total_fallback_applied": 0,
-            # Step-down specific
-            "tier1_groups": 0, "tier1_accepted": 0, "tier1_collapsed": 0,
-            "tier2_groups": 0, "tier2_accepted": 0, "tier2_collapsed": 0,
-            # Per-group detail records (v1.1.0 analytics)
-            "group_details": [],
-        }
-
-        def _transcribe_group(group, group_idx, total_groups, tag="",
-                              skip_recovery_on_collapse=False, tier=0):
-            """Transcribe a single VAD group.
-
-            Args:
-                skip_recovery_on_collapse: If True, return early on COLLAPSED
-                    without applying recovery (for step-down Tier 1 deferral).
-                tier: Step-down tier (0=standard, 1=Tier 1, 2=Tier 2).
-                    Used only for per-group analytics records.
-
-            Returns:
-                (result, assessment_status) where result is a WhisperResult
-                with timestamps offset to scene-relative time, or None.
-                assessment_status is "OK", "COLLAPSED", or None if no result.
-            """
-            if not group:
-                return None, None
-
-            group_start_sec = group[0].start_sec
-            group_end_sec = group[-1].end_sec
-            group_duration = group_end_sec - group_start_sec
-
-            # Per-group detail record for analytics (v1.1.0).
-            # Built progressively, appended to _diag at every exit point.
-            _detail = {
-                "tier": tier,
-                "group_index": group_idx,
-                "time_range": [round(group_start_sec, 3),
-                               round(group_end_sec, 3)],
-                "duration_sec": round(group_duration, 3),
-                "segments_in_group": len(group),
-                "outcome": "skipped",
-                "sentinel_status": None,
-                "sentinel_triggers": [],
-                "assessment_snapshot": None,
-                "subs_produced": 0,
-            }
-
-            if group_duration < 0.1:
-                logger.debug(
-                    "Phase 5%s: Skipping speech region %d/%d (%.3fs < 0.1s)",
-                    tag, group_idx + 1, total_groups, group_duration,
-                )
-                _diag["group_details"].append(_detail)
-                return None, None
-
-            # Slice audio for this speech group
-            start_sample = int(group_start_sec * sr)
-            end_sample = int(group_end_sec * sr)
-            group_audio = audio_data[start_sample:end_sample]
-
-            # Write to temp WAV (QwenASR requires file paths)
-            # Include tier tag in filename to avoid T1/T2 collisions
-            tag_suffix = tag.strip().replace("[", "").replace("]", "").lower()
-            if tag_suffix:
-                region_stem = f"{scene_path.stem}_region_{tag_suffix}_{group_idx:04d}"
-            else:
-                region_stem = f"{scene_path.stem}_region_{group_idx:04d}"
-            region_path = speech_regions_dir / f"{region_stem}.wav"
-            sf.write(str(region_path), group_audio, sr)
-
-            logger.debug(
-                "Phase 5%s: Transcribing speech region %d/%d [%.2f-%.2fs] (%.1fs)",
-                tag, group_idx + 1, total_groups,
-                group_start_sec, group_end_sec, group_duration,
-            )
-
-            # Transcribe the speech region
-            try:
-                result = asr.transcribe(
-                    region_path,
-                    context=context,
-                    artifacts_dir=artifacts_dir,
-                )
-            except Exception as e:
-                logger.warning(
-                    "Phase 5%s: Speech region %d/%d transcription failed: %s",
-                    tag, group_idx + 1, total_groups, e,
-                )
-                _diag["group_details"].append(_detail)
-                return None, None
-
-            if result is None or not result.segments:
-                _diag["group_details"].append(_detail)
-                return None, None
-
-            # ── Alignment Sentinel: detect collapsed timestamps ──
-            words = extract_words_from_result(result)
-            assessment = assess_alignment_quality(words, group_duration)
-            status = assessment["status"]
-
-            # Update detail record with assessment (v1.1.0)
-            _detail["sentinel_status"] = status
-            _detail["sentinel_triggers"] = assessment.get("triggers", [])
-            _detail["assessment_snapshot"] = {
-                "word_count": assessment.get("word_count", 0),
-                "char_count": assessment.get("char_count", 0),
-                "coverage_ratio": round(assessment.get("coverage_ratio", 0.0), 4),
-                "aggregate_cps": round(assessment.get("aggregate_cps", 0.0), 1),
-                "zero_position_ratio": round(
-                    assessment.get("zero_position_ratio", 0.0), 4),
-                "degenerate_ratio": round(
-                    assessment.get("degenerate_ratio", 0.0), 4),
-            }
-
-            if status == "COLLAPSED":
-                _diag["collapses"] += 1
-                self._sentinel_stats["alignment_collapses"] += 1
-
-                if skip_recovery_on_collapse:
-                    # Caller will handle re-grouping (step-down Tier 2)
-                    _detail["outcome"] = "collapsed_deferred"
-                    _diag["group_details"].append(_detail)
-                    return None, "COLLAPSED"
-
-            # ── Apply recovery (if collapsed) + hardening + offset ──
-            if status == "COLLAPSED":
-                # Extract group-relative VAD regions for Strategy C recovery.
-                # group[] contains SpeechSegments with scene-relative times;
-                # offset to group-relative (0-based) for the redistributor.
-                group_speech_regions = [
-                    (seg.start_sec - group_start_sec,
-                     seg.end_sec - group_start_sec)
-                    for seg in group
-                ]
-                corrected_words = redistribute_collapsed_words(
-                    words, group_duration, group_speech_regions,
-                )
-                strategy = ("VAD-GUIDED" if group_speech_regions
-                            else "PROPORTIONAL")
-                result = reconstruct_from_words(
-                    corrected_words, region_path, suppress_silence=False,
-                )
-                self._sentinel_stats["alignment_recoveries"] += 1
-                _diag["recoveries"] += 1
-                logger.warning(
-                    "[SENTINEL]%s Speech region %d/%d: Alignment collapse "
-                    "recovered (%s, %d VAD regions)",
-                    tag, group_idx + 1, total_groups,
-                    strategy, len(group_speech_regions),
-                )
-
-                # Update detail record with recovery info (v1.1.0)
-                _strategy_key = "vad_guided" if group_speech_regions else "proportional"
-                _detail["outcome"] = f"recovered_{_strategy_key}"
-                _detail["recovery"] = {
-                    "strategy": _strategy_key,
-                    "speech_regions_count": len(group_speech_regions),
-                    "words_redistributed": len(corrected_words),
-                }
-            else:
-                _detail["outcome"] = "accepted"
-
-            # ── Hardening: timestamp resolution + clamp + sort ──
-            # Uses group_duration as "scene duration" since we're in
-            # group-relative coordinates at this point.
-            _harden_cfg = HardeningConfig(
-                timestamp_mode=self.timestamp_mode,
-                scene_duration_sec=group_duration,
-            )
-            _h_diag = harden_scene_result(result, _harden_cfg)
-            if _h_diag.interpolated_count:
-                _diag["total_fallback_applied"] += _h_diag.interpolated_count
-                _diag["interp_count"] += _h_diag.interpolated_count
-            if _h_diag.fallback_count:
-                _diag["total_fallback_applied"] += _h_diag.fallback_count
-                _diag["vad_fallback_count"] += _h_diag.fallback_count
-
-            # Offset timestamps from group-relative to scene-relative
-            self._offset_result_timestamps(result, group_start_sec)
-
-            # ── Clamp to scene bounds (scene-relative: 0 to scene_duration) ──
-            # Safety net: after offset, ensure no timestamp exceeds scene boundary.
-            if scene_duration_sec > 0:
-                for seg in result.segments:
-                    if hasattr(seg, 'words') and seg.words:
-                        for word in seg.words:
-                            word.start = max(0.0, min(word.start, scene_duration_sec))
-                            word.end = max(word.start, min(word.end, scene_duration_sec))
-                    else:
-                        seg.start = max(0.0, min(seg.start, scene_duration_sec))
-                        seg.end = max(seg.start, min(seg.end, scene_duration_sec))
-
-            # Finalize detail record (v1.1.0)
-            _detail["subs_produced"] = (
-                len(result.segments) if result and result.segments else 0
-            )
-            _diag["group_details"].append(_detail)
-
-            return result, status
-
-        # ==================================================================
-        # Main dispatch: step-down vs. standard
-        # ==================================================================
-        combined_result = None
-
-        if self.stepdown_enabled:
-            from whisperjav.modules.speech_segmentation import group_segments
-
-            # Tier 1: Context-rich grouping from raw segments
-            tier1_groups = group_segments(
-                seg_result.segments, self.stepdown_initial_group,
-            )
-            _diag["tier1_groups"] = len(tier1_groups)
-            tier1_results = []
-            collapsed_segments = []
-
-            logger.info(
-                "Phase 5 [step-down]: Tier 1 — %d groups at %.0fs from %d raw segments",
-                len(tier1_groups), self.stepdown_initial_group,
-                len(seg_result.segments),
-            )
-
-            for group_idx, group in enumerate(tier1_groups):
-                result, status = _transcribe_group(
-                    group, group_idx, len(tier1_groups), " [T1]",
-                    skip_recovery_on_collapse=True, tier=1,
-                )
-
-                if status == "COLLAPSED":
-                    # Queue raw segments for Tier 2 instead of recovering here
-                    collapsed_segments.extend(group)
-                    _diag["tier1_collapsed"] += 1
-                    logger.info(
-                        "Phase 5 [step-down T1]: Group %d/%d COLLAPSED — "
-                        "queued %d segments for Tier 2",
-                        group_idx + 1, len(tier1_groups), len(group),
-                    )
-                    continue
-
-                if result is None:
-                    continue
-
-                tier1_results.append(result)
-                _diag["tier1_accepted"] += 1
-
-            # Tier 2: Tight grouping for collapsed segments only
-            tier2_results = []
-            if collapsed_segments:
-                tier2_groups = group_segments(
-                    collapsed_segments, self.stepdown_fallback_group,
-                )
-                _diag["tier2_groups"] = len(tier2_groups)
-
-                logger.info(
-                    "Phase 5 [step-down]: Tier 2 — %d groups at %.0fs from %d collapsed segments",
-                    len(tier2_groups), self.stepdown_fallback_group,
-                    len(collapsed_segments),
-                )
-
-                for group_idx, group in enumerate(tier2_groups):
-                    result, status = _transcribe_group(
-                        group, group_idx, len(tier2_groups), " [T2]",
-                        tier=2,
-                    )
-                    if result is None:
-                        continue
-
-                    if status == "COLLAPSED":
-                        # Final safety net: recovery already applied by _transcribe_group
-                        # since _finalize_group_result handles COLLAPSED status
-                        _diag["tier2_collapsed"] += 1
-                    else:
-                        _diag["tier2_accepted"] += 1
-
-                    tier2_results.append(result)
-
-            # Merge all results in timeline order
-            all_results = tier1_results + tier2_results
-            if all_results:
-                combined_result = all_results[0]
-                for r in all_results[1:]:
-                    if r and r.segments:
-                        combined_result.segments.extend(r.segments)
-                # Sort by timeline (Tier 1 + Tier 2 may interleave)
-                combined_result.segments.sort(key=lambda s: s.start)
-
-            total_groups = _diag["tier1_groups"] + _diag["tier2_groups"]
-            logger.info(
-                "Phase 5 [step-down]: T1 %d/%d accepted, T2 %d/%d accepted",
-                _diag["tier1_accepted"], _diag["tier1_groups"],
-                _diag["tier2_accepted"], _diag["tier2_groups"],
-            )
-
-        else:
-            # Standard path (no step-down)
-            total_groups = len(seg_result.groups)
-
-            for group_idx, group in enumerate(seg_result.groups):
-                result, status = _transcribe_group(
-                    group, group_idx, total_groups, "",
-                )
-                if result is None:
-                    continue
-
-                # In standard mode, COLLAPSED groups are already recovered
-                # inside _transcribe_group (proportional redistribution)
-
-                if combined_result is None:
-                    combined_result = result
-                else:
-                    combined_result.segments.extend(result.segments)
-
-        # Ensure all segments are in chronological order (defensive sort).
-        # The step-down path sorts explicitly; this covers the standard path
-        # and acts as a safety net for any edge cases.
-        if combined_result and combined_result.segments:
-            combined_result.segments.sort(key=lambda s: s.start)
-
-        if combined_result and combined_result.segments:
-            logger.debug(
-                "Phase 5: Combined %d segments from %d speech groups",
-                len(combined_result.segments), total_groups,
-            )
-            if _diag["total_fallback_applied"]:
-                logger.info(
-                    "Phase 5: VAD timestamp fallback applied to %d/%d total segments (mode=%s)",
-                    _diag["total_fallback_applied"],
-                    len(combined_result.segments),
-                    self.timestamp_mode.value,
-                )
-
-        # Build per-scene diagnostics (VAD_SLICING)
-        if scene_idx is not None and hasattr(self, "_scene_diagnostics"):
-            _total_segs = len(combined_result.segments) if combined_result and combined_result.segments else 0
-            _aligner_native = max(0, _total_segs - _diag["interp_count"] - _diag["vad_fallback_count"])
-            self._scene_diagnostics[scene_idx] = {
-                "schema_version": "1.1.0",
-                "scene_index": scene_idx,
-                "scene_start_sec": scene_start_sec,
-                "scene_end_sec": scene_end_sec,
-                "scene_duration_sec": scene_duration_sec,
-                "input_mode": "vad_slicing",
-                "sentinel": {
-                    "status": "COLLAPSED" if _diag["collapses"] > 0 else "OK",
-                    "assessment": None,
-                    "recovery": {
-                        "strategy": "vad_guided",
-                        "groups_recovered": _diag["recoveries"],
-                    } if _diag["recoveries"] > 0 else None,
-                },
-                "timing_sources": {
-                    "aligner_native": _aligner_native,
-                    "vad_fallback": _diag["vad_fallback_count"],
-                    "interpolated": _diag["interp_count"],
-                    "total_segments": _total_segs,
-                },
-                "stepdown": {
-                    "enabled": self.stepdown_enabled,
-                    "tier1_groups": _diag["tier1_groups"],
-                    "tier1_accepted": _diag["tier1_accepted"],
-                    "tier1_collapsed": _diag["tier1_collapsed"],
-                    "tier2_groups": _diag["tier2_groups"],
-                    "tier2_accepted": _diag["tier2_accepted"],
-                    "tier2_collapsed": _diag["tier2_collapsed"],
-                } if self.stepdown_enabled else None,
-                "vad_regions": [
-                    {"start": round(s.start_sec, 3), "end": round(s.end_sec, 3)}
-                    for s in seg_result.segments
-                ],
-                # Per-group detail records (v1.1.0 analytics)
-                "group_details": _diag["group_details"],
-            }
-
-        return combined_result
-
-    @staticmethod
-    def _offset_result_timestamps(
-        result: stable_whisper.WhisperResult, offset_sec: float,
-    ):
-        """
-        Offset all timestamps in a WhisperResult by offset_sec.
-
-        Uses word-level operations only when the segment has words,
-        because stable-ts Segment.start/.end are properties whose setters
-        propagate to words[0].start / words[-1].end.  Setting both the
-        segment property AND the word attribute would double-offset the
-        first/last word.
-        """
-        for seg in result.segments:
-            if hasattr(seg, 'words') and seg.words:
-                for word in seg.words:
-                    word.start += offset_sec
-                    word.end += offset_sec
-            else:
-                seg.start += offset_sec
-                seg.end += offset_sec
 
 

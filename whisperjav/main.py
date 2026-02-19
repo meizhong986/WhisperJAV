@@ -491,9 +491,10 @@ def parse_arguments():
     # Context-Aware Chunking
     qwen_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
-                           help="Audio input strategy: 'assembly' (default, decoupled generation+alignment, highest quality), "
-                                "'context_aware' (feeds full scenes for LALM context), or "
-                                "'vad_slicing' (legacy VAD-based chunking)")
+                           help="Audio input strategy: 'assembly' (default, recommended). "
+                                "'context_aware' and 'vad_slicing' are deprecated aliases "
+                                "that map to assembly with --qwen-framer full-scene and "
+                                "vad-grouped respectively.")
     qwen_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_true", default=True,
                            help="Enforce 150-210s scene boundaries for ForcedAligner 300s limit (default: enabled)")

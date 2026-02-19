@@ -394,10 +394,9 @@
                                             <option value="balanced">Balanced</option>
                                             <option value="conservative">Conservative</option>
                                         </select>
-                                        <select id="pass1-input-mode" class="form-select compact" style="display: none;" title="Audio chunking strategy for Qwen3-ASR">
-                                            <option value="assembly" selected>Assembly</option>
-                                            <option value="vad_slicing">VAD Slicing</option>
-                                            <option value="context_aware">Context Aware</option>
+                                        <select id="pass1-framer" class="form-select compact" style="display: none;" title="Temporal framing strategy for Qwen3-ASR">
+                                            <option value="full-scene" selected>Full Scene</option>
+                                            <option value="vad-grouped">VAD Grouped</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -540,10 +539,9 @@
                                             <option value="balanced">Balanced</option>
                                             <option value="conservative" selected>Conservative</option>
                                         </select>
-                                        <select id="pass2-input-mode" class="form-select compact" style="display: none;" title="Audio chunking strategy for Qwen3-ASR" disabled>
-                                            <option value="assembly" selected>Assembly</option>
-                                            <option value="vad_slicing">VAD Slicing</option>
-                                            <option value="context_aware">Context Aware</option>
+                                        <select id="pass2-framer" class="form-select compact" style="display: none;" title="Temporal framing strategy for Qwen3-ASR" disabled>
+                                            <option value="full-scene" selected>Full Scene</option>
+                                            <option value="vad-grouped">VAD Grouped</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>

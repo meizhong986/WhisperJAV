@@ -1198,7 +1198,7 @@ const EnsembleManager = {
             params: null,  // null = use defaults, object = full custom config
             isTransformers: false,  // Track if using Transformers pipeline
             isQwen: false,  // Track if using Qwen3-ASR pipeline
-            inputMode: 'assembly',  // Qwen input mode (assembly/context_aware/vad_slicing)
+            framer: 'full-scene',  // Qwen temporal framer (full-scene/vad-grouped)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         pass2: {
@@ -1213,7 +1213,7 @@ const EnsembleManager = {
             params: null,
             isTransformers: false,
             isQwen: true,  // Default pipeline is Qwen3-ASR
-            inputMode: 'assembly',  // Qwen input mode (assembly/context_aware/vad_slicing)
+            framer: 'full-scene',  // Qwen temporal framer (full-scene/vad-grouped)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'smart_merge',
@@ -1269,15 +1269,15 @@ const EnsembleManager = {
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = this.state.pass2.pipeline === 'qwen';
 
-        // Sync input mode and model options for Qwen passes
+        // Sync framer and model options for Qwen passes
         if (this.state.pass1.isQwen) {
-            const im1 = document.getElementById('pass1-input-mode');
-            if (im1) this.state.pass1.inputMode = im1.value;
+            const fr1 = document.getElementById('pass1-framer');
+            if (fr1) this.state.pass1.framer = fr1.value;
             this.swapModelOptions('pass1', 'qwen');
         }
         if (this.state.pass2.isQwen) {
-            const im2 = document.getElementById('pass2-input-mode');
-            if (im2) this.state.pass2.inputMode = im2.value;
+            const fr2 = document.getElementById('pass2-framer');
+            if (fr2) this.state.pass2.framer = fr2.value;
             this.swapModelOptions('pass2', 'qwen');
         }
 
@@ -1302,12 +1302,12 @@ const EnsembleManager = {
             this.handleSensitivityChange('pass2', e.target.value, e.target);
         });
 
-        // Input mode event handlers (Qwen-specific)
-        document.getElementById('pass1-input-mode')?.addEventListener('change', (e) => {
-            this.state.pass1.inputMode = e.target.value;
+        // Framer event handlers (Qwen-specific)
+        document.getElementById('pass1-framer')?.addEventListener('change', (e) => {
+            this.state.pass1.framer = e.target.value;
         });
-        document.getElementById('pass2-input-mode')?.addEventListener('change', (e) => {
-            this.state.pass2.inputMode = e.target.value;
+        document.getElementById('pass2-framer')?.addEventListener('change', (e) => {
+            this.state.pass2.framer = e.target.value;
         });
 
         // New dropdown event handlers - Pass 1
@@ -1502,25 +1502,25 @@ const EnsembleManager = {
         // Qwen DOES use segmenter as a post-ASR VAD filter (--qwen-segmenter)
         const disableSegmenter = passState.isTransformers;
 
-        // Input Mode selector: shown for Qwen, hidden for others
-        const inputModeSelect = document.getElementById(`${passKey}-input-mode`);
+        // Framer selector: shown for Qwen, hidden for others
+        const framerSelect = document.getElementById(`${passKey}-framer`);
 
         if (disableSensitivity) {
             const pipelineName = passState.isTransformers ? 'Transformers' : 'Qwen3-ASR';
 
-            if (passState.isQwen && inputModeSelect) {
-                // Qwen: hide sensitivity, show input mode selector
+            if (passState.isQwen && framerSelect) {
+                // Qwen: hide sensitivity, show framer selector
                 sensitivitySelect.style.display = 'none';
                 sensitivitySelect.disabled = true;
-                inputModeSelect.style.display = '';
-                inputModeSelect.disabled = isPass2Disabled;
-                inputModeSelect.title = 'Audio chunking strategy for Qwen3-ASR';
+                framerSelect.style.display = '';
+                framerSelect.disabled = isPass2Disabled;
+                framerSelect.title = 'Temporal framing strategy for Qwen3-ASR';
             } else {
                 // Transformers: just disable sensitivity
                 sensitivitySelect.disabled = true;
                 sensitivitySelect.title = `Sensitivity not applicable for ${pipelineName} mode`;
-                if (inputModeSelect) {
-                    inputModeSelect.style.display = 'none';
+                if (framerSelect) {
+                    framerSelect.style.display = 'none';
                 }
             }
 
@@ -1534,8 +1534,8 @@ const EnsembleManager = {
             sensitivitySelect.style.display = '';
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = '';
-            if (inputModeSelect) {
-                inputModeSelect.style.display = 'none';
+            if (framerSelect) {
+                framerSelect.style.display = 'none';
             }
         }
 
@@ -1588,12 +1588,12 @@ const EnsembleManager = {
         document.getElementById('customize-pass2').disabled = !enabled;
         document.getElementById('merge-strategy').disabled = !enabled;
 
-        // Sensitivity, Input Mode, and Segmenter handled by updateRowGreyingState (may be additionally disabled for Transformers)
+        // Sensitivity, Framer, and Segmenter handled by updateRowGreyingState (may be additionally disabled for Transformers)
         if (!enabled) {
             document.getElementById('pass2-sensitivity').disabled = true;
             document.getElementById('pass2-segmenter').disabled = true;
-            const im2 = document.getElementById('pass2-input-mode');
-            if (im2) im2.disabled = true;
+            const fr2 = document.getElementById('pass2-framer');
+            if (fr2) fr2.disabled = true;
         }
 
         // Visual feedback - grey out entire row
@@ -4095,7 +4095,7 @@ const EnsembleManager = {
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
                 isTransformers: this.state.pass1.isTransformers,
                 isQwen: this.state.pass1.isQwen,
-                inputMode: this.state.pass1.isQwen ? this.state.pass1.inputMode : null
+                framer: this.state.pass1.isQwen ? this.state.pass1.framer : null
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
@@ -4110,7 +4110,7 @@ const EnsembleManager = {
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
                 isTransformers: this.state.pass2.isTransformers,
                 isQwen: this.state.pass2.isQwen,
-                inputMode: this.state.pass2.isQwen ? this.state.pass2.inputMode : null
+                framer: this.state.pass2.isQwen ? this.state.pass2.framer : null
             },
             merge_strategy: this.state.mergeStrategy,
             source_language: document.getElementById('source-language').value,
