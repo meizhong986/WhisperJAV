@@ -257,7 +257,7 @@ const QwenManager = {
         // Scene detection (from main dropdown)
         scene: 'semantic',
         // Input mode and context (v1.8.9+)
-        input_mode: 'vad_slicing',
+        input_mode: 'assembly',
         context: '',
         timestamp_mode: 'aligner_vad_fallback',
         repetition_penalty: 1.1,
@@ -1198,7 +1198,7 @@ const EnsembleManager = {
             params: null,  // null = use defaults, object = full custom config
             isTransformers: false,  // Track if using Transformers pipeline
             isQwen: false,  // Track if using Qwen3-ASR pipeline
-            inputMode: 'vad_slicing',  // Qwen input mode (assembly/context_aware/vad_slicing)
+            inputMode: 'assembly',  // Qwen input mode (assembly/context_aware/vad_slicing)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         pass2: {
@@ -1213,7 +1213,7 @@ const EnsembleManager = {
             params: null,
             isTransformers: false,
             isQwen: true,  // Default pipeline is Qwen3-ASR
-            inputMode: 'vad_slicing',  // Qwen input mode (assembly/context_aware/vad_slicing)
+            inputMode: 'assembly',  // Qwen input mode (assembly/context_aware/vad_slicing)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'smart_merge',

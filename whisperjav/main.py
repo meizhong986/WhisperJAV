@@ -489,9 +489,11 @@ def parse_arguments():
                            help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
 
     # Context-Aware Chunking (v1.8.7+)
-    qwen_group.add_argument("--qwen-input-mode", type=str, default="vad_slicing",
+    qwen_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
-                           help="Audio input strategy: 'assembly' (decoupled generation+alignment, highest quality), 'vad_slicing' (default, stable VAD-based chunking), or 'context_aware' (feeds full scenes for LALM context)")
+                           help="Audio input strategy: 'assembly' (default, decoupled generation+alignment, highest quality), "
+                                "'context_aware' (feeds full scenes for LALM context), or "
+                                "'vad_slicing' (legacy VAD-based chunking)")
     qwen_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_true", default=True,
                            help="Enforce 150-210s scene boundaries for ForcedAligner 300s limit (default: enabled)")
@@ -845,7 +847,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "progress_display": progress,
             "subs_language": args.subs_language,
             # Context-Aware Chunking (v1.8.7+)
-            "qwen_input_mode": getattr(args, 'qwen_input_mode', 'vad_slicing'),
+            "qwen_input_mode": getattr(args, 'qwen_input_mode', 'assembly'),
             "qwen_safe_chunking": getattr(args, 'qwen_safe_chunking', True),
             # Scene detection
             "scene_detector": getattr(args, 'qwen_scene', 'none'),

@@ -135,7 +135,7 @@ class QwenPipeline(BasePipeline):
 
         # === Input Mode Configuration (v1.8.7+) ===
         # Controls audio input strategy for Qwen3-ASR (LALM)
-        qwen_input_mode: str = "vad_slicing",  # "vad_slicing" (default) or "context_aware"
+        qwen_input_mode: str = "assembly",  # "assembly" (default), "context_aware", or "vad_slicing"
         qwen_safe_chunking: bool = True,  # Enforce scene boundaries for context-aware mode
 
         # Temporal framing for assembly mode (GAP-5)
@@ -213,10 +213,19 @@ class QwenPipeline(BasePipeline):
             self.input_mode = InputMode(qwen_input_mode)
         except ValueError:
             logger.warning(
-                "Unknown qwen_input_mode '%s', defaulting to 'context_aware'",
+                "Unknown qwen_input_mode '%s', defaulting to 'assembly'",
                 qwen_input_mode,
             )
-            self.input_mode = InputMode.CONTEXT_AWARE
+            self.input_mode = InputMode.ASSEMBLY
+
+        # Deprecation warning for legacy coupled modes
+        if self.input_mode in (InputMode.CONTEXT_AWARE, InputMode.VAD_SLICING):
+            logger.warning(
+                "input_mode='%s' uses legacy coupled architecture. "
+                "For best quality, use input_mode='assembly' with --qwen-framer. "
+                "Coupled modes will be removed in a future release.",
+                self.input_mode.value,
+            )
 
         # Safe chunking: when True, enforces scene boundaries to stay
         # within ForcedAligner's 180s architectural limit
