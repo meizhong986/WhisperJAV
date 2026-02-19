@@ -529,6 +529,46 @@ def parse_arguments():
                            help="Dynamic token budget per audio second (0=disabled, >0=scale budget; default: 20.0). "
                                 "Caps generation time: 47s audio → 940 tokens instead of 4096.")
 
+    # Decoupled Pipeline Options (IMPL-001 Phase 2)
+    decoupled_group = parser.add_argument_group(
+        "Decoupled Pipeline Options (--pipeline decoupled)",
+        "Model-agnostic pipeline using the DecoupledSubtitlePipeline orchestrator. "
+        "Backends are selected by name; new models are deployed by registering a "
+        "TextGenerator — no pipeline code changes needed."
+    )
+    decoupled_group.add_argument("--pipeline", type=str, default=None,
+                                 choices=["decoupled"],
+                                 help="Use the generic decoupled pipeline with component selection. "
+                                      "Overrides --mode when specified.")
+    decoupled_group.add_argument("--generator", type=str, default="qwen3",
+                                 help="TextGenerator backend (default: qwen3)")
+    decoupled_group.add_argument("--framer", type=str, default="full-scene",
+                                 help="TemporalFramer backend: full-scene (default), vad-grouped, srt-source, manual")
+    decoupled_group.add_argument("--aligner", type=str, default="qwen3",
+                                 help="TextAligner backend: qwen3 (default), none (skip alignment)")
+    decoupled_group.add_argument("--cleaner", type=str, default="qwen3",
+                                 help="TextCleaner backend: qwen3 (default), passthrough (skip cleaning)")
+    decoupled_group.add_argument("--generator-config", type=str, default=None,
+                                 help="JSON config for generator backend (e.g., "
+                                      "'{\"model_id\": \"...\", \"batch_size\": 4}')")
+    decoupled_group.add_argument("--framer-config", type=str, default=None,
+                                 help="JSON config for framer backend (e.g., "
+                                      "'{\"srt_path\": \"guide.srt\"}' for srt-source)")
+    decoupled_group.add_argument("--cleaner-config", type=str, default=None,
+                                 help="JSON config for cleaner backend")
+    decoupled_group.add_argument("--aligner-config", type=str, default=None,
+                                 help="JSON config for aligner backend")
+    decoupled_group.add_argument("--context", type=str, default="",
+                                 help="Context string for ASR (e.g., speaker names, domain terminology). "
+                                      "Used with --pipeline decoupled.")
+    decoupled_group.add_argument("--context-file", type=str, default=None,
+                                 help="Path to text file with glossary/context terms for contextual biasing. "
+                                      "Used with --pipeline decoupled.")
+    decoupled_group.add_argument("--timestamp-mode", type=str, default="aligner_interpolation",
+                                 choices=["aligner_interpolation", "aligner_vad_fallback",
+                                          "aligner_only", "vad_only"],
+                                 help="Timestamp resolution mode (default: aligner_interpolation)")
+
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
     return parser.parse_args()
@@ -795,12 +835,69 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     }
 
     # Select pipeline
-    if args.mode == "faster":
+    # --pipeline takes priority over --mode when specified
+    if getattr(args, 'pipeline', None) == "decoupled":
+        # Decoupled pipeline — model-agnostic, component-driven (IMPL-001 Phase 2)
+        from whisperjav.pipelines.decoupled_pipeline import DecoupledPipeline
+        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+
+        # Parse component JSON configs (if provided)
+        _component_configs = {}
+        for _cfg_name in ("generator_config", "framer_config", "cleaner_config", "aligner_config"):
+            _raw = getattr(args, _cfg_name, None)
+            if _raw:
+                try:
+                    _component_configs[_cfg_name] = json.loads(_raw)
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON in --%s: %s", _cfg_name.replace("_", "-"), e)
+                    sys.exit(1)
+
+        # Language mapping: CLI uses lowercase, pipeline uses title case
+        _language_map = {
+            "japanese": "Japanese", "korean": "Korean",
+            "chinese": "Chinese", "english": "English",
+        }
+        _language = _language_map.get(getattr(args, 'language', 'japanese'), 'Japanese')
+
+        # Bridge existing CLI args for scene detection and speech segmenter
+        _scene_detector = getattr(args, 'scene_detection_method', None) or 'semantic'
+        _speech_segmenter = getattr(args, 'speech_segmenter', None) or 'ten'
+
+        pipeline = DecoupledPipeline(
+            output_dir=initial_output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp,
+            save_metadata_json=getattr(args, 'debug', False),
+            progress_display=progress,
+            # Component backends
+            generator_backend=args.generator,
+            framer_backend=args.framer,
+            cleaner_backend=args.cleaner,
+            aligner_backend=args.aligner,
+            # Component configs
+            generator_config=_component_configs.get("generator_config"),
+            framer_config=_component_configs.get("framer_config"),
+            cleaner_config=_component_configs.get("cleaner_config"),
+            aligner_config=_component_configs.get("aligner_config"),
+            # Pipeline-level
+            timestamp_mode=getattr(args, 'timestamp_mode', 'aligner_interpolation'),
+            context=getattr(args, 'context', ''),
+            context_file=getattr(args, 'context_file', None),
+            language=_language,
+            scene_detector=_scene_detector,
+            speech_segmenter=_speech_segmenter,
+            subs_language=args.subs_language,
+        )
+        effective_mode = "decoupled"
+    elif args.mode == "faster":
         pipeline = FasterPipeline(**pipeline_args)
+        effective_mode = args.mode
     elif args.mode == "fast":
         pipeline = FastPipeline(**pipeline_args)
+        effective_mode = args.mode
     elif args.mode == "balanced":
         pipeline = BalancedPipeline(**pipeline_args)
+        effective_mode = args.mode
     elif args.mode == "kotoba-faster-whisper":
         # Kotoba Faster-Whisper pipeline with scene detection (always on)
         scene_method = getattr(args, 'scene_detection_method', None) or 'auditok'
@@ -808,6 +905,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             scene_method=scene_method,
             **pipeline_args
         )
+        effective_mode = args.mode
     elif args.mode == "transformers":
         # HuggingFace Transformers pipeline with dedicated --hf-* arguments
         from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
@@ -833,6 +931,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             hf_dtype=getattr(args, 'hf_dtype', 'auto'),
             subs_language=args.subs_language,
         )
+        effective_mode = args.mode
     elif args.mode == "qwen":
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
@@ -895,8 +994,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         if _sd_fb is not None:
             qwen_kwargs["stepdown_fallback_group"] = _sd_fb
         pipeline = QwenPipeline(**qwen_kwargs)
+        effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
+        effective_mode = args.mode
     
     all_stats, failed_files = [], []
     
@@ -948,7 +1049,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                         srt_path=output_path,
                         producer_credit=args.credit if hasattr(args, 'credit') else None,
                         add_technical_sig=not args.no_signature if hasattr(args, 'no_signature') else True,
-                        mode=args.mode,
+                        mode=effective_mode,
                         sensitivity=args.sensitivity,
                         version=__version__
                     )
@@ -1291,6 +1392,17 @@ def main():
 
     print_banner()
 
+    # Validate --pipeline decoupled combinations
+    if getattr(args, 'pipeline', None) == "decoupled":
+        if getattr(args, 'ensemble', False):
+            logger.error("--pipeline decoupled cannot be combined with --ensemble. "
+                         "Use --pipeline decoupled for single-pass decoupled processing.")
+            sys.exit(1)
+        if getattr(args, 'async_processing', False):
+            logger.error("--pipeline decoupled does not support --async-processing yet. "
+                         "Use synchronous mode (the default).")
+            sys.exit(1)
+
     # Skip input validation if --dump-params is used (diagnostic mode)
     if not args.input and not args.dump_params:
         logger.error("No input files specified. Use -h for help.")
@@ -1362,6 +1474,11 @@ def main():
                 device=args.device,
                 compute_type=args.compute_type,
             )
+
+        elif getattr(args, 'pipeline', None) == "decoupled":
+            # Decoupled pipeline: uses dedicated component args, not legacy config
+            resolved_config = None
+            logger.debug("Decoupled pipeline mode: skipping legacy config resolution (uses --generator/--framer/--aligner/--cleaner args)")
 
         elif args.mode == "transformers":
             # Transformers mode: uses dedicated --hf-* arguments, not legacy config
@@ -1453,6 +1570,7 @@ def main():
         import json
         dump_data = {
             "mode": args.mode,
+            "pipeline": getattr(args, 'pipeline', None),
             "sensitivity": args.sensitivity,
             "subs_language": args.subs_language,
             "language_code": language_code,
@@ -1466,6 +1584,17 @@ def main():
                 "transformers_two_pass": getattr(args, 'transformers_two_pass', False),
             }
         }
+        # Add decoupled pipeline component info when applicable
+        if getattr(args, 'pipeline', None) == "decoupled":
+            dump_data["decoupled_components"] = {
+                "generator": args.generator,
+                "framer": args.framer,
+                "cleaner": args.cleaner,
+                "aligner": args.aligner,
+                "timestamp_mode": getattr(args, 'timestamp_mode', 'aligner_interpolation'),
+                "context": getattr(args, 'context', ''),
+                "context_file": getattr(args, 'context_file', None),
+            }
         try:
             with open(args.dump_params, 'w', encoding='utf-8') as f:
                 json.dump(dump_data, f, indent=2, ensure_ascii=False, default=str)
