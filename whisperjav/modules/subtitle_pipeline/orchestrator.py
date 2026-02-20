@@ -747,7 +747,9 @@ class DecoupledSubtitlePipeline:
                         # Reconstruct with suppress_silence=False (H3 fix)
                         result = reconstruct_from_words(corrected_words, audio_path, suppress_silence=False)
                     else:
-                        result = reconstruct_from_words(all_words, audio_path, suppress_silence=True)
+                        # ForcedAligner timestamps are already accurate — don't let
+                        # stable-ts's crude loudness quantizer shrink them.
+                        result = reconstruct_from_words(all_words, audio_path, suppress_silence=False)
 
                 else:
                     # Aligner-free: build word dicts from frame boundaries
