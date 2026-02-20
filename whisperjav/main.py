@@ -422,113 +422,114 @@ def parse_arguments():
                          choices=["auto", "float16", "bfloat16", "float32"],
                          help="Data type (default: auto)")
 
-    # Qwen3-ASR mode arguments
-    qwen_group = parser.add_argument_group("Qwen3-ASR Mode Options (--mode qwen)")
-    qwen_group.add_argument("--qwen-model-id", type=str,
+    # ── Qwen3-ASR: Model ────────────────────────────────────────────────
+    qwen_model_group = parser.add_argument_group("Qwen3-ASR: Model")
+    qwen_model_group.add_argument("--qwen-model-id", type=str,
                            default="Qwen/Qwen3-ASR-1.7B",
                            help="Qwen3-ASR model ID (default: Qwen/Qwen3-ASR-1.7B)")
-    qwen_group.add_argument("--qwen-device", type=str, default="auto",
+    qwen_model_group.add_argument("--qwen-device", type=str, default="auto",
                            choices=["auto", "cuda", "cpu"],
                            help="Device to use (default: auto)")
-    qwen_group.add_argument("--qwen-dtype", type=str, default="auto",
+    qwen_model_group.add_argument("--qwen-dtype", type=str, default="auto",
                            choices=["auto", "float16", "bfloat16", "float32"],
                            help="Data type (default: auto)")
-    qwen_group.add_argument("--qwen-batch-size", type=int, default=1,
-                           help="Maximum inference batch size (default: 1 for accuracy)")
-    qwen_group.add_argument("--qwen-max-tokens", type=int, default=4096,
-                           help="Maximum tokens to generate (default: 4096, supports ~10 min audio)")
-    qwen_group.add_argument("--qwen-language", type=str, default="Japanese",
+    qwen_model_group.add_argument("--qwen-attn", type=str, default="auto",
+                           choices=["auto", "sdpa", "flash_attention_2", "eager"],
+                           help="Attention implementation (default: auto)")
+    qwen_model_group.add_argument("--qwen-language", type=str, default="Japanese",
                            help="Language for ASR (default: Japanese). Use 'auto' for auto-detect")
-    qwen_group.add_argument("--qwen-timestamps", type=str, default="word",
-                           choices=["word", "none"],
-                           help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word)")
-    qwen_group.add_argument("--qwen-aligner", type=str,
-                           default="Qwen/Qwen3-ForcedAligner-0.6B",
-                           help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B)")
-    qwen_group.add_argument("--qwen-scene", type=str, default="semantic",
+    qwen_model_group.add_argument("--qwen-context", type=str, default="",
+                           help="Context string for transcription accuracy (e.g., speaker names, terminology)")
+    qwen_model_group.add_argument("--qwen-context-file", type=str, default=None,
+                           help="Path to text file with glossary/context terms for contextual biasing")
+
+    # ── Qwen3-ASR: Audio ─────────────────────────────────────────────────
+    qwen_audio_group = parser.add_argument_group("Qwen3-ASR: Audio")
+    qwen_audio_group.add_argument("--qwen-scene", type=str, default="semantic",
                            choices=["none", "auditok", "silero", "semantic"],
                            help="Scene detection method (default: semantic)")
-    qwen_group.add_argument("--qwen-context", type=str, default="",
-                           help="Context string to help improve transcription accuracy (e.g., speaker names, domain terminology)")
-    qwen_group.add_argument("--qwen-context-file", type=str, default=None,
-                           help="Path to text file with glossary/context terms for contextual biasing (e.g., performer names, domain vocabulary)")
-    qwen_group.add_argument("--qwen-attn", type=str, default="auto",
-                           choices=["auto", "sdpa", "flash_attention_2", "eager"],
-                           help="Attention implementation: 'auto' (detect flash-attn), 'sdpa', 'flash_attention_2', 'eager' (default: auto)")
-    qwen_group.add_argument("--qwen-enhancer", type=str, default="none",
+    qwen_audio_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
+                           action="store_true", default=True,
+                           help="Enforce scene boundaries for ForcedAligner 180s limit (default: enabled)")
+    qwen_audio_group.add_argument("--no-qwen-safe-chunking", dest="qwen_safe_chunking",
+                           action="store_false",
+                           help="Disable safe chunking, allow longer scenes")
+    qwen_audio_group.add_argument("--qwen-scene-min-duration", type=float, default=None,
+                           help="Minimum scene duration in seconds (default: 12)")
+    qwen_audio_group.add_argument("--qwen-scene-max-duration", type=float, default=None,
+                           help="Maximum scene duration in seconds (default: 48)")
+    qwen_audio_group.add_argument("--qwen-enhancer", type=str, default="none",
                            choices=["none", "clearvoice", "bs-roformer", "zipenhancer", "ffmpeg-dsp"],
                            help="Speech enhancement backend (default: none)")
-    qwen_group.add_argument("--qwen-enhancer-model", type=str, default=None,
+    qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
-    qwen_group.add_argument("--qwen-segmenter", type=str, default="ten",
+    qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="ten",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1",
                                     "nemo", "nemo-lite", "whisper-vad", "ten"],
                            help="Speech segmentation backend for VAD-based chunking (default: ten)")
-    qwen_group.add_argument("--qwen-max-group-duration", type=float, default=None,
+    qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
-    # Adaptive Step-Down
-    qwen_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
-                           action="store_true", default=True,
-                           help="Adaptive step-down: try initial groups first, "
-                                "retry collapsed groups at fallback size (default: enabled)")
-    qwen_group.add_argument("--no-qwen-stepdown", dest="qwen_stepdown",
-                           action="store_false",
-                           help="Disable adaptive step-down")
-    qwen_group.add_argument("--qwen-stepdown-initial-group", type=float, default=None,
-                           help="Tier 1 group duration for step-down (pipeline default: 6.0)")
-    qwen_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=None,
-                           help="Tier 2 fallback group duration for step-down (pipeline default: 6.0)")
-    qwen_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
-                           action="store_true", default=False,
-                           help="[DEPRECATED] No effect — Qwen3 uses AssemblyTextCleaner instead")
-    qwen_group.add_argument("--no-qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
-                           action="store_false",
-                           help="[DEPRECATED] Already disabled by default for Qwen3")
-    qwen_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
-                           choices=["default", "high_moan", "narrative"],
-                           help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
-
-    # Input Mode (assembly is sole active path since Phase 4)
-    qwen_group.add_argument("--qwen-input-mode", type=str, default="assembly",
+    qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
-                           help="Audio input strategy: 'assembly' (default, recommended). "
-                                "'context_aware' and 'vad_slicing' are deprecated aliases "
-                                "that map to assembly with --qwen-framer full-scene and "
-                                "vad-grouped respectively.")
-    qwen_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
-                           action="store_true", default=True,
-                           help="Enforce 12-48s scene boundaries for ForcedAligner 180s limit (default: enabled)")
-    qwen_group.add_argument("--no-qwen-safe-chunking", dest="qwen_safe_chunking",
-                           action="store_false",
-                           help="Disable safe chunking, allow longer scenes")
-    qwen_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_vad_fallback",
-                           choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
-                           help="Timestamp resolution: 'aligner_vad_fallback' (default, stable VAD boundaries), 'aligner_interpolation' (smooth interpolation), 'aligner_only' (no fallback), 'vad_only' (discard aligner)")
-
-    # Temporal framing for assembly mode (GAP-5)
-    qwen_group.add_argument("--qwen-framer", type=str, default="full-scene",
+                           help="Audio input strategy: 'assembly' (default). "
+                                "'context_aware' and 'vad_slicing' are deprecated aliases.")
+    qwen_audio_group.add_argument("--qwen-framer", type=str, default="full-scene",
                            choices=["full-scene", "vad-grouped", "srt-source", "manual"],
-                           help="Temporal framing strategy for assembly mode: "
-                                "'full-scene' (default, whole scene per frame), "
-                                "'vad-grouped' (VAD-based dialogue chunks), "
-                                "'srt-source' (use existing SRT boundaries)")
-    qwen_group.add_argument("--qwen-framer-srt-path", type=str, default=None,
+                           help="Temporal framing strategy: 'full-scene' (default), "
+                                "'vad-grouped', 'srt-source', 'manual'")
+    qwen_audio_group.add_argument("--qwen-framer-srt-path", type=str, default=None,
                            help="SRT file path for --qwen-framer srt-source")
 
-    # Assembly text cleaner (pre-alignment cleaning in assembly mode)
-    qwen_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
-                           action="store_true", default=True,
-                           help="Enable pre-alignment text cleaning in assembly mode (default: enabled)")
-    qwen_group.add_argument("--no-qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
-                           action="store_false",
-                           help="Disable pre-alignment text cleaning (pass raw ASR text to aligner)")
+    # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
+    qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
+    qwen_gen_group.add_argument("--qwen-batch-size", type=int, default=1,
+                           help="Maximum inference batch size (default: 1 for accuracy)")
+    qwen_gen_group.add_argument("--qwen-max-tokens", type=int, default=4096,
+                           help="Maximum tokens to generate (default: 4096, supports ~10 min audio)")
+    qwen_gen_group.add_argument("--qwen-repetition-penalty", type=float, default=1.1,
+                           help="Repetition penalty (1.0=off, >1.0=penalize repeats; default: 1.1)")
+    qwen_gen_group.add_argument("--qwen-max-tokens-per-second", type=float, default=20.0,
+                           help="Dynamic token budget per audio second (0=disabled; default: 20.0)")
 
-    # Generation safety controls
-    qwen_group.add_argument("--qwen-repetition-penalty", type=float, default=1.1,
-                           help="Repetition penalty for token generation (1.0=off, >1.0=penalize repeats; default: 1.1)")
-    qwen_group.add_argument("--qwen-max-tokens-per-second", type=float, default=20.0,
-                           help="Dynamic token budget per audio second (0=disabled, >0=scale budget; default: 20.0). "
-                                "Caps generation time: 47s audio → 940 tokens instead of 4096.")
+    # ── Qwen3-ASR: Alignment ─────────────────────────────────────────────
+    qwen_align_group = parser.add_argument_group("Qwen3-ASR: Alignment")
+    qwen_align_group.add_argument("--qwen-timestamps", type=str, default="word",
+                           choices=["word", "none"],
+                           help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word)")
+    qwen_align_group.add_argument("--qwen-aligner", type=str,
+                           default="Qwen/Qwen3-ForcedAligner-0.6B",
+                           help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B)")
+    qwen_align_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
+                           action="store_true", default=True,
+                           help="Enable pre-alignment text cleaning (default: enabled)")
+    qwen_align_group.add_argument("--no-qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
+                           action="store_false",
+                           help="Disable pre-alignment text cleaning")
+    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_vad_fallback",
+                           choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
+                           help="Timestamp resolution mode (default: aligner_vad_fallback)")
+    qwen_align_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
+                           action="store_true", default=True,
+                           help="Adaptive step-down: retry collapsed groups at fallback size (default: enabled)")
+    qwen_align_group.add_argument("--no-qwen-stepdown", dest="qwen_stepdown",
+                           action="store_false",
+                           help="Disable adaptive step-down")
+    qwen_align_group.add_argument("--qwen-stepdown-initial-group", type=float, default=None,
+                           help="Tier 1 group duration for step-down (pipeline default: 6.0)")
+    qwen_align_group.add_argument("--qwen-stepdown-fallback-group", type=float, default=None,
+                           help="Tier 2 fallback group duration for step-down (pipeline default: 6.0)")
+
+    # ── Qwen3-ASR: Output ─────────────────────────────────────────────────
+    qwen_output_group = parser.add_argument_group("Qwen3-ASR: Output")
+    qwen_output_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
+                           choices=["default", "high_moan", "narrative"],
+                           help="Subtitle regrouping preset (default: high_moan for JAV)")
+    qwen_output_group.add_argument("--qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
+                           action="store_true", default=False,
+                           help=argparse.SUPPRESS)
+    qwen_output_group.add_argument("--no-qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
+                           action="store_false",
+                           help=argparse.SUPPRESS)
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(
@@ -1018,6 +1019,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "max_tokens_per_audio_second": getattr(args, 'qwen_max_tokens_per_second', 20.0),
         }
         # Pipeline-owned defaults: only forward when user explicitly sets a value
+        _scene_min = getattr(args, 'qwen_scene_min_duration', None)
+        if _scene_min is not None:
+            qwen_kwargs["scene_min_duration"] = _scene_min
+        _scene_max = getattr(args, 'qwen_scene_max_duration', None)
+        if _scene_max is not None:
+            qwen_kwargs["scene_max_duration"] = _scene_max
         _max_grp = getattr(args, 'qwen_max_group_duration', None)
         if _max_grp is not None:
             qwen_kwargs["segmenter_max_group_duration"] = _max_grp

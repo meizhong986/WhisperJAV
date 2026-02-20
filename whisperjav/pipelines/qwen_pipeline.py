@@ -94,6 +94,8 @@ class QwenPipeline(BasePipeline):
         # Controls audio input strategy for Qwen3-ASR (LALM)
         qwen_input_mode: str = "assembly",  # "assembly" (default), "context_aware", or "vad_slicing"
         qwen_safe_chunking: bool = True,  # Enforce 12-48s scene boundaries for ForcedAligner
+        scene_min_duration: Optional[float] = None,  # Override min scene duration (default: 12s)
+        scene_max_duration: Optional[float] = None,  # Override max scene duration (default: 48s)
 
         # Temporal framing for assembly mode (GAP-5)
         qwen_framer: str = "full-scene",  # "full-scene", "vad-grouped", "srt-source"
@@ -195,6 +197,8 @@ class QwenPipeline(BasePipeline):
         # Safe chunking: when True, enforces scene boundaries to stay
         # within ForcedAligner's 180s architectural limit
         self.safe_chunking = qwen_safe_chunking
+        self.scene_min_override = scene_min_duration  # None = use default (12s)
+        self.scene_max_override = scene_max_duration  # None = use default (48s)
 
         # Temporal framing for assembly mode (GAP-5)
         self.framer_backend = qwen_framer
@@ -492,12 +496,14 @@ class QwenPipeline(BasePipeline):
         # Tight scenes (12-48s) reduce timestamp drift and give the
         # aligner shorter, more manageable audio to align.
         if self.safe_chunking:
-            scene_detector_kwargs["min_duration"] = 12  # seconds
-            scene_detector_kwargs["max_duration"] = 48  # seconds
+            min_dur = self.scene_min_override if self.scene_min_override is not None else 12
+            max_dur = self.scene_max_override if self.scene_max_override is not None else 48
+            scene_detector_kwargs["min_duration"] = min_dur
+            scene_detector_kwargs["max_duration"] = max_dur
             logger.info(
                 "[QwenPipeline PID %s] Phase 2: Safe chunking "
-                "(min=12s, max=48s, aligner limit=180s)",
-                os.getpid(),
+                "(min=%ss, max=%ss, aligner limit=180s)",
+                os.getpid(), min_dur, max_dur,
             )
 
         scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_detector_kwargs)

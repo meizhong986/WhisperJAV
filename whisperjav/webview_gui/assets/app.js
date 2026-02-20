@@ -239,29 +239,36 @@ const QwenManager = {
     customized: false,
 
     defaults: {
-        // Model settings
+        // Model
         model_id: 'Qwen/Qwen3-ASR-1.7B',
+        language: null,  // null = auto-detect
+        context: '',
         device: 'auto',
         dtype: 'auto',
         attn_implementation: 'auto',
-        // Processing settings
-        batch_size: 1,  // batch_size=1 recommended for accuracy
-        max_new_tokens: 4096,
-        language: null,  // null = auto-detect
-        // Aligner settings
-        use_aligner: true,
-        aligner_id: 'Qwen/Qwen3-ForcedAligner-0.6B',
-        // Post-processing
-        japanese_postprocess: false,
-        postprocess_preset: 'high_moan',
+        // Audio
+        safe_chunking: true,
+        scene_min_duration: 12,
+        scene_max_duration: 48,
+        max_group_duration: 6,
         // Scene detection (from main dropdown)
         scene: 'semantic',
-        // Input mode and context (v1.8.9+)
         input_mode: 'assembly',
-        context: '',
-        timestamp_mode: 'aligner_vad_fallback',
+        // Generation
+        batch_size: 1,
+        max_new_tokens: 4096,
         repetition_penalty: 1.1,
         max_tokens_per_audio_second: 20.0,
+        // Alignment
+        aligner_backend: 'qwen3',
+        aligner_id: 'Qwen/Qwen3-ForcedAligner-0.6B',
+        assembly_cleaner: 'qwen3',
+        timestamp_mode: 'aligner_vad_fallback',
+        stepdown: true,
+        stepdown_initial_group: 6.0,
+        stepdown_fallback_group: 6.0,
+        // Output
+        postprocess_preset: 'high_moan',
     },
 
     getParams() {
@@ -2930,13 +2937,15 @@ const EnsembleManager = {
     },
 
     generateQwenTabs(schema, currentValues) {
-        // Update tab labels for Qwen context
+        // 5-tab pipeline-stage layout: Model, Audio, Generation, Alignment, Output
+        // Maps to panel IDs: tab-model, tab-quality, tab-segmenter, tab-enhancer, tab-scene
+        // tab-context is hidden (empty)
         const tabLabels = {
             'model': 'Model',
-            'quality': 'Quality',
-            'segmenter': 'Aligner',
-            'enhancer': 'Post-Process',
-            'scene': 'Scene',
+            'quality': 'Audio',
+            'segmenter': 'Generation',
+            'enhancer': 'Alignment',
+            'scene': 'Output',
             'context': 'Context'
         };
 
@@ -2948,214 +2957,43 @@ const EnsembleManager = {
             const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
             if (tabBtn) {
                 tabBtn.textContent = tabLabels[tab];
-                tabBtn.style.display = '';
+                // Hide context tab button (empty)
+                tabBtn.style.display = tab === 'context' ? 'none' : '';
             }
         });
 
-        // Generate Model tab
+        // Generate 5 pipeline-stage tabs
         this.generateQwenModelTab('tab-model', schema.model, currentValues);
-
-        // Generate Quality tab (batch_size, max_new_tokens, language)
-        this.generateQwenQualityTab('tab-quality', schema.quality, currentValues);
-
-        // Generate Aligner tab (in Segmenter slot - use_aligner, aligner_id)
-        this.generateQwenAlignerTab('tab-segmenter', schema.aligner, currentValues);
-
-        // Generate Post-Processing tab (in Enhancer slot)
-        this.generateQwenPostProcessTab('tab-enhancer', schema.postprocess, currentValues);
-
-        // Generate Scene tab
-        this.generateQwenSceneTab('tab-scene', schema.scene, currentValues);
-
-        // Generate Context & Safety tab
-        this.generateQwenContextTab('tab-context', schema.context, currentValues);
+        this.generateQwenAudioTab('tab-quality', schema.audio, currentValues);
+        this.generateQwenGenerationTab('tab-segmenter', schema.generation, currentValues);
+        this.generateQwenAlignmentTab('tab-enhancer', schema.alignment, currentValues);
+        this.generateQwenOutputTab('tab-scene', schema.output, currentValues);
 
         // Reset to first tab
         this.switchModalTab('model');
     },
 
+    // ── Tab 1: Model ─────────────────────────────────────────────────
     generateQwenModelTab(tabId, schemaSection, currentValues) {
         const container = document.getElementById(tabId);
 
         // Model ID dropdown
         const modelDef = schemaSection.model_id;
         container.appendChild(this.createTransformersDropdown(
-            'model_id', 'ASR Model',
+            'model_id', modelDef.label,
             modelDef.options,
             currentValues.model_id || modelDef.default,
-            '1.7B is more accurate, 0.6B is faster and uses less VRAM'
-        ));
-
-        // Device dropdown
-        const deviceDef = schemaSection.device;
-        container.appendChild(this.createTransformersDropdown(
-            'device', 'Device',
-            deviceDef.options,
-            currentValues.device || deviceDef.default,
-            'Compute device (auto will detect GPU availability)'
-        ));
-
-        // Data type dropdown
-        const dtypeDef = schemaSection.dtype;
-        container.appendChild(this.createTransformersDropdown(
-            'dtype', 'Data Type',
-            dtypeDef.options,
-            currentValues.dtype || dtypeDef.default,
-            'Model precision (auto selects based on hardware)'
-        ));
-
-        // Attention implementation
-        const attnDef = schemaSection.attn_implementation;
-        container.appendChild(this.createTransformersDropdown(
-            'attn_implementation', 'Attention',
-            attnDef.options,
-            currentValues.attn_implementation || attnDef.default,
-            'Attention implementation (sdpa is fastest on most GPUs)'
-        ));
-    },
-
-    generateQwenQualityTab(tabId, schemaSection, currentValues) {
-        const container = document.getElementById(tabId);
-
-        // Batch size slider
-        const batchDef = schemaSection.batch_size;
-        container.appendChild(this.createTransformersSlider(
-            'batch_size', batchDef.label,
-            batchDef.min, batchDef.max, batchDef.step,
-            currentValues.batch_size ?? batchDef.default,
-            'Batch size 1 is recommended for best accuracy'
-        ));
-
-        // Max new tokens slider
-        const tokensDef = schemaSection.max_new_tokens;
-        container.appendChild(this.createTransformersSlider(
-            'max_new_tokens', tokensDef.label,
-            tokensDef.min, tokensDef.max, tokensDef.step,
-            currentValues.max_new_tokens ?? tokensDef.default,
-            'Maximum tokens per segment (4096 covers ~5-10 min audio)'
+            modelDef.description
         ));
 
         // Language dropdown
         const langDef = schemaSection.language;
         container.appendChild(this.createTransformersDropdown(
-            'language', 'Language',
+            'language', langDef.label,
             langDef.options,
             currentValues.language || langDef.default,
-            'Force language or auto-detect (null = auto)'
+            langDef.description
         ));
-    },
-
-    generateQwenAlignerTab(tabId, schemaSection, currentValues) {
-        const container = document.getElementById(tabId);
-
-        // Use aligner toggle
-        const alignerToggle = document.createElement('div');
-        alignerToggle.className = 'param-control';
-        alignerToggle.dataset.param = 'use_aligner';
-
-        const toggleLabel = document.createElement('label');
-        toggleLabel.className = 'checkbox-label';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'hf-use_aligner';
-        checkbox.checked = currentValues.use_aligner !== false;
-
-        const span = document.createElement('span');
-        span.textContent = 'Use ForcedAligner for word-level timestamps';
-
-        toggleLabel.appendChild(checkbox);
-        toggleLabel.appendChild(span);
-        alignerToggle.appendChild(toggleLabel);
-
-        const toggleDesc = document.createElement('p');
-        toggleDesc.className = 'param-description';
-        toggleDesc.textContent = 'ForcedAligner provides precise word timestamps for better subtitle timing';
-        alignerToggle.appendChild(toggleDesc);
-
-        container.appendChild(alignerToggle);
-
-        // Aligner model dropdown
-        const alignerDef = schemaSection.aligner_id;
-        container.appendChild(this.createTransformersDropdown(
-            'aligner_id', 'Aligner Model',
-            alignerDef.options,
-            currentValues.aligner_id || alignerDef.default,
-            'ForcedAligner model for word-level timestamps'
-        ));
-
-        // Note about 3-minute limit
-        const noteDiv = document.createElement('div');
-        noteDiv.className = 'param-note';
-        noteDiv.innerHTML = '<strong>Note:</strong> ForcedAligner has a 3-minute segment limit. ' +
-            'For longer audio, use Scene Detection to split into shorter segments.';
-        container.appendChild(noteDiv);
-    },
-
-    generateQwenPostProcessTab(tabId, schemaSection, currentValues) {
-        const container = document.getElementById(tabId);
-
-        // Japanese post-processing toggle
-        const jpToggle = document.createElement('div');
-        jpToggle.className = 'param-control';
-        jpToggle.dataset.param = 'japanese_postprocess';
-
-        const toggleLabel = document.createElement('label');
-        toggleLabel.className = 'checkbox-label';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'hf-japanese_postprocess';
-        checkbox.checked = currentValues.japanese_postprocess !== false;
-
-        const span = document.createElement('span');
-        span.textContent = 'Enable Japanese post-processing';
-
-        toggleLabel.appendChild(checkbox);
-        toggleLabel.appendChild(span);
-        jpToggle.appendChild(toggleLabel);
-
-        const toggleDesc = document.createElement('p');
-        toggleDesc.className = 'param-description';
-        toggleDesc.textContent = 'Apply Japanese-specific regrouping for better subtitle quality';
-        jpToggle.appendChild(toggleDesc);
-
-        container.appendChild(jpToggle);
-
-        // Preset dropdown
-        const presetDef = schemaSection.postprocess_preset;
-        container.appendChild(this.createTransformersDropdown(
-            'postprocess_preset', 'Preset',
-            presetDef.options,
-            currentValues.postprocess_preset || presetDef.default,
-            'Regrouping preset optimized for different content types'
-        ));
-    },
-
-    generateQwenSceneTab(tabId, schemaSection, currentValues) {
-        const container = document.getElementById(tabId);
-
-        // Scene detection dropdown (read-only, synced with main dropdown)
-        const sceneDef = schemaSection.scene;
-        const sceneControl = this.createTransformersDropdown(
-            'scene', sceneDef.label,
-            sceneDef.options,
-            currentValues.scene || sceneDef.default,
-            'Scene detection splits audio into segments before processing'
-        );
-
-        // Add note that this syncs with main dropdown
-        const noteDiv = document.createElement('div');
-        noteDiv.className = 'param-note';
-        noteDiv.innerHTML = '<strong>Note:</strong> Scene detection is configured in the main Ensemble tab. ' +
-            'Qwen3-ASR uses the --qwen-scene parameter internally.';
-        sceneControl.appendChild(noteDiv);
-
-        container.appendChild(sceneControl);
-    },
-
-    generateQwenContextTab(tabId, schemaSection, currentValues) {
-        const container = document.getElementById(tabId);
 
         // Context hints textarea
         const contextDef = schemaSection.context;
@@ -3182,7 +3020,240 @@ const EnsembleManager = {
 
         container.appendChild(contextControl);
 
-        // Timestamp Mode dropdown
+        // Hardware section (collapsed <details>)
+        const details = document.createElement('details');
+        details.className = 'param-group-details';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Hardware';
+        details.appendChild(summary);
+
+        const hwContainer = document.createElement('div');
+        hwContainer.className = 'details-content';
+
+        const deviceDef = schemaSection.device;
+        hwContainer.appendChild(this.createTransformersDropdown(
+            'device', deviceDef.label,
+            deviceDef.options,
+            currentValues.device || deviceDef.default,
+            'Compute device (auto will detect GPU availability)'
+        ));
+
+        const dtypeDef = schemaSection.dtype;
+        hwContainer.appendChild(this.createTransformersDropdown(
+            'dtype', dtypeDef.label,
+            dtypeDef.options,
+            currentValues.dtype || dtypeDef.default,
+            'Model precision (auto selects based on hardware)'
+        ));
+
+        const attnDef = schemaSection.attn_implementation;
+        hwContainer.appendChild(this.createTransformersDropdown(
+            'attn_implementation', attnDef.label,
+            attnDef.options,
+            currentValues.attn_implementation || attnDef.default,
+            'Attention implementation (sdpa is fastest on most GPUs)'
+        ));
+
+        details.appendChild(hwContainer);
+        container.appendChild(details);
+    },
+
+    // ── Tab 2: Audio ─────────────────────────────────────────────────
+    generateQwenAudioTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Scene Detection group header
+        const sceneHeader = document.createElement('div');
+        sceneHeader.className = 'param-group-header';
+        sceneHeader.textContent = 'Scene Detection';
+        container.appendChild(sceneHeader);
+
+        // Safe Chunking checkbox
+        const scDef = schemaSection.safe_chunking;
+        const scControl = document.createElement('div');
+        scControl.className = 'param-control';
+        scControl.dataset.param = 'safe_chunking';
+
+        const scLabel = document.createElement('label');
+        scLabel.className = 'checkbox-label';
+
+        const scCheck = document.createElement('input');
+        scCheck.type = 'checkbox';
+        scCheck.className = 'param-checkbox';
+        scCheck.id = 'hf-safe_chunking';
+        scCheck.checked = currentValues.safe_chunking !== false;
+
+        const scSpan = document.createElement('span');
+        scSpan.textContent = scDef.label;
+
+        scLabel.appendChild(scCheck);
+        scLabel.appendChild(scSpan);
+        scControl.appendChild(scLabel);
+
+        const scDesc = document.createElement('p');
+        scDesc.className = 'param-description';
+        scDesc.textContent = scDef.description;
+        scControl.appendChild(scDesc);
+        container.appendChild(scControl);
+
+        // Custom Scene Bounds (collapsed <details>)
+        const boundsDetails = document.createElement('details');
+        boundsDetails.className = 'param-group-details';
+        const boundsSummary = document.createElement('summary');
+        boundsSummary.textContent = 'Custom Scene Bounds';
+        boundsDetails.appendChild(boundsSummary);
+
+        const boundsContainer = document.createElement('div');
+        boundsContainer.className = 'details-content';
+
+        const minDef = schemaSection.scene_min_duration;
+        boundsContainer.appendChild(this.createTransformersSlider(
+            'scene_min_duration', minDef.label,
+            minDef.min, minDef.max, minDef.step,
+            currentValues.scene_min_duration ?? minDef.default,
+            minDef.description
+        ));
+
+        const maxDef = schemaSection.scene_max_duration;
+        boundsContainer.appendChild(this.createTransformersSlider(
+            'scene_max_duration', maxDef.label,
+            maxDef.min, maxDef.max, maxDef.step,
+            currentValues.scene_max_duration ?? maxDef.default,
+            maxDef.description
+        ));
+
+        boundsDetails.appendChild(boundsContainer);
+        container.appendChild(boundsDetails);
+
+        // VAD Grouping group header
+        const vadHeader = document.createElement('div');
+        vadHeader.className = 'param-group-header';
+        vadHeader.textContent = 'VAD Grouping';
+        container.appendChild(vadHeader);
+
+        // Max Group Duration slider
+        const grpDef = schemaSection.max_group_duration;
+        container.appendChild(this.createTransformersSlider(
+            'max_group_duration', grpDef.label,
+            grpDef.min, grpDef.max, grpDef.step,
+            currentValues.max_group_duration ?? grpDef.default,
+            grpDef.description
+        ));
+    },
+
+    // ── Tab 3: Generation ────────────────────────────────────────────
+    generateQwenGenerationTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Text Generation group header
+        const genHeader = document.createElement('div');
+        genHeader.className = 'param-group-header';
+        genHeader.textContent = 'Text Generation';
+        container.appendChild(genHeader);
+
+        // Batch size slider
+        const batchDef = schemaSection.batch_size;
+        container.appendChild(this.createTransformersSlider(
+            'batch_size', batchDef.label,
+            batchDef.min, batchDef.max, batchDef.step,
+            currentValues.batch_size ?? batchDef.default,
+            batchDef.description
+        ));
+
+        // Max new tokens slider
+        const tokensDef = schemaSection.max_new_tokens;
+        container.appendChild(this.createTransformersSlider(
+            'max_new_tokens', tokensDef.label,
+            tokensDef.min, tokensDef.max, tokensDef.step,
+            currentValues.max_new_tokens ?? tokensDef.default,
+            tokensDef.description
+        ));
+
+        // Generation Safety (collapsed <details>)
+        const safetyDetails = document.createElement('details');
+        safetyDetails.className = 'param-group-details';
+        const safetySummary = document.createElement('summary');
+        safetySummary.textContent = 'Generation Safety';
+        safetyDetails.appendChild(safetySummary);
+
+        const safetyContainer = document.createElement('div');
+        safetyContainer.className = 'details-content';
+
+        const rpDef = schemaSection.repetition_penalty;
+        safetyContainer.appendChild(this.createTransformersSlider(
+            'repetition_penalty', rpDef.label,
+            rpDef.min, rpDef.max, rpDef.step,
+            currentValues.repetition_penalty ?? rpDef.default,
+            rpDef.description
+        ));
+
+        const mtDef = schemaSection.max_tokens_per_audio_second;
+        safetyContainer.appendChild(this.createTransformersSlider(
+            'max_tokens_per_audio_second', mtDef.label,
+            mtDef.min, mtDef.max, mtDef.step,
+            currentValues.max_tokens_per_audio_second ?? mtDef.default,
+            mtDef.description
+        ));
+
+        safetyDetails.appendChild(safetyContainer);
+        container.appendChild(safetyDetails);
+    },
+
+    // ── Tab 4: Alignment ─────────────────────────────────────────────
+    generateQwenAlignmentTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // ─ Forced Aligner section ─
+        const alignerHeader = document.createElement('div');
+        alignerHeader.className = 'param-group-header';
+        alignerHeader.textContent = 'Forced Aligner';
+        container.appendChild(alignerHeader);
+
+        // Aligner backend dropdown
+        const abDef = schemaSection.aligner_backend;
+        container.appendChild(this.createTransformersDropdown(
+            'aligner_backend', abDef.label,
+            abDef.options,
+            currentValues.aligner_backend || abDef.default,
+            abDef.description
+        ));
+
+        // Aligner model dropdown
+        const aiDef = schemaSection.aligner_id;
+        container.appendChild(this.createTransformersDropdown(
+            'aligner_id', aiDef.label,
+            aiDef.options,
+            currentValues.aligner_id || aiDef.default,
+            'ForcedAligner model for word-level timestamps'
+        ));
+
+        // 3-minute limit note
+        const noteDiv = document.createElement('div');
+        noteDiv.className = 'param-note';
+        noteDiv.innerHTML = 'ForcedAligner has a <strong>3-minute segment limit</strong>. ' +
+            'Enable Safe Chunking (Audio tab) to enforce scene boundaries.';
+        container.appendChild(noteDiv);
+
+        // ─ Text Cleaner section ─
+        const cleanerHeader = document.createElement('div');
+        cleanerHeader.className = 'param-group-header';
+        cleanerHeader.textContent = 'Text Cleaner';
+        container.appendChild(cleanerHeader);
+
+        const acDef = schemaSection.assembly_cleaner;
+        container.appendChild(this.createTransformersDropdown(
+            'assembly_cleaner', acDef.label,
+            acDef.options,
+            currentValues.assembly_cleaner || acDef.default,
+            acDef.description
+        ));
+
+        // ─ Timestamp Resolution section ─
+        const tsHeader = document.createElement('div');
+        tsHeader.className = 'param-group-header';
+        tsHeader.textContent = 'Timestamp Resolution';
+        container.appendChild(tsHeader);
+
         const tsDef = schemaSection.timestamp_mode;
         container.appendChild(this.createTransformersDropdown(
             'timestamp_mode', tsDef.label,
@@ -3191,22 +3262,91 @@ const EnsembleManager = {
             tsDef.description
         ));
 
-        // Repetition Penalty slider
-        const rpDef = schemaSection.repetition_penalty;
+        // ─ Step-Down Retry section ─
+        const sdHeader = document.createElement('div');
+        sdHeader.className = 'param-group-header';
+        sdHeader.textContent = 'Step-Down Retry';
+        container.appendChild(sdHeader);
+
+        // Step-down checkbox
+        const sdDef = schemaSection.stepdown;
+        const sdControl = document.createElement('div');
+        sdControl.className = 'param-control';
+        sdControl.dataset.param = 'stepdown';
+
+        const sdLabel = document.createElement('label');
+        sdLabel.className = 'checkbox-label';
+
+        const sdCheck = document.createElement('input');
+        sdCheck.type = 'checkbox';
+        sdCheck.className = 'param-checkbox';
+        sdCheck.id = 'hf-stepdown';
+        sdCheck.checked = currentValues.stepdown !== false;
+
+        const sdSpan = document.createElement('span');
+        sdSpan.textContent = sdDef.label;
+
+        sdLabel.appendChild(sdCheck);
+        sdLabel.appendChild(sdSpan);
+        sdControl.appendChild(sdLabel);
+
+        const sdDesc = document.createElement('p');
+        sdDesc.className = 'param-description';
+        sdDesc.textContent = sdDef.description;
+        sdControl.appendChild(sdDesc);
+        container.appendChild(sdControl);
+
+        // Tier 1 slider
+        const t1Def = schemaSection.stepdown_initial_group;
         container.appendChild(this.createTransformersSlider(
-            'repetition_penalty', rpDef.label,
-            rpDef.min, rpDef.max, rpDef.step,
-            currentValues.repetition_penalty ?? rpDef.default,
-            rpDef.description
+            'stepdown_initial_group', t1Def.label,
+            t1Def.min, t1Def.max, t1Def.step,
+            currentValues.stepdown_initial_group ?? t1Def.default,
+            t1Def.description
         ));
 
-        // Max Tokens per Audio Second slider
-        const mtDef = schemaSection.max_tokens_per_audio_second;
+        // Tier 2 slider
+        const t2Def = schemaSection.stepdown_fallback_group;
         container.appendChild(this.createTransformersSlider(
-            'max_tokens_per_audio_second', mtDef.label,
-            mtDef.min, mtDef.max, mtDef.step,
-            currentValues.max_tokens_per_audio_second ?? mtDef.default,
-            mtDef.description
+            'stepdown_fallback_group', t2Def.label,
+            t2Def.min, t2Def.max, t2Def.step,
+            currentValues.stepdown_fallback_group ?? t2Def.default,
+            t2Def.description
+        ));
+
+        // Phase 4: Mode-awareness — hide step-down for framers that don't use it
+        const passKey = this.state.currentCustomize;
+        if (passKey) {
+            const framerSelect = document.getElementById(`${passKey}-framer`);
+            const framerVal = framerSelect ? framerSelect.value : '';
+            if (framerVal === 'srt-source' || framerVal === 'manual') {
+                // Hide step-down section — not applicable for fixed-boundary framers
+                sdHeader.style.display = 'none';
+                sdControl.style.display = 'none';
+                container.querySelectorAll('[data-param="stepdown_initial_group"], [data-param="stepdown_fallback_group"]').forEach(el => {
+                    el.style.display = 'none';
+                });
+            }
+        }
+    },
+
+    // ── Tab 5: Output ────────────────────────────────────────────────
+    generateQwenOutputTab(tabId, schemaSection, currentValues) {
+        const container = document.getElementById(tabId);
+
+        // Subtitle Formatting group header
+        const fmtHeader = document.createElement('div');
+        fmtHeader.className = 'param-group-header';
+        fmtHeader.textContent = 'Subtitle Formatting';
+        container.appendChild(fmtHeader);
+
+        // Post-processing preset dropdown
+        const presetDef = schemaSection.postprocess_preset;
+        container.appendChild(this.createTransformersDropdown(
+            'postprocess_preset', presetDef.label,
+            presetDef.options,
+            currentValues.postprocess_preset || presetDef.default,
+            presetDef.description
         ));
     },
 

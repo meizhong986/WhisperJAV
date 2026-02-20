@@ -1760,11 +1760,13 @@ class WhisperJAVAPI:
         Get parameter schema for Qwen3-ASR pipeline customize modal.
 
         Returns the schema used by the frontend to generate the customize
-        modal UI for Qwen3-ASR pipeline parameters.
+        modal UI for Qwen3-ASR pipeline parameters.  Organized into 5
+        pipeline-stage sections: model, audio, generation, alignment, output.
         """
         return {
             "success": True,
             "schema": {
+                # ── Tab 1: Model ──────────────────────────────────────
                 "model": {
                     "model_id": {
                         "type": "dropdown",
@@ -1773,57 +1775,8 @@ class WhisperJAVAPI:
                             {"value": "Qwen/Qwen3-ASR-1.7B", "label": "Qwen3-ASR-1.7B (8GB VRAM)"},
                             {"value": "Qwen/Qwen3-ASR-0.6B", "label": "Qwen3-ASR-0.6B (4GB VRAM)"},
                         ],
-                        "default": "Qwen/Qwen3-ASR-1.7B"
-                    },
-                    "device": {
-                        "type": "dropdown",
-                        "label": "Device",
-                        "options": [
-                            {"value": "auto", "label": "Auto (detect GPU)"},
-                            {"value": "cuda", "label": "CUDA (GPU)"},
-                            {"value": "cpu", "label": "CPU"},
-                        ],
-                        "default": "auto"
-                    },
-                    "dtype": {
-                        "type": "dropdown",
-                        "label": "Data Type",
-                        "options": [
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "float16", "label": "Float16 (faster)"},
-                            {"value": "bfloat16", "label": "BFloat16"},
-                            {"value": "float32", "label": "Float32 (slower)"},
-                        ],
-                        "default": "auto"
-                    },
-                    "attn_implementation": {
-                        "type": "dropdown",
-                        "label": "Attention",
-                        "options": [
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "sdpa", "label": "SDPA (fastest)"},
-                            {"value": "flash_attention_2", "label": "Flash Attention 2"},
-                            {"value": "eager", "label": "Eager (slowest)"},
-                        ],
-                        "default": "auto"
-                    },
-                },
-                "quality": {
-                    "batch_size": {
-                        "type": "slider",
-                        "label": "Batch Size",
-                        "min": 1,
-                        "max": 8,
-                        "step": 1,
-                        "default": 1
-                    },
-                    "max_new_tokens": {
-                        "type": "slider",
-                        "label": "Max New Tokens",
-                        "min": 1024,
-                        "max": 8192,
-                        "step": 512,
-                        "default": 4096
+                        "default": "Qwen/Qwen3-ASR-1.7B",
+                        "description": "1.7B is more accurate, 0.6B is faster and uses less VRAM",
                     },
                     "language": {
                         "type": "dropdown",
@@ -1834,107 +1787,194 @@ class WhisperJAVAPI:
                             {"value": "Chinese", "label": "Chinese"},
                             {"value": "null", "label": "Auto-detect"},
                         ],
-                        "default": "Japanese"
+                        "default": "Japanese",
+                        "description": "Force language or auto-detect",
+                    },
+                    "context": {
+                        "type": "textarea",
+                        "label": "Context Hints",
+                        "description": "Actress names, terminology, studio name. Improves accuracy.",
+                        "default": "",
+                        "placeholder": "actress names, terminology...",
+                    },
+                    # Hardware (collapsed in frontend via <details>)
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "group": "hardware",
+                        "options": [
+                            {"value": "auto", "label": "Auto (detect GPU)"},
+                            {"value": "cuda", "label": "CUDA (GPU)"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto",
+                    },
+                    "dtype": {
+                        "type": "dropdown",
+                        "label": "Data Type",
+                        "group": "hardware",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "float16", "label": "Float16 (faster)"},
+                            {"value": "bfloat16", "label": "BFloat16"},
+                            {"value": "float32", "label": "Float32 (slower)"},
+                        ],
+                        "default": "auto",
+                    },
+                    "attn_implementation": {
+                        "type": "dropdown",
+                        "label": "Attention",
+                        "group": "hardware",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "sdpa", "label": "SDPA (fastest)"},
+                            {"value": "flash_attention_2", "label": "Flash Attention 2"},
+                            {"value": "eager", "label": "Eager (slowest)"},
+                        ],
+                        "default": "auto",
                     },
                 },
-                "aligner": {
-                    "use_aligner": {
+                # ── Tab 2: Audio ──────────────────────────────────────
+                "audio": {
+                    "safe_chunking": {
                         "type": "checkbox",
-                        "label": "Use ForcedAligner",
-                        "default": True
+                        "label": "Safe Chunking",
+                        "description": "Enforce scene boundaries for ForcedAligner 180s limit",
+                        "default": True,
+                    },
+                    "scene_min_duration": {
+                        "type": "slider",
+                        "label": "Min Duration",
+                        "description": "Minimum scene length (default: 12s)",
+                        "group": "scene_bounds",
+                        "min": 5, "max": 60, "step": 1,
+                        "default": 12,
+                    },
+                    "scene_max_duration": {
+                        "type": "slider",
+                        "label": "Max Duration",
+                        "description": "Maximum scene length (default: 48s)",
+                        "group": "scene_bounds",
+                        "min": 20, "max": 300, "step": 5,
+                        "default": 48,
+                    },
+                    "max_group_duration": {
+                        "type": "slider",
+                        "label": "Max Group Duration",
+                        "description": "Maximum duration for VAD segment grouping",
+                        "min": 3, "max": 60, "step": 1,
+                        "default": 6,
+                    },
+                },
+                # ── Tab 3: Generation ─────────────────────────────────
+                "generation": {
+                    "batch_size": {
+                        "type": "slider",
+                        "label": "Batch Size",
+                        "description": "1 recommended for accuracy, higher for speed",
+                        "min": 1, "max": 8, "step": 1,
+                        "default": 1,
+                    },
+                    "max_new_tokens": {
+                        "type": "slider",
+                        "label": "Max New Tokens",
+                        "description": "Maximum tokens per segment (4096 covers ~5-10 min audio)",
+                        "min": 1024, "max": 8192, "step": 512,
+                        "default": 4096,
+                    },
+                    # Safety (collapsed in frontend via <details>)
+                    "repetition_penalty": {
+                        "type": "slider",
+                        "label": "Repetition Penalty",
+                        "description": "Penalizes repeated tokens (1.0=off, >1.0=penalize)",
+                        "group": "safety",
+                        "min": 0.8, "max": 2.0, "step": 0.05,
+                        "default": 1.1,
+                    },
+                    "max_tokens_per_audio_second": {
+                        "type": "slider",
+                        "label": "Token Budget",
+                        "description": "Max tokens per audio second. Prevents runaway generation.",
+                        "group": "safety",
+                        "min": 5.0, "max": 40.0, "step": 1.0,
+                        "default": 20.0,
+                    },
+                },
+                # ── Tab 4: Alignment ──────────────────────────────────
+                "alignment": {
+                    "aligner_backend": {
+                        "type": "dropdown",
+                        "label": "Aligner Backend",
+                        "description": "Provides precise word timestamps for subtitle timing",
+                        "options": [
+                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (recommended)"},
+                            {"value": "none", "label": "None (no word timestamps)"},
+                        ],
+                        "default": "qwen3",
                     },
                     "aligner_id": {
                         "type": "dropdown",
                         "label": "Aligner Model",
                         "options": [
-                            {"value": "Qwen/Qwen3-ForcedAligner-0.6B", "label": "Qwen3-ForcedAligner-0.6B (default)"},
+                            {"value": "Qwen/Qwen3-ForcedAligner-0.6B", "label": "Qwen3-ForcedAligner-0.6B"},
                         ],
-                        "default": "Qwen/Qwen3-ForcedAligner-0.6B"
+                        "default": "Qwen/Qwen3-ForcedAligner-0.6B",
                     },
-                },
-                "postprocess": {
-                    "japanese_postprocess": {
-                        "type": "checkbox",
-                        "label": "Japanese Post-processing (deprecated, no effect for Qwen3)",
-                        "default": False
-                    },
-                    "postprocess_preset": {
+                    "assembly_cleaner": {
                         "type": "dropdown",
-                        "label": "Preset",
+                        "label": "Text Cleaner",
+                        "description": "Pre-alignment text cleaning removes ASR artifacts",
                         "options": [
-                            {"value": "high_moan", "label": "High Moan (JAV optimized)"},
-                            {"value": "default", "label": "Default (general)"},
-                            {"value": "narrative", "label": "Narrative (story focus)"},
+                            {"value": "qwen3", "label": "Qwen3 AssemblyTextCleaner"},
+                            {"value": "passthrough", "label": "Passthrough (no cleaning)"},
                         ],
-                        "default": "high_moan"
-                    },
-                },
-                "scene": {
-                    "scene": {
-                        "type": "dropdown",
-                        "label": "Scene Detection",
-                        "options": [
-                            {"value": "semantic", "label": "Semantic (recommended)"},
-                            {"value": "auditok", "label": "Auditok (energy-based)"},
-                            {"value": "silero", "label": "Silero (neural VAD)"},
-                            {"value": "none", "label": "None (process whole file)"},
-                        ],
-                        "default": "semantic"
-                    },
-                },
-                "context": {
-                    "context": {
-                        "type": "textarea",
-                        "label": "Context Hints",
-                        "description": "Actress names, terminology, studio name. Improves transcription accuracy.",
-                        "default": "",
-                        "placeholder": "actress names, terminology..."
+                        "default": "qwen3",
                     },
                     "timestamp_mode": {
                         "type": "dropdown",
                         "label": "Timestamp Mode",
-                        "description": "How word timestamps are resolved from aligner output.",
+                        "description": "How word timestamps are resolved from aligner output",
                         "options": [
                             {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback (Recommended)"},
                             {"value": "aligner_interpolation", "label": "Aligner + Interpolation"},
                             {"value": "aligner_only", "label": "Aligner Only"},
                             {"value": "vad_only", "label": "VAD Only"},
                         ],
-                        "default": "aligner_vad_fallback"
-                    },
-                    "repetition_penalty": {
-                        "type": "slider",
-                        "label": "Repetition Penalty",
-                        "description": "Penalizes repeated tokens during generation. Higher = less repetition.",
-                        "min": 0.8, "max": 2.0, "step": 0.05,
-                        "default": 1.1
-                    },
-                    "max_tokens_per_audio_second": {
-                        "type": "slider",
-                        "label": "Max Tokens per Audio Second",
-                        "description": "Dynamic token budget for generation safety. Prevents runaway generation.",
-                        "min": 5.0, "max": 40.0, "step": 1.0,
-                        "default": 20.0
+                        "default": "aligner_vad_fallback",
                     },
                     "stepdown": {
                         "type": "checkbox",
                         "label": "Adaptive Step-Down",
-                        "description": "Try initial groups first, retry collapsed at fallback size",
+                        "description": "Retry collapsed scenes with tighter framing",
                         "default": True,
                     },
                     "stepdown_initial_group": {
                         "type": "slider",
                         "label": "Tier 1 Duration (s)",
-                        "description": "Group duration for step-down Tier 1.",
+                        "description": "Initial group duration for step-down",
                         "min": 4.0, "max": 30.0, "step": 1.0,
                         "default": 6.0,
                     },
                     "stepdown_fallback_group": {
                         "type": "slider",
                         "label": "Tier 2 Duration (s)",
-                        "description": "Tight fallback group duration for step-down Tier 2.",
+                        "description": "Tight fallback group duration",
                         "min": 4.0, "max": 15.0, "step": 1.0,
                         "default": 6.0,
+                    },
+                },
+                # ── Tab 5: Output ─────────────────────────────────────
+                "output": {
+                    "postprocess_preset": {
+                        "type": "dropdown",
+                        "label": "Post-processing Preset",
+                        "description": "Regrouping preset for subtitle line breaks and timing",
+                        "options": [
+                            {"value": "high_moan", "label": "High Moan (JAV optimized)"},
+                            {"value": "default", "label": "Default (general)"},
+                            {"value": "narrative", "label": "Narrative (story focus)"},
+                        ],
+                        "default": "high_moan",
                     },
                 },
             }

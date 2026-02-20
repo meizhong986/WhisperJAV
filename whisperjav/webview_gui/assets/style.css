@@ -2446,6 +2446,60 @@ details.translation-advanced-section[open] .collapse-icon {
     border-bottom: 1px solid var(--border-color);
 }
 
+/* Pipeline-stage group headers (Qwen modal) */
+.param-group-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.param-group-header:first-child {
+    margin-top: 0;
+}
+
+/* Collapsible details sections (Qwen modal) */
+.param-group-details {
+    margin: 12px 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--background-secondary);
+}
+
+.param-group-details summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    user-select: none;
+}
+
+.param-group-details summary:hover {
+    color: var(--text-primary);
+    background: var(--background-tertiary);
+    border-radius: var(--border-radius);
+}
+
+.param-group-details .details-content {
+    padding: 4px 12px 12px;
+}
+
+/* Informational notes within param tabs */
+.param-note {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--background-secondary);
+    border-left: 3px solid var(--border-color);
+    padding: 8px 12px;
+    margin: 8px 0;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+}
+
 /* Backend header with selector */
 .backend-header {
     background: var(--background-tertiary);

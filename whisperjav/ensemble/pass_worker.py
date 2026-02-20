@@ -413,6 +413,9 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "input_mode": "qwen_input_mode",
         "framer": "qwen_framer",
         "safe_chunking": "qwen_safe_chunking",
+        "scene_min_duration": "qwen_scene_min_duration",
+        "scene_max_duration": "qwen_scene_max_duration",
+        "aligner_backend": "qwen_aligner_backend",
         "timestamp_mode": "qwen_timestamp_mode",
         "assembly_cleaner": "qwen_assembly_cleaner",
         "repetition_penalty": "qwen_repetition_penalty",
@@ -437,6 +440,19 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     # Handle use_aligner special case: if False, set aligner to None
     if qwen_params.get("use_aligner") is False:
         params["qwen_aligner"] = None
+
+    # Handle aligner_backend: "none" → disable aligner, "qwen3" → keep existing
+    aligner_backend = qwen_params.get("aligner_backend")
+    if aligner_backend == "none":
+        params["qwen_aligner"] = None
+        params["qwen_timestamps"] = "none"  # Pipeline derives use_aligner from timestamps
+    # ("qwen3" or absent → no change, use existing aligner_id)
+
+    # Handle assembly_cleaner string values (GUI sends "qwen3"/"passthrough",
+    # CLI sends bool via store_true/store_false)
+    ac = params.get("qwen_assembly_cleaner")
+    if isinstance(ac, str):
+        params["qwen_assembly_cleaner"] = ac != "passthrough"
 
     return params
 
@@ -914,6 +930,10 @@ def _build_pipeline(
             "segmenter_config": segmenter_config if segmenter_config else None,
         }
         # Pipeline-owned defaults: only forward when ensemble config explicitly overrides
+        if "qwen_scene_min_duration" in qwen_defaults:
+            qwen_pipeline_params["scene_min_duration"] = qwen_defaults["qwen_scene_min_duration"]
+        if "qwen_scene_max_duration" in qwen_defaults:
+            qwen_pipeline_params["scene_max_duration"] = qwen_defaults["qwen_scene_max_duration"]
         if "qwen_max_group_duration" in qwen_defaults:
             qwen_pipeline_params["segmenter_max_group_duration"] = qwen_defaults["qwen_max_group_duration"]
         if "qwen_stepdown_initial_group" in qwen_defaults:
