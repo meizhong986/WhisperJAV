@@ -73,8 +73,13 @@ def setup_logger(name: str = "whisperjav",
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, log_level.upper()))
 
-    # Remove existing handlers
+    # Remove existing handlers and prevent propagation to root logger.
+    # Without this, messages duplicate when any dependency triggers
+    # logging.basicConfig() — the root handler re-emits our messages
+    # through stderr, doubling subprocess pipe traffic and risking
+    # pipe buffer deadlocks on Windows GUI subprocesses.
     logger.handlers = []
+    logger.propagate = False
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
