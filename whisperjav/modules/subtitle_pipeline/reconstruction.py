@@ -138,5 +138,6 @@ def reconstruct_from_words(
         demucs=False,
         suppress_silence=suppress_silence,
         suppress_word_ts=suppress_silence,
+        force_order=True,
         verbose=False,
     )
