@@ -14,8 +14,8 @@ Architecture: standalone module-level functions (no class), same pattern as
 merge_master_with_timestamps() in qwen_asr.py.  Independently testable.
 
 Integration points:
-    - Assembly mode: Phase 5 Step 8, after merge_master_with_timestamps()
-    - Coupled modes: after asr.transcribe() returns a WhisperResult
+    - Orchestrator Step 9: after word merging, before reconstruction + hardening
+    - extract_words_from_result(): adapter for WhisperResult → word dicts
 """
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -172,7 +172,7 @@ def assess_alignment_quality(
 
 
 # ---------------------------------------------------------------------------
-# Word extraction (coupled-mode adapter)
+# Word extraction (WhisperResult → word dicts adapter)
 # ---------------------------------------------------------------------------
 
 def extract_words_from_result(result) -> List[Dict[str, Any]]:
@@ -180,8 +180,8 @@ def extract_words_from_result(result) -> List[Dict[str, Any]]:
     Extract word dicts from a WhisperResult's segments.
 
     Produces the same [{word, start, end}] format as merge_master_with_timestamps(),
-    enabling the existing sentinel + recovery pipeline to work on coupled-mode results
-    (where only the final WhisperResult is available, not raw word dicts).
+    enabling the sentinel + recovery pipeline to work on WhisperResult objects
+    (where only the final result is available, not raw word dicts).
 
     Args:
         result: A stable_whisper.WhisperResult with .segments, each segment

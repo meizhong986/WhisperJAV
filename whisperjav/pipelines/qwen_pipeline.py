@@ -8,16 +8,21 @@ for other ASR types.
 
 9-Phase Flow:
     1. Audio Extraction (48kHz)
-    2. Scene Detection (optional, default: none)
+    2. Scene Detection (default: semantic, safe chunking 12-48s)
     3. Speech Enhancement (optional, VRAM Block 1)
-    4. Speech Segmentation / VAD (optional)
-    5. ASR Transcription (VRAM Block 2, includes sentencer)
+    4. Speech Segmentation / VAD (default: TEN)
+    5. ASR Transcription (VRAM Block 2, DecoupledSubtitlePipeline)
     6. Scene SRT Generation (micro-subs)
     7. SRT Stitching
-    8. Sanitisation
+    8. Sanitisation (skipped — no Qwen-specific sanitizer)
     9. Analytics
 
+Since Phase 4 (Strangulation), only the assembly mode code path exists.
+Legacy mode names (context_aware, vad_slicing) map to assembly with
+appropriate framer overrides.
+
 See: docs/architecture/ADR-004-dedicated-qwen-pipeline.md
+See: docs/architecture/QWEN-PIPELINE-REFERENCE.md
 """
 
 import json
@@ -45,8 +50,8 @@ from whisperjav.utils.logger import logger
 
 # Lazy imports to avoid loading heavy modules until needed:
 #   - SceneDetectorFactory (from whisperjav.modules.scene_detection_backends)
-#   - QwenASR (from whisperjav.modules.qwen_asr)
 #   - SpeechSegmenterFactory (from whisperjav.modules.speech_segmentation)
+#   - DecoupledSubtitlePipeline (from whisperjav.modules.subtitle_pipeline.orchestrator)
 
 
 class InputMode(Enum):
@@ -88,15 +93,15 @@ class QwenPipeline(BasePipeline):
         # === Input Mode Configuration ===
         # Controls audio input strategy for Qwen3-ASR (LALM)
         qwen_input_mode: str = "assembly",  # "assembly" (default), "context_aware", or "vad_slicing"
-        qwen_safe_chunking: bool = True,  # Enforce scene boundaries for context-aware mode
+        qwen_safe_chunking: bool = True,  # Enforce 12-48s scene boundaries for ForcedAligner
 
         # Temporal framing for assembly mode (GAP-5)
         qwen_framer: str = "full-scene",  # "full-scene", "vad-grouped", "srt-source"
         framer_srt_path: Optional[str] = None,  # SRT file path (for srt-source framer)
 
         # Scene detection (Phase 2)
-        # Default to "semantic" for context-aware mode - it has true MERGE logic
-        # to guarantee min_duration is met (unlike auditok/silero which only filter)
+        # Default to "semantic" - it has true MERGE logic to guarantee
+        # min_duration is met (unlike auditok/silero which only filter)
         scene_detector: str = "semantic",
 
         # Speech enhancement (Phase 3)
@@ -122,7 +127,7 @@ class QwenPipeline(BasePipeline):
         attn_implementation: str = "auto",
 
         # Timestamp resolution (bridges Phase 4 VAD and Phase 5 ASR)
-        timestamp_mode: str = "aligner_interpolation",  # New default for context-aware
+        timestamp_mode: str = "aligner_interpolation",  # Pipeline default; CLI overrides to aligner_vad_fallback
 
         # Japanese post-processing — DISABLED for Qwen3 (C2 fix, ADR-006).
         # Qwen3 uses AssemblyTextCleaner, not the Whisper-era JapanesePostProcessor.

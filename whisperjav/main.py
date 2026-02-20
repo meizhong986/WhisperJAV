@@ -488,7 +488,7 @@ def parse_arguments():
                            choices=["default", "high_moan", "narrative"],
                            help="Japanese post-processing preset (default: high_moan for JAV): 'high_moan' (adult content, preserves short vocalizations), 'default' (general conversational), 'narrative' (longer passages)")
 
-    # Context-Aware Chunking
+    # Input Mode (assembly is sole active path since Phase 4)
     qwen_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default, recommended). "
@@ -497,7 +497,7 @@ def parse_arguments():
                                 "vad-grouped respectively.")
     qwen_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_true", default=True,
-                           help="Enforce 150-210s scene boundaries for ForcedAligner 300s limit (default: enabled)")
+                           help="Enforce 12-48s scene boundaries for ForcedAligner 180s limit (default: enabled)")
     qwen_group.add_argument("--no-qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_false",
                            help="Disable safe chunking, allow longer scenes")
