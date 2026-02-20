@@ -118,9 +118,10 @@ class Segment:
     avg_db: float
     
     def to_dict(self):
-        # Calculate safe padding (e.g., 0.2s overlap)
-        # We clamp to 0.0 to prevent negative starts
-        pad = 0.2 
+        # Safe padding: buffer around each segment for ASR extraction.
+        # 0.5s accommodates Japanese soft consonant onsets and trailing
+        # particles/vowels that sit near the energy minimum.
+        pad = 0.5
         safe_start = max(0.0, self.start - pad)
         # Note: We don't clamp the end to duration here because we don't always 
         # have the total duration handy in this class, but ffmpeg handles over-reading fine.
