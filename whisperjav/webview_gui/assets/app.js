@@ -1371,6 +1371,10 @@ const EnsembleManager = {
         document.getElementById('customize-pass1').addEventListener('click', () => this.openCustomize('pass1'));
         document.getElementById('customize-pass2').addEventListener('click', () => this.openCustomize('pass2'));
 
+        // Parameter guide buttons
+        document.getElementById('guide-pass1')?.addEventListener('click', () => pywebview.api.open_guide('qwen_guide'));
+        document.getElementById('guide-pass2')?.addEventListener('click', () => pywebview.api.open_guide('qwen_guide'));
+
         // Modal controls
         document.getElementById('customizeModalClose').addEventListener('click', () => this.closeModal());
         document.getElementById('customizeModalApply').addEventListener('click', () => this.applyCustomization());
@@ -1561,6 +1565,10 @@ const EnsembleManager = {
             segmenterSelect.disabled = isPass2Disabled;
             segmenterSelect.title = passState.isQwen ? 'Post-ASR VAD filter for Qwen3-ASR' : '';
         }
+
+        // Parameter guide button: visible only for Qwen pipelines
+        const guideBtn = document.getElementById(`guide-${passKey}`);
+        if (guideBtn) guideBtn.style.display = passState.isQwen ? '' : 'none';
     },
 
     handleSensitivityChange(passKey, newValue, selectElement) {

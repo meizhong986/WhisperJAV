@@ -2706,6 +2706,17 @@ class WhisperJAVAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def open_guide(self, guide_name: str = "qwen_guide") -> Dict[str, Any]:
+        """Open a bundled HTML guide in the system browser."""
+        try:
+            guide_path = Path(__file__).parent / "assets" / f"{guide_name}.html"
+            if not guide_path.exists():
+                return {"success": False, "error": f"Guide not found: {guide_path.name}"}
+            webbrowser.open(guide_path.as_uri())
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     # ========================================================================
     # Translation API (Phase 2 - Translator Tab Support)
     # ========================================================================

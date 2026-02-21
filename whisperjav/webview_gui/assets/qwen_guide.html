@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qwen3-ASR Pipeline — Parameter Guide</title>
+<style>
+  :root {
+    --bg: #1a1b2e;
+    --bg-card: #232540;
+    --bg-code: #191a2e;
+    --border: #353760;
+    --text: #e0e0ef;
+    --text-dim: #9a9bbc;
+    --accent: #6366f1;
+    --accent-dim: #4f46e5;
+    --green: #34d399;
+    --orange: #fb923c;
+    --red: #f87171;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 24px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 28px;
+  }
+
+  /* Flow diagram */
+  .flow {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 2;
+    color: var(--text-dim);
+    overflow-x: auto;
+  }
+  .flow .stage {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .flow .arrow { color: var(--text-dim); }
+
+  /* Sections */
+  .section {
+    margin-bottom: 32px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-num {
+    background: var(--accent);
+    color: #fff;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .section-tab {
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin-left: auto;
+  }
+
+  /* Parameter cards */
+  .param {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+  }
+  .param-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #fff;
+  }
+  .param-default {
+    font-size: 12px;
+    color: var(--green);
+    margin-left: 8px;
+    font-weight: 400;
+  }
+  .param-desc {
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 6px;
+  }
+  .param-when {
+    font-size: 12px;
+    color: var(--orange);
+    margin-top: 6px;
+    padding-left: 12px;
+    border-left: 2px solid var(--orange);
+  }
+  .param-when strong { color: var(--orange); }
+
+  /* Subsection headers within a section */
+  .group-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 18px 0 8px 0;
+  }
+
+  /* Inline code */
+  code {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Qwen3-ASR Pipeline &mdash; Parameter Guide</h1>
+<p class="subtitle">Reference for all parameters in the Customize Parameters modal. Defaults work well for most JAV content.</p>
+
+<!-- Pipeline flow diagram -->
+<div class="flow">
+  <span class="stage">Audio</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Scene Detection</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Speech Enhancement</span> <span class="arrow">&rarr;</span>
+  <span class="stage">VAD Segmentation</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Text Generation</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Text Cleaning</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Forced Alignment</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Timestamp Resolution</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Subtitle Formatting</span> <span class="arrow">&rarr;</span>
+  <span class="stage">SRT</span>
+</div>
+
+<!-- ====== Section 1: Model ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">1</span>
+    <span class="section-title">Model</span>
+    <span class="section-tab">Tab 1</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">ASR Model</span>
+    <span class="param-default">Qwen3-ASR-1.7B</span>
+    <div class="param-desc">
+      The speech recognition model that converts audio to text. The 1.7B parameter model is more
+      accurate and handles complex speech better. The 0.6B model is faster and uses roughly half
+      the VRAM (4GB vs 8GB).
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Switch to 0.6B if your GPU has less than 8GB VRAM,
+      or if processing speed matters more than accuracy.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Language</span>
+    <span class="param-default">Japanese</span>
+    <div class="param-desc">
+      Forces the model to transcribe in a specific language instead of auto-detecting. For JAV
+      content, forcing Japanese avoids the model occasionally switching to Chinese for similar-sounding
+      phonemes.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Use Auto-detect for multilingual content, or force English/Chinese
+      if the primary language is not Japanese.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Context Hints</span>
+    <span class="param-default">(empty)</span>
+    <div class="param-desc">
+      Free-text hints that help the model recognize specific names and terms. The model uses
+      this as context for improved accuracy on proper nouns. Enter actress names, studio names,
+      or domain-specific terminology.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Always fill this in when you know the actress name or the video
+      contains specialized vocabulary. Example: <code>七沢みあ MOODYZ</code>
+    </div>
+  </div>
+
+  <p class="group-header">Hardware</p>
+
+  <div class="param">
+    <span class="param-name">Device</span>
+    <span class="param-default">Auto</span>
+    <div class="param-desc">
+      Where the model runs. Auto detects your GPU; CUDA forces GPU; CPU forces processor-only
+      (much slower). Most users should leave this on Auto.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Force CPU if you encounter CUDA out-of-memory errors and
+      don't want to switch to the 0.6B model.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Data Type</span>
+    <span class="param-default">Auto</span>
+    <div class="param-desc">
+      Model precision. Float16 is fastest on most NVIDIA GPUs. BFloat16 is best on Ampere+ GPUs
+      (RTX 30xx/40xx). Float32 uses more memory and is slower but may be needed on older hardware.
+      Auto selects the best option for your GPU.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Try Float16 explicitly if Auto seems slow, or Float32 if you
+      see NaN/garbled output (rare).
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Attention</span>
+    <span class="param-default">Auto</span>
+    <div class="param-desc">
+      The attention algorithm used internally. SDPA (Scaled Dot-Product Attention) is fastest on
+      most GPUs. Flash Attention 2 requires a separate install and specific hardware.
+      Eager is the slowest but most compatible fallback.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Only if you have Flash Attention 2 installed and want to try
+      it, or if you encounter attention-related errors (switch to Eager).
+    </div>
+  </div>
+</div>
+
+<!-- ====== Section 2: Audio ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">2</span>
+    <span class="section-title">Audio</span>
+    <span class="section-tab">Tab 2</span>
+  </div>
+
+  <p class="group-header">Scene Detection</p>
+
+  <div class="param">
+    <span class="param-name">Safe Chunking</span>
+    <span class="param-default">On</span>
+    <div class="param-desc">
+      Enforces scene boundaries so no audio segment exceeds the ForcedAligner's 180-second (3-minute)
+      processing limit. When enabled, any scene longer than 180s is automatically re-split at silence
+      boundaries. Disabling this risks aligner failures on long scenes.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Only disable if you've also disabled the ForcedAligner entirely
+      (Aligner Backend = None). Otherwise, always keep this on.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Min Scene Duration</span>
+    <span class="param-default">12s</span>
+    <div class="param-desc">
+      Minimum length for a detected scene. Scenes shorter than this are merged with their neighbors.
+      Too low and you get fragmented tiny scenes with lost context. Too high and the detector
+      can't split at natural boundaries.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Lower to 6-8s for rapid dialogue with many short exchanges.
+      Raise to 20-30s for long monologue content.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Max Scene Duration</span>
+    <span class="param-default">48s</span>
+    <div class="param-desc">
+      Maximum length for a detected scene. Scenes longer than this are forcibly split. The default
+      of 48s keeps scenes well within the aligner's 180s limit while preserving context.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Increase to 90-120s if you see natural conversations getting
+      cut mid-sentence. Decrease to 30s if scenes feel too long for accurate alignment.
+    </div>
+  </div>
+
+  <p class="group-header">VAD Grouping</p>
+
+  <div class="param">
+    <span class="param-name">Max Group Duration</span>
+    <span class="param-default">6s</span>
+    <div class="param-desc">
+      Within each scene, VAD (Voice Activity Detection) segments are grouped into chunks for
+      processing. This sets the maximum duration of each group. Shorter groups mean more precise
+      text generation and alignment but add processing overhead.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Increase to 10-15s if you get sentence fragments or words
+      split across subtitle lines. Decrease to 3-4s for very rapid dialogue where precision matters.
+    </div>
+  </div>
+</div>
+
+<!-- ====== Section 3: Generation ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">3</span>
+    <span class="section-title">Generation</span>
+    <span class="section-tab">Tab 3</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Batch Size</span>
+    <span class="param-default">1</span>
+    <div class="param-desc">
+      How many audio segments are processed simultaneously by the ASR model. Batch size 1 processes
+      segments one at a time, giving the model full attention and best accuracy. Higher values
+      use more VRAM but process faster.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Increase to 2-4 if you have VRAM headroom (16GB+) and want
+      faster processing. Keep at 1 for maximum accuracy or if VRAM is limited.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Max New Tokens</span>
+    <span class="param-default">4096</span>
+    <div class="param-desc">
+      Maximum number of text tokens the model can generate per segment. 4096 tokens covers
+      roughly 5-10 minutes of spoken audio. This is a safety ceiling, not a target &mdash; most
+      segments use far fewer tokens.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Increase to 6144-8192 only if you see transcriptions getting
+      cut off (truncated mid-sentence at the end of a segment). This is rare with default scene bounds.
+    </div>
+  </div>
+
+  <p class="group-header">Generation Safety</p>
+
+  <div class="param">
+    <span class="param-name">Repetition Penalty</span>
+    <span class="param-default">1.1</span>
+    <div class="param-desc">
+      Penalizes the model for repeating the same tokens. A value of 1.0 disables the penalty entirely.
+      Values above 1.0 make repetition progressively less likely. Repetition manifests as the model
+      generating the same word or phrase in a loop (e.g., <code>あああああ</code> or the same sentence repeated).
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Increase to 1.2-1.3 if you notice repetitive output loops.
+      Decrease toward 1.0 if the model seems to avoid naturally repeated words in conversation
+      (like <code>はい、はい</code>).
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Token Budget</span>
+    <span class="param-default">20.0 tokens/sec</span>
+    <div class="param-desc">
+      Maximum tokens the model is allowed to generate per second of audio. This is a safety net
+      that stops runaway generation &mdash; if the model hallucinates, it starts producing far more
+      text than real speech warrants. Normal Japanese speech produces roughly 5-10 tokens per second.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Increase to 30-40 only if legitimate speech is being truncated
+      (very fast speakers). Lower to 10-15 if you see excessive hallucinated text.
+    </div>
+  </div>
+</div>
+
+<!-- ====== Section 4: Alignment ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">4</span>
+    <span class="section-title">Alignment</span>
+    <span class="section-tab">Tab 4</span>
+  </div>
+
+  <p class="group-header">Forced Aligner</p>
+
+  <div class="param">
+    <span class="param-name">Aligner Backend</span>
+    <span class="param-default">Qwen3 ForcedAligner</span>
+    <div class="param-desc">
+      The ForcedAligner takes the generated text and the original audio, then produces precise
+      word-level timestamps. This is what makes subtitles appear at the right moment. Disabling it
+      (None) falls back to VAD-based timing, which is less precise.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Set to None if you have severe VRAM constraints (the aligner
+      loads a separate 0.6B model) or if alignment is consistently failing on your content.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Aligner Model</span>
+    <span class="param-default">Qwen3-ForcedAligner-0.6B</span>
+    <div class="param-desc">
+      The model used for forced alignment. Currently only the 0.6B variant is available.
+      It has a hard processing limit of 180 seconds per segment (enforced by Safe Chunking
+      in the Audio tab).
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> No alternative currently available. Leave as-is.
+    </div>
+  </div>
+
+  <p class="group-header">Text Cleaner</p>
+
+  <div class="param">
+    <span class="param-name">Text Cleaner</span>
+    <span class="param-default">Qwen3 AssemblyTextCleaner</span>
+    <div class="param-desc">
+      Cleans up ASR output before alignment. Removes artifacts like stray punctuation, repeated
+      filler sequences, and formatting issues that would confuse the aligner. Passthrough skips
+      all cleaning and sends raw ASR output directly to alignment.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Switch to Passthrough if the cleaner is removing text you want
+      to keep, or for debugging alignment issues (to rule out the cleaner as the cause).
+    </div>
+  </div>
+
+  <p class="group-header">Timestamp Resolution</p>
+
+  <div class="param">
+    <span class="param-name">Timestamp Mode</span>
+    <span class="param-default">Aligner + VAD Fallback</span>
+    <div class="param-desc">
+      How word timestamps are resolved from the aligner's output. The four modes are:
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>Aligner + VAD Fallback</strong> &mdash; Uses aligner timestamps when available; for words
+      the aligner couldn't place, falls back to VAD segment boundaries. Best overall accuracy.<br>
+      <strong>Aligner + Interpolation</strong> &mdash; Uses aligner timestamps, fills gaps by
+      interpolating evenly between placed words. Better for sparse aligner output.<br>
+      <strong>Aligner Only</strong> &mdash; Only uses successfully aligned words; drops any word the
+      aligner couldn't place. Can produce gaps in subtitles.<br>
+      <strong>VAD Only</strong> &mdash; Ignores aligner entirely; uses VAD segment boundaries for all
+      timestamps. Fastest but least precise.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Try Aligner + Interpolation if you see subtitle lines with
+      jagged timing. Use VAD Only if you've disabled the aligner backend.
+    </div>
+  </div>
+
+  <p class="group-header">Step-Down Retry</p>
+
+  <div class="param">
+    <span class="param-name">Adaptive Step-Down</span>
+    <span class="param-default">On</span>
+    <div class="param-desc">
+      When alignment fails for a scene (all word timestamps collapse to a single point), step-down
+      automatically retries the scene with tighter framing &mdash; breaking the audio into smaller
+      segments and re-running generation + alignment. This recovers most collapsed scenes without
+      user intervention.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Disable only for debugging, or if step-down retries are making
+      processing unacceptably slow on very long videos.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Tier 1 Duration</span>
+    <span class="param-default">6.0s</span>
+    <div class="param-desc">
+      The initial group duration used when step-down is triggered. The scene is re-framed into
+      segments of this length and re-processed. If this tier also fails, Tier 2 is attempted.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Decrease to 3-4s if Tier 1 retries are still collapsing.
+      Increase to 10-15s if step-down is splitting sentences unnaturally.
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Tier 2 Duration</span>
+    <span class="param-default">6.0s</span>
+    <div class="param-desc">
+      The fallback group duration if Tier 1 step-down also fails. This is the tightest framing
+      before giving up on alignment for a scene. Smaller values give the aligner less audio
+      context but are more likely to avoid collapse.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Decrease to 3-4s for maximum recovery rate. Values below 3s
+      may not contain enough audio for meaningful alignment.
+    </div>
+  </div>
+</div>
+
+<!-- ====== Section 5: Output ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">5</span>
+    <span class="section-title">Output</span>
+    <span class="section-tab">Tab 5</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Post-processing Preset</span>
+    <span class="param-default">High Moan (JAV optimized)</span>
+    <div class="param-desc">
+      Controls how subtitle lines are regrouped and formatted in the final SRT output. Each preset
+      tunes gap-splitting thresholds, maximum subtitle duration, and merge behavior:
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>High Moan</strong> &mdash; Optimized for JAV content. Splits aggressively at short
+      gaps (1.5s), caps subtitle lines at 8 seconds, and preserves breathy/moaning segments as
+      separate subtitles.<br>
+      <strong>Default</strong> &mdash; General-purpose regrouping. Standard gap thresholds and merge
+      behavior suitable for most spoken content.<br>
+      <strong>Narrative</strong> &mdash; Optimized for story-driven content with longer dialogue.
+      Allows longer subtitle lines and merges more aggressively to maintain sentence flow.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Switch to Default or Narrative for interview, documentary,
+      or drama content where dialogue is continuous and moaning segments are absent.
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  WhisperJAV &mdash; Qwen3-ASR Parameter Guide
+</div>
+
+</body>
+</html>

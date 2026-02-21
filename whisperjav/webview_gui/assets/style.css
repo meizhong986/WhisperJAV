@@ -1536,6 +1536,28 @@ button:focus-visible,
     white-space: nowrap;
 }
 
+/* Help icon button (parameter guide) */
+.btn-help-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--background-secondary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    line-height: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.btn-help-icon:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
 /* Pass badge indicators */
 .pass-badge {
     font-size: 9px;
