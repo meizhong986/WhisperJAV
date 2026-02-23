@@ -41,6 +41,7 @@ from whisperjav.modules.subtitle_pipeline.types import (
     SceneDiagnostics,
     StepDownConfig,
     TemporalFrame,
+    TimestampMode,
 )
 from whisperjav.utils.logger import logger
 
@@ -711,15 +712,22 @@ class DecoupledSubtitlePipeline:
                 recovery_info = None
 
                 if scene_alignments is not None:
-                    # Aligned workflow: merge frame-relative → scene-relative
+                    # Branch A: Aligned workflow — merge frame-relative → scene-relative
                     all_words = self._merge_frame_words(frames, scene_alignments[scene_idx])
                     word_count = len(all_words)
 
-                    # Sentinel assessment
+                    # Sentinel assessment (always run for diagnostics visibility)
                     assessment = assess_alignment_quality(all_words, duration)
                     sentinel_status = assessment["status"]
 
-                    if sentinel_status == "COLLAPSED":
+                    # G3 fix: aligner_only mode wants raw aligner output —
+                    # assess for diagnostics but skip recovery even if collapsed.
+                    skip_recovery = (
+                        self.hardening_config.timestamp_mode == TimestampMode.ALIGNER_ONLY
+                    )
+
+                    if sentinel_status == "COLLAPSED" and not skip_recovery:
+                        # Standard recovery path (aligner_interpolation, aligner_vad_fallback)
                         self.sentinel_stats["collapsed_scenes"] += 1
                         total_collapses += 1
                         logger.warning(
@@ -746,13 +754,24 @@ class DecoupledSubtitlePipeline:
 
                         # Reconstruct with suppress_silence=False (H3 fix)
                         result = reconstruct_from_words(corrected_words, audio_path, suppress_silence=False)
+
+                    elif sentinel_status == "COLLAPSED" and skip_recovery:
+                        # aligner_only: log collapse but keep raw aligner timestamps
+                        self.sentinel_stats["collapsed_scenes"] += 1
+                        total_collapses += 1
+                        logger.info(
+                            "[SENTINEL] Scene %d/%d: COLLAPSED but aligner_only mode "
+                            "— keeping raw aligner timestamps (no recovery)",
+                            scene_idx + 1, n_scenes,
+                        )
+                        result = reconstruct_from_words(all_words, audio_path, suppress_silence=False)
                     else:
-                        # ForcedAligner timestamps are already accurate — don't let
-                        # stable-ts's crude loudness quantizer shrink them.
+                        # OK path — ForcedAligner timestamps are already accurate.
+                        # Don't let stable-ts's crude loudness quantizer shrink them.
                         result = reconstruct_from_words(all_words, audio_path, suppress_silence=False)
 
                 else:
-                    # Aligner-free: build word dicts from frame boundaries
+                    # Branch B: Aligner-free — build word dicts from frame boundaries
                     words = []
                     for frame, text in zip(frames, texts):
                         if text.strip():
@@ -764,7 +783,14 @@ class DecoupledSubtitlePipeline:
                                 }
                             )
                     word_count = len(words)
-                    result = reconstruct_from_words(words, audio_path)
+                    # G1 complement: VAD_ONLY preserves exact frame boundaries —
+                    # suppress_silence=False prevents stable-ts silence detection
+                    # from shifting VAD group timing. Other aligner-free modes
+                    # (future) may want stable-ts adjustment.
+                    suppress = (
+                        self.hardening_config.timestamp_mode != TimestampMode.VAD_ONLY
+                    )
+                    result = reconstruct_from_words(words, audio_path, suppress_silence=suppress)
                     sentinel_status = "N/A"
 
                 # Hardening (shared by all paths)

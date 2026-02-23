@@ -387,8 +387,14 @@ class QwenPipeline(BasePipeline):
             cleaner = TextCleanerFactory.create("passthrough")
 
         # TextAligner: Qwen3 ForcedAligner (or None if timestamps disabled)
+        # G1 fix: vad_only mode has no use for the 0.6B aligner — skip loading
+        # entirely so we save VRAM and take Branch B (aligner-free) in the
+        # orchestrator's _step9_reconstruct_and_harden().
         aligner = None
-        if cfg.get("use_aligner", True):
+        if self.timestamp_mode == TimestampMode.VAD_ONLY:
+            # No aligner → Branch B; no collapse possible → step-down irrelevant
+            pass
+        elif cfg.get("use_aligner", True):
             aligner = TextAlignerFactory.create(
                 "qwen3",
                 aligner_id=cfg["aligner_id"],
@@ -398,8 +404,9 @@ class QwenPipeline(BasePipeline):
             )
 
         # Step-down retry config (uses existing Qwen pipeline params)
+        # Disabled when aligner is None (no alignment = no collapse = nothing to step-down)
         stepdown_cfg = None
-        if self.stepdown_enabled:
+        if self.stepdown_enabled and aligner is not None:
             stepdown_cfg = StepDownConfig(
                 enabled=True,
                 fallback_max_group_s=self.stepdown_fallback_group,
