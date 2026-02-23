@@ -35,7 +35,11 @@ from whisperjav.modules.subtitle_pipeline.protocols import (
     TextCleaner,
     TextGenerator,
 )
-from whisperjav.modules.subtitle_pipeline.reconstruction import reconstruct_from_words
+from whisperjav.modules.subtitle_pipeline.reconstruction import (
+    REGROUP_VAD_ONLY,
+    reconstruct_from_words,
+    split_frame_to_words,
+)
 from whisperjav.modules.subtitle_pipeline.types import (
     HardeningConfig,
     SceneDiagnostics,
@@ -771,26 +775,42 @@ class DecoupledSubtitlePipeline:
                         result = reconstruct_from_words(all_words, audio_path, suppress_silence=False)
 
                 else:
-                    # Branch B: Aligner-free — build word dicts from frame boundaries
+                    # Branch B: Aligner-free — split frame text into sentence-level
+                    # pseudo-words for fine-grained regrouping boundaries.
                     words = []
                     for frame, text in zip(frames, texts):
                         if text.strip():
-                            words.append(
-                                {
-                                    "word": text,
-                                    "start": frame.start,
-                                    "end": frame.end,
-                                }
+                            words.extend(
+                                split_frame_to_words(text, frame.start, frame.end)
                             )
                     word_count = len(words)
                     # G1 complement: VAD_ONLY preserves exact frame boundaries —
                     # suppress_silence=False prevents stable-ts silence detection
-                    # from shifting VAD group timing. Other aligner-free modes
-                    # (future) may want stable-ts adjustment.
+                    # from shifting VAD group timing.
                     suppress = (
                         self.hardening_config.timestamp_mode != TimestampMode.VAD_ONLY
                     )
-                    result = reconstruct_from_words(words, audio_path, suppress_silence=suppress)
+                    # VAD_ONLY uses REGROUP_VAD_ONLY (no gap heuristics — timestamps
+                    # are proportional estimates, not real audio gaps).  Other
+                    # aligner-free modes (future) use full REGROUP_JAV.
+                    regroup = (
+                        REGROUP_VAD_ONLY
+                        if self.hardening_config.timestamp_mode == TimestampMode.VAD_ONLY
+                        else True  # REGROUP_JAV is the default in reconstruct_from_words
+                    )
+                    try:
+                        result = reconstruct_from_words(
+                            words, audio_path, suppress_silence=suppress, regroup=regroup,
+                        )
+                    except Exception as regroup_err:
+                        logger.warning(
+                            "[DecoupledPipeline] Scene %d: regrouping failed (%s), "
+                            "retrying without regrouping",
+                            scene_idx, regroup_err,
+                        )
+                        result = reconstruct_from_words(
+                            words, audio_path, suppress_silence=suppress, regroup=False,
+                        )
                     sentinel_status = "N/A"
 
                 # Hardening (shared by all paths)

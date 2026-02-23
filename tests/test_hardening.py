@@ -10,10 +10,9 @@ Tests cover the 4 timestamp gap fixes:
 Also includes regression guard for aligner_interpolation (unchanged behavior).
 """
 
-import pytest
-from types import SimpleNamespace
 from typing import Optional
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Mock stable_whisper types (lightweight, no real dependency needed)
@@ -73,18 +72,21 @@ class MockResult:
 # ---------------------------------------------------------------------------
 
 from whisperjav.modules.subtitle_pipeline.hardening import (
+    _apply_timestamp_interpolation,
     _apply_vad_only_timestamps,
     _apply_vad_timestamp_fallback,
-    _apply_timestamp_interpolation,
-    _timeline_to_real,
     _clip_regions,
+    _timeline_to_real,
     harden_scene_result,
+)
+from whisperjav.modules.subtitle_pipeline.reconstruction import (
+    REGROUP_VAD_ONLY,
+    split_frame_to_words,
 )
 from whisperjav.modules.subtitle_pipeline.types import (
     HardeningConfig,
     TimestampMode,
 )
-
 
 # ===========================================================================
 # G4: vad_only hardening is a no-op
@@ -385,3 +387,129 @@ class TestClipRegions:
         regions = [(1.0, 3.0), (5.0, 7.0), (9.0, 11.0)]
         clipped = _clip_regions(regions, 2.0, 6.0)
         assert clipped == [(2.0, 3.0), (5.0, 6.0)]
+
+
+# ===========================================================================
+# split_frame_to_words (Branch B granularity fix)
+# ===========================================================================
+
+
+class TestSplitFrameToWords:
+    """Tests for split_frame_to_words: sentence-level splitting for Branch B."""
+
+    def test_sentence_boundary_split(self):
+        """Multi-sentence text should split at sentence-ending punctuation."""
+        text = "もっとダメ？腰動いてんじゃん。ダメ、ダメだって。待って。"
+        words = split_frame_to_words(text, 2.0, 6.0)
+
+        assert len(words) == 4
+        assert words[0]["word"] == "もっとダメ？"
+        assert words[1]["word"] == "腰動いてんじゃん。"
+        assert words[2]["word"] == "ダメ、ダメだって。"
+        assert words[3]["word"] == "待って。"
+
+        # Timestamps span the full frame
+        assert words[0]["start"] == 2.0
+        assert words[-1]["end"] == 6.0
+
+        # Non-overlapping and monotonic
+        for i in range(len(words) - 1):
+            assert words[i]["end"] == pytest.approx(words[i + 1]["start"], abs=1e-9)
+
+    def test_comma_fallback(self):
+        """Long text without sentence punct should split at commas."""
+        text = "ああ、いいよ、そうだね、わかった"
+        words = split_frame_to_words(text, 0.0, 4.0)
+
+        assert len(words) == 4
+        assert words[0]["word"] == "ああ、"
+        assert words[1]["word"] == "いいよ、"
+        assert words[2]["word"] == "そうだね、"
+        assert words[3]["word"] == "わかった"
+        assert words[0]["start"] == 0.0
+        assert words[-1]["end"] == 4.0
+
+    def test_character_chunk_fallback(self):
+        """Long text with no punctuation should split into character chunks."""
+        text = "あいうえおかきくけこさしすせそたちつてと"  # 20 chars, no punct → >20 triggers chunk split? No, >20 is the check
+        # 20 chars, exactly at boundary. Let's use 21.
+        text = "あいうえおかきくけこさしすせそたちつてとな"  # 21 chars
+        words = split_frame_to_words(text, 1.0, 5.0)
+
+        # Should split into chunks of ~10 chars → 3 chunks (7+7+7)
+        assert len(words) >= 2
+        # All text accounted for
+        combined = "".join(w["word"] for w in words)
+        assert combined == text
+        assert words[0]["start"] == 1.0
+        assert words[-1]["end"] == 5.0
+
+    def test_short_text_no_split(self):
+        """Short text (<=15 chars, no sentence punct) should stay as one word."""
+        text = "はい"
+        words = split_frame_to_words(text, 3.0, 4.5)
+
+        assert len(words) == 1
+        assert words[0]["word"] == "はい"
+        assert words[0]["start"] == 3.0
+        assert words[0]["end"] == 4.5
+
+    def test_empty_text(self):
+        """Empty or whitespace text should return empty list."""
+        assert split_frame_to_words("", 0.0, 1.0) == []
+        assert split_frame_to_words("   ", 0.0, 1.0) == []
+
+    def test_single_character(self):
+        """Single character should return one word dict."""
+        words = split_frame_to_words("あ", 0.0, 0.5)
+        assert len(words) == 1
+        assert words[0] == {"word": "あ", "start": 0.0, "end": 0.5}
+
+    def test_timestamp_distribution_proportional(self):
+        """Timestamps should be distributed proportionally by character count."""
+        # 2 chars + 8 chars = 10 total → 20%/80% split of 10s duration
+        text = "はい。そうですよね。"  # "はい。" (3 chars) + "そうですよね。" (7 chars)
+        words = split_frame_to_words(text, 0.0, 10.0)
+
+        assert len(words) == 2
+        # 3/10 of 10s = 3.0s for first word
+        assert words[0]["start"] == 0.0
+        assert words[0]["end"] == pytest.approx(3.0, abs=0.01)
+        assert words[1]["start"] == pytest.approx(3.0, abs=0.01)
+        assert words[1]["end"] == 10.0
+
+    def test_zero_duration_frame(self):
+        """Zero-duration frame should return single word with same start/end."""
+        words = split_frame_to_words("テスト。もう一回。", 5.0, 5.0)
+
+        # Even with multiple sentences, duration=0 means all timestamps are 5.0
+        assert len(words) == 2
+        assert words[0]["start"] == 5.0
+        assert words[-1]["end"] == 5.0
+
+
+# ===========================================================================
+# REGROUP_VAD_ONLY (Branch B regrouping — no gap heuristics)
+# ===========================================================================
+
+
+class TestRegroupVadOnly:
+    """Verify REGROUP_VAD_ONLY string structure."""
+
+    def test_no_gap_heuristics(self):
+        """REGROUP_VAD_ONLY must NOT contain sg (gap-split) or mg (merge-by-gap)."""
+        assert "_sg=" not in REGROUP_VAD_ONLY, "sg (gap-split) must not be in VAD-only regroup"
+        assert "_mg=" not in REGROUP_VAD_ONLY, "mg (merge-by-gap) must not be in VAD-only regroup"
+
+    def test_has_safety_caps(self):
+        """REGROUP_VAD_ONLY must retain sd (duration cap) and sl (char cap)."""
+        assert "_sd=" in REGROUP_VAD_ONLY, "sd (duration cap) missing"
+        assert "_sl=" in REGROUP_VAD_ONLY, "sl (char-length cap) missing"
+
+    def test_has_punctuation_split(self):
+        """REGROUP_VAD_ONLY must retain sentence-ending punctuation split."""
+        assert "_sp=" in REGROUP_VAD_ONLY, "sp (punctuation split) missing"
+
+    def test_has_clamp(self):
+        """REGROUP_VAD_ONLY must include cm (boundary clamp)."""
+        assert "cm" in REGROUP_VAD_ONLY

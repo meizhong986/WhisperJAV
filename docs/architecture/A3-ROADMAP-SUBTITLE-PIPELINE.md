@@ -762,8 +762,62 @@ These items are prerequisites that unblock everything else and should be done fi
 | COMPOSABILITY_DESIGN.md Phases 2-3 (GUI Tab Restructuring + Mode Adaptation) | ~600 lines JS | Phase 1 |
 | COMPOSABILITY_DESIGN.md Phase 4 (Profiles) | ~300 lines | Phases 1-3 |
 | Q3: CompositeFramer (dual-VAD fusion) | 2-3 days | None (standalone framer) |
+| **Option C: Composable Reconstructor** | 1-2 days | Phase 1 (backend schema) |
 
 **Rationale**: Even with a single generator (Qwen3), there are 4 framers, 2 cleaners, 2 aligners, YAML pipeline configs, step-down tuning, hardening modes, and sentinel parameters. All of these exist today but are invisible. Surfacing them through good CLI help, GUI component pickers, and profile presets turns the pipeline from a developer tool into a user-facing product. This does NOT require waiting for BUILD-2 or BUILD-1 — the existing components already offer meaningful user choices.
+
+#### Option C: Composable Reconstructor Protocol (Future)
+
+> **Status**: Deferred. Currently handled by inline branching in the orchestrator
+> (Branch A → `REGROUP_JAV`, Branch B/vad_only → `REGROUP_VAD_ONLY`).
+> Elevate to implementation when a 3rd regrouping strategy is needed.
+
+**Problem**: Reconstruction (word dicts → WhisperResult with subtitle-level segments)
+is currently a hardcoded function (`reconstruct_from_words()`) called directly by the
+orchestrator. The orchestrator selects a regroup string based on `TimestampMode`, but
+this is an if/else chain, not a composable component.  As more regrouping strategies
+emerge (e.g., pre-segmented inference for aligner-free modes, or LLM-guided subtitle
+boundaries), the orchestrator's Branch B will accumulate mode-specific logic.
+
+**Design**: Add `Reconstructor` as the 5th protocol alongside Framer, Generator,
+Cleaner, and Aligner.
+
+```python
+@runtime_checkable
+class Reconstructor(Protocol):
+    """Converts word-level dicts into a WhisperResult with subtitle segments."""
+
+    def reconstruct(
+        self,
+        words: list[dict[str, Any]],
+        audio_path: Path,
+    ) -> "stable_whisper.WhisperResult": ...
+
+    def cleanup(self) -> None: ...
+```
+
+**Backends** (factory-registered):
+
+| Backend | Regroup | Use Case |
+|---------|---------|----------|
+| `RegroupJavReconstructor` | `REGROUP_JAV` (gap + merge + caps) | Branch A (aligned, real timestamps) |
+| `RegroupVadOnlyReconstructor` | `REGROUP_VAD_ONLY` (punct + caps only) | Branch B/vad_only (synthetic timestamps) |
+| `PreSegmentedReconstructor` | `regroup=False`, pre-segmented inference | Future: one segment per pseudo-word |
+| `PassthroughReconstructor` | `regroup=False` | Debugging / raw output |
+
+**Orchestrator change**: Replace the current regroup branching with:
+```python
+result = self.reconstructor.reconstruct(words, audio_path)
+```
+
+**Config wiring**: Factory selects backend based on `timestamp_mode` default,
+overridable via CLI `--reconstructor` and GUI dropdown.
+
+**Why deferred**: The current 2-way branch (`REGROUP_JAV` vs `REGROUP_VAD_ONLY`)
+is manageable with inline logic.  Protocol extraction is warranted when:
+- A 3rd strategy is needed (pre-segmented, LLM-guided, etc.)
+- Users want to select reconstruction strategy independently of timestamp mode
+- The orchestrator's Branch B grows beyond ~20 lines of mode-specific logic
 
 **What users gain immediately**:
 - Framer selection (full-scene vs vad-grouped vs srt-source vs manual) visible in GUI

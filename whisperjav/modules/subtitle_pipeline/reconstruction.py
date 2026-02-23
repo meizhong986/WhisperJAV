@@ -23,6 +23,7 @@ Audit H3 resolution:
     normal words, True is fine (improves timing accuracy).
 """
 
+import re
 from pathlib import Path
 from typing import Any, Union
 
@@ -67,6 +68,127 @@ REGROUP_JAV = (
     "_sd=8"                 # max 8s per subtitle
     "_cm"                   # final clamp
 )
+
+# ---------------------------------------------------------------------------
+# VAD-only regrouping (Branch B — no aligner, synthetic timestamps)
+# ---------------------------------------------------------------------------
+# Branch B timestamps come from split_frame_to_words() — proportional
+# estimates, NOT real audio-derived.  REGROUP_JAV's gap-based heuristics
+# (sg, mg) assume timestamps reflect actual audio gaps, which is false here.
+#
+# REGROUP_VAD_ONLY strips gap analysis and keeps only:
+#   sp   sentence-ending punctuation split (redundant with split_frame_to_words
+#        but harmless — catches any remaining multi-sentence pseudo-words)
+#   sp2  comma split for long segments (>50 chars safety)
+#   sl   char-length cap (80 chars)
+#   sd   duration cap (8 seconds)
+#   cm   boundary clamp
+#
+# Future: ADR-006 Tier 1 — replace with a composable Reconstructor protocol
+# that lets the pipeline choose regrouping strategy per-mode.  See
+# docs/architecture/A3-ROADMAP-SUBTITLE-PIPELINE.md §Tier 1 Option C.
+
+REGROUP_VAD_ONLY = (
+    "cm"
+    "_sp=.* /。/?/？"       # split at sentence-ending punctuation
+    "_sp=,* /，/、++++50"   # split at commas if > 50 chars
+    "_sl=80"                # split if > 80 chars
+    "_sd=8"                 # max 8s per subtitle
+    "_cm"                   # final clamp
+)
+
+
+# ---------------------------------------------------------------------------
+# Frame → pseudo-word splitting (Branch B granularity fix)
+# ---------------------------------------------------------------------------
+# Branch B (aligner-free / vad_only) creates one "word" per temporal frame.
+# REGROUP_JAV expects word-level granularity (1-5 chars, 0.1-0.5s).  These
+# helpers split frame text into sentence-level pseudo-words so REGROUP_JAV's
+# sd=8 cap can actually enforce the 8s limit.
+# ---------------------------------------------------------------------------
+
+# Sentence-ending punctuation: split AFTER these, keeping punct with text
+_SENTENCE_END_RE = re.compile(r"(?<=[。？?！!])")
+
+# Comma punctuation: Japanese and Western commas
+_COMMA_RE = re.compile(r"(?<=[、，,])")
+
+
+def _split_at_sentences(text: str) -> list[str]:
+    """Split text at sentence-ending punctuation, keeping punct with preceding text."""
+    parts = _SENTENCE_END_RE.split(text)
+    return [p for p in parts if p]
+
+
+def _split_at_commas(text: str) -> list[str]:
+    """Split text at Japanese/Western commas, keeping comma with preceding text."""
+    parts = _COMMA_RE.split(text)
+    return [p for p in parts if p]
+
+
+def _split_into_chunks(text: str, max_chars: int = 10) -> list[str]:
+    """Split text into roughly equal chunks of at most max_chars."""
+    if len(text) <= max_chars:
+        return [text]
+    n_chunks = max(2, -(-len(text) // max_chars))  # ceil division
+    chunk_size = -(-len(text) // n_chunks)  # ceil division for even split
+    return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+
+def split_frame_to_words(
+    text: str,
+    start: float,
+    end: float,
+) -> list[dict[str, Any]]:
+    """Split frame text into pseudo-words with proportional timestamps.
+
+    Gives REGROUP_JAV fine-grained word boundaries for frame-level input.
+    Splitting hierarchy: sentences → commas → character chunks.
+
+    Args:
+        text: Frame text (may contain multiple sentences).
+        start: Frame start time in seconds.
+        end: Frame end time in seconds.
+
+    Returns:
+        List of ``{'word': str, 'start': float, 'end': float}`` dicts.
+        Empty list if text is empty/whitespace.
+    """
+    text = text.strip()
+    if not text:
+        return []
+
+    # Try sentence-level splitting first
+    chunks = _split_at_sentences(text)
+
+    # If only 1 chunk and long, try comma splitting
+    if len(chunks) == 1 and len(text) > 15:
+        chunks = _split_at_commas(text)
+
+    # If still 1 chunk and very long, fall back to character chunks
+    if len(chunks) == 1 and len(text) > 20:
+        chunks = _split_into_chunks(text, max_chars=10)
+
+    # Single chunk (short text) — return as-is
+    if len(chunks) == 1:
+        return [{"word": chunks[0], "start": start, "end": end}]
+
+    # Distribute timestamps proportionally by character count
+    total_chars = sum(len(c) for c in chunks)
+    duration = end - start
+    words: list[dict[str, Any]] = []
+    cursor = start
+
+    for i, chunk in enumerate(chunks):
+        if i == len(chunks) - 1:
+            # Last chunk: snap to frame end to avoid float drift
+            chunk_end = end
+        else:
+            chunk_end = cursor + duration * (len(chunk) / total_chars)
+        words.append({"word": chunk, "start": cursor, "end": chunk_end})
+        cursor = chunk_end
+
+    return words
 
 
 def reconstruct_from_words(
