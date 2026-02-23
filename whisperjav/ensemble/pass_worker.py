@@ -926,7 +926,7 @@ def _build_pipeline(
             "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
-            "stepdown_enabled": qwen_defaults.get("qwen_stepdown", False),
+            "stepdown_enabled": qwen_defaults.get("qwen_stepdown", True),
             "segmenter_config": segmenter_config if segmenter_config else None,
         }
         # Pipeline-owned defaults: only forward when ensemble config explicitly overrides

@@ -3322,20 +3322,51 @@ const EnsembleManager = {
             t2Def.description
         ));
 
-        // Phase 4: Mode-awareness — hide step-down for framers that don't use it
+        // Mode-awareness: hide irrelevant sections based on framer and timestamp mode
         const passKey = this.state.currentCustomize;
-        if (passKey) {
-            const framerSelect = document.getElementById(`${passKey}-framer`);
-            const framerVal = framerSelect ? framerSelect.value : '';
-            if (framerVal === 'srt-source' || framerVal === 'manual') {
-                // Hide step-down section — not applicable for fixed-boundary framers
-                sdHeader.style.display = 'none';
-                sdControl.style.display = 'none';
-                container.querySelectorAll('[data-param="stepdown_initial_group"], [data-param="stepdown_fallback_group"]').forEach(el => {
-                    el.style.display = 'none';
-                });
+
+        // Helper: hide/show aligner + step-down based on timestamp_mode
+        const alignerElements = [
+            alignerHeader,
+            container.querySelector('[data-param="aligner_backend"]'),
+            container.querySelector('[data-param="aligner_id"]'),
+            noteDiv,
+        ];
+        const stepdownElements = [
+            sdHeader, sdControl,
+            container.querySelector('[data-param="stepdown_initial_group"]'),
+            container.querySelector('[data-param="stepdown_fallback_group"]'),
+        ];
+
+        const updateVisibility = () => {
+            const tsSelect = container.querySelector('[data-param="timestamp_mode"] .param-select');
+            const tsVal = tsSelect ? tsSelect.value : '';
+
+            // vad_only: aligner is not loaded (G1), step-down is N/A
+            const hideAligner = (tsVal === 'vad_only');
+            const hideStepdown = (tsVal === 'vad_only');
+
+            alignerElements.forEach(el => { if (el) el.style.display = hideAligner ? 'none' : ''; });
+            stepdownElements.forEach(el => { if (el) el.style.display = hideStepdown ? 'none' : ''; });
+
+            // Also hide step-down for fixed-boundary framers (srt-source, manual)
+            if (!hideStepdown && passKey) {
+                const framerSelect = document.getElementById(`${passKey}-framer`);
+                const framerVal = framerSelect ? framerSelect.value : '';
+                if (framerVal === 'srt-source' || framerVal === 'manual') {
+                    stepdownElements.forEach(el => { if (el) el.style.display = 'none'; });
+                }
             }
+        };
+
+        // Listen for timestamp_mode changes
+        const tsDropdown = container.querySelector('[data-param="timestamp_mode"] .param-select');
+        if (tsDropdown) {
+            tsDropdown.addEventListener('change', updateVisibility);
         }
+
+        // Initial visibility
+        updateVisibility();
     },
 
     // ── Tab 5: Output ────────────────────────────────────────────────

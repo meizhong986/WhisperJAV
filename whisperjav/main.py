@@ -991,7 +991,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Speech segmentation / VAD
             "speech_segmenter": getattr(args, 'qwen_segmenter', 'none'),
             # Adaptive Step-Down
-            "stepdown_enabled": getattr(args, 'qwen_stepdown', False),
+            "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
             # Qwen ASR
             "model_id": getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
             "device": getattr(args, 'qwen_device', 'auto'),
@@ -1005,7 +1005,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "context_file": getattr(args, 'qwen_context_file', None),
             "attn_implementation": getattr(args, 'qwen_attn', 'auto'),
             # Timestamp resolution
-            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'aligner_interpolation'),
+            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'aligner_vad_fallback'),
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),

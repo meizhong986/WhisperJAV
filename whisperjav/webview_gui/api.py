@@ -1937,8 +1937,8 @@ class WhisperJAVAPI:
                         "options": [
                             {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback (Recommended)"},
                             {"value": "aligner_interpolation", "label": "Aligner + Interpolation"},
-                            {"value": "aligner_only", "label": "Aligner Only"},
-                            {"value": "vad_only", "label": "VAD Only"},
+                            {"value": "aligner_only", "label": "Aligner Only (no recovery on collapse)"},
+                            {"value": "vad_only", "label": "VAD Only (no aligner loaded)"},
                         ],
                         "default": "aligner_vad_fallback",
                     },
