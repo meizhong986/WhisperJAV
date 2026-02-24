@@ -11,7 +11,8 @@ dialogue at natural thinking pauses.  The JAV-tuned algorithm:
     - Relaxes the gap-split threshold from 0.5s to 1.5s
     - Adds a merge-by-gap post-pass to rejoin punctuation-split fragments
     - Adds Japanese comma (、) to the comma-split set
-    - Caps subtitle duration at 8 seconds
+    - Caps subtitle duration at 8 seconds (speech time via stable-ts ``sd=8``,
+      plus a wall-clock enforcement pass — see ``_enforce_wall_clock_cap``)
 
 See QWEN-PIPELINE-REFERENCE.md §12 for the full rationale.
 
@@ -45,7 +46,7 @@ except ImportError:
 #   NEW  mg=1.5++80+1  Merge fragments if gap < 1.5s AND combined < 80 chars
 #   sp2: add 、        Japanese comma for long-segment splitting
 #   sl:  70   → 80    Match merge limit so sl doesn't undo mg
-#   NEW  sd=8          Hard cap: no subtitle exceeds 8 seconds
+#   NEW  sd=8          Speech-time cap (see _enforce_wall_clock_cap for wall-clock)
 #
 # Full pipeline:
 #   isp          ignore special periods (Mr., Dr.)
@@ -121,6 +122,103 @@ def resolve_regroup(mode: "RegroupMode", is_branch_b: bool) -> Union[str, bool]:
         return REGROUP_SENTENCE_ONLY
     # STANDARD: branch-appropriate algorithm
     return REGROUP_VAD_ONLY if is_branch_b else REGROUP_JAV
+
+
+# ---------------------------------------------------------------------------
+# Wall-clock duration cap (post-regrouping enforcement)
+# ---------------------------------------------------------------------------
+# stable-ts's sd=8 measures cumulative speech time (sum of word durations),
+# NOT wall-clock time (segment.end - segment.start).  When inter-word gaps
+# push wall-clock past the cap while speech stays under, sd doesn't split.
+#
+# Example: a 9.0s segment with 3 sentences separated by 0.5s pauses has
+# ~7.5s of speech — under sd=8 — but stays on screen for 9 seconds.
+#
+# _enforce_wall_clock_cap() runs after stable-ts regrouping and splits any
+# segment whose wall-clock span exceeds the limit.  It uses even-split by
+# wall-clock time, finding the word boundary closest to each split point.
+
+_MAX_SUBTITLE_WALL_CLOCK_S = 8.0
+
+
+def _enforce_wall_clock_cap(
+    result: "stable_whisper.WhisperResult",
+    max_dur: float = _MAX_SUBTITLE_WALL_CLOCK_S,
+) -> int:
+    """Split segments that exceed max_dur wall-clock seconds.
+
+    Supplements stable-ts's ``sd`` (which caps speech time, not screen time).
+    Uses even-split by wall-clock time, finding the word boundary closest to
+    each target split point.
+
+    Args:
+        result: WhisperResult to modify in-place.
+        max_dur: Maximum wall-clock seconds per segment.
+
+    Returns:
+        Number of segments that were split.
+    """
+    if not result or not hasattr(result, "segments") or not result.segments:
+        return 0
+
+    splits_made = 0
+    i = 0
+    while i < len(result.segments):
+        seg = result.segments[i]
+        wall_clock = seg.end - seg.start
+
+        if wall_clock <= max_dur or not seg.has_words or len(seg.words) < 2:
+            i += 1
+            continue
+
+        # Even split: how many parts needed?
+        n_parts = -(-int(wall_clock) // int(max_dur))  # ceil(wall_clock / max_dur)
+        if wall_clock / n_parts > max_dur:
+            n_parts += 1
+        if n_parts < 2:
+            i += 1
+            continue
+
+        target_dur = wall_clock / n_parts
+
+        # Find word indices for split boundaries (wall-clock based).
+        # Each index is the LAST word of a sub-segment.
+        indices = []
+        for p in range(1, n_parts):
+            target_time = seg.start + p * target_dur
+            best_idx = 0
+            best_diff = float("inf")
+            for wi in range(len(seg.words) - 1):  # don't split after last word
+                diff = abs(seg.words[wi].end - target_time)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_idx = wi
+            indices.append(best_idx)
+
+        indices = sorted(set(indices))
+        if not indices:
+            i += 1
+            continue
+
+        new_segments = seg.split(indices, reassign_ids=False)
+        if new_segments:
+            del result.segments[i]
+            for ns in reversed(new_segments):
+                result.segments.insert(i, ns)
+            splits_made += 1
+            # Don't increment i — re-check first new segment in case
+            # it still exceeds the cap (e.g., single-word segment).
+        else:
+            i += 1
+
+    if splits_made > 0:
+        logger.debug(
+            "[RECONSTRUCT] Wall-clock cap: split %d segments exceeding %.1fs",
+            splits_made,
+            max_dur,
+        )
+
+    return splits_made
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +424,7 @@ def reconstruct_from_words(
     def precomputed_inference(audio, **kwargs):
         return [precomputed_words]
 
-    return stable_whisper.transcribe_any(
+    result = stable_whisper.transcribe_any(
         inference_func=precomputed_inference,
         audio=str(audio_path),
         audio_type="str",
@@ -338,3 +436,12 @@ def reconstruct_from_words(
         force_order=True,
         verbose=False,
     )
+
+    # Post-regrouping: enforce wall-clock duration cap.
+    # stable-ts's sd=8 caps speech time (sum of word durations), not wall-clock
+    # time (segment.end - segment.start).  Inter-word gaps can push wall-clock
+    # past the cap without triggering sd.  This pass catches those cases.
+    if regroup:
+        _enforce_wall_clock_cap(result)
+
+    return result

@@ -56,6 +56,29 @@ class MockSegment:
     def end(self, value):
         self._end = value
 
+    @property
+    def has_words(self):
+        return bool(self.words)
+
+    def split(self, indices, reassign_ids=True):
+        """Mock of stable_whisper.Segment.split — splits at word indices."""
+        if not indices:
+            return []
+        indices = list(indices)
+        if indices[-1] != len(self.words) - 1:
+            indices.append(len(self.words) - 1)
+        seg_copies = []
+        prev_i = 0
+        for idx in indices:
+            idx += 1
+            new_words = self.words[prev_i:idx]
+            if new_words:
+                text = "".join(w.word for w in new_words)
+                new_seg = MockSegment(text, new_words[0].start, new_words[-1].end, words=list(new_words))
+                seg_copies.append(new_seg)
+            prev_i = idx
+        return seg_copies
+
     def __repr__(self):
         return f"MockSegment({self.text!r}, {self.start:.3f}-{self.end:.3f})"
 
@@ -81,6 +104,7 @@ from whisperjav.modules.subtitle_pipeline.hardening import (
 )
 from whisperjav.modules.subtitle_pipeline.reconstruction import (
     REGROUP_VAD_ONLY,
+    _enforce_wall_clock_cap,
     reconstruct_frame_native,
     split_frame_to_words,
 )
@@ -731,3 +755,123 @@ class TestGroupFrameWords:
         groups = DecoupledSubtitlePipeline._group_frame_words(frames, word_lists)
 
         assert groups == []
+
+
+# ===========================================================================
+# _enforce_wall_clock_cap (post-regrouping wall-clock duration enforcement)
+# ===========================================================================
+
+
+class TestEnforceWallClockCap:
+    """Tests for _enforce_wall_clock_cap: splits segments exceeding max wall-clock duration."""
+
+    def test_segment_under_cap_unchanged(self):
+        """Segment within the cap should not be split."""
+        w1 = MockWord("こん", 0.0, 3.0)
+        w2 = MockWord("にちは", 3.0, 6.0)
+        seg = MockSegment("こんにちは", 0.0, 6.0, words=[w1, w2])
+        result = MockResult([seg])
+
+        count = _enforce_wall_clock_cap(result, max_dur=8.0)
+
+        assert count == 0
+        assert len(result.segments) == 1
+
+    def test_segment_over_cap_is_split(self):
+        """Segment exceeding the cap should be split at a word boundary."""
+        # 9s wall-clock, 3 words with gaps between them
+        w1 = MockWord("でさ、", 0.0, 2.5)
+        w2 = MockWord("もう思い出してるんだけど。", 3.0, 6.0)
+        w3 = MockWord("何してんの。", 6.5, 8.0)
+        seg = MockSegment("でさ、もう思い出してるんだけど。何してんの。", 0.0, 9.0, words=[w1, w2, w3])
+        result = MockResult([seg])
+
+        count = _enforce_wall_clock_cap(result, max_dur=8.0)
+
+        assert count == 1
+        assert len(result.segments) >= 2
+        # All resulting segments should be <= 8s wall-clock
+        for s in result.segments:
+            assert s.end - s.start <= 8.05, f"Segment {s.start:.1f}-{s.end:.1f} exceeds cap"
+
+    def test_speech_time_under_but_wall_clock_over(self):
+        """The specific bug: speech < 8s but wall-clock > 8s due to inter-word gaps.
+
+        stable-ts's sd=8 would NOT split this (sum of word durations = 7.5s < 8).
+        Our wall-clock cap SHOULD split it (wall-clock = 9.5s > 8).
+        """
+        # 4 words with gaps: speech = 1.5 + 2.0 + 2.0 + 2.0 = 7.5s
+        # But wall-clock spans 0.0 to 9.5s due to 0.5s gaps between words
+        w1 = MockWord("でさ、ね、", 0.0, 1.5)
+        w2 = MockWord("もう思い出してるんだけど。", 2.0, 4.0)
+        w3 = MockWord("あー、ちょっと。", 4.5, 6.5)
+        w4 = MockWord("何してんの。", 7.0, 9.0)
+        seg = MockSegment("test", 0.0, 9.5, words=[w1, w2, w3, w4])
+        result = MockResult([seg])
+
+        count = _enforce_wall_clock_cap(result, max_dur=8.0)
+
+        assert count == 1
+        assert len(result.segments) == 2
+
+    def test_exactly_at_cap_not_split(self):
+        """Segment at exactly max_dur should not be split."""
+        w1 = MockWord("a", 0.0, 4.0)
+        w2 = MockWord("b", 4.0, 8.0)
+        seg = MockSegment("ab", 0.0, 8.0, words=[w1, w2])
+        result = MockResult([seg])
+
+        count = _enforce_wall_clock_cap(result, max_dur=8.0)
+
+        assert count == 0
+        assert len(result.segments) == 1
+
+    def test_single_word_segment_not_split(self):
+        """A segment with only 1 word cannot be split, even if it exceeds the cap."""
+        w1 = MockWord("長い", 0.0, 10.0)
+        seg = MockSegment("長い", 0.0, 10.0, words=[w1])
+        result = MockResult([seg])
+
+        count = _enforce_wall_clock_cap(result, max_dur=8.0)
+
+        assert count == 0
+        assert len(result.segments) == 1
+
+    def test_empty_result(self):
+        """Empty result should return 0 and not error."""
+        assert _enforce_wall_clock_cap(None) == 0
+        assert _enforce_wall_clock_cap(MockResult([])) == 0
+
+    def test_multiple_oversized_segments(self):
+        """Multiple segments over the cap should all be split."""
+        w1a = MockWord("a", 0.0, 3.0)
+        w1b = MockWord("b", 4.0, 9.5)
+        seg1 = MockSegment("ab", 0.0, 9.5, words=[w1a, w1b])
+
+        w2a = MockWord("c", 10.0, 14.0)
+        w2b = MockWord("d", 15.0, 20.0)
+        seg2 = MockSegment("cd", 10.0, 20.0, words=[w2a, w2b])
+
+        seg3 = MockSegment("ok", 21.0, 25.0, words=[MockWord("ok", 21.0, 25.0)])
+
+        result = MockResult([seg1, seg2, seg3])
+
+        count = _enforce_wall_clock_cap(result, max_dur=8.0)
+
+        assert count == 2  # seg1 and seg2 split, seg3 unchanged
+
+    def test_very_long_segment_split_into_multiple_parts(self):
+        """A 25s segment should be split into 4 parts (~6.25s each)."""
+        words = [
+            MockWord(f"w{i}", i * 5.0, i * 5.0 + 4.5)
+            for i in range(5)
+        ]
+        seg = MockSegment("test", 0.0, 25.0, words=words)
+        result = MockResult([seg])
+
+        count = _enforce_wall_clock_cap(result, max_dur=8.0)
+
+        assert count >= 1
+        assert len(result.segments) >= 3  # 25s / 8s → at least 4 parts
+        for s in result.segments:
+            assert s.end - s.start <= 8.5, f"Segment {s.start:.1f}-{s.end:.1f} exceeds cap"
