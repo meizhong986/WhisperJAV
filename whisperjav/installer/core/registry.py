@@ -460,10 +460,10 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="silero-vad",
-        version=">=6.0",
+        version=">=6.2",
         extra=Extra.CLI,
         order=45,
-        reason="Silero VAD for scene detection - 6.0+ has improved accuracy",
+        reason="Silero VAD for scene detection - 6.2+ required for max_speech_duration_s and neg_threshold",
     ),
     Package(
         name="ten-vad",

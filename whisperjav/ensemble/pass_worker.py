@@ -1197,6 +1197,7 @@ SPEECH_SEGMENTER_MAP = {
     "whisper-vad-small": "whisper-vad-small",
     "whisper-vad-medium": "whisper-vad-medium",
     "ten": "ten",
+    "silero-v6.2": "silero-v6.2",
     "none": "none",
 }
 

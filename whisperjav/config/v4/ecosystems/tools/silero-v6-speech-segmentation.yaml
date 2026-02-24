@@ -1,0 +1,179 @@
+# =============================================================================
+# Silero VAD v6.2 Speech Segmentation Tool Configuration
+# =============================================================================
+# Silero VAD v6.2 (pip package) - force-splits long speech, hysteresis for
+# stable segmentation in noisy audio. Solves TEN VAD's failure to detect
+# pauses in fast Japanese dialogue with background audio.
+# Requires: pip install silero-vad>=6.2
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: silero-v6-speech-segmentation
+  displayName: "Silero VAD v6.2"
+  description: |
+    Speech segmentation using Silero VAD v6.2 pip package.
+    Key v6.2 features:
+    - max_speech_duration_s: Force-splits long speech chunks at internal silences
+    - neg_threshold: Hysteresis for stable segmentation in noisy audio
+    - speech_pad_ms: Internal padding (no manual sample-based padding needed)
+    JAV-tuned defaults: threshold=0.5, speech_pad_ms=200, min_speech_duration_ms=100.
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - silero
+    - vad
+    - v6.2
+    - hysteresis
+    - force-split
+  dependencies:
+    - "silero-vad>=6.2"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+
+# =============================================================================
+# Tool Parameters (Balanced preset as default)
+# =============================================================================
+spec:
+  # --- Core VAD Parameters ---
+  threshold: 0.5
+  neg_threshold: null  # Auto-calculated as threshold - 0.15 by v6.2
+
+  # --- Duration Filters ---
+  min_speech_duration_ms: 100   # Preserve short Japanese utterances (はい, ね, うん)
+  max_speech_duration_s: null   # Inherits from max_group_duration_s (safety net)
+  min_silence_duration_ms: 100  # v6.2 default, detect short pauses
+
+  # --- Segment Padding ---
+  # speech_pad_ms is handled internally by v6.2 (no manual sample-based padding)
+  speech_pad_ms: 200  # Capture Japanese soft onsets and trailing particles
+
+  # --- v6.2 max_speech_duration split behavior ---
+  min_silence_at_max_speech: 98          # v6.2 default
+  use_max_poss_sil_at_max_speech: true   # v6.2 default
+
+  # --- Segment Grouping ---
+  chunk_threshold_s: 1.0
+  max_group_duration_s: 29.0  # Upper bound; pipeline typically overrides to 6.0
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+presets:
+  # Conservative: Higher threshold, fewer false positives
+  # Best for: Clean audio, studio recordings
+  conservative:
+    threshold: 0.7
+    min_speech_duration_ms: 150
+    min_silence_duration_ms: 200
+    speech_pad_ms: 100
+
+  # Balanced: Default settings for general use
+  balanced: {}  # Uses spec defaults
+
+  # Aggressive: Lower threshold, maximum capture
+  # Best for: Noisy audio, soft speech, whispered dialogue
+  aggressive:
+    threshold: 0.3
+    neg_threshold: 0.1
+    min_speech_duration_ms: 50
+    min_silence_duration_ms: 50
+    speech_pad_ms: 300
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  threshold:
+    widget: slider
+    label: "Speech Threshold"
+    description: "Probability threshold to detect speech (higher = more selective)"
+    min: 0.1
+    max: 0.9
+    step: 0.05
+    group: detection
+
+  neg_threshold:
+    widget: slider
+    label: "Negative Threshold"
+    description: "Hysteresis threshold for speech end (null = auto: threshold - 0.15)"
+    min: 0.05
+    max: 0.8
+    step: 0.05
+    group: detection
+
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: "Minimum speech segment duration to keep"
+    min: 10
+    max: 500
+    step: 10
+    group: filters
+
+  max_speech_duration_s:
+    widget: slider
+    label: "Max Speech Duration (s)"
+    description: "Force-split long speech at internal silences (null = inherit from max group)"
+    min: 1.0
+    max: 60.0
+    step: 0.5
+    unit: "s"
+    group: filters
+
+  min_silence_duration_ms:
+    widget: spinner
+    label: "Min Silence Duration (ms)"
+    description: "Minimum silence gap to split speech segments"
+    min: 10
+    max: 500
+    step: 10
+    group: filters
+
+  speech_pad_ms:
+    widget: spinner
+    label: "Speech Padding (ms)"
+    description: "Padding around speech segments (handled internally by v6.2)"
+    min: 0
+    max: 500
+    step: 10
+    group: padding
+
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: "Maximum gap to group consecutive segments"
+    min: 0.5
+    max: 5.0
+    step: 0.1
+    group: grouping
+
+  max_group_duration_s:
+    widget: slider
+    label: "Max Group Duration"
+    description: "Maximum duration for grouped segments (pipeline typically overrides)"
+    min: 5
+    max: 60
+    step: 1
+    unit: "s"
+    group: grouping
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.silero_v6
+  class: SileroV6SpeechSegmenter

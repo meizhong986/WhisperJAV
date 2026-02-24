@@ -116,7 +116,7 @@ cli = [
 
     # Voice Activity Detection
     "auditok",
-    "silero-vad>=6.0",
+    "silero-vad>=6.2",
     "ten-vad",
 
     # Performance and utilities

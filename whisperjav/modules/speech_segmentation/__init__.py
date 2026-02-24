@@ -5,7 +5,8 @@ Provides a modular, pluggable speech segmentation system with multiple backend s
 Users can select their preferred speech segmenter via CLI (--speech-segmenter) or GUI.
 
 Available backends:
-- silero (default): Silero VAD v4.0 or v3.1
+- silero (default): Silero VAD v4.0 or v3.1 (torch.hub)
+- silero-v6.2: Silero VAD v6.2 (pip pkg, max_speech_duration_s + hysteresis)
 - nemo: NVIDIA NeMo VAD (requires nemo_toolkit)
 - ten: TEN Framework VAD (requires ten-vad)
 - none: No segmentation (passthrough)

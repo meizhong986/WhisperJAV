@@ -27,6 +27,7 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "whisper-vad-small": "whisperjav.modules.speech_segmentation.backends.whisper_vad.WhisperVadSpeechSegmenter",
     "whisper-vad-medium": "whisperjav.modules.speech_segmentation.backends.whisper_vad.WhisperVadSpeechSegmenter",
     "ten": "whisperjav.modules.speech_segmentation.backends.ten.TenSpeechSegmenter",
+    "silero-v6.2": "whisperjav.modules.speech_segmentation.backends.silero_v6.SileroV6SpeechSegmenter",
     "none": "whisperjav.modules.speech_segmentation.backends.none.NullSpeechSegmenter",
 }
 
@@ -50,6 +51,11 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
     "ten": {
         "packages": ["ten_vad"],
         "install_hint": "See https://github.com/ten-framework/ten-vad",
+        "always_available": False,
+    },
+    "silero-v6.2": {
+        "packages": ["silero_vad"],
+        "install_hint": "pip install silero-vad>=6.2",
         "always_available": False,
     },
     "whisper": {
@@ -111,13 +117,15 @@ class SpeechSegmenterFactory:
             - is_available: True if backend can be used
             - install_hint: Installation instructions if not available
         """
-        # Normalize name (strip version suffix for dependency check)
-        base_name = name.split("-")[0] if "-" in name else name
-
-        if base_name not in _BACKEND_DEPENDENCIES:
-            return False, f"Unknown backend: {name}"
-
-        dep_info = _BACKEND_DEPENDENCIES[base_name]
+        # Check exact name first (e.g., "silero-v6.2" has its own entry),
+        # then fall back to base name (e.g., "silero-v4.0" -> "silero")
+        if name in _BACKEND_DEPENDENCIES:
+            dep_info = _BACKEND_DEPENDENCIES[name]
+        else:
+            base_name = name.split("-")[0] if "-" in name else name
+            if base_name not in _BACKEND_DEPENDENCIES:
+                return False, f"Unknown backend: {name}"
+            dep_info = _BACKEND_DEPENDENCIES[base_name]
 
         if dep_info["always_available"]:
             return True, ""
@@ -149,11 +157,12 @@ class SpeechSegmenterFactory:
             "whisper-vad-tiny": "Whisper VAD (tiny)",
             "whisper-vad-base": "Whisper VAD (base)",
             "whisper-vad-medium": "Whisper VAD (medium)",
+            "silero-v6.2": "Silero VAD v6.2",
             "ten": "TEN VAD",
             "none": "None (Skip)",
         }
 
-        for name in ["silero", "silero-v3.1", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "none"]:
+        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "none"]:
             available, hint = SpeechSegmenterFactory.is_backend_available(name)
             backends.append({
                 "name": name,

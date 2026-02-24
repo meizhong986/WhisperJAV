@@ -302,7 +302,7 @@ def parse_arguments():
     tuning_group.add_argument("--speech-segmenter",
                              type=str,
                              choices=[
-                                 "silero", "silero-v4.0", "silero-v3.1",
+                                 "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                  "nemo", "nemo-lite",
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
                                  "ten", "none"
@@ -312,6 +312,7 @@ def parse_arguments():
                              help=(
                                  "Speech segmentation backend: "
                                  "silero/silero-v4.0 (default), silero-v3.1, "
+                                 "silero-v6.2 (pip pkg, max_speech_duration_s + hysteresis), "
                                  "nemo/nemo-lite (fast frame VAD ~0.5GB), "
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
@@ -464,9 +465,11 @@ def parse_arguments():
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="ten",
-                           choices=["none", "silero", "silero-v4.0", "silero-v3.1",
+                           choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten"],
-                           help="Speech segmentation backend for VAD-based chunking (default: ten)")
+                           help="Speech segmentation backend for VAD-based chunking: "
+                                "ten (default), silero-v6.2 (force-splits long chunks), "
+                                "silero/silero-v4.0/v3.1, nemo/nemo-lite, whisper-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",

@@ -176,6 +176,7 @@ class TestSpeechSegmenterFactory:
         assert "silero" in backends
         assert "silero-v4.0" in backends
         assert "silero-v3.1" in backends
+        assert "silero-v6.2" in backends
         assert "nemo" in backends
         assert "nemo-lite" in backends
         assert "nemo-diarization" in backends
@@ -206,7 +207,7 @@ class TestSpeechSegmenterFactory:
     def test_get_available_backends(self):
         """Test getting backend availability info."""
         backends = SpeechSegmenterFactory.get_available_backends()
-        assert len(backends) >= 5
+        assert len(backends) >= 6
 
         # Check structure
         for b in backends:
@@ -344,6 +345,103 @@ class TestSileroSpeechSegmenter:
 
         v4.cleanup()
         v3.cleanup()
+
+
+class TestSileroV6SpeechSegmenter:
+    """Tests for SileroV6SpeechSegmenter (silero-v6.2 backend)."""
+
+    @pytest.fixture
+    def silero_v6_available(self):
+        """Check if silero-vad pip package is available."""
+        available, _ = SpeechSegmenterFactory.is_backend_available("silero-v6.2")
+        if not available:
+            pytest.skip("silero-vad>=6.2 not installed")
+        return True
+
+    @pytest.fixture
+    def silero_v6_segmenter(self, silero_v6_available):
+        """Create a Silero v6.2 segmenter for testing."""
+        segmenter = SpeechSegmenterFactory.create("silero-v6.2")
+        yield segmenter
+        segmenter.cleanup()
+
+    def test_name_and_display(self, silero_v6_segmenter):
+        """Test name and display name."""
+        assert silero_v6_segmenter.name == "silero-v6.2"
+        assert "v6.2" in silero_v6_segmenter.display_name
+        assert "Silero" in silero_v6_segmenter.display_name
+
+    def test_segment_silent_audio(self, silero_v6_segmenter):
+        """Test segmenting silent audio returns empty."""
+        audio = np.zeros(16000 * 5, dtype=np.float32)
+        result = silero_v6_segmenter.segment(audio, sample_rate=16000)
+        assert result.num_segments == 0
+        assert result.method == "silero-v6.2"
+
+    def test_segment_with_speech(self, silero_v6_segmenter):
+        """Test segmenting audio with speech-like content."""
+        audio = np.zeros(16000 * 5, dtype=np.float32)
+        audio[16000:32000] = np.random.randn(16000).astype(np.float32) * 0.5
+        audio[48000:64000] = np.random.randn(16000).astype(np.float32) * 0.5
+
+        result = silero_v6_segmenter.segment(audio, sample_rate=16000)
+        assert result.method == "silero-v6.2"
+        assert result.audio_duration_sec == pytest.approx(5.0, rel=0.01)
+
+    def test_cleanup(self, silero_v6_available):
+        """Test cleanup releases resources."""
+        segmenter = SpeechSegmenterFactory.create("silero-v6.2")
+        segmenter._ensure_model()
+        assert segmenter._model is not None
+        segmenter.cleanup()
+        assert segmenter._model is None
+
+    def test_max_speech_duration_default(self, silero_v6_available):
+        """Test max_speech_duration_s inherits from max_group_duration_s."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v6.2", max_group_duration_s=6.0
+        )
+        assert segmenter.max_speech_duration_s == 6.0
+        segmenter.cleanup()
+
+    def test_max_speech_duration_explicit(self, silero_v6_available):
+        """Test explicit max_speech_duration_s overrides inheritance."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v6.2", max_group_duration_s=6.0, max_speech_duration_s=10.0
+        )
+        assert segmenter.max_speech_duration_s == 10.0
+        assert segmenter.max_group_duration_s == 6.0
+        segmenter.cleanup()
+
+    def test_neg_threshold_none_by_default(self, silero_v6_available):
+        """Test neg_threshold is None by default (v6.2 auto-calculates)."""
+        segmenter = SpeechSegmenterFactory.create("silero-v6.2")
+        assert segmenter.neg_threshold is None
+        segmenter.cleanup()
+
+    def test_jav_tuned_defaults(self, silero_v6_available):
+        """Test JAV-tuned default values."""
+        segmenter = SpeechSegmenterFactory.create("silero-v6.2")
+        assert segmenter.threshold == 0.5
+        assert segmenter.speech_pad_ms == 200
+        assert segmenter.min_speech_duration_ms == 100
+        assert segmenter.min_silence_duration_ms == 100
+        segmenter.cleanup()
+
+    def test_get_parameters(self, silero_v6_available):
+        """Test _get_parameters returns all expected keys."""
+        segmenter = SpeechSegmenterFactory.create("silero-v6.2")
+        params = segmenter._get_parameters()
+
+        expected_keys = {
+            "threshold", "neg_threshold", "min_speech_duration_ms",
+            "max_speech_duration_s", "min_silence_duration_ms",
+            "speech_pad_ms", "min_silence_at_max_speech",
+            "use_max_poss_sil_at_max_speech", "chunk_threshold_s",
+            "max_group_duration_s",
+        }
+        assert expected_keys == set(params.keys())
+        segmenter.cleanup()
 
 
 class TestFactoryCreateFromResolvedConfig:
