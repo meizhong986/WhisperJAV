@@ -1836,6 +1836,17 @@ class WhisperJAVAPI:
                 },
                 # ── Tab 2: Audio ──────────────────────────────────────
                 "audio": {
+                    "framer": {
+                        "type": "dropdown",
+                        "label": "Temporal Framing",
+                        "description": "How audio is split into frames for text generation",
+                        "options": [
+                            {"value": "vad-grouped", "label": "VAD Grouped (default)"},
+                            {"value": "full-scene", "label": "Full Scene"},
+                            {"value": "srt-source", "label": "SRT Source"},
+                        ],
+                        "default": "vad-grouped",
+                    },
                     "safe_chunking": {
                         "type": "checkbox",
                         "label": "Safe Chunking",
@@ -2263,8 +2274,10 @@ class WhisperJAVAPI:
                 args += ["--pass1-hf-params", json.dumps(pass1['params'])]
             # else: minimal args - backend uses model defaults
         elif pass1.get('isQwen'):
-            # Qwen pass: no sensitivity, handle Qwen params
-            # Always inject framer from prominent selector (even when not customized)
+            # Qwen pass: sensitivity resolves segmenter config via YAML presets
+            if pass1.get('sensitivity'):
+                args += ["--pass1-sensitivity", pass1['sensitivity']]
+            # Always inject framer from state (even when not customized)
             qwen1_params = dict(pass1.get('params') or {}) if pass1.get('customized') else {}
             if pass1.get('framer'):
                 qwen1_params['framer'] = pass1['framer']
@@ -2328,8 +2341,10 @@ class WhisperJAVAPI:
                     args += ["--pass2-hf-params", json.dumps(pass2['params'])]
                 # else: minimal args - backend uses model defaults
             elif pass2.get('isQwen'):
-                # Qwen pass: no sensitivity, handle Qwen params
-                # Always inject framer from prominent selector (even when not customized)
+                # Qwen pass: sensitivity resolves segmenter config via YAML presets
+                if pass2.get('sensitivity'):
+                    args += ["--pass2-sensitivity", pass2['sensitivity']]
+                # Always inject framer from state (even when not customized)
                 qwen2_params = dict(pass2.get('params') or {}) if pass2.get('customized') else {}
                 if pass2.get('framer'):
                     qwen2_params['framer'] = pass2['framer']

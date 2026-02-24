@@ -247,6 +247,7 @@ const QwenManager = {
         dtype: 'auto',
         attn_implementation: 'auto',
         // Audio
+        framer: 'vad-grouped',
         safe_chunking: true,
         scene_min_duration: 12,
         scene_max_duration: 48,
@@ -1199,28 +1200,28 @@ const EnsembleManager = {
             sensitivity: 'aggressive',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'ten',  // TEN VAD default
+            speechSegmenter: 'silero-v6.2',  // Silero v6.2 default
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
             isTransformers: false,  // Track if using Transformers pipeline
             isQwen: false,  // Track if using Qwen3-ASR pipeline
-            framer: 'full-scene',  // Qwen temporal framer (full-scene/vad-grouped)
+            framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         pass2: {
             enabled: false,
             pipeline: 'qwen',
-            sensitivity: 'aggressive',
+            sensitivity: 'balanced',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'ten',  // TEN VAD (matches Qwen pipeline defaults)
+            speechSegmenter: 'silero-v6.2',  // Silero v6.2 (matches Qwen pipeline defaults)
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
             isTransformers: false,
             isQwen: true,  // Default pipeline is Qwen3-ASR
-            framer: 'full-scene',  // Qwen temporal framer (full-scene/vad-grouped)
+            framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'smart_merge',
@@ -1276,15 +1277,11 @@ const EnsembleManager = {
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = this.state.pass2.pipeline === 'qwen';
 
-        // Sync framer and model options for Qwen passes
+        // Swap model options for non-legacy passes
         if (this.state.pass1.isQwen) {
-            const fr1 = document.getElementById('pass1-framer');
-            if (fr1) this.state.pass1.framer = fr1.value;
             this.swapModelOptions('pass1', 'qwen');
         }
         if (this.state.pass2.isQwen) {
-            const fr2 = document.getElementById('pass2-framer');
-            if (fr2) this.state.pass2.framer = fr2.value;
             this.swapModelOptions('pass2', 'qwen');
         }
 
@@ -1307,14 +1304,6 @@ const EnsembleManager = {
         });
         document.getElementById('pass2-sensitivity').addEventListener('change', (e) => {
             this.handleSensitivityChange('pass2', e.target.value, e.target);
-        });
-
-        // Framer event handlers (Qwen-specific)
-        document.getElementById('pass1-framer')?.addEventListener('change', (e) => {
-            this.state.pass1.framer = e.target.value;
-        });
-        document.getElementById('pass2-framer')?.addEventListener('change', (e) => {
-            this.state.pass2.framer = e.target.value;
         });
 
         // New dropdown event handlers - Pass 1
@@ -1442,22 +1431,28 @@ const EnsembleManager = {
         }
     },
 
-    // Set scene detector and segmenter to appropriate defaults for the pipeline type
+    // Set scene detector, segmenter, and sensitivity to appropriate defaults for the pipeline type
     applyPipelinePresets(passKey, pipelineType) {
         const sceneSelect = document.getElementById(`${passKey}-scene`);
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
+        const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
         if (pipelineType === 'qwen') {
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'ten';
+            segmenterSelect.value = 'silero-v6.2';
+            sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'ten';
+            this.state[passKey].speechSegmenter = 'silero-v6.2';
+            this.state[passKey].sensitivity = 'balanced';
+            this.state[passKey].framer = 'vad-grouped';
         } else {
             // Legacy / Transformers defaults
             sceneSelect.value = 'auditok';
             segmenterSelect.value = 'silero';
+            sensitivitySelect.value = 'aggressive';
             this.state[passKey].sceneDetector = 'auditok';
             this.state[passKey].speechSegmenter = 'silero';
+            this.state[passKey].sensitivity = 'aggressive';
         }
     },
 
@@ -1506,34 +1501,16 @@ const EnsembleManager = {
         // Check if pass2 is disabled (controls should be disabled regardless of pipeline)
         const isPass2Disabled = passKey === 'pass2' && !this.state.pass2.enabled;
 
-        // Sensitivity: Disabled for both Transformers and Qwen (neither uses sensitivity presets)
-        const disableSensitivity = passState.isTransformers || passState.isQwen;
+        // Sensitivity: Disabled only for Transformers (Qwen now uses sensitivity presets)
+        const disableSensitivity = passState.isTransformers;
 
         // Segmenter: Only disabled for Transformers (uses HF internal chunking)
         // Qwen DOES use segmenter as a post-ASR VAD filter (--qwen-segmenter)
         const disableSegmenter = passState.isTransformers;
 
-        // Framer selector: shown for Qwen, hidden for others
-        const framerSelect = document.getElementById(`${passKey}-framer`);
-
         if (disableSensitivity) {
-            const pipelineName = passState.isTransformers ? 'Transformers' : 'Qwen3-ASR';
-
-            if (passState.isQwen && framerSelect) {
-                // Qwen: hide sensitivity, show framer selector
-                sensitivitySelect.style.display = 'none';
-                sensitivitySelect.disabled = true;
-                framerSelect.style.display = '';
-                framerSelect.disabled = isPass2Disabled;
-                framerSelect.title = 'Temporal framing strategy for Qwen3-ASR';
-            } else {
-                // Transformers: just disable sensitivity
-                sensitivitySelect.disabled = true;
-                sensitivitySelect.title = `Sensitivity not applicable for ${pipelineName} mode`;
-                if (framerSelect) {
-                    framerSelect.style.display = 'none';
-                }
-            }
+            sensitivitySelect.disabled = true;
+            sensitivitySelect.title = 'Sensitivity not applicable for Transformers mode';
 
             // Set sensitivity to 'none' for visual clarity (if option exists)
             if (sensitivitySelect.querySelector('option[value="none"]')) {
@@ -1544,10 +1521,9 @@ const EnsembleManager = {
             // Re-enable sensitivity (unless pass2 is disabled)
             sensitivitySelect.style.display = '';
             sensitivitySelect.disabled = isPass2Disabled;
-            sensitivitySelect.title = '';
-            if (framerSelect) {
-                framerSelect.style.display = 'none';
-            }
+            sensitivitySelect.title = passState.isQwen
+                ? 'Segmenter sensitivity preset for Qwen3-ASR'
+                : '';
         }
 
         if (disableSegmenter) {
@@ -1603,12 +1579,10 @@ const EnsembleManager = {
         document.getElementById('customize-pass2').disabled = !enabled;
         document.getElementById('merge-strategy').disabled = !enabled;
 
-        // Sensitivity, Framer, and Segmenter handled by updateRowGreyingState (may be additionally disabled for Transformers)
+        // Sensitivity and Segmenter handled by updateRowGreyingState (may be additionally disabled for Transformers)
         if (!enabled) {
             document.getElementById('pass2-sensitivity').disabled = true;
             document.getElementById('pass2-segmenter').disabled = true;
-            const fr2 = document.getElementById('pass2-framer');
-            if (fr2) fr2.disabled = true;
         }
 
         // Visual feedback - grey out entire row
@@ -3070,6 +3044,42 @@ const EnsembleManager = {
     generateQwenAudioTab(tabId, schemaSection, currentValues) {
         const container = document.getElementById(tabId);
 
+        // Temporal Framing section (before Scene Detection)
+        const framerDef = schemaSection.framer;
+        if (framerDef) {
+            const framerHeader = document.createElement('div');
+            framerHeader.className = 'param-group-header';
+            framerHeader.textContent = 'Temporal Framing';
+            container.appendChild(framerHeader);
+
+            const framerControl = document.createElement('div');
+            framerControl.className = 'param-control';
+            framerControl.dataset.param = 'framer';
+
+            const framerLabel = document.createElement('label');
+            framerLabel.textContent = framerDef.label;
+            framerControl.appendChild(framerLabel);
+
+            const framerSelect = document.createElement('select');
+            framerSelect.className = 'param-select';
+            framerSelect.id = 'hf-framer';
+            const currentFramer = currentValues.framer || framerDef.default || 'vad-grouped';
+            framerDef.options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                if (opt.value === currentFramer) option.selected = true;
+                framerSelect.appendChild(option);
+            });
+            framerControl.appendChild(framerSelect);
+
+            const framerDesc = document.createElement('p');
+            framerDesc.className = 'param-description';
+            framerDesc.textContent = framerDef.description;
+            framerControl.appendChild(framerDesc);
+            container.appendChild(framerControl);
+        }
+
         // Scene Detection group header
         const sceneHeader = document.createElement('div');
         sceneHeader.className = 'param-group-header';
@@ -3890,6 +3900,11 @@ const EnsembleManager = {
             if (dropdown) dropdown.value = fullParams.scene_detection_method;
         }
 
+        // Sync framer from modal to state (Qwen only)
+        if (fullParams.framer && this.state[passKey].isQwen) {
+            this.state[passKey].framer = fullParams.framer;
+        }
+
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Saved ${paramCount} parameters for ${passLabel} (Custom)`, 'info');
@@ -4265,9 +4280,9 @@ const EnsembleManager = {
         // - If not customized: send pipeline+sensitivity (backend resolves defaults)
 
         // Helpers for pipeline-specific null handling:
-        // - Sensitivity: null for both Transformers AND Qwen (neither uses sensitivity presets)
+        // - Sensitivity: null only for Transformers (Qwen now uses sensitivity presets)
         // - Segmenter: null for Transformers only (Qwen uses segmenter as post-ASR VAD filter)
-        const disableSensitivity = (passState) => passState.isTransformers || passState.isQwen;
+        const disableSensitivity = (passState) => passState.isTransformers;
         const disableSegmenter = (passState) => passState.isTransformers;  // NOT Qwen!
 
         const config = {

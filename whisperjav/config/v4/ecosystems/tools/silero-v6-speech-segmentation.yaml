@@ -25,7 +25,7 @@ metadata:
     - speech-segmentation
     - silero
     - vad
-    - v6.2
+    - v6-2
     - hysteresis
     - force-split
   dependencies:

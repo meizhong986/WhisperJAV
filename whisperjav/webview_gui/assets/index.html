@@ -394,10 +394,6 @@
                                             <option value="balanced">Balanced</option>
                                             <option value="conservative">Conservative</option>
                                         </select>
-                                        <select id="pass1-framer" class="form-select compact" style="display: none;" title="Temporal framing strategy for Qwen3-ASR">
-                                            <option value="full-scene" selected>Full Scene</option>
-                                            <option value="vad-grouped">VAD Grouped</option>
-                                        </select>
                                     </div>
                                     <div class="col-separator"></div>
                                     <div class="col-scene">
@@ -433,12 +429,12 @@
                                         <select id="pass1-segmenter" class="form-select compact">
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
-                                            <option value="silero-v6.2">Silero v6.2</option>
+                                            <option value="silero-v6.2" selected>Silero v6.2</option>
                                             <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
                                             <option value="whisper-vad">Whisper VAD (small)</option>
                                             <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
                                             <option value="whisper-vad-medium">Whisper VAD (medium)</option>
-                                            <option value="ten" selected>TEN VAD</option>
+                                            <option value="ten">TEN VAD</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -539,12 +535,8 @@
                                     <div class="col-sensitivity">
                                         <select id="pass2-sensitivity" class="form-select compact" disabled>
                                             <option value="aggressive">Aggressive</option>
-                                            <option value="balanced">Balanced</option>
-                                            <option value="conservative" selected>Conservative</option>
-                                        </select>
-                                        <select id="pass2-framer" class="form-select compact" style="display: none;" title="Temporal framing strategy for Qwen3-ASR" disabled>
-                                            <option value="full-scene" selected>Full Scene</option>
-                                            <option value="vad-grouped">VAD Grouped</option>
+                                            <option value="balanced" selected>Balanced</option>
+                                            <option value="conservative">Conservative</option>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -581,12 +573,12 @@
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
-                                            <option value="silero-v6.2">Silero v6.2</option>
+                                            <option value="silero-v6.2" selected>Silero v6.2</option>
                                             <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
                                             <option value="whisper-vad">Whisper VAD (small)</option>
                                             <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
                                             <option value="whisper-vad-medium">Whisper VAD (medium)</option>
-                                            <option value="ten" selected>TEN VAD</option>
+                                            <option value="ten">TEN VAD</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>

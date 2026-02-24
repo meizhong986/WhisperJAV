@@ -10,7 +10,7 @@ for other ASR types.
     1. Audio Extraction (48kHz)
     2. Scene Detection (default: semantic, safe chunking 12-48s)
     3. Speech Enhancement (optional, VRAM Block 1)
-    4. Speech Segmentation / VAD (default: TEN)
+    4. Speech Segmentation / VAD (default: Silero v6.2)
     5. ASR Transcription (VRAM Block 2, DecoupledSubtitlePipeline)
     6. Scene SRT Generation (micro-subs)
     7. SRT Stitching
@@ -98,7 +98,7 @@ class QwenPipeline(BasePipeline):
         scene_max_duration: Optional[float] = None,  # Override max scene duration (default: 48s)
 
         # Temporal framing for assembly mode (GAP-5)
-        qwen_framer: str = "full-scene",  # "full-scene", "vad-grouped", "srt-source"
+        qwen_framer: str = "vad-grouped",  # "vad-grouped", "full-scene", "srt-source"
         framer_srt_path: Optional[str] = None,  # SRT file path (for srt-source framer)
 
         # Scene detection (Phase 2)
@@ -111,7 +111,7 @@ class QwenPipeline(BasePipeline):
         speech_enhancer_model: Optional[str] = None,
 
         # Speech segmentation / VAD (Phase 4)
-        speech_segmenter: str = "ten",  # Default to TEN backend for VAD
+        speech_segmenter: str = "silero-v6.2",  # Default to Silero v6.2 for VAD
         segmenter_max_group_duration: float = 6.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
         segmenter_config: Optional[Dict[str, Any]] = None,  # GUI/CLI custom segmenter params
 

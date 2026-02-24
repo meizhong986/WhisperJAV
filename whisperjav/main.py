@@ -464,24 +464,30 @@ def parse_arguments():
                            help="Speech enhancement backend (default: none)")
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
-    qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="ten",
+    qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="silero-v6.2",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten"],
                            help="Speech segmentation backend for VAD-based chunking: "
-                                "ten (default), silero-v6.2 (force-splits long chunks), "
-                                "silero/silero-v4.0/v3.1, nemo/nemo-lite, whisper-vad, none")
+                                "silero-v6.2 (default, force-splits long chunks), "
+                                "ten, silero/silero-v4.0/v3.1, nemo/nemo-lite, whisper-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default). "
                                 "'context_aware' and 'vad_slicing' are deprecated aliases.")
-    qwen_audio_group.add_argument("--qwen-framer", type=str, default="full-scene",
+    qwen_audio_group.add_argument("--qwen-framer", type=str, default="vad-grouped",
                            choices=["full-scene", "vad-grouped", "srt-source", "manual"],
-                           help="Temporal framing strategy: 'full-scene' (default), "
-                                "'vad-grouped', 'srt-source', 'manual'")
+                           help="Temporal framing strategy: 'vad-grouped' (default), "
+                                "'full-scene', 'srt-source', 'manual'")
     qwen_audio_group.add_argument("--qwen-framer-srt-path", type=str, default=None,
                            help="SRT file path for --qwen-framer srt-source")
+    qwen_audio_group.add_argument("--qwen-sensitivity", type=str, default="balanced",
+                           choices=["conservative", "balanced", "aggressive"],
+                           help="Sensitivity preset for Qwen segmenter config: "
+                                "aggressive (low threshold, max capture), "
+                                "balanced (default), "
+                                "conservative (high threshold, fewer false positives)")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
     qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
@@ -973,7 +979,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     elif args.mode == "qwen":
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+        from whisperjav.ensemble.pass_worker import resolve_qwen_sensitivity, SEGMENTER_PARAMS
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+        # Resolve sensitivity preset into segmenter_config
+        _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
+        _qwen_segmenter = getattr(args, 'qwen_segmenter', 'silero-v6.2')
+        _resolved_segmenter_config = resolve_qwen_sensitivity(
+            _qwen_segmenter, _qwen_sensitivity, None
+        )
         # Build Qwen kwargs — pipeline owns defaults for group duration
         # and step-down params; CLI only forwards explicit user overrides.
         qwen_kwargs = {
@@ -992,7 +1005,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "speech_enhancer": getattr(args, 'qwen_enhancer', 'none'),
             "speech_enhancer_model": getattr(args, 'qwen_enhancer_model', None),
             # Speech segmentation / VAD
-            "speech_segmenter": getattr(args, 'qwen_segmenter', 'none'),
+            "speech_segmenter": _qwen_segmenter,
+            "segmenter_config": _resolved_segmenter_config or None,
             # Adaptive Step-Down
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
             # Qwen ASR
@@ -1013,7 +1027,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
             # Temporal framing for assembly mode (GAP-5)
-            "qwen_framer": getattr(args, 'qwen_framer', 'full-scene'),
+            "qwen_framer": getattr(args, 'qwen_framer', 'vad-grouped'),
             "framer_srt_path": getattr(args, 'qwen_framer_srt_path', None),
             # Assembly text cleaner
             "assembly_cleaner": getattr(args, 'qwen_assembly_cleaner', True),

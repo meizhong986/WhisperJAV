@@ -103,6 +103,23 @@ SEGMENTER_PARAMS = {
     "cache_results",
 }
 
+# Backend name → YAML tool name mapping for ConfigManager.get_tool_config()
+# Used by resolve_qwen_sensitivity() to resolve sensitivity presets
+_SEGMENTER_TOOL_NAMES = {
+    "silero-v6.2": "silero-v6-speech-segmentation",
+    "silero": "silero-speech-segmentation",
+    "silero-v4.0": "silero-speech-segmentation",
+    "silero-v3.1": "silero-speech-segmentation",
+    "ten": "ten-speech-segmentation",
+    "nemo": "nemo-speech-segmentation",
+    "nemo-lite": "nemo-speech-segmentation",
+    "whisper-vad": "whisper-vad-speech-segmentation",
+    "whisper-vad-tiny": "whisper-vad-speech-segmentation",
+    "whisper-vad-base": "whisper-vad-speech-segmentation",
+    "whisper-vad-small": "whisper-vad-speech-segmentation",
+    "whisper-vad-medium": "whisper-vad-speech-segmentation",
+}
+
 # Provider params - common transcriber options shared by all backends
 PROVIDER_PARAMS_COMMON = {
     "temperature",
@@ -370,7 +387,8 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_attn": "auto",
     "qwen_enhancer": "none",
     "qwen_enhancer_model": None,
-    "qwen_segmenter": "ten",
+    "qwen_segmenter": "silero-v6.2",
+    "qwen_sensitivity": "balanced",
     "qwen_japanese_postprocess": False,
     "qwen_postprocess_preset": "high_moan",
     "qwen_input_mode": "assembly",
@@ -411,6 +429,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "japanese_postprocess": "qwen_japanese_postprocess",
         "postprocess_preset": "qwen_postprocess_preset",
         "input_mode": "qwen_input_mode",
+        "sensitivity": "qwen_sensitivity",
         "framer": "qwen_framer",
         "safe_chunking": "qwen_safe_chunking",
         "scene_min_duration": "qwen_scene_min_duration",
@@ -455,6 +474,56 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         params["qwen_assembly_cleaner"] = ac != "passthrough"
 
     return params
+
+
+def resolve_qwen_sensitivity(
+    segmenter_backend: str,
+    sensitivity: str,
+    user_overrides: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Resolve sensitivity preset into segmenter_config for Qwen pipeline.
+
+    Layering: backend YAML spec < sensitivity preset < user overrides.
+    Uses ConfigManager.get_tool_config() which already implements this
+    exact layering.
+
+    Args:
+        segmenter_backend: Speech segmenter backend name (e.g., "silero-v6.2", "ten")
+        sensitivity: Sensitivity level ("aggressive", "balanced", "conservative")
+        user_overrides: Optional user custom params (win over preset)
+
+    Returns:
+        Dict of segmenter config params (filtered to SEGMENTER_PARAMS keys)
+    """
+    if segmenter_backend == "none" or not segmenter_backend:
+        return {}
+
+    tool_name = _SEGMENTER_TOOL_NAMES.get(segmenter_backend)
+    if not tool_name:
+        logger.warning(
+            "Unknown segmenter backend '%s' for sensitivity resolution; "
+            "passing user overrides only",
+            segmenter_backend,
+        )
+        return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
+
+    try:
+        from whisperjav.config.v4 import ConfigManager
+
+        cm = ConfigManager()
+        resolved = cm.get_tool_config(tool_name, sensitivity, user_overrides)
+
+        # Filter to SEGMENTER_PARAMS only — ConfigManager returns full tool config
+        # including metadata keys we don't want to pass to the backend
+        return {k: v for k, v in resolved.items() if k in SEGMENTER_PARAMS}
+    except Exception as e:
+        logger.warning(
+            "ConfigManager failed for '%s' sensitivity '%s': %s. "
+            "Falling back to user overrides only.",
+            tool_name, sensitivity, e,
+        )
+        return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
 
 
 def _write_dropbox_and_exit(result_file: str, result: Dict[str, Any], tracer, exit_code: int) -> None:
@@ -891,14 +960,28 @@ def _build_pipeline(
         if pass_config.get("speech_segmenter"):
             qwen_defaults["qwen_segmenter"] = pass_config["speech_segmenter"]
             logger.debug("Pass %s: Override qwen_segmenter = %s", pass_number, pass_config["speech_segmenter"])
-        # Extract segmenter-relevant params from custom params for Qwen pipeline
-        # (Qwen bypasses apply_custom_params(); segmenter params must be forwarded explicitly)
-        segmenter_config = {}
+        # Resolve sensitivity preset into segmenter_config
+        # Layering: YAML spec < sensitivity preset < user custom overrides
+        qwen_sensitivity = (
+            pass_config.get("sensitivity")
+            or qwen_defaults.get("qwen_sensitivity")
+            or "balanced"
+        )
+        # Extract user segmenter overrides from custom params
+        user_segmenter_overrides = {}
         if pass_config.get("params"):
             for key, value in pass_config["params"].items():
                 if key in SEGMENTER_PARAMS:
-                    segmenter_config[key] = value
-                    logger.debug("Pass %s: Qwen segmenter_config[%s] = %s", pass_number, key, value)
+                    user_segmenter_overrides[key] = value
+                    logger.debug("Pass %s: Qwen user segmenter override[%s] = %s", pass_number, key, value)
+        segmenter_backend = qwen_defaults.get("qwen_segmenter", "silero-v6.2")
+        segmenter_config = resolve_qwen_sensitivity(
+            segmenter_backend, qwen_sensitivity, user_segmenter_overrides or None
+        )
+        logger.debug(
+            "Pass %s: Resolved qwen sensitivity '%s' for '%s' -> %d config keys",
+            pass_number, qwen_sensitivity, segmenter_backend, len(segmenter_config),
+        )
 
         # Map qwen_* prefixed params to QwenPipeline's parameter names
         qwen_pipeline_params = {
@@ -916,11 +999,11 @@ def _build_pipeline(
             "attn_implementation": qwen_defaults.get("qwen_attn", "auto"),
             "speech_enhancer": qwen_defaults.get("qwen_enhancer", "none"),
             "speech_enhancer_model": qwen_defaults.get("qwen_enhancer_model", None),
-            "speech_segmenter": qwen_defaults.get("qwen_segmenter", "none"),
+            "speech_segmenter": qwen_defaults.get("qwen_segmenter", "silero-v6.2"),
             "japanese_postprocess": qwen_defaults.get("qwen_japanese_postprocess", False),
             "postprocess_preset": qwen_defaults.get("qwen_postprocess_preset", "high_moan"),
             "qwen_input_mode": qwen_defaults.get("qwen_input_mode", "assembly"),
-            "qwen_framer": qwen_defaults.get("qwen_framer", "full-scene"),
+            "qwen_framer": qwen_defaults.get("qwen_framer", "vad-grouped"),
             "qwen_safe_chunking": qwen_defaults.get("qwen_safe_chunking", True),
             "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "aligner_vad_fallback"),
             "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
