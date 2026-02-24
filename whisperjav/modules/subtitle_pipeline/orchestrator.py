@@ -37,6 +37,7 @@ from whisperjav.modules.subtitle_pipeline.protocols import (
 )
 from whisperjav.modules.subtitle_pipeline.reconstruction import (
     REGROUP_VAD_ONLY,
+    reconstruct_frame_native,
     reconstruct_from_words,
     resolve_regroup,
     split_frame_to_words,
@@ -719,104 +720,137 @@ class DecoupledSubtitlePipeline:
 
                 if scene_alignments is not None:
                     # Branch A: Aligned workflow — merge frame-relative → scene-relative
-                    all_words = self._merge_frame_words(frames, scene_alignments[scene_idx])
-                    word_count = len(all_words)
-
-                    # Sentinel assessment (always run for diagnostics visibility)
-                    assessment = assess_alignment_quality(all_words, duration)
-                    sentinel_status = assessment["status"]
-
-                    # G3 fix: aligner_only mode wants raw aligner output —
-                    # assess for diagnostics but skip recovery even if collapsed.
-                    skip_recovery = (
-                        self.hardening_config.timestamp_mode == TimestampMode.ALIGNER_ONLY
-                    )
-
                     # Resolve regroup mode for Branch A
                     regroup_a = resolve_regroup(self.hardening_config.regroup_mode, is_branch_b=False)
 
-                    if sentinel_status == "COLLAPSED" and not skip_recovery:
-                        # Standard recovery path (aligner_interpolation, aligner_vad_fallback)
-                        self.sentinel_stats["collapsed_scenes"] += 1
-                        total_collapses += 1
-                        logger.warning(
-                            "[SENTINEL] Scene %d/%d: Alignment Collapse — "
-                            "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
-                            scene_idx + 1, n_scenes,
-                            assessment["coverage_ratio"] * 100,
-                            assessment["aggregate_cps"],
-                            assessment["char_count"],
-                            assessment["word_span_sec"],
-                        )
+                    if regroup_a is False:
+                        # Frame-native path: one segment per frame, skip sentinel recovery.
+                        # User explicitly set regroup_mode=OFF — they want raw frame output.
+                        frame_word_groups = self._group_frame_words(frames, scene_alignments[scene_idx])
+                        word_count = sum(len(g) for g in frame_word_groups)
 
-                        # Get speech regions for recovery
-                        regions = self._get_speech_regions(scene_idx, frame_speech_regions, scene_speech_regions)
+                        # Sentinel assessment for diagnostics only (no recovery)
+                        flat_words = [w for g in frame_word_groups for w in g]
+                        assessment = assess_alignment_quality(flat_words, duration)
+                        sentinel_status = assessment["status"]
+                        if sentinel_status == "COLLAPSED":
+                            self.sentinel_stats["collapsed_scenes"] += 1
+                            total_collapses += 1
 
-                        corrected_words = redistribute_collapsed_words(all_words, duration, regions)
-                        self.sentinel_stats["recovered_scenes"] += 1
-                        strategy = "vad_guided" if regions else "proportional"
-                        self.sentinel_stats["recovery_strategies"][strategy] += 1
-                        recovery_info = {
-                            "strategy": strategy,
-                            "words_redistributed": len(corrected_words),
-                        }
-
-                        # Reconstruct with suppress_silence=False (H3 fix)
-                        result = reconstruct_from_words(
-                            corrected_words, audio_path, suppress_silence=False, regroup=regroup_a,
-                        )
-
-                    elif sentinel_status == "COLLAPSED" and skip_recovery:
-                        # aligner_only: log collapse but keep raw aligner timestamps
-                        self.sentinel_stats["collapsed_scenes"] += 1
-                        total_collapses += 1
-                        logger.info(
-                            "[SENTINEL] Scene %d/%d: COLLAPSED but aligner_only mode "
-                            "— keeping raw aligner timestamps (no recovery)",
-                            scene_idx + 1, n_scenes,
-                        )
-                        result = reconstruct_from_words(
-                            all_words, audio_path, suppress_silence=False, regroup=regroup_a,
-                        )
+                        result = reconstruct_frame_native(frame_word_groups, audio_path)
                     else:
-                        # OK path — ForcedAligner timestamps are already accurate.
-                        # Don't let stable-ts's crude loudness quantizer shrink them.
-                        result = reconstruct_from_words(
-                            all_words, audio_path, suppress_silence=False, regroup=regroup_a,
+                        # Standard merge-and-regroup path
+                        all_words = self._merge_frame_words(frames, scene_alignments[scene_idx])
+                        word_count = len(all_words)
+
+                        # Sentinel assessment (always run for diagnostics visibility)
+                        assessment = assess_alignment_quality(all_words, duration)
+                        sentinel_status = assessment["status"]
+
+                        # G3 fix: aligner_only mode wants raw aligner output —
+                        # assess for diagnostics but skip recovery even if collapsed.
+                        skip_recovery = (
+                            self.hardening_config.timestamp_mode == TimestampMode.ALIGNER_ONLY
                         )
+
+                        if sentinel_status == "COLLAPSED" and not skip_recovery:
+                            # Standard recovery path (aligner_interpolation, aligner_vad_fallback)
+                            self.sentinel_stats["collapsed_scenes"] += 1
+                            total_collapses += 1
+                            logger.warning(
+                                "[SENTINEL] Scene %d/%d: Alignment Collapse — "
+                                "coverage=%.1f%%, CPS=%.1f, %d chars in %.3fs span",
+                                scene_idx + 1, n_scenes,
+                                assessment["coverage_ratio"] * 100,
+                                assessment["aggregate_cps"],
+                                assessment["char_count"],
+                                assessment["word_span_sec"],
+                            )
+
+                            # Get speech regions for recovery
+                            regions = self._get_speech_regions(scene_idx, frame_speech_regions, scene_speech_regions)
+
+                            corrected_words = redistribute_collapsed_words(all_words, duration, regions)
+                            self.sentinel_stats["recovered_scenes"] += 1
+                            strategy = "vad_guided" if regions else "proportional"
+                            self.sentinel_stats["recovery_strategies"][strategy] += 1
+                            recovery_info = {
+                                "strategy": strategy,
+                                "words_redistributed": len(corrected_words),
+                            }
+
+                            # Reconstruct with suppress_silence=False (H3 fix)
+                            result = reconstruct_from_words(
+                                corrected_words, audio_path, suppress_silence=False, regroup=regroup_a,
+                            )
+
+                        elif sentinel_status == "COLLAPSED" and skip_recovery:
+                            # aligner_only: log collapse but keep raw aligner timestamps
+                            self.sentinel_stats["collapsed_scenes"] += 1
+                            total_collapses += 1
+                            logger.info(
+                                "[SENTINEL] Scene %d/%d: COLLAPSED but aligner_only mode "
+                                "— keeping raw aligner timestamps (no recovery)",
+                                scene_idx + 1, n_scenes,
+                            )
+                            result = reconstruct_from_words(
+                                all_words, audio_path, suppress_silence=False, regroup=regroup_a,
+                            )
+                        else:
+                            # OK path — ForcedAligner timestamps are already accurate.
+                            # Don't let stable-ts's crude loudness quantizer shrink them.
+                            result = reconstruct_from_words(
+                                all_words, audio_path, suppress_silence=False, regroup=regroup_a,
+                            )
 
                 else:
-                    # Branch B: Aligner-free — split frame text into sentence-level
-                    # pseudo-words for fine-grained regrouping boundaries.
-                    words = []
-                    for frame, text in zip(frames, texts):
-                        if text.strip():
-                            words.extend(
-                                split_frame_to_words(text, frame.start, frame.end)
-                            )
-                    word_count = len(words)
-                    # G1 complement: VAD_ONLY preserves exact frame boundaries —
-                    # suppress_silence=False prevents stable-ts silence detection
-                    # from shifting VAD group timing.
-                    suppress = (
-                        self.hardening_config.timestamp_mode != TimestampMode.VAD_ONLY
-                    )
+                    # Branch B: Aligner-free
                     # Resolve regroup mode for Branch B (aligner-free)
                     regroup = resolve_regroup(self.hardening_config.regroup_mode, is_branch_b=True)
-                    try:
-                        result = reconstruct_from_words(
-                            words, audio_path, suppress_silence=suppress, regroup=regroup,
+
+                    if regroup is False:
+                        # Frame-native: one segment per frame, each frame = one word entry.
+                        # User explicitly set regroup_mode=OFF — they want raw frame output.
+                        frame_word_groups = []
+                        for frame, text in zip(frames, texts):
+                            if text.strip():
+                                frame_word_groups.append([{
+                                    "word": text.strip(),
+                                    "start": frame.start,
+                                    "end": frame.end,
+                                }])
+                        word_count = len(frame_word_groups)
+                        result = reconstruct_frame_native(frame_word_groups, audio_path)
+                        sentinel_status = "N/A"
+                    else:
+                        # Standard split-and-regroup path
+                        words = []
+                        for frame, text in zip(frames, texts):
+                            if text.strip():
+                                words.extend(
+                                    split_frame_to_words(text, frame.start, frame.end)
+                                )
+                        word_count = len(words)
+                        # G1 complement: VAD_ONLY preserves exact frame boundaries —
+                        # suppress_silence=False prevents stable-ts silence detection
+                        # from shifting VAD group timing.
+                        suppress = (
+                            self.hardening_config.timestamp_mode != TimestampMode.VAD_ONLY
                         )
-                    except Exception as regroup_err:
-                        logger.warning(
-                            "[DecoupledPipeline] Scene %d: regrouping failed (%s), "
-                            "retrying without regrouping",
-                            scene_idx, regroup_err,
-                        )
-                        result = reconstruct_from_words(
-                            words, audio_path, suppress_silence=suppress, regroup=False,
-                        )
-                    sentinel_status = "N/A"
+                        try:
+                            result = reconstruct_from_words(
+                                words, audio_path, suppress_silence=suppress, regroup=regroup,
+                            )
+                        except Exception as regroup_err:
+                            logger.warning(
+                                "[DecoupledPipeline] Scene %d: regrouping failed (%s), "
+                                "retrying without regrouping",
+                                scene_idx, regroup_err,
+                            )
+                            result = reconstruct_from_words(
+                                words, audio_path, suppress_silence=suppress, regroup=False,
+                            )
+                        sentinel_status = "N/A"
 
                 # Hardening (shared by all paths)
                 # Resolve per-scene speech regions for VAD_ONLY mode
@@ -935,6 +969,32 @@ class DecoupledSubtitlePipeline:
                 )
 
         return all_words
+
+    @staticmethod
+    def _group_frame_words(
+        frames: list[TemporalFrame],
+        frame_word_lists: list[list[dict[str, Any]]],
+    ) -> list[list[dict[str, Any]]]:
+        """
+        Group per-frame word lists into scene-relative word groups (one per frame).
+
+        Like _merge_frame_words but keeps frame grouping instead of flattening.
+        Each frame's words are offset by frame.start to convert from frame-relative
+        to scene-relative coordinates.
+
+        Returns:
+            List of per-frame word groups (empty frames omitted).
+        """
+        groups: list[list[dict[str, Any]]] = []
+        for frame, word_list in zip(frames, frame_word_lists):
+            offset = frame.start
+            frame_words = [
+                {"word": w["word"], "start": w["start"] + offset, "end": w["end"] + offset}
+                for w in word_list
+            ]
+            if frame_words:
+                groups.append(frame_words)
+        return groups
 
     # -----------------------------------------------------------------------
     # Speech regions resolution

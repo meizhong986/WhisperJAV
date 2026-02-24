@@ -609,8 +609,8 @@ class QwenPipeline(BasePipeline):
             phase4_start = time.time()
 
             from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
-            segmenter_kwargs = {"max_group_duration_s": self.segmenter_max_group_duration}
-            segmenter_kwargs.update(self.segmenter_config)
+            segmenter_kwargs = dict(self.segmenter_config or {})
+            segmenter_kwargs["max_group_duration_s"] = self.segmenter_max_group_duration
             segmenter = SpeechSegmenterFactory.create(
                 self.segmenter_backend,
                 **segmenter_kwargs,

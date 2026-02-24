@@ -216,6 +216,56 @@ def split_frame_to_words(
     return words
 
 
+def reconstruct_frame_native(
+    frame_word_groups: list[list[dict[str, Any]]],
+    audio_path: Union[str, Path],
+) -> "stable_whisper.WhisperResult":
+    """
+    Reconstruct with one segment per frame (no regrouping).
+
+    Each entry in frame_word_groups becomes its own segment in the
+    WhisperResult.  Used when regroup_mode=OFF to preserve temporal
+    frame boundaries as subtitle boundaries.
+
+    Args:
+        frame_word_groups: List of per-frame word lists.
+            Each inner list is [{'word': str, 'start': float, 'end': float}, ...].
+            Empty inner lists are silently skipped.
+        audio_path: Audio file path (for duration metadata, NOT re-transcribed).
+
+    Returns:
+        WhisperResult with len(non-empty frame_word_groups) segments.
+
+    Raises:
+        RuntimeError: If stable_whisper is not installed.
+    """
+    if stable_whisper is None:
+        raise RuntimeError("stable_whisper is required for reconstruction but not installed")
+
+    # Filter out empty groups
+    non_empty = [g for g in frame_word_groups if g]
+
+    if not non_empty:
+        # Delegate to reconstruct_from_words empty-path
+        return reconstruct_from_words([], audio_path, suppress_silence=False, regroup=False)
+
+    def frame_inference(audio, **kwargs):
+        return non_empty
+
+    return stable_whisper.transcribe_any(
+        inference_func=frame_inference,
+        audio=str(audio_path),
+        audio_type="str",
+        regroup=False,
+        vad=False,
+        demucs=False,
+        suppress_silence=False,
+        suppress_word_ts=False,
+        force_order=True,
+        verbose=False,
+    )
+
+
 def reconstruct_from_words(
     words: list[dict[str, Any]],
     audio_path: Union[str, Path],

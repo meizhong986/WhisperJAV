@@ -68,9 +68,9 @@ class VadGroupedFramer:
         )
 
         kwargs = {
+            **self._segmenter_config,
             "max_group_duration_s": self._max_group,
             "chunk_threshold_s": self._chunk_threshold,
-            **self._segmenter_config,
         }
         self._segmenter = SpeechSegmenterFactory.create(self._backend, **kwargs)
 

@@ -14,7 +14,7 @@ Public API:
                 StepDownConfig, SceneDiagnostics
     Protocols:  TemporalFramer, TextGenerator, TextCleaner, TextAligner
     Constants:  REGROUP_JAV, REGROUP_VAD_ONLY
-    Functions:  harden_scene_result, reconstruct_from_words, split_frame_to_words
+    Functions:  harden_scene_result, reconstruct_frame_native, reconstruct_from_words, split_frame_to_words
 """
 
 from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
@@ -27,6 +27,7 @@ from whisperjav.modules.subtitle_pipeline.protocols import (
 from whisperjav.modules.subtitle_pipeline.reconstruction import (
     REGROUP_JAV,
     REGROUP_VAD_ONLY,
+    reconstruct_frame_native,
     reconstruct_from_words,
     split_frame_to_words,
 )
@@ -65,6 +66,7 @@ __all__ = [
     "REGROUP_VAD_ONLY",
     # Functions
     "harden_scene_result",
+    "reconstruct_frame_native",
     "reconstruct_from_words",
     "split_frame_to_words",
 ]

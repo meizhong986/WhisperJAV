@@ -81,10 +81,14 @@ from whisperjav.modules.subtitle_pipeline.hardening import (
 )
 from whisperjav.modules.subtitle_pipeline.reconstruction import (
     REGROUP_VAD_ONLY,
+    reconstruct_frame_native,
     split_frame_to_words,
 )
+from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline
 from whisperjav.modules.subtitle_pipeline.types import (
     HardeningConfig,
+    RegroupMode,
+    TemporalFrame,
     TimestampMode,
 )
 
@@ -513,3 +517,217 @@ class TestRegroupVadOnly:
     def test_has_clamp(self):
         """REGROUP_VAD_ONLY must include cm (boundary clamp)."""
         assert "cm" in REGROUP_VAD_ONLY
+
+
+# ===========================================================================
+# reconstruct_frame_native (frame-native reconstruction for regroup_mode=OFF)
+# ===========================================================================
+
+
+class TestReconstructFrameNative:
+    """Tests for reconstruct_frame_native: one segment per frame."""
+
+    def test_multi_frame_produces_multi_segment(self, tmp_path):
+        """Each frame's word group should become a separate segment."""
+        # Create a minimal WAV for duration metadata
+        import numpy as np
+
+        try:
+            import soundfile as sf
+        except ImportError:
+            pytest.skip("soundfile not available")
+
+        audio = np.zeros(160000, dtype=np.float32)  # 10s at 16kHz
+        audio_path = tmp_path / "test.wav"
+        sf.write(str(audio_path), audio, 16000)
+
+        frame_groups = [
+            [{"word": "こんにちは", "start": 0.0, "end": 2.5}],
+            [{"word": "お元気ですか", "start": 3.0, "end": 5.5}],
+            [{"word": "はい", "start": 6.0, "end": 7.0}],
+        ]
+
+        result = reconstruct_frame_native(frame_groups, audio_path)
+
+        assert len(result.segments) == 3
+        assert result.segments[0].text.strip() == "こんにちは"
+        assert result.segments[1].text.strip() == "お元気ですか"
+        assert result.segments[2].text.strip() == "はい"
+
+    def test_single_frame(self, tmp_path):
+        """Single frame group should produce exactly one segment."""
+        import numpy as np
+
+        try:
+            import soundfile as sf
+        except ImportError:
+            pytest.skip("soundfile not available")
+
+        audio = np.zeros(80000, dtype=np.float32)  # 5s
+        audio_path = tmp_path / "test.wav"
+        sf.write(str(audio_path), audio, 16000)
+
+        frame_groups = [
+            [{"word": "テスト", "start": 1.0, "end": 3.0}],
+        ]
+
+        result = reconstruct_frame_native(frame_groups, audio_path)
+
+        assert len(result.segments) == 1
+
+    def test_empty_groups_skipped(self, tmp_path):
+        """Empty frame groups should be silently skipped."""
+        import numpy as np
+
+        try:
+            import soundfile as sf
+        except ImportError:
+            pytest.skip("soundfile not available")
+
+        audio = np.zeros(160000, dtype=np.float32)
+        audio_path = tmp_path / "test.wav"
+        sf.write(str(audio_path), audio, 16000)
+
+        frame_groups = [
+            [{"word": "はい", "start": 0.0, "end": 2.0}],
+            [],  # empty frame — skipped
+            [{"word": "いいえ", "start": 5.0, "end": 7.0}],
+        ]
+
+        result = reconstruct_frame_native(frame_groups, audio_path)
+
+        assert len(result.segments) == 2
+
+    def test_all_empty_groups(self, tmp_path):
+        """All-empty frame groups should return an empty result."""
+        import numpy as np
+
+        try:
+            import soundfile as sf
+        except ImportError:
+            pytest.skip("soundfile not available")
+
+        audio = np.zeros(16000, dtype=np.float32)
+        audio_path = tmp_path / "test.wav"
+        sf.write(str(audio_path), audio, 16000)
+
+        result = reconstruct_frame_native([[], []], audio_path)
+
+        assert len(result.segments) == 0
+
+    def test_empty_input(self, tmp_path):
+        """Empty input list should return empty result."""
+        import numpy as np
+
+        try:
+            import soundfile as sf
+        except ImportError:
+            pytest.skip("soundfile not available")
+
+        audio = np.zeros(16000, dtype=np.float32)
+        audio_path = tmp_path / "test.wav"
+        sf.write(str(audio_path), audio, 16000)
+
+        result = reconstruct_frame_native([], audio_path)
+
+        assert len(result.segments) == 0
+
+    def test_multi_word_frame(self, tmp_path):
+        """A frame with multiple words should produce one segment containing all words."""
+        import numpy as np
+
+        try:
+            import soundfile as sf
+        except ImportError:
+            pytest.skip("soundfile not available")
+
+        audio = np.zeros(160000, dtype=np.float32)
+        audio_path = tmp_path / "test.wav"
+        sf.write(str(audio_path), audio, 16000)
+
+        frame_groups = [
+            [
+                {"word": "こん", "start": 0.0, "end": 1.0},
+                {"word": "にちは", "start": 1.0, "end": 2.5},
+            ],
+            [
+                {"word": "元気", "start": 3.0, "end": 4.0},
+            ],
+        ]
+
+        result = reconstruct_frame_native(frame_groups, audio_path)
+
+        assert len(result.segments) == 2
+        # First segment should contain both words
+        assert len(result.segments[0].words) == 2
+
+
+# ===========================================================================
+# _group_frame_words (keeps frame grouping, applies offset)
+# ===========================================================================
+
+
+class TestGroupFrameWords:
+    """Tests for DecoupledSubtitlePipeline._group_frame_words."""
+
+    def test_basic_grouping(self):
+        """Each frame's words should be a separate group with offset applied."""
+        frames = [
+            TemporalFrame(start=10.0, end=15.0, source="test"),
+            TemporalFrame(start=15.0, end=20.0, source="test"),
+        ]
+        word_lists = [
+            [{"word": "a", "start": 0.0, "end": 2.0}],
+            [{"word": "b", "start": 0.5, "end": 3.0}],
+        ]
+
+        groups = DecoupledSubtitlePipeline._group_frame_words(frames, word_lists)
+
+        assert len(groups) == 2
+        assert groups[0][0] == {"word": "a", "start": 10.0, "end": 12.0}
+        assert groups[1][0] == {"word": "b", "start": 15.5, "end": 18.0}
+
+    def test_empty_frames_omitted(self):
+        """Frames with no words should not produce a group."""
+        frames = [
+            TemporalFrame(start=0.0, end=5.0, source="test"),
+            TemporalFrame(start=5.0, end=10.0, source="test"),
+        ]
+        word_lists = [
+            [{"word": "hello", "start": 0.0, "end": 2.0}],
+            [],  # empty
+        ]
+
+        groups = DecoupledSubtitlePipeline._group_frame_words(frames, word_lists)
+
+        assert len(groups) == 1
+        assert groups[0][0]["word"] == "hello"
+
+    def test_multi_word_frame(self):
+        """Multiple words in a frame should all be offset."""
+        frames = [
+            TemporalFrame(start=5.0, end=10.0, source="test"),
+        ]
+        word_lists = [
+            [
+                {"word": "x", "start": 0.0, "end": 1.0},
+                {"word": "y", "start": 1.0, "end": 3.0},
+            ],
+        ]
+
+        groups = DecoupledSubtitlePipeline._group_frame_words(frames, word_lists)
+
+        assert len(groups) == 1
+        assert groups[0][0] == {"word": "x", "start": 5.0, "end": 6.0}
+        assert groups[0][1] == {"word": "y", "start": 6.0, "end": 8.0}
+
+    def test_all_empty(self):
+        """All-empty word lists should return empty groups."""
+        frames = [
+            TemporalFrame(start=0.0, end=5.0, source="test"),
+        ]
+        word_lists = [[]]
+
+        groups = DecoupledSubtitlePipeline._group_frame_words(frames, word_lists)
+
+        assert groups == []

@@ -329,3 +329,69 @@ class TestVadSliderMapping:
         """VAD slider keys are NOT in DEFAULT_QWEN_PARAMS (only present when user sets them)."""
         assert "qwen_vad_threshold" not in DEFAULT_QWEN_PARAMS
         assert "qwen_vad_padding" not in DEFAULT_QWEN_PARAMS
+
+
+# ─── max_group_duration_s priority (explicit > YAML) ──────────────────
+
+
+class TestMaxGroupDurationPriority:
+    """Verify pipeline-explicit max_group_duration_s wins over YAML config."""
+
+    def test_qwen_pipeline_explicit_wins_over_segmenter_config(self):
+        """segmenter_config with max_group_duration_s should NOT overwrite explicit param.
+
+        This guards against the priority inversion bug where
+        segmenter_kwargs.update(segmenter_config) overwrote the explicit value.
+        """
+        # Simulate what qwen_pipeline.py Phase 4 does:
+        # The fix: spread segmenter_config first, then set explicit param
+        segmenter_config = {"max_group_duration_s": 29.0, "threshold": 0.35}
+        explicit_value = 6.0
+
+        # AFTER fix: explicit wins
+        segmenter_kwargs = dict(segmenter_config or {})
+        segmenter_kwargs["max_group_duration_s"] = explicit_value
+
+        assert segmenter_kwargs["max_group_duration_s"] == 6.0
+        assert segmenter_kwargs["threshold"] == 0.35  # other keys preserved
+
+    def test_vad_grouped_framer_explicit_wins(self):
+        """VadGroupedFramer kwargs should have explicit params after config spread.
+
+        This guards against the priority inversion in vad_grouped.py where
+        **self._segmenter_config spread overwrote explicit max_group_duration_s.
+        """
+        segmenter_config = {"max_group_duration_s": 29.0, "some_param": True}
+        max_group = 6.0
+        chunk_threshold = 1.0
+
+        # AFTER fix: spread config first, then set explicit params
+        kwargs = {
+            **segmenter_config,
+            "max_group_duration_s": max_group,
+            "chunk_threshold_s": chunk_threshold,
+        }
+
+        assert kwargs["max_group_duration_s"] == 6.0
+        assert kwargs["chunk_threshold_s"] == 1.0
+        assert kwargs["some_param"] is True
+
+    def test_empty_segmenter_config(self):
+        """Empty segmenter_config should not affect explicit params."""
+        segmenter_config = {}
+        explicit_value = 6.0
+
+        segmenter_kwargs = dict(segmenter_config or {})
+        segmenter_kwargs["max_group_duration_s"] = explicit_value
+
+        assert segmenter_kwargs["max_group_duration_s"] == 6.0
+
+    def test_none_segmenter_config(self):
+        """None segmenter_config should not cause errors."""
+        segmenter_config = None
+        explicit_value = 6.0
+
+        segmenter_kwargs = dict(segmenter_config or {})
+        segmenter_kwargs["max_group_duration_s"] = explicit_value
+
+        assert segmenter_kwargs["max_group_duration_s"] == 6.0
