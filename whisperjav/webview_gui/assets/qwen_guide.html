@@ -17,6 +17,7 @@
     --green: #34d399;
     --orange: #fb923c;
     --red: #f87171;
+    --blue: #60a5fa;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -25,7 +26,7 @@
     color: var(--text);
     line-height: 1.6;
     padding: 32px 24px;
-    max-width: 860px;
+    max-width: 900px;
     margin: 0 auto;
   }
   h1 {
@@ -82,6 +83,9 @@
     font-size: 13px;
     font-weight: 700;
     flex-shrink: 0;
+  }
+  .section-num.row-icon {
+    background: var(--green);
   }
   .section-title {
     font-size: 17px;
@@ -151,6 +155,52 @@
     font-size: 12px;
   }
 
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+  th {
+    background: var(--bg-code);
+    color: var(--accent);
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  td {
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td {
+    background: rgba(35, 37, 64, 0.5);
+  }
+  td code {
+    font-size: 11px;
+  }
+
+  /* Divider between row controls and modal tabs */
+  .divider {
+    border: none;
+    border-top: 2px solid var(--accent-dim);
+    margin: 40px 0 36px;
+  }
+  .divider-label {
+    text-align: center;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 28px;
+  }
+
   /* Footer */
   .footer {
     margin-top: 40px;
@@ -160,26 +210,239 @@
     font-size: 12px;
     text-align: center;
   }
+
+  /* CLI note */
+  .cli-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    padding-left: 12px;
+    border-left: 2px solid var(--border);
+  }
+  .cli-note strong { color: var(--blue); }
 </style>
 </head>
 <body>
 
 <h1>Qwen3-ASR Pipeline &mdash; Parameter Guide</h1>
-<p class="subtitle">Reference for all parameters in the Customize Parameters modal. Defaults work well for most JAV content.</p>
+<p class="subtitle">Complete reference for all Qwen3-ASR controls: ensemble row dropdowns and the Customize Parameters modal. Defaults work well for most JAV content.</p>
 
 <!-- Pipeline flow diagram -->
 <div class="flow">
   <span class="stage">Audio</span> <span class="arrow">&rarr;</span>
   <span class="stage">Scene Detection</span> <span class="arrow">&rarr;</span>
-  <span class="stage">Speech Enhancement</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Enhancement</span> <span class="arrow">&rarr;</span>
   <span class="stage">VAD Segmentation</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Temporal Framing</span> <span class="arrow">&rarr;</span>
   <span class="stage">Text Generation</span> <span class="arrow">&rarr;</span>
   <span class="stage">Text Cleaning</span> <span class="arrow">&rarr;</span>
   <span class="stage">Forced Alignment</span> <span class="arrow">&rarr;</span>
   <span class="stage">Timestamp Resolution</span> <span class="arrow">&rarr;</span>
-  <span class="stage">Subtitle Formatting</span> <span class="arrow">&rarr;</span>
   <span class="stage">SRT</span>
 </div>
+
+<!-- ================================================================== -->
+<!-- ENSEMBLE ROW CONTROLS                                               -->
+<!-- ================================================================== -->
+
+<!-- ====== Row: Sensitivity ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num row-icon">R</span>
+    <span class="section-title">Sensitivity</span>
+    <span class="section-tab">Ensemble Row</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Sensitivity Preset</span>
+    <span class="param-default">Balanced</span>
+    <div class="param-desc">
+      Controls how the speech segmenter (VAD) detects speech vs. silence. The preset
+      automatically adjusts detection thresholds, padding, and duration filters for the
+      selected segmenter backend. This is the single most impactful setting for capturing
+      or ignoring quiet speech.
+    </div>
+    <div class="param-desc" style="margin-top: 10px;">
+      <table>
+        <tr>
+          <th>Preset</th>
+          <th>Behaviour</th>
+          <th>Best for</th>
+        </tr>
+        <tr>
+          <td><strong>Aggressive</strong></td>
+          <td>Low threshold (0.2), extra padding (350ms), keeps very short utterances (50ms+).
+              Captures soft whispers, faint moaning, trailing particles.</td>
+          <td>Noisy audio, soft speech, whispered dialogue, maximum subtitle coverage</td>
+        </tr>
+        <tr>
+          <td><strong>Balanced</strong></td>
+          <td>Default thresholds (0.35), moderate padding (250ms), 100ms min speech.
+              Good tradeoff between capturing speech and avoiding false positives.</td>
+          <td>Most JAV content, general use</td>
+        </tr>
+        <tr>
+          <td><strong>Conservative</strong></td>
+          <td>High threshold (0.5), minimal padding (150ms), 150ms min speech.
+              Only captures clear, confident speech.</td>
+          <td>Clean studio audio, or when you want fewer subtitles (skip background chatter)</td>
+        </tr>
+      </table>
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Start with Balanced. Switch to Aggressive if subtitles are
+      missing quiet dialogue. Switch to Conservative if you see too many spurious subtitle lines
+      triggered by music or background noise.
+    </div>
+    <div class="cli-note">
+      <strong>CLI:</strong> <code>--qwen-sensitivity aggressive|balanced|conservative</code>
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Sensitivity + Custom Parameters</span>
+    <div class="param-desc">
+      Sensitivity acts as a <em>base layer</em>. If you also set custom segmenter parameters
+      in the Customize Parameters modal (e.g., a specific <code>threshold</code> value), your
+      custom values override the matching preset values. Non-overridden preset values are kept.
+      This lets you start from a preset and fine-tune individual parameters.
+    </div>
+  </div>
+</div>
+
+<!-- ====== Row: Scene Detector ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num row-icon">R</span>
+    <span class="section-title">Scene Detector</span>
+    <span class="section-tab">Ensemble Row</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Scene Detection Method</span>
+    <span class="param-default">Semantic</span>
+    <div class="param-desc">
+      Splits the full audio into scenes (12&ndash;48s chunks) before any other processing. Each scene
+      is processed independently through the pipeline. The method controls <em>how</em> boundaries
+      are found:
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>Semantic</strong> &mdash; Uses audio embeddings and clustering to find natural scene
+      transitions. Has true merge logic that guarantees the minimum scene duration is respected.
+      Best for Qwen (default).<br>
+      <strong>Auditok</strong> &mdash; Energy-based silence detection with a two-pass coarse+fine
+      strategy. Fast and reliable; default for Whisper pipelines.<br>
+      <strong>Silero</strong> &mdash; Uses the Silero VAD model for scene-level silence detection.
+      Different from the segmenter &mdash; this runs at scene scale, not frame scale.<br>
+      <strong>None</strong> &mdash; No scene splitting. Entire audio is processed as one scene.
+      Only use for very short files (&lt;3 minutes).
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Leave on Semantic for Qwen. Switch to Auditok if
+      semantic detection produces unnatural splits (rare). Use None only for short clips.
+    </div>
+  </div>
+</div>
+
+<!-- ====== Row: Speech Enhancer ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num row-icon">R</span>
+    <span class="section-title">Speech Enhancer</span>
+    <span class="section-tab">Ensemble Row</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Speech Enhancement Backend</span>
+    <span class="param-default">None</span>
+    <div class="param-desc">
+      Optional audio preprocessing that runs per-scene after scene detection. Cleans up audio
+      before it reaches the VAD segmenter and ASR model. Enhancement uses additional VRAM.
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>None</strong> &mdash; No enhancement. Raw audio goes directly to segmentation. Recommended
+      for most content as Qwen3-ASR handles noise well on its own.<br>
+      <strong>FFmpeg DSP</strong> &mdash; Lightweight audio filters (loudnorm, denoise) running in FFmpeg.
+      Zero GPU cost. Good for normalizing volume levels.<br>
+      <strong>ZipEnhancer (Torch)</strong> &mdash; Neural speech enhancement at 16kHz. Effective but
+      adds ~1GB VRAM. Good for noisy recordings.<br>
+      <strong>ClearVoice</strong> &mdash; Multiple denoising models (FRCRN 16kHz, MossFormerGAN 16kHz).
+      Use FRCRN for general denoising.<br>
+      <strong>BS-RoFormer</strong> &mdash; Vocal isolation (separates speech from music/background).
+      Not yet available.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Only enable if the audio has significant background noise,
+      music, or volume inconsistencies that are causing missed or garbled subtitles.
+    </div>
+  </div>
+</div>
+
+<!-- ====== Row: Speech Segmenter ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num row-icon">R</span>
+    <span class="section-title">Speech Segmenter</span>
+    <span class="section-tab">Ensemble Row</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Segmenter Backend</span>
+    <span class="param-default">Silero v6.2</span>
+    <div class="param-desc">
+      Within each scene, the segmenter runs Voice Activity Detection (VAD) to find exactly where
+      speech occurs. Detected speech regions are grouped into frames (max 6s each) and sent to the
+      ASR model. The sensitivity preset above controls this backend's parameters.
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>Silero v6.2</strong> &mdash; Recommended. Force-splits long speech at internal silences
+      (<code>max_speech_duration_s</code>), hysteresis via <code>neg_threshold</code> for stable
+      segmentation in noisy audio. Handles fast Japanese dialogue well.<br>
+      <strong>TEN VAD</strong> &mdash; Previous default. Lightweight energy-based VAD. Fast but can
+      miss pauses in rapid dialogue with background audio.<br>
+      <strong>Silero v4.0 / v3.1</strong> &mdash; Older Silero versions without force-split or hysteresis.
+      Use only if v6.2 causes issues.<br>
+      <strong>Whisper VAD</strong> &mdash; Uses a Whisper model internally for VAD. Accurate but slow
+      and VRAM-heavy. Variants: tiny, small, medium.<br>
+      <strong>NeMo Lite</strong> &mdash; NVIDIA NeMo-based VAD. Requires <code>nemo_toolkit</code>
+      (not included in default install).<br>
+      <strong>None</strong> &mdash; Skip segmentation. Entire scene goes to ASR as one chunk.
+      Only use with Full Scene framing.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Leave on Silero v6.2 for most content. Try TEN if Silero
+      produces too many tiny segments. Use None only with Full Scene framing for short scenes.
+    </div>
+  </div>
+</div>
+
+<!-- ====== Row: Model ====== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num row-icon">R</span>
+    <span class="section-title">Model</span>
+    <span class="section-tab">Ensemble Row</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">ASR Model</span>
+    <span class="param-default">Qwen3-ASR-1.7B</span>
+    <div class="param-desc">
+      Quick model selection in the ensemble row. The 1.7B model requires ~8GB VRAM; the 0.6B requires
+      ~4GB. This is the same as the ASR Model setting in the Customize Parameters modal (Tab 1) &mdash;
+      changing it in either place updates both.
+    </div>
+  </div>
+</div>
+
+
+<hr class="divider">
+<div class="divider-label">Customize Parameters Modal</div>
+
+
+<!-- ================================================================== -->
+<!-- CUSTOMIZE PARAMETERS MODAL (5 tabs)                                -->
+<!-- ================================================================== -->
 
 <!-- ====== Section 1: Model ====== -->
 <div class="section">
@@ -283,6 +546,36 @@
     <span class="section-tab">Tab 2</span>
   </div>
 
+  <p class="group-header">Temporal Framing</p>
+
+  <div class="param">
+    <span class="param-name">Temporal Framing</span>
+    <span class="param-default">VAD Grouped</span>
+    <div class="param-desc">
+      Controls how audio is divided into frames for text generation. Each frame is sent to
+      the ASR model as an independent unit. This setting determines what the model &ldquo;sees&rdquo;
+      at a time.
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>VAD Grouped</strong> &mdash; Groups VAD speech segments into frames up to Max Group Duration
+      (default 6s). Each frame contains only detected speech regions with natural pause boundaries.
+      Best accuracy for most content.<br>
+      <strong>Full Scene</strong> &mdash; Sends the entire scene (12&ndash;48s) as a single frame. The model
+      gets maximum audio context but may struggle with precise timing on long scenes. Can produce
+      better results for content with continuous dialogue and few pauses.<br>
+      <strong>SRT Source</strong> &mdash; Uses an existing SRT file to define frame boundaries. Useful
+      for re-transcription or translation workflows where timing from a reference subtitle is desired.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Leave on VAD Grouped for most content. Try Full Scene if
+      VAD Grouped is splitting mid-sentence in rapid dialogue. Use SRT Source only for re-processing
+      with reference timing.
+    </div>
+    <div class="cli-note">
+      <strong>CLI:</strong> <code>--qwen-framer vad-grouped|full-scene|srt-source</code>
+    </div>
+  </div>
+
   <p class="group-header">Scene Detection</p>
 
   <div class="param">
@@ -332,9 +625,10 @@
     <span class="param-name">Max Group Duration</span>
     <span class="param-default">6s</span>
     <div class="param-desc">
-      Within each scene, VAD (Voice Activity Detection) segments are grouped into chunks for
-      processing. This sets the maximum duration of each group. Shorter groups mean more precise
-      text generation and alignment but add processing overhead.
+      When using VAD Grouped framing, this sets the maximum duration of each group. VAD speech
+      segments within a scene are grouped together until they hit this limit, then a new group
+      starts. Shorter groups mean more precise text generation and alignment but add processing
+      overhead.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Increase to 10-15s if you get sentence fragments or words
@@ -355,8 +649,8 @@
     <span class="param-name">Batch Size</span>
     <span class="param-default">1</span>
     <div class="param-desc">
-      How many audio segments are processed simultaneously by the ASR model. Batch size 1 processes
-      segments one at a time, giving the model full attention and best accuracy. Higher values
+      How many audio frames are processed simultaneously by the ASR model. Batch size 1 processes
+      frames one at a time, giving the model full attention and best accuracy. Higher values
       use more VRAM but process faster.
     </div>
     <div class="param-when">
@@ -369,13 +663,13 @@
     <span class="param-name">Max New Tokens</span>
     <span class="param-default">4096</span>
     <div class="param-desc">
-      Maximum number of text tokens the model can generate per segment. 4096 tokens covers
+      Maximum number of text tokens the model can generate per frame. 4096 tokens covers
       roughly 5-10 minutes of spoken audio. This is a safety ceiling, not a target &mdash; most
-      segments use far fewer tokens.
+      frames use far fewer tokens.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Increase to 6144-8192 only if you see transcriptions getting
-      cut off (truncated mid-sentence at the end of a segment). This is rare with default scene bounds.
+      cut off (truncated mid-sentence at the end of a frame). This is rare with default scene bounds.
     </div>
   </div>
 
@@ -427,11 +721,13 @@
     <div class="param-desc">
       The ForcedAligner takes the generated text and the original audio, then produces precise
       word-level timestamps. This is what makes subtitles appear at the right moment. Disabling it
-      (None) falls back to VAD-based timing, which is less precise.
+      (None) falls back to VAD-based timing, which is less precise. When set to None, the aligner
+      model is not loaded at all, saving ~2GB VRAM.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Set to None if you have severe VRAM constraints (the aligner
       loads a separate 0.6B model) or if alignment is consistently failing on your content.
+      Selecting None automatically switches timestamp mode to VAD Only.
     </div>
   </div>
 
@@ -470,21 +766,26 @@
     <span class="param-name">Timestamp Mode</span>
     <span class="param-default">Aligner + VAD Fallback</span>
     <div class="param-desc">
-      How word timestamps are resolved from the aligner's output. The four modes are:
+      How word timestamps are resolved from the aligner's output. The four modes offer different
+      tradeoffs between precision and coverage:
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
-      <strong>Aligner + VAD Fallback</strong> &mdash; Uses aligner timestamps when available; for words
-      the aligner couldn't place, falls back to VAD segment boundaries. Best overall accuracy.<br>
+      <strong>Aligner + VAD Fallback</strong> (recommended) &mdash; Uses aligner timestamps when available;
+      for words the aligner couldn't place, falls back to VAD segment boundaries with speech-aware
+      gap filling. Best overall accuracy and coverage.<br>
       <strong>Aligner + Interpolation</strong> &mdash; Uses aligner timestamps, fills gaps by
-      interpolating evenly between placed words. Better for sparse aligner output.<br>
-      <strong>Aligner Only</strong> &mdash; Only uses successfully aligned words; drops any word the
-      aligner couldn't place. Can produce gaps in subtitles.<br>
-      <strong>VAD Only</strong> &mdash; Ignores aligner entirely; uses VAD segment boundaries for all
-      timestamps. Fastest but least precise.
+      interpolating evenly between placed words. Better for sparse aligner output where VAD regions
+      aren't available.<br>
+      <strong>Aligner Only</strong> &mdash; Uses raw aligner timestamps with no recovery. If the
+      aligner collapses, subtitles may have timing issues. Useful for studying raw aligner quality.<br>
+      <strong>VAD Only</strong> &mdash; Skips the aligner entirely (not loaded, saves VRAM). All word
+      timestamps come from VAD frame boundaries. Fastest but least precise. Use when aligner is
+      disabled or VRAM is critical.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Try Aligner + Interpolation if you see subtitle lines with
-      jagged timing. Use VAD Only if you've disabled the aligner backend.
+      <strong>When to change:</strong> Leave on Aligner + VAD Fallback for best results. Try
+      Aligner + Interpolation if you see subtitle lines with jagged timing. Use VAD Only if you've
+      disabled the aligner backend or need to minimize VRAM usage.
     </div>
   </div>
 
@@ -497,7 +798,7 @@
       When alignment fails for a scene (all word timestamps collapse to a single point), step-down
       automatically retries the scene with tighter framing &mdash; breaking the audio into smaller
       segments and re-running generation + alignment. This recovers most collapsed scenes without
-      user intervention.
+      user intervention. Hidden when timestamp mode is VAD Only (not applicable).
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Disable only for debugging, or if step-down retries are making
@@ -513,7 +814,7 @@
       segments of this length and re-processed. If this tier also fails, Tier 2 is attempted.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Decrease to 3-4s if Tier 1 retries are still collapsing.
+      <strong>When to change:</strong> Decrease to 4-5s if Tier 1 retries are still collapsing.
       Increase to 10-15s if step-down is splitting sentences unnaturally.
     </div>
   </div>
@@ -527,7 +828,7 @@
       context but are more likely to avoid collapse.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Decrease to 3-4s for maximum recovery rate. Values below 3s
+      <strong>When to change:</strong> Decrease to 4-5s for maximum recovery rate. Values below 4s
       may not contain enough audio for meaningful alignment.
     </div>
   </div>
@@ -565,7 +866,7 @@
 </div>
 
 <div class="footer">
-  WhisperJAV &mdash; Qwen3-ASR Parameter Guide
+  WhisperJAV &mdash; Qwen3-ASR Parameter Guide &mdash; v1.8.5
 </div>
 
 </body>
