@@ -32,24 +32,24 @@ class SileroV6SpeechSegmenter:
     with v6.2 features: max_speech_duration_s, neg_threshold, and speech_pad_ms.
 
     JAV-tuned defaults:
-    - threshold=0.5: Good noise rejection for background audio
-    - speech_pad_ms=200: Capture Japanese soft onsets and trailing particles
+    - threshold=0.35: Captures speech overlapping with breathing/moaning
+    - speech_pad_ms=250: Capture Japanese soft onsets and trailing particles
     - min_speech_duration_ms=100: Preserve short utterances (はい, ね, うん)
     - max_speech_duration_s inherits from max_group_duration_s as safety net
 
     Example:
-        segmenter = SileroV6SpeechSegmenter(threshold=0.5, max_group_duration_s=6.0)
+        segmenter = SileroV6SpeechSegmenter(threshold=0.35, max_group_duration_s=6.0)
         result = segmenter.segment(audio_path)
     """
 
     def __init__(
         self,
-        threshold: float = 0.5,
+        threshold: float = 0.35,
         neg_threshold: Optional[float] = None,
         min_speech_duration_ms: int = 100,
         max_speech_duration_s: Optional[float] = None,
         min_silence_duration_ms: int = 100,
-        speech_pad_ms: int = 200,
+        speech_pad_ms: int = 250,
         min_silence_at_max_speech: int = 98,
         use_max_poss_sil_at_max_speech: bool = True,
         chunk_threshold_s: Optional[float] = 1.0,
@@ -61,7 +61,8 @@ class SileroV6SpeechSegmenter:
 
         Args:
             threshold: Speech probability threshold [0.0, 1.0]. Higher = more
-                selective. Default 0.5 (v6.2 default, good noise rejection).
+                selective. Default 0.35 (JAV-tuned: captures speech overlapping
+                with breathing/moaning; v6.2 library default is 0.5).
             neg_threshold: Hysteresis threshold for speech end detection.
                 None = auto-calculated as threshold - 0.15 by v6.2.
                 Provides stable segmentation in noisy audio.
@@ -73,7 +74,8 @@ class SileroV6SpeechSegmenter:
                 Default 100ms (v6.2 default, detects short pauses).
             speech_pad_ms: Padding around speech segments (handled internally
                 by v6.2, no manual sample-based padding needed).
-                Default 200ms to capture Japanese soft onsets/trailing particles.
+                Default 250ms to capture Japanese soft onsets and trailing
+                particles/breath tails that get clipped at 200ms.
             min_silence_at_max_speech: Minimum silence duration (ms) used when
                 splitting at max_speech_duration_s. Default 98 (v6.2 default).
             use_max_poss_sil_at_max_speech: When splitting at max_speech_duration_s,

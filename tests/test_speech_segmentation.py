@@ -422,8 +422,8 @@ class TestSileroV6SpeechSegmenter:
     def test_jav_tuned_defaults(self, silero_v6_available):
         """Test JAV-tuned default values."""
         segmenter = SpeechSegmenterFactory.create("silero-v6.2")
-        assert segmenter.threshold == 0.5
-        assert segmenter.speech_pad_ms == 200
+        assert segmenter.threshold == 0.35
+        assert segmenter.speech_pad_ms == 250
         assert segmenter.min_speech_duration_ms == 100
         assert segmenter.min_silence_duration_ms == 100
         segmenter.cleanup()

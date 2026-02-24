@@ -49,8 +49,8 @@ contract:
 # =============================================================================
 spec:
   # --- Core VAD Parameters ---
-  threshold: 0.5
-  neg_threshold: null  # Auto-calculated as threshold - 0.15 by v6.2
+  threshold: 0.35    # JAV-tuned: captures speech overlapping with breathing/moaning
+  neg_threshold: null  # Auto-calculated as threshold - 0.15 by v6.2 (= 0.20)
 
   # --- Duration Filters ---
   min_speech_duration_ms: 100   # Preserve short Japanese utterances (はい, ね, うん)
@@ -59,7 +59,7 @@ spec:
 
   # --- Segment Padding ---
   # speech_pad_ms is handled internally by v6.2 (no manual sample-based padding)
-  speech_pad_ms: 200  # Capture Japanese soft onsets and trailing particles
+  speech_pad_ms: 250  # Capture Japanese soft onsets and trailing particles/breath tails
 
   # --- v6.2 max_speech_duration split behavior ---
   min_silence_at_max_speech: 98          # v6.2 default
@@ -76,10 +76,10 @@ presets:
   # Conservative: Higher threshold, fewer false positives
   # Best for: Clean audio, studio recordings
   conservative:
-    threshold: 0.7
+    threshold: 0.5
     min_speech_duration_ms: 150
     min_silence_duration_ms: 200
-    speech_pad_ms: 100
+    speech_pad_ms: 150
 
   # Balanced: Default settings for general use
   balanced: {}  # Uses spec defaults
@@ -87,11 +87,11 @@ presets:
   # Aggressive: Lower threshold, maximum capture
   # Best for: Noisy audio, soft speech, whispered dialogue
   aggressive:
-    threshold: 0.3
-    neg_threshold: 0.1
+    threshold: 0.2
+    neg_threshold: 0.08
     min_speech_duration_ms: 50
     min_silence_duration_ms: 50
-    speech_pad_ms: 300
+    speech_pad_ms: 350
 
 # =============================================================================
 # GUI Hints
