@@ -75,23 +75,27 @@ spec:
 presets:
   # Conservative: Higher threshold, fewer false positives
   # Best for: Clean audio, studio recordings
+  # Higher padding compensates for late detection — threshold 0.5 misses
+  # soft onsets, so 350ms padding recovers the clipped edges.
   conservative:
     threshold: 0.5
     min_speech_duration_ms: 150
     min_silence_duration_ms: 200
-    speech_pad_ms: 150
+    speech_pad_ms: 350
 
   # Balanced: Default settings for general use
   balanced: {}  # Uses spec defaults
 
   # Aggressive: Lower threshold, maximum capture
   # Best for: Noisy audio, soft speech, whispered dialogue
+  # Lower padding because threshold 0.2 already detects speech early —
+  # excessive padding would double-expand into non-speech regions.
   aggressive:
     threshold: 0.2
     neg_threshold: 0.08
     min_speech_duration_ms: 50
     min_silence_duration_ms: 50
-    speech_pad_ms: 350
+    speech_pad_ms: 150
 
 # =============================================================================
 # GUI Hints

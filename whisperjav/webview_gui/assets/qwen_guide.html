@@ -134,6 +134,14 @@
     border-left: 2px solid var(--orange);
   }
   .param-when strong { color: var(--orange); }
+  .param-cli {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    padding-left: 12px;
+    border-left: 2px solid var(--blue);
+  }
+  .param-cli strong { color: var(--blue); }
 
   /* Subsection headers within a section */
   .group-header {
@@ -271,7 +279,8 @@
         </tr>
         <tr>
           <td><strong>Aggressive</strong></td>
-          <td>Low threshold (0.2), extra padding (350ms), keeps very short utterances (50ms+).
+          <td>Low threshold (0.2), tight padding (150ms), keeps very short utterances (50ms+).
+              Detects speech early &mdash; less padding needed since boundaries are already accurate.
               Captures soft whispers, faint moaning, trailing particles.</td>
           <td>Noisy audio, soft speech, whispered dialogue, maximum subtitle coverage</td>
         </tr>
@@ -283,7 +292,8 @@
         </tr>
         <tr>
           <td><strong>Conservative</strong></td>
-          <td>High threshold (0.5), minimal padding (150ms), 150ms min speech.
+          <td>High threshold (0.5), compensating padding (350ms), 150ms min speech.
+              Detects speech later &mdash; extra padding recovers the clipped edges.
               Only captures clear, confident speech.</td>
           <td>Clean studio audio, or when you want fewer subtitles (skip background chatter)</td>
         </tr>
@@ -622,6 +632,25 @@
   <p class="group-header">VAD Grouping</p>
 
   <div class="param">
+    <span class="param-name">Frame Gap Threshold</span>
+    <span class="param-default">1.0s</span>
+    <div class="param-desc">
+      When using VAD Grouped framing, this sets the maximum silence gap (in seconds) allowed within a
+      single frame. If a silence gap between two speech segments exceeds this threshold, a new frame starts.
+      Lower values produce more, smaller frames with tighter sentence boundaries. Higher values produce
+      fewer, larger frames with more context per frame.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Decrease to 0.3-0.5s for rapid dialogue with clear pauses between
+      sentences. Increase to 2-3s for monologue or content with long pauses within the same thought. The
+      default of 1.0s works well for most conversational content.
+    </div>
+    <div class="param-cli">
+      <strong>CLI:</strong> <code>--qwen-chunk-threshold 0.5</code>
+    </div>
+  </div>
+
+  <div class="param">
     <span class="param-name">Max Group Duration</span>
     <span class="param-default">6s</span>
     <div class="param-desc">
@@ -840,6 +869,37 @@
     <span class="section-num">5</span>
     <span class="section-title">Output</span>
     <span class="section-tab">Tab 5</span>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Subtitle Regrouping</span>
+    <span class="param-default">Standard</span>
+    <div class="param-desc">
+      Controls how the raw word-level output from the aligner is grouped into subtitle lines. This is
+      independent of the Post-processing Preset below, which fine-tunes gap thresholds and merge behavior
+      within the selected regrouping mode.
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>Standard</strong> &mdash; Full regrouping: gap-based splitting, fragment merging,
+      punctuation-based splitting, and duration/character safety caps. Best readability for most content.
+      Branch A uses REGROUP_JAV; Branch B uses text-only splitting (no gap heuristics, since
+      VAD-only timestamps are synthetic).<br>
+      <strong>Sentence Only</strong> &mdash; Text-only splitting: punctuation-based splitting and
+      safety caps (80 characters, 8 seconds) without gap heuristics. Use when gap-based splitting
+      causes problems like merging separate lines or splitting mid-thought. Natural sentence boundaries
+      are preserved.<br>
+      <strong>Off</strong> &mdash; No regrouping at all. Each word becomes its own subtitle segment.
+      Produces raw word-level output for analysis, debugging, or external post-processing tools.
+      Not suitable for direct viewing.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Switch to Sentence Only if you notice subtitle lines being
+      merged across speaker turns or split in unnatural places. Use Off only for quality analysis or
+      when feeding output into your own post-processing pipeline.
+    </div>
+    <div class="param-cli">
+      <strong>CLI:</strong> <code>--qwen-regroup sentence_only</code> or <code>--qwen-regroup off</code>
+    </div>
   </div>
 
   <div class="param">

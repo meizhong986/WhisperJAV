@@ -114,6 +114,27 @@ class AlignmentResult:
 # ---------------------------------------------------------------------------
 
 
+class RegroupMode(str, Enum):
+    """
+    Subtitle regrouping strategy applied during reconstruction.
+
+    Controls how raw word-level output from the aligner or VAD framing
+    is split/merged into subtitle lines.
+    """
+
+    STANDARD = "standard"
+    """Full REGROUP_JAV (Branch A) or REGROUP_VAD_ONLY (Branch B).
+    Gap-split, fragment merge, punctuation-split, duration/char caps."""
+
+    SENTENCE_ONLY = "sentence_only"
+    """Punctuation-split + safety caps only. No gap heuristics (sg/mg removed).
+    Preserves natural sentence boundaries without gap-based manipulation."""
+
+    OFF = "off"
+    """No regrouping. Each word becomes its own subtitle segment.
+    For analysis, debugging, or external post-processing."""
+
+
 class TimestampMode(str, Enum):
     """
     Timestamp resolution strategy applied during hardening.
@@ -163,6 +184,7 @@ class HardeningConfig:
     """Configuration for the post-reconstruction hardening stage."""
 
     timestamp_mode: TimestampMode = TimestampMode.ALIGNER_WITH_INTERPOLATION
+    regroup_mode: RegroupMode = RegroupMode.STANDARD
     scene_duration_sec: float = 0.0
     speech_regions: Optional[list[tuple[float, float]]] = None
 

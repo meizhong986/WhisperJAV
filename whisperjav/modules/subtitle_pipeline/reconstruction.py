@@ -97,6 +97,31 @@ REGROUP_VAD_ONLY = (
     "_cm"                   # final clamp
 )
 
+# Alias: sentence-only regrouping = same as VAD-only (text-only splitting,
+# no gap heuristics).  Exposed as a user-facing option distinct from Branch B's
+# automatic use of REGROUP_VAD_ONLY.
+REGROUP_SENTENCE_ONLY = REGROUP_VAD_ONLY
+
+
+def resolve_regroup(mode: "RegroupMode", is_branch_b: bool) -> Union[str, bool]:
+    """Map RegroupMode enum to a stable-ts regroup parameter value.
+
+    Args:
+        mode: User-selected regrouping mode.
+        is_branch_b: True when running without an aligner (VAD-only / aligner-free).
+
+    Returns:
+        A regrouping algorithm string for stable-ts, or False to skip regrouping.
+    """
+    from whisperjav.modules.subtitle_pipeline.types import RegroupMode
+
+    if mode == RegroupMode.OFF:
+        return False
+    if mode == RegroupMode.SENTENCE_ONLY:
+        return REGROUP_SENTENCE_ONLY
+    # STANDARD: branch-appropriate algorithm
+    return REGROUP_VAD_ONLY if is_branch_b else REGROUP_JAV
+
 
 # ---------------------------------------------------------------------------
 # Frame → pseudo-word splitting (Branch B granularity fix)

@@ -399,10 +399,12 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
     "qwen_stepdown": True,
-    # NOTE: qwen_max_group_duration, qwen_stepdown_initial_group, and
-    # qwen_stepdown_fallback_group are intentionally OMITTED here.
-    # QwenPipeline.__init__ owns these defaults.  Only include them in
-    # ensemble config when you want to override the pipeline's defaults.
+    "qwen_regroup_mode": "standard",
+    # NOTE: qwen_max_group_duration, qwen_chunk_threshold,
+    # qwen_stepdown_initial_group, and qwen_stepdown_fallback_group are
+    # intentionally OMITTED here.  QwenPipeline.__init__ owns these
+    # defaults.  Only include them in ensemble config when you want to
+    # override the pipeline's defaults.
 }
 
 
@@ -443,6 +445,8 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "stepdown": "qwen_stepdown",
         "stepdown_initial_group": "qwen_stepdown_initial_group",
         "stepdown_fallback_group": "qwen_stepdown_fallback_group",
+        "regroup_mode": "qwen_regroup_mode",
+        "chunk_threshold": "qwen_chunk_threshold",
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -1010,6 +1014,7 @@ def _build_pipeline(
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
             "stepdown_enabled": qwen_defaults.get("qwen_stepdown", True),
+            "regroup_mode": qwen_defaults.get("qwen_regroup_mode", "standard"),
             "segmenter_config": segmenter_config if segmenter_config else None,
         }
         # Pipeline-owned defaults: only forward when ensemble config explicitly overrides
@@ -1019,6 +1024,9 @@ def _build_pipeline(
             qwen_pipeline_params["scene_max_duration"] = qwen_defaults["qwen_scene_max_duration"]
         if "qwen_max_group_duration" in qwen_defaults:
             qwen_pipeline_params["segmenter_max_group_duration"] = qwen_defaults["qwen_max_group_duration"]
+        _chunk_thr = qwen_defaults.get("qwen_chunk_threshold")
+        if _chunk_thr is not None:
+            qwen_pipeline_params["segmenter_chunk_threshold"] = float(_chunk_thr)
         if "qwen_stepdown_initial_group" in qwen_defaults:
             qwen_pipeline_params["stepdown_initial_group"] = qwen_defaults["qwen_stepdown_initial_group"]
         if "qwen_stepdown_fallback_group" in qwen_defaults:

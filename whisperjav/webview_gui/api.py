@@ -1869,6 +1869,13 @@ class WhisperJAVAPI:
                         "min": 20, "max": 300, "step": 5,
                         "default": 48,
                     },
+                    "chunk_threshold": {
+                        "type": "slider",
+                        "label": "Frame Gap Threshold",
+                        "description": "Silence gap (seconds) that splits speech into separate frames. Lower = more smaller frames, higher = fewer larger frames.",
+                        "min": 0.3, "max": 5.0, "step": 0.1,
+                        "default": 1.0,
+                    },
                     "max_group_duration": {
                         "type": "slider",
                         "label": "Max Group Duration",
@@ -1976,6 +1983,17 @@ class WhisperJAVAPI:
                 },
                 # ── Tab 5: Output ─────────────────────────────────────
                 "output": {
+                    "regroup_mode": {
+                        "type": "dropdown",
+                        "label": "Subtitle Regrouping",
+                        "description": "Controls post-alignment subtitle line splitting and merging",
+                        "options": [
+                            {"value": "standard", "label": "Standard (merge + split by gaps)"},
+                            {"value": "sentence_only", "label": "Sentence Only (no gap heuristics)"},
+                            {"value": "off", "label": "Off (raw word-level output)"},
+                        ],
+                        "default": "standard",
+                    },
                     "postprocess_preset": {
                         "type": "dropdown",
                         "label": "Post-processing Preset",

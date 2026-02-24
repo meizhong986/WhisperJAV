@@ -472,6 +472,8 @@ def parse_arguments():
                                 "ten, silero/silero-v4.0/v3.1, nemo/nemo-lite, whisper-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
+    qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
+                           help="Silence gap threshold (seconds) for VAD frame grouping (pipeline default: 1.0)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default). "
@@ -530,6 +532,10 @@ def parse_arguments():
 
     # ── Qwen3-ASR: Output ─────────────────────────────────────────────────
     qwen_output_group = parser.add_argument_group("Qwen3-ASR: Output")
+    qwen_output_group.add_argument("--qwen-regroup", type=str, default="standard",
+                           choices=["standard", "sentence_only", "off"],
+                           help="Subtitle regrouping mode: 'standard' (full REGROUP_JAV), "
+                                "'sentence_only' (punctuation + caps only), 'off' (raw word-level)")
     qwen_output_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
                            choices=["default", "high_moan", "narrative"],
                            help="Subtitle regrouping preset (default: high_moan for JAV)")
@@ -1026,6 +1032,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
+            # Subtitle regrouping (O1)
+            "regroup_mode": getattr(args, 'qwen_regroup', 'standard'),
             # Temporal framing for assembly mode (GAP-5)
             "qwen_framer": getattr(args, 'qwen_framer', 'vad-grouped'),
             "framer_srt_path": getattr(args, 'qwen_framer_srt_path', None),
@@ -1045,6 +1053,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _max_grp = getattr(args, 'qwen_max_group_duration', None)
         if _max_grp is not None:
             qwen_kwargs["segmenter_max_group_duration"] = _max_grp
+        _chunk_thr = getattr(args, 'qwen_chunk_threshold', None)
+        if _chunk_thr is not None:
+            qwen_kwargs["segmenter_chunk_threshold"] = _chunk_thr
         _sd_init = getattr(args, 'qwen_stepdown_initial_group', None)
         if _sd_init is not None:
             qwen_kwargs["stepdown_initial_group"] = _sd_init

@@ -113,6 +113,7 @@ class QwenPipeline(BasePipeline):
         # Speech segmentation / VAD (Phase 4)
         speech_segmenter: str = "silero-v6.2",  # Default to Silero v6.2 for VAD
         segmenter_max_group_duration: float = 6.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
+        segmenter_chunk_threshold: float = 1.0,  # Silence gap threshold for VAD frame grouping
         segmenter_config: Optional[Dict[str, Any]] = None,  # GUI/CLI custom segmenter params
 
         # Qwen ASR (Phase 5)
@@ -136,6 +137,9 @@ class QwenPipeline(BasePipeline):
         # Parameter kept for backward compatibility; value is always overridden to False.
         japanese_postprocess: bool = False,
         postprocess_preset: str = "high_moan",
+
+        # Subtitle regrouping (Step 9 — reconstruction)
+        regroup_mode: str = "standard",  # "standard", "sentence_only", "off"
 
         # Assembly text cleaner (Step 4 of assembly mode)
         assembly_cleaner: bool = True,  # Enable/disable pre-alignment text cleaning
@@ -214,6 +218,7 @@ class QwenPipeline(BasePipeline):
         # Speech segmentation config
         self.segmenter_backend = speech_segmenter
         self.segmenter_max_group_duration = segmenter_max_group_duration
+        self.segmenter_chunk_threshold = segmenter_chunk_threshold
         self.segmenter_config = segmenter_config or {}
 
         # Adaptive Step-Down config
@@ -238,6 +243,17 @@ class QwenPipeline(BasePipeline):
                 "Qwen3-ASR uses AssemblyTextCleaner, not JapanesePostProcessor. "
                 "This parameter is deprecated and will be removed in a future version."
             )
+
+        # Subtitle regrouping mode (O1)
+        from whisperjav.modules.subtitle_pipeline.types import RegroupMode
+        try:
+            self.regroup_mode = RegroupMode(regroup_mode)
+        except ValueError:
+            logger.warning(
+                "Unknown regroup_mode '%s', defaulting to 'standard'",
+                regroup_mode,
+            )
+            self.regroup_mode = RegroupMode.STANDARD
 
         # Assembly text cleaner toggle (for --qwen-assembly-cleaner on|off)
         self.assembly_cleaner_enabled = assembly_cleaner
@@ -346,6 +362,7 @@ class QwenPipeline(BasePipeline):
             framer_kwargs = {
                 "segmenter_backend": self.segmenter_backend,
                 "max_group_duration_s": self.segmenter_max_group_duration,
+                "chunk_threshold_s": self.segmenter_chunk_threshold,
                 "segmenter_config": self.segmenter_config,
             }
         elif self.framer_backend == "srt-source":
@@ -417,7 +434,10 @@ class QwenPipeline(BasePipeline):
             generator=generator,
             cleaner=cleaner,
             aligner=aligner,
-            hardening_config=HardeningConfig(timestamp_mode=self.timestamp_mode),
+            hardening_config=HardeningConfig(
+                timestamp_mode=self.timestamp_mode,
+                regroup_mode=self.regroup_mode,
+            ),
             language=cfg.get("language", "ja"),
             context=cfg.get("context", ""),
             stepdown_config=stepdown_cfg,

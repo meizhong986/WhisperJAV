@@ -38,10 +38,12 @@ from whisperjav.modules.subtitle_pipeline.protocols import (
 from whisperjav.modules.subtitle_pipeline.reconstruction import (
     REGROUP_VAD_ONLY,
     reconstruct_from_words,
+    resolve_regroup,
     split_frame_to_words,
 )
 from whisperjav.modules.subtitle_pipeline.types import (
     HardeningConfig,
+    RegroupMode,
     SceneDiagnostics,
     StepDownConfig,
     TemporalFrame,
@@ -730,6 +732,9 @@ class DecoupledSubtitlePipeline:
                         self.hardening_config.timestamp_mode == TimestampMode.ALIGNER_ONLY
                     )
 
+                    # Resolve regroup mode for Branch A
+                    regroup_a = resolve_regroup(self.hardening_config.regroup_mode, is_branch_b=False)
+
                     if sentinel_status == "COLLAPSED" and not skip_recovery:
                         # Standard recovery path (aligner_interpolation, aligner_vad_fallback)
                         self.sentinel_stats["collapsed_scenes"] += 1
@@ -757,7 +762,9 @@ class DecoupledSubtitlePipeline:
                         }
 
                         # Reconstruct with suppress_silence=False (H3 fix)
-                        result = reconstruct_from_words(corrected_words, audio_path, suppress_silence=False)
+                        result = reconstruct_from_words(
+                            corrected_words, audio_path, suppress_silence=False, regroup=regroup_a,
+                        )
 
                     elif sentinel_status == "COLLAPSED" and skip_recovery:
                         # aligner_only: log collapse but keep raw aligner timestamps
@@ -768,11 +775,15 @@ class DecoupledSubtitlePipeline:
                             "— keeping raw aligner timestamps (no recovery)",
                             scene_idx + 1, n_scenes,
                         )
-                        result = reconstruct_from_words(all_words, audio_path, suppress_silence=False)
+                        result = reconstruct_from_words(
+                            all_words, audio_path, suppress_silence=False, regroup=regroup_a,
+                        )
                     else:
                         # OK path — ForcedAligner timestamps are already accurate.
                         # Don't let stable-ts's crude loudness quantizer shrink them.
-                        result = reconstruct_from_words(all_words, audio_path, suppress_silence=False)
+                        result = reconstruct_from_words(
+                            all_words, audio_path, suppress_silence=False, regroup=regroup_a,
+                        )
 
                 else:
                     # Branch B: Aligner-free — split frame text into sentence-level
@@ -790,14 +801,8 @@ class DecoupledSubtitlePipeline:
                     suppress = (
                         self.hardening_config.timestamp_mode != TimestampMode.VAD_ONLY
                     )
-                    # VAD_ONLY uses REGROUP_VAD_ONLY (no gap heuristics — timestamps
-                    # are proportional estimates, not real audio gaps).  Other
-                    # aligner-free modes (future) use full REGROUP_JAV.
-                    regroup = (
-                        REGROUP_VAD_ONLY
-                        if self.hardening_config.timestamp_mode == TimestampMode.VAD_ONLY
-                        else True  # REGROUP_JAV is the default in reconstruct_from_words
-                    )
+                    # Resolve regroup mode for Branch B (aligner-free)
+                    regroup = resolve_regroup(self.hardening_config.regroup_mode, is_branch_b=True)
                     try:
                         result = reconstruct_from_words(
                             words, audio_path, suppress_silence=suppress, regroup=regroup,

@@ -70,24 +70,26 @@ spec:
 presets:
   # Conservative: Higher threshold, fewer false positives
   # Best for: Clean audio, studio recordings
+  # Higher end_pad compensates for late detection at threshold 0.5.
   conservative:
     threshold: 0.5
     min_speech_duration_ms: 150
     min_silence_duration_ms: 150
     start_pad_ms: 0
-    end_pad_ms: 100
+    end_pad_ms: 300
 
   # Balanced: Default settings for general use
   balanced: {}  # Uses spec defaults
 
   # Aggressive: Lower threshold, maximum capture
   # Best for: Noisy audio, soft speech
+  # Lower end_pad — threshold 0.10 already detects speech early.
   aggressive:
     threshold: 0.10
     min_speech_duration_ms: 50
     min_silence_duration_ms: 50
     start_pad_ms: 0
-    end_pad_ms: 300
+    end_pad_ms: 100
 
 # =============================================================================
 # GUI Hints

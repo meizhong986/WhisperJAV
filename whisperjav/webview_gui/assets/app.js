@@ -251,6 +251,7 @@ const QwenManager = {
         safe_chunking: true,
         scene_min_duration: 12,
         scene_max_duration: 48,
+        chunk_threshold: 1.0,
         max_group_duration: 6,
         // Scene detection (from main dropdown)
         scene: 'semantic',
@@ -269,6 +270,7 @@ const QwenManager = {
         stepdown_initial_group: 6.0,
         stepdown_fallback_group: 6.0,
         // Output
+        regroup_mode: 'standard',
         postprocess_preset: 'high_moan',
     },
 
@@ -3149,6 +3151,17 @@ const EnsembleManager = {
         vadHeader.textContent = 'VAD Grouping';
         container.appendChild(vadHeader);
 
+        // Frame Gap Threshold slider (O2: chunk_threshold_s)
+        const chunkDef = schemaSection.chunk_threshold;
+        if (chunkDef) {
+            container.appendChild(this.createTransformersSlider(
+                'chunk_threshold', chunkDef.label,
+                chunkDef.min, chunkDef.max, chunkDef.step,
+                currentValues.chunk_threshold ?? chunkDef.default,
+                chunkDef.description
+            ));
+        }
+
         // Max Group Duration slider
         const grpDef = schemaSection.max_group_duration;
         container.appendChild(this.createTransformersSlider(
@@ -3388,6 +3401,17 @@ const EnsembleManager = {
         fmtHeader.className = 'param-group-header';
         fmtHeader.textContent = 'Subtitle Formatting';
         container.appendChild(fmtHeader);
+
+        // Regroup mode dropdown (O1)
+        const regroupDef = schemaSection.regroup_mode;
+        if (regroupDef) {
+            container.appendChild(this.createTransformersDropdown(
+                'regroup_mode', regroupDef.label,
+                regroupDef.options,
+                currentValues.regroup_mode || regroupDef.default,
+                regroupDef.description
+            ));
+        }
 
         // Post-processing preset dropdown
         const presetDef = schemaSection.postprocess_preset;
