@@ -1883,6 +1883,22 @@ class WhisperJAVAPI:
                         "min": 3, "max": 60, "step": 1,
                         "default": 6,
                     },
+                    "vad_threshold": {
+                        "type": "slider",
+                        "label": "VAD Threshold",
+                        "description": "Speech detection probability threshold. Overrides sensitivity preset. Lower = more sensitive.",
+                        "group": "vad_settings",
+                        "min": 0.05, "max": 0.80, "step": 0.05,
+                        "default": 0.35,
+                    },
+                    "vad_padding": {
+                        "type": "slider",
+                        "label": "VAD Padding (ms)",
+                        "description": "Padding around detected speech segments (ms). Overrides sensitivity preset.",
+                        "group": "vad_settings",
+                        "min": 50, "max": 600, "step": 25,
+                        "default": 250,
+                    },
                 },
                 # ── Tab 3: Generation ─────────────────────────────────
                 "generation": {

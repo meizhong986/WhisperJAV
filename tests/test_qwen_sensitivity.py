@@ -250,3 +250,82 @@ class TestInvertedPadding:
         aggressive = resolve_qwen_sensitivity("silero-v4.0", "aggressive")
         conservative = resolve_qwen_sensitivity("silero-v4.0", "conservative")
         assert aggressive["speech_pad_ms"] < conservative["speech_pad_ms"]
+
+
+# ─── GUI VAD slider overrides ──────────────────────────────────────────
+
+
+class TestVadSliderOverrides:
+    """Tests for VAD threshold/padding slider overrides (GUI scenario)."""
+
+    def test_threshold_override_aggressive(self):
+        """VAD threshold slider overrides aggressive preset's threshold."""
+        result = resolve_qwen_sensitivity(
+            "silero-v6.2", "aggressive", {"threshold": 0.4}
+        )
+        assert result["threshold"] == 0.4
+        # Other aggressive values preserved
+        assert result["neg_threshold"] == 0.08
+        assert result["speech_pad_ms"] == 150
+
+    def test_padding_override_aggressive(self):
+        """VAD padding slider overrides aggressive preset's speech_pad_ms."""
+        result = resolve_qwen_sensitivity(
+            "silero-v6.2", "aggressive", {"speech_pad_ms": 300}
+        )
+        assert result["speech_pad_ms"] == 300
+        # Aggressive threshold preserved
+        assert result["threshold"] == 0.2
+
+    def test_both_sliders_override(self):
+        """Both sliders override simultaneously."""
+        result = resolve_qwen_sensitivity(
+            "silero-v6.2", "conservative",
+            {"threshold": 0.25, "speech_pad_ms": 200}
+        )
+        assert result["threshold"] == 0.25
+        assert result["speech_pad_ms"] == 200
+        # Other conservative values preserved
+        assert result["min_speech_duration_ms"] == 150
+
+    def test_no_override_preserves_preset(self):
+        """Without overrides, sensitivity preset values are unchanged."""
+        with_none = resolve_qwen_sensitivity("silero-v6.2", "aggressive", None)
+        without = resolve_qwen_sensitivity("silero-v6.2", "aggressive")
+        assert with_none == without
+
+    def test_empty_override_preserves_preset(self):
+        """Empty override dict preserves sensitivity preset values."""
+        with_empty = resolve_qwen_sensitivity("silero-v6.2", "balanced", {})
+        without = resolve_qwen_sensitivity("silero-v6.2", "balanced")
+        assert with_empty == without
+
+    def test_threshold_override_balanced(self):
+        """VAD threshold slider overrides balanced preset's default threshold."""
+        result = resolve_qwen_sensitivity(
+            "silero-v6.2", "balanced", {"threshold": 0.15}
+        )
+        assert result["threshold"] == 0.15
+        # Balanced padding preserved
+        assert result["speech_pad_ms"] == 250
+
+
+class TestVadSliderMapping:
+    """Tests for VAD slider key mapping through prepare_qwen_params."""
+
+    def test_vad_threshold_mapping(self):
+        """prepare_qwen_params maps 'vad_threshold' to 'qwen_vad_threshold'."""
+        pass_config = {"qwen_params": {"vad_threshold": 0.25}}
+        result = prepare_qwen_params(pass_config)
+        assert result["qwen_vad_threshold"] == 0.25
+
+    def test_vad_padding_mapping(self):
+        """prepare_qwen_params maps 'vad_padding' to 'qwen_vad_padding'."""
+        pass_config = {"qwen_params": {"vad_padding": 300}}
+        result = prepare_qwen_params(pass_config)
+        assert result["qwen_vad_padding"] == 300
+
+    def test_vad_sliders_not_in_defaults(self):
+        """VAD slider keys are NOT in DEFAULT_QWEN_PARAMS (only present when user sets them)."""
+        assert "qwen_vad_threshold" not in DEFAULT_QWEN_PARAMS
+        assert "qwen_vad_padding" not in DEFAULT_QWEN_PARAMS

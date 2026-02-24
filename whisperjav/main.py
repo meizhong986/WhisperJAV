@@ -490,6 +490,10 @@ def parse_arguments():
                                 "aggressive (low threshold, max capture), "
                                 "balanced (default), "
                                 "conservative (high threshold, fewer false positives)")
+    qwen_audio_group.add_argument("--qwen-vad-threshold", type=float, default=None,
+                           help="VAD speech detection threshold (overrides sensitivity preset)")
+    qwen_audio_group.add_argument("--qwen-vad-padding", type=int, default=None,
+                           help="VAD speech padding in ms (overrides sensitivity preset)")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
     qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
@@ -990,8 +994,15 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
         _qwen_segmenter = getattr(args, 'qwen_segmenter', 'silero-v6.2')
+        _user_vad_overrides = {}
+        _vad_thr = getattr(args, 'qwen_vad_threshold', None)
+        if _vad_thr is not None:
+            _user_vad_overrides["threshold"] = _vad_thr
+        _vad_pad = getattr(args, 'qwen_vad_padding', None)
+        if _vad_pad is not None:
+            _user_vad_overrides["speech_pad_ms"] = _vad_pad
         _resolved_segmenter_config = resolve_qwen_sensitivity(
-            _qwen_segmenter, _qwen_sensitivity, None
+            _qwen_segmenter, _qwen_sensitivity, _user_vad_overrides or None
         )
         # Build Qwen kwargs — pipeline owns defaults for group duration
         # and step-down params; CLI only forwards explicit user overrides.

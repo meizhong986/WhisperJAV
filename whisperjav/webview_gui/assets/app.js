@@ -253,6 +253,8 @@ const QwenManager = {
         scene_max_duration: 48,
         chunk_threshold: 1.0,
         max_group_duration: 6,
+        vad_threshold: 0.35,
+        vad_padding: 250,
         // Scene detection (from main dropdown)
         scene: 'semantic',
         input_mode: 'assembly',
@@ -3170,6 +3172,35 @@ const EnsembleManager = {
             currentValues.max_group_duration ?? grpDef.default,
             grpDef.description
         ));
+
+        // VAD Settings (collapsed <details>)
+        const vadDetails = document.createElement('details');
+        vadDetails.className = 'param-group-details';
+        const vadSummary = document.createElement('summary');
+        vadSummary.textContent = 'VAD Settings';
+        vadDetails.appendChild(vadSummary);
+
+        const vadContainer = document.createElement('div');
+        vadContainer.className = 'details-content';
+
+        const thrDef = schemaSection.vad_threshold;
+        vadContainer.appendChild(this.createTransformersSlider(
+            'vad_threshold', thrDef.label,
+            thrDef.min, thrDef.max, thrDef.step,
+            currentValues.vad_threshold ?? thrDef.default,
+            thrDef.description
+        ));
+
+        const padDef = schemaSection.vad_padding;
+        vadContainer.appendChild(this.createTransformersSlider(
+            'vad_padding', padDef.label,
+            padDef.min, padDef.max, padDef.step,
+            currentValues.vad_padding ?? padDef.default,
+            padDef.description
+        ));
+
+        vadDetails.appendChild(vadContainer);
+        container.appendChild(vadDetails);
     },
 
     // ── Tab 3: Generation ────────────────────────────────────────────

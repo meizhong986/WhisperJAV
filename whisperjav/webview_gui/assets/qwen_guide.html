@@ -664,6 +664,72 @@
       split across subtitle lines. Decrease to 3-4s for very rapid dialogue where precision matters.
     </div>
   </div>
+
+  <p class="group-header">VAD Settings</p>
+
+  <div class="param">
+    <span class="param-name">VAD Threshold</span>
+    <span class="param-default">0.35</span>
+    <div class="param-desc">
+      Speech detection probability threshold for the VAD model. A frame of audio is classified as
+      speech when the model's confidence exceeds this value. Lower values detect quieter or more
+      ambiguous speech (more sensitive), higher values require clearer speech signals (fewer false
+      positives). This slider <strong>overrides</strong> the value set by the sensitivity preset.
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>0.05&ndash;0.15</strong> &mdash; Very sensitive. Captures whispers and background murmuring.
+      May produce false positives from music or ambient noise.<br>
+      <strong>0.20&ndash;0.35</strong> &mdash; Balanced range. Good for most JAV content with varying
+      vocal intensity.<br>
+      <strong>0.40&ndash;0.60</strong> &mdash; Conservative. Only clear speech is detected. Quiet moans
+      or whispered dialogue may be missed.<br>
+      <strong>0.65&ndash;0.80</strong> &mdash; Very strict. Only loud, clear speech passes. Use for
+      extremely noisy source material.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> If the sensitivity preset is close but not quite right for your
+      content, use this slider to fine-tune. For example, use &ldquo;aggressive&rdquo; sensitivity but
+      raise the threshold from 0.2 to 0.25 to reduce a few false positives.
+    </div>
+    <div class="cli-note">
+      <strong>CLI:</strong> <code>--qwen-vad-threshold 0.25</code>
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">VAD Padding (ms)</span>
+    <span class="param-default">250ms</span>
+    <div class="param-desc">
+      Milliseconds of audio added before and after each detected speech segment. Padding ensures the
+      ASR model sees the full onset and release of speech, preventing clipped words. This slider
+      <strong>overrides</strong> the value set by the sensitivity preset.
+    </div>
+    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
+      <strong>50&ndash;150ms</strong> &mdash; Tight padding. Use with aggressive sensitivity (which
+      already detects speech early) to avoid excessive silence in frames.<br>
+      <strong>200&ndash;300ms</strong> &mdash; Standard range. Good default for balanced sensitivity.<br>
+      <strong>350&ndash;600ms</strong> &mdash; Wide padding. Use with conservative sensitivity (which
+      detects speech late) to capture soft onsets and trailing particles.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> If words are getting clipped at the start or end of subtitle
+      lines, increase padding. If subtitle timestamps feel too loose with excessive silence, decrease
+      padding.
+    </div>
+    <div class="cli-note">
+      <strong>CLI:</strong> <code>--qwen-vad-padding 300</code>
+    </div>
+  </div>
+
+  <div class="param">
+    <span class="param-name">Sensitivity + VAD Sliders</span>
+    <div class="param-desc">
+      The sensitivity dropdown sets a complete preset of VAD parameters. The VAD Threshold and
+      VAD Padding sliders <strong>override only the specific values you change</strong>, leaving
+      other preset parameters (like <code>neg_threshold</code>, <code>min_speech_duration_ms</code>)
+      intact. If you don't touch the sliders, the sensitivity preset applies fully.
+    </div>
+  </div>
 </div>
 
 <!-- ====== Section 3: Generation ====== -->

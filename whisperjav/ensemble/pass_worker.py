@@ -447,6 +447,8 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "stepdown_fallback_group": "qwen_stepdown_fallback_group",
         "regroup_mode": "qwen_regroup_mode",
         "chunk_threshold": "qwen_chunk_threshold",
+        "vad_threshold": "qwen_vad_threshold",
+        "vad_padding": "qwen_vad_padding",
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -978,6 +980,15 @@ def _build_pipeline(
                 if key in SEGMENTER_PARAMS:
                     user_segmenter_overrides[key] = value
                     logger.debug("Pass %s: Qwen user segmenter override[%s] = %s", pass_number, key, value)
+        # VAD slider overrides from Qwen GUI (take priority over sensitivity preset)
+        _vad_thr = qwen_defaults.get("qwen_vad_threshold")
+        if _vad_thr is not None:
+            user_segmenter_overrides["threshold"] = float(_vad_thr)
+            logger.debug("Pass %s: VAD threshold slider override = %s", pass_number, _vad_thr)
+        _vad_pad = qwen_defaults.get("qwen_vad_padding")
+        if _vad_pad is not None:
+            user_segmenter_overrides["speech_pad_ms"] = int(_vad_pad)
+            logger.debug("Pass %s: VAD padding slider override = %s ms", pass_number, _vad_pad)
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "silero-v6.2")
         segmenter_config = resolve_qwen_sensitivity(
             segmenter_backend, qwen_sensitivity, user_segmenter_overrides or None
