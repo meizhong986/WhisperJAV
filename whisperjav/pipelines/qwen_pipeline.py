@@ -139,7 +139,7 @@ class QwenPipeline(BasePipeline):
         postprocess_preset: str = "high_moan",
 
         # Subtitle regrouping (Step 9 — reconstruction)
-        regroup_mode: str = "standard",  # "standard", "sentence_only", "off"
+        regroup_mode: str = "off",  # "standard", "sentence_only", "off"
 
         # Assembly text cleaner (Step 4 of assembly mode)
         assembly_cleaner: bool = True,  # Enable/disable pre-alignment text cleaning
@@ -250,10 +250,10 @@ class QwenPipeline(BasePipeline):
             self.regroup_mode = RegroupMode(regroup_mode)
         except ValueError:
             logger.warning(
-                "Unknown regroup_mode '%s', defaulting to 'standard'",
+                "Unknown regroup_mode '%s', defaulting to 'off'",
                 regroup_mode,
             )
-            self.regroup_mode = RegroupMode.STANDARD
+            self.regroup_mode = RegroupMode.OFF
 
         # Assembly text cleaner toggle (for --qwen-assembly-cleaner on|off)
         self.assembly_cleaner_enabled = assembly_cleaner

@@ -536,10 +536,10 @@ def parse_arguments():
 
     # ── Qwen3-ASR: Output ─────────────────────────────────────────────────
     qwen_output_group = parser.add_argument_group("Qwen3-ASR: Output")
-    qwen_output_group.add_argument("--qwen-regroup", type=str, default="standard",
+    qwen_output_group.add_argument("--qwen-regroup", type=str, default="off",
                            choices=["standard", "sentence_only", "off"],
-                           help="Subtitle regrouping mode: 'standard' (full REGROUP_JAV), "
-                                "'sentence_only' (punctuation + caps only), 'off' (raw word-level)")
+                           help="Subtitle regrouping mode: 'off' (frame-native, one subtitle per frame), "
+                                "'standard' (full REGROUP_JAV), 'sentence_only' (punctuation + caps only)")
     qwen_output_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
                            choices=["default", "high_moan", "narrative"],
                            help="Subtitle regrouping preset (default: high_moan for JAV)")

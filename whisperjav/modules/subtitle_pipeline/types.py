@@ -184,7 +184,7 @@ class HardeningConfig:
     """Configuration for the post-reconstruction hardening stage."""
 
     timestamp_mode: TimestampMode = TimestampMode.ALIGNER_WITH_INTERPOLATION
-    regroup_mode: RegroupMode = RegroupMode.STANDARD
+    regroup_mode: RegroupMode = RegroupMode.OFF
     scene_duration_sec: float = 0.0
     speech_regions: Optional[list[tuple[float, float]]] = None
 

@@ -119,9 +119,9 @@ class Segment:
     
     def to_dict(self):
         # Safe padding: buffer around each segment for ASR extraction.
-        # 0.5s accommodates Japanese soft consonant onsets and trailing
-        # particles/vowels that sit near the energy minimum.
-        pad = 0.5
+        # 0.25s balances buffering for Japanese soft consonant onsets against
+        # scene-boundary overlap (±0.25s → ~0.5s overlap vs ~1.0s at ±0.5s).
+        pad = 0.25
         safe_start = max(0.0, self.start - pad)
         # Note: We don't clamp the end to duration here because we don't always 
         # have the total duration handy in this class, but ffmpeg handles over-reading fine.

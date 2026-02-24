@@ -399,7 +399,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
     "qwen_stepdown": True,
-    "qwen_regroup_mode": "standard",
+    "qwen_regroup_mode": "off",
     # NOTE: qwen_max_group_duration, qwen_chunk_threshold,
     # qwen_stepdown_initial_group, and qwen_stepdown_fallback_group are
     # intentionally OMITTED here.  QwenPipeline.__init__ owns these

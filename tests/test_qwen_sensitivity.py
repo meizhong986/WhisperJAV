@@ -202,8 +202,8 @@ class TestRegroupModeDefaults:
     """Tests for regroup_mode in pass_worker defaults and mapping."""
 
     def test_default_regroup_mode(self):
-        """Default regroup mode is 'standard'."""
-        assert DEFAULT_QWEN_PARAMS["qwen_regroup_mode"] == "standard"
+        """Default regroup mode is 'off' (frame-native)."""
+        assert DEFAULT_QWEN_PARAMS["qwen_regroup_mode"] == "off"
 
     def test_regroup_mode_mapping(self):
         """prepare_qwen_params maps 'regroup_mode' to 'qwen_regroup_mode'."""

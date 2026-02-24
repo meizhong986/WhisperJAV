@@ -939,7 +939,7 @@
 
   <div class="param">
     <span class="param-name">Subtitle Regrouping</span>
-    <span class="param-default">Standard</span>
+    <span class="param-default">Off</span>
     <div class="param-desc">
       Controls how the raw word-level output from the aligner is grouped into subtitle lines. This is
       independent of the Post-processing Preset below, which fine-tunes gap thresholds and merge behavior
@@ -954,17 +954,17 @@
       safety caps (80 characters, 8 seconds) without gap heuristics. Use when gap-based splitting
       causes problems like merging separate lines or splitting mid-thought. Natural sentence boundaries
       are preserved.<br>
-      <strong>Off</strong> &mdash; No regrouping at all. Each word becomes its own subtitle segment.
-      Produces raw word-level output for analysis, debugging, or external post-processing tools.
-      Not suitable for direct viewing.
+      <strong>Off (Recommended)</strong> &mdash; Frame-native output: each temporal frame becomes one
+      subtitle line, preserving natural speech segmentation boundaries. No regrouping, merging, or
+      splitting is applied. Best overall quality in testing.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Switch to Sentence Only if you notice subtitle lines being
-      merged across speaker turns or split in unnatural places. Use Off only for quality analysis or
-      when feeding output into your own post-processing pipeline.
+      <strong>When to change:</strong> Off is the recommended default. Switch to Standard if you want
+      automatic line-merging and gap-based splitting, or Sentence Only if frame boundaries feel too
+      coarse and you prefer punctuation-based splitting.
     </div>
     <div class="param-cli">
-      <strong>CLI:</strong> <code>--qwen-regroup sentence_only</code> or <code>--qwen-regroup off</code>
+      <strong>CLI:</strong> <code>--qwen-regroup standard</code> or <code>--qwen-regroup sentence_only</code>
     </div>
   </div>
 

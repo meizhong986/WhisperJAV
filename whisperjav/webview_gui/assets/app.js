@@ -272,7 +272,7 @@ const QwenManager = {
         stepdown_initial_group: 6.0,
         stepdown_fallback_group: 6.0,
         // Output
-        regroup_mode: 'standard',
+        regroup_mode: 'off',
         postprocess_preset: 'high_moan',
     },
 
