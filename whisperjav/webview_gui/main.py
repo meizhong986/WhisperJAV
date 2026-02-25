@@ -500,14 +500,22 @@ def main():
         # Debug mode can be enabled via WHISPERJAV_DEBUG environment variable
         debug_mode = os.getenv('WHISPERJAV_DEBUG', '').lower() in ('1', 'true', 'yes')
         print(f"Starting PyWebView... (debug={debug_mode})")
+
+        # Compute storage path for localStorage persistence (translation settings, etc.)
+        # private_mode=False allows localStorage to survive between sessions
+        if platform.system() == 'Windows':
+            storage_path = str(Path(os.environ.get('APPDATA', Path.home())) / 'WhisperJAV' / 'webview_storage')
+        else:
+            storage_path = str(Path.home() / '.whisperjav' / 'webview_storage')
+
         # If icon kwarg couldn't be used (older pywebview), set icon after start on Windows
         if platform.system() == 'Windows' and icon_path and not icon_used:
             def _after_start():
                 _set_windows_icon('WhisperJAV GUI', icon_path)
                 bind_dom_events(window)
-            webview.start(debug=debug_mode, func=_after_start)
+            webview.start(debug=debug_mode, private_mode=False, storage_path=storage_path, func=_after_start)
         else:
-            webview.start(debug=debug_mode, func=lambda: bind_dom_events(window))
+            webview.start(debug=debug_mode, private_mode=False, storage_path=storage_path, func=lambda: bind_dom_events(window))
 
     except FileNotFoundError as e:
         print("\nERROR: Asset file not found!")

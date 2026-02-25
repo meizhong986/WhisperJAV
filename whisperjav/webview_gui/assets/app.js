@@ -4394,6 +4394,7 @@ const EnsembleManager = {
             config.translate_title = translateSettings.movieTitle || null;
             config.translate_actress = translateSettings.actress || null;
             config.translate_plot = translateSettings.plot || null;
+            config.translate_endpoint = translateSettings.customEndpoint || null;
         }
 
         return config;

@@ -202,7 +202,8 @@ def translate_with_config(
     debug: bool = False,
     extra_context: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
-    n_gpu_layers: int = -1
+    n_gpu_layers: int = -1,
+    endpoint: Optional[str] = None
 ) -> Optional[Path]:
     """
     Translate subtitle file with full configuration resolution.
@@ -233,6 +234,7 @@ def translate_with_config(
         debug: Enable debug output
         extra_context: Additional context for translation (movie title, etc.)
         progress_callback: Optional callback for progress updates
+        endpoint: Custom API endpoint URL (for OpenAI-compatible APIs)
 
     Returns:
         Path to translated file, or None on failure
@@ -257,6 +259,14 @@ def translate_with_config(
     # Validate target language
     if target_lang not in SUPPORTED_TARGETS:
         raise ConfigurationError(f"Unsupported target language: {target_lang}. Valid: {SUPPORTED_TARGETS}")
+
+    # Override api_base if custom endpoint provided (same logic as cli.py:437-443)
+    if endpoint:
+        provider_config = dict(provider_config)  # Copy to avoid mutating original
+        provider_config['api_base'] = endpoint
+        # When using custom endpoint, use OpenAI-compatible backend
+        if provider_config.get('pysubtrans_name') not in ('OpenAI', 'DeepSeek'):
+            provider_config['pysubtrans_name'] = 'OpenAI'
 
     # Load user settings
     settings = load_settings()

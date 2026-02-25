@@ -369,6 +369,8 @@ def _check_cuda_toolkit_installed() -> Optional[str]:
             ["nvcc", "--version"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         if result.returncode == 0:
@@ -812,6 +814,8 @@ def _uninstall_llama_cpp() -> bool:
             [sys.executable, "-m", "pip", "uninstall", "-y", "llama-cpp-python"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=60
         )
 
@@ -866,6 +870,8 @@ def _install_server_deps() -> bool:
             [sys.executable, "-m", "pip", "install", "whisperjav[local-llm]"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=120  # 2 minute timeout
         )
 
@@ -1758,13 +1764,13 @@ def _check_existing_llama_servers() -> list:
             # Use tasklist to find python processes, then filter
             result = subprocess.run(
                 ['tasklist', '/fi', 'imagename eq python.exe', '/fo', 'csv', '/nh'],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=5
             )
             # This gives us PIDs but not cmdlines on Windows
             # Just check if llama_cpp.server might be running via wmic
             result = subprocess.run(
                 ['wmic', 'process', 'where', "name='python.exe'", 'get', 'processid,commandline'],
-                capture_output=True, text=True, timeout=10
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=10
             )
             for line in result.stdout.split('\n'):
                 if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
@@ -1780,7 +1786,7 @@ def _check_existing_llama_servers() -> list:
             # Unix: use ps
             result = subprocess.run(
                 ['ps', 'aux'],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=5
             )
             for line in result.stdout.split('\n'):
                 if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
@@ -2117,7 +2123,7 @@ def start_local_server(
         try:
             pre_check = subprocess.run(
                 [sys.executable, "-c", "import llama_cpp"],
-                capture_output=True, text=True, timeout=30
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30
             )
             if pre_check.returncode != 0:
                 stderr_text = pre_check.stderr.strip()

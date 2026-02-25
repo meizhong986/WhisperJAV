@@ -2489,6 +2489,9 @@ class WhisperJAVAPI:
             if config.get('translate_plot'):
                 args += ["--translate-plot", config['translate_plot']]
 
+            if config.get('translate_endpoint'):
+                args += ["--translate-endpoint", config['translate_endpoint']]
+
         return args
 
     # ========================================================================

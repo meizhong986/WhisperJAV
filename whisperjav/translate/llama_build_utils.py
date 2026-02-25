@@ -54,6 +54,8 @@ def get_cuda_architecture() -> Optional[str]:
             ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         if result.returncode == 0:
@@ -71,6 +73,8 @@ def get_cuda_architecture() -> Optional[str]:
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         if result.returncode == 0:
@@ -118,6 +122,8 @@ def detect_cuda_version() -> Optional[str]:
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         if result.returncode == 0:
@@ -317,6 +323,8 @@ def install_wheel(wheel_path: Path, verbose: bool = True) -> bool:
             [sys.executable, "-m", "pip", "install", str(wheel_path), "--no-deps"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=300  # 5 minute timeout
         )
 
@@ -474,7 +482,9 @@ def build_from_source(verbose: bool = True) -> bool:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", git_url],
             capture_output=not verbose,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
 
         if result.returncode == 0:

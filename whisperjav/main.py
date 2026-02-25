@@ -389,6 +389,10 @@ def parse_arguments():
         "--translate-plot",
         help="Plot summary for translation context"
     )
+    translation_group.add_argument(
+        "--translate-endpoint",
+        help="Custom API endpoint URL for translation (for OpenAI-compatible APIs)"
+    )
 
     # HuggingFace Transformers mode arguments
     hf_group = parser.add_argument_group("HuggingFace Transformers Mode Options (--mode transformers)")
@@ -1153,7 +1157,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             stream=stream_mode,
                             debug=getattr(args, 'debug', False),
                             extra_context=build_translation_context(args),
-                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1)
+                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
+                            endpoint=getattr(args, 'translate_endpoint', None)
                         )
 
                         if translated_path:
@@ -1373,7 +1378,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     stream=stream_mode,
                                     debug=getattr(args, 'debug', False),
                                     extra_context=build_translation_context(args),
-                                    n_gpu_layers=getattr(args, 'translate_gpu_layers', -1)
+                                    n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
+                                    endpoint=getattr(args, 'translate_endpoint', None)
                                 )
 
                                 if translated_path:
@@ -1918,7 +1924,8 @@ def main():
                             model=getattr(args, 'translate_model', None),
                             debug=getattr(args, 'debug', False),
                             extra_context=extra_context,
-                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1)
+                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
+                            endpoint=getattr(args, 'translate_endpoint', None)
                         )
 
                         if translated_path:
