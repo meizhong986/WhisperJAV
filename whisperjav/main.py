@@ -342,9 +342,9 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-provider",
-        choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq", "local"],
+        choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq", "local", "custom"],
         default="deepseek",
-        help="Translation AI provider (default: deepseek). Use 'local' for offline LLM translation."
+        help="Translation AI provider (default: deepseek). Use 'local' for offline LLM translation. Use 'custom' with --translate-endpoint for any OpenAI-compatible API."
     )
     translation_group.add_argument(
         "--translate-target",

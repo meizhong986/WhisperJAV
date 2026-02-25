@@ -260,6 +260,13 @@ def translate_with_config(
     if target_lang not in SUPPORTED_TARGETS:
         raise ConfigurationError(f"Unsupported target language: {target_lang}. Valid: {SUPPORTED_TARGETS}")
 
+    # Custom provider requires an endpoint
+    if provider == 'custom' and not endpoint:
+        raise ConfigurationError(
+            "Custom provider requires --translate-endpoint. Example:\n"
+            "  --translate-provider custom --translate-endpoint http://localhost:11434/v1"
+        )
+
     # Override api_base if custom endpoint provided (same logic as cli.py:437-443)
     if endpoint:
         provider_config = dict(provider_config)  # Copy to avoid mutating original
@@ -271,9 +278,9 @@ def translate_with_config(
     # Load user settings
     settings = load_settings()
 
-    # Resolve API key (not needed for local provider)
-    if provider == 'local':
-        resolved_api_key = None
+    # Resolve API key (not needed for local/custom providers)
+    if provider in ('local', 'custom'):
+        resolved_api_key = api_key or ''
     else:
         resolved_api_key = _resolve_api_key(provider_config, api_key)
 
@@ -342,8 +349,9 @@ def translate_with_config(
 
     # Execute translation
     try:
-        # For local provider: start server and use PySubtrans with OpenAI-compatible API
-        if provider == 'local':
+        # For local provider WITHOUT custom endpoint: start llama.cpp server
+        # If local + endpoint: skip server launch, use the endpoint directly (cloud path)
+        if provider == 'local' and not endpoint:
             from .local_backend import start_local_server, stop_local_server
 
             # =========================================================================

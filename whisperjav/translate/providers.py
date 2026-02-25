@@ -46,6 +46,11 @@ PROVIDER_CONFIGS = {
         'pysubtrans_name': 'Local',  # Marker for local LLM bypass
         'model': 'llama-8b',          # Default: good quality, 6GB VRAM
         'env_var': None               # No API key needed
+    },
+    'custom': {
+        'pysubtrans_name': 'OpenAI',  # OpenAI-compatible endpoint
+        'model': '',                   # User provides via --translate-model
+        'env_var': None               # API key optional, provided via --translate-api-key
     }
 }
 

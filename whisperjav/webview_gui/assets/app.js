@@ -4389,8 +4389,8 @@ const EnsembleManager = {
             config.translate_tone = translateSettings.tone || 'standard';
             // Use model override if provided, otherwise use selected model
             config.translate_model = translateSettings.modelOverride || translateSettings.model || null;
-            // Local provider doesn't need API key
-            config.translate_api_key = (translateSettings.provider === 'local') ? null : (translateSettings.apiKey || null);
+            // Local/custom providers don't require API key (custom: optional via --translate-api-key)
+            config.translate_api_key = (translateSettings.provider === 'local' || translateSettings.provider === 'custom') ? null : (translateSettings.apiKey || null);
             config.translate_title = translateSettings.movieTitle || null;
             config.translate_actress = translateSettings.actress || null;
             config.translate_plot = translateSettings.plot || null;
@@ -5315,7 +5315,8 @@ const TranslatorManager = {
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
         openrouter: ['deepseek/deepseek-chat', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
         glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
-        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768']
+        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
+        custom: []
     },
 
     init() {
@@ -5376,6 +5377,13 @@ const TranslatorManager = {
     async updateApiKeyStatus(provider) {
         const statusEl = document.getElementById('translatorApiStatus');
         if (!statusEl) return;
+
+        // Local/custom providers don't need API key
+        if (provider === 'local' || provider === 'custom') {
+            statusEl.textContent = provider === 'local' ? 'Local (No API)' : 'Custom (No API)';
+            statusEl.className = 'api-status configured';
+            return;
+        }
 
         try {
             const result = await pywebview.api.get_translation_providers();
@@ -5862,7 +5870,8 @@ const TranslationSettingsModal = {
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
         openrouter: ['deepseek/deepseek-chat', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
         glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
-        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768']
+        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
+        custom: []
     },
 
     // Settings state
@@ -6041,13 +6050,13 @@ const TranslationSettingsModal = {
         const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
         const apiKey = document.getElementById('translationApiKey')?.value || '';
 
-        // Local LLM doesn't need API key testing
-        if (provider === 'local') {
+        // Local/custom providers don't need API key testing
+        if (provider === 'local' || provider === 'custom') {
             if (statusEl) {
-                statusEl.textContent = 'Local (No API)';
+                statusEl.textContent = provider === 'local' ? 'Local (No API)' : 'Custom (No API)';
                 statusEl.className = 'api-status connected';
             }
-            ConsoleManager.log('Local LLM provider selected - no API key required', 'info');
+            ConsoleManager.log(`${provider === 'local' ? 'Local LLM' : 'Custom endpoint'} provider selected - no API key required`, 'info');
             return;
         }
 

@@ -2801,7 +2801,7 @@ class WhisperJAVAPI:
                     "name": key.upper() if key in ('glm', 'gpt') else key.title(),
                     "model": config.get('model'),
                     "env_var": config.get('env_var'),
-                    "has_api_key": bool(os.getenv(config.get('env_var', '')))
+                    "has_api_key": bool(os.getenv(config.get('env_var') or ''))
                 })
 
             return {
