@@ -109,9 +109,9 @@ gui:
     label: "Hop Size"
     description: "Frame size in samples (160=10ms, 256=16ms at 16kHz)"
     options:
-      - 160
-      - 256
-      - 512
+      - "160"
+      - "256"
+      - "512"
     group: processing
 
   min_speech_duration_ms:

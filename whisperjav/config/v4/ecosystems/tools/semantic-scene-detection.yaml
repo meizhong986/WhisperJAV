@@ -25,6 +25,10 @@ metadata:
     - texture-based
     - mfcc
     - context-aware
+  dependencies:
+    - librosa>=0.10.0
+    - scikit-learn>=1.3.0
+    - soundfile>=0.12.0
 
 tool_type: scene_detection
 
@@ -38,17 +42,6 @@ contract:
   output:
     segments: list
     semantic_metadata: dict  # Additional context and ASR prompts
-
-# =============================================================================
-# Dependencies (Optional - lazy loaded)
-# =============================================================================
-dependencies:
-  required:
-    - librosa>=0.10.0
-    - scikit-learn>=1.3.0
-    - soundfile>=0.12.0
-  optional:
-    - matplotlib>=3.7.0  # For visualization
 
 # =============================================================================
 # Tool Parameters
