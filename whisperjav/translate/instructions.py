@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 # Default instruction file URLs (Gist raw URLs)
 DEFAULT_INSTRUCTION_URLS = {
-    'standard': 'https://gist.githubusercontent.com/meizhong986/fd38f54ccbf6c1df3f04019a4875f6db/raw/e39b96a58e5e4ea4c751508b7c0d0f6f28157330/translationJAV-standard.txt',
-    'pornify': 'https://gist.githubusercontent.com/meizhong986/bd34016a3d84f16f1086e8caf18e0d0f/raw/60be27cc654300d3299e8dfc4791c840238ca2b2/translationJAV-pornify.txt'
+    'standard': 'https://gist.githubusercontent.com/meizhong986/fd38f54ccbf6c1df3f04019a4875f6db/raw/translationJAV-standard.txt',
+    'pornify': 'https://gist.githubusercontent.com/meizhong986/bd34016a3d84f16f1086e8caf18e0d0f/raw/translationJAV-pornify.txt'
 }
 
 
