@@ -1831,12 +1831,8 @@ def main():
                 }
 
             # Create orchestrator
-            # Note: Ensemble mode does not support per-file "source" output dir.
-            # If "source" is specified, use first file's parent as output_dir.
+            # "source" sentinel is passed through — orchestrator resolves per-file
             ensemble_output_dir = args.output_dir
-            if args.output_dir.lower().strip() == "source":
-                ensemble_output_dir = str(Path(media_files[0]['path']).parent)
-                logger.info(f"Source output mode: ensemble outputs will go to {ensemble_output_dir}")
             orchestrator = EnsembleOrchestrator(
                 output_dir=ensemble_output_dir,
                 temp_dir=args.temp_dir,

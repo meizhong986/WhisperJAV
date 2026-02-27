@@ -45,7 +45,18 @@ class EnsembleOrchestrator:
             log_level: Log level to propagate to subprocess workers
             **kwargs: Additional parameters passed to pipelines
         """
-        self.output_dir = Path(output_dir)
+        # "source" sentinel means each file's SRT goes next to its input file
+        self.source_output_mode = (
+            isinstance(output_dir, str) and output_dir.lower().strip() == "source"
+        )
+        if self.source_output_mode:
+            # In source mode, there's no single output dir — per-file dirs are resolved later.
+            # Use temp_dir as the fallback for metadata/summary files.
+            self.output_dir = Path(temp_dir)
+        else:
+            self.output_dir = Path(output_dir)
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+
         self.temp_dir = Path(temp_dir)
         self.keep_temp_files = keep_temp_files
         self.subs_language = subs_language
@@ -54,7 +65,6 @@ class EnsembleOrchestrator:
         self.extra_kwargs = kwargs
         self.worker_kwargs = self._filter_picklable_kwargs(kwargs)
 
-        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
         self.metadata_manager = MetadataManager(self.temp_dir, self.output_dir)
@@ -94,6 +104,12 @@ class EnsembleOrchestrator:
 
         batch_start = time.time()
         serialized_media = self._serialize_media_files(media_files)
+
+        # Annotate each file with its resolved output directory.
+        # In source mode, each file's SRT goes next to its input file.
+        for info in serialized_media:
+            info['output_dir'] = str(self._resolve_file_output_dir(info))
+
         pass_languages = {
             1: resolve_language_code(pass1_config, self.subs_language),
         }
@@ -309,7 +325,8 @@ class EnsembleOrchestrator:
                             # Both pass1 and pass2 SRT files exist - proceed with merge
                             tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
                             tmp_merge.parent.mkdir(parents=True, exist_ok=True)
-                            final_candidate = self.output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
+                            file_output_dir = Path(media_info.get('output_dir', str(self.output_dir)))
+                            final_candidate = file_output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
                             try:
                                 merge_stats = self.merge_engine.merge(
                                     srt1_path=pass1_srt,
@@ -539,6 +556,16 @@ class EnsembleOrchestrator:
                 normalized['path'] = str(normalized['path'])
             serialized.append(normalized)
         return serialized
+
+    def _resolve_file_output_dir(self, media_info: Dict[str, Any]) -> Path:
+        """Return the output directory for a specific file.
+
+        In source mode, SRTs go next to each input file.
+        Otherwise, all SRTs go to the single configured output_dir.
+        """
+        if self.source_output_mode:
+            return Path(media_info['path']).parent
+        return self.output_dir
 
     def _format_status(self, result: Optional[Dict[str, Any]]) -> str:
         """Render status for summary table."""

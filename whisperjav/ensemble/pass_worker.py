@@ -713,7 +713,9 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                     raise ValueError("Pipeline did not return final_srt path in output_files")
 
                 final_srt = Path(final_srt_path)
-                pass_output = Path(payload.output_dir) / f"{basename}.{language_code}.pass{pass_number}.srt"
+                # Per-file output dir (source mode) takes precedence over payload default
+                file_output_dir = Path(media_info.get('output_dir', payload.output_dir))
+                pass_output = file_output_dir / f"{basename}.{language_code}.pass{pass_number}.srt"
 
                 if not final_srt.exists():
                     # BUG FIX: Previously this case silently fell through and marked as "completed"
