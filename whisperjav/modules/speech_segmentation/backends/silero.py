@@ -141,45 +141,47 @@ class SileroSpeechSegmenter:
         defaults = self.VERSION_DEFAULTS.get(self.version, self.VERSION_DEFAULTS["v4.0"])
 
         # Apply parameters with version-appropriate defaults
-        self.threshold = threshold if threshold is not None else defaults["threshold"]
+        # Type coercion (belt-and-suspenders: factory sanitizes first, but
+        # backend is self-defensive for any direct creation path)
+        self.threshold = float(threshold) if threshold is not None else defaults["threshold"]
         self.min_speech_duration_ms = (
-            min_speech_duration_ms if min_speech_duration_ms is not None
+            int(min_speech_duration_ms) if min_speech_duration_ms is not None
             else defaults["min_speech_duration_ms"]
         )
         self.min_silence_duration_ms = (
-            min_silence_duration_ms if min_silence_duration_ms is not None
+            int(min_silence_duration_ms) if min_silence_duration_ms is not None
             else defaults["min_silence_duration_ms"]
         )
         self.speech_pad_ms = (
-            speech_pad_ms if speech_pad_ms is not None
+            int(speech_pad_ms) if speech_pad_ms is not None
             else defaults["speech_pad_ms"]
         )
         self.neg_threshold = (
-            neg_threshold if neg_threshold is not None
+            float(neg_threshold) if neg_threshold is not None
             else defaults.get("neg_threshold", 0.15)
         )
         self.max_speech_duration_s = (
-            max_speech_duration_s if max_speech_duration_s is not None
+            float(max_speech_duration_s) if max_speech_duration_s is not None
             else defaults.get("max_speech_duration_s", float("inf"))
         )
 
         # Handle backward compatibility: chunk_threshold (old) -> chunk_threshold_s (new)
         if chunk_threshold_s is not None:
-            self.chunk_threshold_s = chunk_threshold_s
+            self.chunk_threshold_s = float(chunk_threshold_s)
         elif "chunk_threshold" in kwargs:
-            self.chunk_threshold_s = kwargs["chunk_threshold"]
+            self.chunk_threshold_s = float(kwargs["chunk_threshold"])
         else:
             self.chunk_threshold_s = 4.0  # Default: matches v1.7.1 behavior for Whisper context
 
         # Maximum group duration - prevents groups from exceeding Whisper's context window
         self.max_group_duration_s = (
-            max_group_duration_s if max_group_duration_s is not None
+            float(max_group_duration_s) if max_group_duration_s is not None
             else defaults.get("max_group_duration_s", 29.0)
         )
 
         # Padding in samples (at 16kHz)
-        self.start_pad_samples = start_pad_samples
-        self.end_pad_samples = end_pad_samples
+        self.start_pad_samples = int(start_pad_samples)
+        self.end_pad_samples = int(end_pad_samples)
 
         # Lazy-loaded model
         self._model = None

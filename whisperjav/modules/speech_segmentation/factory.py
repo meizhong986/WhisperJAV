@@ -70,6 +70,69 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# Parameter schemas for factory-level validation gate.
+# Stops GUI-originated type errors (strings, nulls) from reaching backends.
+# Schema: param_name -> (coerce_fn, default_value, nullable)
+#   - coerce_fn: Type constructor to coerce values (int, float, bool)
+#   - default_value: Fallback when value is None and nullable=False
+#   - nullable: If True, None is a valid value (don't substitute default)
+_PARAM_SCHEMAS = {
+    "ten": {
+        "threshold":               (float, 0.20,  False),
+        "hop_size":                (int,   256,   False),
+        "min_speech_duration_ms":  (int,   100,   False),
+        "min_silence_duration_ms": (int,   100,   False),
+        "start_pad_ms":            (int,   0,     False),
+        "end_pad_ms":              (int,   200,   False),
+        "chunk_threshold_s":       (float, 1.0,   True),
+        "max_group_duration_s":    (float, 29.0,  True),
+    },
+    "silero": {
+        "threshold":               (float, None,  True),   # None → VERSION_DEFAULTS
+        "min_speech_duration_ms":  (int,   None,  True),
+        "min_silence_duration_ms": (int,   None,  True),
+        "speech_pad_ms":           (int,   None,  True),
+        "neg_threshold":           (float, None,  True),
+        "max_speech_duration_s":   (float, None,  True),
+        "chunk_threshold_s":       (float, None,  True),
+        "max_group_duration_s":    (float, None,  True),
+        "start_pad_samples":       (int,   11200, False),
+        "end_pad_samples":         (int,   20800, False),
+    },
+    "silero-v6.2": {
+        "threshold":                        (float, 0.35, False),
+        "neg_threshold":                    (float, None, True),   # None = auto-calc
+        "min_speech_duration_ms":           (int,   100,  False),
+        "max_speech_duration_s":            (float, None, True),   # None = inherit
+        "min_silence_duration_ms":          (int,   100,  False),
+        "speech_pad_ms":                    (int,   250,  False),
+        "min_silence_at_max_speech":        (int,   98,   False),
+        "use_max_poss_sil_at_max_speech":   (bool,  True, False),
+        "chunk_threshold_s":                (float, 1.0,  True),
+        "max_group_duration_s":             (float, 29.0, True),
+    },
+    "whisper-vad": {
+        "no_speech_threshold":     (float, 0.6,   False),
+        "logprob_threshold":       (float, -1.0,  False),
+        "cache_results":           (bool,  True,   False),
+        "chunk_threshold_s":       (float, 2.5,   True),
+        "max_group_duration_s":    (float, 29.0,  True),
+        "min_speech_duration_ms":  (int,   100,   False),
+    },
+    "nemo": {
+        "onset":                   (float, 0.4,   False),
+        "offset":                  (float, 0.3,   False),
+        "pad_onset":               (float, 0.2,   False),
+        "pad_offset":              (float, 0.10,  False),
+        "min_speech_duration_ms":  (int,   100,   False),
+        "min_silence_duration_ms": (int,   200,   False),
+        "filter_speech_first":     (bool,  True,  False),
+        "chunk_threshold_s":       (float, None,  True),
+        "max_group_duration_s":    (float, None,  True),
+        "use_overlap_smoothing":   (bool,  False, False),
+    },
+}
+
 
 class SpeechSegmenterFactory:
     """
@@ -232,6 +295,89 @@ class SpeechSegmenterFactory:
         return backend_class
 
     @staticmethod
+    def _sanitize_params(name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Sanitize parameters before passing to backend.
+
+        Handles three failure modes from GUI customize parameters:
+        1. String values where int/float expected (HTML inputs return strings)
+        2. None values where a concrete value is required (empty GUI fields)
+        3. Wrong types silently accepted by backends without coercion
+
+        Args:
+            name: Backend name (e.g., "ten", "silero-v4.0", "silero-v6.2")
+            params: Raw parameter dict from GUI/config
+
+        Returns:
+            Sanitized parameter dict with correct types
+        """
+        # Resolve schema: try exact name, then base family
+        schema = _PARAM_SCHEMAS.get(name)
+        if schema is None:
+            # silero-v6.2 has its own schema; other silero-* variants use "silero"
+            if name == "silero-v6.2":
+                schema = _PARAM_SCHEMAS.get("silero-v6.2")
+            elif name.startswith("silero"):
+                schema = _PARAM_SCHEMAS.get("silero")
+            elif name.startswith("whisper"):
+                schema = _PARAM_SCHEMAS.get("whisper-vad")
+            elif name.startswith("nemo"):
+                schema = _PARAM_SCHEMAS.get("nemo")
+            else:
+                base = name.split("-")[0] if "-" in name else name
+                schema = _PARAM_SCHEMAS.get(base)
+
+        if schema is None:
+            return params  # Unknown backend, pass through unchanged
+
+        sanitized = dict(params)
+
+        for param_name, (type_fn, default, nullable) in schema.items():
+            if param_name not in sanitized:
+                continue  # Not provided, let backend use its own default
+
+            value = sanitized[param_name]
+
+            # Handle None
+            if value is None:
+                if nullable:
+                    continue  # None is valid for this param
+                elif default is not None:
+                    logger.warning(
+                        f"[SegmenterFactory] Parameter '{param_name}' is None, "
+                        f"using default {default} for backend '{name}'"
+                    )
+                    sanitized[param_name] = default
+                else:
+                    continue  # Both value and default are None, let backend handle
+                continue
+
+            # Type coercion
+            try:
+                coerced = type_fn(value)
+                if coerced != value and not isinstance(value, bool):
+                    logger.debug(
+                        f"[SegmenterFactory] Coerced '{param_name}': "
+                        f"{value!r} ({type(value).__name__}) -> {coerced!r}"
+                    )
+                sanitized[param_name] = coerced
+            except (ValueError, TypeError) as e:
+                if default is not None:
+                    logger.warning(
+                        f"[SegmenterFactory] Cannot convert '{param_name}' value "
+                        f"{value!r} to {type_fn.__name__}, using default {default}: {e}"
+                    )
+                    sanitized[param_name] = default
+                else:
+                    logger.warning(
+                        f"[SegmenterFactory] Cannot convert '{param_name}' value "
+                        f"{value!r} to {type_fn.__name__}, removing: {e}"
+                    )
+                    del sanitized[param_name]
+
+        return sanitized
+
+    @staticmethod
     def create(
         name: str,
         config: Optional[Dict[str, Any]] = None,
@@ -290,6 +436,9 @@ class SpeechSegmenterFactory:
         # Handle Whisper VAD variant suffix (whisper-vad, whisper-vad-tiny, etc.)
         if name.startswith("whisper-vad"):
             params["variant"] = name  # Pass full name as variant
+
+        # Sanitize parameters (validation gate for GUI-originated type errors)
+        params = SpeechSegmenterFactory._sanitize_params(name, params)
 
         # Load and instantiate
         backend_class = SpeechSegmenterFactory._load_backend_class(name)

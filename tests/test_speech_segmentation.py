@@ -766,5 +766,314 @@ class TestNemoIntegration:
             segmenter.cleanup()
 
 
+class TestParameterSanitization:
+    """Tests for factory-level parameter validation gate.
+
+    Regression tests for #173 (string hop_size crash) and #185/#187 (None hop_size crash).
+    The factory sanitizes parameters BEFORE passing to backends, stopping type errors
+    from GUI customize parameters.
+    """
+
+    # --- Direct _sanitize_params unit tests (no backend instantiation) ---
+
+    def test_sanitize_none_non_nullable_gets_default(self):
+        """None value for non-nullable param should get schema default."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "ten", {"hop_size": None, "threshold": None}
+        )
+        assert result["hop_size"] == 256
+        assert result["threshold"] == 0.20
+
+    def test_sanitize_string_to_int(self):
+        """String should be coerced to int."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "ten", {"hop_size": "160"}
+        )
+        assert result["hop_size"] == 160
+        assert isinstance(result["hop_size"], int)
+
+    def test_sanitize_string_to_float(self):
+        """String should be coerced to float."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "ten", {"threshold": "0.35"}
+        )
+        assert result["threshold"] == 0.35
+        assert isinstance(result["threshold"], float)
+
+    def test_sanitize_none_nullable_stays_none(self):
+        """None for nullable param should stay None."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "silero", {"threshold": None, "chunk_threshold_s": None}
+        )
+        assert result["threshold"] is None
+        assert result["chunk_threshold_s"] is None
+
+    def test_sanitize_unconvertible_uses_default(self):
+        """Garbage value should fall back to schema default."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "ten", {"hop_size": "not_a_number"}
+        )
+        assert result["hop_size"] == 256
+
+    def test_sanitize_unconvertible_nullable_removed(self):
+        """Garbage value for nullable param with None default should be removed."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "silero", {"threshold": "garbage"}
+        )
+        # threshold has default=None and nullable=True, but the value is garbage
+        # so it should be removed (del) since default is None
+        assert "threshold" not in result
+
+    def test_sanitize_bool_coercion(self):
+        """Int truthy values should be coerced to bool."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "silero-v6.2", {"use_max_poss_sil_at_max_speech": 1}
+        )
+        assert result["use_max_poss_sil_at_max_speech"] is True
+
+    def test_sanitize_unknown_params_pass_through(self):
+        """Params not in schema should pass through unchanged."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "ten", {"hop_size": 256, "unknown_param": "whatever"}
+        )
+        assert result["unknown_param"] == "whatever"
+
+    def test_sanitize_unknown_backend_passes_through(self):
+        """Unknown backend name should return params unchanged."""
+        params = {"foo": "bar", "baz": None}
+        result = SpeechSegmenterFactory._sanitize_params("unknown_backend", params)
+        assert result == params
+
+    def test_sanitize_already_correct_types_unchanged(self):
+        """Correctly-typed values should pass through without modification."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "ten", {"threshold": 0.3, "hop_size": 160}
+        )
+        assert result["threshold"] == 0.3
+        assert result["hop_size"] == 160
+
+    def test_sanitize_missing_params_not_added(self):
+        """Params not in input should NOT be added from schema defaults."""
+        result = SpeechSegmenterFactory._sanitize_params("ten", {})
+        assert "hop_size" not in result  # Not provided, not added
+
+    def test_sanitize_mixed_valid_none_string(self):
+        """Mixed param types should all be handled correctly."""
+        result = SpeechSegmenterFactory._sanitize_params("ten", {
+            "threshold": 0.3,          # already correct
+            "hop_size": None,           # null -> default 256
+            "start_pad_ms": "50",       # string -> int 50
+            "end_pad_ms": 100,          # already correct
+        })
+        assert result["threshold"] == 0.3
+        assert result["hop_size"] == 256
+        assert result["start_pad_ms"] == 50
+        assert result["end_pad_ms"] == 100
+
+    def test_sanitize_silero_v4_family_resolution(self):
+        """silero-v4.0 should resolve to 'silero' schema."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "silero-v4.0", {"threshold": "0.3", "start_pad_samples": "5000"}
+        )
+        assert result["threshold"] == 0.3
+        assert isinstance(result["threshold"], float)
+        assert result["start_pad_samples"] == 5000
+        assert isinstance(result["start_pad_samples"], int)
+
+    def test_sanitize_whisper_vad_family_resolution(self):
+        """whisper-vad-tiny should resolve to 'whisper-vad' schema."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "whisper-vad-tiny", {"no_speech_threshold": "0.7"}
+        )
+        assert result["no_speech_threshold"] == 0.7
+        assert isinstance(result["no_speech_threshold"], float)
+
+    def test_sanitize_nemo_family_resolution(self):
+        """nemo-lite should resolve to 'nemo' schema."""
+        result = SpeechSegmenterFactory._sanitize_params(
+            "nemo-lite", {"onset": "0.5", "filter_speech_first": 0}
+        )
+        assert result["onset"] == 0.5
+        assert result["filter_speech_first"] is False
+
+    def test_sanitize_all_ten_string_params(self):
+        """All TEN params as strings should be coerced correctly."""
+        result = SpeechSegmenterFactory._sanitize_params("ten", {
+            "threshold": "0.3",
+            "hop_size": "160",
+            "min_speech_duration_ms": "200",
+            "min_silence_duration_ms": "150",
+            "start_pad_ms": "50",
+            "end_pad_ms": "100",
+        })
+        assert result["threshold"] == 0.3
+        assert result["hop_size"] == 160
+        assert result["min_speech_duration_ms"] == 200
+        assert result["min_silence_duration_ms"] == 150
+        assert result["start_pad_ms"] == 50
+        assert result["end_pad_ms"] == 100
+
+    # --- Integration tests (through factory.create) ---
+
+    def test_create_silero_v4_with_string_threshold(self):
+        """String threshold through create() should produce correct float."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v4.0", config={"threshold": "0.35"}
+        )
+        assert segmenter.threshold == 0.35
+        assert isinstance(segmenter.threshold, float)
+
+    def test_create_silero_v4_with_string_params(self):
+        """All Silero v4.0 string params through create() should be coerced."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v4.0", config={
+                "threshold": "0.3",
+                "min_speech_duration_ms": "200",
+                "speech_pad_ms": "500",
+            }
+        )
+        assert segmenter.threshold == 0.3
+        assert isinstance(segmenter.threshold, float)
+        assert segmenter.min_speech_duration_ms == 200
+        assert isinstance(segmenter.min_speech_duration_ms, int)
+        assert segmenter.speech_pad_ms == 500
+        assert isinstance(segmenter.speech_pad_ms, int)
+
+    def test_create_silero_v4_none_threshold_uses_version_default(self):
+        """None threshold for Silero v4.0 should use version default (nullable)."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v4.0", config={"threshold": None}
+        )
+        # threshold is nullable in schema, so None passes through to backend
+        # Backend falls back to VERSION_DEFAULTS[v4.0]["threshold"] = 0.25
+        assert segmenter.threshold == 0.25
+
+    def test_create_none_backend_with_unknown_params(self):
+        """'none' backend with unknown params should not crash."""
+        segmenter = SpeechSegmenterFactory.create(
+            "none", config={"custom_param": "value"}
+        )
+        assert segmenter is not None
+        assert segmenter.name == "none"
+
+    def test_create_existing_test_still_works(self):
+        """Existing test_create_with_config pattern must still work."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero", config={"threshold": 0.3}
+        )
+        assert segmenter.threshold == 0.3
+
+
+class TestParameterSanitizationTEN:
+    """TEN-specific integration tests (require ten_vad package)."""
+
+    @pytest.fixture(autouse=True)
+    def check_ten_available(self):
+        available, _ = SpeechSegmenterFactory.is_backend_available("ten")
+        if not available:
+            pytest.skip("ten-vad not installed")
+
+    def test_none_hop_size_gets_default(self):
+        """Regression test for #185/#187: hop_size=None should not crash."""
+        segmenter = SpeechSegmenterFactory.create("ten", config={"hop_size": None})
+        assert segmenter.hop_size == 256
+
+    def test_string_hop_size_coerced(self):
+        """Regression test for #173: string hop_size should be coerced to int."""
+        segmenter = SpeechSegmenterFactory.create("ten", config={"hop_size": "160"})
+        assert segmenter.hop_size == 160
+        assert isinstance(segmenter.hop_size, int)
+
+    def test_none_threshold_gets_default(self):
+        """None threshold should get schema default 0.20."""
+        segmenter = SpeechSegmenterFactory.create("ten", config={"threshold": None})
+        assert segmenter.threshold == 0.20
+
+    def test_all_none_params_get_defaults(self):
+        """All None params should get safe defaults."""
+        segmenter = SpeechSegmenterFactory.create("ten", config={
+            "threshold": None,
+            "hop_size": None,
+            "min_speech_duration_ms": None,
+            "start_pad_ms": None,
+            "end_pad_ms": None,
+        })
+        assert segmenter.threshold == 0.20
+        assert segmenter.hop_size == 256
+        assert segmenter.min_speech_duration_ms == 100
+        assert segmenter.start_pad_ms == 0
+        assert segmenter.end_pad_ms == 200
+
+    def test_all_string_params_coerced(self):
+        """All TEN params as strings through create() should work."""
+        segmenter = SpeechSegmenterFactory.create("ten", config={
+            "threshold": "0.3",
+            "hop_size": "160",
+            "min_speech_duration_ms": "200",
+            "start_pad_ms": "50",
+            "end_pad_ms": "100",
+        })
+        assert segmenter.threshold == 0.3
+        assert segmenter.hop_size == 160
+        assert segmenter.min_speech_duration_ms == 200
+        assert segmenter.start_pad_ms == 50
+        assert segmenter.end_pad_ms == 100
+
+    def test_unconvertible_hop_size_uses_default(self):
+        """Garbage hop_size should fall back to default with warning."""
+        segmenter = SpeechSegmenterFactory.create("ten", config={
+            "hop_size": "not_a_number"
+        })
+        assert segmenter.hop_size == 256
+
+    def test_mixed_valid_none_string_params(self):
+        """Mixed param types should all be handled correctly."""
+        segmenter = SpeechSegmenterFactory.create("ten", config={
+            "threshold": 0.3,          # already correct
+            "hop_size": None,           # null -> default 256
+            "start_pad_ms": "50",       # string -> int 50
+            "end_pad_ms": 100,          # already correct
+        })
+        assert segmenter.threshold == 0.3
+        assert segmenter.hop_size == 256
+        assert segmenter.start_pad_ms == 50
+        assert segmenter.end_pad_ms == 100
+
+
+class TestParameterSanitizationSileroV6:
+    """Silero v6.2-specific integration tests (require silero-vad package)."""
+
+    @pytest.fixture(autouse=True)
+    def check_v6_available(self):
+        available, _ = SpeechSegmenterFactory.is_backend_available("silero-v6.2")
+        if not available:
+            pytest.skip("silero-vad>=6.2 not installed")
+
+    def test_none_neg_threshold_stays_none(self):
+        """None neg_threshold for v6.2 should stay None (auto-calculated)."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v6.2", config={"neg_threshold": None}
+        )
+        assert segmenter.neg_threshold is None
+        segmenter.cleanup()
+
+    def test_bool_coercion(self):
+        """Int truthy value should be coerced to bool."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v6.2", config={"use_max_poss_sil_at_max_speech": 1}
+        )
+        assert segmenter.use_max_poss_sil_at_max_speech is True
+        segmenter.cleanup()
+
+    def test_string_threshold_coerced(self):
+        """String threshold should be coerced to float."""
+        segmenter = SpeechSegmenterFactory.create(
+            "silero-v6.2", config={"threshold": "0.40"}
+        )
+        assert segmenter.threshold == 0.40
+        assert isinstance(segmenter.threshold, float)
+        segmenter.cleanup()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
