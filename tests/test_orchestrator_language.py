@@ -24,15 +24,31 @@ def test_process_batch_handles_none_overrides(tmp_path, monkeypatch):
         "path": str(tmp_path / "sample.wav"),
     }
 
-    pass_result = {
+    # Create mock SRT files on disk — orchestrator verifies existence defensively
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pass1_file = out_dir / "sample.ja.pass1.srt"
+    pass2_file = out_dir / "sample.ja.pass2.srt"
+    pass1_file.write_text("1\n00:00:00,000 --> 00:00:01,000\npass1\n", encoding="utf-8")
+    pass2_file.write_text("1\n00:00:00,000 --> 00:00:01,000\npass2\n", encoding="utf-8")
+
+    pass1_result = {
         "status": "completed",
-        "srt_path": str(tmp_path / "sample_pass1.srt"),
+        "srt_path": str(pass1_file),
+        "subtitles": 1,
+        "processing_time": 1.0,
+    }
+    pass2_result = {
+        "status": "completed",
+        "srt_path": str(pass2_file),
         "subtitles": 1,
         "processing_time": 1.0,
     }
 
     def fake_run_pass(*args, **kwargs):
-        return {"sample": pass_result}
+        if kwargs["pass_number"] == 1:
+            return {"sample": pass1_result}
+        return {"sample": pass2_result}
 
     monkeypatch.setattr(orchestrator, "_run_pass_in_subprocess", fake_run_pass)
 
@@ -102,9 +118,12 @@ def test_process_batch_reports_merge_failure_and_summary(tmp_path, monkeypatch):
         merge_strategy="pass1_primary",
     )
 
-    assert results[0]["summary"]["final_output"] is None
+    # Merge failed → fallback to pass1 SRT as final output
+    assert results[0]["summary"]["final_output"].endswith("sample.ja.pass1.srt")
     merged_path = out_dir / "sample.ja.merged.whisperjav.srt"
     assert not merged_path.exists()
 
-    summaries = list(out_dir.glob("ensemble_summary_*.json"))
+    # Summary JSON is written to temp_dir, not output_dir
+    temp_dir = tmp_path / "tmp"
+    summaries = list(temp_dir.glob("ensemble_summary_*.json"))
     assert summaries, "JSON summary file should be created"

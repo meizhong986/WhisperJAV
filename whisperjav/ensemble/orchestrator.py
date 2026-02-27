@@ -300,6 +300,7 @@ class EnsembleOrchestrator:
                         row_display['merge'] = 'NOK'
                         row_display['pass2'] = 'NOK'
                         if pass1_srt:
+                            final_output_path = pass1_srt
                             row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
                     else:
                         # pass2_srt exists - record pass2 metadata
@@ -353,6 +354,7 @@ class EnsembleOrchestrator:
                                 merge_info = {'status': 'failed', 'error': str(merge_error)}
                                 row_display['merge'] = 'NOK'
                                 if pass1_srt:
+                                    final_output_path = pass1_srt
                                     row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
                 else:
                     ensemble_metadata['pass2'] = (
@@ -364,6 +366,7 @@ class EnsembleOrchestrator:
                     row_display['merge'] = 'NOK'
                     row_display['pass2'] = self._format_status(ensemble_metadata['pass2'])
                     if pass1_srt:
+                        final_output_path = pass1_srt
                         row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
             else:
                 ensemble_metadata['pass2'] = {'status': 'skipped'}
