@@ -5959,7 +5959,7 @@ const TranslationSettingsModal = {
         }
     },
 
-    save() {
+    async save() {
         // Save settings from form
         this.settings.apiKey = document.getElementById('translationApiKey')?.value || '';
         this.settings.targetLang = document.getElementById('translationTargetLang')?.value || 'english';
@@ -5973,11 +5973,23 @@ const TranslationSettingsModal = {
         this.settings.topP = parseFloat(document.getElementById('translationTopP')?.value) || 0.9;
         this.settings.customEndpoint = document.getElementById('translationCustomEndpoint')?.value || '';
 
-        // Persist to local storage
+        // Persist to localStorage (fast cache / fallback)
         try {
             localStorage.setItem('whisperjav_translation_settings', JSON.stringify(this.settings));
         } catch (e) {
             console.warn('Could not save translation settings to localStorage:', e);
+        }
+
+        // Persist to backend file (authoritative, survives app restarts)
+        try {
+            if (window.pywebview?.api) {
+                const result = await pywebview.api.save_translation_settings(this.settings);
+                if (!result.success) {
+                    console.warn('Backend settings save failed:', result.error);
+                }
+            }
+        } catch (e) {
+            console.warn('Could not save translation settings to backend:', e);
         }
 
         this.close();
@@ -5985,6 +5997,7 @@ const TranslationSettingsModal = {
     },
 
     loadSettings() {
+        // Sync load from localStorage (fast, available before pywebview.api)
         try {
             const saved = localStorage.getItem('whisperjav_translation_settings');
             if (saved) {
@@ -5993,6 +6006,19 @@ const TranslationSettingsModal = {
             }
         } catch (e) {
             console.warn('Could not load translation settings from localStorage:', e);
+        }
+    },
+
+    async loadSettingsFromBackend() {
+        // Load from backend file (authoritative, called when pywebview.api is ready)
+        try {
+            const result = await pywebview.api.get_translation_settings();
+            if (result.success && result.settings) {
+                this.settings = { ...this.settings, ...result.settings };
+                console.log('Translation settings loaded from backend file');
+            }
+        } catch (e) {
+            console.warn('Could not load translation settings from backend:', e);
         }
     },
 
@@ -6165,4 +6191,7 @@ window.addEventListener('pywebviewready', () => {
 
     // Update speech enhancer options based on backend availability
     EnsembleManager.updateEnhancerAvailability();
+
+    // Load translation settings from persistent backend file
+    TranslationSettingsModal.loadSettingsFromBackend();
 });

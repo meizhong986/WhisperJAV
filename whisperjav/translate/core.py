@@ -6,6 +6,22 @@ import sys
 from pathlib import Path
 
 
+def _normalize_api_base(url: str) -> str:
+    """Strip API path suffixes — the OpenAI SDK appends them automatically.
+
+    Users sometimes paste full endpoint URLs like
+    ``https://api.example.com/v1/chat/completions``.  The ``openai`` SDK
+    already appends ``/chat/completions`` to ``base_url``, so passing the
+    full path results in a doubled suffix and a 404.
+    """
+    if not url:
+        return url
+    for suffix in ('/chat/completions', '/responses', '/completions'):
+        if url.rstrip('/').endswith(suffix):
+            url = url.rstrip('/')[:-len(suffix)]
+    return url.rstrip('/')
+
+
 def translate_subtitle(
     input_path: str,
     output_path: Path,
@@ -77,7 +93,7 @@ def translate_subtitle(
         }
 
         if 'api_base' in provider_config:
-            opt_kwargs['api_base'] = provider_config['api_base']
+            opt_kwargs['api_base'] = _normalize_api_base(provider_config['api_base'])
         if stream:
             opt_kwargs['stream_responses'] = True
 
@@ -116,7 +132,27 @@ def translate_subtitle(
 
         # Initialize provider
         print(f"[TRANSLATE] Initializing provider: {provider_config['pysubtrans_name']}...", file=sys.stderr)
-        provider = init_translation_provider(provider_config['pysubtrans_name'], options)
+        try:
+            provider = init_translation_provider(provider_config['pysubtrans_name'], options)
+        except Exception as init_err:
+            if "Unknown translation provider" in str(init_err):
+                # PySubtrans silently skips providers whose SDK isn't installed.
+                # Surface the likely missing package so users know what to install.
+                _PROVIDER_DEPS = {
+                    'Gemini': 'google-genai',
+                    'Claude': 'anthropic',
+                    'OpenAI': 'openai',
+                    'DeepSeek': 'openai',
+                    'OpenRouter': 'openai',
+                }
+                pkg = _PROVIDER_DEPS.get(provider_config['pysubtrans_name'])
+                hint = f"  Hint: install the provider SDK:  pip install {pkg}" if pkg else ""
+                raise RuntimeError(
+                    f"PySubtrans does not have the '{provider_config['pysubtrans_name']}' provider registered.\n"
+                    f"  This usually means its SDK package is not installed.\n"
+                    f"{hint}"
+                ) from init_err
+            raise
 
         # Validate provider settings
         if hasattr(provider, 'ValidateSettings') and not provider.ValidateSettings():

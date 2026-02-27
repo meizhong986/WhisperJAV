@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Optional
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_SOURCES, SUPPORTED_TARGETS
-from .core import translate_subtitle
+from .core import translate_subtitle, _normalize_api_base
 from .instructions import get_instruction_content, get_cache_dir
 from .settings import load_settings, create_default_settings, show_settings, get_settings_path, resolve_config
 from .configure import configure_command
@@ -437,7 +437,7 @@ def main():
     # Override api_base if --endpoint provided (create copy to avoid modifying original)
     if hasattr(args, 'endpoint') and args.endpoint:
         provider_config = dict(provider_config)  # Make a copy
-        provider_config['api_base'] = args.endpoint
+        provider_config['api_base'] = _normalize_api_base(args.endpoint)
         # When using custom endpoint, use OpenAI-compatible backend
         if provider_config.get('pysubtrans_name') not in ('OpenAI', 'DeepSeek'):
             provider_config['pysubtrans_name'] = 'OpenAI'

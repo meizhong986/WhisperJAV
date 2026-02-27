@@ -32,7 +32,7 @@ from typing import Callable, Optional
 from .providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
 from .settings import load_settings, DEFAULT_SETTINGS
 from .instructions import get_instruction_content
-from .core import translate_subtitle
+from .core import translate_subtitle, _normalize_api_base
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +270,7 @@ def translate_with_config(
     # Override api_base if custom endpoint provided (same logic as cli.py:437-443)
     if endpoint:
         provider_config = dict(provider_config)  # Copy to avoid mutating original
-        provider_config['api_base'] = endpoint
+        provider_config['api_base'] = _normalize_api_base(endpoint)
         # When using custom endpoint, use OpenAI-compatible backend
         if provider_config.get('pysubtrans_name') not in ('OpenAI', 'DeepSeek'):
             provider_config['pysubtrans_name'] = 'OpenAI'

@@ -2814,40 +2814,85 @@ class WhisperJAVAPI:
 
     def get_translation_settings(self) -> Dict[str, Any]:
         """
-        Get saved translation settings.
+        Get saved translation settings, mapped to GUI camelCase format.
 
         Returns:
-            dict: Current translation settings
+            dict: {success: bool, settings: {apiKey, targetLang, ...}}
         """
         try:
             from whisperjav.translate.settings import load_settings
-            settings = load_settings()
-            return {
-                "success": True,
-                "settings": dict(settings) if settings else {}
+            backend = load_settings()
+
+            model_params = backend.get('model_params') or {}
+            gui_settings = {
+                'apiKey': backend.get('api_key', '') or '',
+                'targetLang': backend.get('target_language', 'english'),
+                'tone': backend.get('tone', 'standard'),
+                'movieTitle': backend.get('movie_title', '') or '',
+                'actress': backend.get('actress', '') or '',
+                'plot': backend.get('movie_plot', '') or '',
+                'sceneThreshold': backend.get('scene_threshold', 60),
+                'maxBatchSize': backend.get('max_batch_size', 30),
+                'temperature': model_params.get('temperature') or 0.5,
+                'topP': model_params.get('top_p') or 0.9,
+                'customEndpoint': backend.get('custom_endpoint', '') or '',
             }
+            return {"success": True, "settings": gui_settings}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
     def save_translation_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Save translation settings.
+        Save translation settings from GUI (camelCase) to file (snake_case).
+
+        Merges with existing settings to preserve fields the modal doesn't
+        manage (version, _comment, instructions_files, etc.).
 
         Args:
-            settings: Settings dictionary to save
+            settings: GUI settings dict with camelCase keys
 
         Returns:
             dict: Success status
         """
         try:
-            from whisperjav.translate.settings import get_settings_path
+            from whisperjav.translate.settings import get_settings_path, load_settings
             import json
+
+            # Load existing to preserve fields the modal doesn't touch
+            existing = load_settings()
+
+            # Map GUI camelCase → backend snake_case
+            if 'apiKey' in settings:
+                existing['api_key'] = settings['apiKey'] or None
+            if 'targetLang' in settings:
+                existing['target_language'] = settings['targetLang']
+            if 'tone' in settings:
+                existing['tone'] = settings['tone']
+            if 'movieTitle' in settings:
+                existing['movie_title'] = settings['movieTitle'] or None
+            if 'actress' in settings:
+                existing['actress'] = settings['actress'] or None
+            if 'plot' in settings:
+                existing['movie_plot'] = settings['plot'] or None
+            if 'sceneThreshold' in settings:
+                existing['scene_threshold'] = float(settings['sceneThreshold'])
+            if 'maxBatchSize' in settings:
+                existing['max_batch_size'] = int(settings['maxBatchSize'])
+            if 'customEndpoint' in settings:
+                existing['custom_endpoint'] = settings['customEndpoint'] or None
+
+            # Nested model_params
+            mp = existing.setdefault('model_params', {})
+            if 'temperature' in settings:
+                mp['temperature'] = float(settings['temperature'])
+            if 'topP' in settings:
+                mp['top_p'] = float(settings['topP'])
 
             settings_path = get_settings_path()
             settings_path.parent.mkdir(parents=True, exist_ok=True)
 
             with open(settings_path, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, indent=2, ensure_ascii=False)
+                json.dump(existing, f, indent=2, ensure_ascii=False)
 
             return {"success": True, "path": str(settings_path)}
         except Exception as e:
