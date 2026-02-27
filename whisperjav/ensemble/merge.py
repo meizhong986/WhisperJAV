@@ -202,8 +202,36 @@ class MergeEngine:
             return 0.0
         return min(1.0, max(0.0, overlap_duration / base.duration))
 
+    # Below this ratio of unique characters to total characters, text is
+    # considered repetitive (likely hallucination) and its length is zeroed
+    # for quality comparison purposes.
+    _DIVERSITY_FLOOR = 0.20
+
+    @staticmethod
+    def _quality_length(text: str) -> int:
+        """Character count adjusted for diversity.
+
+        Returns the stripped length when character diversity is healthy,
+        or 0 when the unique-character ratio falls below ``_DIVERSITY_FLOOR``
+        (e.g. ``"ああああああああああ"`` → ratio 0.10 → 0).
+        """
+        stripped = text.strip()
+        if not stripped:
+            return 0
+        unique_ratio = len(set(stripped)) / len(stripped)
+        if unique_ratio < MergeEngine._DIVERSITY_FLOOR:
+            return 0
+        return len(stripped)
+
     def _choose_by_timing(self, sub1: Subtitle, sub2: Subtitle) -> Subtitle:
-        """Select the subtitle whose timing best matches the overlap window."""
+        """Select the better subtitle from an overlapping pair.
+
+        Tiebreak chain:
+        1. Coverage ratio (how well each sub fits the overlap window)
+        2. Quality-adjusted text length (diversity gate rejects repetitive text)
+        3. Duration (shorter = tighter cue)
+        4. Start time (earlier = stability)
+        """
         overlap_duration = self._overlap_duration(sub1, sub2)
         coverage1 = self._coverage_ratio(sub1, overlap_duration)
         coverage2 = self._coverage_ratio(sub2, overlap_duration)
@@ -212,8 +240,15 @@ class MergeEngine:
         if abs(coverage_delta) > 0.05:
             return sub1 if coverage_delta >= 0 else sub2
 
-        # Coverage is effectively identical; prefer the subtitle with shorter duration
-        # to avoid inflating cue lengths. Fall back to earliest start time for stability.
+        # Timing is similar — use text content as quality signal.
+        # _quality_length returns 0 for repetitive/hallucinated text,
+        # so garbage can never win on length alone.
+        len1 = self._quality_length(sub1.text)
+        len2 = self._quality_length(sub2.text)
+        if len1 != len2:
+            return sub1 if len1 > len2 else sub2
+
+        # Text quality identical — prefer shorter duration to avoid inflating cue lengths.
         if sub1.duration != sub2.duration:
             return sub1 if sub1.duration <= sub2.duration else sub2
         return sub1 if sub1.start_time <= sub2.start_time else sub2
@@ -371,6 +406,8 @@ class MergeEngine:
 
         merged = []
         used_from_2 = set()
+        pass1_won = 0
+        pass2_won = 0
 
         for sub1 in subs1:
             best_match = None
@@ -396,6 +433,11 @@ class MergeEngine:
                     end_time=chosen.end_time,
                     text=chosen.text
                 ))
+                # Track which pass won this pair
+                if chosen.text == sub1.text:
+                    pass1_won += 1
+                else:
+                    pass2_won += 1
             else:
                 # No good match, keep sub1
                 merged.append(Subtitle(
@@ -406,6 +448,7 @@ class MergeEngine:
                 ))
 
         # Add unmatched subtitles from subs2
+        unmatched_pass2 = 0
         for i, sub2 in enumerate(subs2):
             if i not in used_from_2:
                 merged.append(Subtitle(
@@ -414,6 +457,14 @@ class MergeEngine:
                     end_time=sub2.end_time,
                     text=sub2.text
                 ))
+                unmatched_pass2 += 1
+
+        logger.info(
+            "Smart merge: %d matched pairs (pass1 won %d, pass2 won %d), "
+            "%d unmatched from pass2, %d total output",
+            len(used_from_2), pass1_won, pass2_won,
+            unmatched_pass2, len(merged)
+        )
 
         # Sort by start time
         merged.sort(key=lambda s: s.start_time)

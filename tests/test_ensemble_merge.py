@@ -87,14 +87,16 @@ def test_smart_merge_prefers_segment_with_higher_coverage():
 def test_smart_merge_tie_prefers_shorter_duration_then_earliest_start():
     engine = MergeEngine()
 
-    subs1 = [_sub(0.0, 4.0, "compact window")]
+    # Use equal-length text so text tiebreaker is a tie,
+    # and the duration tiebreak fires (shorter duration wins).
+    subs1 = [_sub(0.0, 4.0, "sub one text")]
     # Slightly longer duration but nearly identical coverage (diff < 5%)
-    subs2 = [_sub(0.0, 4.2, "stretched window")]
+    subs2 = [_sub(0.0, 4.2, "sub two text")]
 
     merged = engine._merge_smart(subs1, subs2)
 
     assert len(merged) == 1
-    assert merged[0].text == "compact window"
+    assert merged[0].text == "sub one text"
     assert merged[0].end_time == 4.0
 
 
@@ -107,7 +109,8 @@ def test_smart_merge_keeps_unmatched_pass2_segments():
     merged = engine._merge_smart(subs1, subs2)
 
     assert len(merged) == 3
-    assert merged[0].text == "shared"
+    # "shared_other" (12 chars) beats "shared" (6 chars) via text quality tiebreaker
+    assert merged[0].text == "shared_other"
     assert merged[1].text == "unique1"
     assert merged[2].text == "unique2"
     assert merged[2].start_time == 6.0
@@ -240,3 +243,123 @@ def test_pass2_primary_randomized_symmetry():
                 assert all(
                     _overlap_duration(pri, sec) == 0.0 for sec in subs2
                 )
+
+
+# --- Text quality tiebreaker tests (#189) ---
+
+
+def test_smart_merge_text_quality_tiebreaker_same_timing():
+    """When timing is identical, longer text wins (more speech captured)."""
+    engine = MergeEngine()
+
+    subs1 = [_sub(0.0, 3.0, "short")]
+    subs2 = [_sub(0.0, 3.0, "longer transcription with more detail")]
+
+    merged = engine._merge_smart(subs1, subs2)
+
+    assert len(merged) == 1
+    assert merged[0].text == "longer transcription with more detail"
+
+
+def test_smart_merge_text_quality_both_passes_contribute():
+    """When passes have same timing but alternating text lengths, both contribute."""
+    engine = MergeEngine()
+
+    subs1 = [
+        _sub(0.0, 2.0, "pass1 wins here with longer text"),
+        _sub(3.0, 5.0, "short"),
+        _sub(6.0, 8.0, "pass1 wins again with more words"),
+    ]
+    subs2 = [
+        _sub(0.0, 2.0, "short"),
+        _sub(3.0, 5.0, "pass2 wins here with longer text"),
+        _sub(6.0, 8.0, "short"),
+    ]
+
+    merged = engine._merge_smart(subs1, subs2)
+
+    assert len(merged) == 3
+    texts = [sub.text for sub in merged]
+    assert texts[0] == "pass1 wins here with longer text"
+    assert texts[1] == "pass2 wins here with longer text"
+    assert texts[2] == "pass1 wins again with more words"
+
+
+def test_smart_merge_timing_still_beats_text_length():
+    """When timing differs significantly, precise timing still wins over longer text."""
+    engine = MergeEngine()
+
+    # sub1: 2s duration, sub2: 8s duration — coverage delta is huge
+    subs1 = [_sub(0.0, 2.0, "short but precise")]
+    subs2 = [_sub(0.0, 8.0, "very long text that should lose because timing is way worse")]
+
+    merged = engine._merge_smart(subs1, subs2)
+
+    assert len(merged) == 1
+    assert merged[0].text == "short but precise"
+
+
+def test_smart_merge_identical_text_and_timing():
+    """When both text and timing are identical, falls through to duration/start tiebreak."""
+    engine = MergeEngine()
+
+    # Same text, same timing — should still produce exactly 1 output
+    subs1 = [_sub(0.0, 3.0, "identical")]
+    subs2 = [_sub(0.0, 3.0, "identical")]
+
+    merged = engine._merge_smart(subs1, subs2)
+
+    assert len(merged) == 1
+    assert merged[0].text == "identical"
+
+
+# --- Diversity gate tests (#189 hardening) ---
+
+
+def test_quality_length_rejects_character_repetition():
+    """Single-character repetition (e.g. hallucinated 'ああああ…') scores 0."""
+    assert MergeEngine._quality_length("ああああああああああ") == 0  # ratio 1/10 = 0.10
+
+
+def test_quality_length_accepts_diverse_japanese():
+    """Normal Japanese dialogue passes the diversity gate."""
+    text = "大丈夫ですか"
+    assert MergeEngine._quality_length(text) == len(text)
+
+
+def test_quality_length_accepts_legitimate_repeats():
+    """Aizuchi and natural repetition (ratio well above floor) are not penalized."""
+    text = "そうですね、そうですね"  # ratio ≈ 0.60
+    assert MergeEngine._quality_length(text) == len(text)
+
+
+def test_quality_length_empty_and_whitespace():
+    assert MergeEngine._quality_length("") == 0
+    assert MergeEngine._quality_length("   ") == 0
+
+
+def test_smart_merge_diversity_gate_rejects_hallucination():
+    """Repetitive hallucination (longer) loses to shorter real dialogue."""
+    engine = MergeEngine()
+
+    subs1 = [_sub(0.0, 3.0, "大丈夫")]             # 3 chars, diverse
+    subs2 = [_sub(0.0, 3.0, "ああああああああああ")]  # 10 chars, ratio 0.10 → quality 0
+
+    merged = engine._merge_smart(subs1, subs2)
+
+    assert len(merged) == 1
+    assert merged[0].text == "大丈夫"
+
+
+def test_smart_merge_both_repetitive_falls_through_to_duration():
+    """When both texts are repetitive (quality 0 each), duration tiebreak fires."""
+    engine = MergeEngine()
+
+    subs1 = [_sub(0.0, 3.0, "ああああああ")]   # quality 0
+    subs2 = [_sub(0.0, 3.5, "いいいいいい")]   # quality 0
+
+    merged = engine._merge_smart(subs1, subs2)
+
+    assert len(merged) == 1
+    # Both quality 0 → tied → duration tiebreak → sub1 (shorter) wins
+    assert merged[0].text == "ああああああ"
