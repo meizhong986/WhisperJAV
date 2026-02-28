@@ -1,14 +1,14 @@
 # WhisperJAV
 
 <p align="center">
-  <a href="https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb">
+  <a href="https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_edition_expert.ipynb">
     <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
   </a>
-  <a href="https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb">
+  <a href="https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_kaggle_parallel_edition.ipynb">
     <img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"/>
   </a>
   <br>
-  <img src="https://img.shields.io/badge/version-1.8.4-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.8.5-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.10--3.12-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
@@ -284,9 +284,9 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Installation
 
-> **v1.8.3 introduces new dependencies from the Qwen3-ASR ecosystem which is prone to version conflicts.** A `--wheel-only` upgrade won't be enough — you'll be missing packages that the Qwen pipeline needs. We recommend a full install. It takes longer, but it avoids half-working states where Whisper pipelines work but Qwen silently fails because a dependency is missing.
-
-Recommended: Uninstall the old version first (Settings > Apps > WhisperJAV on Windows), then install fresh. Your models and output files are stored separately and won't be lost.
+> **If upgrading from v1.7.x or earlier**, a `--wheel-only` upgrade won't be enough — you'll be missing packages that the Qwen pipeline needs. We recommend a full install. It takes longer, but it avoids half-working states where Whisper pipelines work but Qwen silently fails because a dependency is missing.
+>
+> Recommended: Uninstall the old version first (Settings > Apps > WhisperJAV on Windows), then install fresh. Your models and output files are stored separately and won't be lost.
 
 ---
 
@@ -307,7 +307,7 @@ Recommended: Uninstall the old version first (Settings > Apps > WhisperJAV on Wi
 
 The easiest way. No Python knowledge needed.
 
-**Download:** [**WhisperJAV-1.8.3-Windows-x86_64.exe**](https://github.com/meizhong986/WhisperJAV/releases/latest)
+**Download:** [**WhisperJAV-1.8.5-Windows-x86_64.exe**](https://github.com/meizhong986/WhisperJAV/releases/latest)
 
 1. **Download** the `.exe` from the link above
 2. **Run the installer.** No admin rights required. Installs to `%LOCALAPPDATA%\WhisperJAV`.
@@ -425,10 +425,10 @@ For the full walkthrough including Colab/Kaggle setup, headless servers, and sys
 
 ### Google Colab / Kaggle
 
-The notebooks are not updated yet for v1.8.3.
+Two notebooks are maintained:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb)
-[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_parallel_expert.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_edition_expert.ipynb)
+[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_kaggle_parallel_edition.ipynb)
 
 If you run into issues, please open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info, the console log, and the error output.
 
@@ -647,6 +647,7 @@ MIT License. See [LICENSE](LICENSE) file.
 - [faster-whisper](https://github.com/guillaumekln/faster-whisper) - Optimized CTranslate2 inference
 - [HuggingFace Transformers](https://github.com/huggingface/transformers) - Transformers pipeline backend
 - [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) - Japanese-optimized Whisper model
+- [PySubtrans](https://github.com/machinewrapped/llm-subtrans) - AI-powered subtitle translation engine
 - The testing community for feedback and bug reports
 
 ---
