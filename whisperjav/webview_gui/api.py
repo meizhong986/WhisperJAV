@@ -3104,15 +3104,22 @@ class WhisperJAVAPI:
 
             # Start process with unbuffered output for real-time streaming
             # PYTHONUNBUFFERED=1 ensures child process doesn't buffer stdout/stderr
+            # UTF-8 encoding required: without explicit encoding, Popen uses the
+            # system codec (GBK on Chinese Windows), which crashes when reading
+            # non-ASCII translation output (e.g., Chinese characters). See #190.
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
+            env["PYTHONUTF8"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8:replace"
 
             self._translate_process = subprocess.Popen(
                 args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True,
                 bufsize=1,
+                universal_newlines=True,
+                encoding="utf-8",
+                errors="replace",
                 cwd=str(REPO_ROOT),
                 env=env
             )

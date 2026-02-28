@@ -2193,7 +2193,7 @@ def start_local_server(
 
     # Use temp file for stderr to avoid blocking (pipes can fill up and block the server)
     import tempfile
-    stderr_file = tempfile.NamedTemporaryFile(mode='w+', suffix='_llm_server.log', delete=False)
+    stderr_file = tempfile.NamedTemporaryFile(mode='w+b', suffix='_llm_server.log', delete=False)
     stderr_path = stderr_file.name
     _server_stderr_path = stderr_path  # Track for cleanup
     print(f"[LOCAL-LLM]   Server log: {stderr_path}", file=sys.stderr)
@@ -2201,6 +2201,7 @@ def start_local_server(
     try:
         _server_process = subprocess.Popen(
             cmd,
+            stdout=subprocess.DEVNULL,  # Server communicates via HTTP API, not stdout
             stderr=stderr_file,  # Write stderr to temp file (non-blocking)
         )
         _server_port = port
