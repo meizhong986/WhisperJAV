@@ -38,9 +38,10 @@ import stable_whisper
 
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.speech_enhancement import (
-    SCENE_EXTRACTION_SR,
     create_enhancer_direct,
     enhance_scenes,
+    get_extraction_sample_rate,
+    is_passthrough_backend,
 )
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
 from whisperjav.modules.srt_stitching import SRTStitcher
@@ -283,7 +284,9 @@ class QwenPipeline(BasePipeline):
         self.lang_code = normalize_language_code(language or "ja")
 
         # Shared modules (lightweight, safe to create in __init__)
-        self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
+        # v1.8.5+: Extract at 16kHz when enhancer is "none", 48kHz for real enhancers
+        extraction_sr = get_extraction_sample_rate(self.enhancer_backend)
+        self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
         self.stitcher = SRTStitcher()
         self.postprocessor = SRTPostProcessor(language=self.lang_code)
 
@@ -493,7 +496,7 @@ class QwenPipeline(BasePipeline):
         master_metadata["stages"]["extraction"] = {
             "audio_path": str(extracted_audio),
             "duration": duration,
-            "sample_rate": SCENE_EXTRACTION_SR,
+            "sample_rate": self.audio_extractor.sample_rate,
             "time_sec": time.time() - phase1_start,
         }
         logger.info("[QwenPipeline PID %s] Phase 1: Complete (%.1fs audio)", os.getpid(), duration)
@@ -570,28 +573,37 @@ class QwenPipeline(BasePipeline):
 
         # ==============================================================
         # PHASE 3: SPEECH ENHANCEMENT (optional, VRAM Block 1)
+        # When enhancer is "none" (passthrough), scenes are already at
+        # 16kHz from extraction — skip this phase entirely.
         # ==============================================================
         logger.info("[QwenPipeline PID %s] Phase 3: Speech enhancement (backend=%s)", os.getpid(), self.enhancer_backend)
         phase3_start = time.time()
 
-        enhancer = create_enhancer_direct(
-            backend=self.enhancer_backend,
-            model=self.enhancer_model,
-        )
+        if is_passthrough_backend(self.enhancer_backend):
+            # v1.8.5+: Scenes already at 16kHz — skip enhancement entirely
+            logger.info(
+                "[QwenPipeline PID %s] Phase 3: Passthrough — %d scenes at 16kHz, skipping enhancement",
+                os.getpid(), len(scene_paths),
+            )
+        else:
+            enhancer = create_enhancer_direct(
+                backend=self.enhancer_backend,
+                model=self.enhancer_model,
+            )
 
-        def _enhancement_progress(scene_num, total, scene_name):
-            logger.debug(f"Enhancing scene {scene_num}/{total}: {scene_name}")
+            def _enhancement_progress(scene_num, total, scene_name):
+                logger.debug(f"Enhancing scene {scene_num}/{total}: {scene_name}")
 
-        scene_paths = enhance_scenes(
-            scene_paths, enhancer, self.temp_dir,
-            progress_callback=_enhancement_progress,
-        )
+            scene_paths = enhance_scenes(
+                scene_paths, enhancer, self.temp_dir,
+                progress_callback=_enhancement_progress,
+            )
 
-        # VRAM Block 1 cleanup — release enhancer before loading ASR
-        enhancer.cleanup()
-        del enhancer
-        from whisperjav.utils.gpu_utils import safe_cuda_cleanup
-        safe_cuda_cleanup()
+            # VRAM Block 1 cleanup — release enhancer before loading ASR
+            enhancer.cleanup()
+            del enhancer
+            from whisperjav.utils.gpu_utils import safe_cuda_cleanup
+            safe_cuda_cleanup()
 
         master_metadata["stages"]["enhancement"] = {
             "backend": self.enhancer_backend,

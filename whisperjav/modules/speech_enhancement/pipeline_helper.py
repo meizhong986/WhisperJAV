@@ -3,9 +3,9 @@ Pipeline integration helper for speech enhancement.
 
 Provides a clean interface for pipelines to integrate speech enhancement
 without extensive code changes. Handles:
-- Extracting audio at consistent 48kHz for scene files
-- Enhancing scene audio files
-- Resampling to 16kHz for VAD/ASR
+- Dynamic extraction SR: 16kHz when enhancer is "none", 48kHz for real enhancers
+- Enhancing scene audio files (when a real enhancer is configured)
+- Resampling to 16kHz for VAD/ASR (when extracting at 48kHz)
 - Graceful degradation on failure
 - Resource cleanup
 
@@ -13,9 +13,10 @@ without extensive code changes. Handles:
 AUDIO SAMPLE RATE CONTRACT (v1.8.0+)
 ==============================================================================
 
-EXTRACTION:
-  - If speech enhancement enabled AND enhancer needs 48kHz → extract at 48kHz
-  - Otherwise → extract at 16kHz (direct ASR path)
+EXTRACTION (v1.8.5+):
+  - If enhancer backend is "none" (default) → extract at 16kHz (direct ASR path)
+  - If a real enhancer is configured → extract at 48kHz (enhancer needs high-SR)
+  - get_extraction_sample_rate() returns the correct SR based on backend name
   - FFmpeg handles all extraction sample rate conversion
 
 SCENE DETECTION (Auditok):
@@ -37,24 +38,37 @@ VAD/ASR:
 
 ==============================================================================
 
-CONTRACTS (v1.7.4+):
-    Input:  Scene files are ALWAYS 48kHz mono (SCENE_EXTRACTION_SR)
-    Output: Enhanced files are ALWAYS 16kHz mono (TARGET_SAMPLE_RATE)
+CONTRACTS (v1.8.5+):
+    When enhancer backend is "none" (passthrough):
+        - Extract at 16kHz (TARGET_SAMPLE_RATE) — scenes go directly to VAD/ASR
+        - Skip enhance_scenes() entirely — no enhanced_scenes/ folder created
+        - No disk I/O or CPU resampling overhead
+
+    When a real enhancer is configured (clearvoice, bs-roformer, etc.):
+        - Extract at 48kHz (SCENE_EXTRACTION_SR) — enhancers need high-SR input
+        - enhance_scenes() runs the full pipeline (enhance → resample → save)
+        - Output: Enhanced files at 16kHz mono (TARGET_SAMPLE_RATE)
 
 Usage in pipelines:
     from whisperjav.modules.speech_enhancement.pipeline_helper import (
         create_enhancer_from_config,
-        SCENE_EXTRACTION_SR,
+        get_extraction_sample_rate,
+        is_passthrough_backend,
         enhance_scenes,
     )
 
-    # In __init__ - ALWAYS use 48kHz for scene extraction
-    self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
+    # In __init__ - use dynamic extraction SR based on enhancer backend
+    extraction_sr = get_extraction_sample_rate(backend_name)
+    self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
 
-    # After scene detection - ALWAYS run enhancement (even for "none" backend)
-    enhancer = create_enhancer_from_config(resolved_config)
-    scene_paths = enhance_scenes(scene_paths, enhancer, self.temp_dir)
-    enhancer.cleanup()  # Free GPU before ASR
+    # After scene detection - conditionally run enhancement
+    if is_passthrough_backend(backend_name):
+        # Scenes already at 16kHz — skip enhancement entirely
+        pass
+    else:
+        enhancer = create_enhancer_from_config(resolved_config)
+        scene_paths = enhance_scenes(scene_paths, enhancer, self.temp_dir)
+        enhancer.cleanup()  # Free GPU before ASR
 """
 
 from pathlib import Path
@@ -69,10 +83,10 @@ from .base import SpeechEnhancer, resample_audio
 
 logger = logging.getLogger("whisperjav")
 
-# Contract: Scene files are ALWAYS extracted at 48kHz mono
+# Extraction SR when a real enhancer is configured (enhancers need 48kHz input)
 SCENE_EXTRACTION_SR = 48000
 
-# Contract: Enhanced files for VAD/ASR are ALWAYS 16kHz mono
+# Target SR for VAD/ASR — also the extraction SR when enhancer is "none"
 TARGET_SAMPLE_RATE = 16000
 
 
@@ -179,20 +193,33 @@ def create_enhancer_direct(
         return SpeechEnhancerFactory.create("none", config={})
 
 
-def get_extraction_sample_rate(enhancer: Optional[SpeechEnhancer] = None) -> int:
+def get_extraction_sample_rate(enhancer_backend: Optional[str] = None) -> int:
     """
-    Get the sample rate to use for audio extraction.
+    Get the sample rate for audio extraction based on enhancer backend.
 
-    ALWAYS returns SCENE_EXTRACTION_SR (48kHz) per v1.7.4+ clean contract.
-    The enhancer parameter is ignored but kept for backwards compatibility.
+    - "none" or empty: 16kHz (no enhancement needed, extract at ASR target SR)
+    - Any real backend: 48kHz (enhancers work best with high-SR input)
+
+    Note: If a real backend (e.g. "clearvoice") is configured but unavailable
+    at runtime, create_enhancer_from_config/create_enhancer_direct will fall
+    back to NullSpeechEnhancer.  In that case scenes are already at 48kHz,
+    so enhance_scenes() still runs the 48→16 kHz resample — same as before.
+    The 16kHz shortcut only fires when the user *explicitly* configures "none".
 
     Args:
-        enhancer: Ignored (kept for backwards compatibility)
+        enhancer_backend: Backend name string, or None for passthrough
 
     Returns:
-        SCENE_EXTRACTION_SR (48000 Hz)
+        TARGET_SAMPLE_RATE (16000) for passthrough, SCENE_EXTRACTION_SR (48000) otherwise
     """
+    if is_passthrough_backend(enhancer_backend):
+        return TARGET_SAMPLE_RATE
     return SCENE_EXTRACTION_SR
+
+
+def is_passthrough_backend(backend_name: Optional[str]) -> bool:
+    """Whether the named backend is a no-op passthrough (no audio processing)."""
+    return not backend_name or backend_name == "none"
 
 
 def enhance_scenes(

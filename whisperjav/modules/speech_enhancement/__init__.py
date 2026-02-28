@@ -57,6 +57,7 @@ from .pipeline_helper import (
     create_enhancer_from_config,
     create_enhancer_direct,
     get_extraction_sample_rate,
+    is_passthrough_backend,
     enhance_scenes,
     enhance_single_audio,
     SCENE_EXTRACTION_SR,
@@ -78,6 +79,7 @@ __all__ = [
     "create_enhancer_from_config",
     "create_enhancer_direct",
     "get_extraction_sample_rate",
+    "is_passthrough_backend",
     "enhance_scenes",
     "enhance_single_audio",
     # Contract constants (v1.7.4+)

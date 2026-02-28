@@ -35,7 +35,8 @@ from whisperjav.modules.speech_enhancement import (
     create_enhancer_direct,
     enhance_scenes,
     enhance_single_audio,
-    SCENE_EXTRACTION_SR,
+    get_extraction_sample_rate,
+    is_passthrough_backend,
 )
 
 
@@ -231,11 +232,10 @@ class TransformersPipeline(BasePipeline):
         # Only used when asr_backend="qwen" and qwen_segmenter != "none"
         self._segmenter_backend = qwen_segmenter if asr_backend == "qwen" else "none"
 
-        # v1.7.4+ Clean Contract: ALWAYS extract at 48kHz for scene files
-        # Enhancement ALWAYS runs (even "none" backend does 48kHz→16kHz resampling)
-        # This ensures consistent high-quality input for all enhancer backends
-
-        self.audio_extractor = AudioExtractor(sample_rate=SCENE_EXTRACTION_SR)
+        # v1.8.5+: Extract at 16kHz when enhancer is "none", 48kHz for real enhancers
+        self._enhancer_is_passthrough = is_passthrough_backend(self._enhancer_config.get('backend'))
+        extraction_sr = get_extraction_sample_rate(self._enhancer_config.get('backend'))
+        self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
 
         # Scene detector (only if enabled)
         self.scene_detector = None
@@ -290,8 +290,9 @@ class TransformersPipeline(BasePipeline):
         logger.info(f"  ASR backend: {asr_backend}")
         logger.info(f"  Model: {model_name}")
         logger.info(f"  Scene detection: {self.scene_method}")
-        logger.info(f"  Speech enhancer: {hf_speech_enhancer}")
-        logger.info(f"  Extraction SR: {SCENE_EXTRACTION_SR}Hz (v1.7.4+ contract: always 48kHz)")
+        logger.info(f"  Speech enhancer: {self._enhancer_config.get('backend', 'none')}")
+        enh_label = "passthrough" if self._enhancer_is_passthrough else "enhancement enabled"
+        logger.info(f"  Extraction SR: {extraction_sr}Hz ({enh_label})")
 
         # Diagnostic: Log full config for Pass 2 debugging
         if asr_backend == "qwen":
@@ -629,10 +630,10 @@ class TransformersPipeline(BasePipeline):
 
             # =================================================================
             # PHASE 1: SPEECH ENHANCEMENT (Exclusive VRAM Block)
-            # v1.7.4+ Clean Contract: Enhancement ALWAYS runs
-            # Even "none" backend performs 48kHz→16kHz resampling for VAD/ASR
-            # Enhancer is a LOCAL variable - created, used, and DESTROYED
-            # before ASR is loaded. This prevents the "VRAM Sandwich".
+            # When enhancer is "none" (passthrough), scenes are already at
+            # 16kHz from extraction — skip this phase entirely.
+            # When a real enhancer is configured, it runs as a LOCAL variable
+            # created, used, and DESTROYED before ASR loads (VRAM Sandwich prevention).
             # =================================================================
             import gc
             try:
@@ -641,49 +642,58 @@ class TransformersPipeline(BasePipeline):
             except ImportError:
                 _torch_available = False
 
-            # A. Load Enhancer (always succeeds - "none" backend is fallback)
-            enhancer = create_enhancer_direct(**self._enhancer_config)
-            enhancer_name = enhancer.name
-            logger.info(f"Step 2.5: Preparing audio with {enhancer.display_name}...")
-
-            if scene_paths:
-                # B. Process Enhancement - Enhance each scene (includes 48kHz→16kHz resampling)
-                scene_paths = enhance_scenes(
-                    scene_paths,
-                    enhancer,
-                    self.temp_dir,
-                    progress_callback=lambda n, t, name: logger.debug(
-                        f"Enhancing scene {n}/{t}: {name}"
-                    )
-                )
+            if self._enhancer_is_passthrough:
+                # v1.8.5+: Audio already at 16kHz — skip enhancement entirely
+                enhancer_name = "none"
+                logger.info("Speech enhancer is passthrough — skipping enhancement")
                 master_metadata["config"]["speech_enhancement"] = {
-                    "backend": enhancer_name,
-                    "enhanced_scenes": len(scene_paths)
+                    "backend": "none",
+                    "skipped": True,
                 }
             else:
-                # Enhance full audio file (includes 48kHz→16kHz resampling)
-                enhanced_path = self.temp_dir / f"{media_basename}_enhanced.wav"
-                extracted_audio = enhance_single_audio(
-                    extracted_audio,
-                    enhancer,
-                    output_path=enhanced_path
-                )
-                master_metadata["config"]["speech_enhancement"] = {
-                    "backend": enhancer_name,
-                    "enhanced_full_audio": True
-                }
+                # A. Load Enhancer (always succeeds - "none" backend is fallback)
+                enhancer = create_enhancer_direct(**self._enhancer_config)
+                enhancer_name = enhancer.name
+                logger.info(f"Step 2.5: Preparing audio with {enhancer.display_name}...")
 
-            # C. DESTROY Enhancer - This is the "JIT Unload"
-            # We must confirm VRAM is near-zero before loading ASR
-            logger.debug("Destroying enhancer to free VRAM before ASR load")
-            enhancer.cleanup()
-            del enhancer
-            gc.collect()
-            if _torch_available:
-                torch.cuda.empty_cache()
-                logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
+                if scene_paths:
+                    # B. Process Enhancement - Enhance each scene (includes 48kHz→16kHz resampling)
+                    scene_paths = enhance_scenes(
+                        scene_paths,
+                        enhancer,
+                        self.temp_dir,
+                        progress_callback=lambda n, t, name: logger.debug(
+                            f"Enhancing scene {n}/{t}: {name}"
+                        )
+                    )
+                    master_metadata["config"]["speech_enhancement"] = {
+                        "backend": enhancer_name,
+                        "enhanced_scenes": len(scene_paths)
+                    }
+                else:
+                    # Enhance full audio file (includes 48kHz→16kHz resampling)
+                    enhanced_path = self.temp_dir / f"{media_basename}_enhanced.wav"
+                    extracted_audio = enhance_single_audio(
+                        extracted_audio,
+                        enhancer,
+                        output_path=enhanced_path
+                    )
+                    master_metadata["config"]["speech_enhancement"] = {
+                        "backend": enhancer_name,
+                        "enhanced_full_audio": True
+                    }
 
-            logger.info(f"Audio preparation complete, GPU memory released")
+                # C. DESTROY Enhancer - This is the "JIT Unload"
+                # We must confirm VRAM is near-zero before loading ASR
+                logger.debug("Destroying enhancer to free VRAM before ASR load")
+                enhancer.cleanup()
+                del enhancer
+                gc.collect()
+                if _torch_available:
+                    torch.cuda.empty_cache()
+                    logger.debug("GPU memory cleared after enhancement - VRAM should be near-zero")
+
+                logger.info(f"Audio preparation complete, GPU memory released")
 
             self.metadata_manager.update_processing_stage(
                 master_metadata, "speech_enhancement", "completed",
