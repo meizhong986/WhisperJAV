@@ -157,12 +157,42 @@ except ImportError as e:
 
 try:
     import importlib.util
-    _llama_utils_path = _source_dir / "whisperjav" / "translate" / "llama_build_utils.py"
-    _spec = importlib.util.spec_from_file_location("llama_build_utils", _llama_utils_path)
-    _llama_build_utils = importlib.util.module_from_spec(_spec)
-    _spec.loader.exec_module(_llama_build_utils)
-    get_llama_cpp_source_info = _llama_build_utils.get_llama_cpp_source_info
-    get_prebuilt_wheel_url = _llama_build_utils.get_prebuilt_wheel_url
+    import types
+
+    _translate_dir = _source_dir / "whisperjav" / "translate"
+
+    # Create package stubs so relative imports resolve.
+    # whisperjav may already be in sys.modules from the installer import above,
+    # but whisperjav.translate won't be — we only need it for this loader.
+    for _pkg_name, _pkg_path in [
+        ("whisperjav", _source_dir / "whisperjav"),
+        ("whisperjav.translate", _translate_dir),
+    ]:
+        if _pkg_name not in sys.modules:
+            _pkg = types.ModuleType(_pkg_name)
+            _pkg.__path__ = [str(_pkg_path)]
+            _pkg.__package__ = _pkg_name
+            sys.modules[_pkg_name] = _pkg
+
+    # Load llama_cuda_config first (stdlib-only imports, no relative deps)
+    _cuda_config_path = _translate_dir / "llama_cuda_config.py"
+    _cuda_spec = importlib.util.spec_from_file_location(
+        "whisperjav.translate.llama_cuda_config", _cuda_config_path)
+    _cuda_mod = importlib.util.module_from_spec(_cuda_spec)
+    sys.modules["whisperjav.translate.llama_cuda_config"] = _cuda_mod
+    _cuda_spec.loader.exec_module(_cuda_mod)
+
+    # Load llama_build_utils (from .llama_cuda_config now resolves)
+    _utils_path = _translate_dir / "llama_build_utils.py"
+    _utils_spec = importlib.util.spec_from_file_location(
+        "whisperjav.translate.llama_build_utils", _utils_path)
+    _utils_mod = importlib.util.module_from_spec(_utils_spec)
+    _utils_mod.__package__ = "whisperjav.translate"
+    sys.modules["whisperjav.translate.llama_build_utils"] = _utils_mod
+    _utils_spec.loader.exec_module(_utils_mod)
+
+    get_llama_cpp_source_info = _utils_mod.get_llama_cpp_source_info
+    get_prebuilt_wheel_url = _utils_mod.get_prebuilt_wheel_url
     # Alias for install_linux.sh compatibility
     get_llama_cpp_prebuilt_wheel = get_prebuilt_wheel_url
 except Exception as e:
