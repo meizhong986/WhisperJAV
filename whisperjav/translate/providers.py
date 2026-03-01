@@ -31,16 +31,18 @@ PROVIDER_CONFIGS = {
         'env_var': 'OPENAI_API_KEY'
     },
     'glm': {
-        'pysubtrans_name': 'OpenAI',  # GLM uses OpenAI-compatible API
+        'pysubtrans_name': 'Custom Server',  # Custom Server avoids Responses API misrouting (#178)
         'model': 'glm-4-flash',
         'env_var': 'GLM_API_KEY',
-        'api_base': 'https://open.bigmodel.cn/api/paas/v4'  # Zhipu AI endpoint
+        'server_address': 'https://open.bigmodel.cn',
+        'endpoint': '/api/paas/v4/chat/completions',
     },
     'groq': {
-        'pysubtrans_name': 'OpenAI',  # Groq uses OpenAI-compatible API
+        'pysubtrans_name': 'Custom Server',  # Custom Server avoids Responses API misrouting (#178)
         'model': 'llama-3.3-70b-versatile',
         'env_var': 'GROQ_API_KEY',
-        'api_base': 'https://api.groq.com/openai/v1'
+        'server_address': 'https://api.groq.com',
+        'endpoint': '/openai/v1/chat/completions',
     },
     'local': {
         'pysubtrans_name': 'Local',  # Marker for local LLM bypass
@@ -48,7 +50,7 @@ PROVIDER_CONFIGS = {
         'env_var': None               # No API key needed
     },
     'custom': {
-        'pysubtrans_name': 'OpenAI',  # OpenAI-compatible endpoint
+        'pysubtrans_name': 'Custom Server',  # Custom Server avoids Responses API misrouting (#178)
         'model': '',                   # User provides via --translate-model
         'env_var': None               # API key optional, provided via --translate-api-key
     }

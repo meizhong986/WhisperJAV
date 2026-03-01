@@ -32,7 +32,7 @@ from typing import Callable, Optional
 from .providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
 from .settings import load_settings, DEFAULT_SETTINGS
 from .instructions import get_instruction_content
-from .core import translate_subtitle, _normalize_api_base
+from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server
 
 logger = logging.getLogger(__name__)
 
@@ -267,13 +267,21 @@ def translate_with_config(
             "  --translate-provider custom --translate-endpoint http://localhost:11434/v1"
         )
 
-    # Override api_base if custom endpoint provided (same logic as cli.py:437-443)
+    # Override endpoint if custom endpoint provided (same logic as cli.py)
     if endpoint:
         provider_config = dict(provider_config)  # Copy to avoid mutating original
-        provider_config['api_base'] = _normalize_api_base(endpoint)
-        # When using custom endpoint, use OpenAI-compatible backend
-        if provider_config.get('pysubtrans_name') not in ('OpenAI', 'DeepSeek'):
-            provider_config['pysubtrans_name'] = 'OpenAI'
+        psn = provider_config.get('pysubtrans_name')
+        if psn in ('OpenAI', 'DeepSeek'):
+            # These providers handle api_base natively via their SDKs
+            provider_config['api_base'] = _normalize_api_base(endpoint)
+        else:
+            # Route through Custom Server for reliable /chat/completions
+            # access without reasoning model misclassification (#178)
+            server_addr, endpoint_path = _api_base_to_custom_server(endpoint)
+            provider_config['pysubtrans_name'] = 'Custom Server'
+            provider_config['server_address'] = server_addr
+            provider_config['endpoint'] = endpoint_path
+            provider_config.pop('api_base', None)
 
     # Load user settings
     settings = load_settings()

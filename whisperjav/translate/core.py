@@ -22,6 +22,23 @@ def _normalize_api_base(url: str) -> str:
     return url.rstrip('/')
 
 
+def _api_base_to_custom_server(api_base: str) -> tuple:
+    """Convert an api_base URL to Custom Server's (server_address, endpoint) pair.
+
+    PySubtrans's CustomClient uses httpx.Client(base_url=server_address) and
+    then client.post(endpoint, ...).  An absolute endpoint path (starting with /)
+    replaces the base_url path, so server_address must be scheme+host only,
+    and endpoint must be the full path including /chat/completions.
+    """
+    from urllib.parse import urlparse
+    normalized = _normalize_api_base(api_base)
+    parsed = urlparse(normalized)
+    server_address = f"{parsed.scheme}://{parsed.netloc}"
+    path = parsed.path.rstrip('/')
+    endpoint = f"{path}/chat/completions" if path else "/v1/chat/completions"
+    return server_address, endpoint
+
+
 def translate_subtitle(
     input_path: str,
     output_path: Path,
@@ -144,6 +161,7 @@ def translate_subtitle(
                     'OpenAI': 'openai',
                     'DeepSeek': 'openai',
                     'OpenRouter': 'openai',
+                    'Custom Server': None,
                 }
                 pkg = _PROVIDER_DEPS.get(provider_config['pysubtrans_name'])
                 hint = f"  Hint: install the provider SDK:  pip install {pkg}" if pkg else ""

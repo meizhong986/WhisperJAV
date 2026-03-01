@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Optional
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_SOURCES, SUPPORTED_TARGETS
-from .core import translate_subtitle, _normalize_api_base
+from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server
 from .instructions import get_instruction_content, get_cache_dir
 from .settings import load_settings, create_default_settings, show_settings, get_settings_path, resolve_config
 from .configure import configure_command
@@ -434,13 +434,22 @@ def main():
         print(f"Error: Unknown provider: {provider_name}", file=sys.stderr)
         sys.exit(1)
 
-    # Override api_base if --endpoint provided (create copy to avoid modifying original)
+    # Override endpoint if --endpoint provided (create copy to avoid modifying original)
     if hasattr(args, 'endpoint') and args.endpoint:
         provider_config = dict(provider_config)  # Make a copy
-        provider_config['api_base'] = _normalize_api_base(args.endpoint)
-        # When using custom endpoint, use OpenAI-compatible backend
-        if provider_config.get('pysubtrans_name') not in ('OpenAI', 'DeepSeek'):
-            provider_config['pysubtrans_name'] = 'OpenAI'
+        normalized = _normalize_api_base(args.endpoint)
+        psn = provider_config.get('pysubtrans_name')
+        if psn in ('OpenAI', 'DeepSeek'):
+            # These providers handle api_base natively via their SDKs
+            provider_config['api_base'] = normalized
+        else:
+            # Route through Custom Server for reliable /chat/completions
+            # access without reasoning model misclassification (#178)
+            server_addr, endpoint_path = _api_base_to_custom_server(args.endpoint)
+            provider_config['pysubtrans_name'] = 'Custom Server'
+            provider_config['server_address'] = server_addr
+            provider_config['endpoint'] = endpoint_path
+            provider_config.pop('api_base', None)
 
     # Get API key (not needed for local provider)
     if provider_name == 'local':
