@@ -61,7 +61,7 @@ from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
-from whisperjav.__version__ import __version__
+from whisperjav.__version__ import __version__, __version_display__
 
 
 from whisperjav.utils.preflight_check import enforce_gpu_requirement, run_preflight_checks
@@ -126,7 +126,7 @@ def print_banner():
     """Print application banner."""
     banner = f"""
 ╔═══════════════════════════════════════════════════╗
-║          WhisperJAV v{__version__}                        ║
+║          WhisperJAV v{__version_display__}                 ║
 ║   Japanese Adult Video Subtitle Generator         ║
 ║                                                   ║
 ║                                                   ║
@@ -702,7 +702,7 @@ def cleanup_temp_directory(temp_dir: str):
     else:
         logger.debug(f"Cleaning up temp directory contents: {temp_path}")
         try:
-            subdirs_to_clean = ["scenes", "scene_srts", "raw_subs"]
+            subdirs_to_clean = ["scenes", "enhanced_scenes", "scene_srts", "raw_subs"]
             for subdir in subdirs_to_clean:
                 subdir_path = temp_path / subdir
                 if subdir_path.exists():

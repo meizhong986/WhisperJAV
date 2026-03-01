@@ -5,7 +5,7 @@
 __version__ = "1.8.5"
 
 # Human-readable version for display in UI
-__version_display__ = "1.8.5"
+__version_display__ = "1.8.5-hotfix3"
 
 # Version metadata
 __version_info__ = {
