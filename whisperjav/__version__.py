@@ -12,6 +12,6 @@ __version_info__ = {
     "major": 1,
     "minor": 8,
     "patch": 5,
-    "release": "",
+    "release": "hotfix3",
     "architecture": "v4.4"
 }
