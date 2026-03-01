@@ -6144,6 +6144,166 @@ const TranslationSettingsModal = {
 };
 
 // ============================================================
+// GUI Settings Persistence
+// ============================================================
+const SettingsPersistence = {
+    _saveTimer: null,
+    _DEBOUNCE_MS: 800,
+
+    /** Collect current form state into a flat camelCase dict. */
+    collectAll() {
+        const val = (id, fallback = '') => {
+            const el = document.getElementById(id);
+            return el ? el.value : fallback;
+        };
+        const checked = (id) => {
+            const el = document.getElementById(id);
+            return el ? el.checked : false;
+        };
+
+        return {
+            // Tab 1
+            mode: val('mode', 'faster'),
+            sourceLanguage: val('source-language', 'japanese'),
+            subsLanguage: val('language', 'native'),
+            sensitivity: val('sensitivity', 'aggressive'),
+            modelOverrideEnabled: checked('modelOverrideEnabled'),
+            modelOverride: val('modelSelection', ''),
+            outputToSource: checked('outputToSource'),
+            outputDir: val('outputDir', ''),
+            debugLogging: checked('debugLogging'),
+            keepTemp: checked('keepTemp'),
+            tempDir: val('tempDir', ''),
+            acceptCpuMode: checked('acceptCpuMode'),
+            asyncProcessing: checked('asyncProcessing'),
+            // Tab 3 — Ensemble
+            pass1Pipeline: val('pass1-pipeline', 'balanced'),
+            pass1Sensitivity: val('pass1-sensitivity', 'balanced'),
+            pass1SceneDetector: val('pass1-scene', 'auditok'),
+            pass1SpeechEnhancer: val('pass1-enhancer', 'none'),
+            pass1SpeechSegmenter: val('pass1-segmenter', 'silero'),
+            pass1Model: val('pass1-model', ''),
+            pass2Enabled: checked('pass2-enabled'),
+            pass2Pipeline: val('pass2-pipeline', 'fast'),
+            pass2Sensitivity: val('pass2-sensitivity', 'balanced'),
+            pass2SceneDetector: val('pass2-scene', 'auditok'),
+            pass2SpeechEnhancer: val('pass2-enhancer', 'none'),
+            pass2SpeechSegmenter: val('pass2-segmenter', 'silero'),
+            pass2Model: val('pass2-model', ''),
+            mergeStrategy: val('merge-strategy', 'pass1_primary'),
+        };
+    },
+
+    /** Apply a settings dict (camelCase) to the DOM form elements. */
+    applyToForm(s) {
+        // Helpers dispatch 'change' so EnsembleManager state syncs
+        const setVal = (id, v) => {
+            const el = document.getElementById(id);
+            if (el && v !== undefined && v !== null) {
+                el.value = v;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        };
+        const setChecked = (id, v) => {
+            const el = document.getElementById(id);
+            if (el && v !== undefined && v !== null) {
+                el.checked = !!v;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        };
+
+        // Tab 1
+        setVal('mode', s.mode);
+        setVal('source-language', s.sourceLanguage);
+        setVal('language', s.subsLanguage);
+        setVal('sensitivity', s.sensitivity);
+        setChecked('modelOverrideEnabled', s.modelOverrideEnabled);
+        setVal('modelSelection', s.modelOverride);
+        setChecked('outputToSource', s.outputToSource);
+        if (s.outputDir) setVal('outputDir', s.outputDir);
+        setChecked('debugLogging', s.debugLogging);
+        setChecked('keepTemp', s.keepTemp);
+        if (s.tempDir) setVal('tempDir', s.tempDir);
+        setChecked('acceptCpuMode', s.acceptCpuMode);
+        setChecked('asyncProcessing', s.asyncProcessing);
+
+        // Tab 3 — Ensemble
+        setVal('pass1-pipeline', s.pass1Pipeline);
+        setVal('pass1-sensitivity', s.pass1Sensitivity);
+        setVal('pass1-scene', s.pass1SceneDetector);
+        setVal('pass1-enhancer', s.pass1SpeechEnhancer);
+        setVal('pass1-segmenter', s.pass1SpeechSegmenter);
+        setVal('pass1-model', s.pass1Model);
+        setChecked('pass2-enabled', s.pass2Enabled);
+        setVal('pass2-pipeline', s.pass2Pipeline);
+        setVal('pass2-sensitivity', s.pass2Sensitivity);
+        setVal('pass2-scene', s.pass2SceneDetector);
+        setVal('pass2-enhancer', s.pass2SpeechEnhancer);
+        setVal('pass2-segmenter', s.pass2SpeechSegmenter);
+        setVal('pass2-model', s.pass2Model);
+        setVal('merge-strategy', s.mergeStrategy);
+
+        // Trigger dependent UI updates
+        ModeManager.handleModeChange(s.mode || 'faster');
+    },
+
+    /** Load from backend and apply to form. Called on pywebviewready. */
+    async loadFromBackend() {
+        if (!window.pywebview || !pywebview.api) return;
+        try {
+            const result = await pywebview.api.get_gui_settings();
+            if (result.success && result.settings) {
+                this.applyToForm(result.settings);
+                console.log('GUI settings restored from backend');
+            }
+        } catch (e) {
+            console.warn('Failed to load GUI settings:', e);
+        }
+    },
+
+    /** Debounced save — call after any form change. */
+    scheduleSave() {
+        if (this._saveTimer) clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => this._doSave(), this._DEBOUNCE_MS);
+    },
+
+    async _doSave() {
+        if (!window.pywebview || !pywebview.api) return;
+        try {
+            const data = this.collectAll();
+            await pywebview.api.save_gui_settings(data);
+        } catch (e) {
+            console.warn('Failed to save GUI settings:', e);
+        }
+    },
+
+    /** Attach change listeners to all tracked form elements. */
+    init() {
+        const ids = [
+            'mode', 'source-language', 'language', 'sensitivity',
+            'modelOverrideEnabled', 'modelSelection',
+            'outputToSource', 'outputDir', 'debugLogging', 'keepTemp',
+            'tempDir', 'acceptCpuMode', 'asyncProcessing',
+            'pass1-pipeline', 'pass1-sensitivity', 'pass1-scene',
+            'pass1-enhancer', 'pass1-segmenter', 'pass1-model',
+            'pass2-enabled', 'pass2-pipeline', 'pass2-sensitivity',
+            'pass2-scene', 'pass2-enhancer', 'pass2-segmenter',
+            'pass2-model', 'merge-strategy',
+        ];
+        for (const id of ids) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', () => this.scheduleSave());
+                // Also capture input events for text fields
+                if (el.tagName === 'INPUT' && el.type === 'text') {
+                    el.addEventListener('input', () => this.scheduleSave());
+                }
+            }
+        }
+    },
+};
+
+// ============================================================
 // Initialization
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -6169,6 +6329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     TranslatorManager.init();
     TranslateIntegrationManager.init();
     TranslationSettingsModal.init();
+    SettingsPersistence.init();
 
     // Initial validation
     FormManager.validateForm();
@@ -6194,4 +6355,7 @@ window.addEventListener('pywebviewready', () => {
 
     // Load translation settings from persistent backend file
     TranslationSettingsModal.loadSettingsFromBackend();
+
+    // Restore GUI form settings from persistent backend file
+    SettingsPersistence.loadFromBackend();
 });

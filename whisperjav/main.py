@@ -222,7 +222,7 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--merge-strategy", default="pass1_primary",
-                               choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap"],
+                               choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap", "longest"],
                                help="Merge strategy for two-pass results (default: pass1_primary)")
 
     # Environment check
@@ -318,6 +318,18 @@ def parse_arguments():
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), none (disable segmentation)"
                              ))
+    tuning_group.add_argument("--initial-prompt",
+                             type=str, default=None,
+                             help="Initial prompt text for Whisper decoder context (e.g., Japanese domain vocabulary)")
+    tuning_group.add_argument("--vad-threshold",
+                             type=float, default=None,
+                             metavar="FLOAT",
+                             help="VAD speech detection threshold (0.0-1.0, overrides sensitivity preset)")
+    tuning_group.add_argument("--condition-on-previous-text",
+                             type=str, default=None,
+                             choices=["true", "false"],
+                             metavar="BOOL",
+                             help="Enable/disable conditioning on previous text (default: mode-dependent)")
 
     # Async processing
     async_group = parser.add_argument_group("Processing Options")
@@ -1654,6 +1666,36 @@ def main():
         resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
         logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
+
+    # Apply CLI quality knobs (--initial-prompt, --vad-threshold, --condition-on-previous-text)
+    if resolved_config is not None:
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+
+        initial_prompt = getattr(args, 'initial_prompt', None)
+        if initial_prompt is not None:
+            if "provider" not in resolved_config["params"]:
+                resolved_config["params"]["provider"] = {}
+            resolved_config["params"]["provider"]["initial_prompt"] = initial_prompt
+            logger.info(f"Initial prompt set via CLI: {initial_prompt[:50]}{'...' if len(initial_prompt) > 50 else ''}")
+
+        vad_threshold = getattr(args, 'vad_threshold', None)
+        if vad_threshold is not None:
+            if not 0.0 <= vad_threshold <= 1.0:
+                logger.warning(f"--vad-threshold {vad_threshold} outside [0.0, 1.0] range, clamping")
+                vad_threshold = max(0.0, min(1.0, vad_threshold))
+            if "provider" not in resolved_config["params"]:
+                resolved_config["params"]["provider"] = {}
+            resolved_config["params"]["provider"]["vad_threshold"] = vad_threshold
+            logger.info(f"VAD threshold set via CLI: {vad_threshold}")
+
+        condition_on_prev = getattr(args, 'condition_on_previous_text', None)
+        if condition_on_prev is not None:
+            condition_bool = condition_on_prev.lower() == "true"
+            if "decoder" not in resolved_config["params"]:
+                resolved_config["params"]["decoder"] = {}
+            resolved_config["params"]["decoder"]["condition_on_previous_text"] = condition_bool
+            logger.info(f"Condition on previous text set via CLI: {condition_bool}")
 
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:

@@ -2898,6 +2898,78 @@ class WhisperJAVAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # ------------------------------------------------------------------
+    # GUI Settings Persistence
+    # ------------------------------------------------------------------
+
+    # Mapping: backend snake_case  ↔  frontend camelCase
+    _GUI_SETTINGS_MAP = {
+        # snake_case (backend)      camelCase (JS)
+        "mode":                      "mode",
+        "source_language":           "sourceLanguage",
+        "subs_language":             "subsLanguage",
+        "sensitivity":               "sensitivity",
+        "model_override_enabled":    "modelOverrideEnabled",
+        "model_override":            "modelOverride",
+        "output_to_source":          "outputToSource",
+        "output_dir":                "outputDir",
+        "debug_logging":             "debugLogging",
+        "keep_temp":                 "keepTemp",
+        "temp_dir":                  "tempDir",
+        "accept_cpu_mode":           "acceptCpuMode",
+        "async_processing":          "asyncProcessing",
+        "pass1_pipeline":            "pass1Pipeline",
+        "pass1_sensitivity":         "pass1Sensitivity",
+        "pass1_scene_detector":      "pass1SceneDetector",
+        "pass1_speech_enhancer":     "pass1SpeechEnhancer",
+        "pass1_speech_segmenter":    "pass1SpeechSegmenter",
+        "pass1_model":               "pass1Model",
+        "pass2_enabled":             "pass2Enabled",
+        "pass2_pipeline":            "pass2Pipeline",
+        "pass2_sensitivity":         "pass2Sensitivity",
+        "pass2_scene_detector":      "pass2SceneDetector",
+        "pass2_speech_enhancer":     "pass2SpeechEnhancer",
+        "pass2_speech_segmenter":    "pass2SpeechSegmenter",
+        "pass2_model":               "pass2Model",
+        "merge_strategy":            "mergeStrategy",
+    }
+    # Reverse mapping (camelCase → snake_case)
+    _GUI_SETTINGS_MAP_REV = {v: k for k, v in _GUI_SETTINGS_MAP.items()}
+
+    def get_gui_settings(self) -> Dict[str, Any]:
+        """
+        Load persisted GUI settings and return them in camelCase for the frontend.
+        """
+        try:
+            from whisperjav.settings.gui_settings import load_gui_settings
+            backend = load_gui_settings()
+
+            gui = {}
+            for snake, camel in self._GUI_SETTINGS_MAP.items():
+                if snake in backend:
+                    gui[camel] = backend[snake]
+            return {"success": True, "settings": gui}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def save_gui_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Save GUI settings from frontend (camelCase) to backend file (snake_case).
+        """
+        try:
+            from whisperjav.settings.gui_settings import save_gui_settings
+
+            backend_settings = {}
+            for camel_key, value in settings.items():
+                snake_key = self._GUI_SETTINGS_MAP_REV.get(camel_key)
+                if snake_key:
+                    backend_settings[snake_key] = value
+
+            ok = save_gui_settings(backend_settings)
+            return {"success": ok}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def test_provider_connection(self, provider: str, api_key: str = None) -> Dict[str, Any]:
         """
         Test connection to a translation provider.
