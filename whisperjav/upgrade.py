@@ -362,13 +362,13 @@ def check_upgrade_compatibility(install_dir: Path, extras: str = "all") -> Tuple
         extras_list = [e.strip() for e in extras.split(",") if e.strip()]
         install_spec = f"whisperjav[{','.join(extras_list)}]"
 
-    # Use pip's dry-run to check for conflicts
+    # Use pip's dry-run to check for conflicts (PEP 508 syntax, not #egg=)
     print("      Checking dependency compatibility...")
     try:
         result = subprocess.run(
             [
                 str(pip_exe), 'install', '--dry-run', '--ignore-installed',
-                f"git+{GITHUB_REPO.replace('git+', '')}#egg={install_spec}"
+                f"{install_spec} @ {GITHUB_REPO}"
             ],
             capture_output=True,
             text=True,
@@ -861,13 +861,15 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
         print_error("pip not found in installation")
         return False
 
-    # Build the install specifier
+    # Build the install specifier using PEP 508 syntax.
+    # The legacy #egg= fragment does NOT support extras (brackets) and
+    # modern pip rejects it with "egg fragment is invalid" (#192).
     if extras == "all":
-        install_spec = f"{GITHUB_REPO}#egg=whisperjav[all]"
+        install_spec = f"whisperjav[all] @ {GITHUB_REPO}"
     else:
         extras_list = [e.strip() for e in extras.split(",") if e.strip()]
         extras_str = ",".join(extras_list)
-        install_spec = f"{GITHUB_REPO}#egg=whisperjav[{extras_str}]"
+        install_spec = f"whisperjav[{extras_str}] @ {GITHUB_REPO}"
 
     print(f"      Installing whisperjav[{extras}] from GitHub...")
     print("      (This may take several minutes)")
