@@ -1374,6 +1374,16 @@ const EnsembleManager = {
         document.getElementById('customizeModalOK').addEventListener('click', () => this.okAndClose());
         document.getElementById('customizeModalReset').addEventListener('click', () => this.resetToDefaults());
 
+        // Preset controls
+        document.getElementById('presetSaveBtn').addEventListener('click', () => this.saveCurrentAsPreset());
+        document.getElementById('presetDeleteBtn').addEventListener('click', () => this.deleteSelectedPreset());
+        document.getElementById('presetSelector').addEventListener('change', (e) => {
+            const name = e.target.value;
+            // Show/hide delete button
+            document.getElementById('presetDeleteBtn').style.display = name ? '' : 'none';
+            if (name) this.loadPresetIntoModal(name);
+        });
+
         // Modal tab switching
         document.querySelectorAll('.modal-tab').forEach(tab => {
             tab.addEventListener('click', () => this.switchModalTab(tab.dataset.tab));
@@ -1923,6 +1933,9 @@ const EnsembleManager = {
 
             // Reset to first tab
             this.switchModalTab('model');
+
+            // Populate preset dropdown
+            await this.refreshPresetList();
 
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
@@ -2630,6 +2643,9 @@ const EnsembleManager = {
             // Generate Transformers-specific tabs
             this.generateTransformersTabs(result.schema, currentValues);
 
+            // Populate preset dropdown
+            await this.refreshPresetList();
+
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
 
@@ -2913,6 +2929,9 @@ const EnsembleManager = {
 
             // Generate Qwen-specific tabs
             this.generateQwenTabs(result.schema, currentValues);
+
+            // Populate preset dropdown
+            await this.refreshPresetList();
 
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
@@ -4325,6 +4344,216 @@ const EnsembleManager = {
         // If apply failed, still try to close modal to avoid trapping user
         if (!success) {
             this.closeModal();
+        }
+    },
+
+    // ------------------------------------------------------------------
+    // Ensemble Parameter Presets
+    // ------------------------------------------------------------------
+
+    /** Refresh the preset selector dropdown from the backend. */
+    async refreshPresetList() {
+        const selector = document.getElementById('presetSelector');
+        if (!selector || !window.pywebview || !pywebview.api) return;
+
+        try {
+            const result = await pywebview.api.list_presets();
+            // Clear existing options (keep the placeholder)
+            while (selector.options.length > 1) selector.remove(1);
+
+            if (result.success && result.presets && result.presets.length > 0) {
+                for (const p of result.presets) {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    const label = p.pipeline ? `${p.name}  (${p.pipeline})` : p.name;
+                    opt.textContent = label;
+                    selector.appendChild(opt);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load preset list:', e);
+        }
+
+        // Reset selection and hide delete button
+        selector.value = '';
+        document.getElementById('presetDeleteBtn').style.display = 'none';
+    },
+
+    /** Collect current modal state into a preset-shaped object. */
+    _collectPresetData() {
+        const passKey = this.state.currentCustomize;
+        if (!passKey) return null;
+
+        const passState = this.state[passKey];
+
+        // Collect custom params from the modal form (same logic as applyCustomization)
+        const params = {};
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (!panel) return;
+            panel.querySelectorAll('.param-control').forEach(control => {
+                const paramName = control.dataset.param;
+                if (!paramName) return;
+                const checkbox = control.querySelector('.param-checkbox');
+                const slider = control.querySelector('.param-slider');
+                const number = control.querySelector('.param-number');
+                const text = control.querySelector('.param-text');
+                const select = control.querySelector('.param-select');
+
+                let value;
+                if (checkbox) value = checkbox.checked;
+                else if (number) value = parseFloat(number.value);
+                else if (slider) value = parseFloat(slider.value);
+                else if (text) value = text.value;
+                else if (select) value = select.value;
+                if (paramName && value !== undefined) params[paramName] = value;
+            });
+        });
+
+        return {
+            pipeline: passState.pipeline,
+            sensitivity: passState.sensitivity,
+            sceneDetector: passState.sceneDetector,
+            speechEnhancer: passState.speechEnhancer,
+            speechSegmenter: passState.speechSegmenter,
+            model: passState.model,
+            customized: true,
+            params: params,
+            isTransformers: passState.isTransformers,
+            isQwen: passState.isQwen,
+            framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
+            dspEffects: passState.dspEffects || null,
+        };
+    },
+
+    /** Prompt user for a name and save current modal params as a preset. */
+    async saveCurrentAsPreset() {
+        if (!window.pywebview || !pywebview.api) return;
+
+        const name = prompt('Preset name:');
+        if (!name || !name.trim()) return;
+
+        const data = this._collectPresetData();
+        if (!data) {
+            ConsoleManager.log('No active pass to save preset from', 'error');
+            return;
+        }
+
+        try {
+            const result = await pywebview.api.save_preset(name.trim(), data);
+            if (result.success) {
+                ConsoleManager.log(`Preset saved: ${name.trim()}`, 'success');
+                await this.refreshPresetList();
+                // Select the just-saved preset
+                document.getElementById('presetSelector').value = name.trim();
+            } else {
+                ConsoleManager.log(`Failed to save preset: ${result.error || 'unknown error'}`, 'error');
+            }
+        } catch (e) {
+            ConsoleManager.log(`Failed to save preset: ${e.message}`, 'error');
+        }
+    },
+
+    /** Load a preset by name and apply its values to the modal controls. */
+    async loadPresetIntoModal(name) {
+        if (!window.pywebview || !pywebview.api) return;
+
+        try {
+            const result = await pywebview.api.load_preset(name);
+            if (!result.success || !result.preset) {
+                ConsoleManager.log(`Failed to load preset: ${result.error || 'not found'}`, 'error');
+                return;
+            }
+
+            const preset = result.preset;
+            const passKey = this.state.currentCustomize;
+            if (!passKey) return;
+
+            const passState = this.state[passKey];
+
+            // Apply pass-level settings to state (these affect dropdowns in the main row)
+            if (preset.pipeline) passState.pipeline = preset.pipeline;
+            if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
+            if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
+            if (preset.speechEnhancer !== undefined) passState.speechEnhancer = preset.speechEnhancer;
+            if (preset.speechSegmenter) passState.speechSegmenter = preset.speechSegmenter;
+            if (preset.model) passState.model = preset.model;
+            if (preset.framer) passState.framer = preset.framer;
+            if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
+
+            // Update the pass row dropdowns to match
+            const prefix = passKey === 'pass1' ? 'pass1' : 'pass2';
+            const setDrop = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val) { el.value = val; el.dispatchEvent(new Event('change', { bubbles: true })); }
+            };
+            setDrop(`${prefix}-pipeline`, preset.pipeline);
+            setDrop(`${prefix}-sensitivity`, preset.sensitivity);
+            setDrop(`${prefix}-scene`, preset.sceneDetector);
+            setDrop(`${prefix}-enhancer`, preset.speechEnhancer);
+            setDrop(`${prefix}-segmenter`, preset.speechSegmenter);
+            setDrop(`${prefix}-model`, preset.model);
+
+            // Apply custom params to modal form controls
+            if (preset.params && typeof preset.params === 'object') {
+                for (const [paramName, value] of Object.entries(preset.params)) {
+                    // Find the param-control with matching data-param
+                    const control = document.querySelector(`.param-control[data-param="${paramName}"]`);
+                    if (!control) continue;
+
+                    const checkbox = control.querySelector('.param-checkbox');
+                    const slider = control.querySelector('.param-slider');
+                    const number = control.querySelector('.param-number');
+                    const text = control.querySelector('.param-text');
+                    const select = control.querySelector('.param-select');
+
+                    if (checkbox && typeof value === 'boolean') {
+                        checkbox.checked = value;
+                    } else if (number) {
+                        number.value = value;
+                        if (slider) slider.value = value;
+                    } else if (slider) {
+                        slider.value = value;
+                    } else if (text) {
+                        text.value = value;
+                    } else if (select) {
+                        select.value = value;
+                    }
+                }
+            }
+
+            // Mark as customized
+            passState.customized = true;
+            passState.params = preset.params || null;
+            this.updateBadges();
+
+            ConsoleManager.log(`Preset loaded: ${name}`, 'success');
+        } catch (e) {
+            ConsoleManager.log(`Failed to load preset: ${e.message}`, 'error');
+        }
+    },
+
+    /** Delete the currently selected preset. */
+    async deleteSelectedPreset() {
+        if (!window.pywebview || !pywebview.api) return;
+
+        const selector = document.getElementById('presetSelector');
+        const name = selector ? selector.value : '';
+        if (!name) return;
+
+        if (!confirm(`Delete preset "${name}"?`)) return;
+
+        try {
+            const result = await pywebview.api.delete_preset(name);
+            if (result.success) {
+                ConsoleManager.log(`Preset deleted: ${name}`, 'success');
+                await this.refreshPresetList();
+            } else {
+                ConsoleManager.log(`Failed to delete preset: ${result.error || 'unknown error'}`, 'error');
+            }
+        } catch (e) {
+            ConsoleManager.log(`Failed to delete preset: ${e.message}`, 'error');
         }
     },
 

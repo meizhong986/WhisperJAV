@@ -1118,10 +1118,19 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="customizeModalReset">Reset to Defaults</button>
-                <button class="btn btn-primary" id="customizeModalApply">Apply</button>
-                <button class="btn btn-primary" id="customizeModalOK">OK</button>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <div class="modal-footer-left" style="display: flex; gap: 8px; align-items: center;">
+                    <select id="presetSelector" class="form-select" style="width: 180px; font-size: 0.85rem;">
+                        <option value="">Load Preset...</option>
+                    </select>
+                    <button class="btn btn-secondary" id="presetSaveBtn" title="Save current parameters as a named preset">Save Preset</button>
+                    <button class="btn btn-secondary" id="presetDeleteBtn" title="Delete the selected preset" style="display: none;">Delete</button>
+                </div>
+                <div class="modal-footer-right" style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" id="customizeModalReset">Reset to Defaults</button>
+                    <button class="btn btn-primary" id="customizeModalApply">Apply</button>
+                    <button class="btn btn-primary" id="customizeModalOK">OK</button>
+                </div>
             </div>
         </div>
     </div>

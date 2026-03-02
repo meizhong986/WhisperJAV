@@ -2970,6 +2970,93 @@ class WhisperJAVAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # ------------------------------------------------------------------
+    # Ensemble Parameter Presets
+    # ------------------------------------------------------------------
+
+    # Mapping: backend snake_case ↔ frontend camelCase for preset fields
+    _PRESET_MAP = {
+        "name":              "name",
+        "pipeline":          "pipeline",
+        "sensitivity":       "sensitivity",
+        "scene_detector":    "sceneDetector",
+        "speech_enhancer":   "speechEnhancer",
+        "speech_segmenter":  "speechSegmenter",
+        "model":             "model",
+        "customized":        "customized",
+        "params":            "params",       # nested dict — passed as-is
+        "is_transformers":   "isTransformers",
+        "is_qwen":           "isQwen",
+        "framer":            "framer",
+        "dsp_effects":       "dspEffects",
+        "created_at":        "createdAt",
+        "updated_at":        "updatedAt",
+        "schema_version":    "schemaVersion",
+    }
+    _PRESET_MAP_REV = {v: k for k, v in _PRESET_MAP.items()}
+
+    def _preset_to_camel(self, data: dict) -> dict:
+        """Convert a preset dict from snake_case to camelCase."""
+        out = {}
+        for snake, camel in self._PRESET_MAP.items():
+            if snake in data:
+                out[camel] = data[snake]
+        # Pass through any unmapped keys (e.g., extra params)
+        for k, v in data.items():
+            if k not in self._PRESET_MAP:
+                out[k] = v
+        return out
+
+    def _preset_from_camel(self, data: dict) -> dict:
+        """Convert a preset dict from camelCase to snake_case."""
+        out = {}
+        for camel, value in data.items():
+            snake = self._PRESET_MAP_REV.get(camel, camel)
+            out[snake] = value
+        return out
+
+    def list_presets(self) -> Dict[str, Any]:
+        """List all saved ensemble parameter presets."""
+        try:
+            from whisperjav.settings.presets import list_presets
+            presets = list_presets()
+            return {
+                "success": True,
+                "presets": [self._preset_to_camel(p) for p in presets],
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def load_preset(self, name: str) -> Dict[str, Any]:
+        """Load a preset by name."""
+        try:
+            from whisperjav.settings.presets import load_preset
+            data = load_preset(name)
+            if data is None:
+                return {"success": False, "error": f"Preset not found: {name}"}
+            return {"success": True, "preset": self._preset_to_camel(data)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def save_preset(self, name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Save a preset.  *data* is camelCase from the frontend."""
+        try:
+            from whisperjav.settings.presets import save_preset
+            backend = self._preset_from_camel(data)
+            ok = save_preset(name, backend)
+            return {"success": ok}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def delete_preset(self, name: str) -> Dict[str, Any]:
+        """Delete a preset by name."""
+        try:
+            from whisperjav.settings.presets import delete_preset
+            ok = delete_preset(name)
+            return {"success": ok}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def test_provider_connection(self, provider: str, api_key: str = None) -> Dict[str, Any]:
         """
         Test connection to a translation provider.
