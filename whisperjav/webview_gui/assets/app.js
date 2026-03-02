@@ -6149,6 +6149,7 @@ const TranslationSettingsModal = {
 const SettingsPersistence = {
     _saveTimer: null,
     _DEBOUNCE_MS: 800,
+    _isLoading: false,   // Guard: suppress saves during loadFromBackend
 
     /** Collect current form state into a flat camelCase dict. */
     collectAll() {
@@ -6251,6 +6252,7 @@ const SettingsPersistence = {
     async loadFromBackend() {
         if (!window.pywebview || !pywebview.api) return;
         try {
+            this._isLoading = true;          // Suppress saves during restore
             const result = await pywebview.api.get_gui_settings();
             if (result.success && result.settings) {
                 this.applyToForm(result.settings);
@@ -6258,11 +6260,18 @@ const SettingsPersistence = {
             }
         } catch (e) {
             console.warn('Failed to load GUI settings:', e);
+        } finally {
+            this._isLoading = false;         // Re-enable saves
+            if (this._saveTimer) {           // Discard any save queued during load
+                clearTimeout(this._saveTimer);
+                this._saveTimer = null;
+            }
         }
     },
 
     /** Debounced save — call after any form change. */
     scheduleSave() {
+        if (this._isLoading) return;         // Suppress during loadFromBackend
         if (this._saveTimer) clearTimeout(this._saveTimer);
         this._saveTimer = setTimeout(() => this._doSave(), this._DEBOUNCE_MS);
     },
@@ -6339,23 +6348,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     ConsoleManager.log('Press F1 for keyboard shortcuts', 'info');
 });
 
-// PyWebView ready event
-window.addEventListener('pywebviewready', () => {
+// PyWebView ready event — async IIFE so we can await sequential steps.
+// Order matters: dropdown options must be populated before settings
+// restoration sets their values (S17), and default output dir must be
+// resolved before settings might override it (S22).
+window.addEventListener('pywebviewready', async () => {
     console.log('PyWebView API ready!');
     ConsoleManager.log('PyWebView bridge connected', 'success');
 
-    // Reload default output directory from API
-    AppState.loadDefaultOutputDir();
+    // Phase 1: Resolve computed defaults (output dir)
+    await AppState.loadDefaultOutputDir();
 
-    // Update speech segmenter options based on backend availability
-    EnsembleManager.updateSegmenterAvailability();
+    // Phase 2: Populate dynamic dropdown options (segmenters, enhancers)
+    await EnsembleManager.updateSegmenterAvailability();
+    await EnsembleManager.updateEnhancerAvailability();
 
-    // Update speech enhancer options based on backend availability
-    EnsembleManager.updateEnhancerAvailability();
-
-    // Load translation settings from persistent backend file
-    TranslationSettingsModal.loadSettingsFromBackend();
-
-    // Restore GUI form settings from persistent backend file
-    SettingsPersistence.loadFromBackend();
+    // Phase 3: Restore saved settings (must run AFTER phases 1-2)
+    await TranslationSettingsModal.loadSettingsFromBackend();
+    await SettingsPersistence.loadFromBackend();
 });
