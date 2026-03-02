@@ -14,6 +14,7 @@ from whisperjav.modules.subtitle_pipeline.protocols import TextCleaner
 _REGISTRY: dict[str, str] = {
     "qwen3": "whisperjav.modules.subtitle_pipeline.cleaners.qwen3.Qwen3TextCleaner",
     "passthrough": "whisperjav.modules.subtitle_pipeline.cleaners.passthrough.PassthroughCleaner",
+    "anime-whisper": "whisperjav.modules.subtitle_pipeline.cleaners.anime_whisper.AnimeWhisperCleaner",
 }
 
 # Cache for loaded classes

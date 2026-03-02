@@ -2300,7 +2300,10 @@ class WhisperJAVAPI:
 
         # Pass 1 configuration
         pass1 = config.get('pass1', {})
-        args += ["--pass1-pipeline", pass1.get('pipeline', 'balanced')]
+        p1_pipeline = pass1.get('pipeline', 'balanced')
+        if p1_pipeline == 'anime-whisper':
+            p1_pipeline = 'qwen'
+        args += ["--pass1-pipeline", p1_pipeline]
 
         if pass1.get('isTransformers'):
             # Transformers pass: no sensitivity, handle HF params
@@ -2315,6 +2318,8 @@ class WhisperJAVAPI:
             qwen1_params = dict(pass1.get('params') or {}) if pass1.get('customized') else {}
             if pass1.get('framer'):
                 qwen1_params['framer'] = pass1['framer']
+            if pass1.get('isAnimeWhisper'):
+                qwen1_params['generator_backend'] = 'anime-whisper'
             if qwen1_params:
                 args += ["--pass1-qwen-params", json.dumps(qwen1_params)]
         else:
@@ -2367,7 +2372,10 @@ class WhisperJAVAPI:
         # Pass 2 configuration
         pass2 = config.get('pass2', {})
         if pass2.get('enabled', False):
-            args += ["--pass2-pipeline", pass2.get('pipeline', 'qwen')]
+            p2_pipeline = pass2.get('pipeline', 'qwen')
+            if p2_pipeline == 'anime-whisper':
+                p2_pipeline = 'qwen'
+            args += ["--pass2-pipeline", p2_pipeline]
 
             if pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
@@ -2382,6 +2390,8 @@ class WhisperJAVAPI:
                 qwen2_params = dict(pass2.get('params') or {}) if pass2.get('customized') else {}
                 if pass2.get('framer'):
                     qwen2_params['framer'] = pass2['framer']
+                if pass2.get('isAnimeWhisper'):
+                    qwen2_params['generator_backend'] = 'anime-whisper'
                 if qwen2_params:
                     args += ["--pass2-qwen-params", json.dumps(qwen2_params)]
             else:
@@ -2989,6 +2999,7 @@ class WhisperJAVAPI:
         "params":            "params",       # nested dict — passed as-is
         "is_transformers":   "isTransformers",
         "is_qwen":           "isQwen",
+        "is_anime_whisper":  "isAnimeWhisper",
         "framer":            "framer",
         "dsp_effects":       "dspEffects",
         "created_at":        "createdAt",

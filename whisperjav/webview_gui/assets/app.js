@@ -1210,7 +1210,8 @@ const EnsembleManager = {
             params: null,  // null = use defaults, object = full custom config
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,  // Track if using Transformers pipeline
-            isQwen: false,  // Track if using Qwen3-ASR pipeline
+            isQwen: false,  // Track if using Qwen3-ASR or Anime-Whisper pipeline
+            isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
@@ -1227,10 +1228,11 @@ const EnsembleManager = {
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,
             isQwen: true,  // Default pipeline is Qwen3-ASR
+            isAnimeWhisper: false,
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
-        mergeStrategy: 'smart_merge',
+        mergeStrategy: 'pass1_primary',
         currentCustomize: null  // 'pass1' or 'pass2'
     },
 
@@ -1251,6 +1253,9 @@ const EnsembleManager = {
     qwenModels: [
         { value: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR-1.7B    8GB' },
         { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' }
+    ],
+    animeWhisperModels: [
+        { value: 'litagin/anime-whisper', label: 'anime-whisper    ~2GB' }
     ],
 
     async init() {
@@ -1277,17 +1282,23 @@ const EnsembleManager = {
 
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
 
-        // Update isTransformers and isQwen flags based on synced pipeline values
+        // Update isTransformers, isQwen, and isAnimeWhisper flags based on synced pipeline values
         this.state.pass1.isTransformers = this.state.pass1.pipeline === 'transformers';
-        this.state.pass1.isQwen = this.state.pass1.pipeline === 'qwen';
+        this.state.pass1.isQwen = (this.state.pass1.pipeline === 'qwen' || this.state.pass1.pipeline === 'anime-whisper');
+        this.state.pass1.isAnimeWhisper = this.state.pass1.pipeline === 'anime-whisper';
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
-        this.state.pass2.isQwen = this.state.pass2.pipeline === 'qwen';
+        this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper');
+        this.state.pass2.isAnimeWhisper = this.state.pass2.pipeline === 'anime-whisper';
 
         // Swap model options for non-legacy passes
-        if (this.state.pass1.isQwen) {
+        if (this.state.pass1.isAnimeWhisper) {
+            this.swapModelOptions('pass1', 'anime-whisper');
+        } else if (this.state.pass1.isQwen) {
             this.swapModelOptions('pass1', 'qwen');
         }
-        if (this.state.pass2.isQwen) {
+        if (this.state.pass2.isAnimeWhisper) {
+            this.swapModelOptions('pass2', 'anime-whisper');
+        } else if (this.state.pass2.isQwen) {
             this.swapModelOptions('pass2', 'qwen');
         }
 
@@ -1408,14 +1419,17 @@ const EnsembleManager = {
     handlePipelineChange(passKey, newValue, selectElement) {
         const passState = this.state[passKey];
         const isTransformers = newValue === 'transformers';
-        const isQwen = newValue === 'qwen';
+        const isQwen = (newValue === 'qwen' || newValue === 'anime-whisper');
+        const isAnimeWhisper = newValue === 'anime-whisper';
         const wasTransformers = passState.isTransformers;
         const wasQwen = passState.isQwen;
+        const wasAnimeWhisper = passState.isAnimeWhisper;
 
         // Determine pipeline category for model swapping
-        const getPipelineType = (isT, isQ) => isT ? 'transformers' : (isQ ? 'qwen' : 'legacy');
-        const oldType = getPipelineType(wasTransformers, wasQwen);
-        const newType = getPipelineType(isTransformers, isQwen);
+        const getPipelineType = (isT, isQ, isAW) =>
+            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isQ ? 'qwen' : 'legacy'));
+        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper);
+        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper);
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -1426,6 +1440,7 @@ const EnsembleManager = {
                 passState.presetName = null;
                 passState.isTransformers = isTransformers;
                 passState.isQwen = isQwen;
+                passState.isAnimeWhisper = isAnimeWhisper;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
                 if (oldType !== newType) {
@@ -1441,6 +1456,7 @@ const EnsembleManager = {
             passState.presetName = null;
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
+            passState.isAnimeWhisper = isAnimeWhisper;
             this.updateRowGreyingState(passKey);
             if (oldType !== newType) {
                 this.swapModelOptions(passKey, newType);
@@ -1456,7 +1472,7 @@ const EnsembleManager = {
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
-        if (pipelineType === 'qwen') {
+        if (pipelineType === 'qwen' || pipelineType === 'anime-whisper') {
             sceneSelect.value = 'semantic';
             segmenterSelect.value = 'silero-v6.2';
             sensitivitySelect.value = 'balanced';
@@ -1484,6 +1500,9 @@ const EnsembleManager = {
         switch (pipelineType) {
             case 'transformers':
                 models = this.transformersModels;
+                break;
+            case 'anime-whisper':
+                models = this.animeWhisperModels;
                 break;
             case 'qwen':
                 models = this.qwenModels;
@@ -1541,7 +1560,7 @@ const EnsembleManager = {
             sensitivitySelect.style.display = '';
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = passState.isQwen
-                ? 'Segmenter sensitivity preset for Qwen3-ASR'
+                ? `Segmenter sensitivity preset for ${passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR'}`
                 : '';
         }
 
@@ -1558,7 +1577,7 @@ const EnsembleManager = {
             // Re-enable segmenter (unless pass2 is disabled)
             // Note: Qwen uses segmenter as post-ASR VAD filter
             segmenterSelect.disabled = isPass2Disabled;
-            segmenterSelect.title = passState.isQwen ? 'Post-ASR VAD filter for Qwen3-ASR' : '';
+            segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR'}` : '';
         }
 
         // Parameter guide button: visible only for Qwen pipelines
@@ -1788,6 +1807,9 @@ const EnsembleManager = {
 
     async openCustomize(passKey) {
         // passKey is 'pass1' or 'pass2'
+        const btn = document.getElementById(`customize-${passKey}`);
+        if (btn) btn.classList.add('loading');
+        try {
         const passState = this.state[passKey];
 
         // Route to pipeline-specific handler if applicable
@@ -1945,6 +1967,9 @@ const EnsembleManager = {
 
         } catch (error) {
             ErrorHandler.show('Error', 'Failed to open customize dialog: ' + error);
+        }
+        } finally {
+            if (btn) btn.classList.remove('loading');
         }
     },
 
@@ -2916,8 +2941,9 @@ const EnsembleManager = {
             // Set modal title
             const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
             const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
+            const pipelineName = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
             document.getElementById('customizeModalTitle').textContent =
-                `${passLabel} Settings (Qwen3-ASR)${customStatus}`;
+                `${passLabel} Settings (${pipelineName})${customStatus}`;
 
             // Store schema for reset functionality
             this._qwenSchema = result.schema;
@@ -2926,6 +2952,14 @@ const EnsembleManager = {
             const currentValues = passState.customized && passState.params
                 ? { ...passState.params }
                 : { ...QwenManager.defaults };
+
+            // Override defaults for anime-whisper when not customized
+            if (passState.isAnimeWhisper && !passState.customized) {
+                currentValues.model_id = 'litagin/anime-whisper';
+                currentValues.repetition_penalty = 1.0;
+                currentValues.max_new_tokens = 448;
+                currentValues.context = '';
+            }
 
             // Get scene detector from main dropdown
             currentValues.scene = passState.sceneDetector || 'semantic';
@@ -2940,7 +2974,8 @@ const EnsembleManager = {
             document.getElementById('customizeModal').classList.add('active');
 
         } catch (error) {
-            ErrorHandler.show('Error', 'Failed to open Qwen3-ASR customize dialog: ' + error);
+            const errPipeline = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
+            ErrorHandler.show('Error', `Failed to open ${errPipeline} customize dialog: ` + error);
         }
     },
 
@@ -2985,12 +3020,19 @@ const EnsembleManager = {
     generateQwenModelTab(tabId, schemaSection, currentValues) {
         const container = document.getElementById(tabId);
 
-        // Model ID dropdown
+        // Model ID dropdown — override options for anime-whisper
         const modelDef = schemaSection.model_id;
+        const passState = this.state[this.state.currentCustomize];
+        let modelOptions = modelDef.options;
+        let modelDefault = modelDef.default;
+        if (passState && passState.isAnimeWhisper) {
+            modelOptions = [{ value: 'litagin/anime-whisper', label: 'anime-whisper (~2GB VRAM)' }];
+            modelDefault = 'litagin/anime-whisper';
+        }
         container.appendChild(this.createTransformersDropdown(
             'model_id', modelDef.label,
-            modelDef.options,
-            currentValues.model_id || modelDef.default,
+            modelOptions,
+            currentValues.model_id || modelDefault,
             modelDef.description
         ));
 
@@ -3019,6 +3061,11 @@ const EnsembleManager = {
         textarea.rows = 3;
         textarea.placeholder = contextDef.placeholder || '';
         textarea.value = currentValues.context || contextDef.default || '';
+        if (passState && passState.isAnimeWhisper) {
+            textarea.disabled = true;
+            textarea.placeholder = 'Not supported by Anime-Whisper (causes hallucinations)';
+            textarea.value = '';
+        }
         contextControl.appendChild(textarea);
 
         const contextDesc = document.createElement('p');
@@ -4284,7 +4331,14 @@ const EnsembleManager = {
 
     resetQwenToDefaults(passKey) {
         // Reset Qwen controls using QwenManager defaults
-        const defaults = QwenManager.defaults || {};
+        const passState = this.state[passKey];
+        const defaults = { ...(QwenManager.defaults || {}) };
+        if (passState.isAnimeWhisper) {
+            defaults.model_id = 'litagin/anime-whisper';
+            defaults.repetition_penalty = 1.0;
+            defaults.max_new_tokens = 448;
+            defaults.context = '';
+        }
 
         // Reset all controls in all tabs (includes context tab)
         const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
@@ -4326,7 +4380,8 @@ const EnsembleManager = {
         this.state[passKey].presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
-        ConsoleManager.log(`Reset ${passLabel} Qwen3-ASR parameters to defaults`, 'info');
+        const pipelineName = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
+        ConsoleManager.log(`Reset ${passLabel} ${pipelineName} parameters to defaults`, 'info');
 
         this.updateBadges();
     },
@@ -4371,9 +4426,12 @@ const EnsembleManager = {
                 for (const p of result.presets) {
                     const opt = document.createElement('option');
                     opt.value = p.name;
-                    const pipelineCap = p.pipeline
-                        ? p.pipeline.charAt(0).toUpperCase() + p.pipeline.slice(1)
-                        : null;
+                    let pipelineCap = null;
+                    if (p.pipeline === 'anime-whisper') {
+                        pipelineCap = 'Anime-Whisper';
+                    } else if (p.pipeline) {
+                        pipelineCap = p.pipeline.charAt(0).toUpperCase() + p.pipeline.slice(1);
+                    }
                     const label = pipelineCap ? `${p.name}  (${pipelineCap})` : p.name;
                     opt.textContent = label;
                     selector.appendChild(opt);
@@ -4431,6 +4489,7 @@ const EnsembleManager = {
             params: params,
             isTransformers: passState.isTransformers,
             isQwen: passState.isQwen,
+            isAnimeWhisper: passState.isAnimeWhisper || false,
             framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
             dspEffects: passState.dspEffects || null,
         };
@@ -4443,8 +4502,9 @@ const EnsembleManager = {
         const passKey = this.state.currentCustomize;
         const passState = passKey ? this.state[passKey] : null;
         const pipelineLabel = passState
-            ? (passState.isQwen ? 'Qwen' : (passState.isTransformers ? 'Transformers'
-                : passState.pipeline.charAt(0).toUpperCase() + passState.pipeline.slice(1)))
+            ? (passState.isAnimeWhisper ? 'Anime-Whisper'
+                : (passState.isQwen ? 'Qwen' : (passState.isTransformers ? 'Transformers'
+                    : passState.pipeline.charAt(0).toUpperCase() + passState.pipeline.slice(1))))
             : 'Unknown';
         const name = prompt(`Save preset for ${pipelineLabel} pipeline.\nPreset name:`);
         if (!name || !name.trim()) return;
@@ -4496,11 +4556,13 @@ const EnsembleManager = {
             const prefix = passKey;
 
             // Detect pipeline type change
-            const getPipelineType = (isT, isQ) => isT ? 'transformers' : (isQ ? 'qwen' : 'legacy');
-            const oldType = getPipelineType(passState.isTransformers, passState.isQwen);
+            const getPipelineType = (isT, isQ, isAW) =>
+                isT ? 'transformers' : (isAW ? 'anime-whisper' : (isQ ? 'qwen' : 'legacy'));
+            const oldType = getPipelineType(passState.isTransformers, passState.isQwen, passState.isAnimeWhisper);
             const presetIsTransformers = !!preset.isTransformers;
             const presetIsQwen = !!preset.isQwen;
-            const newType = getPipelineType(presetIsTransformers, presetIsQwen);
+            const presetIsAnimeWhisper = !!preset.isAnimeWhisper;
+            const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper);
 
             // Apply ALL preset fields to state
             if (preset.pipeline) passState.pipeline = preset.pipeline;
@@ -4513,6 +4575,7 @@ const EnsembleManager = {
             if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
             passState.isTransformers = presetIsTransformers;
             passState.isQwen = presetIsQwen;
+            passState.isAnimeWhisper = presetIsAnimeWhisper;
             passState.customized = true;
             passState.params = preset.params || null;
             passState.presetName = name;
@@ -4537,7 +4600,6 @@ const EnsembleManager = {
                 // Close and reopen modal so correct pipeline-specific controls appear
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
-                SettingsPersistence.scheduleSave();
                 this.closeModal();
                 ConsoleManager.log(`Preset loaded: ${name} (switching to ${newType} pipeline)`, 'success');
                 // openCustomize reads passState.customized && passState.params to populate
@@ -4575,7 +4637,6 @@ const EnsembleManager = {
 
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
-                SettingsPersistence.scheduleSave();
                 ConsoleManager.log(`Preset loaded: ${name}`, 'success');
             }
         } catch (e) {
@@ -4633,6 +4694,7 @@ const EnsembleManager = {
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
                 isTransformers: this.state.pass1.isTransformers,
                 isQwen: this.state.pass1.isQwen,
+                isAnimeWhisper: this.state.pass1.isAnimeWhisper,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null
             },
             pass2: {
@@ -4648,6 +4710,7 @@ const EnsembleManager = {
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
                 isTransformers: this.state.pass2.isTransformers,
                 isQwen: this.state.pass2.isQwen,
+                isAnimeWhisper: this.state.pass2.isAnimeWhisper,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null
             },
             merge_strategy: this.state.mergeStrategy,
@@ -6425,250 +6488,16 @@ const TranslationSettingsModal = {
 // GUI Settings Persistence
 // ============================================================
 const SettingsPersistence = {
-    _saveTimer: null,
-    _DEBOUNCE_MS: 800,
-    _isLoading: false,   // Guard: suppress saves during loadFromBackend
-
-    /** Collect current form state into a flat camelCase dict. */
-    collectAll() {
-        const val = (id, fallback = '') => {
-            const el = document.getElementById(id);
-            return el ? el.value : fallback;
-        };
-        const checked = (id) => {
-            const el = document.getElementById(id);
-            return el ? el.checked : false;
-        };
-
-        return {
-            // Tab 1
-            mode: val('mode', 'faster'),
-            sourceLanguage: val('source-language', 'japanese'),
-            subsLanguage: val('language', 'native'),
-            sensitivity: val('sensitivity', 'aggressive'),
-            modelOverrideEnabled: checked('modelOverrideEnabled'),
-            modelOverride: val('modelSelection', ''),
-            outputToSource: checked('outputToSource'),
-            outputDir: val('outputDir', ''),
-            debugLogging: checked('debugLogging'),
-            keepTemp: checked('keepTemp'),
-            tempDir: val('tempDir', ''),
-            acceptCpuMode: checked('acceptCpuMode'),
-            asyncProcessing: checked('asyncProcessing'),
-            // Tab 3 — Ensemble
-            pass1Pipeline: val('pass1-pipeline', 'balanced'),
-            pass1Sensitivity: val('pass1-sensitivity', 'balanced'),
-            pass1SceneDetector: val('pass1-scene', 'auditok'),
-            pass1SpeechEnhancer: val('pass1-enhancer', 'none'),
-            pass1SpeechSegmenter: val('pass1-segmenter', 'silero'),
-            pass1Model: val('pass1-model', ''),
-            pass2Enabled: checked('pass2-enabled'),
-            pass2Pipeline: val('pass2-pipeline', 'fast'),
-            pass2Sensitivity: val('pass2-sensitivity', 'balanced'),
-            pass2SceneDetector: val('pass2-scene', 'auditok'),
-            pass2SpeechEnhancer: val('pass2-enhancer', 'none'),
-            pass2SpeechSegmenter: val('pass2-segmenter', 'silero'),
-            pass2Model: val('pass2-model', ''),
-            mergeStrategy: val('merge-strategy', 'pass1_primary'),
-            pass1Preset: EnsembleManager.state.pass1.presetName || '',
-            pass2Preset: EnsembleManager.state.pass2.presetName || '',
-        };
-    },
-
-    /** Apply a settings dict (camelCase) to the DOM form elements. */
-    applyToForm(s) {
-        // Helpers dispatch 'change' so EnsembleManager state syncs
-        const setVal = (id, v) => {
-            const el = document.getElementById(id);
-            if (el && v !== undefined && v !== null) {
-                el.value = v;
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        };
-        const setChecked = (id, v) => {
-            const el = document.getElementById(id);
-            if (el && v !== undefined && v !== null) {
-                el.checked = !!v;
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        };
-
-        // Tab 1
-        setVal('mode', s.mode);
-        setVal('source-language', s.sourceLanguage);
-        setVal('language', s.subsLanguage);
-        setVal('sensitivity', s.sensitivity);
-        setChecked('modelOverrideEnabled', s.modelOverrideEnabled);
-        setVal('modelSelection', s.modelOverride);
-        setChecked('outputToSource', s.outputToSource);
-        if (s.outputDir) setVal('outputDir', s.outputDir);
-        setChecked('debugLogging', s.debugLogging);
-        setChecked('keepTemp', s.keepTemp);
-        if (s.tempDir) setVal('tempDir', s.tempDir);
-        setChecked('acceptCpuMode', s.acceptCpuMode);
-        setChecked('asyncProcessing', s.asyncProcessing);
-
-        // Tab 3 — Ensemble
-        setVal('pass1-pipeline', s.pass1Pipeline);
-        setVal('pass1-sensitivity', s.pass1Sensitivity);
-        setVal('pass1-scene', s.pass1SceneDetector);
-        setVal('pass1-enhancer', s.pass1SpeechEnhancer);
-        setVal('pass1-segmenter', s.pass1SpeechSegmenter);
-        setVal('pass1-model', s.pass1Model);
-        setChecked('pass2-enabled', s.pass2Enabled);
-        setVal('pass2-pipeline', s.pass2Pipeline);
-        setVal('pass2-sensitivity', s.pass2Sensitivity);
-        setVal('pass2-scene', s.pass2SceneDetector);
-        setVal('pass2-enhancer', s.pass2SpeechEnhancer);
-        setVal('pass2-segmenter', s.pass2SpeechSegmenter);
-        setVal('pass2-model', s.pass2Model);
-        setVal('merge-strategy', s.mergeStrategy);
-
-        // Store preset names for deferred restoration (dropdowns may not be ready yet)
-        this._pendingPresets = {
-            pass1: s.pass1Preset || '',
-            pass2: s.pass2Preset || '',
-        };
-
-        // Trigger dependent UI updates
-        ModeManager.handleModeChange(s.mode || 'faster');
-    },
-
-    /** Load from backend and apply to form. Called on pywebviewready. */
-    async loadFromBackend() {
-        if (!window.pywebview || !pywebview.api) return;
-        try {
-            this._isLoading = true;          // Suppress saves during restore
-            const result = await pywebview.api.get_gui_settings();
-            if (result.success && result.settings) {
-                this.applyToForm(result.settings);
-                console.log('GUI settings restored from backend');
-            }
-        } catch (e) {
-            console.warn('Failed to load GUI settings:', e);
-        } finally {
-            this._isLoading = false;         // Re-enable saves
-            if (this._saveTimer) {           // Discard any save queued during load
-                clearTimeout(this._saveTimer);
-                this._saveTimer = null;
-            }
-        }
-    },
-
-    /** Debounced save — call after any form change. */
-    scheduleSave() {
-        if (this._isLoading) return;         // Suppress during loadFromBackend
-        if (this._saveTimer) clearTimeout(this._saveTimer);
-        this._saveTimer = setTimeout(() => this._doSave(), this._DEBOUNCE_MS);
-    },
-
-    async _doSave() {
-        if (!window.pywebview || !pywebview.api) return;
-        try {
-            const data = this.collectAll();
-            await pywebview.api.save_gui_settings(data);
-        } catch (e) {
-            console.warn('Failed to save GUI settings:', e);
-        }
-    },
-
-    /** Restore preset associations after loadFromBackend.
-     *  Only the preset NAME is stored in gui_settings.json — the actual
-     *  preset data is re-loaded from disk so edits are picked up. */
-    async restorePresets() {
-        if (!window.pywebview || !pywebview.api) return;
-        const pending = this._pendingPresets;
-        if (!pending) return;
-        this._pendingPresets = null;
-
-        for (const passKey of ['pass1', 'pass2']) {
-            const presetName = pending[passKey];
-            if (!presetName) continue;
-
-            try {
-                const result = await pywebview.api.load_preset(presetName);
-                if (!result.success || !result.preset) {
-                    console.warn(`Preset "${presetName}" not found for ${passKey}, ignoring`);
-                    continue;
-                }
-
-                const preset = result.preset;
-                const passState = EnsembleManager.state[passKey];
-                const prefix = passKey;
-
-                // Detect pipeline type for model swap
-                const getPipelineType = (isT, isQ) => isT ? 'transformers' : (isQ ? 'qwen' : 'legacy');
-                const oldType = getPipelineType(passState.isTransformers, passState.isQwen);
-                const presetIsTransformers = !!preset.isTransformers;
-                const presetIsQwen = !!preset.isQwen;
-                const newType = getPipelineType(presetIsTransformers, presetIsQwen);
-
-                // Apply all preset fields to state
-                if (preset.pipeline) passState.pipeline = preset.pipeline;
-                if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
-                if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
-                if (preset.speechEnhancer !== undefined) passState.speechEnhancer = preset.speechEnhancer;
-                if (preset.speechSegmenter) passState.speechSegmenter = preset.speechSegmenter;
-                if (preset.model) passState.model = preset.model;
-                if (preset.framer) passState.framer = preset.framer;
-                if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
-                passState.isTransformers = presetIsTransformers;
-                passState.isQwen = presetIsQwen;
-                passState.customized = true;
-                passState.params = preset.params || null;
-                passState.presetName = presetName;
-
-                // Update dropdowns silently (no dispatchEvent — avoid confirm dialogs)
-                const setSilent = (id, val) => {
-                    const el = document.getElementById(id);
-                    if (el && val !== undefined && val !== null) el.value = val;
-                };
-                setSilent(`${prefix}-pipeline`, preset.pipeline);
-                setSilent(`${prefix}-sensitivity`, preset.sensitivity);
-                setSilent(`${prefix}-scene`, preset.sceneDetector);
-                setSilent(`${prefix}-enhancer`, preset.speechEnhancer);
-                setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
-
-                if (oldType !== newType) {
-                    EnsembleManager.swapModelOptions(passKey, newType);
-                    EnsembleManager.applyPipelinePresets(passKey, newType);
-                }
-                setSilent(`${prefix}-model`, preset.model);
-
-                EnsembleManager.updateRowGreyingState(passKey);
-                console.log(`Preset "${presetName}" restored for ${passKey}`);
-            } catch (e) {
-                console.warn(`Failed to restore preset "${presetName}" for ${passKey}:`, e);
-            }
-        }
-
-        EnsembleManager.updateBadges();
-    },
-
-    /** Attach change listeners to all tracked form elements. */
-    init() {
-        const ids = [
-            'mode', 'source-language', 'language', 'sensitivity',
-            'modelOverrideEnabled', 'modelSelection',
-            'outputToSource', 'outputDir', 'debugLogging', 'keepTemp',
-            'tempDir', 'acceptCpuMode', 'asyncProcessing',
-            'pass1-pipeline', 'pass1-sensitivity', 'pass1-scene',
-            'pass1-enhancer', 'pass1-segmenter', 'pass1-model',
-            'pass2-enabled', 'pass2-pipeline', 'pass2-sensitivity',
-            'pass2-scene', 'pass2-enhancer', 'pass2-segmenter',
-            'pass2-model', 'merge-strategy',
-        ];
-        for (const id of ids) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('change', () => this.scheduleSave());
-                // Also capture input events for text fields
-                if (el.tagName === 'INPUT' && el.type === 'text') {
-                    el.addEventListener('input', () => this.scheduleSave());
-                }
-            }
-        }
-    },
+    // Disabled: Tab 1 + Tab 3 always start from HTML defaults.
+    // Backend module (gui_settings.py) retained for future "exit prompt" feature.
+    // Preset CRUD (EnsembleManager) is unaffected.
+    init() {},
+    collectAll() { return {}; },
+    applyToForm() {},
+    async loadFromBackend() {},
+    scheduleSave() {},
+    async _doSave() {},
+    async restorePresets() {},
 };
 
 // ============================================================
@@ -6697,7 +6526,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     TranslatorManager.init();
     TranslateIntegrationManager.init();
     TranslationSettingsModal.init();
-    SettingsPersistence.init();
 
     // Initial validation
     FormManager.validateForm();
@@ -6707,25 +6535,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     ConsoleManager.log('Press F1 for keyboard shortcuts', 'info');
 });
 
-// PyWebView ready event — async IIFE so we can await sequential steps.
-// Order matters: dropdown options must be populated before settings
-// restoration sets their values (S17), and default output dir must be
-// resolved before settings might override it (S22).
+// PyWebView ready event — populate dynamic options and load Tab 4 settings.
 window.addEventListener('pywebviewready', async () => {
     console.log('PyWebView API ready!');
     ConsoleManager.log('PyWebView bridge connected', 'success');
 
-    // Phase 1: Resolve computed defaults (output dir)
     await AppState.loadDefaultOutputDir();
-
-    // Phase 2: Populate dynamic dropdown options (segmenters, enhancers)
     await EnsembleManager.updateSegmenterAvailability();
     await EnsembleManager.updateEnhancerAvailability();
 
-    // Phase 3: Restore saved settings (must run AFTER phases 1-2)
+    // Tab 4 translation settings (unaffected by persistence removal)
     await TranslationSettingsModal.loadSettingsFromBackend();
-    await SettingsPersistence.loadFromBackend();
-
-    // Phase 4: Restore preset associations (after loadFromBackend sets dropdowns)
-    await SettingsPersistence.restorePresets();
 });

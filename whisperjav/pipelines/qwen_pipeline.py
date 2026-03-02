@@ -154,6 +154,11 @@ class QwenPipeline(BasePipeline):
         repetition_penalty: float = 1.1,              # Pipeline default: conservative penalty for JAV
         max_tokens_per_audio_second: float = 20.0,    # Pipeline default: dynamic scaling enabled
 
+        # Generator backend selection (v1.8.6+)
+        # "qwen3" (default) uses Qwen3-ASR text-only mode.
+        # "anime-whisper" uses litagin/anime-whisper (HF Whisper fine-tune).
+        generator_backend: str = "qwen3",
+
         # Output
         subs_language: str = "native",
 
@@ -258,6 +263,9 @@ class QwenPipeline(BasePipeline):
 
         # Assembly text cleaner toggle (for --qwen-assembly-cleaner on|off)
         self.assembly_cleaner_enabled = assembly_cleaner
+
+        # Generator backend selection (v1.8.6+)
+        self.generator_backend = generator_backend
 
         # Qwen ASR config (stored as dict for deferred construction)
         self._asr_config = {
@@ -381,22 +389,35 @@ class QwenPipeline(BasePipeline):
             )
         framer = TemporalFramerFactory.create(self.framer_backend, **framer_kwargs)
 
-        # TextGenerator: Qwen3 text-only mode
-        generator = TextGeneratorFactory.create(
-            "qwen3",
-            model_id=cfg["model_id"],
-            device=cfg["device"],
-            dtype=cfg["dtype"],
-            batch_size=cfg["batch_size"],
-            max_new_tokens=cfg["max_new_tokens"],
-            language=cfg["language"],
-            repetition_penalty=cfg["repetition_penalty"],
-            max_tokens_per_audio_second=cfg["max_tokens_per_audio_second"],
-            attn_implementation=cfg["attn_implementation"],
-        )
+        # TextGenerator: selected by generator_backend (v1.8.6+)
+        if self.generator_backend == "anime-whisper":
+            generator = TextGeneratorFactory.create(
+                "anime-whisper",
+                model_id=cfg.get("model_id", "litagin/anime-whisper"),
+                device=cfg["device"],
+                dtype=cfg["dtype"],
+                no_repeat_ngram_size=cfg.get("no_repeat_ngram_size", 5),
+                max_new_tokens=cfg.get("max_new_tokens", 448),
+            )
+        else:
+            # Default: Qwen3 text-only mode (existing behavior)
+            generator = TextGeneratorFactory.create(
+                "qwen3",
+                model_id=cfg["model_id"],
+                device=cfg["device"],
+                dtype=cfg["dtype"],
+                batch_size=cfg["batch_size"],
+                max_new_tokens=cfg["max_new_tokens"],
+                language=cfg["language"],
+                repetition_penalty=cfg["repetition_penalty"],
+                max_tokens_per_audio_second=cfg["max_tokens_per_audio_second"],
+                attn_implementation=cfg["attn_implementation"],
+            )
 
-        # TextCleaner: Qwen3 assembly cleaner (or passthrough if disabled)
-        if self.assembly_cleaner_enabled:
+        # TextCleaner: auto-selected based on generator backend
+        if self.generator_backend == "anime-whisper":
+            cleaner = TextCleanerFactory.create("anime-whisper")
+        elif self.assembly_cleaner_enabled:
             cleaner_config = AssemblyCleanerConfig(enabled=True)
             cleaner = TextCleanerFactory.create(
                 "qwen3",

@@ -441,6 +441,10 @@ def parse_arguments():
 
     # ── Qwen3-ASR: Model ────────────────────────────────────────────────
     qwen_model_group = parser.add_argument_group("Qwen3-ASR: Model")
+    qwen_model_group.add_argument("--qwen-generator", type=str, default="qwen3",
+                           choices=["qwen3", "anime-whisper"],
+                           help="Text generator backend (default: qwen3). "
+                                "anime-whisper uses litagin/anime-whisper for anime/VN dialogue")
     qwen_model_group.add_argument("--qwen-model-id", type=str,
                            default="Qwen/Qwen3-ASR-1.7B",
                            help="Qwen3-ASR model ID (default: Qwen/Qwen3-ASR-1.7B)")
@@ -1042,6 +1046,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "segmenter_config": _resolved_segmenter_config or None,
             # Adaptive Step-Down
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
+            # Generator backend selection (v1.8.6+)
+            "generator_backend": getattr(args, 'qwen_generator', 'qwen3'),
             # Qwen ASR
             "model_id": getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
             "device": getattr(args, 'qwen_device', 'auto'),
@@ -1089,6 +1095,15 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _sd_fb = getattr(args, 'qwen_stepdown_fallback_group', None)
         if _sd_fb is not None:
             qwen_kwargs["stepdown_fallback_group"] = _sd_fb
+        # When anime-whisper generator is selected, override ASR model defaults
+        # unless the user explicitly set them via CLI flags
+        _gen_backend = qwen_kwargs.get("generator_backend", "qwen3")
+        if _gen_backend == "anime-whisper":
+            if not any(a.startswith('--qwen-model-id') for a in sys.argv):
+                qwen_kwargs["model_id"] = "litagin/anime-whisper"
+            if not any(a.startswith('--qwen-max-tokens') for a in sys.argv):
+                qwen_kwargs["max_new_tokens"] = 448
+
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode
     else:  # fidelity

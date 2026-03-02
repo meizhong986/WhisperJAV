@@ -399,6 +399,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
     "qwen_stepdown": True,
+    "qwen_generator_backend": "qwen3",
     "qwen_regroup_mode": "off",
     # NOTE: qwen_max_group_duration, qwen_chunk_threshold,
     # qwen_stepdown_initial_group, and qwen_stepdown_fallback_group are
@@ -447,6 +448,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "stepdown_fallback_group": "qwen_stepdown_fallback_group",
         "regroup_mode": "qwen_regroup_mode",
         "chunk_threshold": "qwen_chunk_threshold",
+        "generator_backend": "qwen_generator_backend",
         "vad_threshold": "qwen_vad_threshold",
         "vad_padding": "qwen_vad_padding",
     }
@@ -1027,9 +1029,19 @@ def _build_pipeline(
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
             "stepdown_enabled": qwen_defaults.get("qwen_stepdown", True),
+            "generator_backend": qwen_defaults.get("qwen_generator_backend", "qwen3"),
             "regroup_mode": qwen_defaults.get("qwen_regroup_mode", "standard"),
             "segmenter_config": segmenter_config if segmenter_config else None,
         }
+        # When anime-whisper generator is selected, override model defaults
+        # unless ensemble config explicitly set them
+        _gen_backend = qwen_pipeline_params.get("generator_backend", "qwen3")
+        if _gen_backend == "anime-whisper":
+            _user_qwen = pass_config.get("qwen_params") or {}
+            if "model_id" not in _user_qwen and not pass_config.get("model"):
+                qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
+            if "max_new_tokens" not in _user_qwen:
+                qwen_pipeline_params["max_new_tokens"] = 448
         # Pipeline-owned defaults: only forward when ensemble config explicitly overrides
         if "qwen_scene_min_duration" in qwen_defaults:
             qwen_pipeline_params["scene_min_duration"] = qwen_defaults["qwen_scene_min_duration"]
