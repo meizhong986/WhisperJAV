@@ -1208,6 +1208,7 @@ const EnsembleManager = {
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
+            presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,  // Track if using Transformers pipeline
             isQwen: false,  // Track if using Qwen3-ASR pipeline
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
@@ -1223,6 +1224,7 @@ const EnsembleManager = {
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
+            presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,
             isQwen: true,  // Default pipeline is Qwen3-ASR
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
@@ -1421,6 +1423,7 @@ const EnsembleManager = {
                 passState.pipeline = newValue;
                 passState.customized = false;
                 passState.params = null;
+                passState.presetName = null;
                 passState.isTransformers = isTransformers;
                 passState.isQwen = isQwen;
                 this.updateBadges();
@@ -1435,6 +1438,7 @@ const EnsembleManager = {
             }
         } else {
             passState.pipeline = newValue;
+            passState.presetName = null;
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
             this.updateRowGreyingState(passKey);
@@ -1442,6 +1446,7 @@ const EnsembleManager = {
                 this.swapModelOptions(passKey, newType);
                 this.applyPipelinePresets(passKey, newType);
             }
+            this.updateBadges();
         }
     },
 
@@ -1570,6 +1575,7 @@ const EnsembleManager = {
                 passState.sensitivity = newValue;
                 passState.customized = false;
                 passState.params = null;
+                passState.presetName = null;
                 this.updateBadges();
             } else {
                 // Revert selection
@@ -1661,39 +1667,36 @@ const EnsembleManager = {
     },
 
     updateBadges() {
-        // Update Pass 1 badge
-        const pass1Badge = document.getElementById('pass1-badge');
-        if (pass1Badge) {
-            if (this.state.pass1.customized) {
-                pass1Badge.textContent = 'Custom';
-                pass1Badge.className = 'pass-badge custom';
-            } else {
-                pass1Badge.textContent = 'Default';
-                pass1Badge.className = 'pass-badge default';
-            }
-        }
+        const updateBadge = (passKey) => {
+            const badge = document.getElementById(`${passKey}-badge`);
+            const btn = document.getElementById(`customize-${passKey}`);
+            const passState = this.state[passKey];
+            if (!badge) return;
 
-        // Update Pass 2 badge
-        const pass2Badge = document.getElementById('pass2-badge');
-        if (pass2Badge) {
-            if (this.state.pass2.customized) {
-                pass2Badge.textContent = 'Custom';
-                pass2Badge.className = 'pass-badge custom';
+            if (passState.presetName) {
+                // Preset loaded — show truncated name
+                const name = passState.presetName;
+                badge.textContent = name.length > 15 ? name.slice(0, 15) + '\u2026' : name;
+                badge.className = 'pass-badge preset';
+                badge.title = name;
+            } else if (passState.customized) {
+                badge.textContent = 'Custom';
+                badge.className = 'pass-badge custom';
+                badge.title = '';
             } else {
-                pass2Badge.textContent = 'Default';
-                pass2Badge.className = 'pass-badge default';
+                badge.textContent = 'Default';
+                badge.className = 'pass-badge default';
+                badge.title = '';
             }
-        }
 
-        // Update button text
-        const btn1 = document.getElementById('customize-pass1');
-        const btn2 = document.getElementById('customize-pass2');
-        if (btn1) {
-            btn1.textContent = this.state.pass1.customized ? 'Edit Parameters' : 'Customize Parameters';
-        }
-        if (btn2) {
-            btn2.textContent = this.state.pass2.customized ? 'Edit Parameters' : 'Customize Parameters';
-        }
+            if (btn) {
+                btn.textContent = (passState.presetName || passState.customized)
+                    ? 'Edit Parameters' : 'Customize Parameters';
+            }
+        };
+
+        updateBadge('pass1');
+        updateBadge('pass2');
     },
 
     async loadComponents() {
@@ -4204,6 +4207,7 @@ const EnsembleManager = {
         // Clear customized state - will use defaults
         passState.params = null;
         passState.customized = false;
+        passState.presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Reset ${passLabel} to defaults`, 'info');
@@ -4270,6 +4274,7 @@ const EnsembleManager = {
         // Clear customized state
         this.state[passKey].params = null;
         this.state[passKey].customized = false;
+        this.state[passKey].presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Reset ${passLabel} Transformers parameters to defaults`, 'info');
@@ -4318,6 +4323,7 @@ const EnsembleManager = {
         // Clear customized state
         this.state[passKey].params = null;
         this.state[passKey].customized = false;
+        this.state[passKey].presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Reset ${passLabel} Qwen3-ASR parameters to defaults`, 'info');
@@ -4365,7 +4371,10 @@ const EnsembleManager = {
                 for (const p of result.presets) {
                     const opt = document.createElement('option');
                     opt.value = p.name;
-                    const label = p.pipeline ? `${p.name}  (${p.pipeline})` : p.name;
+                    const pipelineCap = p.pipeline
+                        ? p.pipeline.charAt(0).toUpperCase() + p.pipeline.slice(1)
+                        : null;
+                    const label = pipelineCap ? `${p.name}  (${pipelineCap})` : p.name;
                     opt.textContent = label;
                     selector.appendChild(opt);
                 }
@@ -4431,7 +4440,13 @@ const EnsembleManager = {
     async saveCurrentAsPreset() {
         if (!window.pywebview || !pywebview.api) return;
 
-        const name = prompt('Preset name:');
+        const passKey = this.state.currentCustomize;
+        const passState = passKey ? this.state[passKey] : null;
+        const pipelineLabel = passState
+            ? (passState.isQwen ? 'Qwen' : (passState.isTransformers ? 'Transformers'
+                : passState.pipeline.charAt(0).toUpperCase() + passState.pipeline.slice(1)))
+            : 'Unknown';
+        const name = prompt(`Save preset for ${pipelineLabel} pipeline.\nPreset name:`);
         if (!name || !name.trim()) return;
 
         const data = this._collectPresetData();
@@ -4447,6 +4462,11 @@ const EnsembleManager = {
                 await this.refreshPresetList();
                 // Select the just-saved preset
                 document.getElementById('presetSelector').value = name.trim();
+                // Associate preset name with pass state
+                if (passKey && this.state[passKey]) {
+                    this.state[passKey].presetName = name.trim();
+                    this.updateBadges();
+                }
             } else {
                 ConsoleManager.log(`Failed to save preset: ${result.error || 'unknown error'}`, 'error');
             }
@@ -4455,7 +4475,9 @@ const EnsembleManager = {
         }
     },
 
-    /** Load a preset by name and apply its values to the modal controls. */
+    /** Load a preset by name and apply its values to the modal controls.
+     *  If the preset's pipeline type differs from the current pass, the modal
+     *  is closed and reopened so the correct pipeline-specific controls appear. */
     async loadPresetIntoModal(name) {
         if (!window.pywebview || !pywebview.api) return;
 
@@ -4471,8 +4493,16 @@ const EnsembleManager = {
             if (!passKey) return;
 
             const passState = this.state[passKey];
+            const prefix = passKey;
 
-            // Apply pass-level settings to state (these affect dropdowns in the main row)
+            // Detect pipeline type change
+            const getPipelineType = (isT, isQ) => isT ? 'transformers' : (isQ ? 'qwen' : 'legacy');
+            const oldType = getPipelineType(passState.isTransformers, passState.isQwen);
+            const presetIsTransformers = !!preset.isTransformers;
+            const presetIsQwen = !!preset.isQwen;
+            const newType = getPipelineType(presetIsTransformers, presetIsQwen);
+
+            // Apply ALL preset fields to state
             if (preset.pipeline) passState.pipeline = preset.pipeline;
             if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
             if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
@@ -4481,54 +4511,73 @@ const EnsembleManager = {
             if (preset.model) passState.model = preset.model;
             if (preset.framer) passState.framer = preset.framer;
             if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
-
-            // Update the pass row dropdowns to match
-            const prefix = passKey === 'pass1' ? 'pass1' : 'pass2';
-            const setDrop = (id, val) => {
-                const el = document.getElementById(id);
-                if (el && val) { el.value = val; el.dispatchEvent(new Event('change', { bubbles: true })); }
-            };
-            setDrop(`${prefix}-pipeline`, preset.pipeline);
-            setDrop(`${prefix}-sensitivity`, preset.sensitivity);
-            setDrop(`${prefix}-scene`, preset.sceneDetector);
-            setDrop(`${prefix}-enhancer`, preset.speechEnhancer);
-            setDrop(`${prefix}-segmenter`, preset.speechSegmenter);
-            setDrop(`${prefix}-model`, preset.model);
-
-            // Apply custom params to modal form controls
-            if (preset.params && typeof preset.params === 'object') {
-                for (const [paramName, value] of Object.entries(preset.params)) {
-                    // Find the param-control with matching data-param
-                    const control = document.querySelector(`.param-control[data-param="${paramName}"]`);
-                    if (!control) continue;
-
-                    const checkbox = control.querySelector('.param-checkbox');
-                    const slider = control.querySelector('.param-slider');
-                    const number = control.querySelector('.param-number');
-                    const text = control.querySelector('.param-text');
-                    const select = control.querySelector('.param-select');
-
-                    if (checkbox && typeof value === 'boolean') {
-                        checkbox.checked = value;
-                    } else if (number) {
-                        number.value = value;
-                        if (slider) slider.value = value;
-                    } else if (slider) {
-                        slider.value = value;
-                    } else if (text) {
-                        text.value = value;
-                    } else if (select) {
-                        select.value = value;
-                    }
-                }
-            }
-
-            // Mark as customized
+            passState.isTransformers = presetIsTransformers;
+            passState.isQwen = presetIsQwen;
             passState.customized = true;
             passState.params = preset.params || null;
-            this.updateBadges();
+            passState.presetName = name;
 
-            ConsoleManager.log(`Preset loaded: ${name}`, 'success');
+            // Update pass row dropdowns silently (no dispatchEvent to avoid confirm dialogs)
+            const setSilent = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val !== undefined && val !== null) el.value = val;
+            };
+            setSilent(`${prefix}-pipeline`, preset.pipeline);
+            setSilent(`${prefix}-sensitivity`, preset.sensitivity);
+            setSilent(`${prefix}-scene`, preset.sceneDetector);
+            setSilent(`${prefix}-enhancer`, preset.speechEnhancer);
+            setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
+
+            if (oldType !== newType) {
+                // Pipeline type changed — swap model options first, then set model
+                this.swapModelOptions(passKey, newType);
+                this.applyPipelinePresets(passKey, newType);
+                setSilent(`${prefix}-model`, preset.model);
+
+                // Close and reopen modal so correct pipeline-specific controls appear
+                this.updateBadges();
+                this.updateRowGreyingState(passKey);
+                SettingsPersistence.scheduleSave();
+                this.closeModal();
+                ConsoleManager.log(`Preset loaded: ${name} (switching to ${newType} pipeline)`, 'success');
+                // openCustomize reads passState.customized && passState.params to populate
+                await this.openCustomize(passKey);
+            } else {
+                // Same pipeline type — set model and apply params inline
+                setSilent(`${prefix}-model`, preset.model);
+
+                // Apply custom params to current modal form controls
+                if (preset.params && typeof preset.params === 'object') {
+                    for (const [paramName, value] of Object.entries(preset.params)) {
+                        const control = document.querySelector(`.param-control[data-param="${paramName}"]`);
+                        if (!control) continue;
+
+                        const checkbox = control.querySelector('.param-checkbox');
+                        const slider = control.querySelector('.param-slider');
+                        const number = control.querySelector('.param-number');
+                        const text = control.querySelector('.param-text');
+                        const select = control.querySelector('.param-select');
+
+                        if (checkbox && typeof value === 'boolean') {
+                            checkbox.checked = value;
+                        } else if (number) {
+                            number.value = value;
+                            if (slider) slider.value = value;
+                        } else if (slider) {
+                            slider.value = value;
+                        } else if (text) {
+                            text.value = value;
+                        } else if (select) {
+                            select.value = value;
+                        }
+                    }
+                }
+
+                this.updateBadges();
+                this.updateRowGreyingState(passKey);
+                SettingsPersistence.scheduleSave();
+                ConsoleManager.log(`Preset loaded: ${name}`, 'success');
+            }
         } catch (e) {
             ConsoleManager.log(`Failed to load preset: ${e.message}`, 'error');
         }
@@ -6421,6 +6470,8 @@ const SettingsPersistence = {
             pass2SpeechSegmenter: val('pass2-segmenter', 'silero'),
             pass2Model: val('pass2-model', ''),
             mergeStrategy: val('merge-strategy', 'pass1_primary'),
+            pass1Preset: EnsembleManager.state.pass1.presetName || '',
+            pass2Preset: EnsembleManager.state.pass2.presetName || '',
         };
     },
 
@@ -6473,6 +6524,12 @@ const SettingsPersistence = {
         setVal('pass2-model', s.pass2Model);
         setVal('merge-strategy', s.mergeStrategy);
 
+        // Store preset names for deferred restoration (dropdowns may not be ready yet)
+        this._pendingPresets = {
+            pass1: s.pass1Preset || '',
+            pass2: s.pass2Preset || '',
+        };
+
         // Trigger dependent UI updates
         ModeManager.handleModeChange(s.mode || 'faster');
     },
@@ -6513,6 +6570,79 @@ const SettingsPersistence = {
         } catch (e) {
             console.warn('Failed to save GUI settings:', e);
         }
+    },
+
+    /** Restore preset associations after loadFromBackend.
+     *  Only the preset NAME is stored in gui_settings.json — the actual
+     *  preset data is re-loaded from disk so edits are picked up. */
+    async restorePresets() {
+        if (!window.pywebview || !pywebview.api) return;
+        const pending = this._pendingPresets;
+        if (!pending) return;
+        this._pendingPresets = null;
+
+        for (const passKey of ['pass1', 'pass2']) {
+            const presetName = pending[passKey];
+            if (!presetName) continue;
+
+            try {
+                const result = await pywebview.api.load_preset(presetName);
+                if (!result.success || !result.preset) {
+                    console.warn(`Preset "${presetName}" not found for ${passKey}, ignoring`);
+                    continue;
+                }
+
+                const preset = result.preset;
+                const passState = EnsembleManager.state[passKey];
+                const prefix = passKey;
+
+                // Detect pipeline type for model swap
+                const getPipelineType = (isT, isQ) => isT ? 'transformers' : (isQ ? 'qwen' : 'legacy');
+                const oldType = getPipelineType(passState.isTransformers, passState.isQwen);
+                const presetIsTransformers = !!preset.isTransformers;
+                const presetIsQwen = !!preset.isQwen;
+                const newType = getPipelineType(presetIsTransformers, presetIsQwen);
+
+                // Apply all preset fields to state
+                if (preset.pipeline) passState.pipeline = preset.pipeline;
+                if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
+                if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
+                if (preset.speechEnhancer !== undefined) passState.speechEnhancer = preset.speechEnhancer;
+                if (preset.speechSegmenter) passState.speechSegmenter = preset.speechSegmenter;
+                if (preset.model) passState.model = preset.model;
+                if (preset.framer) passState.framer = preset.framer;
+                if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
+                passState.isTransformers = presetIsTransformers;
+                passState.isQwen = presetIsQwen;
+                passState.customized = true;
+                passState.params = preset.params || null;
+                passState.presetName = presetName;
+
+                // Update dropdowns silently (no dispatchEvent — avoid confirm dialogs)
+                const setSilent = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el && val !== undefined && val !== null) el.value = val;
+                };
+                setSilent(`${prefix}-pipeline`, preset.pipeline);
+                setSilent(`${prefix}-sensitivity`, preset.sensitivity);
+                setSilent(`${prefix}-scene`, preset.sceneDetector);
+                setSilent(`${prefix}-enhancer`, preset.speechEnhancer);
+                setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
+
+                if (oldType !== newType) {
+                    EnsembleManager.swapModelOptions(passKey, newType);
+                    EnsembleManager.applyPipelinePresets(passKey, newType);
+                }
+                setSilent(`${prefix}-model`, preset.model);
+
+                EnsembleManager.updateRowGreyingState(passKey);
+                console.log(`Preset "${presetName}" restored for ${passKey}`);
+            } catch (e) {
+                console.warn(`Failed to restore preset "${presetName}" for ${passKey}:`, e);
+            }
+        }
+
+        EnsembleManager.updateBadges();
     },
 
     /** Attach change listeners to all tracked form elements. */
@@ -6595,4 +6725,7 @@ window.addEventListener('pywebviewready', async () => {
     // Phase 3: Restore saved settings (must run AFTER phases 1-2)
     await TranslationSettingsModal.loadSettingsFromBackend();
     await SettingsPersistence.loadFromBackend();
+
+    // Phase 4: Restore preset associations (after loadFromBackend sets dropdowns)
+    await SettingsPersistence.restorePresets();
 });

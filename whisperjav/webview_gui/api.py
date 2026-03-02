@@ -2932,6 +2932,8 @@ class WhisperJAVAPI:
         "pass2_speech_segmenter":    "pass2SpeechSegmenter",
         "pass2_model":               "pass2Model",
         "merge_strategy":            "mergeStrategy",
+        "pass1_preset":              "pass1Preset",
+        "pass2_preset":              "pass2Preset",
     }
     # Reverse mapping (camelCase → snake_case)
     _GUI_SETTINGS_MAP_REV = {v: k for k, v in _GUI_SETTINGS_MAP.items()}

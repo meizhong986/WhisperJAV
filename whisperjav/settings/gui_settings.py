@@ -65,6 +65,8 @@ DEFAULT_GUI_SETTINGS = {
     "pass2_speech_segmenter": "silero-v6.2",
     "pass2_model": "Qwen/Qwen3-ASR-1.7B",
     "merge_strategy": "pass1_primary",
+    "pass1_preset": "",
+    "pass2_preset": "",
 }
 
 

@@ -153,6 +153,8 @@ class TestS01FirstLaunch:
             "pass2_speech_segmenter": "silero-v6.2",
             "pass2_model": "Qwen/Qwen3-ASR-1.7B",
             "merge_strategy": "pass1_primary",
+            "pass1_preset": "",
+            "pass2_preset": "",
         }
         for key, expected in html_defaults.items():
             actual = DEFAULT_GUI_SETTINGS.get(key)
@@ -814,7 +816,7 @@ class TestCompleteness:
         data_keys = {
             k for k in DEFAULT_GUI_SETTINGS if k not in ("version", "_comment")
         }
-        # 13 Tab 1 keys + 14 Tab 3 keys = 27
-        assert len(data_keys) == 27, (
-            f"Expected 27 settings keys, got {len(data_keys)}: {data_keys}"
+        # 13 Tab 1 keys + 14 Tab 3 keys + 2 preset keys = 29
+        assert len(data_keys) == 29, (
+            f"Expected 29 settings keys, got {len(data_keys)}: {data_keys}"
         )
