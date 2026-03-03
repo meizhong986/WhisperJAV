@@ -6,6 +6,46 @@ import sys
 from pathlib import Path
 
 
+def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
+    """Cap translation batch size to fit within the LLM context window.
+
+    Local LLMs (e.g., gemma-9b via llama-cpp) have limited context windows.
+    PySubtrans formats each subtitle line with numbered headers, original text,
+    and translation placeholders. Both the prompt (input) and the expected
+    response must fit within n_ctx tokens.
+
+    Japanese text is tokenized at ~2-3 tokens per character by byte-level
+    tokenizers (LLaMA, Gemma). A typical subtitle line of 30-50 Japanese
+    characters becomes 60-150 tokens. Combined with the response (translated
+    text) and PySubtrans formatting headers, we budget conservatively:
+
+    Per subtitle line (both directions):
+    - Input: ~100 tokens (``#N\\nOriginal>\\n`` + Japanese text)
+    - Output: ~100 tokens (``#N\\nTranslation>\\n`` + translated text)
+    - Subtotal: ~200 tokens, padded to 350 for safety (long lines exist)
+
+    Fixed overhead:
+    - System message: ~500 tokens
+    - Translation instructions: ~1000 tokens
+    - Formatting, preamble: ~500 tokens
+    - Total: ~2000 tokens
+
+    Empirical validation: batch_size=30 overflows 8K context (#183).
+    This formula yields 17 for 8K (safe) and 30 for 16K+ (no change).
+
+    Args:
+        max_batch_size: Current batch size setting
+        n_ctx: LLM context window in tokens
+
+    Returns:
+        Capped batch size (may be unchanged if already within limits)
+    """
+    overhead = 2000  # system message + instructions + formatting
+    tokens_per_line = 350  # input + output per subtitle line (conservative)
+    safe_max = max(5, (n_ctx - overhead) // tokens_per_line)
+    return min(max_batch_size, safe_max)
+
+
 def _normalize_api_base(url: str) -> str:
     """Strip API path suffixes — the OpenAI SDK appends them automatically.
 
