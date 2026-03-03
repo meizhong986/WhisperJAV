@@ -41,7 +41,6 @@ class AnimeWhisperGenerator:
         model_id: str = "litagin/anime-whisper",
         device: str = "auto",
         dtype: str = "auto",
-        chunk_length_s: float = 30.0,
         no_repeat_ngram_size: int = 5,
         max_new_tokens: int = 448,
     ):
@@ -52,8 +51,6 @@ class AnimeWhisperGenerator:
             model_id: HuggingFace model ID or local path for anime-whisper.
             device: Device ('auto', 'cuda', 'cuda:0', 'cpu').
             dtype: Data type ('auto', 'float16', 'bfloat16', 'float32').
-            chunk_length_s: HF pipeline chunking length for long audio (seconds).
-                Frames under this length are processed without chunking.
             no_repeat_ngram_size: N-gram repetition prevention (model card: >=5).
             max_new_tokens: Maximum generated tokens per utterance.
                 Model card demo uses 64 (for 15s clips).  For subtitle frames
@@ -63,7 +60,6 @@ class AnimeWhisperGenerator:
             "model_id": model_id,
             "device": device,
             "dtype": dtype,
-            "chunk_length_s": chunk_length_s,
             "no_repeat_ngram_size": no_repeat_ngram_size,
             "max_new_tokens": max_new_tokens,
         }
@@ -135,7 +131,7 @@ class AnimeWhisperGenerator:
             "automatic-speech-recognition",
             model=cfg["model_id"],
             device=device,
-            torch_dtype=dtype,
+            dtype=dtype,
         )
 
         elapsed = time.time() - start
@@ -208,9 +204,14 @@ class AnimeWhisperGenerator:
         }
 
         try:
+            # return_timestamps=True activates Whisper's native long-form
+            # decoding (sequential 30s windows) for audio >30s.  We discard
+            # the timestamps and only take the text.  This avoids the
+            # experimental chunk_length_s path which crashes on Windows
+            # (0xC0000409 heap corruption in CUDA kernels).
             result = self._pipe(
                 str(audio_path),
-                chunk_length_s=cfg["chunk_length_s"],
+                return_timestamps=True,
                 generate_kwargs=generate_kwargs,
             )
             text = result.get("text", "").strip()
