@@ -31,6 +31,7 @@ class EnsembleOrchestrator:
         subs_language: str = 'native',
         progress_display=None,
         log_level: str = "INFO",
+        serial_file_processing: bool = False,
         **kwargs
     ):
         """
@@ -43,6 +44,9 @@ class EnsembleOrchestrator:
             subs_language: Language for subtitles ('native' or 'direct-to-english')
             progress_display: Progress display object
             log_level: Log level to propagate to subprocess workers
+            serial_file_processing: If True, each file completes its full cycle
+                (Pass 1 → Pass 2 → Merge) before the next file begins. Slower
+                (reloads models per file) but delivers results incrementally.
             **kwargs: Additional parameters passed to pipelines
         """
         # "source" sentinel means each file's SRT goes next to its input file
@@ -62,6 +66,7 @@ class EnsembleOrchestrator:
         self.subs_language = subs_language
         self.progress_display = progress_display
         self.log_level = log_level
+        self.serial_file_processing = serial_file_processing
         self.extra_kwargs = kwargs
         self.worker_kwargs = self._filter_picklable_kwargs(kwargs)
 
@@ -101,6 +106,13 @@ class EnsembleOrchestrator:
     ) -> List[Dict]:
         if not media_files:
             return []
+
+        # Serial mode: each file completes Pass1→Pass2→Merge before the next starts.
+        # Single-file batches always take the batch path (identical result, no overhead).
+        if self.serial_file_processing and len(media_files) > 1:
+            return self._process_batch_serial(
+                media_files, pass1_config, pass2_config, merge_strategy,
+            )
 
         batch_start = time.time()
         serialized_media = self._serialize_media_files(media_files)
@@ -228,172 +240,12 @@ class EnsembleOrchestrator:
         table_rows: List[Dict[str, str]] = []
 
         for media_info in serialized_media:
-            basename = media_info['basename']
-            lang_code = pass_languages[1]
-            ensemble_metadata = self._create_ensemble_metadata(
-                media_info, pass1_config, pass2_config, merge_strategy
+            metadata, row = self._process_single_file_merge(
+                media_info, pass1_results, pass2_results,
+                pass1_config, pass2_config, merge_strategy, pass_languages,
             )
-
-            pass1 = pass1_results.get(basename)
-            pass2 = pass2_results.get(basename) if pass2_config else None
-
-            row_display = {
-                'file': basename,
-                'pass1': self._format_status(pass1),
-                'pass2': self._format_status(pass2) if pass2_config else 'n/a',
-                'merge': 'n/a' if not pass2_config else 'NOK',
-                'final': f"{basename}: missing",
-            }
-
-            if not pass1 or pass1['status'] != 'completed':
-                error_msg = pass1.get('error') if pass1 else 'Pass 1 worker returned no result'
-                ensemble_metadata['pass1'] = {'status': 'failed', 'error': error_msg}
-                if pass2_config:
-                    ensemble_metadata['pass2'] = (
-                        pass2 if pass2 else {'status': 'skipped', 'error': 'Pass 2 not executed'}
-                    )
-                else:
-                    ensemble_metadata['pass2'] = {'status': 'skipped'}
-                ensemble_metadata['status'] = 'failed'
-                ensemble_metadata['merge'] = {'status': 'skipped'}
-                all_metadata.append(ensemble_metadata)
-                table_rows.append(row_display)
-                continue
-
-            pass1_srt = Path(pass1['srt_path']) if pass1.get('srt_path') else None
-
-            # Defensive check: verify pass1 SRT file actually exists
-            if pass1_srt and not pass1_srt.exists():
-                logger.warning(
-                    "Pass 1 reported completed but SRT file not found: %s",
-                    pass1_srt,
-                )
-                pass1_srt = None  # Treat as if no SRT was produced
-
-            ensemble_metadata['pass1'] = {
-                'status': pass1['status'],
-                'srt_path': str(pass1_srt) if pass1_srt else None,
-                'subtitles': pass1.get('subtitles', 0),
-                'processing_time': pass1.get('processing_time', 0.0),
-            }
-
-            final_output_path: Optional[Path] = None
-            merge_info: Dict[str, Any] = {'status': 'skipped' if not pass2_config else 'pending'}
-
-            if pass2_config:
-                if pass2 and pass2['status'] == 'completed' and pass2.get('srt_path'):
-                    pass2_srt = Path(pass2['srt_path'])
-
-                    # Defensive check: verify pass2 SRT file actually exists
-                    if not pass2_srt.exists():
-                        logger.warning(
-                            "Pass 2 reported completed but SRT file not found: %s",
-                            pass2_srt,
-                        )
-                        # Treat pass2 as failed
-                        ensemble_metadata['pass2'] = {
-                            'status': 'failed',
-                            'error': f'SRT file not found: {pass2_srt}',
-                            'processing_time': pass2.get('processing_time', 0.0),
-                        }
-                        merge_info = {'status': 'skipped', 'reason': 'pass2_file_missing'}
-                        row_display['merge'] = 'NOK'
-                        row_display['pass2'] = 'NOK'
-                        if pass1_srt:
-                            final_output_path = pass1_srt
-                            row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
-                    else:
-                        # pass2_srt exists - record pass2 metadata
-                        ensemble_metadata['pass2'] = {
-                            'status': pass2['status'],
-                            'srt_path': pass2['srt_path'],
-                            'subtitles': pass2.get('subtitles', 0),
-                            'processing_time': pass2.get('processing_time', 0.0),
-                        }
-
-                        # Check if pass1_srt is valid before attempting merge
-                        if not pass1_srt:
-                            logger.warning(
-                                "Cannot merge: Pass 1 SRT file missing or invalid for %s",
-                                basename,
-                            )
-                            merge_info = {'status': 'skipped', 'reason': 'pass1_file_missing'}
-                            row_display['merge'] = 'NOK'
-                            # Use pass2 as final output since pass1 is unavailable
-                            final_output_path = pass2_srt
-                            row_display['final'] = f"pass2 only ({pass2_srt.name})"
-                        else:
-                            # Both pass1 and pass2 SRT files exist - proceed with merge
-                            tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
-                            tmp_merge.parent.mkdir(parents=True, exist_ok=True)
-                            file_output_dir = Path(media_info.get('output_dir', str(self.output_dir)))
-                            final_candidate = file_output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
-                            try:
-                                merge_stats = self.merge_engine.merge(
-                                    srt1_path=pass1_srt,
-                                    srt2_path=pass2_srt,
-                                    output_path=tmp_merge,
-                                    strategy=merge_strategy,
-                                )
-                                if final_candidate.exists():
-                                    final_candidate.unlink()
-                                shutil.move(tmp_merge, final_candidate)
-                                merge_info = {
-                                    'status': 'completed',
-                                    'strategy': merge_strategy,
-                                    'output_path': str(final_candidate),
-                                    'statistics': merge_stats,
-                                }
-                                final_output_path = final_candidate
-                                row_display['merge'] = 'OK'
-                                row_display['final'] = final_candidate.name
-                            except Exception as merge_error:
-                                if tmp_merge.exists():
-                                    tmp_merge.unlink()
-                                logger.error("Merge failed for %s: %s", basename, merge_error)
-                                merge_info = {'status': 'failed', 'error': str(merge_error)}
-                                row_display['merge'] = 'NOK'
-                                if pass1_srt:
-                                    final_output_path = pass1_srt
-                                    row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
-                else:
-                    ensemble_metadata['pass2'] = (
-                        {'status': pass2['status'], 'error': pass2.get('error')}
-                        if pass2
-                        else {'status': 'failed', 'error': 'Pass 2 did not return a result'}
-                    )
-                    merge_info = {'status': 'skipped', 'reason': 'pass2_failed'}
-                    row_display['merge'] = 'NOK'
-                    row_display['pass2'] = self._format_status(ensemble_metadata['pass2'])
-                    if pass1_srt:
-                        final_output_path = pass1_srt
-                        row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
-            else:
-                ensemble_metadata['pass2'] = {'status': 'skipped'}
-
-            if not pass2_config and pass1_srt:
-                final_output_path = pass1_srt
-                row_display['final'] = pass1_srt.name
-
-            ensemble_metadata['merge'] = merge_info
-
-            passes_completed = 2 if pass2_config and pass2 and pass2.get('status') == 'completed' else 1
-            total_time = pass1.get('processing_time', 0.0) + (pass2.get('processing_time', 0.0) if pass2 else 0.0)
-            ensemble_metadata['summary'] = {
-                'final_output': str(final_output_path) if final_output_path else None,
-                'passes_completed': passes_completed,
-                'total_processing_time_seconds': total_time,
-            }
-            ensemble_metadata['output_files'] = {
-                'final_srt': str(final_output_path) if final_output_path else None,
-                'pass1_srt': pass1.get('srt_path'),
-                'pass2_srt': pass2.get('srt_path') if pass2 else None,
-            }
-
-            ensemble_metadata.setdefault('status', 'completed')
-
-            all_metadata.append(ensemble_metadata)
-            table_rows.append(row_display)
+            all_metadata.append(metadata)
+            table_rows.append(row)
 
         if not self.keep_temp_files:
             for media_info in serialized_media:
@@ -413,6 +265,313 @@ class EnsembleOrchestrator:
             "failed": len(all_metadata) - completed_count,
             "total_duration_seconds": round(batch_duration, 2),
             "summary_path": str(summary_path) if summary_path else None,
+        })
+
+        return all_metadata
+
+    def _process_single_file_merge(
+        self,
+        media_info: Dict[str, Any],
+        pass1_results: Dict[str, Dict],
+        pass2_results: Dict[str, Dict],
+        pass1_config: Dict[str, Any],
+        pass2_config: Optional[Dict[str, Any]],
+        merge_strategy: str,
+        pass_languages: Dict[int, str],
+    ) -> tuple:
+        """Merge results for a single file and produce metadata + display row.
+
+        This is the shared merge/metadata logic used by both batch and serial modes.
+
+        Returns:
+            (ensemble_metadata, row_display) tuple.
+        """
+        basename = media_info['basename']
+        lang_code = pass_languages[1]
+        ensemble_metadata = self._create_ensemble_metadata(
+            media_info, pass1_config, pass2_config, merge_strategy
+        )
+
+        pass1 = pass1_results.get(basename)
+        pass2 = pass2_results.get(basename) if pass2_config else None
+
+        row_display = {
+            'file': basename,
+            'pass1': self._format_status(pass1),
+            'pass2': self._format_status(pass2) if pass2_config else 'n/a',
+            'merge': 'n/a' if not pass2_config else 'NOK',
+            'final': f"{basename}: missing",
+        }
+
+        if not pass1 or pass1['status'] != 'completed':
+            error_msg = pass1.get('error') if pass1 else 'Pass 1 worker returned no result'
+            ensemble_metadata['pass1'] = {'status': 'failed', 'error': error_msg}
+            if pass2_config:
+                ensemble_metadata['pass2'] = (
+                    pass2 if pass2 else {'status': 'skipped', 'error': 'Pass 2 not executed'}
+                )
+            else:
+                ensemble_metadata['pass2'] = {'status': 'skipped'}
+            ensemble_metadata['status'] = 'failed'
+            ensemble_metadata['merge'] = {'status': 'skipped'}
+            return ensemble_metadata, row_display
+
+        pass1_srt = Path(pass1['srt_path']) if pass1.get('srt_path') else None
+
+        # Defensive check: verify pass1 SRT file actually exists
+        if pass1_srt and not pass1_srt.exists():
+            logger.warning(
+                "Pass 1 reported completed but SRT file not found: %s",
+                pass1_srt,
+            )
+            pass1_srt = None  # Treat as if no SRT was produced
+
+        ensemble_metadata['pass1'] = {
+            'status': pass1['status'],
+            'srt_path': str(pass1_srt) if pass1_srt else None,
+            'subtitles': pass1.get('subtitles', 0),
+            'processing_time': pass1.get('processing_time', 0.0),
+        }
+
+        final_output_path: Optional[Path] = None
+        merge_info: Dict[str, Any] = {'status': 'skipped' if not pass2_config else 'pending'}
+
+        if pass2_config:
+            if pass2 and pass2['status'] == 'completed' and pass2.get('srt_path'):
+                pass2_srt = Path(pass2['srt_path'])
+
+                # Defensive check: verify pass2 SRT file actually exists
+                if not pass2_srt.exists():
+                    logger.warning(
+                        "Pass 2 reported completed but SRT file not found: %s",
+                        pass2_srt,
+                    )
+                    # Treat pass2 as failed
+                    ensemble_metadata['pass2'] = {
+                        'status': 'failed',
+                        'error': f'SRT file not found: {pass2_srt}',
+                        'processing_time': pass2.get('processing_time', 0.0),
+                    }
+                    merge_info = {'status': 'skipped', 'reason': 'pass2_file_missing'}
+                    row_display['merge'] = 'NOK'
+                    row_display['pass2'] = 'NOK'
+                    if pass1_srt:
+                        final_output_path = pass1_srt
+                        row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
+                else:
+                    # pass2_srt exists - record pass2 metadata
+                    ensemble_metadata['pass2'] = {
+                        'status': pass2['status'],
+                        'srt_path': pass2['srt_path'],
+                        'subtitles': pass2.get('subtitles', 0),
+                        'processing_time': pass2.get('processing_time', 0.0),
+                    }
+
+                    # Check if pass1_srt is valid before attempting merge
+                    if not pass1_srt:
+                        logger.warning(
+                            "Cannot merge: Pass 1 SRT file missing or invalid for %s",
+                            basename,
+                        )
+                        merge_info = {'status': 'skipped', 'reason': 'pass1_file_missing'}
+                        row_display['merge'] = 'NOK'
+                        # Use pass2 as final output since pass1 is unavailable
+                        final_output_path = pass2_srt
+                        row_display['final'] = f"pass2 only ({pass2_srt.name})"
+                    else:
+                        # Both pass1 and pass2 SRT files exist - proceed with merge
+                        tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
+                        tmp_merge.parent.mkdir(parents=True, exist_ok=True)
+                        file_output_dir = Path(media_info.get('output_dir', str(self.output_dir)))
+                        final_candidate = file_output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
+                        try:
+                            merge_stats = self.merge_engine.merge(
+                                srt1_path=pass1_srt,
+                                srt2_path=pass2_srt,
+                                output_path=tmp_merge,
+                                strategy=merge_strategy,
+                            )
+                            if final_candidate.exists():
+                                final_candidate.unlink()
+                            shutil.move(tmp_merge, final_candidate)
+                            merge_info = {
+                                'status': 'completed',
+                                'strategy': merge_strategy,
+                                'output_path': str(final_candidate),
+                                'statistics': merge_stats,
+                            }
+                            final_output_path = final_candidate
+                            row_display['merge'] = 'OK'
+                            row_display['final'] = final_candidate.name
+                        except Exception as merge_error:
+                            if tmp_merge.exists():
+                                tmp_merge.unlink()
+                            logger.error("Merge failed for %s: %s", basename, merge_error)
+                            merge_info = {'status': 'failed', 'error': str(merge_error)}
+                            row_display['merge'] = 'NOK'
+                            if pass1_srt:
+                                final_output_path = pass1_srt
+                                row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
+            else:
+                ensemble_metadata['pass2'] = (
+                    {'status': pass2['status'], 'error': pass2.get('error')}
+                    if pass2
+                    else {'status': 'failed', 'error': 'Pass 2 did not return a result'}
+                )
+                merge_info = {'status': 'skipped', 'reason': 'pass2_failed'}
+                row_display['merge'] = 'NOK'
+                row_display['pass2'] = self._format_status(ensemble_metadata['pass2'])
+                if pass1_srt:
+                    final_output_path = pass1_srt
+                    row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
+        else:
+            ensemble_metadata['pass2'] = {'status': 'skipped'}
+
+        if not pass2_config and pass1_srt:
+            final_output_path = pass1_srt
+            row_display['final'] = pass1_srt.name
+
+        ensemble_metadata['merge'] = merge_info
+
+        passes_completed = 2 if pass2_config and pass2 and pass2.get('status') == 'completed' else 1
+        total_time = pass1.get('processing_time', 0.0) + (pass2.get('processing_time', 0.0) if pass2 else 0.0)
+        ensemble_metadata['summary'] = {
+            'final_output': str(final_output_path) if final_output_path else None,
+            'passes_completed': passes_completed,
+            'total_processing_time_seconds': total_time,
+        }
+        ensemble_metadata['output_files'] = {
+            'final_srt': str(final_output_path) if final_output_path else None,
+            'pass1_srt': pass1.get('srt_path'),
+            'pass2_srt': pass2.get('srt_path') if pass2 else None,
+        }
+
+        ensemble_metadata.setdefault('status', 'completed')
+
+        return ensemble_metadata, row_display
+
+    def _process_batch_serial(
+        self,
+        media_files: List[Dict],
+        pass1_config: Dict[str, Any],
+        pass2_config: Optional[Dict[str, Any]],
+        merge_strategy: str,
+    ) -> List[Dict]:
+        """Process files serially: each file completes Pass1→Pass2→Merge before the next starts.
+
+        Slower than batch mode (reloads models per file) but delivers results incrementally —
+        each file's final SRT is on disk and usable before the next file begins processing.
+        """
+        batch_start = time.time()
+        serialized_media = self._serialize_media_files(media_files)
+
+        for info in serialized_media:
+            info['output_dir'] = str(self._resolve_file_output_dir(info))
+
+        pass_languages = {
+            1: resolve_language_code(pass1_config, self.subs_language),
+        }
+        if pass2_config:
+            pass_languages[2] = resolve_language_code(pass2_config, self.subs_language)
+
+        # Trace serial ensemble start
+        self.tracer.emit("ensemble_batch_start", {
+            "files_count": len(serialized_media),
+            "pass1_pipeline": pass1_config.get('pipeline'),
+            "pass2_pipeline": pass2_config.get('pipeline') if pass2_config else None,
+            "merge_strategy": merge_strategy,
+            "subs_language": self.subs_language,
+            "serial_mode": True,
+        })
+
+        total_files = len(serialized_media)
+        logger.info(
+            "Starting SERIAL ensemble: %d files (each file completes fully before next)",
+            total_files,
+        )
+
+        all_metadata: List[Dict[str, Any]] = []
+        table_rows: List[Dict[str, str]] = []
+
+        for file_idx, media_info in enumerate(serialized_media, 1):
+            basename = media_info['basename']
+            file_start = time.time()
+
+            # --- Pass 1 ---
+            logger.info(
+                "[%d/%d] %s — Pass 1 (%s)...",
+                file_idx, total_files, basename, pass1_config['pipeline'],
+            )
+            pass1_results = self._run_pass_in_subprocess(
+                pass_number=1,
+                media_files=[media_info],
+                pass_config=pass1_config,
+                language_code=pass_languages[1],
+            )
+
+            # --- Pass 2 (if enabled) ---
+            pass2_results: Dict[str, Dict[str, Any]] = {}
+            if pass2_config:
+                logger.info(
+                    "[%d/%d] %s — Pass 2 (%s)...",
+                    file_idx, total_files, basename, pass2_config['pipeline'],
+                )
+                pass2_results = self._run_pass_in_subprocess(
+                    pass_number=2,
+                    media_files=[media_info],
+                    pass_config=pass2_config,
+                    language_code=pass_languages[2],
+                )
+
+            # --- Merge + metadata (reuses shared method) ---
+            if pass2_config:
+                logger.info(
+                    "[%d/%d] %s — Merge (%s)...",
+                    file_idx, total_files, basename, merge_strategy,
+                )
+            metadata, row = self._process_single_file_merge(
+                media_info, pass1_results, pass2_results,
+                pass1_config, pass2_config, merge_strategy, pass_languages,
+            )
+            all_metadata.append(metadata)
+            table_rows.append(row)
+
+            # --- Per-file cleanup ---
+            if not self.keep_temp_files:
+                self._cleanup_intermediate(basename)
+
+            # --- Per-file completion banner ---
+            file_elapsed = time.time() - file_start
+            final_output = metadata.get('summary', {}).get('final_output')
+            if final_output and metadata.get('status') != 'failed':
+                final_name = Path(final_output).name
+                subs_count = metadata.get('pass1', {}).get('subtitles', '?')
+                logger.info(
+                    "[%d/%d] DONE: %s -> %s (%s subs, %.0fs)",
+                    file_idx, total_files, basename, final_name,
+                    subs_count, file_elapsed,
+                )
+            else:
+                logger.warning(
+                    "[%d/%d] FAILED: %s (%.0fs)",
+                    file_idx, total_files, basename, file_elapsed,
+                )
+
+        # --- Batch summary (same as batch mode) ---
+        self._print_summary_table(table_rows, time.time() - batch_start)
+        summary_path = self._write_batch_summary(all_metadata)
+        if summary_path:
+            logger.info("Batch summary saved to %s", summary_path)
+
+        batch_duration = time.time() - batch_start
+        completed_count = sum(1 for m in all_metadata if m.get('status') == 'completed')
+        self.tracer.emit("ensemble_batch_complete", {
+            "files_processed": len(all_metadata),
+            "completed": completed_count,
+            "failed": len(all_metadata) - completed_count,
+            "total_duration_seconds": round(batch_duration, 2),
+            "summary_path": str(summary_path) if summary_path else None,
+            "serial_mode": True,
         })
 
         return all_metadata

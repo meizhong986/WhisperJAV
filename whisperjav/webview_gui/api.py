@@ -2298,6 +2298,10 @@ class WhisperJAVAPI:
         # Enable ensemble mode
         args.append("--ensemble")
 
+        # Serial mode: finish each file before starting the next
+        if config.get('serial_mode', False):
+            args.append("--ensemble-serial")
+
         # Pass 1 configuration
         pass1 = config.get('pass1', {})
         p1_pipeline = pass1.get('pipeline', 'balanced')
@@ -2320,6 +2324,9 @@ class WhisperJAVAPI:
                 qwen1_params['framer'] = pass1['framer']
             if pass1.get('isAnimeWhisper'):
                 qwen1_params['generator_backend'] = 'anime-whisper'
+                qwen1_params.setdefault('timestamp_mode', 'vad_only')
+                qwen1_params.setdefault('assembly_cleaner', 'passthrough')
+                qwen1_params.setdefault('stepdown', False)
             if qwen1_params:
                 args += ["--pass1-qwen-params", json.dumps(qwen1_params)]
         else:
@@ -2392,6 +2399,9 @@ class WhisperJAVAPI:
                     qwen2_params['framer'] = pass2['framer']
                 if pass2.get('isAnimeWhisper'):
                     qwen2_params['generator_backend'] = 'anime-whisper'
+                    qwen2_params.setdefault('timestamp_mode', 'vad_only')
+                    qwen2_params.setdefault('assembly_cleaner', 'passthrough')
+                    qwen2_params.setdefault('stepdown', False)
                 if qwen2_params:
                     args += ["--pass2-qwen-params", json.dumps(qwen2_params)]
             else:

@@ -1233,6 +1233,7 @@ const EnsembleManager = {
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
         mergeStrategy: 'pass1_primary',
+        serialMode: false,
         currentCustomize: null  // 'pass1' or 'pass2'
     },
 
@@ -1255,7 +1256,7 @@ const EnsembleManager = {
         { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' }
     ],
     animeWhisperModels: [
-        { value: 'litagin/anime-whisper', label: 'anime-whisper    ~2GB' }
+        { value: 'litagin/anime-whisper', label: 'anime-whisper    ~4GB' }
     ],
 
     async init() {
@@ -1281,6 +1282,7 @@ const EnsembleManager = {
         this.state.pass2.model = document.getElementById('pass2-model').value;
 
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
+        this.state.serialMode = document.getElementById('ensemble-serial').checked;
 
         // Update isTransformers, isQwen, and isAnimeWhisper flags based on synced pipeline values
         this.state.pass1.isTransformers = this.state.pass1.pipeline === 'transformers';
@@ -1371,6 +1373,11 @@ const EnsembleManager = {
         // Merge strategy
         document.getElementById('merge-strategy').addEventListener('change', (e) => {
             this.state.mergeStrategy = e.target.value;
+        });
+
+        // Serial mode (finish each file before starting next)
+        document.getElementById('ensemble-serial').addEventListener('change', (e) => {
+            this.state.serialMode = e.target.checked;
         });
 
         // Customize buttons
@@ -1472,7 +1479,15 @@ const EnsembleManager = {
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
-        if (pipelineType === 'qwen' || pipelineType === 'anime-whisper') {
+        if (pipelineType === 'anime-whisper') {
+            sceneSelect.value = 'semantic';
+            segmenterSelect.value = 'ten';
+            sensitivitySelect.value = 'balanced';
+            this.state[passKey].sceneDetector = 'semantic';
+            this.state[passKey].speechSegmenter = 'ten';
+            this.state[passKey].sensitivity = 'balanced';
+            this.state[passKey].framer = 'vad-grouped';
+        } else if (pipelineType === 'qwen') {
             sceneSelect.value = 'semantic';
             segmenterSelect.value = 'silero-v6.2';
             sensitivitySelect.value = 'balanced';
@@ -2958,6 +2973,11 @@ const EnsembleManager = {
                 currentValues.model_id = 'litagin/anime-whisper';
                 currentValues.repetition_penalty = 1.0;
                 currentValues.context = '';
+                currentValues.timestamp_mode = 'vad_only';
+                currentValues.assembly_cleaner = 'passthrough';
+                currentValues.stepdown = false;
+                currentValues.chunk_threshold = 0.5;
+                currentValues.max_group_duration = 5;
             }
 
             // Get scene detector from main dropdown
@@ -3025,7 +3045,7 @@ const EnsembleManager = {
         let modelOptions = modelDef.options;
         let modelDefault = modelDef.default;
         if (passState && passState.isAnimeWhisper) {
-            modelOptions = [{ value: 'litagin/anime-whisper', label: 'anime-whisper (~2GB VRAM)' }];
+            modelOptions = [{ value: 'litagin/anime-whisper', label: 'anime-whisper (~4GB VRAM)' }];
             modelDefault = 'litagin/anime-whisper';
         }
         container.appendChild(this.createTransformersDropdown(
@@ -4336,6 +4356,11 @@ const EnsembleManager = {
             defaults.model_id = 'litagin/anime-whisper';
             defaults.repetition_penalty = 1.0;
             defaults.context = '';
+            defaults.timestamp_mode = 'vad_only';
+            defaults.assembly_cleaner = 'passthrough';
+            defaults.stepdown = false;
+            defaults.chunk_threshold = 0.5;
+            defaults.max_group_duration = 5;
         }
 
         // Reset all controls in all tabs (includes context tab)
@@ -4712,6 +4737,7 @@ const EnsembleManager = {
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null
             },
             merge_strategy: this.state.mergeStrategy,
+            serial_mode: this.state.serialMode,
             source_language: document.getElementById('source-language').value,
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,

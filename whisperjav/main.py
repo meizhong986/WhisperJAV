@@ -224,6 +224,9 @@ def parse_arguments():
     twopass_group.add_argument("--merge-strategy", default="pass1_primary",
                                choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap", "longest"],
                                help="Merge strategy for two-pass results (default: pass1_primary)")
+    twopass_group.add_argument("--ensemble-serial", action="store_true",
+                               help="Complete each file (Pass1+Pass2+Merge) before starting the next. "
+                                    "Slower (reloads models per file) but delivers results incrementally.")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -1014,6 +1017,11 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
         _qwen_segmenter = getattr(args, 'qwen_segmenter', 'silero-v6.2')
+        # anime-whisper: default to TEN VAD (must override BEFORE sensitivity resolution)
+        _gen_backend_early = getattr(args, 'qwen_generator', 'qwen3')
+        if _gen_backend_early == "anime-whisper":
+            if not any(a.startswith('--qwen-segmenter') for a in sys.argv):
+                _qwen_segmenter = "ten"
         _user_vad_overrides = {}
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
@@ -1101,6 +1109,16 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         if _gen_backend == "anime-whisper":
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "litagin/anime-whisper"
+            if not any(a.startswith('--qwen-timestamp-mode') for a in sys.argv):
+                qwen_kwargs["timestamp_mode"] = "vad_only"
+            if not any(a.startswith('--qwen-assembly-cleaner') for a in sys.argv):
+                qwen_kwargs["assembly_cleaner"] = False
+            if not any(a.startswith('--qwen-stepdown') for a in sys.argv):
+                qwen_kwargs["stepdown_enabled"] = False
+            if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
+                qwen_kwargs["segmenter_chunk_threshold"] = 0.5
+            if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
+                qwen_kwargs["segmenter_max_group_duration"] = 5.0
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode
@@ -1896,6 +1914,7 @@ def main():
                 subs_language=args.subs_language,
                 parameter_tracer=tracer,
                 log_level=log_level,
+                serial_file_processing=getattr(args, 'ensemble_serial', False),
             )
 
             # Process all files with batch processing for optimal VRAM usage
