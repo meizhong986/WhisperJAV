@@ -1,9 +1,9 @@
 """
 anime-whisper TextGenerator adapter.
 
-Wraps the HuggingFace Transformers ASR pipeline for litagin/anime-whisper
-behind the TextGenerator protocol.  anime-whisper is a Whisper fine-tune
-(kotoba-whisper-v2.0 base) specialized for anime/visual-novel dialogue.
+Uses the low-level WhisperProcessor + WhisperForConditionalGeneration API
+(NOT the HF ``pipeline()`` wrapper, which crashes with 0xC0000409 on
+torch 2.9+ / transformers 4.57+ / Windows / CUDA).
 
 Key model constraints (from model card):
     - NO initial prompt / context — causes hallucinations.  The ``context``
@@ -14,7 +14,7 @@ Key model constraints (from model card):
       Qwen3 ForcedAligner downstream in the subtitle pipeline.
 
 Lifecycle design follows Qwen3TextGenerator pattern:
-    Fresh HF pipeline per load()/unload() cycle.
+    Fresh model per load()/unload() cycle.
 
 VRAM cleanup:
     unload() uses safe_cuda_cleanup() from whisperjav.utils.gpu_utils.
@@ -24,6 +24,8 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+import numpy as np
+
 from whisperjav.modules.subtitle_pipeline.types import TranscriptionResult
 from whisperjav.utils.logger import logger
 
@@ -32,8 +34,8 @@ class AnimeWhisperGenerator:
     """
     TextGenerator backed by litagin/anime-whisper (HuggingFace Whisper fine-tune).
 
-    Produces raw transcription text (no timestamps) from audio files.
-    Manages its own HF pipeline lifecycle via load()/unload() for VRAM swapping.
+    Uses WhisperProcessor + WhisperForConditionalGeneration directly,
+    loading audio via librosa and running model.generate() under torch.no_grad().
     """
 
     def __init__(
@@ -45,7 +47,7 @@ class AnimeWhisperGenerator:
         max_new_tokens: int = 448,
     ):
         """
-        Store configuration for deferred HF pipeline construction.
+        Store configuration for deferred model construction.
 
         Args:
             model_id: HuggingFace model ID or local path for anime-whisper.
@@ -63,7 +65,10 @@ class AnimeWhisperGenerator:
             "no_repeat_ngram_size": no_repeat_ngram_size,
             "max_new_tokens": max_new_tokens,
         }
-        self._pipe = None  # HF ASR pipeline, created in load()
+        self._processor = None
+        self._model = None
+        self._device = None   # Resolved device string (e.g. "cuda:0")
+        self._dtype = None    # Resolved torch dtype (e.g. torch.float16)
         self._loaded = False
 
     @property
@@ -101,9 +106,10 @@ class AnimeWhisperGenerator:
 
     def load(self) -> None:
         """
-        Create HF ASR pipeline and load the anime-whisper model into GPU.
+        Load WhisperProcessor and WhisperForConditionalGeneration.
 
-        Fresh pipeline each time — prevents stale state across load/unload cycles.
+        Uses the low-level API (not pipeline()) which is proven stable
+        on torch 2.9+ / Windows / CUDA.
         """
         if self._loaded:
             logger.debug("[AnimeWhisperGenerator] Already loaded")
@@ -113,7 +119,8 @@ class AnimeWhisperGenerator:
         os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
         os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
-        from transformers import pipeline
+        import torch
+        from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
         cfg = self._config
         device = self._detect_device(cfg["device"])
@@ -127,16 +134,18 @@ class AnimeWhisperGenerator:
         import time
         start = time.time()
 
-        self._pipe = pipeline(
-            "automatic-speech-recognition",
-            model=cfg["model_id"],
-            device=device,
-            dtype=dtype,
-        )
+        self._processor = WhisperProcessor.from_pretrained(cfg["model_id"])
+        self._model = WhisperForConditionalGeneration.from_pretrained(
+            cfg["model_id"],
+            torch_dtype=dtype,
+        ).to(device)
+
+        self._device = device
+        self._dtype = dtype
+        self._loaded = True
 
         elapsed = time.time() - start
         logger.info("[AnimeWhisperGenerator] Model loaded (%.1fs)", elapsed)
-        self._loaded = True
 
     def unload(self) -> None:
         """
@@ -147,15 +156,51 @@ class AnimeWhisperGenerator:
         if not self._loaded:
             return
 
-        if self._pipe is not None:
-            del self._pipe
-            self._pipe = None
+        if self._model is not None:
+            del self._model
+            self._model = None
+        if self._processor is not None:
+            del self._processor
+            self._processor = None
 
         from whisperjav.utils.gpu_utils import safe_cuda_cleanup
         safe_cuda_cleanup()
 
+        self._device = None
+        self._dtype = None
         self._loaded = False
         logger.info("[AnimeWhisperGenerator] Model unloaded")
+
+    # ------------------------------------------------------------------
+    # Audio loading
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _load_audio(audio_path: Path) -> np.ndarray:
+        """
+        Load audio file as float32 numpy array at 16kHz mono.
+
+        Uses librosa (proven path from working anime-whisper scripts).
+        Falls back to soundfile if librosa fails.
+        """
+        import librosa
+
+        try:
+            audio, _sr = librosa.load(str(audio_path), sr=16000)
+            return audio
+        except Exception as e:
+            logger.warning(
+                "[AnimeWhisperGenerator] librosa failed for %s: %s — trying soundfile",
+                audio_path.name if hasattr(audio_path, "name") else audio_path, e,
+            )
+            import soundfile as sf
+            audio, sr = sf.read(str(audio_path))
+            if sr != 16000:
+                audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+            # Ensure mono
+            if audio.ndim > 1:
+                audio = audio.mean(axis=1)
+            return audio.astype(np.float32)
 
     # ------------------------------------------------------------------
     # Generation
@@ -192,29 +237,42 @@ class AnimeWhisperGenerator:
                 "(anime-whisper model constraint: no initial prompt)"
             )
 
+        import torch
+
         cfg = self._config
 
-        generate_kwargs = {
-            "language": "Japanese",
-            "do_sample": False,
-            "num_beams": 1,
-            "no_repeat_ngram_size": cfg["no_repeat_ngram_size"],
-            "repetition_penalty": 1.0,
-            "max_new_tokens": cfg["max_new_tokens"],
-        }
-
         try:
-            # return_timestamps=True activates Whisper's native long-form
-            # decoding (sequential 30s windows) for audio >30s.  We discard
-            # the timestamps and only take the text.  This avoids the
-            # experimental chunk_length_s path which crashes on Windows
-            # (0xC0000409 heap corruption in CUDA kernels).
-            result = self._pipe(
-                str(audio_path),
-                return_timestamps=True,
-                generate_kwargs=generate_kwargs,
+            # Load and preprocess audio
+            audio = self._load_audio(audio_path)
+
+            # Extract features via WhisperProcessor and cast to model dtype
+            # (processor outputs float32; model may be float16 on CUDA)
+            inputs = self._processor(
+                audio,
+                sampling_rate=16000,
+                return_tensors="pt",
             )
-            text = result.get("text", "").strip()
+            input_features = inputs.input_features.to(
+                device=self._device, dtype=self._dtype
+            )
+
+            # Generate text tokens
+            with torch.no_grad():
+                generated_ids = self._model.generate(
+                    input_features=input_features,
+                    language="ja",
+                    task="transcribe",
+                    do_sample=False,
+                    num_beams=1,
+                    no_repeat_ngram_size=cfg["no_repeat_ngram_size"],
+                    max_new_tokens=cfg["max_new_tokens"],
+                )
+
+            # Decode tokens to text
+            text = self._processor.batch_decode(
+                generated_ids, skip_special_tokens=True
+            )[0].strip()
+
         except Exception as e:
             logger.error(
                 "[AnimeWhisperGenerator] Transcription failed for %s: %s",
@@ -242,9 +300,9 @@ class AnimeWhisperGenerator:
         """
         Transcribe a batch of audio files to text.
 
-        HF ASR pipeline processes one file at a time, so this iterates
-        sequentially.  The VRAM lifecycle (load/unload) is managed by
-        the orchestrator, not per-call.
+        Processes one file at a time (Whisper encoder takes fixed-size
+        mel spectrogram per utterance).  The VRAM lifecycle (load/unload)
+        is managed by the orchestrator, not per-call.
 
         Args:
             audio_paths: Paths to audio files (one per frame).
