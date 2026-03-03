@@ -267,6 +267,17 @@ class QwenPipeline(BasePipeline):
         # Generator backend selection (v1.8.6+)
         self.generator_backend = generator_backend
 
+        # anime-whisper: vad_only (skip ForcedAligner, save ~1GB VRAM),
+        # passthrough cleaner, no step-down (no aligner = no collapse),
+        # TEN VAD segmenter with tighter grouping for anime speech patterns
+        if generator_backend == "anime-whisper":
+            self.timestamp_mode = TimestampMode.VAD_ONLY
+            self.assembly_cleaner_enabled = False
+            self.stepdown_enabled = False
+            self.segmenter_backend = "ten"
+            self.segmenter_chunk_threshold = 0.5
+            self.segmenter_max_group_duration = 5.0
+
         # Qwen ASR config (stored as dict for deferred construction)
         self._asr_config = {
             "model_id": model_id,
@@ -391,13 +402,16 @@ class QwenPipeline(BasePipeline):
 
         # TextGenerator: selected by generator_backend (v1.8.6+)
         if self.generator_backend == "anime-whisper":
+            # Whisper max_target_positions=448, minus 4 special tokens = 444.
+            # Do NOT forward the Qwen3 default of 4096 — it crashes Whisper.
+            aw_max_tokens = min(cfg.get("max_new_tokens", 444), 444)
             generator = TextGeneratorFactory.create(
                 "anime-whisper",
                 model_id=cfg.get("model_id", "litagin/anime-whisper"),
                 device=cfg["device"],
                 dtype=cfg["dtype"],
-                no_repeat_ngram_size=cfg.get("no_repeat_ngram_size", 5),
-                max_new_tokens=cfg.get("max_new_tokens"),
+                no_repeat_ngram_size=cfg.get("no_repeat_ngram_size", 0),
+                max_new_tokens=aw_max_tokens,
             )
         else:
             # Default: Qwen3 text-only mode (existing behavior)

@@ -5,13 +5,16 @@ Uses the low-level WhisperProcessor + WhisperForConditionalGeneration API
 (NOT the HF ``pipeline()`` wrapper, which crashes with 0xC0000409 on
 torch 2.9+ / transformers 4.57+ / Windows / CUDA).
 
-Key model constraints (from model card):
+Key model constraints (from developer's demo app + model card):
     - NO initial prompt / context — causes hallucinations.  The ``context``
       parameter in generate() is intentionally IGNORED.
-    - no_repeat_ngram_size >= 5 required to prevent repetition loops.
+    - no_repeat_ngram_size = 0 recommended by model card (default).
+      5-10 is a fallback if repetition hallucinations are noticeable.
+    - Greedy decoding: do_sample=False, num_beams=1 (litagin demo).
     - Japanese only.
     - Output is text-only (no timestamps).  Timestamps come from the
       Qwen3 ForcedAligner downstream in the subtitle pipeline.
+    - VRAM: ~4GB (Whisper large-v2, ~1.55B params, float16).
 
 Lifecycle design follows Qwen3TextGenerator pattern:
     Fresh model per load()/unload() cycle.
@@ -43,8 +46,8 @@ class AnimeWhisperGenerator:
         model_id: str = "litagin/anime-whisper",
         device: str = "auto",
         dtype: str = "auto",
-        no_repeat_ngram_size: int = 5,
-        max_new_tokens: int = None,
+        no_repeat_ngram_size: int = 0,
+        max_new_tokens: int = 444,
     ):
         """
         Store configuration for deferred model construction.
@@ -53,10 +56,14 @@ class AnimeWhisperGenerator:
             model_id: HuggingFace model ID or local path for anime-whisper.
             device: Device ('auto', 'cuda', 'cuda:0', 'cpu').
             dtype: Data type ('auto', 'float16', 'bfloat16', 'float32').
-            no_repeat_ngram_size: N-gram repetition prevention (model card: >=5).
+            no_repeat_ngram_size: N-gram repetition prevention (model card default: 0 = disabled).
+                Set to 5-10 if repetition hallucinations are noticeable.
             max_new_tokens: Maximum generated tokens per utterance.
-                None = let Whisper use its own max_target_positions (448).
-                Only set explicitly if you need to limit output length.
+                444 = max safe value (max_target_positions 448 minus 4 special
+                tokens).  Must be set explicitly because the model's
+                generation_config defaults to 4096, which exceeds 448.
+                litagin's demo uses 64 for 15s clips; 444 is appropriate
+                for our 6-48s framed audio.
         """
         self._config = {
             "model_id": model_id,
@@ -241,47 +248,40 @@ class AnimeWhisperGenerator:
 
         cfg = self._config
 
-        try:
-            # Load and preprocess audio
-            audio = self._load_audio(audio_path)
+        # Load and preprocess audio (has its own fallback logic)
+        audio = self._load_audio(audio_path)
 
-            # Extract features via WhisperProcessor and cast to model dtype
-            # (processor outputs float32; model may be float16 on CUDA)
-            inputs = self._processor(
-                audio,
-                sampling_rate=16000,
-                return_tensors="pt",
-            )
-            input_features = inputs.input_features.to(
-                device=self._device, dtype=self._dtype
-            )
+        # Extract features via WhisperProcessor and cast to model dtype
+        # (processor outputs float32; model may be float16 on CUDA)
+        inputs = self._processor(
+            audio,
+            sampling_rate=16000,
+            return_tensors="pt",
+        )
+        input_features = inputs.input_features.to(
+            device=self._device, dtype=self._dtype
+        )
 
-            # Generate text tokens — match proven working pattern:
-            # let Whisper manage its own token budget (max_target_positions)
-            with torch.no_grad():
-                gen_kwargs = {
-                    "input_features": input_features,
-                    "language": "ja",
-                    "task": "transcribe",
-                    "no_repeat_ngram_size": cfg["no_repeat_ngram_size"],
-                    "num_beams": 5,
-                }
-                if cfg["max_new_tokens"] is not None:
-                    gen_kwargs["max_new_tokens"] = cfg["max_new_tokens"]
-                generated_ids = self._model.generate(**gen_kwargs)
+        # Generate text tokens — match litagin's demo pattern:
+        # greedy decoding (num_beams=1, do_sample=False).
+        # max_new_tokens MUST be set explicitly — the model's
+        # generation_config defaults to 4096, exceeding max_target_positions=448.
+        with torch.no_grad():
+            gen_kwargs = {
+                "input_features": input_features,
+                "language": "ja",
+                "task": "transcribe",
+                "do_sample": False,
+                "num_beams": 1,
+                "no_repeat_ngram_size": cfg["no_repeat_ngram_size"],
+                "max_new_tokens": cfg["max_new_tokens"],
+            }
+            generated_ids = self._model.generate(**gen_kwargs)
 
-            # Decode tokens to text
-            text = self._processor.batch_decode(
-                generated_ids, skip_special_tokens=True
-            )[0].strip()
-
-        except Exception as e:
-            logger.error(
-                "[AnimeWhisperGenerator] Transcription failed for %s: %s",
-                audio_path.name if hasattr(audio_path, "name") else audio_path,
-                e,
-            )
-            text = ""
+        # Decode tokens to text
+        text = self._processor.batch_decode(
+            generated_ids, skip_special_tokens=True
+        )[0].strip()
 
         return TranscriptionResult(
             text=text,

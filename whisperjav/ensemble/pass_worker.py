@@ -970,6 +970,11 @@ def _build_pipeline(
         if pass_config.get("speech_segmenter"):
             qwen_defaults["qwen_segmenter"] = pass_config["speech_segmenter"]
             logger.debug("Pass %s: Override qwen_segmenter = %s", pass_number, pass_config["speech_segmenter"])
+        # anime-whisper: default to TEN VAD (must override BEFORE sensitivity resolution)
+        _aw_gen = qwen_defaults.get("qwen_generator_backend", "qwen3")
+        if _aw_gen == "anime-whisper" and not pass_config.get("speech_segmenter"):
+            qwen_defaults["qwen_segmenter"] = "ten"
+            logger.debug("Pass %s: anime-whisper default qwen_segmenter = ten", pass_number)
         # Resolve sensitivity preset into segmenter_config
         # Layering: YAML spec < sensitivity preset < user custom overrides
         qwen_sensitivity = (
@@ -1040,6 +1045,16 @@ def _build_pipeline(
             _user_qwen = pass_config.get("qwen_params") or {}
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
+            if "timestamp_mode" not in _user_qwen:
+                qwen_pipeline_params["timestamp_mode"] = "vad_only"
+            if "assembly_cleaner" not in _user_qwen:
+                qwen_pipeline_params["assembly_cleaner"] = False
+            if "stepdown" not in _user_qwen:
+                qwen_pipeline_params["stepdown_enabled"] = False
+            if "chunk_threshold" not in _user_qwen:
+                qwen_pipeline_params["segmenter_chunk_threshold"] = 0.5
+            if "max_group_duration" not in _user_qwen:
+                qwen_pipeline_params["segmenter_max_group_duration"] = 5.0
         # Pipeline-owned defaults: only forward when ensemble config explicitly overrides
         if "qwen_scene_min_duration" in qwen_defaults:
             qwen_pipeline_params["scene_min_duration"] = qwen_defaults["qwen_scene_min_duration"]
