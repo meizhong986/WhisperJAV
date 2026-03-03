@@ -595,7 +595,7 @@ class WhisperJAVAPI:
         # iterated character-by-character by pywebview and cause parse errors (e.g., 'M').
         # Use semicolon-separated patterns without spaces for compatibility.
         file_types = [
-            'Media Files (*.mp4;*.mkv;*.avi;*.flv;*.wmv;*.webm;*.mpg;*.mpeg;*.ts;*.mp3;*.wav;*.aac;*.m4a;*.flac;*.ogg;*.opus)',
+            'Media Files (*.mp4;*.mkv;*.avi;*.flv;*.wmv;*.webm;*.mpg;*.mpeg;*.ts;*.mp3;*.wav;*.aac;*.m4a;*.m4b;*.flac;*.ogg;*.opus)',
             'All Files (*.*)'
         ]
 

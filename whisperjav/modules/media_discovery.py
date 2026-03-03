@@ -19,7 +19,7 @@ class MediaDiscovery:
         
         # Supported extensions
         self.video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg'}
-        self.audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.opus'}
+        self.audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.m4b', '.opus'}
         self.supported_extensions = self.video_extensions | self.audio_extensions
     
     def _check_ffprobe(self) -> bool:
