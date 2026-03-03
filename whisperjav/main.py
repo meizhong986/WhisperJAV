@@ -2,6 +2,19 @@
 """WhisperJAV Main Entry Point - V3 Enhanced with all improvements."""
 
 # ===========================================================================
+# UTF-8 MODE — for direct execution (python -m whisperjav.main) on Chinese
+# Windows. Relaunches in UTF-8 mode so open() defaults to UTF-8. See #190.
+# ===========================================================================
+import os as _os, sys as _sys  # noqa: E401 — early minimal imports
+if (
+    _os.name == 'nt'
+    and not getattr(_sys.flags, 'utf8_mode', False)
+    and __name__ == '__main__'
+):
+    from whisperjav.utils.console import relaunch_for_utf8
+    relaunch_for_utf8('whisperjav.main')
+
+# ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
 # Suppress noisy library warnings that don't affect functionality

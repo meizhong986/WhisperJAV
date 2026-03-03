@@ -11,6 +11,17 @@ Entry point: whisperjav
 """
 
 # ===========================================================================
+# UTF-8 MODE — must be the very first thing before any library imports.
+# On Chinese Windows (GBK locale), third-party libraries crash with codec
+# errors when processing non-ASCII content. Relaunch in UTF-8 mode so that
+# open() defaults to UTF-8 across the entire process. See #190.
+# ===========================================================================
+import os, sys  # noqa: E401 — intentionally early, minimal imports
+if os.name == 'nt' and not getattr(sys.flags, 'utf8_mode', False):
+    from whisperjav.utils.console import relaunch_for_utf8
+    relaunch_for_utf8('whisperjav.cli')
+
+# ===========================================================================
 # EARLY SETUP - Must be before any library imports
 # ===========================================================================
 # Import console utilities first for encoding fix and warning suppression

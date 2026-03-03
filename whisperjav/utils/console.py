@@ -4,6 +4,7 @@ Console utilities for WhisperJAV.
 
 Provides:
 - UTF-8 encoding fix for Windows console
+- UTF-8 mode relaunch for CLI entry points (fixes open() default encoding)
 - Safe print functions that handle encoding errors
 - Warning suppression for common noisy dependencies
 
@@ -26,6 +27,53 @@ import warnings
 from typing import Any, TextIO
 
 
+def relaunch_for_utf8(module_name: str) -> None:
+    """
+    On Windows with non-UTF-8 locale, relaunch the process in UTF-8 mode.
+
+    Third-party libraries (PySubtrans, etc.) may use open() without explicit
+    encoding, which defaults to the system locale (GBK on Chinese Windows).
+    This causes UnicodeDecodeError when processing non-ASCII content like
+    Chinese translations. See GitHub issue #190.
+
+    The only way to fix open() default encoding in Python 3.10-3.14 is to
+    start the interpreter with ``-X utf8`` or ``PYTHONUTF8=1``. This function
+    transparently relaunches the process with UTF-8 mode enabled.
+
+    Call at the very start of CLI entry points, before any other code.
+    Does nothing on non-Windows or if already in UTF-8 mode.
+
+    Args:
+        module_name: The module to run via ``-m`` (e.g., 'whisperjav.translate.cli')
+    """
+    if os.name != 'nt':
+        return
+
+    if getattr(sys.flags, 'utf8_mode', False):
+        return
+
+    # Safety guard against infinite relaunch (shouldn't happen since
+    # utf8_mode would be True after relaunch, but protects edge cases)
+    if os.environ.get('_WHISPERJAV_UTF8') == '1':
+        return
+
+    if not sys.executable:
+        return
+
+    import subprocess
+
+    env = os.environ.copy()
+    env['PYTHONUTF8'] = '1'
+    env['PYTHONIOENCODING'] = 'utf-8:replace'
+    env['_WHISPERJAV_UTF8'] = '1'
+
+    result = subprocess.run(
+        [sys.executable, '-X', 'utf8', '-m', module_name] + sys.argv[1:],
+        env=env,
+    )
+    sys.exit(result.returncode)
+
+
 def ensure_utf8_console() -> None:
     """
     Ensure stdout and stderr use UTF-8 encoding on Windows.
@@ -34,6 +82,9 @@ def ensure_utf8_console() -> None:
     not displaying correctly in Windows console. Should be called
     early in the application startup, before any output.
 
+    Also sets PYTHONUTF8=1 in the environment so any child processes
+    inherit UTF-8 mode.
+
     Safe to call multiple times - will only apply the fix once.
 
     Example:
@@ -41,6 +92,10 @@ def ensure_utf8_console() -> None:
         from whisperjav.utils.console import ensure_utf8_console
         ensure_utf8_console()
     """
+    # Set env vars for child processes (subprocess, os.system, etc.)
+    os.environ.setdefault('PYTHONUTF8', '1')
+    os.environ.setdefault('PYTHONIOENCODING', 'utf-8:replace')
+
     _fix_stream_encoding(sys.stdout, 1)
     _fix_stream_encoding(sys.stderr, 2)
 
@@ -48,6 +103,9 @@ def ensure_utf8_console() -> None:
 def _fix_stream_encoding(stream: TextIO | None, fd: int) -> None:
     """
     Fix encoding for a single stream.
+
+    Prefers reconfigure() (Python 3.7+) which modifies the stream in-place,
+    preserving any cached references. Falls back to TextIOWrapper replacement.
 
     Args:
         stream: The stream to fix (sys.stdout or sys.stderr)
@@ -64,7 +122,15 @@ def _fix_stream_encoding(stream: TextIO | None, fd: int) -> None:
     except (AttributeError, TypeError):
         pass
 
-    # Apply UTF-8 wrapper
+    # Prefer reconfigure() - modifies stream in-place (safer)
+    try:
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+            return
+    except (AttributeError, OSError, ValueError):
+        pass
+
+    # Fallback: create new TextIOWrapper
     try:
         if hasattr(stream, 'buffer'):
             buffer = stream.buffer
@@ -249,6 +315,7 @@ def print_missing_extra_error(
 
 # Module-level exports
 __all__ = [
+    "relaunch_for_utf8",
     "ensure_utf8_console",
     "safe_print",
     "suppress_dependency_warnings",

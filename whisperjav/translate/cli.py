@@ -9,12 +9,21 @@ Requires the [translate] extra: pip install whisperjav[translate]
 """
 
 # ===========================================================================
+# UTF-8 MODE — must be the very first thing before any library imports.
+# On Chinese Windows (GBK locale), PySubtrans crashes with 'gbk' codec
+# errors when processing Chinese translations. Relaunch in UTF-8 mode so
+# that open() defaults to UTF-8 across the entire process. See #190.
+# ===========================================================================
+import os, sys  # noqa: E401 — intentionally early, minimal imports
+if os.name == 'nt' and not getattr(sys.flags, 'utf8_mode', False):
+    from whisperjav.utils.console import relaunch_for_utf8
+    relaunch_for_utf8('whisperjav.translate.cli')
+
+# ===========================================================================
 # EARLY SETUP - Must be before any library imports
 # ===========================================================================
 from whisperjav.utils.console import setup_console, print_missing_extra_error
 setup_console()
-
-import sys
 
 # Check for translate extra dependencies before importing them
 def _check_translate_dependencies():
