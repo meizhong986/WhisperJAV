@@ -1,5 +1,6 @@
 from typing import Union, Optional, Tuple, Dict
 from pathlib import Path
+import re
 import shutil
 
 from whisperjav.modules.subtitle_sanitizer import SubtitleSanitizer
@@ -249,3 +250,48 @@ class SRTPostProcessor:
             # Clean up temporary directory
             if temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def convert_srt_to_vtt(srt_path: Union[str, Path]) -> Path:
+    """
+    Convert an SRT subtitle file to WebVTT format.
+
+    WebVTT differs from SRT in two ways:
+    1. Starts with a "WEBVTT" header line followed by a blank line
+    2. Timestamps use dots instead of commas for millisecond separators
+       SRT:  00:01:23,456 --> 00:01:25,789
+       VTT:  00:01:23.456 --> 00:01:25.789
+
+    Sequence numbers (valid but optional in VTT) are preserved.
+
+    Args:
+        srt_path: Path to the source SRT file.
+
+    Returns:
+        Path to the created VTT file (same name, .vtt extension).
+
+    Raises:
+        FileNotFoundError: If the SRT file does not exist.
+    """
+    srt_path = Path(srt_path)
+    if not srt_path.exists():
+        raise FileNotFoundError(f"SRT file not found: {srt_path}")
+
+    vtt_path = srt_path.with_suffix('.vtt')
+
+    with open(srt_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Strip BOM if present (common in Windows-generated SRT files)
+    content = content.lstrip('\ufeff')
+
+    # Replace comma with dot in timestamp lines only
+    # Pattern: HH:MM:SS,mmm (the SRT timestamp format)
+    content = re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', content)
+
+    with open(vtt_path, 'w', encoding='utf-8') as f:
+        f.write('WEBVTT\n\n')
+        f.write(content)
+
+    logger.info(f"Converted to VTT: {vtt_path.name}")
+    return vtt_path

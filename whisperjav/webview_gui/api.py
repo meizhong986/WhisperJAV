@@ -173,6 +173,11 @@ class WhisperJAVAPI:
         if options.get('debug', False):
             args += ["--debug"]
 
+        # Output format (srt/vtt/both)
+        output_format = options.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
+
         # Advanced options (WIP features)
         if options.get('adaptive_classification', False):
             args += ["--adaptive-classification"]
@@ -275,6 +280,11 @@ class WhisperJAVAPI:
 
         if options.get('debug', False):
             args += ["--debug"]
+
+        # Output format (srt/vtt/both)
+        output_format = options.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
 
         if options.get('accept_cpu_mode', False):
             args += ["--accept-cpu-mode"]
@@ -2481,6 +2491,11 @@ class WhisperJAVAPI:
         if config.get('debug', False):
             args += ["--debug"]
 
+        # Output format (srt/vtt/both)
+        output_format = config.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
+
         # Translation options (single CLI command approach)
         if config.get('translate', False):
             args += ["--translate"]
@@ -2934,6 +2949,7 @@ class WhisperJAVAPI:
         "output_to_source":          "outputToSource",
         "output_dir":                "outputDir",
         "debug_logging":             "debugLogging",
+        "output_format":             "outputFormat",
         "keep_temp":                 "keepTemp",
         "temp_dir":                  "tempDir",
         "accept_cpu_mode":           "acceptCpuMode",

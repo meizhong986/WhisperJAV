@@ -86,6 +86,9 @@ from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 # Translation service - direct function call instead of subprocess
 from whisperjav.translate import translate_with_config, TranslationError, ConfigurationError
 
+# SRT → VTT conversion
+from whisperjav.modules.srt_postprocessing import convert_srt_to_vtt
+
 
 # Language code mapping for Whisper
 LANGUAGE_CODE_MAP = {
@@ -265,6 +268,8 @@ def parse_arguments():
     path_group.add_argument("--output-dir", default="source",
                            help='Output directory. "source" (default) saves SRT next to each input video. '
                                 'Specify a path to use a fixed output directory.')
+    path_group.add_argument("--output-format", choices=["srt", "vtt", "both"], default="srt",
+                           help='Output subtitle format: srt (default), vtt (WebVTT), or both')
     path_group.add_argument("--temp-dir", default=None, help="Temporary directory")
     path_group.add_argument("--keep-temp", action="store_true", help="Keep temporary files")
     path_group.add_argument("--skip-existing", action="store_true",
@@ -717,6 +722,27 @@ def add_signatures_to_srt(srt_path: str, producer_credit: str = None,
         # Don't fail the whole process if signatures can't be added
 
 
+def apply_vtt_conversion(srt_path: str, output_format: str) -> None:
+    """Convert SRT to VTT if requested by --output-format, and optionally remove the SRT.
+
+    Args:
+        srt_path: Path to the SRT file.
+        output_format: "srt" (no-op), "vtt" (convert and remove SRT), or "both" (convert, keep SRT).
+    """
+    if output_format == "srt" or not srt_path:
+        return
+    srt = Path(srt_path)
+    if not srt.exists():
+        return
+    try:
+        vtt_path = convert_srt_to_vtt(srt)
+        if output_format == "vtt":
+            srt.unlink()
+            logger.info(f"Removed SRT (--output-format vtt): {srt.name}")
+    except Exception as e:
+        logger.warning(f"VTT conversion failed for {srt}: {e}")
+
+
 def cleanup_temp_directory(temp_dir: str):
     """Clean up the temporary directory after processing."""
     temp_path = Path(temp_dir)
@@ -1161,8 +1187,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     expected_dir = Path(file_path_str).parent
                 else:
                     expected_dir = Path(args.output_dir)
-                expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-                if expected_output.exists():
+                expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+                expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
+                if expected_srt.exists() or expected_vtt.exists():
                     logger.info(f"Skipping (output exists): {file_name}")
                     skipped_count += 1
                     all_stats.append({"file": file_path_str, "status": "skipped", "reason": "output_exists"})
@@ -1235,6 +1262,15 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     except Exception as e:
                         logger.error(f"Translation failed: {e}")
                         # Don't re-raise - continue with next file
+
+                # VTT conversion (if requested via --output-format)
+                output_format = getattr(args, 'output_format', 'srt')
+                if output_format != 'srt':
+                    apply_vtt_conversion(output_path, output_format)
+                    # Also convert translated SRT if present
+                    translated_srt = metadata.get("output_files", {}).get("translated_srt", "")
+                    if translated_srt:
+                        apply_vtt_conversion(translated_srt, output_format)
 
                 progress.show_file_complete(file_name, subtitle_count, output_path)
                 
@@ -1377,8 +1413,9 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                 expected_dir = Path(file_path_str).parent
             else:
                 expected_dir = Path(args.output_dir)
-            expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-            if expected_output.exists():
+            expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+            expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
+            if expected_srt.exists() or expected_vtt.exists():
                 logger.info(f"Skipping (output exists): {Path(file_path_str).name}")
                 skipped_files.append(file_path_str)
             else:
@@ -1456,7 +1493,15 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                             except Exception as e:
                                 logger.error(f"Translation failed: {e}")
                                 # Don't re-raise - continue with next file
-        
+
+                        # VTT conversion (if requested via --output-format)
+                        output_format = getattr(args, 'output_format', 'srt')
+                        if output_format != 'srt':
+                            apply_vtt_conversion(output_path, output_format)
+                            translated_srt = task.result.get("output_files", {}).get("translated_srt", "")
+                            if translated_srt:
+                                apply_vtt_conversion(translated_srt, output_format)
+
         # Summarize results
         successful = sum(1 for t in tasks if t.status == ProcessingStatus.COMPLETED)
         failed = sum(1 for t in tasks if t.status == ProcessingStatus.FAILED)
@@ -2014,6 +2059,7 @@ def main():
                         if translated_path:
                             logger.info(f"Translation saved: {translated_path}")
                             print(f"  -> {translated_path}")
+                            result.setdefault('summary', {})['translated_output'] = str(translated_path)
                             translation_success += 1
                         else:
                             logger.warning(f"Translation returned no output for {basename}")
@@ -2033,6 +2079,22 @@ def main():
                 print(f"Translated: {translation_success}")
                 print(f"Failed: {translation_failed}")
                 print("="*50)
+
+            # ============================================================
+            # VTT CONVERSION: Convert SRT outputs if requested
+            # ============================================================
+            output_format = getattr(args, 'output_format', 'srt')
+            if output_format != 'srt' and successful_count > 0:
+                for result in results:
+                    if result.get('error') or result.get('status') == 'failed':
+                        continue
+                    srt_path = result.get('summary', {}).get('final_output')
+                    if srt_path:
+                        apply_vtt_conversion(srt_path, output_format)
+                    # Also convert translated SRT if present
+                    translated_srt = result.get('summary', {}).get('translated_output', '')
+                    if translated_srt:
+                        apply_vtt_conversion(translated_srt, output_format)
 
             # Close parameter tracer for ensemble mode
             if tracer:

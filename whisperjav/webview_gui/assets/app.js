@@ -706,6 +706,7 @@ const FormManager = {
             keep_temp: document.getElementById('keepTemp').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
+            output_format: document.getElementById('outputFormat').value,
         };
 
         // Transformers mode: Minimal args by default (use model's internal defaults)
@@ -4742,7 +4743,8 @@ const EnsembleManager = {
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
-            temp_dir: document.getElementById('tempDir').value.trim()
+            temp_dir: document.getElementById('tempDir').value.trim(),
+            output_format: document.getElementById('outputFormat').value,
         };
 
         // Add translation settings if enabled (single CLI command approach)
