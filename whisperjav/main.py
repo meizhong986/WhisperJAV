@@ -1101,8 +1101,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         if _gen_backend == "anime-whisper":
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "litagin/anime-whisper"
-            if not any(a.startswith('--qwen-max-tokens') for a in sys.argv):
-                qwen_kwargs["max_new_tokens"] = 448
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode

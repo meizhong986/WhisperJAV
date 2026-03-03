@@ -44,7 +44,7 @@ class AnimeWhisperGenerator:
         device: str = "auto",
         dtype: str = "auto",
         no_repeat_ngram_size: int = 5,
-        max_new_tokens: int = 448,
+        max_new_tokens: int = None,
     ):
         """
         Store configuration for deferred model construction.
@@ -55,8 +55,8 @@ class AnimeWhisperGenerator:
             dtype: Data type ('auto', 'float16', 'bfloat16', 'float32').
             no_repeat_ngram_size: N-gram repetition prevention (model card: >=5).
             max_new_tokens: Maximum generated tokens per utterance.
-                Model card demo uses 64 (for 15s clips).  For subtitle frames
-                (6-48s), 448 is Whisper large's architectural max.
+                None = let Whisper use its own max_target_positions (448).
+                Only set explicitly if you need to limit output length.
         """
         self._config = {
             "model_id": model_id,
@@ -256,17 +256,19 @@ class AnimeWhisperGenerator:
                 device=self._device, dtype=self._dtype
             )
 
-            # Generate text tokens
+            # Generate text tokens — match proven working pattern:
+            # let Whisper manage its own token budget (max_target_positions)
             with torch.no_grad():
-                generated_ids = self._model.generate(
-                    input_features=input_features,
-                    language="ja",
-                    task="transcribe",
-                    do_sample=False,
-                    num_beams=1,
-                    no_repeat_ngram_size=cfg["no_repeat_ngram_size"],
-                    max_new_tokens=cfg["max_new_tokens"],
-                )
+                gen_kwargs = {
+                    "input_features": input_features,
+                    "language": "ja",
+                    "task": "transcribe",
+                    "no_repeat_ngram_size": cfg["no_repeat_ngram_size"],
+                    "num_beams": 5,
+                }
+                if cfg["max_new_tokens"] is not None:
+                    gen_kwargs["max_new_tokens"] = cfg["max_new_tokens"]
+                generated_ids = self._model.generate(**gen_kwargs)
 
             # Decode tokens to text
             text = self._processor.batch_decode(

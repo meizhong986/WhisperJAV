@@ -397,7 +397,7 @@ class QwenPipeline(BasePipeline):
                 device=cfg["device"],
                 dtype=cfg["dtype"],
                 no_repeat_ngram_size=cfg.get("no_repeat_ngram_size", 5),
-                max_new_tokens=cfg.get("max_new_tokens", 448),
+                max_new_tokens=cfg.get("max_new_tokens"),
             )
         else:
             # Default: Qwen3 text-only mode (existing behavior)

@@ -2957,7 +2957,6 @@ const EnsembleManager = {
             if (passState.isAnimeWhisper && !passState.customized) {
                 currentValues.model_id = 'litagin/anime-whisper';
                 currentValues.repetition_penalty = 1.0;
-                currentValues.max_new_tokens = 448;
                 currentValues.context = '';
             }
 
@@ -4336,7 +4335,6 @@ const EnsembleManager = {
         if (passState.isAnimeWhisper) {
             defaults.model_id = 'litagin/anime-whisper';
             defaults.repetition_penalty = 1.0;
-            defaults.max_new_tokens = 448;
             defaults.context = '';
         }
 

@@ -1040,8 +1040,6 @@ def _build_pipeline(
             _user_qwen = pass_config.get("qwen_params") or {}
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
-            if "max_new_tokens" not in _user_qwen:
-                qwen_pipeline_params["max_new_tokens"] = 448
         # Pipeline-owned defaults: only forward when ensemble config explicitly overrides
         if "qwen_scene_min_duration" in qwen_defaults:
             qwen_pipeline_params["scene_min_duration"] = qwen_defaults["qwen_scene_min_duration"]
