@@ -97,6 +97,54 @@ VALID_EXTRAS = [
     "huggingface", "analysis", "compatibility", "all",
 ]
 
+IS_WINDOWS = platform.system() == 'Windows'
+
+
+# =============================================================================
+# Cross-Platform Helpers
+# =============================================================================
+
+def _find_python(install_dir: Path) -> Optional[Path]:
+    """Find the Python executable inside an installation directory.
+
+    Works for:
+      - conda-constructor installs (Windows): prefix/python.exe
+      - pip virtualenvs (Windows):            prefix/Scripts/python.exe
+      - pip virtualenvs (Linux/macOS):        prefix/bin/python
+      - System installs (Linux):              prefix/bin/python3
+    """
+    candidates = [
+        install_dir / 'python.exe',          # conda-constructor (Windows)
+        install_dir / 'python',              # rare direct layout
+        install_dir / 'Scripts' / 'python.exe',  # pip venv (Windows)
+        install_dir / 'bin' / 'python',      # pip venv / system (Linux/macOS)
+        install_dir / 'bin' / 'python3',     # system (Linux/macOS)
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _find_pip(install_dir: Path) -> Optional[Path]:
+    """Find the pip executable inside an installation directory.
+
+    Works for:
+      - conda-constructor (Windows): prefix/Scripts/pip.exe
+      - pip virtualenvs (Windows):   prefix/Scripts/pip.exe
+      - pip virtualenvs (Linux):     prefix/bin/pip
+    """
+    candidates = [
+        install_dir / 'Scripts' / 'pip.exe',
+        install_dir / 'Scripts' / 'pip',
+        install_dir / 'bin' / 'pip',
+        install_dir / 'bin' / 'pip3',
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
 
 def print_header():
     """Print the upgrade tool header."""
@@ -168,13 +216,8 @@ def create_upgrade_snapshot(install_dir: Path) -> Optional[Path]:
         snapshot_path.mkdir()
 
         # Get pip executable
-        pip_exe = install_dir / 'Scripts' / 'pip.exe'
-        if not pip_exe.exists():
-            pip_exe = install_dir / 'Scripts' / 'pip'
-        if not pip_exe.exists():
-            pip_exe = install_dir / 'bin' / 'pip'
-
-        if not pip_exe.exists():
+        pip_exe = _find_pip(install_dir)
+        if pip_exe is None:
             print_warning("pip not found, skipping snapshot creation")
             return None
 
@@ -268,13 +311,8 @@ def rollback_to_snapshot(install_dir: Path, snapshot_path: Path) -> bool:
         return False
 
     # Get pip executable
-    pip_exe = install_dir / 'Scripts' / 'pip.exe'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'Scripts' / 'pip'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'bin' / 'pip'
-
-    if not pip_exe.exists():
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
         print_error("pip not found in installation")
         return False
 
@@ -346,13 +384,8 @@ def check_upgrade_compatibility(install_dir: Path, extras: str = "all") -> Tuple
     warnings = []
 
     # Get pip executable
-    pip_exe = install_dir / 'Scripts' / 'pip.exe'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'Scripts' / 'pip'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'bin' / 'pip'
-
-    if not pip_exe.exists():
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
         return False, ["pip not found in installation"]
 
     # Build the install specifier
@@ -426,26 +459,31 @@ def detect_installation() -> Optional[Path]:
     """
     Detect the WhisperJAV installation directory.
 
+    Supports:
+      - conda-constructor installs (Windows): python.exe directly in prefix
+      - pip virtualenvs (any platform): python in bin/ or Scripts/
+      - System pip installs (Linux): python3 in bin/
+
     Returns:
         Path to installation directory, or None if not found
     """
-    # Check if running from within the installation
+    # Check if running from within a Python environment that has whisperjav
     if hasattr(sys, 'prefix'):
         install_dir = Path(sys.prefix)
-        if (install_dir / 'python.exe').exists() or (install_dir / 'python').exists():
+        if _find_python(install_dir) is not None:
             # Verify it's a WhisperJAV installation
             try:
-                import whisperjav
+                import whisperjav  # noqa: F811
                 return install_dir
             except ImportError:
                 pass
 
-    # Check default Windows installation location
-    if platform.system() == 'Windows':
+    # Check default Windows installation location (conda-constructor)
+    if IS_WINDOWS:
         local_app_data = os.environ.get('LOCALAPPDATA', '')
         if local_app_data:
             default_path = Path(local_app_data) / 'WhisperJAV'
-            if (default_path / 'python.exe').exists():
+            if _find_python(default_path) is not None:
                 return default_path
 
     return None
@@ -461,11 +499,8 @@ def get_current_version(install_dir: Path) -> Optional[str]:
     Returns:
         Version string, or None if not found
     """
-    python_exe = install_dir / 'python.exe'
-    if not python_exe.exists():
-        python_exe = install_dir / 'python'
-
-    if not python_exe.exists():
+    python_exe = _find_python(install_dir)
+    if python_exe is None:
         return None
 
     try:
@@ -504,13 +539,8 @@ def upgrade_package(install_dir: Path) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    pip_exe = install_dir / 'Scripts' / 'pip.exe'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'Scripts' / 'pip'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'bin' / 'pip'
-
-    if not pip_exe.exists():
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
         print_error("pip not found in installation")
         return False
 
@@ -552,13 +582,8 @@ def fix_package_versions(install_dir: Path) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    pip_exe = install_dir / 'Scripts' / 'pip.exe'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'Scripts' / 'pip'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'bin' / 'pip'
-
-    if not pip_exe.exists():
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
         print_error("pip not found in installation")
         return False
 
@@ -585,12 +610,20 @@ def update_launcher(install_dir: Path) -> bool:
     """
     Update the WhisperJAV-GUI.exe launcher in the installation root.
 
+    Windows-only (conda-constructor installs). On Linux/macOS pip installs,
+    console_scripts entry points handle launching, so this is a no-op.
+
     Args:
         install_dir: Path to installation directory
 
     Returns:
         True if successful, False otherwise
     """
+    if not IS_WINDOWS:
+        # Linux/macOS pip installs use console_scripts entry points — no launcher exe needed
+        print_success("Launcher update skipped (not needed on this platform)")
+        return True
+
     src = install_dir / 'Scripts' / 'whisperjav-gui.exe'
     dst = install_dir / 'WhisperJAV-GUI.exe'
 
@@ -807,13 +840,8 @@ def upgrade_package_wheel_only(install_dir: Path) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    pip_exe = install_dir / 'Scripts' / 'pip.exe'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'Scripts' / 'pip'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'bin' / 'pip'
-
-    if not pip_exe.exists():
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
         print_error("pip not found in installation")
         return False
 
@@ -851,13 +879,8 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
     Returns:
         True if successful, False otherwise.
     """
-    pip_exe = install_dir / 'Scripts' / 'pip.exe'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'Scripts' / 'pip'
-    if not pip_exe.exists():
-        pip_exe = install_dir / 'bin' / 'pip'
-
-    if not pip_exe.exists():
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
         print_error("pip not found in installation")
         return False
 
@@ -1012,8 +1035,14 @@ def main() -> int:
     if not install_dir:
         print_error("WhisperJAV installation not found")
         print()
-        print("Please run this script from within the WhisperJAV environment:")
-        print("  %LOCALAPPDATA%\\WhisperJAV\\python.exe -m whisperjav.upgrade")
+        if IS_WINDOWS:
+            print("Please run this script from within the WhisperJAV environment:")
+            print("  %LOCALAPPDATA%\\WhisperJAV\\python.exe -m whisperjav.upgrade")
+        else:
+            print("Please ensure whisperjav is installed in the active Python environment:")
+            print("  pip install whisperjav          # then: whisperjav-upgrade")
+            print("  # or from a virtualenv:")
+            print("  source /path/to/venv/bin/activate && whisperjav-upgrade")
         print()
         return 1
 
@@ -1173,8 +1202,12 @@ def main() -> int:
 
         print_success(f"WhisperJAV {new_version} installed successfully")
 
-        print_step(3, total_steps, "Updating desktop shortcut...")
-        update_desktop_shortcut(install_dir, new_version)
+        if IS_WINDOWS:
+            print_step(3, total_steps, "Updating desktop shortcut...")
+            update_desktop_shortcut(install_dir, new_version)
+        else:
+            print_step(3, total_steps, "Finalizing...")
+            print_success("No shortcut update needed on this platform")
 
         print()
         print("=" * 60)
@@ -1224,9 +1257,12 @@ def main() -> int:
 
     print_success(f"WhisperJAV {new_version} installed successfully")
 
-    # Step 5: Update shortcut and cleanup
-    print_step(5, total_steps, "Updating desktop shortcut and cleaning up...")
-    update_desktop_shortcut(install_dir, new_version)
+    # Step 5: Update shortcut (Windows) and cleanup
+    if IS_WINDOWS:
+        print_step(5, total_steps, "Updating desktop shortcut and cleaning up...")
+        update_desktop_shortcut(install_dir, new_version)
+    else:
+        print_step(5, total_steps, "Cleaning up...")
 
     cleaned = cleanup_old_files(install_dir)
     if cleaned > 0:
@@ -1250,7 +1286,10 @@ def main() -> int:
     print(f"  Extras: [{args.extras}]")
     print(f"  Installation: {install_dir}")
     print()
-    print("  You can now launch WhisperJAV from your desktop shortcut.")
+    if IS_WINDOWS:
+        print("  You can now launch WhisperJAV from your desktop shortcut.")
+    else:
+        print("  You can now run WhisperJAV with: whisperjav <video>")
     print()
     print("  Note: Your AI models and settings have been preserved.")
     if snapshot_path:

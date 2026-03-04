@@ -75,20 +75,20 @@ class TenSpeechSegmenter:
     Note: TEN VAD requires int16 audio input and operates at 16kHz only.
 
     Example:
-        segmenter = TenSpeechSegmenter(threshold=0.20)
+        segmenter = TenSpeechSegmenter(threshold=0.26)
         result = segmenter.segment(audio_path)
     """
 
     def __init__(
         self,
-        threshold: float = 0.20,
+        threshold: float = 0.26,
         hop_size: int = 256,
-        min_speech_duration_ms: int = 100,
+        min_speech_duration_ms: int = 81,
         min_silence_duration_ms: int = 100,
         chunk_threshold_s: Optional[float] = 1.0,
         max_group_duration_s: Optional[float] = None,
         start_pad_ms: int = 0,
-        end_pad_ms: int = 200,
+        end_pad_ms: int = 100,
         **kwargs
     ):
         """
@@ -96,7 +96,7 @@ class TenSpeechSegmenter:
 
         Args:
             threshold: Speech probability threshold [0.0, 1.0]. Lower values
-                detect more speech (more sensitive). Default 0.20.
+                detect more speech (more sensitive). Default 0.26.
             hop_size: Frame size in samples (160 or 256 recommended)
             min_speech_duration_ms: Minimum speech segment duration
             min_silence_duration_ms: Minimum silence between segments (not implemented)

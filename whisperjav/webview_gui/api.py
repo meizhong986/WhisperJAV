@@ -173,6 +173,11 @@ class WhisperJAVAPI:
         if options.get('debug', False):
             args += ["--debug"]
 
+        # Output format (srt/vtt/both)
+        output_format = options.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
+
         # Advanced options (WIP features)
         if options.get('adaptive_classification', False):
             args += ["--adaptive-classification"]
@@ -275,6 +280,11 @@ class WhisperJAVAPI:
 
         if options.get('debug', False):
             args += ["--debug"]
+
+        # Output format (srt/vtt/both)
+        output_format = options.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
 
         if options.get('accept_cpu_mode', False):
             args += ["--accept-cpu-mode"]
@@ -595,7 +605,7 @@ class WhisperJAVAPI:
         # iterated character-by-character by pywebview and cause parse errors (e.g., 'M').
         # Use semicolon-separated patterns without spaces for compatibility.
         file_types = [
-            'Media Files (*.mp4;*.mkv;*.avi;*.flv;*.wmv;*.webm;*.mpg;*.mpeg;*.ts;*.mp3;*.wav;*.aac;*.m4a;*.flac;*.ogg;*.opus)',
+            'Media Files (*.mp4;*.mkv;*.avi;*.flv;*.wmv;*.webm;*.mpg;*.mpeg;*.ts;*.mp3;*.wav;*.aac;*.m4a;*.m4b;*.flac;*.ogg;*.opus)',
             'All Files (*.*)'
         ]
 
@@ -2298,9 +2308,16 @@ class WhisperJAVAPI:
         # Enable ensemble mode
         args.append("--ensemble")
 
+        # Serial mode: finish each file before starting the next
+        if config.get('serial_mode', False):
+            args.append("--ensemble-serial")
+
         # Pass 1 configuration
         pass1 = config.get('pass1', {})
-        args += ["--pass1-pipeline", pass1.get('pipeline', 'balanced')]
+        p1_pipeline = pass1.get('pipeline', 'balanced')
+        if p1_pipeline == 'anime-whisper':
+            p1_pipeline = 'qwen'
+        args += ["--pass1-pipeline", p1_pipeline]
 
         if pass1.get('isTransformers'):
             # Transformers pass: no sensitivity, handle HF params
@@ -2315,6 +2332,11 @@ class WhisperJAVAPI:
             qwen1_params = dict(pass1.get('params') or {}) if pass1.get('customized') else {}
             if pass1.get('framer'):
                 qwen1_params['framer'] = pass1['framer']
+            if pass1.get('isAnimeWhisper'):
+                qwen1_params['generator_backend'] = 'anime-whisper'
+                qwen1_params.setdefault('timestamp_mode', 'vad_only')
+                qwen1_params.setdefault('assembly_cleaner', 'passthrough')
+                qwen1_params.setdefault('stepdown', False)
             if qwen1_params:
                 args += ["--pass1-qwen-params", json.dumps(qwen1_params)]
         else:
@@ -2367,7 +2389,10 @@ class WhisperJAVAPI:
         # Pass 2 configuration
         pass2 = config.get('pass2', {})
         if pass2.get('enabled', False):
-            args += ["--pass2-pipeline", pass2.get('pipeline', 'qwen')]
+            p2_pipeline = pass2.get('pipeline', 'qwen')
+            if p2_pipeline == 'anime-whisper':
+                p2_pipeline = 'qwen'
+            args += ["--pass2-pipeline", p2_pipeline]
 
             if pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
@@ -2382,6 +2407,11 @@ class WhisperJAVAPI:
                 qwen2_params = dict(pass2.get('params') or {}) if pass2.get('customized') else {}
                 if pass2.get('framer'):
                     qwen2_params['framer'] = pass2['framer']
+                if pass2.get('isAnimeWhisper'):
+                    qwen2_params['generator_backend'] = 'anime-whisper'
+                    qwen2_params.setdefault('timestamp_mode', 'vad_only')
+                    qwen2_params.setdefault('assembly_cleaner', 'passthrough')
+                    qwen2_params.setdefault('stepdown', False)
                 if qwen2_params:
                     args += ["--pass2-qwen-params", json.dumps(qwen2_params)]
             else:
@@ -2460,6 +2490,11 @@ class WhisperJAVAPI:
         # Debug logging
         if config.get('debug', False):
             args += ["--debug"]
+
+        # Output format (srt/vtt/both)
+        output_format = config.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
 
         # Translation options (single CLI command approach)
         if config.get('translate', False):
@@ -2895,6 +2930,169 @@ class WhisperJAVAPI:
                 json.dump(existing, f, indent=2, ensure_ascii=False)
 
             return {"success": True, "path": str(settings_path)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # ------------------------------------------------------------------
+    # GUI Settings Persistence
+    # ------------------------------------------------------------------
+
+    # Mapping: backend snake_case  ↔  frontend camelCase
+    _GUI_SETTINGS_MAP = {
+        # snake_case (backend)      camelCase (JS)
+        "mode":                      "mode",
+        "source_language":           "sourceLanguage",
+        "subs_language":             "subsLanguage",
+        "sensitivity":               "sensitivity",
+        "model_override_enabled":    "modelOverrideEnabled",
+        "model_override":            "modelOverride",
+        "output_to_source":          "outputToSource",
+        "output_dir":                "outputDir",
+        "debug_logging":             "debugLogging",
+        "output_format":             "outputFormat",
+        "keep_temp":                 "keepTemp",
+        "temp_dir":                  "tempDir",
+        "accept_cpu_mode":           "acceptCpuMode",
+        "async_processing":          "asyncProcessing",
+        "pass1_pipeline":            "pass1Pipeline",
+        "pass1_sensitivity":         "pass1Sensitivity",
+        "pass1_scene_detector":      "pass1SceneDetector",
+        "pass1_speech_enhancer":     "pass1SpeechEnhancer",
+        "pass1_speech_segmenter":    "pass1SpeechSegmenter",
+        "pass1_model":               "pass1Model",
+        "pass2_enabled":             "pass2Enabled",
+        "pass2_pipeline":            "pass2Pipeline",
+        "pass2_sensitivity":         "pass2Sensitivity",
+        "pass2_scene_detector":      "pass2SceneDetector",
+        "pass2_speech_enhancer":     "pass2SpeechEnhancer",
+        "pass2_speech_segmenter":    "pass2SpeechSegmenter",
+        "pass2_model":               "pass2Model",
+        "merge_strategy":            "mergeStrategy",
+        "pass1_preset":              "pass1Preset",
+        "pass2_preset":              "pass2Preset",
+    }
+    # Reverse mapping (camelCase → snake_case)
+    _GUI_SETTINGS_MAP_REV = {v: k for k, v in _GUI_SETTINGS_MAP.items()}
+
+    def get_gui_settings(self) -> Dict[str, Any]:
+        """
+        Load persisted GUI settings and return them in camelCase for the frontend.
+        """
+        try:
+            from whisperjav.settings.gui_settings import load_gui_settings
+            backend = load_gui_settings()
+
+            gui = {}
+            for snake, camel in self._GUI_SETTINGS_MAP.items():
+                if snake in backend:
+                    gui[camel] = backend[snake]
+            return {"success": True, "settings": gui}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def save_gui_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Save GUI settings from frontend (camelCase) to backend file (snake_case).
+        """
+        try:
+            from whisperjav.settings.gui_settings import save_gui_settings
+
+            backend_settings = {}
+            for camel_key, value in settings.items():
+                snake_key = self._GUI_SETTINGS_MAP_REV.get(camel_key)
+                if snake_key:
+                    backend_settings[snake_key] = value
+
+            ok = save_gui_settings(backend_settings)
+            return {"success": ok}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # ------------------------------------------------------------------
+    # Ensemble Parameter Presets
+    # ------------------------------------------------------------------
+
+    # Mapping: backend snake_case ↔ frontend camelCase for preset fields
+    _PRESET_MAP = {
+        "name":              "name",
+        "pipeline":          "pipeline",
+        "sensitivity":       "sensitivity",
+        "scene_detector":    "sceneDetector",
+        "speech_enhancer":   "speechEnhancer",
+        "speech_segmenter":  "speechSegmenter",
+        "model":             "model",
+        "customized":        "customized",
+        "params":            "params",       # nested dict — passed as-is
+        "is_transformers":   "isTransformers",
+        "is_qwen":           "isQwen",
+        "is_anime_whisper":  "isAnimeWhisper",
+        "framer":            "framer",
+        "dsp_effects":       "dspEffects",
+        "created_at":        "createdAt",
+        "updated_at":        "updatedAt",
+        "schema_version":    "schemaVersion",
+    }
+    _PRESET_MAP_REV = {v: k for k, v in _PRESET_MAP.items()}
+
+    def _preset_to_camel(self, data: dict) -> dict:
+        """Convert a preset dict from snake_case to camelCase."""
+        out = {}
+        for snake, camel in self._PRESET_MAP.items():
+            if snake in data:
+                out[camel] = data[snake]
+        # Pass through any unmapped keys (e.g., extra params)
+        for k, v in data.items():
+            if k not in self._PRESET_MAP:
+                out[k] = v
+        return out
+
+    def _preset_from_camel(self, data: dict) -> dict:
+        """Convert a preset dict from camelCase to snake_case."""
+        out = {}
+        for camel, value in data.items():
+            snake = self._PRESET_MAP_REV.get(camel, camel)
+            out[snake] = value
+        return out
+
+    def list_presets(self) -> Dict[str, Any]:
+        """List all saved ensemble parameter presets."""
+        try:
+            from whisperjav.settings.presets import list_presets
+            presets = list_presets()
+            return {
+                "success": True,
+                "presets": [self._preset_to_camel(p) for p in presets],
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def load_preset(self, name: str) -> Dict[str, Any]:
+        """Load a preset by name."""
+        try:
+            from whisperjav.settings.presets import load_preset
+            data = load_preset(name)
+            if data is None:
+                return {"success": False, "error": f"Preset not found: {name}"}
+            return {"success": True, "preset": self._preset_to_camel(data)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def save_preset(self, name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Save a preset.  *data* is camelCase from the frontend."""
+        try:
+            from whisperjav.settings.presets import save_preset
+            backend = self._preset_from_camel(data)
+            ok = save_preset(name, backend)
+            return {"success": ok}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def delete_preset(self, name: str) -> Dict[str, Any]:
+        """Delete a preset by name."""
+        try:
+            from whisperjav.settings.presets import delete_preset
+            ok = delete_preset(name)
+            return {"success": ok}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

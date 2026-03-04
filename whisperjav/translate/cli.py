@@ -9,12 +9,21 @@ Requires the [translate] extra: pip install whisperjav[translate]
 """
 
 # ===========================================================================
+# UTF-8 MODE — must be the very first thing before any library imports.
+# On Chinese Windows (GBK locale), PySubtrans crashes with 'gbk' codec
+# errors when processing Chinese translations. Relaunch in UTF-8 mode so
+# that open() defaults to UTF-8 across the entire process. See #190.
+# ===========================================================================
+import os, sys  # noqa: E401 — intentionally early, minimal imports
+if os.name == 'nt' and not getattr(sys.flags, 'utf8_mode', False):
+    from whisperjav.utils.console import relaunch_for_utf8
+    relaunch_for_utf8('whisperjav.translate.cli')
+
+# ===========================================================================
 # EARLY SETUP - Must be before any library imports
 # ===========================================================================
 from whisperjav.utils.console import setup_console, print_missing_extra_error
 setup_console()
-
-import sys
 
 # Check for translate extra dependencies before importing them
 def _check_translate_dependencies():
@@ -51,7 +60,7 @@ from pathlib import Path
 from typing import Optional
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_SOURCES, SUPPORTED_TARGETS
-from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server
+from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context
 from .instructions import get_instruction_content, get_cache_dir
 from .settings import load_settings, create_default_settings, show_settings, get_settings_path, resolve_config
 from .configure import configure_command
@@ -550,6 +559,16 @@ def main():
                         print(f"[CLI] ERROR: Failed to start local server: {e}", file=sys.stderr)
                         sys.exit(1)
 
+                    # Auto-cap batch size to fit within local LLM context window.
+                    # See #183: default batch_size=30 exceeds 8K context → "Hit API
+                    # token limit" + "No matches" from PySubtrans.
+                    local_n_ctx = 8192  # matches start_local_server() default
+                    _user_batch = merged.get('max_batch_size', 30)
+                    local_batch_size = cap_batch_size_for_context(_user_batch, local_n_ctx)
+                    if local_batch_size < _user_batch:
+                        print(f"[CLI]   NOTE: Batch size auto-reduced from {_user_batch} to "
+                              f"{local_batch_size} to fit {local_n_ctx}-token context window", file=sys.stderr)
+
                 # Use Custom Server provider - designed for local OpenAI-compatible servers
                 # This uses /v1/chat/completions endpoint which llama-cpp-python supports
                 server_address = api_base.replace('/v1', '')
@@ -574,7 +593,7 @@ def main():
                         target_lang=target_lang,
                         instruction_file=instruction_file,
                         scene_threshold=merged.get('scene_threshold', 60.0),
-                        max_batch_size=merged.get('max_batch_size', 30),
+                        max_batch_size=local_batch_size,
                         stream=args.stream if hasattr(args, 'stream') else False,
                         debug=args.debug,
                         provider_options=provider_options,

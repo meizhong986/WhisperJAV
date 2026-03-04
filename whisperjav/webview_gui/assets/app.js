@@ -706,6 +706,7 @@ const FormManager = {
             keep_temp: document.getElementById('keepTemp').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
+            output_format: document.getElementById('outputFormat').value,
         };
 
         // Transformers mode: Minimal args by default (use model's internal defaults)
@@ -1208,8 +1209,10 @@ const EnsembleManager = {
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
+            presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,  // Track if using Transformers pipeline
-            isQwen: false,  // Track if using Qwen3-ASR pipeline
+            isQwen: false,  // Track if using Qwen3-ASR or Anime-Whisper pipeline
+            isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
@@ -1223,12 +1226,15 @@ const EnsembleManager = {
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
+            presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,
             isQwen: true,  // Default pipeline is Qwen3-ASR
+            isAnimeWhisper: false,
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
         },
-        mergeStrategy: 'smart_merge',
+        mergeStrategy: 'pass1_primary',
+        serialMode: false,
         currentCustomize: null  // 'pass1' or 'pass2'
     },
 
@@ -1249,6 +1255,11 @@ const EnsembleManager = {
     qwenModels: [
         { value: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR-1.7B    8GB' },
         { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' }
+    ],
+    animeWhisperModels: [
+        { value: 'litagin/anime-whisper', label: 'anime-whisper    ~4GB' },
+        { value: 'kotoba-tech/kotoba-whisper-v2.0', label: 'Kotoba v2.0    ~2GB' },
+        { value: 'kotoba-tech/kotoba-whisper-v2.1', label: 'Kotoba v2.1    ~2GB' }
     ],
 
     async init() {
@@ -1274,18 +1285,25 @@ const EnsembleManager = {
         this.state.pass2.model = document.getElementById('pass2-model').value;
 
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
+        this.state.serialMode = document.getElementById('ensemble-serial').checked;
 
-        // Update isTransformers and isQwen flags based on synced pipeline values
+        // Update isTransformers, isQwen, and isAnimeWhisper flags based on synced pipeline values
         this.state.pass1.isTransformers = this.state.pass1.pipeline === 'transformers';
-        this.state.pass1.isQwen = this.state.pass1.pipeline === 'qwen';
+        this.state.pass1.isQwen = (this.state.pass1.pipeline === 'qwen' || this.state.pass1.pipeline === 'anime-whisper');
+        this.state.pass1.isAnimeWhisper = this.state.pass1.pipeline === 'anime-whisper';
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
-        this.state.pass2.isQwen = this.state.pass2.pipeline === 'qwen';
+        this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper');
+        this.state.pass2.isAnimeWhisper = this.state.pass2.pipeline === 'anime-whisper';
 
         // Swap model options for non-legacy passes
-        if (this.state.pass1.isQwen) {
+        if (this.state.pass1.isAnimeWhisper) {
+            this.swapModelOptions('pass1', 'anime-whisper');
+        } else if (this.state.pass1.isQwen) {
             this.swapModelOptions('pass1', 'qwen');
         }
-        if (this.state.pass2.isQwen) {
+        if (this.state.pass2.isAnimeWhisper) {
+            this.swapModelOptions('pass2', 'anime-whisper');
+        } else if (this.state.pass2.isQwen) {
             this.swapModelOptions('pass2', 'qwen');
         }
 
@@ -1360,6 +1378,11 @@ const EnsembleManager = {
             this.state.mergeStrategy = e.target.value;
         });
 
+        // Serial mode (finish each file before starting next)
+        document.getElementById('ensemble-serial').addEventListener('change', (e) => {
+            this.state.serialMode = e.target.checked;
+        });
+
         // Customize buttons
         document.getElementById('customize-pass1').addEventListener('click', () => this.openCustomize('pass1'));
         document.getElementById('customize-pass2').addEventListener('click', () => this.openCustomize('pass2'));
@@ -1373,6 +1396,16 @@ const EnsembleManager = {
         document.getElementById('customizeModalApply').addEventListener('click', () => this.applyCustomization());
         document.getElementById('customizeModalOK').addEventListener('click', () => this.okAndClose());
         document.getElementById('customizeModalReset').addEventListener('click', () => this.resetToDefaults());
+
+        // Preset controls
+        document.getElementById('presetSaveBtn').addEventListener('click', () => this.saveCurrentAsPreset());
+        document.getElementById('presetDeleteBtn').addEventListener('click', () => this.deleteSelectedPreset());
+        document.getElementById('presetSelector').addEventListener('change', (e) => {
+            const name = e.target.value;
+            // Show/hide delete button
+            document.getElementById('presetDeleteBtn').style.display = name ? '' : 'none';
+            if (name) this.loadPresetIntoModal(name);
+        });
 
         // Modal tab switching
         document.querySelectorAll('.modal-tab').forEach(tab => {
@@ -1396,14 +1429,17 @@ const EnsembleManager = {
     handlePipelineChange(passKey, newValue, selectElement) {
         const passState = this.state[passKey];
         const isTransformers = newValue === 'transformers';
-        const isQwen = newValue === 'qwen';
+        const isQwen = (newValue === 'qwen' || newValue === 'anime-whisper');
+        const isAnimeWhisper = newValue === 'anime-whisper';
         const wasTransformers = passState.isTransformers;
         const wasQwen = passState.isQwen;
+        const wasAnimeWhisper = passState.isAnimeWhisper;
 
         // Determine pipeline category for model swapping
-        const getPipelineType = (isT, isQ) => isT ? 'transformers' : (isQ ? 'qwen' : 'legacy');
-        const oldType = getPipelineType(wasTransformers, wasQwen);
-        const newType = getPipelineType(isTransformers, isQwen);
+        const getPipelineType = (isT, isQ, isAW) =>
+            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isQ ? 'qwen' : 'legacy'));
+        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper);
+        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper);
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -1411,8 +1447,10 @@ const EnsembleManager = {
                 passState.pipeline = newValue;
                 passState.customized = false;
                 passState.params = null;
+                passState.presetName = null;
                 passState.isTransformers = isTransformers;
                 passState.isQwen = isQwen;
+                passState.isAnimeWhisper = isAnimeWhisper;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
                 if (oldType !== newType) {
@@ -1425,13 +1463,16 @@ const EnsembleManager = {
             }
         } else {
             passState.pipeline = newValue;
+            passState.presetName = null;
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
+            passState.isAnimeWhisper = isAnimeWhisper;
             this.updateRowGreyingState(passKey);
             if (oldType !== newType) {
                 this.swapModelOptions(passKey, newType);
                 this.applyPipelinePresets(passKey, newType);
             }
+            this.updateBadges();
         }
     },
 
@@ -1441,7 +1482,15 @@ const EnsembleManager = {
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
-        if (pipelineType === 'qwen') {
+        if (pipelineType === 'anime-whisper') {
+            sceneSelect.value = 'semantic';
+            segmenterSelect.value = 'ten';
+            sensitivitySelect.value = 'balanced';
+            this.state[passKey].sceneDetector = 'semantic';
+            this.state[passKey].speechSegmenter = 'ten';
+            this.state[passKey].sensitivity = 'balanced';
+            this.state[passKey].framer = 'vad-grouped';
+        } else if (pipelineType === 'qwen') {
             sceneSelect.value = 'semantic';
             segmenterSelect.value = 'silero-v6.2';
             sensitivitySelect.value = 'balanced';
@@ -1469,6 +1518,9 @@ const EnsembleManager = {
         switch (pipelineType) {
             case 'transformers':
                 models = this.transformersModels;
+                break;
+            case 'anime-whisper':
+                models = this.animeWhisperModels;
                 break;
             case 'qwen':
                 models = this.qwenModels;
@@ -1526,7 +1578,7 @@ const EnsembleManager = {
             sensitivitySelect.style.display = '';
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = passState.isQwen
-                ? 'Segmenter sensitivity preset for Qwen3-ASR'
+                ? `Segmenter sensitivity preset for ${passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR'}`
                 : '';
         }
 
@@ -1543,7 +1595,7 @@ const EnsembleManager = {
             // Re-enable segmenter (unless pass2 is disabled)
             // Note: Qwen uses segmenter as post-ASR VAD filter
             segmenterSelect.disabled = isPass2Disabled;
-            segmenterSelect.title = passState.isQwen ? 'Post-ASR VAD filter for Qwen3-ASR' : '';
+            segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR'}` : '';
         }
 
         // Parameter guide button: visible only for Qwen pipelines
@@ -1560,6 +1612,7 @@ const EnsembleManager = {
                 passState.sensitivity = newValue;
                 passState.customized = false;
                 passState.params = null;
+                passState.presetName = null;
                 this.updateBadges();
             } else {
                 // Revert selection
@@ -1651,39 +1704,36 @@ const EnsembleManager = {
     },
 
     updateBadges() {
-        // Update Pass 1 badge
-        const pass1Badge = document.getElementById('pass1-badge');
-        if (pass1Badge) {
-            if (this.state.pass1.customized) {
-                pass1Badge.textContent = 'Custom';
-                pass1Badge.className = 'pass-badge custom';
-            } else {
-                pass1Badge.textContent = 'Default';
-                pass1Badge.className = 'pass-badge default';
-            }
-        }
+        const updateBadge = (passKey) => {
+            const badge = document.getElementById(`${passKey}-badge`);
+            const btn = document.getElementById(`customize-${passKey}`);
+            const passState = this.state[passKey];
+            if (!badge) return;
 
-        // Update Pass 2 badge
-        const pass2Badge = document.getElementById('pass2-badge');
-        if (pass2Badge) {
-            if (this.state.pass2.customized) {
-                pass2Badge.textContent = 'Custom';
-                pass2Badge.className = 'pass-badge custom';
+            if (passState.presetName) {
+                // Preset loaded — show truncated name
+                const name = passState.presetName;
+                badge.textContent = name.length > 15 ? name.slice(0, 15) + '\u2026' : name;
+                badge.className = 'pass-badge preset';
+                badge.title = name;
+            } else if (passState.customized) {
+                badge.textContent = 'Custom';
+                badge.className = 'pass-badge custom';
+                badge.title = '';
             } else {
-                pass2Badge.textContent = 'Default';
-                pass2Badge.className = 'pass-badge default';
+                badge.textContent = 'Default';
+                badge.className = 'pass-badge default';
+                badge.title = '';
             }
-        }
 
-        // Update button text
-        const btn1 = document.getElementById('customize-pass1');
-        const btn2 = document.getElementById('customize-pass2');
-        if (btn1) {
-            btn1.textContent = this.state.pass1.customized ? 'Edit Parameters' : 'Customize Parameters';
-        }
-        if (btn2) {
-            btn2.textContent = this.state.pass2.customized ? 'Edit Parameters' : 'Customize Parameters';
-        }
+            if (btn) {
+                btn.textContent = (passState.presetName || passState.customized)
+                    ? 'Edit Parameters' : 'Customize Parameters';
+            }
+        };
+
+        updateBadge('pass1');
+        updateBadge('pass2');
     },
 
     async loadComponents() {
@@ -1775,6 +1825,9 @@ const EnsembleManager = {
 
     async openCustomize(passKey) {
         // passKey is 'pass1' or 'pass2'
+        const btn = document.getElementById(`customize-${passKey}`);
+        if (btn) btn.classList.add('loading');
+        try {
         const passState = this.state[passKey];
 
         // Route to pipeline-specific handler if applicable
@@ -1924,11 +1977,17 @@ const EnsembleManager = {
             // Reset to first tab
             this.switchModalTab('model');
 
+            // Populate preset dropdown
+            await this.refreshPresetList();
+
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
 
         } catch (error) {
             ErrorHandler.show('Error', 'Failed to open customize dialog: ' + error);
+        }
+        } finally {
+            if (btn) btn.classList.remove('loading');
         }
     },
 
@@ -2630,6 +2689,9 @@ const EnsembleManager = {
             // Generate Transformers-specific tabs
             this.generateTransformersTabs(result.schema, currentValues);
 
+            // Populate preset dropdown
+            await this.refreshPresetList();
+
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
 
@@ -2897,8 +2959,9 @@ const EnsembleManager = {
             // Set modal title
             const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
             const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
+            const pipelineName = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
             document.getElementById('customizeModalTitle').textContent =
-                `${passLabel} Settings (Qwen3-ASR)${customStatus}`;
+                `${passLabel} Settings (${pipelineName})${customStatus}`;
 
             // Store schema for reset functionality
             this._qwenSchema = result.schema;
@@ -2908,17 +2971,33 @@ const EnsembleManager = {
                 ? { ...passState.params }
                 : { ...QwenManager.defaults };
 
+            // Override defaults for anime-whisper when not customized
+            if (passState.isAnimeWhisper && !passState.customized) {
+                currentValues.model_id = 'litagin/anime-whisper';
+                currentValues.repetition_penalty = 1.0;
+                currentValues.context = '';
+                currentValues.timestamp_mode = 'vad_only';
+                currentValues.assembly_cleaner = 'passthrough';
+                currentValues.stepdown = false;
+                currentValues.chunk_threshold = 0.5;
+                currentValues.max_group_duration = 5;
+            }
+
             // Get scene detector from main dropdown
             currentValues.scene = passState.sceneDetector || 'semantic';
 
             // Generate Qwen-specific tabs
             this.generateQwenTabs(result.schema, currentValues);
 
+            // Populate preset dropdown
+            await this.refreshPresetList();
+
             // Show modal
             document.getElementById('customizeModal').classList.add('active');
 
         } catch (error) {
-            ErrorHandler.show('Error', 'Failed to open Qwen3-ASR customize dialog: ' + error);
+            const errPipeline = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
+            ErrorHandler.show('Error', `Failed to open ${errPipeline} customize dialog: ` + error);
         }
     },
 
@@ -2963,12 +3042,19 @@ const EnsembleManager = {
     generateQwenModelTab(tabId, schemaSection, currentValues) {
         const container = document.getElementById(tabId);
 
-        // Model ID dropdown
+        // Model ID dropdown — override options for anime-whisper
         const modelDef = schemaSection.model_id;
+        const passState = this.state[this.state.currentCustomize];
+        let modelOptions = modelDef.options;
+        let modelDefault = modelDef.default;
+        if (passState && passState.isAnimeWhisper) {
+            modelOptions = [{ value: 'litagin/anime-whisper', label: 'anime-whisper (~4GB VRAM)' }];
+            modelDefault = 'litagin/anime-whisper';
+        }
         container.appendChild(this.createTransformersDropdown(
             'model_id', modelDef.label,
-            modelDef.options,
-            currentValues.model_id || modelDef.default,
+            modelOptions,
+            currentValues.model_id || modelDefault,
             modelDef.description
         ));
 
@@ -2997,6 +3083,11 @@ const EnsembleManager = {
         textarea.rows = 3;
         textarea.placeholder = contextDef.placeholder || '';
         textarea.value = currentValues.context || contextDef.default || '';
+        if (passState && passState.isAnimeWhisper) {
+            textarea.disabled = true;
+            textarea.placeholder = 'Not supported by Anime-Whisper (causes hallucinations)';
+            textarea.value = '';
+        }
         contextControl.appendChild(textarea);
 
         const contextDesc = document.createElement('p');
@@ -4185,6 +4276,7 @@ const EnsembleManager = {
         // Clear customized state - will use defaults
         passState.params = null;
         passState.customized = false;
+        passState.presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Reset ${passLabel} to defaults`, 'info');
@@ -4251,6 +4343,7 @@ const EnsembleManager = {
         // Clear customized state
         this.state[passKey].params = null;
         this.state[passKey].customized = false;
+        this.state[passKey].presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Reset ${passLabel} Transformers parameters to defaults`, 'info');
@@ -4260,7 +4353,18 @@ const EnsembleManager = {
 
     resetQwenToDefaults(passKey) {
         // Reset Qwen controls using QwenManager defaults
-        const defaults = QwenManager.defaults || {};
+        const passState = this.state[passKey];
+        const defaults = { ...(QwenManager.defaults || {}) };
+        if (passState.isAnimeWhisper) {
+            defaults.model_id = 'litagin/anime-whisper';
+            defaults.repetition_penalty = 1.0;
+            defaults.context = '';
+            defaults.timestamp_mode = 'vad_only';
+            defaults.assembly_cleaner = 'passthrough';
+            defaults.stepdown = false;
+            defaults.chunk_threshold = 0.5;
+            defaults.max_group_duration = 5;
+        }
 
         // Reset all controls in all tabs (includes context tab)
         const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
@@ -4299,9 +4403,11 @@ const EnsembleManager = {
         // Clear customized state
         this.state[passKey].params = null;
         this.state[passKey].customized = false;
+        this.state[passKey].presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
-        ConsoleManager.log(`Reset ${passLabel} Qwen3-ASR parameters to defaults`, 'info');
+        const pipelineName = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
+        ConsoleManager.log(`Reset ${passLabel} ${pipelineName} parameters to defaults`, 'info');
 
         this.updateBadges();
     },
@@ -4325,6 +4431,265 @@ const EnsembleManager = {
         // If apply failed, still try to close modal to avoid trapping user
         if (!success) {
             this.closeModal();
+        }
+    },
+
+    // ------------------------------------------------------------------
+    // Ensemble Parameter Presets
+    // ------------------------------------------------------------------
+
+    /** Refresh the preset selector dropdown from the backend. */
+    async refreshPresetList() {
+        const selector = document.getElementById('presetSelector');
+        if (!selector || !window.pywebview || !pywebview.api) return;
+
+        try {
+            const result = await pywebview.api.list_presets();
+            // Clear existing options (keep the placeholder)
+            while (selector.options.length > 1) selector.remove(1);
+
+            if (result.success && result.presets && result.presets.length > 0) {
+                for (const p of result.presets) {
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    let pipelineCap = null;
+                    if (p.pipeline === 'anime-whisper') {
+                        pipelineCap = 'Anime-Whisper';
+                    } else if (p.pipeline) {
+                        pipelineCap = p.pipeline.charAt(0).toUpperCase() + p.pipeline.slice(1);
+                    }
+                    const label = pipelineCap ? `${p.name}  (${pipelineCap})` : p.name;
+                    opt.textContent = label;
+                    selector.appendChild(opt);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load preset list:', e);
+        }
+
+        // Reset selection and hide delete button
+        selector.value = '';
+        document.getElementById('presetDeleteBtn').style.display = 'none';
+    },
+
+    /** Collect current modal state into a preset-shaped object. */
+    _collectPresetData() {
+        const passKey = this.state.currentCustomize;
+        if (!passKey) return null;
+
+        const passState = this.state[passKey];
+
+        // Collect custom params from the modal form (same logic as applyCustomization)
+        const params = {};
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
+        tabs.forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (!panel) return;
+            panel.querySelectorAll('.param-control').forEach(control => {
+                const paramName = control.dataset.param;
+                if (!paramName) return;
+                const checkbox = control.querySelector('.param-checkbox');
+                const slider = control.querySelector('.param-slider');
+                const number = control.querySelector('.param-number');
+                const text = control.querySelector('.param-text');
+                const select = control.querySelector('.param-select');
+
+                let value;
+                if (checkbox) value = checkbox.checked;
+                else if (number) value = parseFloat(number.value);
+                else if (slider) value = parseFloat(slider.value);
+                else if (text) value = text.value;
+                else if (select) value = select.value;
+                if (paramName && value !== undefined) params[paramName] = value;
+            });
+        });
+
+        return {
+            pipeline: passState.pipeline,
+            sensitivity: passState.sensitivity,
+            sceneDetector: passState.sceneDetector,
+            speechEnhancer: passState.speechEnhancer,
+            speechSegmenter: passState.speechSegmenter,
+            model: passState.model,
+            customized: true,
+            params: params,
+            isTransformers: passState.isTransformers,
+            isQwen: passState.isQwen,
+            isAnimeWhisper: passState.isAnimeWhisper || false,
+            framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
+            dspEffects: passState.dspEffects || null,
+        };
+    },
+
+    /** Prompt user for a name and save current modal params as a preset. */
+    async saveCurrentAsPreset() {
+        if (!window.pywebview || !pywebview.api) return;
+
+        const passKey = this.state.currentCustomize;
+        const passState = passKey ? this.state[passKey] : null;
+        const pipelineLabel = passState
+            ? (passState.isAnimeWhisper ? 'Anime-Whisper'
+                : (passState.isQwen ? 'Qwen' : (passState.isTransformers ? 'Transformers'
+                    : passState.pipeline.charAt(0).toUpperCase() + passState.pipeline.slice(1))))
+            : 'Unknown';
+        const name = prompt(`Save preset for ${pipelineLabel} pipeline.\nPreset name:`);
+        if (!name || !name.trim()) return;
+
+        const data = this._collectPresetData();
+        if (!data) {
+            ConsoleManager.log('No active pass to save preset from', 'error');
+            return;
+        }
+
+        try {
+            const result = await pywebview.api.save_preset(name.trim(), data);
+            if (result.success) {
+                ConsoleManager.log(`Preset saved: ${name.trim()}`, 'success');
+                await this.refreshPresetList();
+                // Select the just-saved preset
+                document.getElementById('presetSelector').value = name.trim();
+                // Associate preset name with pass state
+                if (passKey && this.state[passKey]) {
+                    this.state[passKey].presetName = name.trim();
+                    this.updateBadges();
+                }
+            } else {
+                ConsoleManager.log(`Failed to save preset: ${result.error || 'unknown error'}`, 'error');
+            }
+        } catch (e) {
+            ConsoleManager.log(`Failed to save preset: ${e.message}`, 'error');
+        }
+    },
+
+    /** Load a preset by name and apply its values to the modal controls.
+     *  If the preset's pipeline type differs from the current pass, the modal
+     *  is closed and reopened so the correct pipeline-specific controls appear. */
+    async loadPresetIntoModal(name) {
+        if (!window.pywebview || !pywebview.api) return;
+
+        try {
+            const result = await pywebview.api.load_preset(name);
+            if (!result.success || !result.preset) {
+                ConsoleManager.log(`Failed to load preset: ${result.error || 'not found'}`, 'error');
+                return;
+            }
+
+            const preset = result.preset;
+            const passKey = this.state.currentCustomize;
+            if (!passKey) return;
+
+            const passState = this.state[passKey];
+            const prefix = passKey;
+
+            // Detect pipeline type change
+            const getPipelineType = (isT, isQ, isAW) =>
+                isT ? 'transformers' : (isAW ? 'anime-whisper' : (isQ ? 'qwen' : 'legacy'));
+            const oldType = getPipelineType(passState.isTransformers, passState.isQwen, passState.isAnimeWhisper);
+            const presetIsTransformers = !!preset.isTransformers;
+            const presetIsQwen = !!preset.isQwen;
+            const presetIsAnimeWhisper = !!preset.isAnimeWhisper;
+            const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper);
+
+            // Apply ALL preset fields to state
+            if (preset.pipeline) passState.pipeline = preset.pipeline;
+            if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
+            if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
+            if (preset.speechEnhancer !== undefined) passState.speechEnhancer = preset.speechEnhancer;
+            if (preset.speechSegmenter) passState.speechSegmenter = preset.speechSegmenter;
+            if (preset.model) passState.model = preset.model;
+            if (preset.framer) passState.framer = preset.framer;
+            if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
+            passState.isTransformers = presetIsTransformers;
+            passState.isQwen = presetIsQwen;
+            passState.isAnimeWhisper = presetIsAnimeWhisper;
+            passState.customized = true;
+            passState.params = preset.params || null;
+            passState.presetName = name;
+
+            // Update pass row dropdowns silently (no dispatchEvent to avoid confirm dialogs)
+            const setSilent = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val !== undefined && val !== null) el.value = val;
+            };
+            setSilent(`${prefix}-pipeline`, preset.pipeline);
+            setSilent(`${prefix}-sensitivity`, preset.sensitivity);
+            setSilent(`${prefix}-scene`, preset.sceneDetector);
+            setSilent(`${prefix}-enhancer`, preset.speechEnhancer);
+            setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
+
+            if (oldType !== newType) {
+                // Pipeline type changed — swap model options first, then set model
+                this.swapModelOptions(passKey, newType);
+                this.applyPipelinePresets(passKey, newType);
+                setSilent(`${prefix}-model`, preset.model);
+
+                // Close and reopen modal so correct pipeline-specific controls appear
+                this.updateBadges();
+                this.updateRowGreyingState(passKey);
+                this.closeModal();
+                ConsoleManager.log(`Preset loaded: ${name} (switching to ${newType} pipeline)`, 'success');
+                // openCustomize reads passState.customized && passState.params to populate
+                await this.openCustomize(passKey);
+            } else {
+                // Same pipeline type — set model and apply params inline
+                setSilent(`${prefix}-model`, preset.model);
+
+                // Apply custom params to current modal form controls
+                if (preset.params && typeof preset.params === 'object') {
+                    for (const [paramName, value] of Object.entries(preset.params)) {
+                        const control = document.querySelector(`.param-control[data-param="${paramName}"]`);
+                        if (!control) continue;
+
+                        const checkbox = control.querySelector('.param-checkbox');
+                        const slider = control.querySelector('.param-slider');
+                        const number = control.querySelector('.param-number');
+                        const text = control.querySelector('.param-text');
+                        const select = control.querySelector('.param-select');
+
+                        if (checkbox && typeof value === 'boolean') {
+                            checkbox.checked = value;
+                        } else if (number) {
+                            number.value = value;
+                            if (slider) slider.value = value;
+                        } else if (slider) {
+                            slider.value = value;
+                        } else if (text) {
+                            text.value = value;
+                        } else if (select) {
+                            select.value = value;
+                        }
+                    }
+                }
+
+                this.updateBadges();
+                this.updateRowGreyingState(passKey);
+                ConsoleManager.log(`Preset loaded: ${name}`, 'success');
+            }
+        } catch (e) {
+            ConsoleManager.log(`Failed to load preset: ${e.message}`, 'error');
+        }
+    },
+
+    /** Delete the currently selected preset. */
+    async deleteSelectedPreset() {
+        if (!window.pywebview || !pywebview.api) return;
+
+        const selector = document.getElementById('presetSelector');
+        const name = selector ? selector.value : '';
+        if (!name) return;
+
+        if (!confirm(`Delete preset "${name}"?`)) return;
+
+        try {
+            const result = await pywebview.api.delete_preset(name);
+            if (result.success) {
+                ConsoleManager.log(`Preset deleted: ${name}`, 'success');
+                await this.refreshPresetList();
+            } else {
+                ConsoleManager.log(`Failed to delete preset: ${result.error || 'unknown error'}`, 'error');
+            }
+        } catch (e) {
+            ConsoleManager.log(`Failed to delete preset: ${e.message}`, 'error');
         }
     },
 
@@ -4355,6 +4720,7 @@ const EnsembleManager = {
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
                 isTransformers: this.state.pass1.isTransformers,
                 isQwen: this.state.pass1.isQwen,
+                isAnimeWhisper: this.state.pass1.isAnimeWhisper,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null
             },
             pass2: {
@@ -4370,14 +4736,17 @@ const EnsembleManager = {
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
                 isTransformers: this.state.pass2.isTransformers,
                 isQwen: this.state.pass2.isQwen,
+                isAnimeWhisper: this.state.pass2.isAnimeWhisper,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null
             },
             merge_strategy: this.state.mergeStrategy,
+            serial_mode: this.state.serialMode,
             source_language: document.getElementById('source-language').value,
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
-            temp_dir: document.getElementById('tempDir').value.trim()
+            temp_dir: document.getElementById('tempDir').value.trim(),
+            output_format: document.getElementById('outputFormat').value,
         };
 
         // Add translation settings if enabled (single CLI command approach)
@@ -6144,6 +6513,22 @@ const TranslationSettingsModal = {
 };
 
 // ============================================================
+// GUI Settings Persistence
+// ============================================================
+const SettingsPersistence = {
+    // Disabled: Tab 1 + Tab 3 always start from HTML defaults.
+    // Backend module (gui_settings.py) retained for future "exit prompt" feature.
+    // Preset CRUD (EnsembleManager) is unaffected.
+    init() {},
+    collectAll() { return {}; },
+    applyToForm() {},
+    async loadFromBackend() {},
+    scheduleSave() {},
+    async _doSave() {},
+    async restorePresets() {},
+};
+
+// ============================================================
 // Initialization
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -6178,20 +6563,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     ConsoleManager.log('Press F1 for keyboard shortcuts', 'info');
 });
 
-// PyWebView ready event
-window.addEventListener('pywebviewready', () => {
+// PyWebView ready event — populate dynamic options and load Tab 4 settings.
+window.addEventListener('pywebviewready', async () => {
     console.log('PyWebView API ready!');
     ConsoleManager.log('PyWebView bridge connected', 'success');
 
-    // Reload default output directory from API
-    AppState.loadDefaultOutputDir();
+    await AppState.loadDefaultOutputDir();
+    await EnsembleManager.updateSegmenterAvailability();
+    await EnsembleManager.updateEnhancerAvailability();
 
-    // Update speech segmenter options based on backend availability
-    EnsembleManager.updateSegmenterAvailability();
-
-    // Update speech enhancer options based on backend availability
-    EnsembleManager.updateEnhancerAvailability();
-
-    // Load translation settings from persistent backend file
-    TranslationSettingsModal.loadSettingsFromBackend();
+    // Tab 4 translation settings (unaffected by persistence removal)
+    await TranslationSettingsModal.loadSettingsFromBackend();
 });

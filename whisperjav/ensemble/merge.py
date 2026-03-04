@@ -17,6 +17,7 @@ class MergeStrategy(Enum):
     PASS1_OVERLAP = 'pass1_overlap'
     PASS2_OVERLAP = 'pass2_overlap'
     SMART_MERGE = 'smart_merge'
+    LONGEST = 'longest'
 
 
 @dataclass
@@ -47,6 +48,7 @@ class MergeEngine:
             'pass1_overlap': self._merge_pass1_overlap,
             'pass2_overlap': self._merge_pass2_overlap,
             'smart_merge': self._merge_smart,
+            'longest': self._merge_longest,
         }
 
     def merge(
@@ -471,6 +473,57 @@ class MergeEngine:
         return merged
 
 
+    def _merge_longest(
+        self,
+        subs1: List[Subtitle],
+        subs2: List[Subtitle]
+    ) -> List[Subtitle]:
+        """
+        Longest: for each overlapping pair, pick the subtitle with more text.
+
+        Non-overlapping subtitles are included from both passes.
+        Uses quality_length to reject repetitive/hallucinated text.
+        """
+        if not subs1:
+            return [Subtitle(0, s.start_time, s.end_time, s.text) for s in subs2]
+        if not subs2:
+            return [Subtitle(0, s.start_time, s.end_time, s.text) for s in subs1]
+
+        merged = []
+        used_from_2 = set()
+
+        for sub1 in subs1:
+            best_match = None
+            best_overlap = 0.0
+
+            for i, sub2 in enumerate(subs2):
+                if i in used_from_2:
+                    continue
+                overlap = self._calculate_overlap(sub1, sub2)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best_match = (i, sub2)
+
+            if best_match and best_overlap >= self.OVERLAP_THRESHOLD:
+                i, sub2 = best_match
+                used_from_2.add(i)
+                # Pick the subtitle with more quality-adjusted text
+                len1 = self._quality_length(sub1.text)
+                len2 = self._quality_length(sub2.text)
+                chosen = sub1 if len1 >= len2 else sub2
+                merged.append(Subtitle(0, chosen.start_time, chosen.end_time, chosen.text))
+            else:
+                merged.append(Subtitle(0, sub1.start_time, sub1.end_time, sub1.text))
+
+        # Add unmatched from subs2
+        for i, sub2 in enumerate(subs2):
+            if i not in used_from_2:
+                merged.append(Subtitle(0, sub2.start_time, sub2.end_time, sub2.text))
+
+        merged.sort(key=lambda s: s.start_time)
+        return merged
+
+
 def get_available_strategies() -> List[Dict[str, str]]:
     """Return list of available merge strategies with descriptions."""
     return [
@@ -503,5 +556,10 @@ def get_available_strategies() -> List[Dict[str, str]]:
             'name': 'pass2_overlap',
             'label': 'Pass 2 + Fill (30% Overlap)',
             'description': 'Pass 2 primary, allows partial overlap when filling from Pass 1'
+        },
+        {
+            'name': 'longest',
+            'label': 'Longest Text',
+            'description': 'For each overlapping pair, picks the subtitle with more text content'
         }
     ]

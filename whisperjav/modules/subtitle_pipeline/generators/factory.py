@@ -13,6 +13,7 @@ from whisperjav.modules.subtitle_pipeline.protocols import TextGenerator
 # Registry: name → "module.path.ClassName"
 _REGISTRY: dict[str, str] = {
     "qwen3": "whisperjav.modules.subtitle_pipeline.generators.qwen3.Qwen3TextGenerator",
+    "anime-whisper": "whisperjav.modules.subtitle_pipeline.generators.anime_whisper.AnimeWhisperGenerator",
 }
 
 # Cache for loaded classes

@@ -78,12 +78,12 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
 #   - nullable: If True, None is a valid value (don't substitute default)
 _PARAM_SCHEMAS = {
     "ten": {
-        "threshold":               (float, 0.20,  False),
+        "threshold":               (float, 0.26,  False),
         "hop_size":                (int,   256,   False),
-        "min_speech_duration_ms":  (int,   100,   False),
+        "min_speech_duration_ms":  (int,   81,    False),
         "min_silence_duration_ms": (int,   100,   False),
         "start_pad_ms":            (int,   0,     False),
-        "end_pad_ms":              (int,   200,   False),
+        "end_pad_ms":              (int,   100,   False),
         "chunk_threshold_s":       (float, 1.0,   True),
         "max_group_duration_s":    (float, 29.0,  True),
     },

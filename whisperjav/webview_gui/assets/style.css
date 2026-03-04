@@ -1580,6 +1580,11 @@ button:focus-visible,
     color: white;
 }
 
+.pass-badge.preset {
+    background: var(--success-color, #28a745);
+    color: white;
+}
+
 /* Disabled/greyed row state */
 .grid-row.disabled {
     opacity: 0.5;

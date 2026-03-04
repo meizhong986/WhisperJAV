@@ -2,6 +2,19 @@
 """WhisperJAV Main Entry Point - V3 Enhanced with all improvements."""
 
 # ===========================================================================
+# UTF-8 MODE — for direct execution (python -m whisperjav.main) on Chinese
+# Windows. Relaunches in UTF-8 mode so open() defaults to UTF-8. See #190.
+# ===========================================================================
+import os as _os, sys as _sys  # noqa: E401 — early minimal imports
+if (
+    _os.name == 'nt'
+    and not getattr(_sys.flags, 'utf8_mode', False)
+    and __name__ == '__main__'
+):
+    from whisperjav.utils.console import relaunch_for_utf8
+    relaunch_for_utf8('whisperjav.main')
+
+# ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
 # Suppress noisy library warnings that don't affect functionality
@@ -73,6 +86,9 @@ from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 # Translation service - direct function call instead of subprocess
 from whisperjav.translate import translate_with_config, TranslationError, ConfigurationError
 
+# SRT → VTT conversion
+from whisperjav.modules.srt_postprocessing import convert_srt_to_vtt
+
 
 # Language code mapping for Whisper
 LANGUAGE_CODE_MAP = {
@@ -126,7 +142,7 @@ def print_banner():
     """Print application banner."""
     banner = f"""
 ╔═══════════════════════════════════════════════════╗
-║          WhisperJAV v{__version_display__}                 ║
+║{f'          WhisperJAV v{__version_display__}':<51}║
 ║   Japanese Adult Video Subtitle Generator         ║
 ║                                                   ║
 ║                                                   ║
@@ -222,8 +238,11 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--merge-strategy", default="pass1_primary",
-                               choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap"],
+                               choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap", "longest"],
                                help="Merge strategy for two-pass results (default: pass1_primary)")
+    twopass_group.add_argument("--ensemble-serial", action="store_true",
+                               help="Complete each file (Pass1+Pass2+Merge) before starting the next. "
+                                    "Slower (reloads models per file) but delivers results incrementally.")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -249,6 +268,8 @@ def parse_arguments():
     path_group.add_argument("--output-dir", default="source",
                            help='Output directory. "source" (default) saves SRT next to each input video. '
                                 'Specify a path to use a fixed output directory.')
+    path_group.add_argument("--output-format", choices=["srt", "vtt", "both"], default="srt",
+                           help='Output subtitle format: srt (default), vtt (WebVTT), or both')
     path_group.add_argument("--temp-dir", default=None, help="Temporary directory")
     path_group.add_argument("--keep-temp", action="store_true", help="Keep temporary files")
     path_group.add_argument("--skip-existing", action="store_true",
@@ -318,6 +339,18 @@ def parse_arguments():
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), none (disable segmentation)"
                              ))
+    tuning_group.add_argument("--initial-prompt",
+                             type=str, default=None,
+                             help="Initial prompt text for Whisper decoder context (e.g., Japanese domain vocabulary)")
+    tuning_group.add_argument("--vad-threshold",
+                             type=float, default=None,
+                             metavar="FLOAT",
+                             help="VAD speech detection threshold (0.0-1.0, overrides sensitivity preset)")
+    tuning_group.add_argument("--condition-on-previous-text",
+                             type=str, default=None,
+                             choices=["true", "false"],
+                             metavar="BOOL",
+                             help="Enable/disable conditioning on previous text (default: mode-dependent)")
 
     # Async processing
     async_group = parser.add_argument_group("Processing Options")
@@ -429,6 +462,10 @@ def parse_arguments():
 
     # ── Qwen3-ASR: Model ────────────────────────────────────────────────
     qwen_model_group = parser.add_argument_group("Qwen3-ASR: Model")
+    qwen_model_group.add_argument("--qwen-generator", type=str, default="qwen3",
+                           choices=["qwen3", "anime-whisper"],
+                           help="Text generator backend (default: qwen3). "
+                                "anime-whisper uses litagin/anime-whisper for anime/VN dialogue")
     qwen_model_group.add_argument("--qwen-model-id", type=str,
                            default="Qwen/Qwen3-ASR-1.7B",
                            help="Qwen3-ASR model ID (default: Qwen/Qwen3-ASR-1.7B)")
@@ -683,6 +720,27 @@ def add_signatures_to_srt(srt_path: str, producer_credit: str = None,
     except Exception as e:
         logger.warning(f"Could not add signatures to {srt_path}: {e}")
         # Don't fail the whole process if signatures can't be added
+
+
+def apply_vtt_conversion(srt_path: str, output_format: str) -> None:
+    """Convert SRT to VTT if requested by --output-format, and optionally remove the SRT.
+
+    Args:
+        srt_path: Path to the SRT file.
+        output_format: "srt" (no-op), "vtt" (convert and remove SRT), or "both" (convert, keep SRT).
+    """
+    if output_format == "srt" or not srt_path:
+        return
+    srt = Path(srt_path)
+    if not srt.exists():
+        return
+    try:
+        vtt_path = convert_srt_to_vtt(srt)
+        if output_format == "vtt":
+            srt.unlink()
+            logger.info(f"Removed SRT (--output-format vtt): {srt.name}")
+    except Exception as e:
+        logger.warning(f"VTT conversion failed for {srt}: {e}")
 
 
 def cleanup_temp_directory(temp_dir: str):
@@ -998,6 +1056,11 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
         _qwen_segmenter = getattr(args, 'qwen_segmenter', 'silero-v6.2')
+        # anime-whisper: default to TEN VAD (must override BEFORE sensitivity resolution)
+        _gen_backend_early = getattr(args, 'qwen_generator', 'qwen3')
+        if _gen_backend_early == "anime-whisper":
+            if not any(a.startswith('--qwen-segmenter') for a in sys.argv):
+                _qwen_segmenter = "ten"
         _user_vad_overrides = {}
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
@@ -1030,6 +1093,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "segmenter_config": _resolved_segmenter_config or None,
             # Adaptive Step-Down
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
+            # Generator backend selection (v1.8.6+)
+            "generator_backend": getattr(args, 'qwen_generator', 'qwen3'),
             # Qwen ASR
             "model_id": getattr(args, 'qwen_model_id', 'Qwen/Qwen3-ASR-1.7B'),
             "device": getattr(args, 'qwen_device', 'auto'),
@@ -1077,6 +1142,23 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _sd_fb = getattr(args, 'qwen_stepdown_fallback_group', None)
         if _sd_fb is not None:
             qwen_kwargs["stepdown_fallback_group"] = _sd_fb
+        # When anime-whisper generator is selected, override ASR model defaults
+        # unless the user explicitly set them via CLI flags
+        _gen_backend = qwen_kwargs.get("generator_backend", "qwen3")
+        if _gen_backend == "anime-whisper":
+            if not any(a.startswith('--qwen-model-id') for a in sys.argv):
+                qwen_kwargs["model_id"] = "litagin/anime-whisper"
+            if not any(a.startswith('--qwen-timestamp-mode') for a in sys.argv):
+                qwen_kwargs["timestamp_mode"] = "vad_only"
+            if not any(a.startswith('--qwen-assembly-cleaner') for a in sys.argv):
+                qwen_kwargs["assembly_cleaner"] = False
+            if not any(a.startswith('--qwen-stepdown') for a in sys.argv):
+                qwen_kwargs["stepdown_enabled"] = False
+            if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
+                qwen_kwargs["segmenter_chunk_threshold"] = 0.5
+            if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
+                qwen_kwargs["segmenter_max_group_duration"] = 5.0
+
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode
     else:  # fidelity
@@ -1105,8 +1187,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     expected_dir = Path(file_path_str).parent
                 else:
                     expected_dir = Path(args.output_dir)
-                expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-                if expected_output.exists():
+                expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+                expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
+                if expected_srt.exists() or expected_vtt.exists():
                     logger.info(f"Skipping (output exists): {file_name}")
                     skipped_count += 1
                     all_stats.append({"file": file_path_str, "status": "skipped", "reason": "output_exists"})
@@ -1179,6 +1262,15 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     except Exception as e:
                         logger.error(f"Translation failed: {e}")
                         # Don't re-raise - continue with next file
+
+                # VTT conversion (if requested via --output-format)
+                output_format = getattr(args, 'output_format', 'srt')
+                if output_format != 'srt':
+                    apply_vtt_conversion(output_path, output_format)
+                    # Also convert translated SRT if present
+                    translated_srt = metadata.get("output_files", {}).get("translated_srt", "")
+                    if translated_srt:
+                        apply_vtt_conversion(translated_srt, output_format)
 
                 progress.show_file_complete(file_name, subtitle_count, output_path)
                 
@@ -1321,8 +1413,9 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                 expected_dir = Path(file_path_str).parent
             else:
                 expected_dir = Path(args.output_dir)
-            expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-            if expected_output.exists():
+            expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+            expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
+            if expected_srt.exists() or expected_vtt.exists():
                 logger.info(f"Skipping (output exists): {Path(file_path_str).name}")
                 skipped_files.append(file_path_str)
             else:
@@ -1400,7 +1493,15 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                             except Exception as e:
                                 logger.error(f"Translation failed: {e}")
                                 # Don't re-raise - continue with next file
-        
+
+                        # VTT conversion (if requested via --output-format)
+                        output_format = getattr(args, 'output_format', 'srt')
+                        if output_format != 'srt':
+                            apply_vtt_conversion(output_path, output_format)
+                            translated_srt = task.result.get("output_files", {}).get("translated_srt", "")
+                            if translated_srt:
+                                apply_vtt_conversion(translated_srt, output_format)
+
         # Summarize results
         successful = sum(1 for t in tasks if t.status == ProcessingStatus.COMPLETED)
         failed = sum(1 for t in tasks if t.status == ProcessingStatus.FAILED)
@@ -1655,6 +1756,36 @@ def main():
         logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
 
+    # Apply CLI quality knobs (--initial-prompt, --vad-threshold, --condition-on-previous-text)
+    if resolved_config is not None:
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+
+        initial_prompt = getattr(args, 'initial_prompt', None)
+        if initial_prompt is not None:
+            if "provider" not in resolved_config["params"]:
+                resolved_config["params"]["provider"] = {}
+            resolved_config["params"]["provider"]["initial_prompt"] = initial_prompt
+            logger.info(f"Initial prompt set via CLI: {initial_prompt[:50]}{'...' if len(initial_prompt) > 50 else ''}")
+
+        vad_threshold = getattr(args, 'vad_threshold', None)
+        if vad_threshold is not None:
+            if not 0.0 <= vad_threshold <= 1.0:
+                logger.warning(f"--vad-threshold {vad_threshold} outside [0.0, 1.0] range, clamping")
+                vad_threshold = max(0.0, min(1.0, vad_threshold))
+            if "provider" not in resolved_config["params"]:
+                resolved_config["params"]["provider"] = {}
+            resolved_config["params"]["provider"]["vad_threshold"] = vad_threshold
+            logger.info(f"VAD threshold set via CLI: {vad_threshold}")
+
+        condition_on_prev = getattr(args, 'condition_on_previous_text', None)
+        if condition_on_prev is not None:
+            condition_bool = condition_on_prev.lower() == "true"
+            if "decoder" not in resolved_config["params"]:
+                resolved_config["params"]["decoder"] = {}
+            resolved_config["params"]["decoder"]["condition_on_previous_text"] = condition_bool
+            logger.info(f"Condition on previous text set via CLI: {condition_bool}")
+
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
         import json
@@ -1841,6 +1972,7 @@ def main():
                 subs_language=args.subs_language,
                 parameter_tracer=tracer,
                 log_level=log_level,
+                serial_file_processing=getattr(args, 'ensemble_serial', False),
             )
 
             # Process all files with batch processing for optimal VRAM usage
@@ -1927,6 +2059,7 @@ def main():
                         if translated_path:
                             logger.info(f"Translation saved: {translated_path}")
                             print(f"  -> {translated_path}")
+                            result.setdefault('summary', {})['translated_output'] = str(translated_path)
                             translation_success += 1
                         else:
                             logger.warning(f"Translation returned no output for {basename}")
@@ -1946,6 +2079,22 @@ def main():
                 print(f"Translated: {translation_success}")
                 print(f"Failed: {translation_failed}")
                 print("="*50)
+
+            # ============================================================
+            # VTT CONVERSION: Convert SRT outputs if requested
+            # ============================================================
+            output_format = getattr(args, 'output_format', 'srt')
+            if output_format != 'srt' and successful_count > 0:
+                for result in results:
+                    if result.get('error') or result.get('status') == 'failed':
+                        continue
+                    srt_path = result.get('summary', {}).get('final_output')
+                    if srt_path:
+                        apply_vtt_conversion(srt_path, output_format)
+                    # Also convert translated SRT if present
+                    translated_srt = result.get('summary', {}).get('translated_output', '')
+                    if translated_srt:
+                        apply_vtt_conversion(translated_srt, output_format)
 
             # Close parameter tracer for ensemble mode
             if tracer:

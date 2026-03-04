@@ -32,7 +32,7 @@ from typing import Callable, Optional
 from .providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
 from .settings import load_settings, DEFAULT_SETTINGS
 from .instructions import get_instruction_content
-from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server
+from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context
 
 logger = logging.getLogger(__name__)
 
@@ -398,6 +398,17 @@ def translate_with_config(
             print(f"[SERVICE]   pysubtrans_name: Custom Server", file=sys.stderr)
             print(f"[SERVICE]   server_address: {server_address}", file=sys.stderr)
             print(f"[SERVICE]   endpoint: /v1/chat/completions", file=sys.stderr)
+
+            # Auto-cap batch size to fit within local LLM context window.
+            # Default n_ctx=8192 can't handle 30 subtitle lines — the prompt
+            # exceeds the context and PySubtrans gets truncated/garbled responses
+            # ("Hit API token limit" + "No matches"). See #183.
+            local_n_ctx = 8192  # matches start_local_server() default
+            capped_batch_size = cap_batch_size_for_context(resolved_max_batch_size, local_n_ctx)
+            if capped_batch_size < resolved_max_batch_size:
+                print(f"[SERVICE]   NOTE: Batch size auto-reduced from {resolved_max_batch_size} to "
+                      f"{capped_batch_size} to fit {local_n_ctx}-token context window", file=sys.stderr)
+                resolved_max_batch_size = capped_batch_size
 
             try:
                 result_path = translate_subtitle(
