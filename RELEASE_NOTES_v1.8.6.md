@@ -24,6 +24,7 @@ v1.8.6 is a feature + stability release. Highlights: VTT output format, M4B audi
 | #183 (secondary) | "API token limit" + "No matches" with local LLM translation | Auto-cap batch size when model context window is small |
 | #183 (upgrade) | `whisperjav-upgrade --wheel-only` shows `[X] installation not found` on Linux | Cross-platform Python/pip detection helpers |
 | Anime-whisper | Generator crash, forced max_new_tokens, wrong decoding defaults | Rewritten with low-level API, greedy decoding, safe token cap |
+| #188 | "Unknown translation provider: Gemini" on minimal installs (Linux pip) | Added `google-api-core` as explicit dependency — PySubtrans has an undeclared transitive dep |
 
 ### Breaking Changes
 
@@ -179,6 +180,6 @@ The notebooks are not updated yet for this release.
 
 ## Full Changelog
 
-**17 commits since v1.8.5**
+**20 commits since v1.8.5**
 
 [View full comparison](https://github.com/meizhong986/WhisperJAV/compare/v1.8.5...v1.8.6)

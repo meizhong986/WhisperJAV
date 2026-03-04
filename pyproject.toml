@@ -142,6 +142,7 @@ translate = [
     "pysubtrans>=1.5.0",  # AI subtitle translation (requires Python 3.10+)
     "openai>=1.35.0",     # GPT provider
     "google-genai>=1.39.0",  # Gemini provider
+    "google-api-core>=2.14.0",  # Required by pysubtrans Gemini provider (undeclared transitive dep)
 ]
 
 # Local LLM support (server dependencies)

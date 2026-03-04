@@ -541,6 +541,14 @@ PACKAGES: List[Package] = [
         order=62,
         reason="Gemini provider for pysubtrans",
     ),
+    Package(
+        name="google-api-core",
+        version=">=2.14.0",
+        extra=Extra.TRANSLATE,
+        order=62,
+        import_name="google.api_core",
+        reason="Required by pysubtrans Gemini provider (undeclared transitive dep)",
+    ),
 
     # =========================================================================
     # PHASE 5: LLM Server Packages (Order 63-69)
