@@ -142,7 +142,7 @@ def print_banner():
     """Print application banner."""
     banner = f"""
 ╔═══════════════════════════════════════════════════╗
-║          WhisperJAV v{__version_display__}                 ║
+║{f'          WhisperJAV v{__version_display__}':<51}║
 ║   Japanese Adult Video Subtitle Generator         ║
 ║                                                   ║
 ║                                                   ║

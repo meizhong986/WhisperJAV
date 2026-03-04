@@ -1,30 +1,48 @@
-v1.8.6 is a feature + stability release. Highlights: VTT output format, M4B audiobook support, encoding fixes for non-English Windows, auto-tuned LLM batch sizes, serial ensemble mode, anime-whisper backend with Kotoba model support, TEN VAD tuning, ensemble presets, and Linux/macOS upgrade support.
+v1.8.6 introduces the **ChronosJAV pipeline** — a new dedicated pipeline for anime and JAV content with specialized speech models. This release also brings ensemble workflow improvements (presets, serial mode, settings persistence), new output formats, and fixes for translation on non-English systems.
 
 ---
-### What's Changed
+
+### New: ChronosJAV Pipeline
+
+The headline feature of v1.8.6. A new pipeline in the Ensemble tab built around models trained specifically for Japanese anime and adult content. Inspired by the temporal-awareness approach in [ChronusOmni](https://arxiv.org/abs/2512.09841) (Chen et al., 2025).
+
+| Feature | Description |
+|---------|-------------|
+| **Anime-Whisper model** | New speech model fine-tuned for anime and JAV dialogue. Available in the GUI Ensemble tab under the ChronosJAV pipeline. Greedy decoding with TEN VAD segmentation for accurate timing. |
+| **Kotoba v2.0 and v2.1 models** | Two additional Japanese speech models available in the ChronosJAV model dropdown. Lighter weight (~2GB vs ~4GB) alternative to anime-whisper, based on the same Whisper large-v3 architecture. Kotoba v2.1 adds punctuation support. |
+| **Improved subtitle timing** | Retuned TEN VAD defaults for better segment boundaries. Eliminates oversized 15-36 second subtitle blocks and produces tighter, more natural subtitle timing while preserving sensitivity for short utterances and soft speech. |
+
+---
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Ensemble presets** | Save, load, and delete named ensemble configurations from the GUI. Reuse your tuned settings across sessions and across different pipeline combinations. Badge names for quick identification. |
+| **Settings persistence** | GUI pipeline and ensemble settings now survive application restarts. No more reconfiguring every session. Includes backup rotation and safe atomic writes. |
+| **VTT output format (#143)** | New output option: `--output-format srt/vtt/both` in CLI, or select from the dropdown in Advanced Options. Generates WebVTT subtitles for HTML5 video players. Works with all pipelines including ensemble. |
+| **Serial ensemble mode (#179)** | New `--ensemble-serial` option completes each file fully (Pass 1 → Pass 2 → Merge) before starting the next. See results as they finish instead of waiting for the entire batch. GUI checkbox in the merge strategy row. |
+
+---
+
+### Enhancements
 
 | Enhancement | Description |
-|------|-------------|
-| **VTT output format (#143)** | `--output-format srt/vtt/both` CLI option + GUI dropdown in Advanced Options. Converts SRT to WebVTT for HTML5 video players. Works with all pipelines including ensemble. |
-| **M4B audiobook support (#194)** | `.m4b` added to allowed input extensions. FFmpeg handles the format natively — no extra dependencies. |
-| **Ensemble serial mode (#179)** | `--ensemble-serial` completes each file (Pass 1 → Pass 2 → Merge) before starting the next. Delivers results incrementally instead of batching all files. GUI checkbox in merge strategy row. |
-| **Anime-Whisper backend** | New generator for the anime-whisper HuggingFace model. Greedy decoding, safe token cap, TEN VAD segmenter. GUI integration with ChronosJAV branding. Now also supports **Kotoba v2.0** and **Kotoba v2.1** as alternative model options in the GUI dropdown. |
-| **TEN VAD tuning** | Retuned TEN VAD defaults for better segment granularity: threshold 0.20→0.26, end padding 200→100ms, min speech duration 100→81ms. Fixes oversized 15-36s subtitle segments observed with Kotoba models while preserving sensitivity for short utterances. |
-| **Ensemble parameter presets** | Save, load, and delete named ensemble configurations. Cross-pipeline loading, badge names, persistent storage in settings file. |
-| **GUI settings persistence** | Initial framework for persisting pipeline and ensemble settings across sessions. Backup rotation, atomic writes. Also adds CLI quality knobs and longest merge strategy. |
-| **Linux/macOS upgrade tool** | `whisperjav-upgrade` now detects pip-based installations on Linux/macOS. Platform-appropriate error messages and step labels instead of Windows-only assumptions. |
+|-------------|-------------|
+| **M4B audiobook support (#194)** | `.m4b` audiobook files can now be processed directly. Just drag and drop — FFmpeg handles the format natively. |
+| **Linux/macOS upgrade support** | `whisperjav-upgrade` now works on pip-based installations on Linux and macOS. Previously Windows-only. |
+| **Longest merge strategy** | New merge strategy option for ensemble mode, plus additional CLI quality knobs for advanced users. |
 
 ---
 
 ### Bug Fixes
 
-| Issue | What Happened | Fixed |
-|-------|---------------|-------|
-| #190 | GBK codec crash on Chinese/Japanese Windows during local LLM translation | Process-wide UTF-8 mode (`PYTHONIOENCODING=utf-8`) covers PySubtrans internals |
-| #183 (secondary) | "API token limit" + "No matches" with local LLM translation | Auto-cap batch size when model context window is small |
-| #183 (upgrade) | `whisperjav-upgrade --wheel-only` shows `[X] installation not found` on Linux | Cross-platform Python/pip detection helpers |
-| Anime-whisper | Generator crash, forced max_new_tokens, wrong decoding defaults | Rewritten with low-level API, greedy decoding, safe token cap |
-| #188 | "Unknown translation provider: Gemini" on minimal installs (Linux pip) | Added `google-api-core` as explicit dependency — PySubtrans has an undeclared transitive dep |
+| Issue | What was broken | What we fixed |
+|-------|-----------------|---------------|
+| #190 | Translation crashed on Chinese/Japanese Windows with a GBK codec error | Process-wide UTF-8 mode now covers all translation internals |
+| #188 | "Unknown translation provider: Gemini" on Linux pip installs — even with google-genai installed | Added missing `google-api-core` dependency (undeclared by upstream PySubtrans) |
+| #183 | "API token limit" and "No matches" errors during local LLM translation | Auto-detect model context window size and cap batch size accordingly |
+| #183 | `whisperjav-upgrade --wheel-only` showed "installation not found" on Linux | Cross-platform Python/pip detection for the upgrade tool |
 
 ### Breaking Changes
 

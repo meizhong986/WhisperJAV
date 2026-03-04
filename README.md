@@ -8,7 +8,7 @@
     <img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"/>
   </a>
   <br>
-  <img src="https://img.shields.io/badge/version-1.8.5-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.8.6-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.10--3.12-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
 </p>
@@ -637,6 +637,7 @@ MIT License. See [LICENSE](LICENSE) file.
 - In-Context Learning Boosts Speech Recognition." (2025). arXiv:2505.1
 - Koenecke, A., et al. (2024). "Careless Whisper: Speech-to-Text Hallucination Harms." ACM FAccT 2024.
 - Bain, M., et al. (2023). "WhisperX: Time-Accurate Speech Transcription of Long-Form Audio." arXiv:2303.00747.
+- Chen, Y., et al. (2025). "ChronusOmni: Improving Time Awareness of Omni Large Language Models." arXiv:2512.09841. *(Inspiration for the ChronosJAV pipeline)*
 
 
 ## Acknowledgments
@@ -646,6 +647,7 @@ MIT License. See [LICENSE](LICENSE) file.
 - [stable-ts](https://github.com/jianfch/stable-ts) - Timestamp refinement
 - [faster-whisper](https://github.com/guillaumekln/faster-whisper) - Optimized CTranslate2 inference
 - [HuggingFace Transformers](https://github.com/huggingface/transformers) - Transformers pipeline backend
+- [Anime-Whisper](https://huggingface.co/litagin/anime-whisper) - Anime/JAV-tuned speech model (ChronosJAV pipeline)
 - [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) - Japanese-optimized Whisper model
 - [PySubtrans](https://github.com/machinewrapped/llm-subtrans) - AI-powered subtitle translation engine
 - The testing community for feedback and bug reports
