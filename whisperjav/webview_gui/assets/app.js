@@ -1257,7 +1257,9 @@ const EnsembleManager = {
         { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' }
     ],
     animeWhisperModels: [
-        { value: 'litagin/anime-whisper', label: 'anime-whisper    ~4GB' }
+        { value: 'litagin/anime-whisper', label: 'anime-whisper    ~4GB' },
+        { value: 'kotoba-tech/kotoba-whisper-v2.0', label: 'Kotoba v2.0    ~2GB' },
+        { value: 'kotoba-tech/kotoba-whisper-v2.1', label: 'Kotoba v2.1    ~2GB' }
     ],
 
     async init() {
