@@ -579,10 +579,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-4-install-ffmpeg" class="md-nav__link">
+  <a href="#step-4-install-ffmpeg-and-portaudio" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Install FFmpeg
+        Step 4: Install FFmpeg and PortAudio
       
     </span>
   </a>
@@ -1132,6 +1132,17 @@
     <span class="md-ellipsis">
       
         NumPy Build Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyaudio-portaudio-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyaudio / PortAudio Errors
       
     </span>
   </a>
@@ -2267,10 +2278,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-4-install-ffmpeg" class="md-nav__link">
+  <a href="#step-4-install-ffmpeg-and-portaudio" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4: Install FFmpeg
+        Step 4: Install FFmpeg and PortAudio
       
     </span>
   </a>
@@ -2827,6 +2838,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pyaudio-portaudio-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyaudio / PortAudio Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#soundfile-libsndfile-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3124,9 +3146,13 @@
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>pyenv<span class="w"> </span>init<span class="w"> </span>-<span class="k">)</span><span class="s2">&quot;</span>
 </code></pre></div></p>
 <p><strong>Important:</strong> Do NOT use the system Python that comes with macOS. It is too old and is managed by the OS.</p>
-<h3 id="step-4-install-ffmpeg">Step 4: Install FFmpeg<a class="headerlink" href="#step-4-install-ffmpeg" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg
+<h3 id="step-4-install-ffmpeg-and-portaudio">Step 4: Install FFmpeg and PortAudio<a class="headerlink" href="#step-4-install-ffmpeg-and-portaudio" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w"> </span>portaudio
 </code></pre></div>
+<ul>
+<li><strong>FFmpeg</strong> is used for audio/video extraction and format conversion.</li>
+<li><strong>PortAudio</strong> is a system library required by <code>pyaudio</code>, which is used by <code>auditok</code> for scene detection.</li>
+</ul>
 <p><strong>Verify:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>ffmpeg<span class="w"> </span>-version
 </code></pre></div></p>
@@ -3200,7 +3226,7 @@
 <a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;pydantic&gt;=2.0,&lt;3.0&quot;</span><span class="w"> </span><span class="s2">&quot;PyYAML&gt;=6.0&quot;</span><span class="w"> </span>jsonschema
 <a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>
 <a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a><span class="c1"># VAD (Voice Activity Detection)</span>
-<a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>pip<span class="w"> </span>install<span class="w"> </span>auditok<span class="w"> </span><span class="s2">&quot;silero-vad&gt;=6.0&quot;</span><span class="w"> </span>ten-vad
+<a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>pip<span class="w"> </span>install<span class="w"> </span>pyaudio<span class="w"> </span>auditok<span class="w"> </span><span class="s2">&quot;silero-vad&gt;=6.0&quot;</span><span class="w"> </span>ten-vad
 <a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>
 <a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a><span class="c1"># Performance</span>
 <a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;psutil&gt;=5.9.0&quot;</span><span class="w"> </span><span class="s2">&quot;scikit-learn&gt;=1.3.0&quot;</span>
@@ -3607,33 +3633,40 @@ Note: On macOS, pywebview uses the native WebKit engine. No additional dependenc
 2. Try installing pre-built wheels:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>pip<span class="w"> </span>install<span class="w"> </span>--only-binary<span class="o">=</span>:all:<span class="w"> </span><span class="s2">&quot;numpy&gt;=1.26.0,&lt;2.0&quot;</span>
 </code></pre></div></p>
+<h3 id="pyaudio-portaudio-errors">pyaudio / PortAudio Errors<a class="headerlink" href="#pyaudio-portaudio-errors" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> <code>ERROR: Could not build wheels for pyaudio</code> or <code>portaudio.h: No such file or directory</code></p>
+<p><strong>Solution:</strong> Install the PortAudio system library before installing pyaudio:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>brew<span class="w"> </span>install<span class="w"> </span>portaudio
+<a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>pip<span class="w"> </span>install<span class="w"> </span>pyaudio
+</code></pre></div></p>
+<p>PortAudio is required by <code>auditok</code>, which is used for scene detection.</p>
 <h3 id="soundfile-libsndfile-errors">soundfile / libsndfile Errors<a class="headerlink" href="#soundfile-libsndfile-errors" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> <code>OSError: cannot load library 'libsndfile.dylib'</code></p>
 <p><strong>Solutions:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>brew<span class="w"> </span>install<span class="w"> </span>libsndfile
+<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>brew<span class="w"> </span>install<span class="w"> </span>libsndfile
 </code></pre></div></p>
 <p>Then reinstall soundfile:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>pip<span class="w"> </span>uninstall<span class="w"> </span>soundfile
-<a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>pip<span class="w"> </span>install<span class="w"> </span>soundfile
+<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>pip<span class="w"> </span>uninstall<span class="w"> </span>soundfile
+<a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>pip<span class="w"> </span>install<span class="w"> </span>soundfile
 </code></pre></div></p>
 <h3 id="mps-out-of-memory">MPS Out of Memory<a class="headerlink" href="#mps-out-of-memory" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> <code>RuntimeError: MPS backend out of memory</code></p>
 <p><strong>Solutions:</strong>
 1. Use a smaller model:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers<span class="w"> </span>--model<span class="w"> </span>medium
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers<span class="w"> </span>--model<span class="w"> </span>medium
 </code></pre></div>
 2. Enable MPS memory fallback:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PYTORCH_MPS_HIGH_WATERMARK_RATIO</span><span class="o">=</span><span class="m">0</span>.0
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PYTORCH_MPS_HIGH_WATERMARK_RATIO</span><span class="o">=</span><span class="m">0</span>.0
 </code></pre></div>
 3. Close other applications to free memory.
 4. If the problem persists, fall back to CPU mode:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>faster
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>faster
 </code></pre></div></p>
 <h3 id="slower-than-expected-performance">slower-than-expected Performance<a class="headerlink" href="#slower-than-expected-performance" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> Processing is very slow even with MPS.</p>
 <p><strong>Check:</strong>
 1. Verify you are using <code>--mode transformers</code> (not <code>balanced</code> or <code>faster</code>, which use CPU on Mac):
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers
 </code></pre></div>
 2. Verify MPS is being used (look for "MPS device detected" in output or run with <code>--verbose</code>).
 3. Check Activity Monitor for memory pressure. If the system is swapping, processing will be very slow.</p>
@@ -3641,26 +3674,26 @@ Note: On macOS, pywebview uses the native WebKit engine. No additional dependenc
 <p><strong>Symptom:</strong> <code>python3: command not found</code> after installing Python via Homebrew.</p>
 <p><strong>Solutions:</strong></p>
 <p>On Apple Silicon, Homebrew installs to <code>/opt/homebrew/</code>. Ensure it is in your PATH:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a><span class="c1"># Add to ~/.zshrc</span>
-<a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>/opt/homebrew/bin/brew<span class="w"> </span>shellenv<span class="k">)</span><span class="s2">&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a><span class="c1"># Add to ~/.zshrc</span>
+<a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>/opt/homebrew/bin/brew<span class="w"> </span>shellenv<span class="k">)</span><span class="s2">&quot;</span>
 </code></pre></div>
 <p>Then reload:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a><span class="nb">source</span><span class="w"> </span>~/.zshrc
+<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a><span class="nb">source</span><span class="w"> </span>~/.zshrc
 </code></pre></div></p>
 <h3 id="pep-668-error-externally-managed-environment">PEP 668 Error ("externally-managed-environment")<a class="headerlink" href="#pep-668-error-externally-managed-environment" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> <code>error: externally-managed-environment</code></p>
 <p>This occurs when trying to install packages globally with Homebrew Python. Always use a virtual environment:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/venvs/whisperjav
-<a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a><span class="nb">source</span><span class="w"> </span>~/venvs/whisperjav/bin/activate
-<a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a><span class="c1"># Then install within the venv</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/venvs/whisperjav
+<a id="__codelineno-64-2" name="__codelineno-64-2" href="#__codelineno-64-2"></a><span class="nb">source</span><span class="w"> </span>~/venvs/whisperjav/bin/activate
+<a id="__codelineno-64-3" name="__codelineno-64-3" href="#__codelineno-64-3"></a><span class="c1"># Then install within the venv</span>
 </code></pre></div>
 <h3 id="git-timeout-during-installation">Git Timeout During Installation<a class="headerlink" href="#git-timeout-during-installation" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> <code>Failed to connect to github.com port 443 after 21 ms</code></p>
 <p><strong>Solutions:</strong>
 1. Check your internet connection.
 2. If behind a VPN or firewall, configure Git timeouts:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>http.connectTimeout<span class="w"> </span><span class="m">120</span>
-<a id="__codelineno-64-2" name="__codelineno-64-2" href="#__codelineno-64-2"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>http.timeout<span class="w"> </span><span class="m">300</span>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>http.connectTimeout<span class="w"> </span><span class="m">120</span>
+<a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>http.timeout<span class="w"> </span><span class="m">300</span>
 </code></pre></div>
 3. Retry the installation.</p>
 <hr />
@@ -3672,49 +3705,49 @@ Note: On macOS, pywebview uses the native WebKit engine. No additional dependenc
 <p>As of v1.8.3, the Qwen ASR module (<code>qwen_asr.py</code>) does not detect MPS and falls back to CPU on Apple Silicon. This is a code limitation, not a framework limitation -- the underlying <code>transformers</code> library supports MPS. A fix is expected in a future release.</p>
 <h3 id="speech-enhancement-backend-compatibility">Speech Enhancement Backend Compatibility<a class="headerlink" href="#speech-enhancement-backend-compatibility" title="Permanent link">&para;</a></h3>
 <p>The speech enhancement backends (ClearVoice, BS-RoFormer) may have limited testing on macOS. If you encounter issues:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a><span class="c1"># Skip speech enhancement during installation</span>
-<a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a>python<span class="w"> </span>install.py<span class="w"> </span>--no-speech-enhancement
-<a id="__codelineno-65-3" name="__codelineno-65-3" href="#__codelineno-65-3"></a>
-<a id="__codelineno-65-4" name="__codelineno-65-4" href="#__codelineno-65-4"></a><span class="c1"># Or skip at runtime</span>
-<a id="__codelineno-65-5" name="__codelineno-65-5" href="#__codelineno-65-5"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers<span class="w"> </span>--no-enhance
+<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a><span class="c1"># Skip speech enhancement during installation</span>
+<a id="__codelineno-66-2" name="__codelineno-66-2" href="#__codelineno-66-2"></a>python<span class="w"> </span>install.py<span class="w"> </span>--no-speech-enhancement
+<a id="__codelineno-66-3" name="__codelineno-66-3" href="#__codelineno-66-3"></a>
+<a id="__codelineno-66-4" name="__codelineno-66-4" href="#__codelineno-66-4"></a><span class="c1"># Or skip at runtime</span>
+<a id="__codelineno-66-5" name="__codelineno-66-5" href="#__codelineno-66-5"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers<span class="w"> </span>--no-enhance
 </code></pre></div>
 <h3 id="no-standalone-installer-for-mac">No Standalone Installer for Mac<a class="headerlink" href="#no-standalone-installer-for-mac" title="Permanent link">&para;</a></h3>
 <p>The standalone installer (conda-constructor <code>.exe</code>) is only available for Windows. Mac users must install from source using this guide.</p>
 <h3 id="onnx-runtime-on-apple-silicon">ONNX Runtime on Apple Silicon<a class="headerlink" href="#onnx-runtime-on-apple-silicon" title="Permanent link">&para;</a></h3>
 <p>The <code>onnxruntime</code> package (used by the enhance extra) may not have optimized Apple Silicon builds. If it fails to install, you can skip it -- it is only needed for speech enhancement:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>pip<span class="w"> </span>install<span class="w"> </span>onnxruntime<span class="w">  </span><span class="c1"># If this fails, speech enhancement won&#39;t work but transcription is unaffected</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>pip<span class="w"> </span>install<span class="w"> </span>onnxruntime<span class="w">  </span><span class="c1"># If this fails, speech enhancement won&#39;t work but transcription is unaffected</span>
 </code></pre></div>
 <h3 id="openai-whisper-mps-stability">openai-whisper MPS Stability<a class="headerlink" href="#openai-whisper-mps-stability" title="Permanent link">&para;</a></h3>
 <p>While OpenAI Whisper supports MPS, some operations may fall back to CPU for numerical stability. This is handled automatically by PyTorch and may result in slightly lower GPU utilization compared to CUDA. You may see warnings like:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>UserWarning: MPS: fallback to CPU for op &#39;aten::...&#39;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>UserWarning: MPS: fallback to CPU for op &#39;aten::...&#39;
 </code></pre></div>
 These are informational and do not indicate errors.</p>
 <hr />
 <h2 id="quick-reference-card">Quick Reference Card<a class="headerlink" href="#quick-reference-card" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a><span class="c1"># === Setup (one time) ===</span>
-<a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a>xcode-select<span class="w"> </span>--install
-<a id="__codelineno-68-3" name="__codelineno-68-3" href="#__codelineno-68-3"></a>brew<span class="w"> </span>install<span class="w"> </span>python@3.12<span class="w"> </span>ffmpeg<span class="w"> </span>git
-<a id="__codelineno-68-4" name="__codelineno-68-4" href="#__codelineno-68-4"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/venvs/whisperjav
-<a id="__codelineno-68-5" name="__codelineno-68-5" href="#__codelineno-68-5"></a><span class="nb">source</span><span class="w"> </span>~/venvs/whisperjav/bin/activate
-<a id="__codelineno-68-6" name="__codelineno-68-6" href="#__codelineno-68-6"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
-<a id="__codelineno-68-7" name="__codelineno-68-7" href="#__codelineno-68-7"></a>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchaudio
-<a id="__codelineno-68-8" name="__codelineno-68-8" href="#__codelineno-68-8"></a>
-<a id="__codelineno-68-9" name="__codelineno-68-9" href="#__codelineno-68-9"></a><span class="c1"># === Install WhisperJAV ===</span>
-<a id="__codelineno-68-10" name="__codelineno-68-10" href="#__codelineno-68-10"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/meizhong986/whisperjav.git
-<a id="__codelineno-68-11" name="__codelineno-68-11" href="#__codelineno-68-11"></a><span class="nb">cd</span><span class="w"> </span>whisperjav
-<a id="__codelineno-68-12" name="__codelineno-68-12" href="#__codelineno-68-12"></a>python<span class="w"> </span>install.py<span class="w"> </span>--cpu-only
-<a id="__codelineno-68-13" name="__codelineno-68-13" href="#__codelineno-68-13"></a>
-<a id="__codelineno-68-14" name="__codelineno-68-14" href="#__codelineno-68-14"></a><span class="c1"># === Daily usage ===</span>
-<a id="__codelineno-68-15" name="__codelineno-68-15" href="#__codelineno-68-15"></a><span class="nb">source</span><span class="w"> </span>~/venvs/whisperjav/bin/activate
-<a id="__codelineno-68-16" name="__codelineno-68-16" href="#__codelineno-68-16"></a>
-<a id="__codelineno-68-17" name="__codelineno-68-17" href="#__codelineno-68-17"></a><span class="c1"># Recommended for Mac (MPS GPU acceleration)</span>
-<a id="__codelineno-68-18" name="__codelineno-68-18" href="#__codelineno-68-18"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers
-<a id="__codelineno-68-19" name="__codelineno-68-19" href="#__codelineno-68-19"></a>
-<a id="__codelineno-68-20" name="__codelineno-68-20" href="#__codelineno-68-20"></a><span class="c1"># GUI</span>
-<a id="__codelineno-68-21" name="__codelineno-68-21" href="#__codelineno-68-21"></a>whisperjav-gui
-<a id="__codelineno-68-22" name="__codelineno-68-22" href="#__codelineno-68-22"></a>
-<a id="__codelineno-68-23" name="__codelineno-68-23" href="#__codelineno-68-23"></a><span class="c1"># Check environment</span>
-<a id="__codelineno-68-24" name="__codelineno-68-24" href="#__codelineno-68-24"></a>whisperjav<span class="w"> </span>--check
+<div class="highlight"><pre><span></span><code><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a><span class="c1"># === Setup (one time) ===</span>
+<a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>xcode-select<span class="w"> </span>--install
+<a id="__codelineno-69-3" name="__codelineno-69-3" href="#__codelineno-69-3"></a>brew<span class="w"> </span>install<span class="w"> </span>python@3.12<span class="w"> </span>ffmpeg<span class="w"> </span>portaudio<span class="w"> </span>git
+<a id="__codelineno-69-4" name="__codelineno-69-4" href="#__codelineno-69-4"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/venvs/whisperjav
+<a id="__codelineno-69-5" name="__codelineno-69-5" href="#__codelineno-69-5"></a><span class="nb">source</span><span class="w"> </span>~/venvs/whisperjav/bin/activate
+<a id="__codelineno-69-6" name="__codelineno-69-6" href="#__codelineno-69-6"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+<a id="__codelineno-69-7" name="__codelineno-69-7" href="#__codelineno-69-7"></a>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchaudio
+<a id="__codelineno-69-8" name="__codelineno-69-8" href="#__codelineno-69-8"></a>
+<a id="__codelineno-69-9" name="__codelineno-69-9" href="#__codelineno-69-9"></a><span class="c1"># === Install WhisperJAV ===</span>
+<a id="__codelineno-69-10" name="__codelineno-69-10" href="#__codelineno-69-10"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/meizhong986/whisperjav.git
+<a id="__codelineno-69-11" name="__codelineno-69-11" href="#__codelineno-69-11"></a><span class="nb">cd</span><span class="w"> </span>whisperjav
+<a id="__codelineno-69-12" name="__codelineno-69-12" href="#__codelineno-69-12"></a>python<span class="w"> </span>install.py<span class="w"> </span>--cpu-only
+<a id="__codelineno-69-13" name="__codelineno-69-13" href="#__codelineno-69-13"></a>
+<a id="__codelineno-69-14" name="__codelineno-69-14" href="#__codelineno-69-14"></a><span class="c1"># === Daily usage ===</span>
+<a id="__codelineno-69-15" name="__codelineno-69-15" href="#__codelineno-69-15"></a><span class="nb">source</span><span class="w"> </span>~/venvs/whisperjav/bin/activate
+<a id="__codelineno-69-16" name="__codelineno-69-16" href="#__codelineno-69-16"></a>
+<a id="__codelineno-69-17" name="__codelineno-69-17" href="#__codelineno-69-17"></a><span class="c1"># Recommended for Mac (MPS GPU acceleration)</span>
+<a id="__codelineno-69-18" name="__codelineno-69-18" href="#__codelineno-69-18"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>transformers
+<a id="__codelineno-69-19" name="__codelineno-69-19" href="#__codelineno-69-19"></a>
+<a id="__codelineno-69-20" name="__codelineno-69-20" href="#__codelineno-69-20"></a><span class="c1"># GUI</span>
+<a id="__codelineno-69-21" name="__codelineno-69-21" href="#__codelineno-69-21"></a>whisperjav-gui
+<a id="__codelineno-69-22" name="__codelineno-69-22" href="#__codelineno-69-22"></a>
+<a id="__codelineno-69-23" name="__codelineno-69-23" href="#__codelineno-69-23"></a><span class="c1"># Check environment</span>
+<a id="__codelineno-69-24" name="__codelineno-69-24" href="#__codelineno-69-24"></a>whisperjav<span class="w"> </span>--check
 </code></pre></div>
 
 
