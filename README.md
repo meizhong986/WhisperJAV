@@ -82,29 +82,19 @@ whisperjav /path/to/media_folder --output-dir ./subtitles
 
 ## Features
 
-### ChronosJAV Pipeline
-
-A dedicated pipeline for anime and JAV content, available in the Ensemble tab. Built around speech models fine-tuned for Japanese dialogue with greedy decoding and TEN VAD segmentation for tight timing.
-
-| Model | Size | Notes |
-|-------|------|-------|
-| **anime-whisper** | ~4 GB | Fine-tuned for anime/JAV dialogue |
-| **Kotoba v2.0** | ~2 GB | Lighter alternative, same Whisper large-v3 architecture |
-| **Kotoba v2.1** | ~2 GB | Adds punctuation support |
-
-Use it standalone or as one pass in an ensemble configuration for maximum accuracy.
-
 ### Processing Modes
 
-| Mode | Backend | Scene Detection | VAD | Best For |
-|------|---------|-----------------|-----|----------|
-| **faster** | stable-ts (turbo) | No | No | Speed priority, clean audio |
-| **fast** | stable-ts | Yes | No | General use, mixed quality |
-| **balanced** | faster-whisper | Yes | Yes | Default. Noisy audio, dialogue-heavy |
-| **fidelity** | OpenAI Whisper | Yes | Yes (Silero) | Maximum accuracy, slower |
-| **transformers** | HuggingFace | Optional | Internal | Japanese-optimized Kotoba model |
-| **qwen** | Qwen3-ASR | Yes | Yes | Alternative ASR engine with forced alignment |
-| **ChronosJAV** | anime-whisper | Yes | TEN | Anime/JAV-tuned speech models |
+Seven pipelines, each with different tradeoffs. Scene detection, speech enhancement, and speech segmenter are configurable for all pipelines that support them — the table shows defaults.
+
+| Pipeline | Backend | Scene Detection | Speech Enhancer | Speech Segmenter | Best For |
+|----------|---------|-----------------|-----------------|------------------|----------|
+| **faster** | Faster-Whisper (turbo) | — | — | — | Speed, clean audio |
+| **fast** | OpenAI Whisper | Auditok | — | — | General use, mixed quality |
+| **balanced** | Faster-Whisper | Auditok | Configurable | Silero | Default. Noisy, dialogue-heavy |
+| **fidelity** | OpenAI Whisper | Auditok | Configurable | Silero | Maximum accuracy, slower |
+| **transformers** | HuggingFace Kotoba | Optional | Configurable | Optional | Kotoba Japanese models |
+| **qwen** | Qwen3-ASR | Semantic | Configurable | Silero | Qwen ASR with forced alignment |
+| **anime** | anime-whisper | Semantic | Configurable | TEN | Anime/JAV-tuned dialogue |
 
 ### Sensitivity Settings
 
@@ -112,20 +102,13 @@ Use it standalone or as one pass in an ensemble configuration for maximum accura
 - **Balanced**: Default. Works for most content.
 - **Aggressive**: Lower thresholds, catches more dialogue. Good for whisper/ASMR content.
 
-### Transformers Mode
+### ChronosJAV
 
-Uses HuggingFace's `kotoba-tech/kotoba-whisper-v2.2` model, optimized for Japanese conversational speech:
+ChronosJAV is a dedicated pipeline for transcribing with models that do not produce their own timestamps — LLMs, Qwen ASR, anime-whisper, Kotoba, and similar. It handles text generation and timestamp alignment as separate stages, so any model that can produce text from audio can be plugged in.
 
-```bash
-whisperjav video.mp4 --mode transformers
+#### Qwen3-ASR
 
-# Customize parameters
-whisperjav video.mp4 --mode transformers --hf-beam-size 5 --hf-chunk-length 20
-```
-
-### Qwen3-ASR Pipeline
-
-An alternative ASR engine based on [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR). Uses a Qwen language model for text generation and a separate forced aligner for timestamps.
+Uses [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) models (1.7B, 0.6B) for text generation with a local forced aligner for word-level timestamps. Three processing modes:
 
 | Mode | How It Works | Best For |
 |------|-------------|----------|
@@ -133,7 +116,13 @@ An alternative ASR engine based on [Qwen3-ASR](https://github.com/QwenLM/Qwen3-A
 | **Context-Aware** | ASR and alignment together on full scenes (30-90s). | More context per utterance |
 | **VAD Slicing** (default) | Coupled ASR+alignment with step-wise fallback. | More detail, less context |
 
-Access via CLI (`--mode qwen`) or the Ensemble tab in the GUI.
+#### Anime-Whisper
+
+Uses [`litagin/anime-whisper`](https://huggingface.co/litagin/anime-whisper), a Whisper large-v3 model fine-tuned on anime and JAV dialogue. Greedy decoding with TEN VAD segmentation for tight subtitle timing. Also supports Kotoba v2.0 and v2.1 (lighter models; v2.1 adds punctuation).
+
+#### Future: LLM-based transcription
+
+The decoupled architecture means any model that generates text from audio can be wired in — including future LLM-based ASR models. New models can be deployed via YAML configuration without pipeline code changes.
 
 ### Two-Pass Ensemble Mode
 
@@ -277,15 +266,15 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Content-Specific Recommendations
 
-| Content Type | Mode | Sensitivity | Notes |
-|--------------|------|-------------|-------|
-| Drama / Dialogue Heavy | balanced | aggressive | Or try transformers mode |
-| Anime / JAV Dialogue | ChronosJAV | aggressive | anime-whisper model with TEN VAD |
+| Content Type | Pipeline | Sensitivity | Notes |
+|--------------|----------|-------------|-------|
+| Drama / Dialogue Heavy | balanced | aggressive | Full pipeline with Silero VAD |
+| Anime / JAV Dialogue | anime | aggressive | anime-whisper model with TEN VAD |
 | Group Scenes | faster | conservative | Speed matters, less precision needed |
 | Amateur / Homemade | fast | conservative | Variable audio quality |
 | ASMR / VR / Whisper | fidelity | aggressive | Maximum accuracy for quiet speech |
 | Heavy Background Music | balanced | conservative | VAD helps filter music |
-| Maximum Accuracy | ensemble | varies | ChronosJAV + balanced, or two different pipelines |
+| Maximum Accuracy | ensemble | varies | anime + balanced, or two different pipelines |
 
 ---
 
