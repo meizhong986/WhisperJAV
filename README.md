@@ -7,19 +7,14 @@
   <a href="https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_kaggle_parallel_edition.ipynb">
     <img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"/>
   </a>
-  <br>
-  <img src="https://img.shields.io/badge/version-1.8.6-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/python-3.10--3.12-green.svg" alt="Python">
-  <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
-  <a href="https://meizhong986.github.io/WhisperJAV/">
-    <img src="https://img.shields.io/badge/docs-online-brightgreen.svg" alt="Documentation">
-  </a>
   <a href="https://buymeacoffee.com/meizhong">
     <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee">
   </a>
 </p>
 
 A subtitle generator for Japanese Adult Videos.
+
+For user guide please see the [online documentation](https://meizhong986.github.io/WhisperJAV/).
 
 ---
 
