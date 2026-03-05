@@ -1,0 +1,153 @@
+# =============================================================================
+# WhisperJAV Documentation — MkDocs Material Configuration
+# =============================================================================
+# Builds to: https://meizhong986.github.io/whisperjav/
+# Local preview: mkdocs serve
+# Deploy: automatic via GitHub Actions on push to main
+# =============================================================================
+
+site_name: WhisperJAV Documentation
+site_url: https://meizhong986.github.io/whisperjav/
+site_description: Japanese Adult Video Subtitle Generator with AI-powered transcription
+site_author: MeiZhong
+repo_url: https://github.com/meizhong986/whisperjav
+repo_name: meizhong986/whisperjav
+edit_uri: edit/main/docs/
+
+# =============================================================================
+# Theme
+# =============================================================================
+theme:
+  name: material
+  palette:
+    # Dark mode (default)
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    # Light mode
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+# =============================================================================
+# Navigation
+# =============================================================================
+# User-facing content first, developer docs at the end.
+# Files not listed here are still accessible by URL but won't appear in nav.
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Windows (Installer): guides/installation_windows_standalone.md
+    - Windows (Python): guides/installation_windows_python.md
+    - macOS (Apple Silicon): guides/installation_mac_apple_silicon.md
+    - Linux: guides/installation_linux.md
+  - User Guide:
+    - user-guide/index.md
+    - GUI Walkthrough: guides/gui_user_guide.md
+    - Common Workflows: user-guide/workflows.md
+    - CLI Reference: user-guide/cli-reference.md
+    - Output Formats: user-guide/output-formats.md
+    - Translation: user-guide/translation.md
+  - Pipelines:
+    - pipelines/index.md
+    - Ensemble Mode: pipelines/ensemble.md
+    - ChronosJAV: pipelines/chronosjav.md
+    - Qwen3-ASR: pipelines/qwen3-asr.md
+  - Upgrading:
+    - UPGRADE.md
+    - Troubleshooting: UPGRADE_TROUBLESHOOTING.md
+    - Manual Rollback: MANUAL_ROLLBACK.md
+  - FAQ: faq.md
+  - Developer:
+    - developer/index.md
+    - Architecture Overview: architecture/CONFIG_SOURCES_HIERARCHY.md
+    - ADR-001 YAML Config: adr/ADR-001-yaml-config-architecture.md
+    - ADR-002 Batched Pipeline: adr/ADR-002-batched-transcription-pipeline.md
+    - ADR-003 Qwen3 Integration: architecture/ADR-003-qwen3-asr-integration.md
+    - ADR-004 Dedicated Qwen Pipeline: architecture/ADR-004-dedicated-qwen-pipeline.md
+
+# =============================================================================
+# Excluded Files
+# =============================================================================
+# Exclude files that aren't valid UTF-8 or are internal dev artifacts.
+# MkDocs scans all .md files in docs/ even if not in nav — these would cause
+# build errors.
+exclude_docs: |
+  SPEECH_SEGMENTER_AUDIT.md
+  SCENE_DETECTOR_AUDIT.md
+  SCENE_DETECTOR_ARCHITECTURE_REVIEW.md
+  SCENE_DETECT_CONTRACT_DESIGN.md
+  SCENE_DETECT_MIGRATION_STRATEGY.md
+  PIPELINE_AUDIT_FAST_VS_QWEN.md
+  CONFIG_ARCHITECTURE.md
+  INSTALLATION_STRATEGY.md
+  INSTALLATION_GUIDE.md
+  RELEASE_PLAN_*.md
+  sprint*.md
+  plans/
+  plan/
+  audit/
+  design/
+  testing/
+  analysis/
+  release/
+  known_issues/
+
+# =============================================================================
+# Plugins
+# =============================================================================
+plugins:
+  - search
+
+# =============================================================================
+# Markdown Extensions
+# =============================================================================
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+# =============================================================================
+# Extra
+# =============================================================================
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/meizhong986/whisperjav
+
+copyright: Copyright &copy; 2024-2026 MeiZhong — MIT License

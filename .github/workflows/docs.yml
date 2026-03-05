@@ -1,0 +1,40 @@
+# =============================================================================
+# Deploy WhisperJAV Documentation to GitHub Pages
+# =============================================================================
+# Triggers on push to main when docs/ or mkdocs.yml change.
+# Uses MkDocs Material to build and deploy to GitHub Pages.
+#
+# Setup required (one-time):
+#   1. Go to repo Settings → Pages → Source → "GitHub Actions"
+#   2. That's it. First push to main will create the gh-pages branch.
+# =============================================================================
+
+name: Deploy Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install MkDocs Material
+        run: pip install mkdocs-material
+
+      - name: Build and Deploy
+        run: mkdocs gh-deploy --force
