@@ -82,27 +82,19 @@ whisperjav /path/to/media_folder --output-dir ./subtitles
 
 ## Features
 
-### Qwen3-ASR Pipeline (New in v1.8.3 — Preview)
+### ChronosJAV Pipeline
 
-A new ASR engine based on [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR), available as an alternative to Whisper. It uses a Qwen language model for text generation and a separate forced aligner for word-level timestamps.
+A dedicated pipeline for anime and JAV content, available in the Ensemble tab. Built around speech models fine-tuned for Japanese dialogue with greedy decoding and TEN VAD segmentation for tight timing.
 
-The Qwen pipeline supports three ways to process your audio:
+| Model | Size | Notes |
+|-------|------|-------|
+| **anime-whisper** | ~4 GB | Fine-tuned for anime/JAV dialogue |
+| **Kotoba v2.0** | ~2 GB | Lighter alternative, same Whisper large-v3 architecture |
+| **Kotoba v2.1** | ~2 GB | Adds punctuation support |
 
-| Mode | How It Works | Best For |
-|------|-------------|----------|
-| **Assembly** | Generates text first, then aligns timestamps in a separate pass. Batches scenes up to 120s. | Most content. Decoupled design means each step can be optimized independently. |
-| **Context-Aware** | Runs ASR and alignment together on full scenes (30-90s). | When you need the model to "see" more context around each utterance. |
-| **VAD Slicing** (default) | Coupled ASR+alignment with a step-wise fallback system. If the aligner collapses, it falls back to VAD-based grouping (up to 29s). | More detail, less context. |
+Use it standalone or as one pass in an ensemble configuration for maximum accuracy.
 
-Access it via the CLI (`--mode qwen`) or the Ensemble tab in the GUI.
-
-**Known limitations (work in progress):**
-- **Timestamps** — The forced aligner sometimes drifts, especially on long scenes with background music. Assembly mode mitigates this with tighter scene boundaries (120s max), but it's not as precise as we want.
-- **Hallucination** — The Qwen model can hallucinate during piano music and moans. Japanese post-processing catches some of these, but it's not fully solved. Other languages don't have that post-processing yet.
-- **vLLM backend** — Current implementation uses transformers. The Assembly mode is architecturally ready for vLLM (the text generation step can be swapped), but the integration isn't built yet.
-- **MPS (Apple Silicon)** — The Qwen pipeline currently runs on CPU on Macs. The underlying `transformers` library supports MPS, but the forced aligner doesn't detect it yet.
-
-### Processing Modes (Whisper)
+### Processing Modes
 
 | Mode | Backend | Scene Detection | VAD | Best For |
 |------|---------|-----------------|-----|----------|
@@ -110,7 +102,9 @@ Access it via the CLI (`--mode qwen`) or the Ensemble tab in the GUI.
 | **fast** | stable-ts | Yes | No | General use, mixed quality |
 | **balanced** | faster-whisper | Yes | Yes | Default. Noisy audio, dialogue-heavy |
 | **fidelity** | OpenAI Whisper | Yes | Yes (Silero) | Maximum accuracy, slower |
-| **transformers** | HuggingFace | Optional | Internal | Japanese-optimized model, customizable |
+| **transformers** | HuggingFace | Optional | Internal | Japanese-optimized Kotoba model |
+| **qwen** | Qwen3-ASR | Yes | Yes | Alternative ASR engine with forced alignment |
+| **ChronosJAV** | anime-whisper | Yes | TEN | Anime/JAV-tuned speech models |
 
 ### Sensitivity Settings
 
@@ -118,9 +112,9 @@ Access it via the CLI (`--mode qwen`) or the Ensemble tab in the GUI.
 - **Balanced**: Default. Works for most content.
 - **Aggressive**: Lower thresholds, catches more dialogue. Good for whisper/ASMR content.
 
-### Transformers Mode (New in v1.7)
+### Transformers Mode
 
-Uses HuggingFace's `kotoba-tech/kotoba-whisper-v2.2` model, which is optimized for Japanese conversational speech:
+Uses HuggingFace's `kotoba-tech/kotoba-whisper-v2.2` model, optimized for Japanese conversational speech:
 
 ```bash
 whisperjav video.mp4 --mode transformers
@@ -129,14 +123,19 @@ whisperjav video.mp4 --mode transformers
 whisperjav video.mp4 --mode transformers --hf-beam-size 5 --hf-chunk-length 20
 ```
 
-**Transformers-specific options:**
-- `--hf-model-id`: Model (default: `kotoba-tech/kotoba-whisper-v2.2`)
-- `--hf-chunk-length`: Seconds per chunk (default: 15)
-- `--hf-beam-size`: Beam search width (default: 5)
-- `--hf-temperature`: Sampling temperature (default: 0.0)
-- `--hf-scene`: Scene detection method (`none`, `auditok`, `silero`, `semantic`)
+### Qwen3-ASR Pipeline
 
-### Two-Pass Ensemble Mode (New in v1.7)
+An alternative ASR engine based on [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR). Uses a Qwen language model for text generation and a separate forced aligner for timestamps.
+
+| Mode | How It Works | Best For |
+|------|-------------|----------|
+| **Assembly** | Text first, then align timestamps. Batches scenes up to 120s. | Most content |
+| **Context-Aware** | ASR and alignment together on full scenes (30-90s). | More context per utterance |
+| **VAD Slicing** (default) | Coupled ASR+alignment with step-wise fallback. | More detail, less context |
+
+Access via CLI (`--mode qwen`) or the Ensemble tab in the GUI.
+
+### Two-Pass Ensemble Mode
 
 Runs your video through two different pipelines and merges results. Different models catch different things.
 
@@ -144,32 +143,31 @@ Runs your video through two different pipelines and merges results. Different mo
 # Pass 1 with transformers, Pass 2 with balanced
 whisperjav video.mp4 --ensemble --pass1-pipeline transformers --pass2-pipeline balanced
 
-# Custom sensitivity per pass
-whisperjav video.mp4 --ensemble --pass1-pipeline balanced --pass1-sensitivity aggressive --pass2-pipeline fidelity
+# Serial mode: finish each file before starting the next
+whisperjav video.mp4 --ensemble --ensemble-serial --pass1-pipeline balanced --pass2-pipeline fidelity
 ```
 
 **Merge strategies:**
-- `smart_merge` (default): Intelligent overlap detection
-- `pass1_primary` / `pass2_primary`: Prioritize one pass, fill gaps from other
+- `pass1_primary` (default) / `pass2_primary`: Prioritize one pass, fill gaps from other
+- `smart_merge`: Intelligent overlap detection
 - `full_merge`: Combine everything from both passes
+- `pass1_overlap` / `pass2_overlap`: Overlap-aware priority merge
+- `longest`: Keep whichever pass produced the longer subtitle for each segment
 
-### Speech Enhancement tools (New in v1.7.3)
+**Ensemble presets**: Save, load, and delete named ensemble configurations from the GUI. Reuse your tuned settings across sessions and across different pipeline combinations.
 
-Pre-process audio scenes. When selected runs per-scene after scene detection.
-Note: Only use for surgical reasons. In general any audio processing that may alter mel-spectogram has the potential to introduce more artefacts and hallucination.
+**Serial mode** (`--ensemble-serial`): Completes each file fully (Pass 1 → Pass 2 → Merge) before starting the next. See results as they finish instead of waiting for the entire batch.
+
+### Speech Enhancement
+
+Pre-process audio per-scene after scene detection. Use surgically — audio processing that alters the mel-spectrogram can introduce artefacts.
 
 ```bash
 # ClearVoice denoising (48kHz, best quality)
 whisperjav video.mp4 --mode balanced --pass1-speech-enhancer clearvoice
 
-# ClearVoice with specific 16kHz model
-whisperjav video.mp4 --mode balanced --pass1-speech-enhancer clearvoice:FRCRN_SE_16K
-
 # FFmpeg DSP filters (lightweight, always available)
 whisperjav video.mp4 --mode balanced --pass1-speech-enhancer ffmpeg-dsp:loudnorm,denoise
-
-# ZipEnhancer (lightweight SOTA)
-whisperjav video.mp4 --mode balanced --pass1-speech-enhancer zipenhancer
 
 # BS-RoFormer vocal isolation
 whisperjav video.mp4 --mode balanced --pass1-speech-enhancer bs-roformer
@@ -190,17 +188,27 @@ whisperjav video.mp4 --ensemble \
 | `zipenhancer` | ZipEnhancer 16kHz | `torch` (GPU), `onnx` (CPU) |
 | `bs-roformer` | Vocal isolation | `vocals`, `other` |
 
-**Syntax:** `--pass1-speech-enhancer <backend>` or `--pass1-speech-enhancer <backend>:<model>`
+### Output Formats
 
-### GUI Parameter Customization
+SRT (default) and WebVTT for HTML5 video players:
 
-The GUI has three tabs:
+```bash
+whisperjav video.mp4 --output-format vtt
+whisperjav video.mp4 --output-format both    # generates .srt and .vtt
+```
 
-1. **Transcription Mode**: Select pipeline, sensitivity, language
-2. **Advanced Options**: Model override, scene detection method, debug settings
-3. **Two-Pass Ensemble**: Configure both passes with full parameter customization via JSON editor
+Also available as a dropdown in the GUI Advanced Options tab.
 
-The Ensemble tab lets you customize beam size, temperature, VAD thresholds, and other ASR parameters without editing config files.
+### GUI
+
+The GUI has four tabs:
+
+1. **Transcription Mode**: Pipeline, sensitivity, model, language
+2. **Advanced Options**: Output format, scene detection method, debug settings
+3. **Ensemble Mode**: Two-pass configuration with presets, serial mode, and per-pass parameter customization
+4. **AI SRT Translate**: Translate existing subtitle files
+
+Settings persist across application restarts.
 
 ### AI Translation
 
@@ -216,33 +224,29 @@ whisperjav-translate -i subtitles.srt --provider deepseek
 
 Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, OpenRouter, GLM, Groq, and local LLMs.
 
-#### Local LLM Translation (New in v1.8)
+#### Local LLM Translation
 
-Run translation entirely on your GPU - no cloud API, no API key required:
+Run translation entirely on your GPU — no cloud API, no API key required:
 
 ```bash
 whisperjav-translate -i subtitles.srt --provider local
 ```
 
-**Zero-Config Setup**: On first use, WhisperJAV automatically downloads and installs `llama-cpp-python` (~700MB). No manual installation needed.
+**Zero-Config Setup**: On first use, WhisperJAV automatically downloads and installs `llama-cpp-python` (~700MB). No manual installation needed. Batch size auto-adjusts to your model's context window.
 
 Available models:
 | Model | VRAM | Notes |
 |-------|------|-------|
-| `llama-8b` | 6GB+ | **Default** - Llama 3.1 8B |
+| `llama-8b` | 6GB+ | **Default** — Llama 3.1 8B |
 | `gemma-9b` | 8GB+ | Gemma 2 9B (alternative) |
 | `llama-3b` | 3GB+ | Llama 3.2 3B (low VRAM only) |
 | `auto` | varies | Auto-selects based on available VRAM |
 
-```bash
-# Use specific model
-whisperjav-translate -i subtitles.srt --provider local --model gemma-9b
-
-# Control GPU offloading
-whisperjav-translate -i subtitles.srt --provider local --translate-gpu-layers 32
-```
-
 **Resume Support**: If translation is interrupted, just run the same command again. It automatically resumes from where it left off using the `.subtrans` project file.
+
+### Supported Input Formats
+
+Any format FFmpeg can read: MP4, MKV, AVI, MOV, WMV, FLV, WAV, MP3, FLAC, M4A, M4B (audiobooks), and many more.
 
 ---
 
@@ -251,10 +255,11 @@ whisperjav-translate -i subtitles.srt --provider local --translate-gpu-layers 32
 ### Scene Detection
 Splits audio at natural breaks instead of forcing fixed-length chunks. This prevents cutting off sentences mid-word.
 
-Three methods are available:
-- **Auditok** (default): Energy-based detection, fast and reliable
+Four methods are available:
+- **Semantic** (default): Texture-based clustering using MFCC features, groups acoustically similar segments together
+- **Auditok**: Energy-based detection, fast and reliable
 - **Silero**: Neural VAD-based detection, better for noisy audio
-- **Semantic** (new in v1.7.4): Texture-based clustering using MFCC features, groups acoustically similar segments together
+- **TEN**: Used by ChronosJAV pipeline for tight subtitle timing
 
 ### Voice Activity Detection (VAD)
 Identifies when someone is actually speaking vs. background noise or music. Reduces false transcriptions during quiet moments.
@@ -275,19 +280,18 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 | Content Type | Mode | Sensitivity | Notes |
 |--------------|------|-------------|-------|
 | Drama / Dialogue Heavy | balanced | aggressive | Or try transformers mode |
+| Anime / JAV Dialogue | ChronosJAV | aggressive | anime-whisper model with TEN VAD |
 | Group Scenes | faster | conservative | Speed matters, less precision needed |
 | Amateur / Homemade | fast | conservative | Variable audio quality |
 | ASMR / VR / Whisper | fidelity | aggressive | Maximum accuracy for quiet speech |
 | Heavy Background Music | balanced | conservative | VAD helps filter music |
-| Maximum Accuracy | ensemble | varies | Two-pass with different pipelines |
+| Maximum Accuracy | ensemble | varies | ChronosJAV + balanced, or two different pipelines |
 
 ---
 
 ## Installation
 
-> **If upgrading from v1.7.x or earlier**, a `--wheel-only` upgrade won't be enough — you'll be missing packages that the Qwen pipeline needs. We recommend a full install. It takes longer, but it avoids half-working states where Whisper pipelines work but Qwen silently fails because a dependency is missing.
->
-> Recommended: Uninstall the old version first (Settings > Apps > WhisperJAV on Windows), then install fresh. Your models and output files are stored separately and won't be lost.
+> **Upgrading?** Run `whisperjav-upgrade` (works on Windows, Linux, and macOS). For code-only updates: `whisperjav-upgrade --wheel-only`. See the [Upgrade Guide](docs/UPGRADE.md) for details.
 
 ---
 
@@ -308,7 +312,7 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 The easiest way. No Python knowledge needed.
 
-**Download:** [**WhisperJAV-1.8.5-Windows-x86_64.exe**](https://github.com/meizhong986/WhisperJAV/releases/latest)
+**Download:** [**Latest Windows Installer**](https://github.com/meizhong986/WhisperJAV/releases/latest)
 
 1. **Download** the `.exe` from the link above
 2. **Run the installer.** No admin rights required. Installs to `%LOCALAPPDATA%\WhisperJAV`.
@@ -563,30 +567,27 @@ installer\install_windows.bat --dev
 whisperjav video.mp4
 whisperjav video.mp4 --mode balanced --sensitivity aggressive
 
-# All modes: faster, fast, balanced, fidelity, transformers
+# All modes: faster, fast, balanced, fidelity, transformers, qwen
 whisperjav video.mp4 --mode fidelity
 
-# Transformers mode with custom parameters
-whisperjav video.mp4 --mode transformers --hf-beam-size 5 --hf-chunk-length 20
+# Output format (SRT, VTT, or both)
+whisperjav video.mp4 --output-format vtt
+whisperjav video.mp4 --output-format both --output-dir ./subtitles
 
 # Two-pass ensemble
 whisperjav video.mp4 --ensemble --pass1-pipeline transformers --pass2-pipeline balanced
-whisperjav video.mp4 --ensemble --pass1-pipeline balanced --pass2-pipeline fidelity --merge-strategy smart_merge
-
-# Output options
-whisperjav video.mp4 --output-dir ./subtitles
-whisperjav video.mp4 --subs-language english-direct
+whisperjav video.mp4 --ensemble --ensemble-serial --merge-strategy longest
 
 # Batch processing
 whisperjav /path/to/folder --output-dir ./subtitles
-whisperjav /path/to/folder --skip-existing    # Resume interrupted batch (skip already processed)
-
-# Debugging
-whisperjav video.mp4 --debug --keep-temp
+whisperjav /path/to/folder --skip-existing    # Resume interrupted batch
 
 # Translation
 whisperjav video.mp4 --translate --translate-provider deepseek
-whisperjav-translate -i subtitles.srt --provider gemini
+whisperjav-translate -i subtitles.srt --provider local
+
+# Debugging
+whisperjav video.mp4 --debug --keep-temp
 ```
 
 Run `whisperjav --help` for all options.
