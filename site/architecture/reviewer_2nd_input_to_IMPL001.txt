@@ -1,0 +1,48 @@
+Based on a scrutiny of the provided document (`IMPL-001-subtitle-pipeline-convergence.md`), I must report that **this plan does not yet reflect the strategic pivot we just discussed.**
+
+Despite being labeled "Version 2" or "Copy," the content matches the original **"Option C"** strategy (Source), which we determined is strategically flawed. It still prioritizes patching the "impossible" coupled modes over unlocking the future architecture.
+
+Here is the scrutiny of this version based on our latest knowledge regarding the **Integrated Aligner limitation** and the **"Strangulate" strategy**:
+
+### 1. Critical Strategic Failure: Phase 1 is still a "Waste of Time"
+**The Plan:** Phase 1, Task 1.1 explicitly plans to "Add Mid-Pipeline Text Cleaning to Coupled Modes (BRK-1)" [Source 10].
+**The Reality:** We established that coupled modes use the `QwenASR` integrated aligner, making mid-pipeline cleaning physically impossible to do effectively (the alignment collapse happens *inside* the atomic call).
+**Critique:**
+*   The plan acknowledges this is a "temporary fix" [Source 10], but allocates engineering resources to writing `_clean_coupled_result()` [Source 11] and creating mocks/tests for a feature we intend to kill.
+*   **Verdict:** This task should be **removed entirely**. We should not polish the code we are about to delete, especially when the "fix" cannot prevent the primary symptom (alignment collapse).
+
+### 2. Roadmap Misalignment: The "Future" is Delayed
+**The Plan:** The `DecoupledPipeline` class (the Generic Entry Point) is pushed to **Phase 4** [Source 34].
+**The Reality:** The Product Owner's vision relies on plugging in new models (vLLM, Transformers) [Source 4], which requires this generic entry point (Gap A).
+**Critique:**
+*   By placing the Generic Entry Point *after* the Step-Down Retry (Phase 3), the plan delays the primary architectural deliverable.
+*   **Verdict:** Phase 4 should be moved up. The ability to use the "Right Pipeline" (Decoupled) cleanly is more important than feature parity for the "Wrong Pipeline" (Coupled).
+
+### 3. The "Step-Down" Logic is Correct, but Prioritization is Wrong
+**The Plan:** Phase 3 implements the "Step-Down Retry" in the orchestrator using a "Batched Retry" approach [Source 31].
+**The Reality:** This is the correct technical approach (preserving VRAM efficiency), and it is the key to making the Decoupled mode superior to `VAD_SLICING`.
+**Critique:**
+*   The logic in Task 3.3 [Source 30] is sound. However, because it is gated behind Phase 1 (The "Waste of Time"), it is unnecessarily delayed.
+*   **Verdict:** This phase is the engineering priority. It should be Phase 2 (immediately after fixing critical interface bugs like Context Propagation).
+
+### 4. Missed Opportunity: "Strangulation" is not formalized
+**The Plan:** Phase 5 (Coupled Mode Convergence) deletes the coupled code [Source 39].
+**The Reality:** The plan treats Phase 5 as a cleanup task at the end.
+**Critique:**
+*   The plan lacks an aggressive posture toward deprecation. It suggests a "Deprecation Period" [Source 40] and debates keeping `CONTEXT_AWARE` [Source 38].
+*   **Verdict:** The plan should explicitly state that **Assembly Mode is the default** as soon as Step-Down (Phase 3) is complete.
+
+---
+
+### Corrective Action Plan (How to fix this document)
+
+To align this document with our "Latest Knowledge," the Architect must make the following specific edits:
+
+1.  **DELETE Task 1.1 (BRK-1):** Remove Section 5.3 entirely. Do not attempt to clean coupled mode output. Accept it as broken/legacy.
+2.  **RENAME Phase 1:** From "Foundation Fixes" to **"Assembly Parity"**. Focus on Task 1.2 (Context Propagation) and Task 2.1 (Expose Framers).
+3.  **PROMOTE Task 2.1:** Move "Wire Framer Selection to Assembly Mode" [Source 20] into **Phase 1**. This immediately allows Assembly mode to use `vad-grouped` framing, making it a viable alternative to `VAD_SLICING`.
+4.  **ACCELERATE Phase 4:** Move "Generic Pipeline Entry Point" [Source 34] to **Phase 3** (or even Phase 2). This creates the `DecoupledPipeline` class early, allowing new model integration to start in parallel with the Step-Down complex refactoring.
+5.  **UPDATE Risk Register [Source 45]:** Add a new risk: *"Effort spent on Legacy Coupled Modes delays migration."* Mitigation: *"Abandon BRK-1 fixes; focus solely on Decoupled parity."*
+
+**Final Assessment for the User:**
+This version of the plan is **REJECTED**. It is still fighting the "Physics" of the integrated aligner rather than bypassing it. Tell the developer to strip out the coupled-mode fixes and fast-track the Decoupled Orchestrator features.

@@ -141,6 +141,26 @@ check_ffmpeg() {
     fi
 }
 
+check_portaudio() {
+    # PortAudio is a system library required by pyaudio, which auditok uses
+    # for scene detection. Without it, pip install pyaudio will fail.
+    if brew list portaudio &>/dev/null 2>&1; then
+        echo -e "${GREEN}PortAudio: installed${NC}"
+    elif [[ -f /opt/homebrew/lib/libportaudio.dylib ]] || [[ -f /usr/local/lib/libportaudio.dylib ]]; then
+        echo -e "${GREEN}PortAudio: installed (non-Homebrew)${NC}"
+    else
+        echo ""
+        echo -e "${YELLOW}PortAudio is not installed.${NC}"
+        echo "PortAudio is required by pyaudio for scene detection (auditok)."
+        echo ""
+        echo "Install it with:"
+        echo "  brew install portaudio"
+        echo ""
+        echo -e "${YELLOW}Continuing without PortAudio (pyaudio install may fail)...${NC}"
+        echo ""
+    fi
+}
+
 # ==============================================================================
 # PEP 668 / Virtual Environment Check (macOS-specific messaging)
 # ==============================================================================
@@ -207,6 +227,7 @@ check_xcode_cli_tools
 check_homebrew
 check_python
 check_ffmpeg
+check_portaudio
 echo ""
 
 # Check PEP 668 / venv requirement

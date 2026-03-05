@@ -353,7 +353,7 @@ For the full walkthrough, see [docs/guides/installation_windows_python.md](docs/
 **Prerequisites:**
 ```bash
 xcode-select --install                    # Xcode Command Line Tools
-brew install python@3.12 ffmpeg git       # Or python@3.11
+brew install python@3.12 ffmpeg portaudio git  # Or python@3.11
 ```
 
 **Install:**

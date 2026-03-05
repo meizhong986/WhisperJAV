@@ -1,0 +1,2846 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/ISSUE_TRACKER_v1.8.x/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>WhisperJAV Issue Tracker — v1.8.x Cycle - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-issue-tracker-v18x-cycle" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperJAV Issue Tracker — v1.8.x Cycle
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#critical-issues-requiring-immediate-attention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CRITICAL: Issues Requiring Immediate Attention
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CRITICAL: Issues Requiring Immediate Attention">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#190-gbk-codec-error-fixed-in-v186-dev-commit-68d1644" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        #190 — GBK Codec Error — FIXED in v1.8.6 dev (commit 68d1644)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#183-ubuntu-llm-translation-fails-secondary-fixed-in-v186-dev-commit-24faa3b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        #183 — Ubuntu LLM Translation Fails (Secondary) — FIXED in v1.8.6 dev (commit 24faa3b)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#github-housekeeping-issues-to-close" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Housekeeping — Issues to Close
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#closed-this-cycle-on-github" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closed This Cycle (on GitHub)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Closed This Cycle (on GitHub)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#newly-closed-since-last-update-2026-03-01-2026-03-03" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Newly Closed Since Last Update (2026-03-01 → 2026-03-03)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#previously-closed-this-cycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Previously Closed This Cycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#active-issues-master-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Active Issues — Master Table
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Active Issues — Master Table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bugs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#questions-documentation-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Questions / Documentation / Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#needs-more-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Needs More Info
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hotfix-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hotfix Tracking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hotfix Tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v185-hotfix1-3-commits-released" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.5-hotfix1 (3 commits, RELEASED)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v185-hotfix2-6-commits-released" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.5-hotfix2 (6 commits, RELEASED)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v185-hotfix3-10-commits-released-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.5-hotfix3 (10 commits, RELEASED 2026-03-01)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v186-development-in-progress-branch-v156-settings-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.6 Development (in progress, branch v156-settings-persistence)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#roadmap-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roadmap Summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Roadmap Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v185-released-base-3-hotfixes-19-commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.5 — RELEASED (base + 3 hotfixes, 19 commits)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v186-next-feature-release-in-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.6 — Next Feature Release (in development)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v19-deferred" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.9+ (Deferred)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duplicate-related-issue-clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate / Related Issue Clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#github-discussions-10-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Discussions (10 open)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/ISSUE_TRACKER_v1.8.x.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-issue-tracker-v18x-cycle">WhisperJAV Issue Tracker — v1.8.x Cycle<a class="headerlink" href="#whisperjav-issue-tracker-v18x-cycle" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>Updated: 2026-03-03 (evening) — v1.8.5-hotfix3 RELEASED | v1.8.6 dev in progress (14 commits) | Source: <a href="https://github.com/meizhong986/WhisperJAV/issues">GitHub Issues</a> | 40 open on GitHub</p>
+</blockquote>
+<hr />
+<h2 id="quick-stats">Quick Stats<a class="headerlink" href="#quick-stats" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Open on GitHub</td>
+<td>40</td>
+</tr>
+<tr>
+<td>Closed this cycle (on GitHub)</td>
+<td>37+</td>
+</tr>
+<tr>
+<td><strong>Closeable now</strong> (fix confirmed or answered)</td>
+<td>14</td>
+</tr>
+<tr>
+<td><strong>Reopened / still broken</strong></td>
+<td>0 (#190 and #183-secondary now fixed in v1.8.6 dev)</td>
+</tr>
+<tr>
+<td>Fixed in hotfix3 (released 2026-03-01)</td>
+<td>6 (#190, #178, #158/#183, #192, #166-partial)</td>
+</tr>
+<tr>
+<td>Fixed in hotfix2 (released)</td>
+<td>7 (#189, #185, #187, #173, #176, #188, #178-partial)</td>
+</tr>
+<tr>
+<td>Fixed in hotfix1 (released)</td>
+<td>3 (#186, #177, #143/#150/#69)</td>
+</tr>
+<tr>
+<td><strong>NEW issues</strong> (since last update)</td>
+<td>2 (#193, #194)</td>
+</tr>
+<tr>
+<td>Active bugs (need work)</td>
+<td>1 (#187-unclear)</td>
+</tr>
+<tr>
+<td>Feature requests (open)</td>
+<td>18</td>
+</tr>
+<tr>
+<td>Questions / docs / support</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Needs more info</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Deferred (v1.9+)</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="critical-issues-requiring-immediate-attention">CRITICAL: Issues Requiring Immediate Attention<a class="headerlink" href="#critical-issues-requiring-immediate-attention" title="Permanent link">&para;</a></h2>
+<h3 id="190-gbk-codec-error-fixed-in-v186-dev-commit-68d1644">#190 — GBK Codec Error — FIXED in v1.8.6 dev (commit <code>68d1644</code>)<a class="headerlink" href="#190-gbk-codec-error-fixed-in-v186-dev-commit-68d1644" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ~~User MatteoHugo confirmed on 2026-03-02 that the error persisted after hotfix3.~~ <strong>Now fixed:</strong> commit <code>68d1644</code> forces UTF-8 mode for the entire Python process on non-UTF-8 Windows systems. This sets <code>PYTHONIOENCODING=utf-8</code> process-wide, which covers both WhisperJAV's own subprocess calls AND PySubtrans's internal encoding. Awaiting user verification.</p>
+<p><strong>Previous status:</strong> Hotfix3 only fixed WhisperJAV's subprocess encoding. The error originated in PySubtrans's own I/O path. The new fix covers the entire process tree.</p>
+<h3 id="183-ubuntu-llm-translation-fails-secondary-fixed-in-v186-dev-commit-24faa3b">#183 — Ubuntu LLM Translation Fails (Secondary) — FIXED in v1.8.6 dev (commit <code>24faa3b</code>)<a class="headerlink" href="#183-ubuntu-llm-translation-fails-secondary-fixed-in-v186-dev-commit-24faa3b" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ~~Translation failed with "API token limit" + "No matches".~~ <strong>Now fixed:</strong> commit <code>24faa3b</code> auto-caps batch size when the local LLM's context window is small. The root cause was PySubtrans sending batches larger than the model's context could handle. The fix detects the model's max context and reduces batch_size accordingly. Also: the upgrade tool now works on Linux (commit <code>2e402f3</code>).</p>
+<hr />
+<h2 id="github-housekeeping-issues-to-close">GitHub Housekeeping — Issues to Close<a class="headerlink" href="#github-housekeeping-issues-to-close" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reason</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/191">#191</a></td>
+<td>Pass2 missing (Chinese)</td>
+<td><strong>Answered</strong> — SSL cert error, not a bug. User on v1.8.3.</td>
+<td>Close with comment</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/193">#193</a></td>
+<td>How to update packages</td>
+<td><strong>Support question</strong> — urllib3/chardet version warning. Not a bug.</td>
+<td>Answer + close</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/188">#188</a></td>
+<td>Unknown provider: Gemini</td>
+<td><strong>Answered</strong> — missing <code>google-genai</code> SDK, not a code bug.</td>
+<td>Close with install instructions</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/150">#150</a></td>
+<td>Xiaomi Mimo API</td>
+<td><strong>Done</strong> — <code>custom</code> provider in hotfix1 covers this.</td>
+<td>Close</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/162">#162</a></td>
+<td>Local model translation (ggml.dll)</td>
+<td><strong>Fixed</strong> in v1.8.4. User hasn't retested.</td>
+<td>Close with upgrade note</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/146">#146</a></td>
+<td>Local server error</td>
+<td><strong>Fixed</strong> in v1.8.3/v1.8.4. Stale 5+ weeks.</td>
+<td>Close</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/174">#174</a></td>
+<td>GUI settings reset</td>
+<td><strong>Duplicate</strong> of #96. Translation part fixed in hotfix2.</td>
+<td>Close as dup of #96</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/184">#184</a></td>
+<td>GUI save configurations</td>
+<td><strong>Duplicate</strong> of #96/#174.</td>
+<td>Close as dup of #96</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/186">#186</a></td>
+<td>UnicodeEncodeError subprocess</td>
+<td><strong>Fixed</strong> in hotfix1. No user follow-up.</td>
+<td>Close with note</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/177">#177</a></td>
+<td>cp950 codec AI translation</td>
+<td><strong>Fixed</strong> in hotfix1. No user follow-up.</td>
+<td>Close with note</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="closed-this-cycle-on-github">Closed This Cycle (on GitHub)<a class="headerlink" href="#closed-this-cycle-on-github" title="Permanent link">&para;</a></h2>
+<h3 id="newly-closed-since-last-update-2026-03-01-2026-03-03">Newly Closed Since Last Update (2026-03-01 → 2026-03-03)<a class="headerlink" href="#newly-closed-since-last-update-2026-03-01-2026-03-03" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Resolution</th>
+<th>Date Closed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/192">#192</a></td>
+<td>Upgrade to latest dev failed</td>
+<td><strong>Fixed hotfix3</strong> — PEP 508 syntax.</td>
+<td>2026-03-02</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/172">#172</a></td>
+<td>Ranking AI translation</td>
+<td>Answered — community info.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/170">#170</a></td>
+<td>Which modes for highest accuracy</td>
+<td>Answered — community info.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/166">#166</a></td>
+<td>Kaggle fail to run</td>
+<td>CLI args fixed in hotfix3.</td>
+<td>2026-03-02</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/163">#163</a></td>
+<td>Sync issue (~100ms ahead)</td>
+<td>Fixed — timestamp architecture.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/160">#160</a></td>
+<td>Backend performance rationale</td>
+<td>Answered — technical explanation.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/152">#152</a></td>
+<td>Kaggle incomplete pass1</td>
+<td>Addressed.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/137">#137</a></td>
+<td>Can't detect PyTorch</td>
+<td>Addressed.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/134">#134</a></td>
+<td>Colab setup error</td>
+<td>Addressed.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/132">#132</a></td>
+<td>Local LLM in Colab</td>
+<td>Addressed.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/125">#125</a></td>
+<td>Error 3221226505</td>
+<td>Fixed — os._exit.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/118">#118</a></td>
+<td>OOM 4GB VRAM</td>
+<td>Addressed.</td>
+<td>2026-03-01</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/108">#108</a></td>
+<td>macOS pywebview</td>
+<td>Addressed.</td>
+<td>2026-03-01</td>
+</tr>
+</tbody>
+</table>
+<h3 id="previously-closed-this-cycle">Previously Closed This Cycle<a class="headerlink" href="#previously-closed-this-cycle" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Resolution</th>
+<th>Date Closed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/173">#173</a></td>
+<td>TEN VAD TypeError</td>
+<td><strong>Fixed hotfix2.</strong></td>
+<td>2026-02-25</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/169">#169</a></td>
+<td>Colab not working (SOLVED)</td>
+<td>Self-resolved.</td>
+<td>2026-02-25</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/167">#167</a></td>
+<td>Qwen-ASR hang</td>
+<td>Fixed v1.8.5 timestamp arch.</td>
+<td>2026-02-25</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/157">#157</a></td>
+<td>Binary compat (llama-cpp)</td>
+<td>Fixed — AVX2 detection.</td>
+<td>2026-02-20</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/153">#153</a></td>
+<td>Standalone Translator tab</td>
+<td><strong>Shipped v1.8.4.</strong></td>
+<td>2026-02-18</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/165">#165</a></td>
+<td>Windows Defender flags exe</td>
+<td>User communication.</td>
+<td>2026-02-18</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/168">#168</a></td>
+<td>ZipEnhancer setup</td>
+<td>Answered.</td>
+<td>2026-02-18</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/171">#171</a></td>
+<td>Fresh install 1.8.4</td>
+<td>User confirmed.</td>
+<td>2026-02-19</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/149">#149</a></td>
+<td>Local server timeout</td>
+<td>Fixed v1.8.3.</td>
+<td>2026-02-27</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/148">#148</a></td>
+<td>Local LLM 502 errors</td>
+<td>Fixed v1.8.3.</td>
+<td>2026-02-27</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/103">#103</a></td>
+<td>Cache cleanup</td>
+<td>User confirmed.</td>
+<td>2026-02-25</td>
+</tr>
+<tr>
+<td>And ~13 more earlier in cycle (see previous tracker version for full list)</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="active-issues-master-table">Active Issues — Master Table<a class="headerlink" href="#active-issues-master-table" title="Permanent link">&para;</a></h2>
+<h3 id="bugs">Bugs<a class="headerlink" href="#bugs" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Status</th>
+<th>Summary</th>
+<th>Rec</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/190">#190</a></td>
+<td>GBK codec crash (Chinese translation)</td>
+<td><strong>FIXED</strong> (v1.8.6 dev)</td>
+<td>Process-wide UTF-8 mode (<code>68d1644</code>). Covers PySubtrans internal encoding. Awaiting user verification.</td>
+<td><strong>Close when confirmed</strong></td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/183">#183</a></td>
+<td>Ubuntu LLM translation fails</td>
+<td><strong>FIXED</strong> (v1.8.6 dev)</td>
+<td>Auto-cap batch size for small context LLMs (<code>24faa3b</code>). Upgrade tool Linux fix (<code>2e402f3</code>).</td>
+<td><strong>Close when confirmed</strong></td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/189">#189</a></td>
+<td>Smart Merge clears one pass</td>
+<td>Fixed hotfix2</td>
+<td>Quality-aware tiebreaker. Awaiting retest.</td>
+<td>Close when confirmed</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/187">#187</a></td>
+<td>v1.8.5 can't generate subtitles</td>
+<td><strong>UNCLEAR</strong></td>
+<td>User weifu8435 claims on hotfix2. Last exchange: owner sent exe link. No new error logs. Possibly user confusion.</td>
+<td>Info-needed</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/185">#185</a></td>
+<td>v1.8.4+ regression (VAD params)</td>
+<td>Fixed hotfix2</td>
+<td>Same root cause as #173. User is same as #187 (weifu8435).</td>
+<td>Dup of #187</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/178">#178</a></td>
+<td>Custom endpoint → /responses 404</td>
+<td>Fixed hotfix3</td>
+<td>Custom Server bypass. Upstream bug filed.</td>
+<td>Close when confirmed</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/158">#158</a></td>
+<td>Linux LLM build regression</td>
+<td>Fixed hotfix3</td>
+<td>Import path fixed.</td>
+<td>Close</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/44">#44</a></td>
+<td>GUI drag-drop filename only</td>
+<td>Open</td>
+<td>Old. Drag-drop sends filename not path.</td>
+<td>Accept</td>
+<td>v1.8.6+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/90">#90</a></td>
+<td>Source build dep conflict</td>
+<td>Open</td>
+<td>Dependency version conflicts.</td>
+<td>Accept</td>
+<td>v1.8.6+</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="feature-requests">Feature Requests<a class="headerlink" href="#feature-requests" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Status</th>
+<th>Summary</th>
+<th>Rec</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/179">#179</a></td>
+<td>Per-video pass ordering</td>
+<td><strong>DONE</strong></td>
+<td>Implemented as <code>--ensemble-serial</code> (commit <code>8bb5cb0</code>). Each file completes Pass1→Pass2→Merge before next. GUI checkbox "Finish each file" in merge row.</td>
+<td><strong>Close</strong></td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/194">#194</a></td>
+<td>M4B file support</td>
+<td><strong>DONE</strong></td>
+<td>Added <code>.m4b</code> to allowed extensions (<code>5769688</code>).</td>
+<td><strong>Close</strong></td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/96">#96</a></td>
+<td>Full GUI settings persistence</td>
+<td>Open</td>
+<td>Core request. Translation part done (hotfix2). Pipeline/ensemble settings need serialization framework.</td>
+<td>Accept</td>
+<td>v1.9</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/181">#181</a></td>
+<td>Frameless window / hide title bar</td>
+<td>Open</td>
+<td>Cosmetic. PyWebView <code>frameless=True</code>.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/180">#180</a></td>
+<td>Multi-language GUI (i18n)</td>
+<td>Open</td>
+<td>Full i18n framework. High effort.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/175">#175</a></td>
+<td>i18n Chinese</td>
+<td>Open</td>
+<td>Dup of #180.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/164">#164</a></td>
+<td>Format compat + Google Drive</td>
+<td>Open</td>
+<td>(1) MPEG-TS remux. (2) Google Drive Kaggle.</td>
+<td>Accept (1)</td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/159">#159</a></td>
+<td>CLI --vad-threshold override</td>
+<td>Open</td>
+<td>Simple float CLI arg.</td>
+<td>Accept</td>
+<td>v1.8.6+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/143">#143</a></td>
+<td>Custom local models + VTT</td>
+<td><strong>DONE</strong></td>
+<td>Ollama done (custom provider). VTT output done (<code>b7e794f</code>) — <code>--output-format srt/vtt/both</code>, GUI dropdown.</td>
+<td><strong>Close</strong></td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/142">#142</a></td>
+<td>AMD Radeon GPU detection</td>
+<td>Open</td>
+<td>Requires DirectML/ROCm.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/126">#126</a></td>
+<td>Recursive directory processing</td>
+<td>Open</td>
+<td>Walk subdirectories.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/114">#114</a></td>
+<td>DirectML for AMD/Intel</td>
+<td>Open</td>
+<td>Major platform enablement.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/99">#99</a></td>
+<td>4GB VRAM solutions</td>
+<td>Open</td>
+<td>VRAM check + model suggestion. Related to #118 (closed).</td>
+<td>Accept</td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/71">#71</a></td>
+<td>Google Translate (free)</td>
+<td>Open</td>
+<td>Fragile unofficial API.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/69">#69</a></td>
+<td>Grok translation</td>
+<td>Open</td>
+<td>Partially covered by <code>custom</code> provider.</td>
+<td>Defer</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/51">#51</a></td>
+<td>Batch translate wildcard</td>
+<td>Open</td>
+<td>Glob/directory in translate CLI.</td>
+<td>Accept</td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/49">#49</a></td>
+<td>Output SRT to source folder</td>
+<td>Open</td>
+<td><code>--output-dir source</code> already works. May need UX refinement.</td>
+<td>Accept</td>
+<td>v1.8.6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/43">#43</a></td>
+<td>DeepL provider</td>
+<td>Open</td>
+<td>Non-LLM adapter.</td>
+<td>Defer</td>
+<td>v1.9+</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="questions-documentation-support">Questions / Documentation / Support<a class="headerlink" href="#questions-documentation-support" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Status</th>
+<th>Rec</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/193">#193</a></td>
+<td>How to update packages</td>
+<td>NEW — urllib3/chardet version warning. Not a bug.</td>
+<td>Answer + close</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/161">#161</a></td>
+<td>Colab translate error</td>
+<td>Stale. Screenshot-only.</td>
+<td>Close as stale</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/33">#33</a></td>
+<td>Linux pyaudio dependency docs</td>
+<td>Old documentation gap.</td>
+<td>Accept (docs)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/59">#59</a></td>
+<td>Feature plans for 1.x</td>
+<td>Meta-issue. Keep open.</td>
+<td>Keep</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/99">#99</a></td>
+<td>3050/4GB VRAM feasibility</td>
+<td>Q&amp;A + feature overlap with VRAM check.</td>
+<td>Keep</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="needs-more-info">Needs More Info<a class="headerlink" href="#needs-more-info" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Action Needed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/187">#187</a></td>
+<td>v1.8.5 can't generate</td>
+<td>Confirm user has hotfix2/hotfix3 exe. Request debug log with <code>--debug</code>.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/185">#185</a></td>
+<td>v1.8.4+ regression</td>
+<td>Same user as #187. Likely resolves together.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/meizhong986/WhisperJAV/issues/161">#161</a></td>
+<td>Colab translate error</td>
+<td>Stale since Feb 7. No useful info.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="hotfix-tracking">Hotfix Tracking<a class="headerlink" href="#hotfix-tracking" title="Permanent link">&para;</a></h2>
+<h3 id="v185-hotfix1-3-commits-released">v1.8.5-hotfix1 (3 commits, RELEASED)<a class="headerlink" href="#v185-hotfix1-3-commits-released" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Commit</th>
+<th>Issues</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>8fe643a</code></td>
+<td><strong>#186, #177</strong></td>
+<td>UTF-8 subprocess encoding (13 calls)</td>
+</tr>
+<tr>
+<td><code>e783723</code></td>
+<td><strong>D#101</strong></td>
+<td>Language-neutral instruction prompts</td>
+</tr>
+<tr>
+<td><code>404176b</code></td>
+<td><strong>#143, #150, #69, D#131</strong></td>
+<td>Generic <code>custom</code> provider + <code>os.getenv(None)</code> crash fix</td>
+</tr>
+</tbody>
+</table>
+<h3 id="v185-hotfix2-6-commits-released">v1.8.5-hotfix2 (6 commits, RELEASED)<a class="headerlink" href="#v185-hotfix2-6-commits-released" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Commit</th>
+<th>Issues</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>5b6d79e</code></td>
+<td><strong>#185, #187, #173</strong></td>
+<td>Factory-level param validation gate for all speech segmenters</td>
+</tr>
+<tr>
+<td><code>d00bfb8</code></td>
+<td><strong>#189</strong></td>
+<td>Smart Merge quality-aware text tiebreaker</td>
+</tr>
+<tr>
+<td><code>8d0deae</code></td>
+<td><strong>#178 (partial), #188, #176</strong></td>
+<td>URL normalization, provider error hints, settings persistence</td>
+</tr>
+<tr>
+<td><code>77c1a31</code></td>
+<td>(internal)</td>
+<td>Ensemble multi-file output dir fix</td>
+</tr>
+<tr>
+<td><code>24b31cb</code></td>
+<td>(internal)</td>
+<td>Merge fallback metadata fix</td>
+</tr>
+<tr>
+<td><code>8fa8ca3</code></td>
+<td>(cosmetic)</td>
+<td>EOF newline fix</td>
+</tr>
+</tbody>
+</table>
+<h3 id="v185-hotfix3-10-commits-released-2026-03-01">v1.8.5-hotfix3 (10 commits, RELEASED 2026-03-01)<a class="headerlink" href="#v185-hotfix3-10-commits-released-2026-03-01" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Commit</th>
+<th>Issues</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>4d9b2a9</code></td>
+<td><strong>#190</strong> (partial)</td>
+<td>GBK codec fix for WhisperJAV subprocess — <strong>PySubtrans-side error persists</strong></td>
+</tr>
+<tr>
+<td><code>19f6785</code></td>
+<td>(optimization)</td>
+<td>Enhancement passthrough: skip I/O when enhancer is "none"</td>
+</tr>
+<tr>
+<td><code>f35b17a</code></td>
+<td>(housekeeping)</td>
+<td>Notebook consolidation: rename/delete/redirect</td>
+</tr>
+<tr>
+<td><code>c538330</code></td>
+<td><strong>#166 (partial), #132</strong></td>
+<td>Fix 4 fatal CLI arg bugs in Kaggle parallel notebook + Colab expert fixes</td>
+</tr>
+<tr>
+<td><code>55635a8</code></td>
+<td>(docs)</td>
+<td>README: add PySubtrans acknowledgment, fix stale badges</td>
+</tr>
+<tr>
+<td><code>3abbfcb</code></td>
+<td><strong>#158, #183</strong></td>
+<td>Fix Linux llama_build_utils import regression</td>
+</tr>
+<tr>
+<td><code>4cc4425</code></td>
+<td><strong>#178</strong></td>
+<td>Fix PySubtrans /responses routing — Custom Server bypass for non-GPT providers</td>
+</tr>
+<tr>
+<td><code>c33ec97</code></td>
+<td><strong>#192</strong></td>
+<td>Fix whisperjav-upgrade egg fragment error — PEP 508 syntax</td>
+</tr>
+<tr>
+<td><code>9f6c3b1</code></td>
+<td>(version)</td>
+<td>Set display_label to hotfix3</td>
+</tr>
+<tr>
+<td><code>552231c</code></td>
+<td>(version)</td>
+<td>Fix VERSION for build, add acceptance tests</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="v186-development-in-progress-branch-v156-settings-persistence">v1.8.6 Development (in progress, branch <code>v156-settings-persistence</code>)<a class="headerlink" href="#v186-development-in-progress-branch-v156-settings-persistence" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Commit</th>
+<th>Issues</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>c2310b3</code></td>
+<td><strong>#96 (partial)</strong></td>
+<td>GUI settings persistence (initial), CLI quality knobs, longest merge strategy</td>
+</tr>
+<tr>
+<td><code>eb80105</code></td>
+<td><strong>#96 (partial)</strong></td>
+<td>Harden settings: backup rotation, atomic writes, 55 unit tests</td>
+</tr>
+<tr>
+<td><code>11b7d40</code></td>
+<td>—</td>
+<td>Ensemble parameter presets: save, load, delete named configs</td>
+</tr>
+<tr>
+<td><code>5b976bf</code></td>
+<td>—</td>
+<td>Preset UX: cross-pipeline loading, badge names, persistence</td>
+</tr>
+<tr>
+<td><code>191ed49</code></td>
+<td>—</td>
+<td>Anime-Whisper generator backend with ChronosJAV GUI branding</td>
+</tr>
+<tr>
+<td><code>c58af04</code></td>
+<td>—</td>
+<td>Fix AnimeWhisperGenerator crash</td>
+</tr>
+<tr>
+<td><code>c75b992</code></td>
+<td>—</td>
+<td>Rewrite AnimeWhisperGenerator: low-level API</td>
+</tr>
+<tr>
+<td><code>da2a5c0</code></td>
+<td>—</td>
+<td>Fix anime-whisper: drop forced max_new_tokens</td>
+</tr>
+<tr>
+<td><code>8bb5cb0</code></td>
+<td><strong>#179</strong></td>
+<td><strong>--ensemble-serial</strong>: per-file serial ensemble processing</td>
+</tr>
+<tr>
+<td><code>43f60d1</code></td>
+<td>—</td>
+<td>Fix anime-whisper defaults: greedy decoding, safe token cap, TEN VAD</td>
+</tr>
+<tr>
+<td><code>68d1644</code></td>
+<td><strong>#190</strong></td>
+<td><strong>Force UTF-8 mode</strong> for entire process on non-UTF-8 Windows</td>
+</tr>
+<tr>
+<td><code>24faa3b</code></td>
+<td><strong>#183</strong> (secondary)</td>
+<td><strong>Auto-cap batch size</strong> for local LLM context window</td>
+</tr>
+<tr>
+<td><code>5769688</code></td>
+<td><strong>#194</strong></td>
+<td><strong>M4B audiobook file support</strong> — add .m4b to allowed extensions</td>
+</tr>
+<tr>
+<td><code>b7e794f</code></td>
+<td><strong>#143</strong></td>
+<td><strong>VTT output format</strong> — <code>--output-format srt/vtt/both</code>, GUI dropdown, all pipelines</td>
+</tr>
+<tr>
+<td><code>2e402f3</code></td>
+<td><strong>#183</strong> (upgrade)</td>
+<td><strong>Linux upgrade tool</strong> — cross-platform detection, pip helpers, platform messages</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="roadmap-summary">Roadmap Summary<a class="headerlink" href="#roadmap-summary" title="Permanent link">&para;</a></h2>
+<h3 id="v185-released-base-3-hotfixes-19-commits">v1.8.5 — RELEASED (base + 3 hotfixes, 19 commits)<a class="headerlink" href="#v185-released-base-3-hotfixes-19-commits" title="Permanent link">&para;</a></h3>
+<p>All hotfixes released. 15+ issues fixed. Major themes: encoding, VAD validation, settings persistence, PySubtrans routing.</p>
+<h3 id="v186-next-feature-release-in-development">v1.8.6 — Next Feature Release (in development)<a class="headerlink" href="#v186-next-feature-release-in-development" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Items</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Critical</strong></td>
+<td>#190 GBK codec — process-wide UTF-8</td>
+<td><strong>DONE</strong> (commit <code>68d1644</code>)</td>
+</tr>
+<tr>
+<td><strong>Critical</strong></td>
+<td>#183 LLM translation — auto-cap batch size</td>
+<td><strong>DONE</strong> (commit <code>24faa3b</code>)</td>
+</tr>
+<tr>
+<td><strong>High</strong></td>
+<td>#179 Per-video serial ensemble</td>
+<td><strong>DONE</strong> (commit <code>8bb5cb0</code>)</td>
+</tr>
+<tr>
+<td><strong>High</strong></td>
+<td>#96 GUI settings persistence (initial framework)</td>
+<td><strong>IN PROGRESS</strong> (commits <code>c2310b3</code>, <code>eb80105</code>)</td>
+</tr>
+<tr>
+<td>High</td>
+<td>Anime-Whisper generator backend</td>
+<td><strong>DONE</strong> (4 commits)</td>
+</tr>
+<tr>
+<td>High</td>
+<td>Ensemble parameter presets</td>
+<td><strong>DONE</strong> (2 commits)</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>#194 M4B file support</td>
+<td><strong>DONE</strong> (commit <code>5769688</code>)</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>#51 Batch translate wildcard</td>
+<td>Glob support in translate CLI</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>#143 VTT output format</td>
+<td><strong>DONE</strong> (commit <code>b7e794f</code>)</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>#99 VRAM check + model suggestion</td>
+<td>Auto-detect + warn</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>#159 --vad-threshold CLI override</td>
+<td>Simple float arg</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>#164 MPEG-TS auto-remux</td>
+<td>FFmpeg format probe</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>#44 Drag-drop path resolution</td>
+<td>GUI fix</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>#49 Output folder UX</td>
+<td>Refinement (source mode exists)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="v19-deferred">v1.9+ (Deferred)<a class="headerlink" href="#v19-deferred" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>#96</td>
+<td>Full GUI settings persistence (all tabs)</td>
+<td>Major UX redesign — file-backed state for every control</td>
+</tr>
+<tr>
+<td>#180/#175</td>
+<td>Multi-language GUI (i18n)</td>
+<td>Full i18n framework — high effort</td>
+</tr>
+<tr>
+<td>#114/#142</td>
+<td>DirectML / ROCm for AMD/Intel</td>
+<td>Major platform enablement</td>
+</tr>
+<tr>
+<td>#126</td>
+<td>Recursive directory + mirror output</td>
+<td>Medium effort</td>
+</tr>
+<tr>
+<td>#181</td>
+<td>Frameless window</td>
+<td>Cosmetic</td>
+</tr>
+<tr>
+<td>#43</td>
+<td>DeepL provider</td>
+<td>Non-LLM adapter complexity</td>
+</tr>
+<tr>
+<td>#71</td>
+<td>Google Translate (no API key)</td>
+<td>Fragile unofficial APIs</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="duplicate-related-issue-clusters">Duplicate / Related Issue Clusters<a class="headerlink" href="#duplicate-related-issue-clusters" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Cluster</th>
+<th>Issues</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Windows encoding (GBK/cp950/UTF-8)</strong></td>
+<td>~~#190~~, ~~#186~~, ~~#177~~</td>
+<td><strong>All fixed.</strong> #190 process-wide UTF-8 (<code>68d1644</code>).</td>
+</tr>
+<tr>
+<td><strong>PySubtrans bugs</strong></td>
+<td>~~#190~~, ~~#178~~, ~~#183-secondary~~</td>
+<td>All addressed. Encoding, routing, batch size all fixed.</td>
+</tr>
+<tr>
+<td><strong>ggml.dll / llama-cpp</strong></td>
+<td>~~#162~~, ~~#149~~, ~~#148~~, ~~#157~~, ~~#146~~, ~~#139~~</td>
+<td><strong>Fully resolved.</strong> All closeable.</td>
+</tr>
+<tr>
+<td><strong>VAD parameter type crashes</strong></td>
+<td>~~#173~~, ~~#185~~, ~~#187~~</td>
+<td><strong>Fully resolved in hotfix2.</strong></td>
+</tr>
+<tr>
+<td><strong>GUI settings persistence</strong></td>
+<td>#96, ~~#174~~, ~~#184~~, ~~#176~~</td>
+<td>#176 done. #96 in progress (v1.8.6 dev). #174/#184 are dups.</td>
+</tr>
+<tr>
+<td><strong>Ensemble UX</strong></td>
+<td>~~#179~~, ~~#189~~, ~~#191~~</td>
+<td>#179 DONE (serial mode). #189 fixed. #191 answered (SSL).</td>
+</tr>
+<tr>
+<td><strong>Colab/Kaggle</strong></td>
+<td>~~#166~~, ~~#152~~, ~~#134~~, ~~#132~~, ~~#161~~</td>
+<td>Mostly closed. #161 stale.</td>
+</tr>
+<tr>
+<td><strong>macOS</strong></td>
+<td>~~#108~~, ~~#155~~, ~~#100~~, ~~#110~~</td>
+<td>All closed.</td>
+</tr>
+<tr>
+<td><strong>Local LLM server</strong></td>
+<td>~~#149~~, ~~#148~~, ~~#158~~, ~~#183~~ (import part)</td>
+<td>Import issues all fixed. Translation quality (#183) separate.</td>
+</tr>
+<tr>
+<td><strong>AMD/non-NVIDIA GPU</strong></td>
+<td>#142, #114</td>
+<td>Deferred to v1.9+.</td>
+</tr>
+<tr>
+<td><strong>CLI batch workflow</strong></td>
+<td>#49, #51, #126</td>
+<td>#49/#51 for v1.8.6. #126 deferred.</td>
+</tr>
+<tr>
+<td><strong>Translation provider</strong></td>
+<td>~~#178~~, ~~#188~~, ~~#143~~, ~~#150~~, #69</td>
+<td>Most fixed. #69 covered by custom provider.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="github-discussions-10-open">GitHub Discussions (10 open)<a class="headerlink" href="#github-discussions-10-open" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D#24</td>
+<td>Welcome</td>
+<td>Pinned</td>
+</tr>
+<tr>
+<td>D#101</td>
+<td>LLM prompt slot suggestion</td>
+<td>Instruction prompts shipped in hotfix1</td>
+</tr>
+<tr>
+<td>D#121</td>
+<td>Kaggle support suggestion</td>
+<td>Kaggle notebook shipped</td>
+</tr>
+<tr>
+<td>D#131</td>
+<td>Local Models thank you</td>
+<td>Custom provider covers this</td>
+</tr>
+<tr>
+<td>D#133</td>
+<td>--instructions-file override?</td>
+<td>Documentation question</td>
+</tr>
+<tr>
+<td>D#145</td>
+<td>Local LLM discussion</td>
+<td>General discussion</td>
+</tr>
+<tr>
+<td>D#147</td>
+<td>AMD GPU discussion</td>
+<td>Deferred</td>
+</tr>
+<tr>
+<td>D#154</td>
+<td>Initial prompt to reduce hallucination</td>
+<td>Feature consideration</td>
+</tr>
+<tr>
+<td>D#156</td>
+<td>--max-workers CPU flag</td>
+<td>Documentation question</td>
+</tr>
+<tr>
+<td>D#182</td>
+<td>Can't find whisperjav in folder</td>
+<td>Installation support</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>This tracker is a point-in-time analysis. For live status, see <a href="https://github.com/meizhong986/WhisperJAV/issues">GitHub Issues</a>.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
