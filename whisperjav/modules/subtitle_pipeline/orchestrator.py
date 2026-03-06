@@ -122,6 +122,7 @@ class DecoupledSubtitlePipeline:
         scene_audio_paths: list[Path],
         scene_durations: list[float],
         scene_speech_regions: Optional[list[list[tuple[float, float]]]] = None,
+        vad_audio_paths: Optional[list[Path]] = None,
     ) -> list[tuple[Any, dict[str, Any]]]:
         """
         Process all scenes through the decoupled pipeline.
@@ -131,9 +132,15 @@ class DecoupledSubtitlePipeline:
 
         Args:
             scene_audio_paths: Paths to per-scene audio files (WAV, 16kHz).
+                Used for ASR generation and alignment.
             scene_durations: Duration of each scene in seconds.
             scene_speech_regions: Optional per-scene VAD speech regions
                 (from Phase 4 or VadGroupedFramer metadata).
+            vad_audio_paths: Optional per-scene audio files for VAD/framing
+                only (dual-track ``--enhance-for-vad`` mode).  When provided,
+                the framer uses these (enhanced) files for temporal framing
+                while ASR slicing reads from *scene_audio_paths* (original).
+                When None (default), framing and slicing use the same files.
 
         Returns:
             List of (WhisperResult_or_None, diagnostics_dict) per scene.
@@ -141,16 +148,22 @@ class DecoupledSubtitlePipeline:
         n_scenes = len(scene_audio_paths)
         if n_scenes != len(scene_durations):
             raise ValueError(f"scene_audio_paths ({n_scenes}) and scene_durations ({len(scene_durations)}) must match")
+        if vad_audio_paths is not None and len(vad_audio_paths) != n_scenes:
+            raise ValueError(f"vad_audio_paths ({len(vad_audio_paths)}) and scene_audio_paths ({n_scenes}) must match")
 
         logger.info(
-            "[DecoupledPipeline] Processing %d scenes (aligner=%s, step-down=%s)",
+            "[DecoupledPipeline] Processing %d scenes (aligner=%s, step-down=%s%s)",
             n_scenes,
             "yes" if self.aligner else "none",
             "enabled" if (self.stepdown_config and self.stepdown_config.enabled) else "disabled",
+            ", dual-track=yes" if vad_audio_paths else "",
         )
 
         # --- Pass 1: Normal processing ---
-        results = self._run_pass(scene_audio_paths, scene_durations, scene_speech_regions)
+        results = self._run_pass(
+            scene_audio_paths, scene_durations, scene_speech_regions,
+            vad_audio_paths=vad_audio_paths,
+        )
 
         # --- Identify collapsed scenes ---
         collapsed_indices = [
@@ -179,6 +192,7 @@ class DecoupledSubtitlePipeline:
             retry_results = self._run_stepdown_pass(
                 collapsed_indices, scene_audio_paths,
                 scene_durations, scene_speech_regions,
+                vad_audio_paths=vad_audio_paths,
             )
             # Replace Pass 1 results for retried scenes with Pass 2 results
             for idx, retry_result in zip(collapsed_indices, retry_results):
@@ -241,20 +255,24 @@ class DecoupledSubtitlePipeline:
         scene_durations: list[float],
         scene_speech_regions: Optional[list[list[tuple[float, float]]]] = None,
         framer_override_max_group: Optional[float] = None,
+        vad_audio_paths: Optional[list[Path]] = None,
     ) -> list[tuple[Any, dict[str, Any]]]:
         """Execute a single pass of the pipeline (framing → generation → alignment → hardening).
 
         Args:
-            scene_audio_paths: Per-scene audio file paths.
+            scene_audio_paths: Per-scene audio file paths (used for ASR).
             scene_durations: Per-scene durations.
             scene_speech_regions: Optional per-scene VAD speech regions.
             framer_override_max_group: When set, calls framer.reframe()
                 with this max group duration instead of framer.frame().
+            vad_audio_paths: Optional per-scene audio for framing/VAD
+                (dual-track mode).  When None, framing uses scene_audio_paths.
         """
         try:
             scene_frames, frame_audio_paths, frame_speech_regions = self._step1_frame_and_slice(
                 scene_audio_paths, scene_durations,
                 framer_override_max_group=framer_override_max_group,
+                vad_audio_paths=vad_audio_paths,
             )
             scene_texts = self._step2_4_generate_and_clean(scene_frames, frame_audio_paths, scene_durations)
             scene_alignments = self._step5_7_align(scene_frames, frame_audio_paths, scene_texts, scene_durations)
@@ -273,6 +291,7 @@ class DecoupledSubtitlePipeline:
         scene_audio_paths: list[Path],
         scene_durations: list[float],
         scene_speech_regions: Optional[list[list[tuple[float, float]]]] = None,
+        vad_audio_paths: Optional[list[Path]] = None,
     ) -> list[tuple[Any, dict[str, Any]]]:
         """Re-process collapsed scenes with tighter framing (step-down retry)."""
         retry_audio_paths = [scene_audio_paths[i] for i in collapsed_indices]
@@ -281,9 +300,14 @@ class DecoupledSubtitlePipeline:
             [scene_speech_regions[i] for i in collapsed_indices]
             if scene_speech_regions else None
         )
+        retry_vad_paths = (
+            [vad_audio_paths[i] for i in collapsed_indices]
+            if vad_audio_paths else None
+        )
         return self._run_pass(
             retry_audio_paths, retry_durations, retry_speech_regions,
             framer_override_max_group=self.stepdown_config.fallback_max_group_s,
+            vad_audio_paths=retry_vad_paths,
         )
 
     @staticmethod
@@ -300,6 +324,7 @@ class DecoupledSubtitlePipeline:
         scene_audio_paths: list[Path],
         scene_durations: list[float],
         framer_override_max_group: Optional[float] = None,
+        vad_audio_paths: Optional[list[Path]] = None,
     ) -> tuple[
         list[list[TemporalFrame]],
         list[list[Path]],
@@ -311,6 +336,10 @@ class DecoupledSubtitlePipeline:
         Args:
             framer_override_max_group: When set and the framer supports
                 ``reframe()``, uses tighter grouping (step-down retry).
+            vad_audio_paths: Optional per-scene audio for framing/VAD
+                (dual-track ``--enhance-for-vad`` mode).  When provided,
+                the framer runs on these (enhanced) files while audio
+                slicing reads from *scene_audio_paths* (original quality).
 
         Returns:
             scene_frames: Per-scene list of TemporalFrame objects.
@@ -318,9 +347,11 @@ class DecoupledSubtitlePipeline:
             frame_speech_regions: Per-scene speech regions from framer metadata.
         """
         n_scenes = len(scene_audio_paths)
+        dual_track = vad_audio_paths is not None
         logger.info(
-            "[DecoupledPipeline] Step 1: Framing %d scenes%s", n_scenes,
+            "[DecoupledPipeline] Step 1: Framing %d scenes%s%s", n_scenes,
             f" (reframe override={framer_override_max_group}s)" if framer_override_max_group else "",
+            " (dual-track: enhanced→framer, original→ASR)" if dual_track else "",
         )
 
         scene_frames: list[list[TemporalFrame]] = []
@@ -328,16 +359,17 @@ class DecoupledSubtitlePipeline:
         frame_speech_regions: list[Optional[list[list[tuple[float, float]]]]] = []
 
         for scene_idx, audio_path in enumerate(scene_audio_paths):
-            # Load scene audio
-            audio, sr = self._load_audio(audio_path)
+            # Dual-track: framer runs on enhanced audio, slicing on original
+            framing_path = vad_audio_paths[scene_idx] if dual_track else audio_path
+            framing_audio, sr = self._load_audio(framing_path)
 
             # Run framer (or reframe for step-down)
             if framer_override_max_group is not None and hasattr(self.framer, "reframe"):
                 framing_result = self.framer.reframe(
-                    audio, sr, max_group_duration_s=framer_override_max_group,
+                    framing_audio, sr, max_group_duration_s=framer_override_max_group,
                 )
             else:
-                framing_result = self.framer.frame(audio, sr)
+                framing_result = self.framer.frame(framing_audio, sr)
             frames = framing_result.frames
             scene_frames.append(frames)
 
@@ -345,17 +377,23 @@ class DecoupledSubtitlePipeline:
             regions = framing_result.metadata.get("speech_regions")
             frame_speech_regions.append(regions)
 
-            # Slice audio per frame → temp WAV
+            # Load ASR audio (only needed if dual-track and we have frames to slice)
+            if dual_track and not (len(frames) == 1 and frames[0].start == 0.0):
+                asr_audio, sr = self._load_audio(audio_path)
+            else:
+                asr_audio = framing_audio  # same source, no extra load
+
+            # Slice audio per frame → temp WAV (always from ASR audio)
             frame_paths = []
             for frame_idx, frame in enumerate(frames):
                 if len(frames) == 1 and frame.start == 0.0:
-                    # Full-scene frame — use original audio path (no slicing needed)
+                    # Full-scene frame — use original ASR audio path (no slicing needed)
                     frame_paths.append(audio_path)
                 else:
-                    # Slice and write temp WAV
+                    # Slice and write temp WAV from ASR audio
                     start_sample = int(frame.start * sr)
                     end_sample = int(frame.end * sr)
-                    frame_audio = audio[start_sample:end_sample]
+                    frame_audio = asr_audio[start_sample:end_sample]
                     temp_path = self._write_temp_wav(frame_audio, sr, scene_idx, frame_idx)
                     frame_paths.append(temp_path)
 

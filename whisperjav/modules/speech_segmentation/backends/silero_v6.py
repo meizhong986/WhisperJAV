@@ -33,7 +33,7 @@ class SileroV6SpeechSegmenter:
 
     JAV-tuned defaults:
     - threshold=0.35: Captures speech overlapping with breathing/moaning
-    - speech_pad_ms=250: Capture Japanese soft onsets and trailing particles
+    - speech_pad_ms=350: Capture Japanese soft onsets and trailing particles (ね, よ, わ)
     - min_speech_duration_ms=100: Preserve short utterances (はい, ね, うん)
     - max_speech_duration_s inherits from max_group_duration_s as safety net
 
@@ -49,7 +49,7 @@ class SileroV6SpeechSegmenter:
         min_speech_duration_ms: int = 100,
         max_speech_duration_s: Optional[float] = None,
         min_silence_duration_ms: int = 100,
-        speech_pad_ms: int = 250,
+        speech_pad_ms: int = 350,
         min_silence_at_max_speech: int = 98,
         use_max_poss_sil_at_max_speech: bool = True,
         chunk_threshold_s: Optional[float] = 1.0,

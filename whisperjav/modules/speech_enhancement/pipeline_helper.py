@@ -222,6 +222,61 @@ def is_passthrough_backend(backend_name: Optional[str]) -> bool:
     return not backend_name or backend_name == "none"
 
 
+def resample_scenes(
+    scene_paths: List[Tuple[Path, float, float, float]],
+    temp_dir: Path,
+) -> List[Tuple[Path, float, float, float]]:
+    """
+    Resample scene audio files from extraction SR (48kHz) to 16kHz without enhancement.
+
+    Used by the dual-track ``--enhance-for-vad`` mode: the original (non-enhanced)
+    scenes are resampled to 16kHz so they can be fed to the ASR generator, while
+    the enhanced copies are used only for VAD framing.
+
+    Args:
+        scene_paths: List of (scene_path, start_sec, end_sec, duration_sec)
+                     at extraction sample rate (typically 48kHz).
+        temp_dir: Temporary directory (``resampled_scenes/`` will be created here).
+
+    Returns:
+        List of (resampled_path, start_sec, end_sec, duration_sec).
+        Same structure as input, but paths point to 16kHz mono WAV files.
+    """
+    if not scene_paths:
+        return scene_paths
+
+    import numpy as np
+
+    resampled_dir = temp_dir / "resampled_scenes"
+    resampled_dir.mkdir(exist_ok=True)
+
+    resampled_paths = []
+    for scene_path, start_sec, end_sec, dur_sec in scene_paths:
+        resampled_path = resampled_dir / f"{scene_path.stem}_resampled.wav"
+        try:
+            audio_data, actual_sr = sf.read(str(scene_path), dtype='float32')
+
+            # Convert stereo to mono if needed
+            if audio_data.ndim > 1:
+                audio_data = np.mean(audio_data, axis=1)
+
+            # Resample to 16kHz if needed
+            if actual_sr != TARGET_SAMPLE_RATE:
+                audio_data = resample_audio(audio_data, actual_sr, TARGET_SAMPLE_RATE)
+
+            sf.write(str(resampled_path), audio_data, TARGET_SAMPLE_RATE)
+            resampled_paths.append((resampled_path, start_sec, end_sec, dur_sec))
+        except Exception as e:
+            logger.warning(
+                "Failed to resample scene %s: %s. Using original.",
+                scene_path.name, e,
+            )
+            resampled_paths.append((scene_path, start_sec, end_sec, dur_sec))
+
+    logger.info("Resampled %d scenes to %dHz (dual-track ASR path)", len(resampled_paths), TARGET_SAMPLE_RATE)
+    return resampled_paths
+
+
 def enhance_scenes(
     scene_paths: List[Tuple[Path, float, float, float]],
     enhancer: SpeechEnhancer,

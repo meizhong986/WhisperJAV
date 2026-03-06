@@ -42,6 +42,7 @@ from whisperjav.modules.speech_enhancement import (
     enhance_scenes,
     get_extraction_sample_rate,
     is_passthrough_backend,
+    resample_scenes,
 )
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
 from whisperjav.modules.srt_stitching import SRTStitcher
@@ -110,6 +111,7 @@ class QwenPipeline(BasePipeline):
         # Speech enhancement (Phase 3)
         speech_enhancer: str = "none",
         speech_enhancer_model: Optional[str] = None,
+        enhance_for_vad: bool = False,  # Dual-track: enhanced audio for VAD, original for ASR
 
         # Speech segmentation / VAD (Phase 4)
         speech_segmenter: str = "silero-v6.2",  # Default to Silero v6.2 for VAD
@@ -220,6 +222,7 @@ class QwenPipeline(BasePipeline):
         # Speech enhancement config
         self.enhancer_backend = speech_enhancer
         self.enhancer_model = speech_enhancer_model
+        self._enhance_for_vad = enhance_for_vad
 
         # Speech segmentation config
         self.segmenter_backend = speech_segmenter
@@ -610,17 +613,63 @@ class QwenPipeline(BasePipeline):
         # PHASE 3: SPEECH ENHANCEMENT (optional, VRAM Block 1)
         # When enhancer is "none" (passthrough), scenes are already at
         # 16kHz from extraction — skip this phase entirely.
+        #
+        # Dual-track mode (--enhance-for-vad): enhanced audio is used
+        # only for VAD (Phase 4) and framing (Phase 5 orchestrator).
+        # ASR reads from the original audio resampled to 16kHz.
         # ==============================================================
         logger.info("[QwenPipeline PID %s] Phase 3: Speech enhancement (backend=%s)", os.getpid(), self.enhancer_backend)
         phase3_start = time.time()
 
+        # Dual-track paths (populated only when --enhance-for-vad is active)
+        _vad_scene_paths = None   # Phase 4 VAD iterates these (enhanced)
+        _orch_vad_paths = None    # Phase 5 orchestrator framer uses these (enhanced)
+
         if is_passthrough_backend(self.enhancer_backend):
             # v1.8.5+: Scenes already at 16kHz — skip enhancement entirely
+            if self._enhance_for_vad:
+                logger.warning(
+                    "[QwenPipeline PID %s] Phase 3: --enhance-for-vad ignored — "
+                    "no speech enhancer configured (backend=%s)",
+                    os.getpid(), self.enhancer_backend,
+                )
             logger.info(
                 "[QwenPipeline PID %s] Phase 3: Passthrough — %d scenes at 16kHz, skipping enhancement",
                 os.getpid(), len(scene_paths),
             )
+        elif self._enhance_for_vad:
+            # Dual-track: enhanced audio → VAD/framing, original → ASR
+            logger.info(
+                "[QwenPipeline PID %s] Phase 3: Dual-track mode — "
+                "enhanced audio for VAD/framing, original for ASR",
+                os.getpid(),
+            )
+            enhancer = create_enhancer_direct(
+                backend=self.enhancer_backend,
+                model=self.enhancer_model,
+            )
+
+            def _enhancement_progress(scene_num, total, scene_name):
+                logger.debug(f"Enhancing scene {scene_num}/{total}: {scene_name}")
+
+            enhanced_paths = enhance_scenes(
+                scene_paths, enhancer, self.temp_dir,
+                progress_callback=_enhancement_progress,
+            )
+            original_16k_paths = resample_scenes(scene_paths, self.temp_dir)
+
+            # VRAM Block 1 cleanup — release enhancer before loading ASR
+            enhancer.cleanup()
+            del enhancer
+            from whisperjav.utils.gpu_utils import safe_cuda_cleanup
+            safe_cuda_cleanup()
+
+            # VAD and framer use enhanced; ASR uses original
+            _vad_scene_paths = enhanced_paths
+            _orch_vad_paths = enhanced_paths
+            scene_paths = original_16k_paths
         else:
+            # Single-track (current behavior): enhanced audio → both VAD and ASR
             enhancer = create_enhancer_direct(
                 backend=self.enhancer_backend,
                 model=self.enhancer_model,
@@ -640,8 +689,13 @@ class QwenPipeline(BasePipeline):
             from whisperjav.utils.gpu_utils import safe_cuda_cleanup
             safe_cuda_cleanup()
 
+        # Phase 4 VAD paths: enhanced (dual-track) or same as scene_paths (single-track)
+        if _vad_scene_paths is None:
+            _vad_scene_paths = scene_paths
+
         master_metadata["stages"]["enhancement"] = {
             "backend": self.enhancer_backend,
+            "dual_track": _orch_vad_paths is not None,
             "time_sec": time.time() - phase3_start,
         }
         logger.info("[QwenPipeline PID %s] Phase 3: Complete (%.1fs)", os.getpid(), time.time() - phase3_start)
@@ -663,13 +717,13 @@ class QwenPipeline(BasePipeline):
                 **segmenter_kwargs,
             )
 
-            for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(scene_paths):
+            for idx, (scene_path, start_sec, end_sec, dur_sec) in enumerate(_vad_scene_paths):
                 try:
                     seg_result = segmenter.segment(scene_path, sample_rate=16000)
                     speech_regions_per_scene[idx] = seg_result
                     logger.debug(
                         "Phase 4: Scene %d/%d — %d speech segments (coverage=%.1f%%)",
-                        idx + 1, len(scene_paths),
+                        idx + 1, len(_vad_scene_paths),
                         len(seg_result.segments),
                         seg_result.speech_coverage_ratio * 100,
                     )
@@ -729,11 +783,18 @@ class QwenPipeline(BasePipeline):
                 else:
                     orch_speech_regions.append([])
 
+        # Dual-track: orchestrator framer uses enhanced audio for framing
+        orch_vad_paths = (
+            [Path(sp[0]) for sp in _orch_vad_paths]
+            if _orch_vad_paths else None
+        )
+
         # Run orchestrator
         orch_results = self._subtitle_pipeline.process_scenes(
             scene_audio_paths=orch_audio_paths,
             scene_durations=orch_durations,
             scene_speech_regions=orch_speech_regions,
+            vad_audio_paths=orch_vad_paths,
         )
 
         # Convert to Phase 6 format: (WhisperResult, scene_idx)
