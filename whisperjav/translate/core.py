@@ -16,22 +16,32 @@ def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
 
     Japanese text is tokenized at ~2-3 tokens per character by byte-level
     tokenizers (LLaMA, Gemma). A typical subtitle line of 30-50 Japanese
-    characters becomes 60-150 tokens. Combined with the response (translated
-    text) and PySubtrans formatting headers, we budget conservatively:
+    characters becomes 75-150 tokens. Combined with the response (translated
+    text), PySubtrans formatting headers, and <summary>/<scene> tags, we
+    budget for worst-case (long) lines:
 
     Per subtitle line (both directions):
-    - Input: ~100 tokens (``#N\\nOriginal>\\n`` + Japanese text)
+    - Input: ~150 tokens (``#N\\nOriginal>\\n`` + Japanese text, long lines)
     - Output: ~100 tokens (``#N\\nTranslation>\\n`` + translated text)
-    - Subtotal: ~200 tokens, padded to 350 for safety (long lines exist)
+    - Subtotal: ~250 tokens typical, 500 budget for worst-case long lines
 
     Fixed overhead:
     - System message: ~500 tokens
-    - Translation instructions: ~1000 tokens
-    - Formatting, preamble: ~500 tokens
-    - Total: ~2000 tokens
+    - Translation instructions (standard.txt): ~700 tokens
+    - Context from previous batches (<scene>/<summary>): ~500 tokens
+    - Response summary/scene tags: ~200 tokens
+    - Formatting, preamble, retry margin: ~600 tokens
+    - Total: ~2500 tokens
 
-    Empirical validation: batch_size=30 overflows 8K context (#183).
-    This formula yields 17 for 8K (safe) and 30 for 16K+ (no change).
+    Revision history:
+    - v1.8.6: overhead=2000, per_line=350 → 17 for 8K. Proved unsafe (#196).
+    - v1.8.7: overhead=2500, per_line=500 → 11 for 8K. Accounts for long
+      Japanese lines, PySubtrans context, and response summary tags.
+
+    Results by context size:
+    - 8K (8192):  11 lines per batch
+    - 16K (16384): 27 lines per batch
+    - 32K+: 30 (capped by max_batch_size default)
 
     Args:
         max_batch_size: Current batch size setting
@@ -40,8 +50,8 @@ def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
     Returns:
         Capped batch size (may be unchanged if already within limits)
     """
-    overhead = 2000  # system message + instructions + formatting
-    tokens_per_line = 350  # input + output per subtitle line (conservative)
+    overhead = 2500  # system message + instructions + context + response tags
+    tokens_per_line = 500  # input + output per subtitle line (worst-case long lines)
     safe_max = max(5, (n_ctx - overhead) // tokens_per_line)
     return min(max_batch_size, safe_max)
 

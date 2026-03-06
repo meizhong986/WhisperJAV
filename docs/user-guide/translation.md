@@ -89,6 +89,32 @@ Use the standalone translation tab:
 !!! tip "Improving Translation Quality"
     Filling in the Movie Title and Actress Names fields significantly improves translation quality. The AI uses this context to make better word choices and handle names consistently.
 
+### Batch Size Tuning for Local LLMs
+
+Local LLMs have limited context windows compared to cloud APIs. If you see errors like **"Hit API token limit"** or **"No matches found in translation text"**, your batch size is too large for your model's context window.
+
+WhisperJAV auto-adjusts the batch size based on context window size, but you can also set it manually:
+
+```bash
+# CLI: set batch size explicitly
+whisperjav-translate -i subtitles.srt --provider local --max-batch-size 10
+
+# Or configure it persistently
+whisperjav-translate --configure
+# When prompted for "Max batch size", enter your preferred value
+```
+
+**Recommended batch sizes by model context window:**
+
+| Context Window | Auto-Cap | Recommended Manual | Notes |
+|---------------|----------|-------------------|-------|
+| 8K (8192) | 11 | 8–12 | gemma-9b, small models |
+| 16K (16384) | 27 | 20–27 | Most mid-range models |
+| 32K+ | 30 | 30 | Large context models, cloud APIs |
+
+!!! note
+    The default batch size of 30 is designed for cloud APIs with 128K+ context windows. For local models, the auto-cap handles most cases automatically. Only set it manually if you still see token limit errors.
+
 ---
 
 ## CLI Translation
@@ -102,4 +128,7 @@ whisperjav-translate -i subtitles.srt --provider gemini --tone adult
 
 # Translate to Chinese
 whisperjav-translate -i subtitles.srt --target-language Chinese
+
+# Local LLM with reduced batch size (for 8K context models)
+whisperjav-translate -i subtitles.srt --provider local --max-batch-size 10
 ```
