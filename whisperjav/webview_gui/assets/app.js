@@ -1214,7 +1214,8 @@ const EnsembleManager = {
             isQwen: false,  // Track if using Qwen3-ASR or Anime-Whisper pipeline
             isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
-            dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
+            dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
+            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
         },
         pass2: {
             enabled: false,
@@ -1231,7 +1232,8 @@ const EnsembleManager = {
             isQwen: true,  // Default pipeline is Qwen3-ASR
             isAnimeWhisper: false,
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
-            dspEffects: ['loudnorm']  // Default FFmpeg DSP effects
+            dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
+            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
         },
         mergeStrategy: 'pass1_primary',
         serialMode: false,
@@ -3292,6 +3294,48 @@ const EnsembleManager = {
 
         vadDetails.appendChild(vadContainer);
         container.appendChild(vadDetails);
+
+        // ─ Speech Enhancement Mode (enhance-for-vad) ─
+        // Only shown when a non-passthrough speech enhancer is selected on the pass card.
+        // Only effective for Qwen pipeline (pass_worker.py enforces this).
+        const passKey = this.state.currentCustomize;
+        const passState = passKey ? this.state[passKey] : null;
+        const currentEnhancer = passState ? (passState.speechEnhancer || 'none') : 'none';
+        if (currentEnhancer !== 'none' && currentEnhancer !== '') {
+            const efvHeader = document.createElement('div');
+            efvHeader.className = 'param-group-header';
+            efvHeader.textContent = 'Speech Enhancement Mode';
+            container.appendChild(efvHeader);
+
+            const efvControl = document.createElement('div');
+            efvControl.className = 'efv-control';  // Not .param-control — collected manually
+
+            const efvLabel = document.createElement('label');
+            efvLabel.className = 'checkbox-label';
+
+            const efvCheck = document.createElement('input');
+            efvCheck.type = 'checkbox';
+            efvCheck.className = 'param-checkbox';
+            efvCheck.id = 'modal-enhance-for-vad';
+            efvCheck.checked = passState ? !!passState.enhanceForVad : false;
+
+            const efvSpan = document.createElement('span');
+            efvSpan.textContent = 'Use enhanced audio for VAD framing only';
+
+            efvLabel.appendChild(efvCheck);
+            efvLabel.appendChild(efvSpan);
+            efvControl.appendChild(efvLabel);
+
+            const efvDesc = document.createElement('p');
+            efvDesc.className = 'param-description';
+            efvDesc.textContent =
+                'Enhanced audio drives VAD segment boundaries; original (non-enhanced) ' +
+                'audio is fed to the ASR model. Prevents enhancement artifacts from ' +
+                'degrading transcription while still benefiting from cleaner VAD. ' +
+                'Requires a non-passthrough speech enhancer (e.g. clearvoice, bs-roformer).';
+            efvControl.appendChild(efvDesc);
+            container.appendChild(efvControl);
+        }
     },
 
     // ── Tab 3: Generation ────────────────────────────────────────────
@@ -4051,6 +4095,12 @@ const EnsembleManager = {
             this.state[passKey].framer = fullParams.framer;
         }
 
+        // Sync enhance-for-vad from modal checkbox to state (Qwen only, not a qwen-param)
+        const efvCheck = document.getElementById('modal-enhance-for-vad');
+        if (efvCheck !== null) {
+            this.state[passKey].enhanceForVad = efvCheck.checked;
+        }
+
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Saved ${paramCount} parameters for ${passLabel} (Custom)`, 'info');
@@ -4518,6 +4568,7 @@ const EnsembleManager = {
             isAnimeWhisper: passState.isAnimeWhisper || false,
             framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
             dspEffects: passState.dspEffects || null,
+            enhanceForVad: passState.enhanceForVad || false,
         };
     },
 
@@ -4599,6 +4650,7 @@ const EnsembleManager = {
             if (preset.model) passState.model = preset.model;
             if (preset.framer) passState.framer = preset.framer;
             if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
+            passState.enhanceForVad = preset.enhanceForVad || false;
             passState.isTransformers = presetIsTransformers;
             passState.isQwen = presetIsQwen;
             passState.isAnimeWhisper = presetIsAnimeWhisper;
@@ -4721,7 +4773,8 @@ const EnsembleManager = {
                 isTransformers: this.state.pass1.isTransformers,
                 isQwen: this.state.pass1.isQwen,
                 isAnimeWhisper: this.state.pass1.isAnimeWhisper,
-                framer: this.state.pass1.isQwen ? this.state.pass1.framer : null
+                framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
+                enhanceForVad: this.state.pass1.isQwen ? (this.state.pass1.enhanceForVad || false) : false
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
@@ -4737,7 +4790,8 @@ const EnsembleManager = {
                 isTransformers: this.state.pass2.isTransformers,
                 isQwen: this.state.pass2.isQwen,
                 isAnimeWhisper: this.state.pass2.isAnimeWhisper,
-                framer: this.state.pass2.isQwen ? this.state.pass2.framer : null
+                framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
+                enhanceForVad: this.state.pass2.isQwen ? (this.state.pass2.enhanceForVad || false) : false
             },
             merge_strategy: this.state.mergeStrategy,
             serial_mode: this.state.serialMode,

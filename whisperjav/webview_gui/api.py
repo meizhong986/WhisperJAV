@@ -2379,6 +2379,11 @@ class WhisperJAVAPI:
             else:
                 args += ["--pass1-speech-enhancer", enhancer1]
 
+        # Pass 1: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
+        # Only effective for Qwen pipeline; pass_worker.py silently ignores for others.
+        if pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', ''):
+            args += ["--pass1-enhance-for-vad"]
+
         # Pass 1: Model
         # Note: All pipelines use --pass1-model. For Qwen, pass_worker.py
         # translates this to qwen_model_id parameter.
@@ -2453,6 +2458,10 @@ class WhisperJAVAPI:
                     args += ["--pass2-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
                 else:
                     args += ["--pass2-speech-enhancer", enhancer2]
+
+            # Pass 2: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
+            if pass2.get('enhanceForVad') and enhancer2 and enhancer2 not in ('none', ''):
+                args += ["--pass2-enhance-for-vad"]
 
             # Pass 2: Model
             # Note: All pipelines use --pass2-model. For Qwen, pass_worker.py
