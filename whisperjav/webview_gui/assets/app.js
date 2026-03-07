@@ -949,6 +949,9 @@ const ProcessManager = {
             try {
                 const logs = await pywebview.api.get_logs();
 
+                // Guard against overlapping async callbacks (same race as status monitor)
+                if (!AppState.logPollInterval) return;
+
                 if (logs && logs.length > 0) {
                     logs.forEach(line => {
                         // Remove trailing newline if present
@@ -977,6 +980,14 @@ const ProcessManager = {
         AppState.statusPollInterval = setInterval(async () => {
             try {
                 const status = await pywebview.api.get_process_status();
+
+                // Guard: another concurrent callback may have already handled completion
+                // and called stopStatusMonitoring() while this one was awaiting.
+                // setInterval with async callbacks does not prevent overlap — multiple
+                // in-flight callbacks can all see status='completed' when the pywebview
+                // message queue drains after heavy LLM streaming. Only the first one
+                // should act; the rest must exit here.
+                if (!AppState.statusPollInterval) return;
 
                 // Update status label
                 ProgressManager.setStatus(this.formatStatus(status.status));
