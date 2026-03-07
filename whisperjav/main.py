@@ -422,6 +422,11 @@ def parse_arguments():
         help="GPU layers for local LLM (-1=all to GPU, 0=CPU only). Only used with --translate-provider local"
     )
     translation_group.add_argument(
+        "--stream",
+        action="store_true",
+        help="Enable streaming for cloud translation providers. Local LLM always streams regardless of this flag."
+    )
+    translation_group.add_argument(
         "--translate-quiet",
         action="store_true",
         help="Hide translation progress messages (default: show progress)"
@@ -1250,9 +1255,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     try:
                         logger.info("Starting translation...")
 
-                        # Determine stream mode based on progress settings
-                        stream_mode = not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False)
-
                         # Call translation service directly (no subprocess)
                         translated_path = translate_with_config(
                             input_path=output_path,
@@ -1261,7 +1263,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             tone=args.translate_tone,
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
-                            stream=stream_mode,
+                            stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=build_translation_context(args),
                             n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
@@ -1481,9 +1483,6 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                             try:
                                 logger.info("Starting translation...")
 
-                                # Determine stream mode based on progress settings
-                                stream_mode = not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False)
-
                                 # Call translation service directly (no subprocess)
                                 translated_path = translate_with_config(
                                     input_path=output_path,
@@ -1492,7 +1491,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     tone=args.translate_tone,
                                     api_key=getattr(args, 'translate_api_key', None),
                                     model=getattr(args, 'translate_model', None),
-                                    stream=stream_mode,
+                                    stream=getattr(args, 'stream', False),
                                     debug=getattr(args, 'debug', False),
                                     extra_context=build_translation_context(args),
                                     n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
@@ -2096,6 +2095,7 @@ def main():
                             tone=args.translate_tone,
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
+                            stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=extra_context,
                             n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),

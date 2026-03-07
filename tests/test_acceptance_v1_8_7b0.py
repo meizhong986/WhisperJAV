@@ -435,6 +435,36 @@ class TestCLIArgumentParsing:
         assert "--vad-threshold" in result.stdout + result.stderr
         assert "--speech-pad-ms" in result.stdout + result.stderr
 
+    def test_stream_flag_in_help(self):
+        """--stream must appear in main.py --help (CLI entry point)."""
+        result = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--help"],
+            capture_output=True, text=True, timeout=15
+        )
+        assert result.returncode == 0, "--help should exit 0"
+        assert "--stream" in result.stdout + result.stderr, \
+            "--stream not found in main.py --help — flag missing from argparse"
+
+    def test_stream_flag_accepted_by_main(self):
+        """--stream must not cause 'unrecognized arguments' error."""
+        result = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--stream", "--help"],
+            capture_output=True, text=True, timeout=15
+        )
+        assert result.returncode == 0, \
+            f"--stream caused exit {result.returncode}: {result.stderr[:300]}"
+        assert "unrecognized" not in result.stderr.lower()
+
+    def test_stream_default_false(self):
+        """--stream defaults to False when not passed."""
+        args = self._get_args(["dummy.mp4"])
+        assert args.stream is False
+
+    def test_stream_true_when_passed(self):
+        """--stream sets args.stream to True."""
+        args = self._get_args(["dummy.mp4", "--stream"])
+        assert args.stream is True
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # F  --ENHANCE-FOR-VAD STRUCTURAL INTEGRITY
