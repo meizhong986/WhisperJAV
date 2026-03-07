@@ -221,6 +221,8 @@ def translate_subtitle(
             opt_kwargs['max_tokens'] = provider_config['max_tokens']
         if 'max_completion_tokens' in provider_config:
             opt_kwargs['max_completion_tokens'] = provider_config['max_completion_tokens']
+        if 'supports_streaming' in provider_config:
+            opt_kwargs['supports_streaming'] = provider_config['supports_streaming']
 
         # Merge provider-specific options
         if provider_options:

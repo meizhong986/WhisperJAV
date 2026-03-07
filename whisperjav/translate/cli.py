@@ -589,6 +589,10 @@ def main():
                     'supports_conversation': True,
                     'supports_system_messages': True,
                     'max_tokens': local_max_tokens,  # Prevents finish_reason='length' (#196)
+                    'supports_streaming': True,       # Required: CustomClient.enable_streaming =
+                                                      # stream_responses AND supports_streaming.
+                                                      # Without this flag CustomClient silently
+                                                      # disables streaming even when requested.
                 }
                 if i == 0:
                     print(f"[CLI]   PySubtrans config: Custom Server at {server_address}", file=sys.stderr)
