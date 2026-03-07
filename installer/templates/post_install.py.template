@@ -348,15 +348,22 @@ def detect_nvidia_driver() -> DriverInfo:
     return DriverInfo(None, None, "none")
 
 
-def verify_existing_torch_stack() -> bool:
-    """Return True if CUDA-enabled torch and torchaudio meet requirements."""
+def verify_existing_torch_stack() -> Tuple[bool, Optional[str]]:
+    """
+    Check if CUDA-enabled torch and torchaudio meet requirements.
+
+    Returns:
+        (valid, error) — valid=True means torch is good AND constraints written.
+        error is a failure reason string if something went wrong, None otherwise.
+        When error is set, the caller should abort (not retry with fresh install).
+    """
     log("Checking for existing CUDA-enabled PyTorch and torchaudio...")
     try:
         import torch
         import torchaudio
     except ImportError as exc:
         log(f"PyTorch stack missing: {exc}")
-        return False
+        return False, None
 
     log(f"Found PyTorch {torch.__version__}")
     try:
@@ -367,31 +374,37 @@ def verify_existing_torch_stack() -> bool:
     log(f"PyTorch CUDA available: {'YES' if cuda_available else 'NO'}")
 
     if not cuda_available:
-        return False
+        return False, None
 
     cuda_str = getattr(torch.version, "cuda", "") or ""
     cuda_tuple = parse_version_string(cuda_str)
     if not cuda_tuple:
         log("Unable to determine PyTorch CUDA version; reinstall required.")
-        return False
+        return False, None
 
     if cuda_tuple >= MIN_TORCH_CUDA_VERSION:
         log(f"Existing PyTorch satisfies CUDA >= {format_version_tuple(MIN_TORCH_CUDA_VERSION)}. Skipping reinstall.")
-        # Still create GPU constraints to protect pre-existing torch from overwrites
+        # Create GPU constraints to protect pre-existing torch from overwrites.
+        # If this fails, abort — continuing without protection risks silent
+        # CUDA→CPU replacement in Phase 3.5/4 (much harder to debug).
         gpu_pins = {"torch": torch.__version__}
         try:
             gpu_pins["torchaudio"] = torchaudio.__version__
         except Exception:
             pass
-        create_gpu_constraints(gpu_pins)
-        return True
+        if not create_gpu_constraints(gpu_pins):
+            reason = f"Cannot write GPU constraints file: {GPU_CONSTRAINTS_FILE} (check permissions/disk space)"
+            log(f"FATAL: {reason}")
+            log("       Without this file, subsequent installs may replace CUDA PyTorch with CPU-only.")
+            return False, reason
+        return True, None
 
     log(
         "Installed PyTorch CUDA version "
         f"{format_version_tuple(cuda_tuple)} is below required "
         f"{format_version_tuple(MIN_TORCH_CUDA_VERSION)}. Reinstalling..."
     )
-    return False
+    return False, None
 
 
 def normalize_pip_command(command: str) -> list[str]:
@@ -679,12 +692,22 @@ def check_cuda_driver() -> DriverInfo:
     return driver_info
 
 
-def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
-    """Install PyTorch/Torchaudio with best available acceleration."""
+def install_pytorch(driver_info: Optional[DriverInfo] = None) -> Optional[str]:
+    """
+    Install PyTorch/Torchaudio with best available acceleration.
+
+    Returns:
+        None on success, or a failure reason string for diagnostics.
+    """
     log_section("PyTorch Installation")
 
-    if verify_existing_torch_stack():
-        return True
+    existing_ok, existing_error = verify_existing_torch_stack()
+    if existing_ok:
+        return None
+    if existing_error:
+        # Torch exists and is valid, but constraints couldn't be written.
+        # Don't waste time reinstalling — the filesystem problem won't fix itself.
+        return existing_error
 
     driver_info = driver_info or detect_nvidia_driver()
     plan = select_torch_install_plan(driver_info)
@@ -706,10 +729,10 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
         response = timed_input("Install CPU-only PyTorch? (Y/n): ", 20, "y").strip().lower()
         if response != 'y':
             log("User declined CPU-only PyTorch installation.")
-            return False
+            return "User declined CPU-only PyTorch"
 
     if not install_pytorch_and_torchaudio(plan):
-        return False
+        return "PyTorch package installation failed (pip/uv error)"
 
     try:
         import torch
@@ -721,19 +744,27 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None) -> bool:
             log("CUDA acceleration: DISABLED (CPU-only mode)")
 
         # Lock GPU packages: pin torch/torchaudio to prevent subsequent pip installs
-        # from replacing CUDA wheels with CPU-only versions from PyPI
+        # from replacing CUDA wheels with CPU-only versions from PyPI.
+        # If this fails, abort — continuing without protection risks silent
+        # CUDA→CPU replacement in Phase 3.5/4 (much harder to debug).
         gpu_pins = {"torch": torch.__version__}
         try:
             import torchaudio
             gpu_pins["torchaudio"] = torchaudio.__version__
         except ImportError:
             pass
-        create_gpu_constraints(gpu_pins)
+        if not create_gpu_constraints(gpu_pins):
+            log("FATAL: Cannot write GPU constraints file.")
+            log(f"       Check write permissions to: {GPU_CONSTRAINTS_FILE}")
+            log("       Without this file, subsequent installs may replace CUDA PyTorch with CPU-only.")
+            return f"Cannot write GPU constraints file: {GPU_CONSTRAINTS_FILE} (check permissions/disk space)"
 
     except Exception as exc:
-        log(f"WARNING: PyTorch installed but verification failed: {exc}")
+        log(f"FATAL: PyTorch installed but verification/pinning failed: {exc}")
+        log("       Cannot guarantee GPU package protection. Aborting.")
+        return f"PyTorch verification/pinning failed: {exc}"
 
-    return True
+    return None
 
 
 # Track if Git timeouts have been configured (only do it once)
@@ -1146,9 +1177,11 @@ def create_failure_file(error_message: str):
             f.write(f"3. Check install_log_v{{VERSION}}.txt for details\n\n")
             f.write("Common Solutions:\n")
             f.write("- Out of disk space: Free up 8GB and retry\n")
+            f.write("- Permission error: Run installer as administrator, or check antivirus\n")
             f.write("- Network error: Check internet connection and firewall\n")
             f.write("- CUDA error: Update NVIDIA drivers or try CPU mode\n")
             f.write("- WebView2 missing: Install from https://go.microsoft.com/fwlink/p/?LinkId=2124703\n\n")
+            f.write(f"Full details: {LOG_FILE}\n\n")
             f.write("Support: https://github.com/meizhong986/WhisperJAV/issues\n")
         log(f"Failure details written to: {failure_file}")
     except Exception:
@@ -1664,7 +1697,7 @@ def get_llama_cpp_source_info() -> Tuple[str, str, Optional[str], dict]:
     """
     import platform as platform_module
 
-    git_url = "llama-cpp-python[server] @ git+https://github.com/JamePeng/llama-cpp-python.git"
+    git_url = "llama-cpp-python @ git+https://github.com/JamePeng/llama-cpp-python.git"
     cmake_args = None
     env_vars = {}
 
@@ -1805,8 +1838,7 @@ def install_llama_cpp_python() -> bool:
             log("WARNING: JamePeng wheel failed, trying source build...")
 
     # Strategy 3: Fall back to source build (slowest but most compatible)
-    # NOTE: Source build uses git URL with [server] extras bundled in single install.
-    # This is safe because it's one atomic install from source, not resolving from PyPI.
+    # Server deps (uvicorn, fastapi, etc.) already installed via requirements.txt [llm] extra.
     log("  No prebuilt wheel available, building from source...")
     git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
 
@@ -1853,6 +1885,8 @@ def _pin_llama_cpp_version():
             version = get_version("llama-cpp-python")
         if version:
             append_gpu_constraint("llama-cpp-python", version)
+        else:
+            log("  WARNING: Could not detect llama-cpp-python version — unable to pin")
     except Exception as e:
         log(f"  WARNING: Could not pin llama-cpp-python version: {e}")
 
@@ -2118,8 +2152,9 @@ def main() -> int:
 
     # === Phase 3: PyTorch Installation ===
     log_section("Phase 3: PyTorch Installation")
-    if not install_pytorch(driver_info):
-        create_failure_file("PyTorch installation failed")
+    pytorch_error = install_pytorch(driver_info)
+    if pytorch_error:
+        create_failure_file(f"PyTorch installation failed: {pytorch_error}")
         return 1
 
     # === Phase 3.5: Git-Based Core Packages ===
