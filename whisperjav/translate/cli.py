@@ -60,7 +60,7 @@ from pathlib import Path
 from typing import Optional
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_SOURCES, SUPPORTED_TARGETS
-from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context
+from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
 from .instructions import get_instruction_content, get_cache_dir
 from .settings import load_settings, create_default_settings, show_settings, get_settings_path, resolve_config
 from .configure import configure_command
@@ -569,6 +569,16 @@ def main():
                         print(f"[CLI]   NOTE: Batch size auto-reduced from {_user_batch} to "
                               f"{local_batch_size} to fit {local_n_ctx}-token context window", file=sys.stderr)
 
+                    # Compute max_tokens to prevent finish_reason='length' on the server.
+                    # CJK tokenization: Japanese chars encode as ~3 BPE tokens/char in
+                    # LLaMA/Gemma → long JAV narration lines consume up to 300 input
+                    # tokens each. Without a max_tokens cap the server fills all remaining
+                    # context with output, truncating mid-translation and breaking the
+                    # PySubtrans parser ("No matches found"). See issue #196.
+                    local_max_tokens = compute_max_output_tokens(local_batch_size, local_n_ctx)
+                    print(f"[CLI]   Output token limit (max_tokens): {local_max_tokens} "
+                          f"(JAV/CJK-tuned, prevents context overflow)", file=sys.stderr)
+
                 # Use Custom Server provider - designed for local OpenAI-compatible servers
                 # This uses /v1/chat/completions endpoint which llama-cpp-python supports
                 server_address = api_base.replace('/v1', '')
@@ -578,6 +588,11 @@ def main():
                     'endpoint': '/v1/chat/completions',
                     'supports_conversation': True,
                     'supports_system_messages': True,
+                    'max_tokens': local_max_tokens,  # Prevents finish_reason='length' (#196)
+                    'supports_streaming': True,       # Required: CustomClient.enable_streaming =
+                                                      # stream_responses AND supports_streaming.
+                                                      # Without this flag CustomClient silently
+                                                      # disables streaming even when requested.
                 }
                 if i == 0:
                     print(f"[CLI]   PySubtrans config: Custom Server at {server_address}", file=sys.stderr)
@@ -594,7 +609,11 @@ def main():
                         instruction_file=instruction_file,
                         scene_threshold=merged.get('scene_threshold', 60.0),
                         max_batch_size=local_batch_size,
-                        stream=args.stream if hasattr(args, 'stream') else False,
+                        stream=True,  # Always stream for local LLM: non-streaming blocks the
+                                      # entire HTTP connection until the last token is generated.
+                                      # On slow backends (MPS, CPU) this exceeds the read timeout
+                                      # every batch. Streaming delivers tokens incrementally so
+                                      # no read timeout can fire. Output is identical. (#196)
                         debug=args.debug,
                         provider_options=provider_options,
                         extra_context=extra_context if extra_context else None,

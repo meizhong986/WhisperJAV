@@ -211,8 +211,14 @@ def parse_arguments():
                                help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none)")
     twopass_group.add_argument("--pass1-speech-enhancer", default=None,
                                help="Speech enhancer for pass 1 (e.g., none)")
+    twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
+                               help="Dual-track mode for pass 1: enhanced audio for VAD, original for ASR")
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
+    twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
+                               help="VAD threshold for pass 1 (0.0-1.0)")
+    twopass_group.add_argument("--pass1-speech-pad-ms", type=int, default=None,
+                               help="Speech padding in ms for pass 1")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
@@ -235,8 +241,14 @@ def parse_arguments():
                                help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none)")
     twopass_group.add_argument("--pass2-speech-enhancer", default=None,
                                help="Speech enhancer for pass 2 (e.g., none)")
+    twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
+                               help="Dual-track mode for pass 2: enhanced audio for VAD, original for ASR")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
+    twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
+                               help="VAD threshold for pass 2 (0.0-1.0)")
+    twopass_group.add_argument("--pass2-speech-pad-ms", type=int, default=None,
+                               help="Speech padding in ms for pass 2")
     twopass_group.add_argument("--merge-strategy", default="pass1_primary",
                                choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap", "longest"],
                                help="Merge strategy for two-pass results (default: pass1_primary)")
@@ -346,6 +358,10 @@ def parse_arguments():
                              type=float, default=None,
                              metavar="FLOAT",
                              help="VAD speech detection threshold (0.0-1.0, overrides sensitivity preset)")
+    tuning_group.add_argument("--speech-pad-ms",
+                             type=int, default=None,
+                             metavar="INT",
+                             help="Padding around detected speech in milliseconds (default: backend-specific)")
     tuning_group.add_argument("--condition-on-previous-text",
                              type=str, default=None,
                              choices=["true", "false"],
@@ -404,6 +420,11 @@ def parse_arguments():
         type=int,
         default=-1,
         help="GPU layers for local LLM (-1=all to GPU, 0=CPU only). Only used with --translate-provider local"
+    )
+    translation_group.add_argument(
+        "--stream",
+        action="store_true",
+        help="Enable streaming for cloud translation providers. Local LLM always streams regardless of this flag."
     )
     translation_group.add_argument(
         "--translate-quiet",
@@ -505,6 +526,9 @@ def parse_arguments():
                            help="Speech enhancement backend (default: none)")
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
+    qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
+                           help="Dual-track mode: use enhanced audio for VAD/framing but original audio "
+                                "for ASR transcription (Qwen/Decoupled pipelines only)")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="silero-v6.2",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten"],
@@ -995,6 +1019,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         elif _sd_attempts is not None and _sd_attempts > 0:
             _pipeline_kwargs["stepdown_enabled"] = True
 
+        # Dual-track enhancement
+        if getattr(args, 'enhance_for_vad', False):
+            _pipeline_kwargs.setdefault("enhance_for_vad", True)
+
         # 3. Construct pipeline — DecoupledPipeline defaults fill anything not specified
         pipeline = DecoupledPipeline(
             output_dir=initial_output_dir,
@@ -1088,6 +1116,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             # Speech enhancement
             "speech_enhancer": getattr(args, 'qwen_enhancer', 'none'),
             "speech_enhancer_model": getattr(args, 'qwen_enhancer_model', None),
+            "enhance_for_vad": getattr(args, 'enhance_for_vad', False),
             # Speech segmentation / VAD
             "speech_segmenter": _qwen_segmenter,
             "segmenter_config": _resolved_segmenter_config or None,
@@ -1226,9 +1255,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     try:
                         logger.info("Starting translation...")
 
-                        # Determine stream mode based on progress settings
-                        stream_mode = not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False)
-
                         # Call translation service directly (no subprocess)
                         translated_path = translate_with_config(
                             input_path=output_path,
@@ -1237,7 +1263,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             tone=args.translate_tone,
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
-                            stream=stream_mode,
+                            stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=build_translation_context(args),
                             n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
@@ -1457,9 +1483,6 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                             try:
                                 logger.info("Starting translation...")
 
-                                # Determine stream mode based on progress settings
-                                stream_mode = not getattr(args, 'no_progress', False) and not getattr(args, 'translate_quiet', False)
-
                                 # Call translation service directly (no subprocess)
                                 translated_path = translate_with_config(
                                     input_path=output_path,
@@ -1468,7 +1491,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     tone=args.translate_tone,
                                     api_key=getattr(args, 'translate_api_key', None),
                                     model=getattr(args, 'translate_model', None),
-                                    stream=stream_mode,
+                                    stream=getattr(args, 'stream', False),
                                     debug=getattr(args, 'debug', False),
                                     extra_context=build_translation_context(args),
                                     n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
@@ -1773,10 +1796,26 @@ def main():
             if not 0.0 <= vad_threshold <= 1.0:
                 logger.warning(f"--vad-threshold {vad_threshold} outside [0.0, 1.0] range, clamping")
                 vad_threshold = max(0.0, min(1.0, vad_threshold))
-            if "provider" not in resolved_config["params"]:
-                resolved_config["params"]["provider"] = {}
-            resolved_config["params"]["provider"]["vad_threshold"] = vad_threshold
+            # Route to vad params (where ASR modules read threshold)
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["threshold"] = vad_threshold
+            # Also route to speech_segmenter config (merged in ASR init)
+            if "speech_segmenter" not in resolved_config["params"]:
+                resolved_config["params"]["speech_segmenter"] = {}
+            resolved_config["params"]["speech_segmenter"]["threshold"] = vad_threshold
             logger.info(f"VAD threshold set via CLI: {vad_threshold}")
+
+        speech_pad_ms = getattr(args, 'speech_pad_ms', None)
+        if speech_pad_ms is not None:
+            speech_pad_ms = max(0, speech_pad_ms)
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["speech_pad_ms"] = speech_pad_ms
+            if "speech_segmenter" not in resolved_config["params"]:
+                resolved_config["params"]["speech_segmenter"] = {}
+            resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
+            logger.info(f"Speech pad set via CLI: {speech_pad_ms}ms")
 
         condition_on_prev = getattr(args, 'condition_on_previous_text', None)
         if condition_on_prev is not None:
@@ -1935,7 +1974,10 @@ def main():
                 'scene_detector': args.pass1_scene_detector,
                 'speech_segmenter': args.pass1_speech_segmenter,
                 'speech_enhancer': args.pass1_speech_enhancer,
+                'enhance_for_vad': getattr(args, 'pass1_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                 'model': args.pass1_model,
+                'vad_threshold': args.pass1_vad_threshold,
+                'speech_pad_ms': args.pass1_speech_pad_ms,
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params,  # For transformers pipeline
                 'qwen_params': pass1_qwen_params,  # For qwen pipeline
@@ -1952,7 +1994,10 @@ def main():
                     'scene_detector': args.pass2_scene_detector,
                     'speech_segmenter': args.pass2_speech_segmenter,
                     'speech_enhancer': args.pass2_speech_enhancer,
+                    'enhance_for_vad': getattr(args, 'pass2_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                     'model': args.pass2_model,
+                    'vad_threshold': args.pass2_vad_threshold,
+                    'speech_pad_ms': args.pass2_speech_pad_ms,
                     'params': pass2_params,
                     'hf_params': pass2_hf_params,  # For transformers pipeline
                     'qwen_params': pass2_qwen_params,  # For qwen pipeline
@@ -2050,6 +2095,7 @@ def main():
                             tone=args.translate_tone,
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
+                            stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=extra_context,
                             n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),

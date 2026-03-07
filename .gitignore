@@ -35,6 +35,7 @@ workaround_results.json
 tests/*_results.json
 results/
 test_*
+!test_*.py
 
 # IDE
 .vscode/

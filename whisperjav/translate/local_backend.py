@@ -52,7 +52,8 @@ class ServerDiagnostics:
     # GPU/CPU status
     gpu_layers_loaded: int = 0
     total_layers: int = 0
-    using_cuda: bool = False
+    using_cuda: bool = False   # NVIDIA CUDA backend
+    using_metal: bool = False  # Apple Silicon Metal/MPS backend
     vram_used_gb: float = 0.0
 
     # Inference performance
@@ -61,8 +62,8 @@ class ServerDiagnostics:
     # Derived
     @property
     def is_gpu_accelerated(self) -> bool:
-        """True if any layers are on GPU."""
-        return self.gpu_layers_loaded > 0 and self.using_cuda
+        """True if any layers are on GPU (CUDA or Metal)."""
+        return self.gpu_layers_loaded > 0 and (self.using_cuda or self.using_metal)
 
     @property
     def gpu_offload_percent(self) -> float:
@@ -81,10 +82,11 @@ class ServerDiagnostics:
     def get_status_summary(self) -> str:
         """Get a human-readable status summary for console output."""
         if self.is_gpu_accelerated:
+            backend = "Metal/MPS" if self.using_metal else "CUDA"
             if self.gpu_offload_percent >= 100:
-                status = f"GPU: {self.gpu_layers_loaded} layers on CUDA"
+                status = f"GPU: {self.gpu_layers_loaded} layers on {backend}"
             else:
-                status = f"Partial GPU: {self.gpu_layers_loaded}/{self.total_layers} layers on CUDA ({self.gpu_offload_percent:.0f}%)"
+                status = f"Partial GPU: {self.gpu_layers_loaded}/{self.total_layers} layers on {backend} ({self.gpu_offload_percent:.0f}%)"
             if self.vram_used_gb > 0:
                 status += f", {self.vram_used_gb:.1f}GB VRAM"
         else:
@@ -1491,13 +1493,13 @@ def _parse_server_stderr(stderr_path: str) -> ServerDiagnostics:
     if offload_with_total:
         diag.gpu_layers_loaded = int(offload_with_total.group(1))
         diag.total_layers = int(offload_with_total.group(2))
-        diag.using_cuda = True
+        # Backend (CUDA vs Metal) is determined below — don't set using_cuda here
     else:
         # Fall back to pattern without total
         offload_match = re.search(r'offload(?:ing|ed)\s+(\d+)\s+(?:repeating\s+)?layers?\s+to\s+GPU', stderr_content, re.IGNORECASE)
         if offload_match:
             diag.gpu_layers_loaded = int(offload_match.group(1))
-            diag.using_cuda = True
+            # Backend determined below
 
     # Parse total layers if not found above
     # Pattern: "llama_model_loader: - model has 35 layers"
@@ -1512,10 +1514,16 @@ def _parse_server_stderr(stderr_path: str) -> ServerDiagnostics:
     if vram_match:
         diag.vram_used_gb = float(vram_match.group(1))
 
-    # Check for CUDA initialization
-    # Pattern: "ggml_cuda_init: found 1 CUDA devices"
-    cuda_match = re.search(r'(?:ggml_cuda_init|CUDA|cuda).*(?:found|device|initialized)', stderr_content, re.IGNORECASE)
-    if cuda_match:
+    # Detect GPU backend: Metal/MPS (Apple Silicon) vs CUDA (NVIDIA).
+    # llama-cpp logs "ggml_metal_init" for Apple Metal and "ggml_cuda_init" for NVIDIA CUDA.
+    # BOTH log "offloading X layers to GPU" — only the backend init message distinguishes them.
+    if re.search(r'ggml_metal_init', stderr_content, re.IGNORECASE):
+        diag.using_metal = True
+    elif re.search(r'(?:ggml_cuda_init|CUDA|cuda).*(?:found|device|initialized)', stderr_content, re.IGNORECASE):
+        diag.using_cuda = True
+    elif diag.gpu_layers_loaded > 0:
+        # GPU offloading confirmed but no backend init message found.
+        # Fallback: assume CUDA (conservative — affects label only, not function).
         diag.using_cuda = True
 
     # Check for explicit CPU-only mode
@@ -1523,6 +1531,7 @@ def _parse_server_stderr(stderr_path: str) -> ServerDiagnostics:
     cpu_only_match = re.search(r'(?:using\s+CPU|no\s+CUDA|CPU\s+only|CUDA.*not\s+available)', stderr_content, re.IGNORECASE)
     if cpu_only_match and not diag.gpu_layers_loaded:
         diag.using_cuda = False
+        diag.using_metal = False
 
     return diag
 
@@ -1876,11 +1885,12 @@ def _assess_server_viability(
 
     # GPU status line
     if diagnostics.is_gpu_accelerated:
+        _backend = "Metal/MPS" if diagnostics.using_metal else "CUDA"
         if diagnostics.gpu_offload_percent >= 100:
-            print(f"  GPU: {diagnostics.gpu_layers_loaded} layers on CUDA (full offload)")
+            print(f"  GPU: {diagnostics.gpu_layers_loaded} layers on {_backend} (full offload)")
         else:
             print(f"  GPU: {diagnostics.gpu_layers_loaded}/{diagnostics.total_layers} layers "
-                  f"({diagnostics.gpu_offload_percent:.0f}% offload)")
+                  f"on {_backend} ({diagnostics.gpu_offload_percent:.0f}% offload)")
         if diagnostics.vram_used_gb > 0:
             print(f"  VRAM: {diagnostics.vram_used_gb:.1f} GB")
     else:

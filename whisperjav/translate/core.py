@@ -56,6 +56,50 @@ def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
     return min(max_batch_size, safe_max)
 
 
+def compute_max_output_tokens(batch_size: int, n_ctx: int) -> int:
+    """Compute max_tokens for local LLM output to prevent context overflow (#196).
+
+    Japanese/CJK tokenization in LLaMA/Gemma BPE tokenizers:
+    - Each CJK character encodes as 3 UTF-8 bytes → typically 2-3 BPE tokens/char
+    - A long JAV narration line (80-100 Japanese chars) = ~240-300 input tokens
+    - We budget 300 tokens/line input as the worst-case (very long narration)
+
+    English output per line:
+    - PySubtrans markers (#N\\nTranslation>\\n): ~8 tokens
+    - Translated English text for a typical subtitle: ~50-100 tokens
+    - Budget: 120 tokens/line output (generous for long translated sentences)
+
+    Fixed per-batch output overhead:
+    - PySubtrans appends <summary>, <scene>, <synopsis> tags after translations
+    - These can consume 200-400 tokens depending on model verbosity
+    - Budget: 500 tokens fixed overhead
+
+    Strategy: clamp to the smaller of (available context after worst-case input)
+    and (2× expected output). This prevents finish_reason='length' while
+    still allowing the model to be verbose when content is shorter.
+
+    Results:
+    - 8K  (batch=11): ~2392 tokens max output (~2× the ~1320 tokens expected)
+    - 16K (batch=27): ~5784 tokens max output (~1.5× the ~3740 tokens expected)
+    - 32K (batch=30): ~8200 tokens max output (capped by 2× expected)
+
+    Args:
+        batch_size: Number of subtitle lines in the batch
+        n_ctx: LLM context window in tokens
+
+    Returns:
+        max_tokens value to pass to the local LLM server
+    """
+    overhead = 2500          # matches cap_batch_size_for_context() — same fixed overhead
+    input_per_line_cjk = 300  # JAV worst-case: 80-100 JP chars × ~3 BPE tokens/char
+    output_per_line_en = 120  # English translation per line incl. PySubtrans markers
+    output_fixed_tags = 500   # <summary>/<scene>/<synopsis> tags emitted per batch
+
+    available = n_ctx - overhead - (batch_size * input_per_line_cjk)
+    expected = (batch_size * output_per_line_en) + output_fixed_tags
+    return max(512, min(available, expected * 2))
+
+
 def _normalize_api_base(url: str) -> str:
     """Strip API path suffixes — the OpenAI SDK appends them automatically.
 
@@ -173,6 +217,12 @@ def translate_subtitle(
             opt_kwargs['supports_conversation'] = provider_config['supports_conversation']
         if 'supports_system_messages' in provider_config:
             opt_kwargs['supports_system_messages'] = provider_config['supports_system_messages']
+        if 'max_tokens' in provider_config:
+            opt_kwargs['max_tokens'] = provider_config['max_tokens']
+        if 'max_completion_tokens' in provider_config:
+            opt_kwargs['max_completion_tokens'] = provider_config['max_completion_tokens']
+        if 'supports_streaming' in provider_config:
+            opt_kwargs['supports_streaming'] = provider_config['supports_streaming']
 
         # Merge provider-specific options
         if provider_options:

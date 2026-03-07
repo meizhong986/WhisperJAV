@@ -120,24 +120,32 @@ class TransformersASR:
         if self.device_request == "auto":
             if torch.cuda.is_available():
                 return "cuda:0"
-            else:
-                return "cpu"
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                return "mps"
+            return "cpu"
         elif self.device_request == "cuda":
             if torch.cuda.is_available():
                 return "cuda:0"
             else:
                 logger.warning("CUDA requested but not available. Falling back to CPU.")
                 return "cpu"
+        elif self.device_request == "mps":
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                return "mps"
+            else:
+                logger.warning("MPS requested but not available. Falling back to CPU.")
+                return "cpu"
         else:
-            return "cpu"
+            return self.device_request
 
     def _detect_dtype(self, device: str) -> torch.dtype:
         """Detect best dtype for device."""
         if self.dtype_request == "auto":
             if "cuda" in device:
                 return torch.bfloat16
-            else:
-                return torch.float32
+            if device == "mps":
+                return torch.float16  # MPS supports float16 but not bfloat16
+            return torch.float32
         elif self.dtype_request == "float16":
             return torch.float16
         elif self.dtype_request == "bfloat16":

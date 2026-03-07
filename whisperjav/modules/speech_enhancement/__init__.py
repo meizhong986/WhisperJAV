@@ -60,6 +60,7 @@ from .pipeline_helper import (
     is_passthrough_backend,
     enhance_scenes,
     enhance_single_audio,
+    resample_scenes,
     SCENE_EXTRACTION_SR,
     TARGET_SAMPLE_RATE,
 )
@@ -82,6 +83,7 @@ __all__ = [
     "is_passthrough_backend",
     "enhance_scenes",
     "enhance_single_audio",
+    "resample_scenes",
     # Contract constants (v1.7.4+)
     "SCENE_EXTRACTION_SR",
     "TARGET_SAMPLE_RATE",

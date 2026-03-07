@@ -858,6 +858,13 @@ def _build_pipeline(
     if not pipeline_class:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
 
+    # Guard: enhance_for_vad only supported by orchestrator-based pipelines
+    if pass_config.get("enhance_for_vad") and pipeline_name not in ("qwen",):
+        logger.warning(
+            "Pass %s: --enhance-for-vad ignored — only supported by qwen pipeline, not '%s'",
+            pass_number, pipeline_name,
+        )
+
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
 
     # Diagnostic: Log full pass_config for debugging Pass 2 issues
@@ -998,6 +1005,16 @@ def _build_pipeline(
         if _vad_pad is not None:
             user_segmenter_overrides["speech_pad_ms"] = int(_vad_pad)
             logger.debug("Pass %s: VAD padding slider override = %s ms", pass_number, _vad_pad)
+        # CLI pass-level overrides (--pass1-vad-threshold, --pass1-speech-pad-ms)
+        # Highest priority — overrides both GUI sliders and sensitivity presets
+        _cli_vad_thr = pass_config.get("vad_threshold")
+        if _cli_vad_thr is not None:
+            user_segmenter_overrides["threshold"] = max(0.0, min(1.0, float(_cli_vad_thr)))
+            logger.debug("Pass %s: CLI vad_threshold override = %s", pass_number, _cli_vad_thr)
+        _cli_pad = pass_config.get("speech_pad_ms")
+        if _cli_pad is not None:
+            user_segmenter_overrides["speech_pad_ms"] = max(0, int(_cli_pad))
+            logger.debug("Pass %s: CLI speech_pad_ms override = %s ms", pass_number, _cli_pad)
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "silero-v6.2")
         segmenter_config = resolve_qwen_sensitivity(
             segmenter_backend, qwen_sensitivity, user_segmenter_overrides or None
@@ -1023,6 +1040,7 @@ def _build_pipeline(
             "attn_implementation": qwen_defaults.get("qwen_attn", "auto"),
             "speech_enhancer": qwen_defaults.get("qwen_enhancer", "none"),
             "speech_enhancer_model": qwen_defaults.get("qwen_enhancer_model", None),
+            "enhance_for_vad": pass_config.get("enhance_for_vad", False),
             "speech_segmenter": qwen_defaults.get("qwen_segmenter", "silero-v6.2"),
             "japanese_postprocess": qwen_defaults.get("qwen_japanese_postprocess", False),
             "postprocess_preset": qwen_defaults.get("qwen_postprocess_preset", "high_moan"),
@@ -1423,3 +1441,31 @@ def _apply_gui_overrides(
             if enhancer_model:
                 resolved_config["params"]["speech_enhancer"]["model"] = enhancer_model
             logger.debug("Pass %s: Override speech_enhancer = %s, model = %s", pass_number, enhancer_backend, enhancer_model)
+
+    # Override VAD threshold if specified
+    vad_threshold = pass_config.get("vad_threshold")
+    if vad_threshold is not None:
+        vad_threshold = max(0.0, min(1.0, float(vad_threshold)))
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+        if "vad" not in resolved_config["params"]:
+            resolved_config["params"]["vad"] = {}
+        resolved_config["params"]["vad"]["threshold"] = vad_threshold
+        if "speech_segmenter" not in resolved_config["params"]:
+            resolved_config["params"]["speech_segmenter"] = {}
+        resolved_config["params"]["speech_segmenter"]["threshold"] = vad_threshold
+        logger.debug("Pass %s: Override vad_threshold = %s", pass_number, vad_threshold)
+
+    # Override speech padding if specified
+    speech_pad_ms = pass_config.get("speech_pad_ms")
+    if speech_pad_ms is not None:
+        speech_pad_ms = max(0, int(speech_pad_ms))
+        if "params" not in resolved_config:
+            resolved_config["params"] = {}
+        if "vad" not in resolved_config["params"]:
+            resolved_config["params"]["vad"] = {}
+        resolved_config["params"]["vad"]["speech_pad_ms"] = speech_pad_ms
+        if "speech_segmenter" not in resolved_config["params"]:
+            resolved_config["params"]["speech_segmenter"] = {}
+        resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
+        logger.debug("Pass %s: Override speech_pad_ms = %s", pass_number, speech_pad_ms)
