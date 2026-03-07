@@ -221,13 +221,13 @@ def detect_gpu() -> GPUInfo:
     plat = detect_platform()
     if plat == DetectedPlatform.MACOS_SILICON:
         return GPUInfo(
-            detected=False,
-            name=None,
+            detected=True,  # Apple Silicon HAS a GPU (Metal/MPS)
+            name="Apple Silicon (Metal)",
             driver_version=None,
-            cuda_version=None,
-            torch_index=CPU_TORCH_INDEX,  # macOS uses CPU/Metal, not CUDA
+            cuda_version="metal",  # Sentinel: install torch from default PyPI (has MPS)
+            torch_index="",  # Empty = no --index-url needed, default PyPI has arm64+MPS wheels
             detection_method="platform",
-            message="Apple Silicon detected - CUDA not supported, using Metal",
+            message="Apple Silicon detected - using Metal/MPS acceleration",
         )
 
     # Try nvidia-smi first (most reliable)
@@ -498,6 +498,9 @@ def get_torch_index_url(cuda_version: Optional[str] = None) -> str:
 
     if cuda_version == "cpu":
         return CPU_TORCH_INDEX
+
+    if cuda_version == "metal":
+        return ""  # Apple Silicon: use default PyPI (has arm64+MPS wheels)
 
     # Find in CUDA matrix
     for entry in CUDA_DRIVER_MATRIX:

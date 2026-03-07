@@ -749,6 +749,11 @@ def _get_translate_deps_from_registry() -> list:
     return _get_packages_for_step([Extra.TRANSLATE])
 
 
+def _get_llm_deps_from_registry() -> list:
+    """Get LLM server package specs from registry (uvicorn, fastapi, etc.)."""
+    return _get_packages_for_step([Extra.LLM])
+
+
 def _get_gui_deps_from_registry() -> list:
     """Get GUI package specs from registry."""
     return _get_packages_for_step([Extra.GUI])
@@ -887,7 +892,7 @@ def detect_cuda_version(args) -> str:
         args: Parsed command-line arguments
 
     Returns:
-        "cpu", "cu118", or "cu128"
+        "cpu", "cu118", "cu128", or "metal" (Apple Silicon)
     """
     # Explicit user request
     if args.cpu_only:
@@ -902,7 +907,8 @@ def detect_cuda_version(args) -> str:
         gpu_info = detect_gpu()
         if gpu_info.detected:
             log(f"\n  GPU detected: {gpu_info.name}")
-            log(f"  Driver: {gpu_info.driver_version[0]}.{gpu_info.driver_version[1]}")
+            if gpu_info.driver_version:
+                log(f"  Driver: {gpu_info.driver_version[0]}.{gpu_info.driver_version[1]}")
             log(f"  Selected: {gpu_info.cuda_version or 'CPU'}")
             return gpu_info.cuda_version or "cpu"
         else:
@@ -1229,12 +1235,21 @@ def main():
     # All subsequent packages that depend on torch will see it as satisfied.
     #
     print_header("Installing PyTorch", "Step 2/6")
-    torch_url = get_torch_index_url(cuda_version)
-    run_pip(
-        executor,
-        ["install", "torch", "torchaudio", "--index-url", torch_url],
-        f"Install PyTorch ({cuda_version})"
-    )
+    if cuda_version == "metal":
+        # Apple Silicon: install from default PyPI (has arm64 wheels with MPS support)
+        # Do NOT use --index-url — the CPU index provides x86_64-only builds
+        run_pip(
+            executor,
+            ["install", "torch", "torchaudio"],
+            "Install PyTorch (Metal/MPS)"
+        )
+    else:
+        torch_url = get_torch_index_url(cuda_version)
+        run_pip(
+            executor,
+            ["install", "torch", "torchaudio", "--index-url", torch_url],
+            f"Install PyTorch ({cuda_version})"
+        )
 
     # -------------------------------------------------------------------------
     # Step 3: Install core dependencies
@@ -1308,6 +1323,14 @@ def main():
     translate_deps = _get_translate_deps_from_registry()
     if translate_deps:
         run_pip(executor, ["install"] + translate_deps, "Install translation packages")
+
+    # LLM server framework (from registry) - uvicorn, fastapi, etc.
+    # These are needed for the local LLM translation server.
+    # Installed unconditionally (lightweight, pure Python) so the server
+    # is ready if the user installs llama-cpp-python now or later.
+    llm_deps = _get_llm_deps_from_registry()
+    if llm_deps:
+        run_pip(executor, ["install"] + llm_deps, "Install LLM server packages")
 
     # -------------------------------------------------------------------------
     # Local LLM (llama-cpp-python) - Included by Default
@@ -1472,25 +1495,51 @@ def _install_local_llm(executor: StepExecutor, build_from_source: bool):
     is_intel_mac = (sys.platform == "darwin" and platform_module.machine() != "arm64")
 
     if is_apple_silicon:
-        # Apple Silicon: build from source with Metal
-        log("    Apple Silicon detected - building from source with Metal support.")
-        if get_llama_cpp_source_info:
-            git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
-            log(f"    Backend: {backend}")
-            for key, value in env_vars.items():
-                log(f"    Setting {key}={value}")
-                os.environ[key] = value
-            if cmake_args:
-                log(f"    Setting CMAKE_ARGS={cmake_args}")
-                os.environ["CMAKE_ARGS"] = cmake_args
-            run_pip(
-                executor,
-                ["install", git_url],
-                f"Install llama-cpp-python ({backend})",
-                allow_fail=True
-            )
-        else:
-            log("    ERROR: llama_build_utils not available")
+        # Apple Silicon: try prebuilt Metal wheel first, then source build
+        log("    Apple Silicon detected - checking for prebuilt Metal wheel...")
+
+        # Strategy 1: Try prebuilt Metal wheel (fast, ~1 min download)
+        prebuilt_installed = False
+        if get_prebuilt_wheel_url:
+            wheel_url, wheel_backend = get_prebuilt_wheel_url(verbose=True)
+            if wheel_url:
+                log(f"    Found prebuilt wheel: {wheel_backend}")
+                prebuilt_installed = run_pip(
+                    executor,
+                    ["install", wheel_url],
+                    f"Install llama-cpp-python ({wheel_backend})",
+                    allow_fail=True
+                )
+                if prebuilt_installed:
+                    run_pip(
+                        executor,
+                        ["install", "llama-cpp-python[server]"],
+                        "Install llama-cpp-python server extras",
+                        allow_fail=True
+                    )
+            else:
+                log("    No prebuilt Metal wheel found.")
+
+        # Strategy 2: Fall back to source build with Metal (slow, ~10 min)
+        if not prebuilt_installed:
+            log("    Building from source with Metal support...")
+            if get_llama_cpp_source_info:
+                git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
+                log(f"    Backend: {backend}")
+                for key, value in env_vars.items():
+                    log(f"    Setting {key}={value}")
+                    os.environ[key] = value
+                if cmake_args:
+                    log(f"    Setting CMAKE_ARGS={cmake_args}")
+                    os.environ["CMAKE_ARGS"] = cmake_args
+                run_pip(
+                    executor,
+                    ["install", git_url],
+                    f"Install llama-cpp-python ({backend})",
+                    allow_fail=True
+                )
+            else:
+                log("    ERROR: llama_build_utils not available")
 
     elif is_intel_mac:
         # Intel Mac: CPU only

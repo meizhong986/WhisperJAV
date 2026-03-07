@@ -34,6 +34,7 @@ from ..base import (
     load_audio_to_array,
     create_failed_result,
     resample_audio,
+    resolve_torch_device,
 )
 
 logger = logging.getLogger("whisperjav")
@@ -154,21 +155,44 @@ class ZipEnhancerBackend:
 
             logger.info("Loading ZipEnhancer via ModelScope (torch)...")
 
-            # Determine device
-            device = self.device
-            if device is None:
-                device = "gpu" if torch.cuda.is_available() else "cpu"
-            elif device == "cuda":
-                device = "gpu"  # ModelScope uses "gpu" not "cuda"
+            # Resolve best available device (cuda > mps > cpu)
+            torch_device = resolve_torch_device(self.device)
 
-            self._pipeline = pipeline(
-                Tasks.acoustic_noise_suppression,
-                model=MODELSCOPE_MODEL_ID,
-                device=device
-            )
+            # ModelScope uses "gpu" for CUDA, "cpu" for CPU.
+            # For MPS: try passing "mps" directly — ModelScope >= 1.20 may
+            # forward it to PyTorch. If it fails, fall back to CPU.
+            if torch_device == "cuda":
+                ms_device = "gpu"
+            elif torch_device == "mps":
+                ms_device = "mps"  # Will be validated below with fallback
+            else:
+                ms_device = "cpu"
+
+            # Try to create the pipeline with the selected device
+            try:
+                self._pipeline = pipeline(
+                    Tasks.acoustic_noise_suppression,
+                    model=MODELSCOPE_MODEL_ID,
+                    device=ms_device
+                )
+            except Exception as mps_err:
+                # If MPS failed (ModelScope may not support it), fall back to CPU
+                if ms_device == "mps":
+                    logger.info(
+                        f"ModelScope does not support MPS device ({mps_err}), "
+                        "falling back to CPU"
+                    )
+                    ms_device = "cpu"
+                    self._pipeline = pipeline(
+                        Tasks.acoustic_noise_suppression,
+                        model=MODELSCOPE_MODEL_ID,
+                        device=ms_device
+                    )
+                else:
+                    raise
 
             self._initialized = True
-            logger.info(f"ZipEnhancer (torch) loaded successfully on {device}")
+            logger.info(f"ZipEnhancer (torch) loaded successfully on {ms_device}")
             return True
 
         except ImportError as e:
@@ -213,13 +237,14 @@ class ZipEnhancerBackend:
                     f"Directory contents: {contents}"
                 )
 
-            # Configure ONNX providers
+            # Configure ONNX providers (CUDA > CoreML/Apple Silicon > CPU)
+            available_providers = ort.get_available_providers()
             providers = ['CPUExecutionProvider']
             if self.device != 'cpu':
-                # Try CUDA first if available
-                available_providers = ort.get_available_providers()
                 if 'CUDAExecutionProvider' in available_providers:
                     providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                elif 'CoreMLExecutionProvider' in available_providers:
+                    providers = ['CoreMLExecutionProvider', 'CPUExecutionProvider']
 
             self._onnx_session = ort.InferenceSession(
                 onnx_model_path,

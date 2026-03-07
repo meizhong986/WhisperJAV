@@ -26,6 +26,7 @@ from ..base import (
     load_audio_to_array,
     create_failed_result,
     resample_audio,
+    resolve_torch_device,
 )
 
 logger = logging.getLogger("whisperjav")
@@ -107,17 +108,23 @@ class BSRoformerSpeechEnhancer:
 
             logger.info(f"Loading BS-RoFormer model for stem: {self._model_name}")
 
-            # Determine device
-            device = self._device
-            if device == "auto":
-                try:
-                    import torch
-                    device = "cuda" if torch.cuda.is_available() else "cpu"
-                except ImportError:
-                    device = "cpu"
+            # Resolve best available device (cuda > mps > cpu)
+            device = resolve_torch_device(self._device)
 
-            # Initialize separator
-            self._separator = BSRoformer(device=device)
+            # Try initializing with the selected device
+            try:
+                self._separator = BSRoformer(device=device)
+            except Exception as dev_err:
+                # If MPS failed (model may not support all ops), fall back to CPU
+                if device == "mps":
+                    logger.info(
+                        f"BS-RoFormer does not support MPS ({dev_err}), "
+                        "falling back to CPU"
+                    )
+                    device = "cpu"
+                    self._separator = BSRoformer(device=device)
+                else:
+                    raise
 
             self._initialized = True
             logger.info(f"BS-RoFormer loaded successfully on {device}")

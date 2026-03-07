@@ -206,6 +206,47 @@ class SpeechEnhancer(Protocol):
         ...
 
 
+def resolve_torch_device(requested: Optional[str] = None) -> str:
+    """
+    Resolve the best available torch device for speech enhancement.
+
+    Priority: explicit request > CUDA > MPS (Apple Silicon) > CPU.
+    Validates that the device actually works before returning it.
+
+    Args:
+        requested: Explicitly requested device ("cuda", "mps", "cpu", "auto", or None).
+                   None and "auto" both trigger auto-detection.
+
+    Returns:
+        Device string suitable for torch: "cuda", "mps", or "cpu".
+    """
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+
+    # Explicit request (not auto)
+    if requested and requested not in (None, "auto"):
+        if requested == "cuda" and torch.cuda.is_available():
+            return "cuda"
+        if requested == "mps":
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                return "mps"
+            logger.debug("MPS requested but not available, falling back to CPU")
+            return "cpu"
+        if requested == "cpu":
+            return "cpu"
+        # Unknown device string — fall through to auto-detect
+        logger.debug(f"Unknown device '{requested}', auto-detecting")
+
+    # Auto-detect: CUDA > MPS > CPU
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 def load_audio_to_array(
     audio: Union[np.ndarray, Path, str],
     target_sample_rate: Optional[int] = None
