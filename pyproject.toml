@@ -164,19 +164,26 @@ llm = [
 #   sudo dnf install libsndfile       (Fedora/RHEL)
 #
 # VERSION NOTES:
-# - datasets: ZipEnhancer recommends ==2.18.0, we use >=2.14.0,<4.0 for flexibility.
-#   If you encounter ModelScope issues, try: pip install datasets==2.18.0
-# - modelscope: >=1.20 required, 1.22.0 recommended by ZipEnhancer docs.
+# - datasets: ModelScope requires >=3.0.0,<=3.6.0 (as of modelscope master 2026-03)
+# - modelscope: >=1.20 required, 1.22.0+ recommended.
+# - setuptools: Required by modelscope at runtime (uses pkg_resources in utils/plugins.py)
+# - einops: Required by modelscope framework for tensor operations
 enhance = [
     # ModelScope (ZipEnhancer) - core framework
     "modelscope>=1.20",
+    # setuptools: modelscope uses pkg_resources at runtime (not just build-time)
+    "setuptools",
+    # einops: tensor operations required by modelscope framework
+    "einops",
     # oss2: Alibaba Cloud OSS SDK - required by ModelScope to download models
     "oss2",
     "addict",
-    "datasets>=2.14.0,<4.0",  # 4.x breaks modelscope; ZipEnhancer recommends 2.18.0
+    "attrs",  # Required by modelscope framework
+    "datasets>=3.0.0,<=3.6.0",  # Must match modelscope's constraint (was >=2.14.0)
     "simplejson",
     "sortedcontainers",
     "packaging",
+    "Pillow",  # Required by modelscope framework
 
     # ClearVoice (fork with relaxed librosa)
     "clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",
@@ -186,6 +193,9 @@ enhance = [
 
     # ONNX inference
     "onnxruntime>=1.16.0",
+
+    # ModelScope framework requires transformers; pull via huggingface extra
+    "whisperjav[huggingface]",
 ]
 
 # HuggingFace ecosystem (for kotoba-whisper, model downloads)

@@ -33,8 +33,10 @@ Quick Start:
 
 Available Backends:
     - none: Passthrough (no enhancement)
-    - clearvoice: ClearerVoice speech enhancement (denoising)
-    - bs-roformer: BS-RoFormer vocal isolation
+    - ffmpeg-dsp: FFmpeg audio filters (loudnorm, compress, denoise)
+    - zipenhancer: ZipEnhancer 16kHz via ModelScope (lightweight, SOTA quality)
+    - clearvoice: ClearerVoice speech enhancement (denoising, 48kHz)
+    - bs-roformer: BS-RoFormer vocal isolation (44.1kHz)
 
 Design Principles:
     - Lazy loading: Backends loaded only when needed

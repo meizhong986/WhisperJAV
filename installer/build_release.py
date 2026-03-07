@@ -178,6 +178,7 @@ class ReleaseBuilder:
             "cli",
             "gui",
             "translate",
+            "llm",
             "enhance",
             "huggingface",
             "qwen",

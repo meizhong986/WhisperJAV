@@ -102,7 +102,7 @@ class Extra(Enum):
     GUI = "gui"             # PyWebView GUI
     TRANSLATE = "translate" # AI translation (pysubtrans, OpenAI, Gemini)
     LLM = "llm"             # Local LLM server (FastAPI, uvicorn)
-    ENHANCE = "enhance"     # Speech enhancement (ClearVoice, BS-RoFormer)
+    ENHANCE = "enhance"     # Speech enhancement (ZipEnhancer, ClearVoice, BS-RoFormer, FFmpeg-DSP)
     HUGGINGFACE = "huggingface"  # HuggingFace Transformers
     QWEN = "qwen"           # Qwen3-ASR support (v1.8.3+)
     ANALYSIS = "analysis"   # Scientific analysis and visualization
@@ -602,9 +602,10 @@ PACKAGES: List[Package] = [
     # Reference: https://modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base
     #
     # IMPORTANT - Version Sensitivity:
-    # - datasets: ZipEnhancer docs recommend ==2.18.0, but we use >=2.14.0,<4.0
-    #   for broader compatibility. If you encounter issues, try pinning to 2.18.0.
-    # - modelscope: >=1.20 required, 1.22.0 recommended by ZipEnhancer docs.
+    # - datasets: ModelScope requires >=3.0.0,<=3.6.0 (as of 2026-03)
+    # - modelscope: >=1.20 required, 1.22.0+ recommended
+    # - setuptools: Required at RUNTIME by modelscope (uses pkg_resources in utils/plugins.py)
+    # - einops: Required by modelscope framework for tensor operations
     #
     # LINUX SYSTEM DEPENDENCIES (not pip-installable):
     # - libsndfile1: Required for soundfile package. Install with:
@@ -619,6 +620,19 @@ PACKAGES: List[Package] = [
         reason="ModelScope framework for ZipEnhancer speech enhancement",
     ),
     Package(
+        name="setuptools",
+        extra=Extra.ENHANCE,
+        order=70,
+        import_name="pkg_resources",
+        reason="Runtime dependency of modelscope (uses pkg_resources in utils/plugins.py)",
+    ),
+    Package(
+        name="einops",
+        extra=Extra.ENHANCE,
+        order=70,
+        reason="Tensor operations - required by modelscope framework",
+    ),
+    Package(
         name="oss2",
         extra=Extra.ENHANCE,
         order=71,
@@ -631,11 +645,17 @@ PACKAGES: List[Package] = [
         reason="Dict subclass for modelscope configs",
     ),
     Package(
+        name="attrs",
+        extra=Extra.ENHANCE,
+        order=72,
+        reason="Attribute classes - required by modelscope framework",
+    ),
+    Package(
         name="datasets",
-        version=">=2.14.0,<4.0",
+        version=">=3.0.0,<=3.6.0",
         extra=Extra.ENHANCE,
         order=73,
-        reason="HuggingFace datasets - pinned <4.0 due to modelscope compat (ZipEnhancer recommends 2.18.0)",
+        reason="HuggingFace datasets - must match modelscope constraint (>=3.0.0)",
     ),
     Package(
         name="simplejson",
@@ -654,6 +674,13 @@ PACKAGES: List[Package] = [
         extra=Extra.ENHANCE,
         order=76,
         reason="Version parsing for modelscope",
+    ),
+    Package(
+        name="Pillow",
+        extra=Extra.ENHANCE,
+        order=76,
+        import_name="PIL",
+        reason="Image processing - required by modelscope framework",
     ),
     Package(
         name="clearvoice",

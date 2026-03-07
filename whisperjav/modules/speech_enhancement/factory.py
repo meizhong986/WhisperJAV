@@ -3,11 +3,12 @@ Factory for creating speech enhancer instances.
 
 Supports lazy loading to avoid import overhead for unused backends.
 
-Design Decisions (v1.7.3):
+Design Decisions (v1.7.3, extended v1.8.x):
 - Single backend entry with model parameter (not separate entries per sample rate)
-- Default model is 48kHz variant for best quality
+- Default model varies by backend (e.g., 48kHz for ClearVoice, 16kHz for ZipEnhancer)
 - Graceful degradation handled at backend level
 - Consistent with SpeechSegmenterFactory pattern
+- Five backends: none, ffmpeg-dsp, zipenhancer, clearvoice, bs-roformer
 """
 
 from typing import Dict, Type, Optional, Any, List, Tuple
