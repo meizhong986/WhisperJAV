@@ -2527,6 +2527,13 @@ class WhisperJAVAPI:
             if config.get('translate_endpoint'):
                 args += ["--translate-endpoint", config['translate_endpoint']]
 
+            # Streaming — default True: prevents read timeout on slow MPS/CPU inference.
+            # Non-streaming blocks the HTTP connection until the last token arrives; on
+            # slow local backends this exceeds the timeout every batch. Streaming delivers
+            # tokens incrementally so no read timeout can fire. See issue #196.
+            if config.get('translate_stream', True):
+                args += ["--stream"]
+
         return args
 
     # ========================================================================
@@ -3299,6 +3306,13 @@ class WhisperJAVAPI:
                 args.extend(["--max-retries", str(options['max_retries'])])
             if options.get('output_dir'):
                 args.extend(["-o", options['output_dir']])
+
+            # Streaming — default True: prevents read timeout on slow MPS/CPU inference.
+            # Non-streaming blocks the HTTP connection until the last token arrives; on
+            # slow local backends this exceeds the timeout every batch. Streaming delivers
+            # tokens incrementally so no read timeout can fire. See issue #196.
+            if options.get('stream', True):
+                args.append("--stream")
 
             # Start process with unbuffered output for real-time streaming
             # PYTHONUNBUFFERED=1 ensures child process doesn't buffer stdout/stderr

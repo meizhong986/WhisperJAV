@@ -605,7 +605,11 @@ def main():
                         instruction_file=instruction_file,
                         scene_threshold=merged.get('scene_threshold', 60.0),
                         max_batch_size=local_batch_size,
-                        stream=args.stream if hasattr(args, 'stream') else False,
+                        stream=True,  # Always stream for local LLM: non-streaming blocks the
+                                      # entire HTTP connection until the last token is generated.
+                                      # On slow backends (MPS, CPU) this exceeds the read timeout
+                                      # every batch. Streaming delivers tokens incrementally so
+                                      # no read timeout can fire. Output is identical. (#196)
                         debug=args.debug,
                         provider_options=provider_options,
                         extra_context=extra_context if extra_context else None,
