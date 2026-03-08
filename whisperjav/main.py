@@ -1571,6 +1571,10 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
 
 def main():
     """Enhanced main entry point with all V3 improvements."""
+    # Apply HuggingFace Hub network resilience patch (#204)
+    from whisperjav.utils.model_loader import patch_hf_hub_downloads
+    patch_hf_hub_downloads()
+
     args = parse_arguments()
     
     # Run environment checks if requested

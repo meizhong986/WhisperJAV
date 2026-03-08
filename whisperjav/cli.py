@@ -62,6 +62,10 @@ def main():
         print("For full functionality, install with: pip install whisperjav[cli]")
         print()
 
+    # Apply HuggingFace Hub network resilience patch (#204)
+    from whisperjav.utils.model_loader import patch_hf_hub_downloads
+    patch_hf_hub_downloads()
+
     # Import and run the main application
     try:
         from whisperjav.main import main as whisperjav_main

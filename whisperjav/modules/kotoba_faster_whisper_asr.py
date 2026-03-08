@@ -19,7 +19,7 @@ from typing import Any, Dict, Union
 
 import srt
 import torch
-from whisperjav.utils.model_loader import load_faster_whisper_model
+from faster_whisper import WhisperModel
 
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
@@ -141,7 +141,7 @@ class KotobaFasterWhisperASR:
         # See: https://github.com/OpenNMT/CTranslate2/issues/1865
 
         try:
-            self.model = load_faster_whisper_model(
+            self.model = WhisperModel(
                 model_size_or_path=self.model_name,
                 device=self.device,
                 compute_type=self.compute_type,
@@ -173,7 +173,7 @@ class KotobaFasterWhisperASR:
                             torch.cuda.empty_cache()
                             gc.collect()
 
-                        self.model = load_faster_whisper_model(
+                        self.model = WhisperModel(
                             model_size_or_path=self.model_name,
                             device=self.device,
                             compute_type="int8",

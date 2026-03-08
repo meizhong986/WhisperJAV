@@ -251,7 +251,7 @@ class WhisperVadSpeechSegmenter:
         logger.info("[WhisperVAD] This may download model files on first run...")
 
         try:
-            from whisperjav.utils.model_loader import load_faster_whisper_model
+            from faster_whisper import WhisperModel
         except ImportError:
             raise ImportError(
                 "faster-whisper is required for WhisperVAD.\n"
@@ -267,7 +267,7 @@ class WhisperVadSpeechSegmenter:
 
         # Note: compute_type="auto" (default) lets CTranslate2 handle device-specific selection
         # See: https://github.com/OpenNMT/CTranslate2/issues/1865
-        self._model = load_faster_whisper_model(
+        self._model = WhisperModel(
             self._model_size,
             device=device,
             compute_type=self.compute_type,

@@ -450,6 +450,10 @@ def main():
 
     Initializes PyWebView and starts the GUI.
     """
+    # Apply HuggingFace Hub network resilience patch (#204)
+    from whisperjav.utils.model_loader import patch_hf_hub_downloads
+    patch_hf_hub_downloads()
+
     import webview
     import logging
     # Use display version for user-facing output, fallback to PEP 440 version
