@@ -286,10 +286,32 @@ class StableTSASR:
                     )
                     self._prefetch_faster_whisper_weights(force=True)
         except Exception as e:
-            logger.warning(f"Failed to prefetch faster-whisper weights ({self.model_repo}): {e}")
+            # On network/SSL errors, try loading from local cache (#204)
+            from whisperjav.utils.model_loader import _is_network_error
+            if _is_network_error(e):
+                logger.warning(
+                    f"Network error during model prefetch: {e}. "
+                    "Attempting to use local cache..."
+                )
+                try:
+                    snapshot_download(
+                        repo_id=self.model_repo,
+                        local_files_only=True,
+                        allow_patterns=["*.bin", "*.json", "*.txt", "*.model", "*.vocab*"],
+                    )
+                    logger.info("Model found in local cache. Proceeding offline.")
+                except Exception:
+                    logger.warning(
+                        f"Model not in local cache either. "
+                        f"Original network error: {e}"
+                    )
+            else:
+                logger.warning(f"Failed to prefetch faster-whisper weights ({self.model_repo}): {e}")
 
     def _load_faster_whisper_with_retry(self):
-        """Load faster-whisper with a cache refresh fallback."""
+        """Load faster-whisper with a cache refresh fallback and network resilience."""
+        from whisperjav.utils.model_loader import _is_network_error
+
         last_exc: Optional[Exception] = None
         for attempt in range(2):
             try:
@@ -308,6 +330,25 @@ class StableTSASR:
                     )
                     self._prefetch_faster_whisper_weights(force=True)
                     continue
+                raise
+            except Exception as exc:
+                # Catch network/SSL errors and retry with local_files_only (#204)
+                if _is_network_error(exc):
+                    logger.warning(
+                        f"Network error during model load: {exc}. "
+                        "Attempting to load from local cache..."
+                    )
+                    try:
+                        model = stable_whisper.load_faster_whisper(
+                            self.model_name,
+                            device=self.device,
+                            compute_type=self.compute_type,
+                            local_files_only=True,
+                        )
+                        logger.info("Model loaded from local cache (offline).")
+                        return model
+                    except Exception:
+                        raise exc
                 raise
 
         if last_exc:

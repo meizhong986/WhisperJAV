@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union, Optional, Any
 import gc
 import torch
-from faster_whisper import WhisperModel
+from whisperjav.utils.model_loader import load_faster_whisper_model
 import soundfile as sf
 import numpy as np
 import srt
@@ -195,7 +195,7 @@ class FasterWhisperProASR:
         logger.debug("=" * 60)
 
         try:
-            self.whisper_model = WhisperModel(
+            self.whisper_model = load_faster_whisper_model(
                 model_size_or_path=self.model_name,
                 device=self.device,
                 compute_type=self.compute_type,
@@ -230,7 +230,7 @@ class FasterWhisperProASR:
                             torch.cuda.empty_cache()
                             gc.collect()
 
-                        self.whisper_model = WhisperModel(
+                        self.whisper_model = load_faster_whisper_model(
                             model_size_or_path=self.model_name,
                             device=self.device,
                             compute_type="int8",
