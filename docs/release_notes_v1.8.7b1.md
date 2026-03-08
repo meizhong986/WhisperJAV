@@ -18,7 +18,7 @@ WhisperJAV now handles unstable network conditions gracefully — especially for
 
 1. **Step 1 — Normal download from huggingface.co:** Works as before. If this succeeds, nothing changes.
 2. **Step 2 — Local cache fallback:** If Step 1 fails with a network/SSL error, WhisperJAV checks your local model cache. If the model was downloaded before, it loads from cache and continues normally. You'll see a warning in the log, but processing is not interrupted.
-3. **Step 3 — China mirror (hf-mirror.com):** If the model is not in your local cache, WhisperJAV automatically tries downloading from `hf-mirror.com`, the official HuggingFace mirror for China. This works even when your VPN blocks `huggingface.co`. Once downloaded, the model is cached locally for future use.
+3. **Step 3 — China mirror (hf-mirror.com):** If the model is not in your local cache, WhisperJAV automatically tries downloading from `hf-mirror.com`, a widely-used community mirror for HuggingFace in China. This works even when your VPN blocks `huggingface.co`. Once downloaded, the model is cached locally for future use.
 
 If all 3 steps fail, WhisperJAV shows a diagnostic summary with:
 - The exact model name and download URLs (both huggingface.co and hf-mirror.com)

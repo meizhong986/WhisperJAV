@@ -30,7 +30,7 @@ from whisperjav.utils.logger import logger
 
 _patched = False
 
-# Official HuggingFace mirror for China — maintained by HuggingFace
+# Widely-used community mirror for HuggingFace in China
 _HF_MIRROR_ENDPOINT = "https://hf-mirror.com"
 
 # Error strings that indicate a network/SSL problem (not a model/CUDA problem)

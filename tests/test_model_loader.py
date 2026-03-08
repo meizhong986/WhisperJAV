@@ -310,6 +310,40 @@ class TestPatchHfHubDownloads:
             with pytest.raises(OSError, match="model not in cache"):
                 patched("tiny", local_files_only=True)
 
+    def test_custom_endpoint_overridden_by_mirror_in_step3(self):
+        """Caller's custom endpoint is overridden by mirror in step 3.
+
+        This is intentional: if the user's custom endpoint failed in step 1,
+        trying their same broken endpoint in step 3 would be pointless.
+        The mirror is the best fallback regardless of original endpoint.
+        """
+        import huggingface_hub
+        import whisperjav.utils.model_loader as ml
+
+        call_log = []
+
+        def mock_download(*args, **kwargs):
+            call_log.append(kwargs.copy())
+            if kwargs.get("local_files_only"):
+                raise OSError("not in cache")
+            if kwargs.get("endpoint") == ml._HF_MIRROR_ENDPOINT:
+                return "/mirror/path"
+            raise ssl.SSLError("custom endpoint SSL fail")
+
+        ml._patched = False
+        with patch.object(huggingface_hub, "snapshot_download", mock_download):
+            self._apply_patch()
+            patched = huggingface_hub.snapshot_download
+
+            result = patched("org/repo", endpoint="https://my-proxy.com")
+            assert result == "/mirror/path"
+            # Step 1: caller's custom endpoint
+            assert call_log[0]["endpoint"] == "https://my-proxy.com"
+            # Step 2: local cache (endpoint preserved but irrelevant)
+            assert call_log[1]["local_files_only"] is True
+            # Step 3: mirror overrides caller's endpoint
+            assert call_log[2]["endpoint"] == ml._HF_MIRROR_ENDPOINT
+
 
 # ---------------------------------------------------------------------------
 # 3. Integration: Verify patch works with faster-whisper's download_model
