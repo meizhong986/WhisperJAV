@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-08 (Item 1 complete) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **20 open** on GitHub
+> Updated: 2026-03-08 (all items complete) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **19 open** on GitHub
 
 ---
 
@@ -8,13 +8,13 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **19** | Was 40 — closed 21 housekeeping + #195 already fixed |
-| Closed this session | 21 | #69, #143, #146, #150, #158, #159, #161, #162, #174, #176, #177, #178, #179, #184, #185, #186, #187, #189, #191, #193, #194 |
+| Total open on GitHub | **19** | Was 40 — closed 22 issues this session |
+| Closed this session | 22 | #69, #143, #146, #150, #158, #159, #161, #162, #174, #176, #177, #178, #179, #184, #185, #186, #187, #189, #191, #193, #194, #195 |
 | Previously closed (since last tracker) | 5 | #196, #197, #198, #200, #201 |
 | New issues (not in prior tracker) | 2 | #203, #204 |
-| **Active bugs (need code work)** | 2 | #204, #132 |
-| **Active bugs (need reply only)** | 1 | #203 |
-| Fixed in v1.8.7b0 (shipped) | 5 | #196, #198, #159, setuptools pin, zipenhancer GUI |
+| **Active bugs (need code work)** | 1 | #132 (Local LLM on Colab) |
+| **Active bugs (fixed, awaiting confirmation)** | 2 | #204 (SSL fallback), #203 (serial mode reply) |
+| Fixed in v1.8.7 (all committed on main) | 8 | #196, #198, #195, #204, #159, setuptools pin, zipenhancer GUI, installer diagnostics |
 | Feature requests (open) | 11 | |
 | Deferred to v1.9+ | 8 | |
 
@@ -30,7 +30,7 @@ The most impactful cluster for Chinese users. HuggingFace model downloads fail t
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#204** | VPN users (v2rayN) SSL failures | yangming2027 | **OPEN** | faster-whisper/HF hub tries online model validation even when cache exists. SSL errors through proxies kill the run. Works offline. | **NEW — needs fix** |
+| **#204** | VPN users (v2rayN) SSL failures | yangming2027 | **OPEN** | faster-whisper/HF hub tries online model validation even when cache exists. SSL errors through proxies kill the run. Works offline. | **FIXED** commit `ffde153` — SSL fallback to local cache. Awaiting user confirmation. |
 | **#201** | Install SSL cert error on fresh Win10 | jl6564 | CLOSED | Missing root CA certs on fresh Windows. Post-install network check fails. | Closed — env issue |
 | **#200** | NVML "Driver Not Loaded" on Optimus laptop | Ywocp | CLOSED | Dual-GPU Optimus: NVML can't load in non-GPU context. Installer falls back to CPU. | Closed — documented |
 | **#191** | Pass2 missing — SSL error | yangming2027 | OPEN | Same SSL/proxy issue as #204. Pass2 model download fails. | **Close as dup of #204** |
@@ -219,20 +219,23 @@ All stem from non-UTF-8 data in subprocess I/O.
 | #146 | Stale/fixed | "Fixed in v1.8.3. Closing." |
 | #143 | Fixed v1.8.6 | "VTT output and custom model path shipped in v1.8.6. Closing." |
 
-After closing these 20, open count drops from **40 to 20**.
+After closing 22 issues, open count is now **19**.
 
 ---
 
-## v1.8.7 Remaining Work
+## v1.8.7 — Summary of Fixes (all committed on main)
 
-### Bug Fixes
+| Commit | Issue | Summary |
+|--------|-------|---------|
+| `10fbf30` | #198 | MPS device detection for Apple Silicon |
+| `55df512` | #195 | `errors='replace'` in audio extraction subprocess |
+| `c092db9` | #159 | `--vad-threshold` and `--speech-pad-ms` CLI flags |
+| `7407ab6` `e5328c8` `090fd43` | #196 | Local LLM: max_tokens cap, streaming, CustomClient |
+| `f81d278` | — | zipenhancer GUI option fix |
+| `2abb3b3` | — | setuptools>=61.0,<82 pin (pkg_resources fix) |
+| `ffde153` | #204 | SSL/network error fallback to local model cache |
 
-| Priority | # | Description | Effort |
-|----------|---|-------------|--------|
-| **HIGH** | #204 | HF model download: fallback to local cache on SSL/network error | Medium |
-| ~~MEDIUM~~ | ~~#195~~ | ~~`audio_extraction.py`: already fixed in `55df512`~~ | ~~Done~~ |
-
-### Enhancements
+### v1.8.7 Remaining Work (Enhancements — not blockers)
 
 | Priority | # | Description | Effort |
 |----------|---|-------------|--------|
@@ -243,12 +246,14 @@ After closing these 20, open count drops from **40 to 20**.
 | **LOW** | #33 | Linux pyaudio install docs | Tiny (docs) |
 | **LOW** | #44 | GUI drag-drop full path | Small |
 
-### Respond Only
+### Responded / Closed This Session
 
-| # | Action |
-|---|--------|
-| #203 | Reply confirming "Finish each file" is the serial mode they requested in #179. It's shipped in v1.8.6. |
-| #69 | Close with note: custom provider endpoint covers Grok. |
+| # | Action | Done |
+|---|--------|------|
+| #203 | Replied: "Finish each file" serial mode exists in v1.8.6. | Yes |
+| #69 | Closed: custom provider endpoint covers Grok. | Yes |
+| #195 | Closed: already fixed in `55df512`. | Yes |
+| 21 others | Closed: stale, fixed, dup, or answered. | Yes |
 
 ---
 
