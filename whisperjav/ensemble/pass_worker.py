@@ -611,6 +611,11 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
     # to skip risky CUDA operations that can crash on Windows
     os.environ['WHISPERJAV_SUBPROCESS_WORKER'] = '1'
 
+    # Apply HuggingFace Hub network resilience patch (#204)
+    # Spawned workers get a fresh interpreter — patch must be re-applied
+    from whisperjav.utils.model_loader import patch_hf_hub_downloads
+    patch_hf_hub_downloads()
+
     # Reconfigure logger with the log level from main process
     # (subprocess starts fresh with default INFO level due to 'spawn' context)
     setup_logger("whisperjav", payload.log_level)

@@ -280,33 +280,94 @@ class TestPatchHfHubDownloads:
 # 3. Integration: Verify patch works with faster-whisper's download_model
 # ---------------------------------------------------------------------------
 
-class TestFasterWhisperIntegration:
-    """Verify the monkeypatch intercepts faster-whisper's actual call path."""
+class TestHfHubDownloadPatch:
+    """Test that hf_hub_download is also patched with resilience."""
 
     def setup_method(self):
         import whisperjav.utils.model_loader as ml
         ml._patched = False
 
-    def test_faster_whisper_uses_patched_snapshot_download(self):
-        """faster_whisper.utils.download_model should use the patched function."""
+    def _apply_patch(self):
+        from whisperjav.utils.model_loader import patch_hf_hub_downloads
+        patch_hf_hub_downloads()
+
+    def test_hf_hub_download_is_patched(self):
+        """After patching, hf_hub_download should be wrapped."""
+        import huggingface_hub
+        original = huggingface_hub.hf_hub_download
+        self._apply_patch()
+        assert huggingface_hub.hf_hub_download is not original
+        assert huggingface_hub.hf_hub_download.__name__ == "_resilient_hf_hub_download"
+
+    def test_hf_hub_download_ssl_fallback(self):
+        """SSL error on hf_hub_download should retry with local_files_only."""
+        import huggingface_hub
+        import whisperjav.utils.model_loader as ml
+
+        call_log = []
+
+        def mock_download(*args, **kwargs):
+            call_log.append(kwargs.copy())
+            if not kwargs.get("local_files_only"):
+                raise ssl.SSLError("record layer failure")
+            return "/cached/file/path"
+
+        ml._patched = False
+        with patch.object(huggingface_hub, "hf_hub_download", mock_download):
+            self._apply_patch()
+            patched = huggingface_hub.hf_hub_download
+
+            result = patched("org/repo", filename="model.bin")
+            assert result == "/cached/file/path"
+            assert len(call_log) == 2
+            assert call_log[1]["local_files_only"] is True
+
+    def test_hf_hub_download_non_network_error_raises(self):
+        """Non-network errors should not trigger fallback for hf_hub_download."""
+        import huggingface_hub
+        import whisperjav.utils.model_loader as ml
+
+        def mock_download(*args, **kwargs):
+            raise ValueError("bad filename")
+
+        ml._patched = False
+        with patch.object(huggingface_hub, "hf_hub_download", mock_download):
+            self._apply_patch()
+            patched = huggingface_hub.hf_hub_download
+
+            with pytest.raises(ValueError, match="bad filename"):
+                patched("org/repo", filename="bad")
+
+
+# ---------------------------------------------------------------------------
+# 4. Integration: Verify patch coverage across entry points and call paths
+# ---------------------------------------------------------------------------
+
+class TestIntegrationCoverage:
+    """Verify the monkeypatch intercepts all relevant call paths."""
+
+    def setup_method(self):
+        import whisperjav.utils.model_loader as ml
+        ml._patched = False
+
+    def test_both_functions_patched(self):
+        """Both snapshot_download and hf_hub_download should be patched."""
         from whisperjav.utils.model_loader import patch_hf_hub_downloads
         import huggingface_hub
 
         patch_hf_hub_downloads()
 
-        # Verify the function faster_whisper will call is our patched version
         assert huggingface_hub.snapshot_download.__name__ == "_resilient_snapshot_download"
+        assert huggingface_hub.hf_hub_download.__name__ == "_resilient_hf_hub_download"
 
-    def test_no_direct_whispermodel_import_in_asr_modules(self):
+    def test_asr_modules_use_whispermodel_directly(self):
         """ASR modules should use WhisperModel directly (monkeypatch handles resilience)."""
-        # With the monkeypatch approach, modules SHOULD import WhisperModel directly.
-        # The resilience is handled at the huggingface_hub level, not per-module.
         from whisperjav.modules import faster_whisper_pro_asr
         source = Path(faster_whisper_pro_asr.__file__).read_text(encoding="utf-8")
         assert "from faster_whisper import WhisperModel" in source
 
     def test_entry_points_apply_patch(self):
-        """Verify CLI and GUI entry points call patch_hf_hub_downloads."""
+        """Verify CLI, main, GUI, and worker entry points call patch_hf_hub_downloads."""
         cli_source = Path("whisperjav/cli.py").read_text(encoding="utf-8")
         assert "patch_hf_hub_downloads" in cli_source
 
@@ -315,3 +376,8 @@ class TestFasterWhisperIntegration:
 
         gui_source = Path("whisperjav/webview_gui/main.py").read_text(encoding="utf-8")
         assert "patch_hf_hub_downloads" in gui_source
+
+    def test_ensemble_worker_applies_patch(self):
+        """Ensemble subprocess workers must apply the patch."""
+        worker_source = Path("whisperjav/ensemble/pass_worker.py").read_text(encoding="utf-8")
+        assert "patch_hf_hub_downloads" in worker_source

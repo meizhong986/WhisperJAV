@@ -75,11 +75,70 @@ def _is_network_error(error: Exception) -> bool:
     return False
 
 
+def _make_resilient_wrapper(original_fn, fn_name):
+    """Create a resilient wrapper for a HuggingFace Hub download function.
+
+    On SSL/network errors, retries with local_files_only=True.
+    Works for both snapshot_download and hf_hub_download.
+    """
+
+    def _resilient_wrapper(*args, **kwargs):
+        # If already requesting local-only, don't wrap
+        if kwargs.get("local_files_only"):
+            return original_fn(*args, **kwargs)
+
+        try:
+            return original_fn(*args, **kwargs)
+        except Exception as e:
+            if not _is_network_error(e):
+                raise
+
+            # Extract identifier for messaging (first positional arg or kwarg)
+            resource_id = args[0] if args else kwargs.get("repo_id", "unknown")
+
+            logger.warning(
+                "Network/SSL error while checking '%s' on HuggingFace: %s",
+                resource_id, e,
+            )
+            logger.warning(
+                "Attempting to load from local cache..."
+            )
+
+            try:
+                result = original_fn(
+                    *args, **{**kwargs, "local_files_only": True}
+                )
+                logger.info(
+                    "Loaded '%s' from local cache. "
+                    "Network issues did not affect model loading.",
+                    resource_id,
+                )
+                return result
+            except Exception:
+                logger.error(
+                    "Model '%s' not found in local cache. "
+                    "A working internet connection is required for first-time "
+                    "model download. Please check your VPN/proxy settings, "
+                    "or try disconnecting your VPN and downloading the model "
+                    "once with a direct connection.",
+                    resource_id,
+                )
+                raise e  # Re-raise original network error
+
+    _resilient_wrapper.__name__ = f"_resilient_{fn_name}"
+    _resilient_wrapper.__qualname__ = f"_resilient_{fn_name}"
+    return _resilient_wrapper
+
+
 def patch_hf_hub_downloads():
-    """Monkeypatch huggingface_hub.snapshot_download with network resilience.
+    """Monkeypatch huggingface_hub download functions with network resilience.
+
+    Patches both snapshot_download (used by faster-whisper for model repos)
+    and hf_hub_download (used for individual file downloads like NeMo, LLM
+    GGUF files, classifiers).
 
     On SSL/connection/timeout errors, automatically retries with
-    local_files_only=True to use cached models. Provides clear user
+    local_files_only=True to use cached files. Provides clear user
     messages for each scenario:
 
     1. SSL fail + cache hit  -> warning + continues normally
@@ -94,59 +153,24 @@ def patch_hf_hub_downloads():
     except ImportError:
         return  # HF Hub not installed, nothing to patch
 
-    _original_snapshot_download = huggingface_hub.snapshot_download
+    # Patch snapshot_download (used by faster-whisper, stable-ts)
+    _patched_snapshot = _make_resilient_wrapper(
+        huggingface_hub.snapshot_download, "snapshot_download"
+    )
+    huggingface_hub.snapshot_download = _patched_snapshot
 
-    def _resilient_snapshot_download(*args, **kwargs):
-        # If already requesting local-only, don't wrap
-        if kwargs.get("local_files_only"):
-            return _original_snapshot_download(*args, **kwargs)
+    # Patch hf_hub_download (used by NeMo VAD, local LLM backend, classifiers)
+    _patched_hf_hub = _make_resilient_wrapper(
+        huggingface_hub.hf_hub_download, "hf_hub_download"
+    )
+    huggingface_hub.hf_hub_download = _patched_hf_hub
 
-        try:
-            return _original_snapshot_download(*args, **kwargs)
-        except Exception as e:
-            if not _is_network_error(e):
-                raise
-
-            # Extract repo_id for messaging (first positional arg or kwarg)
-            repo_id = args[0] if args else kwargs.get("repo_id", "unknown")
-
-            logger.warning(
-                "Network/SSL error while checking '%s' on HuggingFace: %s",
-                repo_id, e,
-            )
-            logger.warning(
-                "Attempting to load from local cache..."
-            )
-
-            try:
-                result = _original_snapshot_download(
-                    *args, **{**kwargs, "local_files_only": True}
-                )
-                logger.info(
-                    "Loaded '%s' from local cache. "
-                    "Network issues did not affect model loading.",
-                    repo_id,
-                )
-                return result
-            except Exception:
-                logger.error(
-                    "Model '%s' not found in local cache. "
-                    "A working internet connection is required for first-time "
-                    "model download. Please check your VPN/proxy settings, "
-                    "or try disconnecting your VPN and downloading the model "
-                    "once with a direct connection.",
-                    repo_id,
-                )
-                raise e  # Re-raise original network error
-
-    # Apply the patch to the module AND to faster_whisper.utils which
-    # may have already imported snapshot_download at module load time
-    huggingface_hub.snapshot_download = _resilient_snapshot_download
-
+    # Also patch faster_whisper.utils which imports huggingface_hub at module level
     try:
         import faster_whisper.utils as fw_utils
         if hasattr(fw_utils, "huggingface_hub"):
-            fw_utils.huggingface_hub.snapshot_download = _resilient_snapshot_download
+            fw_utils.huggingface_hub.snapshot_download = _patched_snapshot
+            fw_utils.huggingface_hub.hf_hub_download = _patched_hf_hub
     except ImportError:
         pass
 
