@@ -621,10 +621,12 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="setuptools",
+        version=">=61.0,<82",
         extra=Extra.ENHANCE,
         order=70,
         import_name="pkg_resources",
-        reason="Runtime dependency of modelscope (uses pkg_resources in utils/plugins.py)",
+        reason="Runtime dependency of modelscope (uses pkg_resources in utils/plugins.py). "
+               "setuptools 82.0.0 removed pkg_resources — pin <82 until modelscope migrates.",
     ),
     Package(
         name="einops",
@@ -845,13 +847,8 @@ PACKAGES: List[Package] = [
         order=95,
         reason="Plotting for diagnostic visualizations",
     ),
-    Package(
-        name="Pillow",
-        extra=Extra.ANALYSIS,
-        order=96,
-        import_name="PIL",  # pip name != import name
-        reason="Image processing library",
-    ),
+    # Pillow: already registered under ENHANCE (order 76) for modelscope.
+    # Analysis also uses it but the ENHANCE entry covers both.
 
     # =========================================================================
     # PHASE 5: Compatibility Packages (Order 98-103)

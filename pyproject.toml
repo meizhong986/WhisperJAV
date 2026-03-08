@@ -172,7 +172,8 @@ enhance = [
     # ModelScope (ZipEnhancer) - core framework
     "modelscope>=1.20",
     # setuptools: modelscope uses pkg_resources at runtime (not just build-time)
-    "setuptools",
+    # setuptools 82.0.0 removed pkg_resources — pin to <82 until modelscope migrates
+    "setuptools>=61.0,<82",
     # einops: tensor operations required by modelscope framework
     "einops",
     # oss2: Alibaba Cloud OSS SDK - required by ModelScope to download models
@@ -220,7 +221,7 @@ qwen = [
 # Note: scikit-learn is in [cli] for scene detection clustering
 analysis = [
     "matplotlib",
-    "Pillow",
+    # Pillow: transitive via matplotlib, explicitly listed under [enhance] for modelscope
 ]
 
 # pyvideotrans compatibility layer
