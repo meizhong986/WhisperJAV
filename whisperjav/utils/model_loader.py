@@ -34,13 +34,34 @@ _NETWORK_ERROR_INDICATORS = [
 
 def _is_network_error(error: Exception) -> bool:
     """Check if an exception is caused by a network/SSL problem."""
+    # OSError subclasses that are NOT network-related
+    _NON_NETWORK_OS_ERRORS = (
+        FileNotFoundError,
+        FileExistsError,
+        IsADirectoryError,
+        NotADirectoryError,
+        PermissionError,
+    )
+
     # Walk the exception chain (including __cause__ and __context__)
     current = error
     seen = set()
     while current and id(current) not in seen:
         seen.add(id(current))
-        if isinstance(current, (ssl.SSLError, ConnectionError, TimeoutError, OSError)):
+        # Skip non-network OSError subclasses
+        if isinstance(current, _NON_NETWORK_OS_ERRORS):
+            current = current.__cause__ or current.__context__
+            continue
+        if isinstance(current, (ssl.SSLError, ConnectionError, TimeoutError)):
             return True
+        # Generic OSError: check message for network indicators
+        if isinstance(current, OSError):
+            error_str = str(current).lower()
+            if any(indicator in error_str for indicator in _NETWORK_ERROR_INDICATORS):
+                return True
+            current = current.__cause__ or current.__context__
+            continue
+        # Non-OSError: check message for network indicators
         error_str = str(current).lower()
         if any(indicator in error_str for indicator in _NETWORK_ERROR_INDICATORS):
             return True
