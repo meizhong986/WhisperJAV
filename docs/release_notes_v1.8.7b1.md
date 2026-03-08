@@ -6,7 +6,28 @@ Pre-release for testing. Feedback welcome via [Issues](https://github.com/meizho
 
 ## What's New in beta.1
 
-- **#204 — SSL/VPN resilience for HuggingFace downloads** — Users behind corporate proxies or Chinese VPN services (e.g., v2rayN) no longer get blocked by SSL certificate validation errors when models are already cached locally. A single startup-time monkeypatch transparently retries failed HuggingFace Hub downloads from local cache. Covers all download paths: faster-whisper models, NeMo VAD, speech enhancement models, and ensemble subprocess workers.
+### Network Resilience for Users in China (#204)
+
+WhisperJAV now handles unstable network conditions gracefully — especially for users in China who connect through VPN/proxy services like v2rayN, Clash, or corporate proxies.
+
+**The problem:** HuggingFace Hub (where AI models are hosted) always contacts its servers to check for updates before loading a model — even when the model is already fully downloaded and cached on your machine. In China, VPN proxy tools often break SSL certificate validation, causing these checks to fail with `CERTIFICATE_VERIFY_FAILED` errors. The result: WhisperJAV refuses to start even though all required models are already on disk.
+
+**The fix:** WhisperJAV now automatically detects SSL/network failures and uses a 3-step fallback strategy. No configuration needed — it works transparently at startup.
+
+**What you'll see (3-step fallback):**
+
+1. **Step 1 — Normal download from huggingface.co:** Works as before. If this succeeds, nothing changes.
+2. **Step 2 — Local cache fallback:** If Step 1 fails with a network/SSL error, WhisperJAV checks your local model cache. If the model was downloaded before, it loads from cache and continues normally. You'll see a warning in the log, but processing is not interrupted.
+3. **Step 3 — China mirror (hf-mirror.com):** If the model is not in your local cache, WhisperJAV automatically tries downloading from `hf-mirror.com`, the official HuggingFace mirror for China. This works even when your VPN blocks `huggingface.co`. Once downloaded, the model is cached locally for future use.
+
+If all 3 steps fail, WhisperJAV shows a diagnostic summary with:
+- The exact model name and download URLs (both huggingface.co and hf-mirror.com)
+- Your local cache directory path, so you can download and place files manually
+- The `HF_ENDPOINT` environment variable you can set as a permanent workaround
+
+**Coverage:** This protection applies to all AI model downloads — Whisper models (faster-whisper), VAD models (NeMo/Silero), speech enhancement models (ZipEnhancer, BS-RoFormer, ClearVoice), and ensemble mode subprocess workers. Every entry point (CLI, GUI, ensemble workers) is protected.
+
+**For users in China:** In most cases, WhisperJAV will now "just work" — even on first run — because the China mirror fallback handles the initial download automatically. No need to disconnect your VPN.
 
 ## Carried from beta.0
 
@@ -35,7 +56,7 @@ Pre-release for testing. Feedback welcome via [Issues](https://github.com/meizho
 ## Installation
 
 ```bash
-pip install "whisperjav @ git+https://github.com/meizhong986/whisperjav.git@v1.8.7-beta.1"
+pip install "whisperjav @ git+https://github.com/meizhong986/whisperjav.git@v1.8.7b1"
 ```
 
 Or for Mac users:

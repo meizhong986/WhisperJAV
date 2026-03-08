@@ -235,8 +235,41 @@ class TestPatchHfHubDownloads:
             with pytest.raises(ValueError, match="Invalid repo_id"):
                 patched("bad/repo/format")
 
-    def test_ssl_fail_no_cache_raises_original_error(self):
-        """When SSL fails and cache miss, the ORIGINAL SSL error is raised."""
+    def test_ssl_fail_no_cache_tries_mirror(self):
+        """When SSL fails and cache miss, should try hf-mirror.com."""
+        import huggingface_hub
+        import whisperjav.utils.model_loader as ml
+
+        call_log = []
+
+        def mock_download(*args, **kwargs):
+            call_log.append(kwargs.copy())
+            if kwargs.get("local_files_only"):
+                raise OSError("model not found in cache")
+            if kwargs.get("endpoint") == ml._HF_MIRROR_ENDPOINT:
+                return "/mirror/model/path"
+            raise OSError(
+                "urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] cert verify failed"
+            )
+
+        ml._patched = False
+        with patch.object(huggingface_hub, "snapshot_download", mock_download):
+            self._apply_patch()
+            patched = huggingface_hub.snapshot_download
+
+            result = patched("Systran/faster-whisper-large-v2")
+            assert result == "/mirror/model/path"
+            assert len(call_log) == 3
+            # Step 1: normal attempt
+            assert not call_log[0].get("local_files_only")
+            assert not call_log[0].get("endpoint")
+            # Step 2: local cache
+            assert call_log[1]["local_files_only"] is True
+            # Step 3: mirror
+            assert call_log[2]["endpoint"] == ml._HF_MIRROR_ENDPOINT
+
+    def test_ssl_fail_no_cache_no_mirror_raises_original_error(self):
+        """When all 3 steps fail, the ORIGINAL SSL error is raised."""
         import huggingface_hub
         import whisperjav.utils.model_loader as ml
 
@@ -247,6 +280,8 @@ class TestPatchHfHubDownloads:
         def mock_download(*args, **kwargs):
             if kwargs.get("local_files_only"):
                 raise OSError("model not found in cache")
+            if kwargs.get("endpoint"):
+                raise ConnectionError("mirror also unreachable")
             raise original_error
 
         ml._patched = False
@@ -321,6 +356,31 @@ class TestHfHubDownloadPatch:
             assert result == "/cached/file/path"
             assert len(call_log) == 2
             assert call_log[1]["local_files_only"] is True
+
+    def test_hf_hub_download_mirror_fallback(self):
+        """SSL error + cache miss should try hf-mirror.com for hf_hub_download."""
+        import huggingface_hub
+        import whisperjav.utils.model_loader as ml
+
+        call_log = []
+
+        def mock_download(*args, **kwargs):
+            call_log.append(kwargs.copy())
+            if kwargs.get("local_files_only"):
+                raise OSError("not in cache")
+            if kwargs.get("endpoint") == ml._HF_MIRROR_ENDPOINT:
+                return "/mirror/file/path"
+            raise ssl.SSLError("record layer failure")
+
+        ml._patched = False
+        with patch.object(huggingface_hub, "hf_hub_download", mock_download):
+            self._apply_patch()
+            patched = huggingface_hub.hf_hub_download
+
+            result = patched("org/repo", filename="model.bin")
+            assert result == "/mirror/file/path"
+            assert len(call_log) == 3
+            assert call_log[2]["endpoint"] == ml._HF_MIRROR_ENDPOINT
 
     def test_hf_hub_download_non_network_error_raises(self):
         """Non-network errors should not trigger fallback for hf_hub_download."""
