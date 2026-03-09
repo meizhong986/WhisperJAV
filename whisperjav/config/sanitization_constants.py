@@ -49,6 +49,16 @@ class RepetitionConstants:
     HIGH_DENSITY_MIN_OCCURRENCES: int = 5
     HIGH_DENSITY_RATIO: float = 0.3
 
+    # Safety net: maximum subtitle text length (chars) before flagging as hallucination.
+    # Normal Japanese subtitles are 10-40 chars. Lines >200 are almost certainly
+    # Whisper repetition hallucinations. (#209)
+    MAX_SUBTITLE_TEXT_LENGTH: int = 200
+
+    # Generic repetition detector: minimum substring coverage ratio to flag as repetition.
+    # If a repeated substring covers >50% of the text, it's repetitive. (#209)
+    GENERIC_REPETITION_COVERAGE_THRESHOLD: float = 0.50
+    GENERIC_REPETITION_MIN_OCCURRENCES: int = 3
+
 @dataclass
 class CrossSubtitleConstants:
     """Constants for cross-subtitle processing"""

@@ -47,53 +47,35 @@ class RepetitionCleaner:
 
 
         # This is the final, curated list of patterns.
-
         # They are ordered from most specific/extreme to most general.
-
         self.cleaning_patterns = [
-
             # 1. Targets extreme phrase repetition with separators (e.g., "あ!!あ!!あ!!")
-
-            # Uses a backreference `\1` to ensure phrases are identical.
-
-            ('phrase_with_separator', regex.compile(r'((?:[\p{L}\p{N}]{1,8}[、,!\s!!??。。・]+))\1{3,}'), r'\1'),
-
-
+            # Increased phrase length limit from {1,8} to {1,30} for long Japanese phrases (#209)
+            ('phrase_with_separator', regex.compile(r'((?:[\p{L}\p{N}]{1,30}[、,!\s!!??。。・〜ー]+))\1{3,}'), r'\1'),
 
             # 2. Targets extreme multi-character word repetition (e.g., "ハッハッハッハッ")
-
             ('multi_char_word', regex.compile(r'(([ぁ-んァ-ン]{2,4}))\1{3,}'), r'\1\1'),
 
-            
-
             # 3. Targets phrase repetition with a comma (e.g., "ゆーちゃん、ゆーちゃん、ゆーちゃん")
-
-            ('phrase_with_comma', regex.compile(r'((?:[\p{L}\p{N}]{1,10}[、,]\s*))\1{2,}'), r'\1'),
-
-
+            # Increased phrase length limit from {1,10} to {1,30} (#209)
+            ('phrase_with_comma', regex.compile(r'((?:[\p{L}\p{N}]{1,30}[、,]\s*))\1{2,}'), r'\1'),
 
             # 3b. Targets newline/whitespace separated single-character floods (e.g., "あ\nあ\nあ")
-
             ('single_char_whitespace_flood', regex.compile(r'([ぁ-んァ-ン])(?:[\s　]*\1){3,}'), r'\1\1'),
 
-
-
             # 4. Targets single character with prefix (e.g., "あらららら...")
-
             ('prefix_plus_char', regex.compile(r'([ぁ-んァ-ン]{1,2})([ぁ-んァ-ン])\2{3,}'), r'\1\2\2'),
 
-
-
             # 5. Targets simple single-character floods (e.g., "ううううう")
-
-            ('single_char_flood', regex.compile(r'([ぁ-んァ-ン])\1{3,}'), r'\1\1'),
-
-            
+            # Now includes optional dakuten/handakuten marks — both combining (U+3099, U+309A)
+            # and standalone (U+309B, U+309C) forms — so that "あ゛あ゛あ゛あ゛" is matched (#209)
+            ('single_char_flood', regex.compile(r'([ぁ-んァ-ン][゙゚゛゜]?)\1{3,}'), r'\1\1'),
 
             # 6. Targets vowel extensions (e.g., "あ〜〜〜〜")
-
             ('vowel_extension', regex.compile(r'([ぁ-んァ-ン])([〜ー])\2{3,}'), r'\1\2\2'),
 
+            # 7. Targets wave-dash + comma phrase repetitions (e.g., "あ〜、あ〜、あ〜、") (#209)
+            ('wavedash_comma_phrase', regex.compile(r'([\p{L}]{1,10}[〜ー]+[、,]\s*)\1{2,}'), r'\1'),
         ]
 
 
@@ -103,64 +85,142 @@ class RepetitionCleaner:
 
 
     def clean_repetitions(self, text: str) -> Tuple[str, List[Dict]]:
-
         """
-
-        Applies the final, curated list of cleaning patterns.
-
+        Applies cleaning in 3 layers:
+        1. Curated regex patterns (specific known repetition types)
+        2. Generic substring repetition detector (safety net for unknown patterns)
+        3. Absolute length limit (hallucination catch-all)
         """
-
         if not text or not text.strip():
-
             return text, []
 
-
-
         modifications = []
-
         current_text = text
 
-
-
+        # === Layer 1: Curated regex patterns ===
         for name, pattern, replacement in self.cleaning_patterns:
-
             try:
-
                 original_text = current_text
-
                 new_text = pattern.sub(replacement, original_text)
 
-
-
                 if new_text != original_text:
-
                     modifications.append({
-
                         'type': name,
-
                         'pattern': pattern.pattern,
-
                         'original': original_text,
-
                         'modified': new_text,
-
                         'confidence': 0.99,
-
                         'category': 'repetition_cleaning'
-
                     })
-
                     current_text = new_text
-
             except Exception as e:
-
                 logger.warning(f"Pattern '{name}' failed on text '{text[:30]}...': {e}")
-
                 continue
 
-        
+        # === Layer 2: Generic substring repetition detector (safety net) ===
+        # If text is still long after Layer 1, check for ANY repeated substring
+        # that dominates the text. This catches patterns the regex list missed. (#209)
+        if len(current_text) > 40:
+            cleaned, was_cleaned = self._detect_generic_repetition(current_text)
+            if was_cleaned:
+                modifications.append({
+                    'type': 'generic_repetition_safety_net',
+                    'pattern': 'substring_dominance_detector',
+                    'original': current_text,
+                    'modified': cleaned,
+                    'confidence': 0.95,
+                    'category': 'repetition_cleaning'
+                })
+                current_text = cleaned
+
+        # === Layer 3: Absolute length limit ===
+        # Normal Japanese subtitles are 10-40 chars. Lines exceeding the max are
+        # almost certainly Whisper repetition hallucinations. (#209)
+        max_len = self.constants.MAX_SUBTITLE_TEXT_LENGTH
+        if len(current_text) > max_len:
+            # Try to break at the last comma or period, but never truncate below
+            # 75% of max_len to avoid over-cutting when the boundary is early.
+            floor = int(max_len * 0.75)
+            truncated = current_text[:max_len]
+            for sep in ('。', '、'):
+                if sep in truncated:
+                    candidate = truncated.rsplit(sep, 1)[0]
+                    if len(candidate) >= floor:
+                        truncated = candidate
+                        break
+            logger.warning(
+                f"Subtitle exceeds {max_len} chars ({len(current_text)} chars), "
+                f"likely hallucination. Truncating."
+            )
+            modifications.append({
+                'type': 'length_limit_truncation',
+                'pattern': f'len>{max_len}',
+                'original': current_text,
+                'modified': truncated,
+                'confidence': 0.90,
+                'category': 'repetition_cleaning'
+            })
+            current_text = truncated
 
         return current_text.strip(), modifications
+
+    def _detect_generic_repetition(self, text: str) -> Tuple[str, bool]:
+        """
+        Generic substring repetition detector.
+
+        Finds any substring of length 2-50, starting at ANY position in the text,
+        that repeats enough times to cover >50% of the text. If found, reduces
+        to 1-2 occurrences.
+
+        This is the safety net for patterns the curated regex list doesn't cover.
+        Algorithm: For each substring length, try candidates starting at each
+        position in the text. To keep it tractable, we limit candidate start
+        positions to the first `sub_len` characters (any repeating unit must
+        begin within its own length from the start).
+        """
+        text_len = len(text)
+        coverage_threshold = self.constants.GENERIC_REPETITION_COVERAGE_THRESHOLD
+        min_occurrences = self.constants.GENERIC_REPETITION_MIN_OCCURRENCES
+        best_sub = None
+        best_count = 0
+        best_coverage = 0.0
+
+        # Try substring lengths from 2 to min(50, text_len // 2)
+        max_sub_len = min(50, text_len // 2)
+        for sub_len in range(2, max_sub_len + 1):
+            # Try candidates starting at each offset within one unit length.
+            # A repeating unit "ABCABC..." must start within positions 0..sub_len-1.
+            # For text like "XYお腹お腹お腹", the unit "お腹" starts at position 2,
+            # which is within sub_len=2 from the start.
+            for start in range(min(sub_len, text_len - sub_len + 1)):
+                candidate = text[start:start + sub_len]
+                count = 0
+                pos = 0
+                while pos <= text_len - sub_len:
+                    if text[pos:pos + sub_len] == candidate:
+                        count += 1
+                        pos += sub_len
+                    else:
+                        pos += 1
+
+                if count >= min_occurrences:
+                    coverage = (count * sub_len) / text_len
+                    if coverage > best_coverage:
+                        best_coverage = coverage
+                        best_count = count
+                        best_sub = candidate
+
+        if best_sub and best_coverage >= coverage_threshold:
+            # Reduce to 1-2 occurrences
+            keep = 2 if len(best_sub) <= 5 else 1
+            cleaned = (best_sub * keep).strip()
+            logger.debug(
+                f"Generic repetition detected: '{best_sub[:20]}...' x{best_count} "
+                f"(coverage {best_coverage:.0%}). Reduced to {keep} occurrence(s)."
+            )
+            return cleaned, True
+
+        return text, False
 
 
 
