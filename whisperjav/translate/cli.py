@@ -460,13 +460,14 @@ def main():
             provider_config['endpoint'] = endpoint_path
             provider_config.pop('api_base', None)
 
-    # Get API key (not needed for local provider)
-    if provider_name == 'local':
-        api_key = None
+    # Get API key (not needed for local/custom providers — Ollama, LM Studio, etc.)
+    if provider_name in ('local', 'custom'):
+        api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else ''
     else:
-        api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else os.getenv(provider_config['env_var'])
+        env_var = provider_config.get('env_var')
+        api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else (os.getenv(env_var) if env_var else None)
         if not api_key:
-            print(f"Error: API key not found. Set {provider_config['env_var']} or use --api-key", file=sys.stderr)
+            print(f"Error: API key not found. Set {env_var} or use --api-key", file=sys.stderr)
             sys.exit(1)
 
     # Get model

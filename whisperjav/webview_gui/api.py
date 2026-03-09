@@ -3133,16 +3133,17 @@ class WhisperJAVAPI:
             if not config:
                 return {"success": False, "error": f"Unknown provider: {provider}"}
 
-            # Local LLM provider doesn't need API key testing
-            if provider == 'local':
+            # Local/Custom providers don't require API keys
+            if provider in ('local', 'custom'):
                 return {
                     "success": True,
-                    "message": "Local LLM provider - no API key required",
-                    "local": True
+                    "message": f"{provider.capitalize()} provider - no API key required",
+                    "local": provider == 'local'
                 }
 
             # Get API key
-            key = api_key or os.getenv(config.get('env_var', ''))
+            env_var = config.get('env_var') or ''
+            key = api_key or (os.getenv(env_var) if env_var else None)
             if not key:
                 return {
                     "success": False,
