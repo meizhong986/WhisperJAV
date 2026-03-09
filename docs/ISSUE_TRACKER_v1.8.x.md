@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-09 (rev2 — full comment sweep) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **25 open** on GitHub
+> Updated: 2026-03-09 (rev3 — Groups B, C, D committed) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **25 open** on GitHub
 
 ---
 
@@ -11,12 +11,12 @@
 | Total open on GitHub | **25** | Was 19 at last update; 5 new (#205-#209), 1 self-closed (#208) |
 | New issues since last update | 5 | #205, #206, #207, #208, #209 |
 | Self-closed by reporters | 1 | #208 (LLM server, user installed NVIDIA Toolkit) |
-| **Active bugs (need code work)** | 3 | #209 (repetition hallucination), #196 (LLM token limit STILL broken), #132 (Local LLM on Kaggle) |
-| **Active bugs (awaiting user confirmation)** | 2 | #204 (SSL fallback, v1.8.7b1 released), #203 (serial mode reply) |
-| **New bug reports on CLOSED issues** | 3 | #196 (zhstark: LLM still broken on Ubuntu/v1.8.7b1), #198 (francetoastVN: Mac LLM+Transformers failures), #143 (OdinShiva: Custom+Ollama NoneType) |
+| **Active bugs (need code work)** | 1 | #196 (LLM token limit STILL broken) |
+| **Active bugs (awaiting user confirmation)** | 5 | #204 (SSL fallback), #203 (serial mode), #209 (repetition fix committed), #198 (MPS fix committed), #143 (custom provider fix committed) |
+| **New bug reports on CLOSED issues** | 1 | #196 (zhstark: LLM still broken on Ubuntu/v1.8.7b1) |
 | **New duplicates** | 1 | #207 (dup of #96, settings persistence) |
 | **New feature requests** | 2 | #205 (VibeVoice ASR), #206 (grey out incompatible options) |
-| Fixed in v1.8.7b1 (all committed on main) | 9 | #198-MPS, #195, #204, #159, setuptools pin, zipenhancer GUI, installer diagnostics, China mirror fallback |
+| Fixed in v1.8.7b2 (all committed on main) | 12 | #198-MPS+kwargs, #195, #204, #159, #209, #143, setuptools pin, zipenhancer GUI, installer diagnostics, China mirror fallback |
 | Feature requests (open) | 13 | Added #205, #206 |
 | Deferred to v1.9+ | 10 | Added #205, #206 |
 
@@ -142,7 +142,7 @@ All stem from non-UTF-8 data in subprocess I/O. **All fixed.**
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| ~~#198~~ | No MPS on M1 Mac | francetoastVN | CLOSED | Fixed v1.8.7b0 — MPS detection in TransformersASR. | Done |
+| ~~#198~~ | No MPS on M1 Mac | francetoastVN | CLOSED | Fixed v1.8.7b0 (MPS detection) + v1.8.7b2 (defer generate_kwargs to model defaults — root cause of beam search IndexError on MPS). | Done |
 | **#142** | AMD Radeon 9600XT not detected | MatthaisUK | OPEN | DirectML/ROCm not supported. | **Defer v1.9+** |
 | **#114** | DirectML for AMD/Intel | SingingDalong | OPEN | Major platform enablement. | **Defer v1.9+** |
 
@@ -152,7 +152,7 @@ All stem from non-UTF-8 data in subprocess I/O. **All fixed.**
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#143** | Custom local models | ymilv | CLOSED | VTT + custom model shipped v1.8.6. **BUT**: New comment from OdinShiva (2026-03-09) reports Custom+Ollama broken. | **NEW BUG on closed issue** — see below |
+| **#143** | Custom local models | ymilv | CLOSED | VTT + custom model shipped v1.8.6. OdinShiva reported Custom+Ollama broken (os.getenv(None) crash). | **FIXED** `cd72de4` — custom provider added to early-return group in api.py + cli.py. Awaiting user confirmation. |
 | ~~#178~~ | Custom endpoint ignored | Ywocp | CLOSED | Fixed hotfix3. | Closed |
 | ~~#69~~ | Grok translation | lingyunlxh | CLOSED | Covered by custom provider. | Closed |
 | **#71** | Google Translate (free, no key) | x8086 | OPEN | Fragile unofficial API. | **Defer v1.9+** |
@@ -169,8 +169,8 @@ Screenshots examined:
 - Error message: `"Connection to custom failed: str expected, not NoneType"`
 - Second screenshot shows Ollama running with `qwen3.5:4b` model loaded
 
-**Diagnosis (preliminary):**
-The error `str expected, not NoneType` strongly suggests the code passes the API key as `None` to the OpenAI client constructor. Ollama doesn't require API keys, but the code likely does `openai.OpenAI(api_key=api_key)` where `api_key` is None from the empty GUI field. The OpenAI SDK expects a string (even if it's a dummy like `"ollama"`). This is a **simple input validation bug** — the GUI should pass a default dummy key (e.g., `"not-needed"`) when the API key field is empty and provider is Custom.
+**Root cause (confirmed and fixed):**
+PROVIDER_CONFIGS defines `custom.env_var = None` (explicit None, not missing key). `config.get('env_var', '')` returns None because the key EXISTS with value None. This None is passed to `os.getenv(None)` which raises TypeError. Two code paths affected: `webview_gui/api.py` (GUI Test Connection) and `translate/cli.py` (CLI translation). Fix: added `custom` to early-return group alongside `local` in both paths; guarded `os.getenv()` call. `service.py` was already safe. **Fixed in commit `cd72de4`.**
 
 ---
 
@@ -180,7 +180,7 @@ The error `str expected, not NoneType` strongly suggests the code passes the API
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#209** | Single subtitle often very long | weifu8435 | **OPEN** | Whisper repetition hallucinations not caught by RepetitionCleaner due to 4 architectural gaps in pattern matching. | **Active — root cause identified, needs code fix** |
+| **#209** | Single subtitle often very long | weifu8435 | **OPEN** | Whisper repetition hallucinations not caught by RepetitionCleaner due to 4 architectural gaps in pattern matching. | **FIXED** `9317695` — 3-layer fix: regex gaps patched, generic safety net added, 200-char length limit. Awaiting user confirmation. |
 
 **Reporter**: weifu8435 (repeat user, previously #187, #185)
 **Platform**: Windows, Ensemble mode (Fidelity+Balanced, Large V2, "Finish each file")
@@ -288,9 +288,8 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 
 | Status | Count | Issues |
 |--------|------:|--------|
-| **Active bugs needing code work** | 4 | #196 (LLM token limit STILL broken), #209 (repetition hallucination), #143 (Ollama NoneType), #132 (Local LLM on Kaggle) |
-| **Active bugs needing investigation** | 1 | #198 (Mac Transformers no output — need to examine log) |
-| **Active bugs awaiting user confirmation** | 2 | #204 (SSL fallback), #203 (serial mode) |
+| **Active bugs needing code work** | 2 | #196 (LLM token limit STILL broken), #132 (Local LLM on Kaggle) |
+| **Active bugs awaiting user confirmation** | 5 | #204 (SSL fallback), #203 (serial mode), #209 (repetition fix), #198 (MPS/kwargs fix), #143 (custom provider fix) |
 | **New — needs response only** | 2 | #207 (dup of #96), #206 (feature request ack) |
 | **Feature requests (open, not done)** | 13 | #205, #206, #181, #180, #175, #164, #126, #99, #71, #51, #49, #44, #33 |
 | **Meta / roadmap** | 1 | #59 |
@@ -301,11 +300,11 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 | Priority | # | Issue | Effort | Why |
 |----------|---|-------|--------|-----|
 | **HIGH** | #196 | LLM "No matches found" STILL broken on v1.8.7b1 | Medium | Fix claimed shipped but 2 users on different platforms report failure. Credibility issue. |
-| **HIGH** | #209 | Repetition hallucination not caught by sanitizer | Medium | Visible output quality issue; 4 architectural gaps identified |
-| **MEDIUM** | #143 | Custom+Ollama NoneType API key | Tiny | Simple input validation — pass default dummy key when empty |
-| **MEDIUM** | #198 | Mac: Transformers mode no output | Unknown | Need to examine attached log; Mac is 2nd priority platform |
 | **MEDIUM** | #207 | Settings persistence (dup of #96) | Tiny (reply) | Respond referencing #96, explain what IS saved |
 | **LOW** | #132 | Local LLM on Kaggle | Unknown | Needs investigation of new debug log; Kaggle is 4th priority platform |
+| **DONE** | #209 | Repetition hallucination — 3-layer fix | — | Fixed `9317695`. Awaiting user confirmation. |
+| **DONE** | #143 | Custom+Ollama os.getenv(None) crash | — | Fixed `cd72de4`. Awaiting user confirmation. |
+| **DONE** | #198 | MPS beam search — defer to model defaults | — | Fixed `f0ad57a`. Awaiting user confirmation. |
 | **WAITING** | #204 | SSL/China fallback | — | v1.8.7b1 shipped, awaiting user test |
 | **WAITING** | #203 | Serial mode exists | — | Replied, awaiting user confirmation |
 
@@ -322,15 +321,18 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 | `f81d278` | — | zipenhancer GUI option fix |
 | `2abb3b3` | — | setuptools>=61.0,<82 pin (pkg_resources fix) |
 | `ffde153`+ | #204 | SSL/network 3-step fallback (normal → cache → hf-mirror.com) |
+| `cd72de4` | #143 | Custom provider os.getenv(None) crash — added custom to early-return in api.py + cli.py |
+| `9317695` | #209 | Repetition cleaner: 4 regex gaps fixed + generic safety net + 200-char length limit |
+| `f0ad57a` | #198 | HF Transformers: defer generate_kwargs to model defaults (removes forced num_beams=5) |
 
 ### v1.8.7 Remaining Work
 
 | Priority | # | Description | Effort | Status |
 |----------|---|-------------|--------|--------|
 | **HIGH** | #196 | LLM "No matches found" — v1.8.7b1 fix incomplete | Medium | Need to investigate why auto-batch + max_tokens still fails |
-| **HIGH** | #209 | Repetition hallucination safety net in RepetitionCleaner | Medium | Root cause identified, fix planned |
-| **MEDIUM** | #143 | Custom+Ollama NoneType API key | Tiny | Pass dummy key when API key field empty |
-| **MEDIUM** | #198 | Mac Transformers mode no subtitle output | Unknown | Need to examine attached log |
+| ~~HIGH~~ | ~~#209~~ | ~~Repetition hallucination safety net~~ | — | **DONE** `9317695` |
+| ~~MEDIUM~~ | ~~#143~~ | ~~Custom+Ollama NoneType API key~~ | — | **DONE** `cd72de4` |
+| ~~MEDIUM~~ | ~~#198~~ | ~~Mac Transformers mode / beam search crash~~ | — | **DONE** `f0ad57a` |
 | **MEDIUM** | #99 | Log GPU VRAM at INFO before model load | Tiny | Not started |
 | **MEDIUM** | #164 | MPEG-TS auto-remux | Small | Not started |
 | **LOW** | #51 | Batch translate wildcard/directory | Medium | Not started |
@@ -378,10 +380,10 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 | **GUI settings** | #96, **#207**, ~~#176~~, ~~#174~~, ~~#184~~ | **#96** | Partial (v1.9); #207 is 4th dup |
 | **Encoding/Unicode** | ~~#195~~, ~~#190~~, ~~#186~~, ~~#177~~ | — | **Fully resolved** |
 | **Ensemble mode** | #203, ~~#189~~, ~~#179~~ | **#203** | Awaiting user reply |
-| **Repetition/Hallucination** | **#209** | **#209** | **NEW — needs code fix** |
-| **Apple Silicon / MPS** | ~~#198~~ | Done | Resolved |
+| **Repetition/Hallucination** | **#209** | **#209** | **FIXED** `9317695` — awaiting confirmation |
+| **Apple Silicon / MPS** | ~~#198~~ | Done | **FIXED** `10fbf30` (MPS detection) + `f0ad57a` (kwargs) |
 | **AMD/non-NVIDIA** | #142, #114 | Deferred | v1.9+ |
-| **Translation providers** | **#143** (new bug), ~~#178~~, ~~#69~~, #71, #43 | **#143 new bug** (Ollama NoneType) | #143 needs fix, rest deferred v1.9+ |
+| **Translation providers** | **#143** (fixed), ~~#178~~, ~~#69~~, #71, #43 | **#143 FIXED** `cd72de4` | Awaiting confirmation, rest deferred v1.9+ |
 | **i18n** | #180, #175 | Deferred | v1.9+ |
 
 ---
@@ -393,9 +395,9 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 | # | Action | Priority |
 |---|--------|----------|
 | #196 | Respond to zhstark: acknowledge fix is incomplete, ask for full server log and the SRT file being translated. Need to understand why batch 11 still hits token limit. | **HIGH** |
-| #198 | Respond to francetoastVN: (1) LLM "No matches" is same issue as #196, being investigated. (2) Download and examine TransformerTest.txt log for Transformers mode failure. | **HIGH** |
-| #143 | Respond to OdinShiva: acknowledge bug, explain workaround (put any dummy text in API Key field, e.g., "ollama"). Fix incoming. | **MEDIUM** |
-| #209 | Acknowledge bug report, explain we've identified the root cause (repetition cleaner pattern gaps). Ask for version number and whether all examples come from same video or different videos. | **MEDIUM** |
+| #198 | Respond to francetoastVN: (1) LLM "No matches" is same issue as #196, being investigated. (2) Transformers mode: fix committed (`f0ad57a`) — forced beam search was root cause. Will be in next release. | **MEDIUM** |
+| #143 | Respond to OdinShiva: fix committed (`cd72de4`). Workaround for now: put any text in API Key field. Will be in next release. | **MEDIUM** |
+| #209 | Respond to weifu8435: fix committed (`9317695`) — 3-layer repetition cleaner fix. Will be in next release. | **MEDIUM** |
 | #207 | Respond: reference #96, explain what IS saved (translation, ensemble) vs what isn't (pipeline settings). | **LOW** |
 | #206 | Respond: acknowledge feature request, realistic about effort (needs compatibility matrix). | **LOW** |
 
@@ -460,75 +462,55 @@ The auto-batch formula uses a **static calculation** that doesn't account for:
 
 ---
 
-### Group B (MEDIUM): Custom Provider API Key Handling
+### Group B (MEDIUM): Custom Provider API Key Handling — FIXED
 
 **Issues**: #143 (OdinShiva — Ollama)
-**Severity**: MEDIUM — blocks all Ollama/LM Studio users who don't set an API key
-**Fix effort**: Tiny (1-2 lines)
+**Status**: **FIXED** in commit `cd72de4`
 
-**Evidence**: GUI screenshot shows Custom provider, empty API Key field, endpoint `http://localhost:11434/v1`, model `qwen3.5:4b`. Error: `"Connection to custom failed: str expected, not NoneType"`. Second screenshot confirms Ollama is running with model loaded.
+**Root cause**: PROVIDER_CONFIGS defines `custom.env_var = None` (explicit None). `config.get('env_var', '')` returns None because the key EXISTS. `os.getenv(None)` raises TypeError. Two code paths affected.
 
-**Root cause**: `openai.OpenAI(api_key=None)` — SDK requires string, gets None from empty GUI field.
+**Fix applied**: Added `custom` to early-return group alongside `local` in both `webview_gui/api.py` and `translate/cli.py`. Guarded `os.getenv()` with `if env_var` check. `service.py` was already safe.
 
-**Fix**: When provider is "custom" and API key is empty/None, default to `"not-needed"`.
-
-**Files**: `whisperjav/translate/core.py` or `whisperjav/webview_gui/api.py` — wherever OpenAI client is constructed for custom provider.
-
-**Workaround to tell user**: Put any text (e.g., `"ollama"`) in the API Key field.
+**Awaiting**: User confirmation that custom provider works with Ollama.
 
 ---
 
-### Group C (HIGH): Whisper Repetition Hallucination
+### Group C (HIGH): Whisper Repetition Hallucination — FIXED
 
 **Issues**: #209 (weifu8435)
-**Severity**: HIGH — visible output quality degradation for all transcription users
-**Fix effort**: Medium
+**Status**: **FIXED** in commit `9317695`
 
-**Evidence**: 5 SRT screenshots with 4 distinct repetition patterns:
-1. `あ゛あ゛あ゛あ゛...` — char+dakuten, regex backreference broken by combining diacritics
-2. `あ〜、あ〜、あ〜...` — short phrase+wave dash+comma, misses all patterns
-3. `お腹が空いているときは...` repeated 15+ times — 10+ chars exceeds pattern limit of 10
-4. `お母さんがお腹を張ってくれているので...` repeated 10+ times — 16 chars, far over limit
+**Root cause**: 4 architectural gaps in RepetitionCleaner regex patterns (dakuten marks, phrase length limit 10→30, rigid separators, no safety net).
 
-**Root cause**: 4 architectural gaps in `whisperjav/modules/repetition_cleaner.py`:
-1. **Dakuten** (U+309B combining mark) breaks `([ぁ-んァ-ン])\1{3,}` backreference
-2. **Max phrase length 10 chars** in `{1,10}` quantifiers — Japanese phrases routinely exceed this
-3. **Rigid separator patterns** — miss comma+wave-dash combos
-4. **No safety net** — no general "is >50% of text repeated?" detector; `_is_all_repetition()` exists but is disabled
+**Fix applied (3 layers):**
+1. **Layer 1 — Regex patterns fixed**: dakuten support (U+309B/U+309C/U+3099/U+309A), phrase length {1,10}→{1,30}, new `wavedash_comma_phrase` pattern
+2. **Layer 2 — Generic substring repetition detector**: scans substrings at positions 0..sub_len-1, flags if any repeated 3+ times covers >50% of text
+3. **Layer 3 — 200-char absolute length limit**: truncates at sentence boundaries with 75% floor
 
-**Fix plan (3 layers):**
-1. **Generic substring repetition detector** — safety net: try substring lengths 2 to len//2, if any repeated 3+ times covers >50% of text → clean
-2. **Fix specific patterns** — dakuten support (`[゙゚〜ー]*` after base char), increase `{1,10}` to `{1,30}`
-3. **Absolute length limit** — >200 chars for Japanese subtitle ≈ certainly hallucination → truncate with warning
+**False-positive testing verified**: All 10 LEGITIMATE_REPETITIONS pass through. 12 realistic JAV sounds (moans, 2x repetitions) pass through. All 4 dirty examples from #209 caught.
 
-**Files to modify:**
-- `whisperjav/modules/repetition_cleaner.py` — patterns (lines 53-97) + new safety net method
-- `whisperjav/config/sanitization_constants.py` — add `MAX_SUBTITLE_LENGTH`
+**Pipeline coherence verified**: Sanitization pipeline order (HallucinationRemover → RepetitionCleaner → CPS check) is correct. CPS check operates on already-cleaned text (correct design). The fix is correctly placed in RepetitionCleaner.
+
+**Awaiting**: User confirmation with next release.
 
 ---
 
-### Group D (MEDIUM): MPS Beam Search Crash (Upstream Bug)
+### Group D (MEDIUM): MPS Beam Search Crash — FIXED (Architectural)
 
 **Issues**: #198-Transformers (francetoastVN — Mac M1)
-**Severity**: MEDIUM — blocks Transformers mode on Apple Silicon
-**Fix effort**: Small (defensive)
+**Status**: **FIXED** in commit `f0ad57a`
 
-**Evidence**: Full 166-line traceback. Error: `IndexError: index 1077827584 is out of bounds for dimension 0 with size 40` in `transformers/models/whisper/generation_whisper.py:1172` → `split_by_batch_index`. The value `1077827584` (0x40404040) is a classic uninitialized memory pattern.
+**Root cause (revised after deep investigation)**: NOT an upstream HF bug. WhisperJAV forced `num_beams=5` on all HF models including Kotoba-whisper-bilingual-v1.0, which was never tested with beam search (its reference code passes only `{"language": "ja", "task": "transcribe"}`). The forced beam search triggered an IndexError in HF's `split_by_batch_index` code path on MPS.
 
-**Root cause**: HuggingFace Transformers library bug on MPS backend. Beam search indices come back as garbage from Metal GPU. Known class of MPS backend issues in PyTorch.
+**Architectural fix**: Defer to HF best practice — models ship with `generation_config.json` containing tested defaults. Only pass essential kwargs (`language`, `task`). All 6 other kwargs (num_beams, temperature, compression_ratio_threshold, logprob_threshold, no_speech_threshold, condition_on_prev_tokens) changed from hardcoded values to `Optional[None]` — only included in generate_kwargs if user explicitly sets them via CLI/GUI.
 
-Key observations:
-- Model loads on MPS successfully, audio extracts fine (7348.9s ≈ 2hr movie)
-- Crash occurs on first transcription chunk's beam search postprocessing
-- Uses kotoba-whisper-bilingual-v1.0, float16, batch 8
+**Changes across 4 files** (all callers aligned):
+- `transformers_asr.py` — defaults to None, conditional generate_kwargs, MPS fallback removed (no longer needed)
+- `transformers_pipeline.py` — hf_beam_size/hf_temperature defaults to None
+- `pass_worker.py` — DEFAULT_HF_PARAMS aligned
+- `main.py` — argparse defaults and getattr fallbacks aligned, batch_size 8→16
 
-**Fix plan:**
-1. **Immediate workaround**: Tell user `--hf-device cpu` (bypasses MPS, slower but works)
-2. **Defensive fix**: In `transformers_asr.py`, catch `IndexError` during transcription → retry with `device="cpu"` + log warning. Follows existing MPS→CPU fallback pattern used in speech enhancement backends.
-3. **Upstream**: File issue with HuggingFace Transformers for beam search on MPS with long audio
-
-**Files to modify:**
-- `whisperjav/modules/transformers_asr.py` — add try/except around `self.pipe()` call (line ~285)
+**Awaiting**: User confirmation with next release.
 
 ---
 
@@ -564,16 +546,14 @@ Key observations:
 
 This is the recommended order for processing these groups:
 
-| Step | Group | Action | Effort | Blocks |
+| Step | Group | Action | Effort | Status |
 |------|-------|--------|--------|--------|
-| 1 | **B** | Fix #143 Ollama NoneType API key | Tiny (1-2 lines) | Quick win, unblocks Ollama users |
-| 2 | **E** | Respond to #207, #206 on GitHub | Tiny (comments) | Clears response backlog |
-| 3 | **D** | Respond to #198 with `--hf-device cpu` workaround + add defensive MPS→CPU fallback | Small | Unblocks Mac Transformers user |
-| 4 | **C** | Fix #209 repetition hallucination (3-layer safety net) | Medium | Output quality for all users |
-| 5 | **A** | Fix #196 translation token overflow cascade (dynamic batch + retry + garbage detection) | Medium | Most impactful fix — all LLM translation users |
-| 6 | **F** | Wait for #204 confirmation | None | — |
-
-**Rationale**: Start with quick wins (B, E) to clear the queue, then handle the two medium-effort fixes (C, D, A) in order of isolation (C and D are independent; A is complex and may need PySubtrans investigation).
+| 1 | **B** | ~~Fix #143 Ollama NoneType API key~~ | ~~Tiny~~ | **DONE** `cd72de4` |
+| 2 | **C** | ~~Fix #209 repetition hallucination (3-layer safety net)~~ | ~~Medium~~ | **DONE** `9317695` |
+| 3 | **D** | ~~Fix #198 MPS beam search — defer to model defaults~~ | ~~Small~~ | **DONE** `f0ad57a` |
+| 4 | **E** | Respond to #207, #206 on GitHub | Tiny (comments) | **Pending** |
+| 5 | **A** | Fix #196 translation token overflow cascade (dynamic batch + retry + garbage detection) | Medium | **Pending** — most impactful remaining fix |
+| 6 | **F** | Wait for #204 confirmation | None | **Waiting** |
 
 ---
 
