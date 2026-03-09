@@ -457,15 +457,15 @@ def parse_arguments():
                          help="Chunk length in seconds (default: 15)")
     hf_group.add_argument("--hf-stride", type=float, default=None,
                          help="Stride/overlap between chunks in seconds (default: chunk_length/6)")
-    hf_group.add_argument("--hf-batch-size", type=int, default=8,
-                         help="Batch size for parallel chunk processing (default: 8)")
+    hf_group.add_argument("--hf-batch-size", type=int, default=16,
+                         help="Batch size for parallel chunk processing (default: 16)")
     hf_group.add_argument("--hf-scene", type=str, default="none",
                          choices=["none", "auditok", "silero"],
                          help="Scene detection method (default: none)")
-    hf_group.add_argument("--hf-beam-size", type=int, default=5,
-                         help="Beam size for beam search (default: 5)")
-    hf_group.add_argument("--hf-temperature", type=float, default=0.0,
-                         help="Sampling temperature (0=greedy, default: 0.0)")
+    hf_group.add_argument("--hf-beam-size", type=int, default=None,
+                         help="Beam size for beam search (default: model's own default)")
+    hf_group.add_argument("--hf-temperature", type=float, default=None,
+                         help="Sampling temperature (default: model's own default)")
     hf_group.add_argument("--hf-attn", type=str, default="sdpa",
                          choices=["sdpa", "flash_attention_2", "eager"],
                          help="Attention implementation (default: sdpa)")
@@ -1063,10 +1063,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             hf_model_id=getattr(args, 'hf_model_id', 'kotoba-tech/kotoba-whisper-bilingual-v1.0'),
             hf_chunk_length=getattr(args, 'hf_chunk_length', 15),
             hf_stride=getattr(args, 'hf_stride', None),
-            hf_batch_size=getattr(args, 'hf_batch_size', 8),
+            hf_batch_size=getattr(args, 'hf_batch_size', 16),
             hf_scene=getattr(args, 'hf_scene', 'none'),
-            hf_beam_size=getattr(args, 'hf_beam_size', 5),
-            hf_temperature=getattr(args, 'hf_temperature', 0.0),
+            hf_beam_size=getattr(args, 'hf_beam_size', None),
+            hf_temperature=getattr(args, 'hf_temperature', None),
             hf_attn=getattr(args, 'hf_attn', 'sdpa'),
             hf_timestamps=getattr(args, 'hf_timestamps', 'segment'),
             hf_language=getattr(args, 'hf_language', 'ja'),

@@ -42,11 +42,9 @@ class TransformersASR:
     DEFAULT_MODEL_ID = "kotoba-tech/kotoba-whisper-bilingual-v1.0"
     DEFAULT_CHUNK_LENGTH = 15  # Optimal for distil-large-v3 architecture
     DEFAULT_STRIDE = None  # None = chunk_length / 6
-    DEFAULT_BATCH_SIZE = 8
+    DEFAULT_BATCH_SIZE = 16  # Kotoba recommends 16
     DEFAULT_LANGUAGE = "ja"
     DEFAULT_TASK = "transcribe"
-    DEFAULT_BEAM_SIZE = 5
-    DEFAULT_TEMPERATURE = 0.0
 
     def __init__(
         self,
@@ -60,12 +58,12 @@ class TransformersASR:
         language: str = DEFAULT_LANGUAGE,
         task: str = DEFAULT_TASK,
         timestamps: str = "segment",
-        beam_size: int = DEFAULT_BEAM_SIZE,
-        temperature: float = DEFAULT_TEMPERATURE,
-        compression_ratio_threshold: float = 2.4,
-        logprob_threshold: float = -1.0,
-        no_speech_threshold: float = 0.6,
-        condition_on_previous: bool = True,
+        beam_size: Optional[int] = None,
+        temperature: Optional[float] = None,
+        compression_ratio_threshold: Optional[float] = None,
+        logprob_threshold: Optional[float] = None,
+        no_speech_threshold: Optional[float] = None,
+        condition_on_previous: Optional[bool] = None,
     ):
         """
         Initialize TransformersASR.
@@ -81,12 +79,12 @@ class TransformersASR:
             language: Language code (e.g., 'ja')
             task: Task type ('transcribe' or 'translate')
             timestamps: Timestamp granularity ('segment' or 'word')
-            beam_size: Beam size for beam search decoding
-            temperature: Sampling temperature (0 = greedy/deterministic)
-            compression_ratio_threshold: Filter high compression ratio segments
-            logprob_threshold: Filter low confidence segments
-            no_speech_threshold: Threshold for non-speech detection
-            condition_on_previous: Condition on previous text for coherence
+            beam_size: Beam size (None = use model's generation_config default)
+            temperature: Sampling temperature (None = use model's default)
+            compression_ratio_threshold: Filter threshold (None = use model's default)
+            logprob_threshold: Filter threshold (None = use model's default)
+            no_speech_threshold: Non-speech threshold (None = use model's default)
+            condition_on_previous: Condition on previous text (None = use model's default)
         """
         self.model_id = model_id
         self.device_request = device
@@ -261,17 +259,26 @@ class TransformersASR:
         if self.task == 'translate':
             logger.info(f"TransformersASR transcribing with task='translate' - output should be in English")
 
-        # Configure generate_kwargs
+        # Configure generate_kwargs — only pass essential params.
+        # All other params (num_beams, temperature, thresholds, etc.) defer to
+        # the model's generation_config.json which contains tested defaults.
+        # Users can override via constructor args if needed.
         generate_kwargs = {
             "language": self.language,
             "task": self.task,
-            "num_beams": self.beam_size,
-            "temperature": self.temperature,
-            "compression_ratio_threshold": self.compression_ratio_threshold,
-            "logprob_threshold": self.logprob_threshold,
-            "no_speech_threshold": self.no_speech_threshold,
-            "condition_on_prev_tokens": self.condition_on_previous,
         }
+        if self.beam_size is not None:
+            generate_kwargs["num_beams"] = self.beam_size
+        if self.temperature is not None:
+            generate_kwargs["temperature"] = self.temperature
+        if self.compression_ratio_threshold is not None:
+            generate_kwargs["compression_ratio_threshold"] = self.compression_ratio_threshold
+        if self.logprob_threshold is not None:
+            generate_kwargs["logprob_threshold"] = self.logprob_threshold
+        if self.no_speech_threshold is not None:
+            generate_kwargs["no_speech_threshold"] = self.no_speech_threshold
+        if self.condition_on_previous is not None:
+            generate_kwargs["condition_on_prev_tokens"] = self.condition_on_previous
 
         # Configure return_timestamps
         if self.timestamps == "word":

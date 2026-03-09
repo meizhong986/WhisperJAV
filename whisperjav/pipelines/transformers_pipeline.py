@@ -67,8 +67,8 @@ class TransformersPipeline(BasePipeline):
         hf_stride: Optional[float] = None,
         hf_batch_size: int = 16,
         hf_scene: str = "none",
-        hf_beam_size: int = 5,
-        hf_temperature: float = 0.0,
+        hf_beam_size: Optional[int] = None,
+        hf_temperature: Optional[float] = None,
         hf_attn: str = "sdpa",
         hf_timestamps: str = "segment",
         hf_language: str = "ja",
@@ -115,8 +115,8 @@ class TransformersPipeline(BasePipeline):
             hf_stride: Overlap between chunks (None = chunk_length/6)
             hf_batch_size: Batch size for parallel processing
             hf_scene: Scene detection method ('none', 'auditok', 'silero')
-            hf_beam_size: Beam size for beam search
-            hf_temperature: Sampling temperature
+            hf_beam_size: Beam size (None = use model's default, typically greedy)
+            hf_temperature: Sampling temperature (None = use model's default)
             hf_attn: Attention implementation
             hf_timestamps: Timestamp granularity ('segment' or 'word')
             hf_language: Language code
