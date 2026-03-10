@@ -233,21 +233,32 @@ echo ""
 # Check PEP 668 / venv requirement
 check_venv_requirement
 
-# Navigate to repository root
-cd "$REPO_ROOT"
+# Navigate to repository root (or clone if running via curl pipe)
+GITHUB_REPO="https://github.com/meizhong986/whisperjav.git"
 
-# Verify install.py exists
+if [[ -f "$REPO_ROOT/install.py" ]]; then
+    # Running from within a cloned repo — use it directly
+    cd "$REPO_ROOT"
+    echo -e "${GREEN}Running from local repository: $REPO_ROOT${NC}"
+else
+    # Running standalone (e.g., curl | bash) — clone the repo first
+    echo ""
+    echo -e "${CYAN}Cloning WhisperJAV repository...${NC}"
+    CLONE_DIR="${TMPDIR:-/tmp}/whisperjav_install_$$"
+    git clone --depth 1 "$GITHUB_REPO" "$CLONE_DIR"
+    cd "$CLONE_DIR"
+    echo -e "${GREEN}Cloned latest version to: $CLONE_DIR${NC}"
+fi
+
+# Final check
 if [[ ! -f "install.py" ]]; then
     echo ""
     echo -e "${RED}============================================================${NC}"
     echo -e "${RED}  ERROR: install.py not found${NC}"
     echo -e "${RED}============================================================${NC}"
     echo ""
-    echo "  This script must be run from the WhisperJAV repository."
-    echo "  Expected location: whisperjav/installer/install_mac.sh"
-    echo ""
-    echo "  To install WhisperJAV:"
-    echo "    git clone https://github.com/meizhong986/whisperjav.git"
+    echo "  Could not locate install.py. Please install manually:"
+    echo "    git clone $GITHUB_REPO"
     echo "    cd whisperjav"
     echo "    chmod +x installer/install_mac.sh"
     echo "    ./installer/install_mac.sh"
