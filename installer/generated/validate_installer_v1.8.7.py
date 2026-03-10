@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-WhisperJAV v1.8.7b2 Installer Validation Script
+WhisperJAV v1.8.7 Installer Validation Script
 ==============================================
 
 This script performs comprehensive pre-build validation checks to ensure
@@ -41,23 +41,23 @@ BLUE = '\033[94m'
 RESET = '\033[0m'
 
 # Expected version
-EXPECTED_VERSION = "1.8.7b2"
+EXPECTED_VERSION = "1.8.7"
 
-# Required files for v1.8.7b2 installer
+# Required files for v1.8.7 installer
 REQUIRED_FILES = [
-    "construct_v1.8.7b2.yaml",
-    "post_install_v1.8.7b2.bat",
-    "post_install_v1.8.7b2.py",
-    "requirements_v1.8.7b2.txt",
-    "WhisperJAV_Launcher_v1.8.7b2.py",
-    "README_INSTALLER_v1.8.7b2.txt",
+    "construct_v1.8.7.yaml",
+    "post_install_v1.8.7.bat",
+    "post_install_v1.8.7.py",
+    "requirements_v1.8.7.txt",
+    "WhisperJAV_Launcher_v1.8.7.py",
+    "README_INSTALLER_v1.8.7.txt",
     "LICENSE.txt",
     "whisperjav_icon.ico",
 ]
 
 # Wheel file pattern - matches version with PEP 440 normalization
 # e.g., "1.7.0-beta" becomes "1.7.0b0" in wheel filename
-WHEEL_PATTERN = "whisperjav-1.8.7b2*.whl"
+WHEEL_PATTERN = "whisperjav-1.8.7*.whl"
 WHEEL_PATTERN_FALLBACK = "whisperjav-*.whl"
 
 # Expected module path (no old Tkinter GUI references)
@@ -132,10 +132,10 @@ def validate_version_consistency():
     # - Display: 1.7.0-beta, 1.7.0-alpha (with hyphen)
     version_pattern = r"(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:-[a-zA-Z0-9]+)?)"
     version_files = [
-        ("construct_v1.8.7b2.yaml", rf"version:\s*['\"]?{version_pattern}"),
-        ("post_install_v1.8.7b2.py", rf"WhisperJAV v{version_pattern}"),
-        ("WhisperJAV_Launcher_v1.8.7b2.py", rf"v{version_pattern}"),
-        ("README_INSTALLER_v1.8.7b2.txt", rf"WhisperJAV v{version_pattern}"),
+        ("construct_v1.8.7.yaml", rf"version:\s*['\"]?{version_pattern}"),
+        ("post_install_v1.8.7.py", rf"WhisperJAV v{version_pattern}"),
+        ("WhisperJAV_Launcher_v1.8.7.py", rf"v{version_pattern}"),
+        ("README_INSTALLER_v1.8.7.txt", rf"WhisperJAV v{version_pattern}"),
     ]
 
     for filename, pattern in version_files:
@@ -173,8 +173,8 @@ def validate_module_paths():
 
     all_passed = True
     files_to_check = [
-        "WhisperJAV_Launcher_v1.8.7b2.py",
-        "post_install_v1.8.7b2.py",
+        "WhisperJAV_Launcher_v1.8.7.py",
+        "post_install_v1.8.7.py",
     ]
 
     for filename in files_to_check:
@@ -223,7 +223,7 @@ def validate_requirements_encoding():
     """Check that requirements.txt is valid UTF-8 without encoding issues"""
     print_header("Phase 4: Requirements File Encoding Check")
 
-    filename = "requirements_v1.8.7b2.txt"
+    filename = "requirements_v1.8.7.txt"
 
     if not check_file_exists(filename):
         print_check(f"{filename} encoding", False, "File not found")
@@ -303,7 +303,7 @@ def validate_yaml_syntax():
     """Basic YAML syntax validation for construct file"""
     print_header("Phase 6: YAML Syntax Validation")
 
-    filename = "construct_v1.8.7b2.yaml"
+    filename = "construct_v1.8.7.yaml"
 
     if not check_file_exists(filename):
         print_check(f"{filename} syntax", False, "File not found")
@@ -370,7 +370,7 @@ def main():
     """Run all validation checks"""
     print()
     print("=" * 80)
-    print(" " * 20 + "WhisperJAV v1.8.7b2 Installer Validation")
+    print(" " * 20 + "WhisperJAV v1.8.7 Installer Validation")
     print("=" * 80)
     print()
     print("Running pre-build validation checks...")
@@ -404,7 +404,7 @@ def main():
         print(f"{GREEN}✓ All validation checks passed!{RESET}")
         print()
         print("The installer is ready to build.")
-        print("Run: build_installer_v1.8.7b2.bat")
+        print("Run: build_installer_v1.8.7.bat")
         print()
         return 0
     else:

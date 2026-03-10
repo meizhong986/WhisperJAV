@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-WhisperJAV v1.8.7b2 GUI Launcher
+WhisperJAV v1.8.7 GUI Launcher
 ================================
 
 This launcher script:
@@ -55,7 +55,7 @@ def log_first_run_info(install_root: Path):
             # Create default config for first run
             config = {
                 "first_run": True,
-                "version": "1.8.7b2"
+                "version": "1.8.7"
             }
             with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2)
@@ -77,7 +77,7 @@ def main():
         else:
             install_root = Path(sys.prefix)
 
-        print(f"WhisperJAV v1.8.7b2 Launcher")
+        print(f"WhisperJAV v1.8.7 Launcher")
         print(f"Installation: {install_root}")
         print()
 

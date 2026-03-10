@@ -1,9 +1,9 @@
 @echo off
 REM ===============================================================================
-REM WhisperJAV v1.8.7b2 Uninstaller
+REM WhisperJAV v1.8.7 Uninstaller
 REM ===============================================================================
 REM
-REM This script completely removes WhisperJAV v1.8.7b2 from your system:
+REM This script completely removes WhisperJAV v1.8.7 from your system:
 REM - Installation directory (all files)
 REM - Desktop shortcut
 REM - Optionally: User configuration
@@ -15,10 +15,10 @@ REM
 SETLOCAL EnableDelayedExpansion
 
 echo ===============================================================================
-echo                      WhisperJAV v1.8.7b2 Uninstaller
+echo                      WhisperJAV v1.8.7 Uninstaller
 echo ===============================================================================
 echo.
-echo This will PERMANENTLY DELETE WhisperJAV v1.8.7b2 and all its files.
+echo This will PERMANENTLY DELETE WhisperJAV v1.8.7 and all its files.
 echo.
 
 REM Get the installation directory (where this script is located)
@@ -32,7 +32,7 @@ echo.
 REM ===== Confirmation Prompt =====
 echo WARNING: This action cannot be undone!
 echo.
-set /p CONFIRM="Are you sure you want to uninstall WhisperJAV v1.8.7b2? (yes/no): "
+set /p CONFIRM="Are you sure you want to uninstall WhisperJAV v1.8.7? (yes/no): "
 
 if /i not "%CONFIRM%"=="yes" (
     echo.
@@ -49,8 +49,8 @@ echo ===========================================================================
 echo.
 
 REM Create uninstall log
-set UNINSTALL_LOG=%TEMP%\whisperjav_uninstall_v1.8.7b2.txt
-echo WhisperJAV v1.8.7b2 Uninstallation Log > "%UNINSTALL_LOG%"
+set UNINSTALL_LOG=%TEMP%\whisperjav_uninstall_v1.8.7.txt
+echo WhisperJAV v1.8.7 Uninstallation Log > "%UNINSTALL_LOG%"
 echo Uninstall started: %DATE% %TIME% >> "%UNINSTALL_LOG%"
 echo Installation directory: %INSTALL_DIR% >> "%UNINSTALL_LOG%"
 echo. >> "%UNINSTALL_LOG%"
@@ -59,7 +59,7 @@ REM ===== Step 1: Remove Desktop Shortcut =====
 echo [Step 1/6] Removing desktop shortcut...
 echo [Step 1/6] Desktop shortcut >> "%UNINSTALL_LOG%"
 
-set SHORTCUT_PATH=%USERPROFILE%\Desktop\WhisperJAV v1.8.7b2.lnk
+set SHORTCUT_PATH=%USERPROFILE%\Desktop\WhisperJAV v1.8.7.lnk
 
 if exist "%SHORTCUT_PATH%" (
     del "%SHORTCUT_PATH%"
@@ -199,10 +199,10 @@ echo [Step 4/6] Installation directory >> "%UNINSTALL_LOG%"
 REM We need to delete the installation directory, but this script is running from it!
 REM Strategy: Create a temporary cleanup script that runs after this script exits
 
-set CLEANUP_SCRIPT=%TEMP%\whisperjav_cleanup_v1.8.7b2.bat
+set CLEANUP_SCRIPT=%TEMP%\whisperjav_cleanup_v1.8.7.bat
 
 echo @echo off > "%CLEANUP_SCRIPT%"
-echo REM Temporary cleanup script for WhisperJAV v1.8.7b2 >> "%CLEANUP_SCRIPT%"
+echo REM Temporary cleanup script for WhisperJAV v1.8.7 >> "%CLEANUP_SCRIPT%"
 echo echo Removing installation directory... >> "%CLEANUP_SCRIPT%"
 echo timeout /t 2 /nobreak ^>nul >> "%CLEANUP_SCRIPT%"
 echo rmdir /s /q "%INSTALL_DIR%" >> "%CLEANUP_SCRIPT%"
@@ -215,7 +215,7 @@ echo     pause >> "%CLEANUP_SCRIPT%"
 echo ) else ( >> "%CLEANUP_SCRIPT%"
 echo     echo Installation directory removed successfully! >> "%CLEANUP_SCRIPT%"
 echo     echo. >> "%CLEANUP_SCRIPT%"
-echo     echo WhisperJAV v1.8.7b2 has been uninstalled. >> "%CLEANUP_SCRIPT%"
+echo     echo WhisperJAV v1.8.7 has been uninstalled. >> "%CLEANUP_SCRIPT%"
 echo     timeout /t 3 /nobreak ^>nul >> "%CLEANUP_SCRIPT%"
 echo ) >> "%CLEANUP_SCRIPT%"
 echo del "%%~f0" >> "%CLEANUP_SCRIPT%"
@@ -234,7 +234,7 @@ echo                      Uninstallation Complete!
 echo ===============================================================================
 echo.
 echo The following items have been removed:
-echo   - Desktop shortcut: WhisperJAV v1.8.7b2.lnk
+echo   - Desktop shortcut: WhisperJAV v1.8.7.lnk
 echo   - Start Menu shortcut folder
 if /i "%DEL_CONFIG%"=="y" echo   - User configuration files (APPDATA and legacy)
 if /i "%DEL_MODELS%"=="y" echo   - Cached AI models (~!MODEL_SIZE_MB! MB)

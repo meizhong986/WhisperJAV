@@ -347,6 +347,15 @@ PACKAGES: List[Package] = [
         required=True,
         reason="Audio processing for PyTorch - must match torch version",
     ),
+    Package(
+        name="torchvision",
+        extra=Extra.CORE,
+        source=InstallSource.INDEX_URL,
+        index_url="https://download.pytorch.org/whl/{cuda}",
+        order=12,
+        required=True,
+        reason="PyTorch vision - required by ClearVoice enhancement backend; must match torch CUDA index",
+    ),
 
     # =========================================================================
     # PHASE 3: Scientific Stack (Order 20-29)
@@ -692,6 +701,64 @@ PACKAGES: List[Package] = [
         order=77,
         reason="ClearVoice speech enhancement - custom fork with relaxed librosa",
     ),
+    # ClearVoice transitive deps (explicit for --no-deps safety in Phase 3.5):
+    # These are declared in ClearVoice's pyproject.toml but skipped with --no-deps.
+    # Version pins are relaxed from ClearVoice's exact pins to avoid conflicts.
+    Package(
+        name="gdown",
+        extra=Extra.ENHANCE,
+        order=77,
+        reason="Google Drive downloader - used by ClearVoice for model downloads",
+    ),
+    Package(
+        name="joblib",
+        extra=Extra.ENHANCE,
+        order=77,
+        reason="Lightweight parallelism - ClearVoice transitive dep (also via scikit-learn)",
+    ),
+    Package(
+        name="opencv-python",
+        version=">=4.0",
+        extra=Extra.ENHANCE,
+        order=77,
+        import_name="cv2",
+        reason="Computer vision - required by ClearVoice (relaxed from ==4.10.0.84)",
+    ),
+    Package(
+        name="python-speech-features",
+        version=">=0.6",
+        extra=Extra.ENHANCE,
+        order=77,
+        import_name="python_speech_features",
+        reason="Speech feature extraction - required by ClearVoice",
+    ),
+    Package(
+        name="rotary-embedding-torch",
+        version=">=0.8",
+        extra=Extra.ENHANCE,
+        order=77,
+        import_name="rotary_embedding_torch",
+        reason="Rotary positional embeddings - required by ClearVoice model architecture",
+    ),
+    Package(
+        name="scenedetect",
+        version=">=0.6",
+        extra=Extra.ENHANCE,
+        order=77,
+        reason="Video scene detection - required by ClearVoice",
+    ),
+    Package(
+        name="torchinfo",
+        extra=Extra.ENHANCE,
+        order=77,
+        reason="PyTorch model summary utility - required by ClearVoice",
+    ),
+    Package(
+        name="yamlargparse",
+        extra=Extra.ENHANCE,
+        order=77,
+        reason="YAML-based argument parser - required by ClearVoice configuration",
+    ),
     Package(
         name="bs-roformer-infer",
         extra=Extra.ENHANCE,
@@ -791,6 +858,21 @@ PACKAGES: List[Package] = [
         extra=Extra.CORE,
         order=89,
         reason="Advanced regex for Japanese text processing",
+    ),
+    Package(
+        name="tiktoken",
+        version=">=0.7.0",
+        extra=Extra.CORE,
+        order=89,
+        reason="Tokenizer for OpenAI Whisper (making transitive dep explicit for --no-deps safety)",
+    ),
+    Package(
+        name="more-itertools",
+        version=">=10.0",
+        extra=Extra.CORE,
+        order=89,
+        import_name="more_itertools",
+        reason="Extended iteration utilities - transitive dep of openai-whisper (explicit for --no-deps safety)",
     ),
 
     # =========================================================================
@@ -1083,8 +1165,8 @@ def generate_requirements_txt(include_core: bool = True) -> str:
 
         lines.append(f"# {extra.value.upper()} packages")
         for pkg in sorted(packages, key=lambda p: p.order):
-            # Skip torch/torchaudio - installed separately with CUDA
-            if pkg.name in ("torch", "torchaudio"):
+            # Skip torch/torchaudio/torchvision - installed separately with CUDA
+            if pkg.name in ("torch", "torchaudio", "torchvision"):
                 lines.append(f"# {pkg.name} - installed separately with CUDA detection")
                 continue
 

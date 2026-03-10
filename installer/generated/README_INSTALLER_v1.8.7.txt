@@ -1,5 +1,5 @@
 ===============================================================================
-                            WhisperJAV v1.8.7b2
+                            WhisperJAV v1.8.7
                 Japanese AV Subtitle Generator with AI
 ===============================================================================
 
@@ -8,7 +8,7 @@ Thank you for installing WhisperJAV!
 -------------------------------------------------------------------------------
 QUICK START
 -------------------------------------------------------------------------------
-1. Double-click the "WhisperJAV v1.8.7b2" desktop icon
+1. Double-click the "WhisperJAV v1.8.7" desktop icon
 2. Select your video/audio files using "Add File(s)" or "Add Folder"
 3. Choose processing mode (Balanced recommended for best quality)
 4. Click "Start" to begin processing
@@ -19,9 +19,9 @@ FIRST RUN NOTE: On your first transcription, AI models will download (~3GB).
                 on your internet speed. Progress is shown in the GUI.
 
 -------------------------------------------------------------------------------
-WHAT'S NEW IN v1.8.7b2
+WHAT'S NEW IN v1.8.7
 -------------------------------------------------------------------------------
-Version 1.8.7b2 brings major improvements across 5 key areas:
+Version 1.8.7 brings major improvements across 5 key areas:
 
 1. QWEN3-ASR PIPELINE (NEW)
    - New Qwen3-based ASR engine with three input modes:
@@ -49,7 +49,7 @@ Version 1.8.7b2 brings major improvements across 5 key areas:
    - Improved ensemble defaults and pass configuration in GUI
    - Streamlined CUDA driver detection (2-tier: cu118/cu128)
 
-For detailed release notes, see RELEASE_NOTES_v1.8.7b2.md
+For detailed release notes, see RELEASE_NOTES_v1.8.7.md
 
 -------------------------------------------------------------------------------
 WHAT THIS INSTALLER DOES
@@ -99,7 +99,7 @@ RECOMMENDED FOR BEST PERFORMANCE:
   - 16 GB RAM
   - SSD for faster processing
 
-SUPPORTED PLATFORMS (v1.8.7b2):
+SUPPORTED PLATFORMS (v1.8.7):
   - Windows: NVIDIA GPU (RTX 20/30/40/50-series) or CPU-only
   - macOS: Apple Silicon (M1/M2/M3/M4/M5) with native MPS acceleration
   - macOS: Intel (CPU-only, slower)
@@ -124,7 +124,7 @@ CUDA GPU ACCELERATION:
 AFTER INSTALLATION
 -------------------------------------------------------------------------------
 LAUNCHING THE APPLICATION:
-  - Desktop shortcut: "WhisperJAV v1.8.7b2.lnk" (double-click to start)
+  - Desktop shortcut: "WhisperJAV v1.8.7.lnk" (double-click to start)
   - Manual launch: Double-click WhisperJAV-GUI.exe in installation folder
   - Alternative: Open the installation folder and run:
     pythonw.exe -m whisperjav.webview_gui.main
@@ -134,9 +134,9 @@ INSTALLATION LOCATION:
   - Or custom location chosen during installation
 
 LOGS AND DIAGNOSTICS:
-  - Installation log: install_log_v1.8.7b2.txt (in install folder)
+  - Installation log: install_log_v1.8.7.txt (in install folder)
   - Application logs: Shown in GUI console during processing
-  - Failure marker: INSTALLATION_FAILED_v1.8.7b2.txt (only if install failed)
+  - Failure marker: INSTALLATION_FAILED_v1.8.7.txt (only if install failed)
 
 OUTPUT FILES:
   - Subtitles are saved next to your input video/audio files
@@ -156,7 +156,7 @@ SENSITIVITY LEVELS:
   - Balanced: Good balance of detail and accuracy (recommended)
   - Aggressive: Maximum detail capture, may include more background noise
 
-SOURCE LANGUAGES (NEW in v1.8.7b2):
+SOURCE LANGUAGES (NEW in v1.8.7):
   - Japanese (日本語): Fully optimized, best results
   - Korean (한국어): Experimental, basic support
   - Chinese (中文): Experimental, basic support
@@ -198,7 +198,7 @@ INSTALLATION ISSUES:
    - Models are downloaded to C:\Users\[Name]\.cache\whisper (~3 GB)
 
 5. "Installation failed after retries":
-   - Check install_log_v1.8.7b2.txt for specific error messages
+   - Check install_log_v1.8.7.txt for specific error messages
    - Common causes: antivirus blocking downloads, network timeout
    - Try running the installer as Administrator (right-click > Run as admin)
 
@@ -222,7 +222,7 @@ RUNTIME ISSUES:
 4. "Subtitles have errors or gibberish":
    - Try "balanced" mode for better quality
    - Use "conservative" sensitivity to reduce false positives
-   - Ensure correct source language is selected (NEW in v1.8.7b2)
+   - Ensure correct source language is selected (NEW in v1.8.7)
    - For non-Japanese audio, try English or other languages
 
 5. "Application crashes during processing":
@@ -231,21 +231,21 @@ RUNTIME ISSUES:
    - Try processing one file at a time instead of batch
    - Report crashes at: https://github.com/meizhong986/WhisperJAV/issues
 
-6. "Translation interrupted and lost progress" (FIXED in v1.8.7b2):
-   - v1.8.7b2 now auto-saves translation progress
+6. "Translation interrupted and lost progress" (FIXED in v1.8.7):
+   - v1.8.7 now auto-saves translation progress
    - Simply re-run the same command to resume from last batch
    - No more lost work or API costs!
 
 -------------------------------------------------------------------------------
 UNINSTALLING
 -------------------------------------------------------------------------------
-To completely remove WhisperJAV v1.8.7b2:
+To completely remove WhisperJAV v1.8.7:
 
 1. Delete the installation directory:
    C:\Users\[YourName]\AppData\Local\WhisperJAV (or your custom location)
 
 2. Delete the desktop shortcut:
-   Desktop\WhisperJAV v1.8.7b2.lnk
+   Desktop\WhisperJAV v1.8.7.lnk
 
 3. (Optional) Delete cached models to free up ~3 GB:
    C:\Users\[YourName]\.cache\whisper
@@ -253,7 +253,7 @@ To completely remove WhisperJAV v1.8.7b2:
 4. (Optional) Delete user configuration:
    [Install Directory]\whisperjav_config.json
 
-NOTE: An automated uninstaller (uninstall_v1.8.7b2.bat) is included in the
+NOTE: An automated uninstaller (uninstall_v1.8.7.bat) is included in the
       installation directory for your convenience.
 
 -------------------------------------------------------------------------------
@@ -278,7 +278,7 @@ PERFORMANCE TIPS
    - Process multiple files overnight using batch mode
    - Use "async processing" (experimental) for parallel execution
 
-5. Translation Tips (v1.8.7b2):
+5. Translation Tips (v1.8.7):
    - Enable resume feature for long translations
    - Progress auto-saved after each batch
    - Re-run same command to resume interrupted translations
@@ -309,7 +309,7 @@ TRANSLATION:
   # Use custom instructions
   whisperjav-translate -i subtitles.srt --custom-gist [URL]
 
-  # Resume interrupted translation (NEW in v1.8.7b2)
+  # Resume interrupted translation (NEW in v1.8.7)
   whisperjav-translate -i subtitles.srt
   # (Progress auto-saves, just re-run if interrupted)
 
@@ -328,11 +328,11 @@ with detailed information about your system and the problem.
 -------------------------------------------------------------------------------
 VERSION INFORMATION
 -------------------------------------------------------------------------------
-WhisperJAV Version: 1.8.7b2
+WhisperJAV Version: 1.8.7
 Release Date: February 2026
-Installer Version: v1.8.7b2 (conda-constructor)
+Installer Version: v1.8.7 (conda-constructor)
 
-Key Changes in 1.8.7b2:
+Key Changes in 1.8.7:
   - Qwen3-ASR pipeline (assembly, context-aware, VAD-slicing modes)
   - Adaptive step-down architecture (Tier 1/Tier 2 grouping with fallback)
   - Pipeline analytics and health check system
@@ -347,7 +347,7 @@ Previous Major Changes (1.5.1):
   - Better WebView2 detection and installation guidance
   - CPU-only fallback for systems without NVIDIA GPUs
 
-For full release notes, see RELEASE_NOTES_v1.8.7b2.md
+For full release notes, see RELEASE_NOTES_v1.8.7.md
 
 -------------------------------------------------------------------------------
 LICENSE

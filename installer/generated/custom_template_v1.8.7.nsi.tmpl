@@ -1676,7 +1676,7 @@ Section "Install"
         call AbortRetryNSExecWait
     ${EndIf}
 
-    ; === WhisperJAV v1.8.7b2 Custom Desktop Shortcut Creation ===
+    ; === WhisperJAV v1.8.7 Custom Desktop Shortcut Creation ===
     ; Create desktop shortcut to WhisperJAV GUI application
     ; This runs after post_install completes and all packages are installed
     ${If} $Ana_CreateShortcuts_State = ${BST_CHECKED}
@@ -1686,7 +1686,7 @@ Section "Install"
         SetOutPath "$INSTDIR"
 
         ; Create desktop shortcut
-        ; Target: WhisperJAV v1.8.7b2.lnk on user's desktop
+        ; Target: WhisperJAV v1.8.7.lnk on user's desktop
         ; Executable: WhisperJAV-GUI.exe (copied from Scripts/whisperjav-gui.exe by post_install)
         ; Parameters: none (exe handles everything)
         ; Icon: whisperjav_icon.ico in installation folder
@@ -1694,14 +1694,14 @@ Section "Install"
         ; Window state: SW_SHOWNORMAL (normal window)
         ; Hotkey: none ("")
         ; Description: shown in tooltip and properties
-        CreateShortCut "$DESKTOP\WhisperJAV v1.8.7b2.lnk" \
+        CreateShortCut "$DESKTOP\WhisperJAV v1.8.7.lnk" \
             "$INSTDIR\WhisperJAV-GUI.exe" \
             "" \
             "$INSTDIR\whisperjav_icon.ico" \
             0 \
             SW_SHOWNORMAL \
             "" \
-            "WhisperJAV v1.8.7b2 - Japanese AV Subtitle Generator"
+            "WhisperJAV v1.8.7 - Japanese AV Subtitle Generator"
 
         ${Print} "Desktop shortcut created successfully"
     ${EndIf}

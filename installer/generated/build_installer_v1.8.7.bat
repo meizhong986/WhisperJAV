@@ -1,26 +1,26 @@
 @echo off
 REM ===============================================================================
-REM WhisperJAV v1.8.7b2 Installer Build Script
+REM WhisperJAV v1.8.7 Installer Build Script
 REM ===============================================================================
 REM
-REM This script builds the conda-constructor installer for WhisperJAV v1.8.7b2
+REM This script builds the conda-constructor installer for WhisperJAV v1.8.7
 REM
 REM Prerequisites:
 REM - Conda with constructor package installed:
 REM   conda install constructor -c conda-forge
-REM - All v1.8.7b2 installer files must be present in installer/ directory
+REM - All v1.8.7 installer files must be present in installer/ directory
 REM
 REM Build Process:
 REM 1. Check prerequisites (constructor, Python)
 REM 2. Verify/build WhisperJAV wheel
 REM 3. Download uv package manager (fast installer)
 REM 4. Validate installer configuration
-REM 5. Clean previous v1.8.7b2 builds
+REM 5. Clean previous v1.8.7 builds
 REM 6. Run constructor to build installer
 REM 7. Verify output and generate build report
 REM
-REM Output: WhisperJAV-1.8.7b2-Windows-x86_64.exe
-REM Logs: build_log_v1.8.7b2.txt
+REM Output: WhisperJAV-1.8.7-Windows-x86_64.exe
+REM Logs: build_log_v1.8.7.txt
 REM
 
 SETLOCAL EnableDelayedExpansion
@@ -29,18 +29,18 @@ REM Change to script directory
 cd /d "%~dp0"
 
 REM ===== Configuration =====
-set CONFIG_FILE=construct_v1.8.7b2.yaml
-set VALIDATOR=validate_installer_v1.8.7b2.py
-set BUILD_LOG=build_log_v1.8.7b2.txt
-set VERSION=1.8.7b2
+set CONFIG_FILE=construct_v1.8.7.yaml
+set VALIDATOR=validate_installer_v1.8.7.py
+set BUILD_LOG=build_log_v1.8.7.txt
+set VERSION=1.8.7
 
 echo ===============================================================================
-echo                    WhisperJAV v1.8.7b2 Installer Build
+echo                    WhisperJAV v1.8.7 Installer Build
 echo ===============================================================================
 echo.
 
 REM Initialize log file
-echo WhisperJAV v1.8.7b2 Installer Build Log > "%BUILD_LOG%"
+echo WhisperJAV v1.8.7 Installer Build Log > "%BUILD_LOG%"
 echo Build started: %DATE% %TIME% >> "%BUILD_LOG%"
 echo. >> "%BUILD_LOG%"
 
@@ -337,10 +337,10 @@ if exist "%VALIDATOR%" (
 echo.
 
 REM ===== Phase 5: Clean Previous Builds =====
-echo [Phase 5/7] Cleaning previous v1.8.7b2 builds...
+echo [Phase 5/7] Cleaning previous v1.8.7 builds...
 echo [Phase 5/7] Cleaning previous builds... >> "%BUILD_LOG%"
 
-REM Only clean v1.8.7b2 builds, preserve other versions
+REM Only clean v1.8.7 builds, preserve other versions
 if exist build (
     echo   - Removing build/ directory...
     rmdir /s /q build
@@ -382,7 +382,7 @@ if errorlevel 1 (
     echo Check the error messages above for details.
     echo.
     echo Common issues:
-    echo   - Missing dependencies in construct_v1.8.7b2.yaml
+    echo   - Missing dependencies in construct_v1.8.7.yaml
     echo   - Network issues downloading packages
     echo   - Insufficient disk space
     echo   - Corrupted conda package cache
@@ -390,7 +390,7 @@ if errorlevel 1 (
     echo To troubleshoot:
     echo   1. Check %BUILD_LOG% for details
     echo   2. Try: conda clean --all
-    echo   3. Verify all files in construct_v1.8.7b2.yaml extra_files exist
+    echo   3. Verify all files in construct_v1.8.7.yaml extra_files exist
     echo.
     pause
     exit /b 1
@@ -450,7 +450,7 @@ echo.
 echo Next Steps:
 echo   1. Test the installer on a clean Windows VM
 echo   2. Verify all features work correctly
-echo   3. Check installation logs (install_log_v1.8.7b2.txt)
+echo   3. Check installation logs (install_log_v1.8.7.txt)
 echo   4. Distribute to users
 echo.
 echo To test installer:

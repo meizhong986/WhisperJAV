@@ -1,6 +1,6 @@
 @echo off
 REM ========================================
-REM WhisperJAV v1.8.7b2 Desktop Shortcut Creator
+REM WhisperJAV v1.8.7 Desktop Shortcut Creator
 REM ========================================
 REM
 REM This script creates a Windows desktop shortcut that:
@@ -12,13 +12,13 @@ REM
 REM Uses PowerShell to create .lnk file via WScript.Shell COM object
 REM
 
-echo Creating WhisperJAV v1.8.7b2 desktop shortcut...
+echo Creating WhisperJAV v1.8.7 desktop shortcut...
 
 REM Get the directory where this script is located (install root)
 set SCRIPT_DIR=%~dp0
 
 REM Shortcut configuration
-set SHORTCUT_NAME=WhisperJAV v1.8.7b2.lnk
+set SHORTCUT_NAME=WhisperJAV v1.8.7.lnk
 set TARGET_EXE=%SCRIPT_DIR%WhisperJAV-GUI.exe
 set PYTHONW=%SCRIPT_DIR%pythonw.exe
 set TARGET_ARGS=-m whisperjav.webview_gui.main
@@ -66,12 +66,12 @@ if %ERRORLEVEL% EQU 0 (
         REM Preferred: Point to WhisperJAV-GUI.exe
         echo Shortcut target: %TARGET_EXE%
         echo.
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%TARGET_EXE%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.8.7b2 Japanese AV Subtitle Generator'; $Shortcut.Save()"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%TARGET_EXE%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.8.7 Japanese AV Subtitle Generator'; $Shortcut.Save()"
     ) else (
         REM Fallback: Point to pythonw.exe with module arguments
         echo Shortcut target: %PYTHONW% %TARGET_ARGS%
         echo.
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%PYTHONW%'; $Shortcut.Arguments = '%TARGET_ARGS%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.8.7b2 Japanese AV Subtitle Generator'; $Shortcut.Save()"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell = New-Object -ComObject WScript.Shell; $Desktop = [Environment]::GetFolderPath('Desktop'); $ShortcutPath = Join-Path $Desktop '%SHORTCUT_NAME%'; $Shortcut = $WshShell.CreateShortcut($ShortcutPath); $Shortcut.TargetPath = '%PYTHONW%'; $Shortcut.Arguments = '%TARGET_ARGS%'; $Shortcut.WorkingDirectory = '%SCRIPT_DIR%'; if ('%ICON%' -ne '') { $Shortcut.IconLocation = '%ICON%' }; $Shortcut.Description = 'WhisperJAV v1.8.7 Japanese AV Subtitle Generator'; $Shortcut.Save()"
     )
 ) else (
     REM PowerShell not available - use VBScript fallback (works on all Windows)
@@ -90,7 +90,7 @@ if %ERRORLEVEL% EQU 0 (
             echo Set Shortcut = WshShell.CreateShortcut^(DesktopPath ^& "\%SHORTCUT_NAME%"^)
             echo Shortcut.TargetPath = "%TARGET_EXE%"
             echo Shortcut.WorkingDirectory = "%SCRIPT_DIR%"
-            echo Shortcut.Description = "WhisperJAV v1.8.7b2 - Japanese AV Subtitle Generator"
+            echo Shortcut.Description = "WhisperJAV v1.8.7 - Japanese AV Subtitle Generator"
         ) > "%VBS_SCRIPT%"
         REM Add icon line if icon exists
         if not "%ICON%"=="" (
@@ -109,7 +109,7 @@ if %ERRORLEVEL% EQU 0 (
             echo Shortcut.TargetPath = "%PYTHONW%"
             echo Shortcut.Arguments = "%TARGET_ARGS%"
             echo Shortcut.WorkingDirectory = "%SCRIPT_DIR%"
-            echo Shortcut.Description = "WhisperJAV v1.8.7b2 - Japanese AV Subtitle Generator"
+            echo Shortcut.Description = "WhisperJAV v1.8.7 - Japanese AV Subtitle Generator"
         ) > "%VBS_SCRIPT%"
         REM Add icon line if icon exists
         if not "%ICON%"=="" (

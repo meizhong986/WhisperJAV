@@ -697,10 +697,10 @@ def _get_core_deps_from_registry() -> list:
             "soxr>=0.3.0",
         ]
 
-    # Exclude torch/torchaudio (installed in Step 2)
+    # Exclude torch/torchaudio/torchvision (installed in Step 2)
     # Exclude git-based packages (installed separately)
     specs = []
-    exclude_names = {"torch", "torchaudio", "openai-whisper", "stable-ts", "ffmpeg-python"}
+    exclude_names = {"torch", "torchaudio", "torchvision", "openai-whisper", "stable-ts", "ffmpeg-python"}
 
     # Core packages (CORE extra) - excluding torch
     for pkg in get_packages_by_extra(Extra.CORE):
@@ -1240,14 +1240,14 @@ def main():
         # Do NOT use --index-url — the CPU index provides x86_64-only builds
         run_pip(
             executor,
-            ["install", "torch", "torchaudio"],
+            ["install", "torch", "torchaudio", "torchvision"],
             "Install PyTorch (Metal/MPS)"
         )
     else:
         torch_url = get_torch_index_url(cuda_version)
         run_pip(
             executor,
-            ["install", "torch", "torchaudio", "--index-url", torch_url],
+            ["install", "torch", "torchaudio", "torchvision", "--index-url", torch_url],
             f"Install PyTorch ({cuda_version})"
         )
 

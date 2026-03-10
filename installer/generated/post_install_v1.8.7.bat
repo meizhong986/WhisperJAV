@@ -1,6 +1,6 @@
 @echo off
 REM ========================================
-REM WhisperJAV v1.8.7b2 Post-Install Wrapper
+REM WhisperJAV v1.8.7 Post-Install Wrapper
 REM ========================================
 REM
 REM This batch file is called by conda-constructor after the base environment
@@ -16,7 +16,7 @@ REM - Desktop shortcut creation
 REM
 
 ECHO ========================================
-ECHO WhisperJAV v1.8.7b2 Post-Install
+ECHO WhisperJAV v1.8.7 Post-Install
 ECHO ========================================
 ECHO.
 
@@ -31,21 +31,21 @@ if not exist "%~dp0..\python.exe" (
 )
 
 REM Verify Python post-install script exists in parent directory
-if not exist "%~dp0..\post_install_v1.8.7b2.py" (
-    ECHO ERROR: Cannot find post_install_v1.8.7b2.py
-    ECHO Expected location: %~dp0..\post_install_v1.8.7b2.py
+if not exist "%~dp0..\post_install_v1.8.7.py" (
+    ECHO ERROR: Cannot find post_install_v1.8.7.py
+    ECHO Expected location: %~dp0..\post_install_v1.8.7.py
     ECHO Installation files may be missing.
     ECHO.
     exit /b 1
 )
 
 ECHO Using Python: "%~dp0..\python.exe"
-ECHO Script location: "%~dp0..\post_install_v1.8.7b2.py"
+ECHO Script location: "%~dp0..\post_install_v1.8.7.py"
 ECHO.
 
 REM Run the Python post-install script
 REM Both python.exe and the .py script are in the parent directory (../)
-"%~dp0..\python.exe" "%~dp0..\post_install_v1.8.7b2.py"
+"%~dp0..\python.exe" "%~dp0..\post_install_v1.8.7.py"
 
 REM Check exit code and propagate to NSIS
 REM IMPORTANT: Do NOT use 'pause' here - nsExec cannot handle interactive commands
@@ -56,7 +56,7 @@ if %errorlevel% neq 0 (
     ECHO ERROR: Post-install script failed!
     ECHO ========================================
     ECHO Exit code: %errorlevel%
-    ECHO Check install_log_v1.8.7b2.txt for details
+    ECHO Check install_log_v1.8.7.txt for details
     ECHO.
     REM Return error code to NSIS - NSIS will show abort/retry dialog
     exit /b %errorlevel%
