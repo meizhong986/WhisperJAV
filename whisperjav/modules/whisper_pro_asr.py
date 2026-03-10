@@ -259,7 +259,13 @@ class WhisperProASR:
             all_segments = self._transcribe_full_audio(audio_data)
         else:
             all_segments = []
-            for vad_group in vad_segments:
+            for i, vad_group in enumerate(vad_segments, 1):
+                group_start = vad_group[0]["start_sec"]
+                group_end = vad_group[-1]["end_sec"]
+                logger.info(
+                    f"Transcribing group {i}/{len(vad_segments)} "
+                    f"({group_start:.1f}s - {group_end:.1f}s)"
+                )
                 segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
                 all_segments.extend(segments)
 

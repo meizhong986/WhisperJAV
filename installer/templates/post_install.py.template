@@ -150,7 +150,7 @@ if USE_UV:
     os.environ["UV_HTTP_TIMEOUT"] = "300"  # 5 minutes for large downloads
 
 MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (11, 8, 0)
-CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio torchvision"
+CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio torchvision numpy>=1.26,<2"
 
 
 class DriverMatrixEntry(NamedTuple):
@@ -190,13 +190,13 @@ TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
     DriverMatrixEntry(
         (570, 0, 0),
         "CUDA 12.8",
-        "pip3 install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu128"
+        "pip3 install torch torchaudio torchvision numpy>=1.26,<2 --index-url https://download.pytorch.org/whl/cu128"
     ),
     # Driver 450+ → CUDA 11.8 (Universal fallback for all older drivers)
     DriverMatrixEntry(
         (450, 0, 0),
         "CUDA 11.8",
-        "pip3 install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118"
+        "pip3 install torch torchaudio torchvision numpy>=1.26,<2 --index-url https://download.pytorch.org/whl/cu118"
     ),
 )
 
@@ -2585,23 +2585,6 @@ def main() -> int:
     # === Phase 2: GPU and CUDA Detection ===
     log_section("Phase 2: GPU and CUDA Detection")
     driver_info = check_cuda_driver()
-
-    # === Phase 2.5: Pre-install numpy<2 ===
-    # WHY: Phase 3 uses --index-url to install torch from the PyTorch CUDA index.
-    # That index mirrors PyPI's numpy wheels, so uv resolves torch's numpy dep
-    # and installs numpy 2.x. Later, Phase 4 tries to downgrade to numpy<2
-    # (for ModelScope compatibility), but the numpy 2.x .pyd files are locked
-    # in memory (loaded by `import torch` verification) and can't be replaced.
-    # Fix: install numpy<2 BEFORE torch so the dependency is already satisfied.
-    log_section("Phase 2.5: NumPy Version Lock")
-    log("Pre-installing NumPy 1.x (required for ModelScope compatibility)...")
-    if not run_pip(
-        ["install", "numpy>=1.26.0,<2.0"],
-        "Install NumPy 1.x",
-        use_constraints=False,
-    ):
-        log("WARNING: NumPy pre-install failed. Phase 3 may install NumPy 2.x,")
-        log("         which could cause issues with ModelScope speech enhancement.")
 
     # === Phase 3: PyTorch Installation ===
     log_section("Phase 3: PyTorch Installation")

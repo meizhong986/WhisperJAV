@@ -1240,14 +1240,14 @@ def main():
         # Do NOT use --index-url — the CPU index provides x86_64-only builds
         run_pip(
             executor,
-            ["install", "torch", "torchaudio", "torchvision"],
+            ["install", "torch", "torchaudio", "torchvision", "numpy>=1.26,<2"],
             "Install PyTorch (Metal/MPS)"
         )
     else:
         torch_url = get_torch_index_url(cuda_version)
         run_pip(
             executor,
-            ["install", "torch", "torchaudio", "torchvision", "--index-url", torch_url],
+            ["install", "torch", "torchaudio", "torchvision", "numpy>=1.26,<2", "--index-url", torch_url],
             f"Install PyTorch ({cuda_version})"
         )
 
