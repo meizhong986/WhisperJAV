@@ -280,6 +280,14 @@ class TransformersASR:
         if self.condition_on_previous is not None:
             generate_kwargs["condition_on_prev_tokens"] = self.condition_on_previous
 
+        # MPS (Apple Silicon): force greedy decoding. HuggingFace beam search
+        # crashes on MPS with uninitialized memory in beam_indices tensors
+        # (torch.AcceleratorError: index out of bounds). This is a known
+        # incompatibility between HF Transformers and PyTorch MPS backend.
+        # See: https://github.com/meizhong986/WhisperJAV/issues/198
+        if self._device == "mps":
+            generate_kwargs["num_beams"] = 1
+
         # Configure return_timestamps
         if self.timestamps == "word":
             return_timestamps = "word"
