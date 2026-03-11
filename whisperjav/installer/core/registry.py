@@ -221,7 +221,7 @@ class Package:
         Generate pyproject.toml dependency specification.
 
         Returns string like:
-        - "numpy>=1.26.0,<2.0"
+        - "numpy>=1.26.0"
         - "openai-whisper @ git+https://github.com/openai/whisper@main"
         - "pywin32>=305; sys_platform == 'win32'"
         """
@@ -367,25 +367,25 @@ PACKAGES: List[Package] = [
     #
     Package(
         name="numpy",
-        version=">=1.26.0,<2.0",
+        version=">=1.26.0",
         extra=Extra.CLI,
         order=20,
         required=True,
-        reason="NumPy 1.26.x for pyvideotrans compatibility - MUST be before numba",
+        reason="Scientific computing - MUST be before numba (ABI compatibility)",
     ),
     Package(
         name="scipy",
-        version=">=1.10.1",
+        version=">=1.12.0",
         extra=Extra.CLI,
         order=21,
         reason="Signal processing and scientific computing",
     ),
     Package(
         name="numba",
-        version=">=0.58.0",
+        version=">=0.59.0",
         extra=Extra.CLI,
         order=22,
-        reason="JIT compilation for performance - 0.58.0+ supports NumPy 1.22-2.0",
+        reason="JIT compilation for performance - 0.59.0+ supports NumPy 2.x",
     ),
 
     # =========================================================================
@@ -450,7 +450,7 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="librosa",
-        version=">=0.10.0",
+        version=">=0.10.2",
         extra=Extra.CLI,
         order=42,
         reason="Audio analysis (mel spectrograms, etc.) - 0.10+ for numba compat",
@@ -489,7 +489,7 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="scikit-learn",
-        version=">=1.3.0",
+        version=">=1.4.0",
         extra=Extra.CLI,
         order=48,
         import_name="sklearn",  # pip name != import name
@@ -718,7 +718,7 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="opencv-python",
-        version=">=4.0",
+        version=">=4.9.0",
         extra=Extra.ENHANCE,
         order=77,
         import_name="cv2",

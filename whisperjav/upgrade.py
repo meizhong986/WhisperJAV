@@ -67,7 +67,7 @@ GITHUB_REPO = os.environ.get(
 
 # Packages to fix AFTER main installation (ensure consistent versions)
 FIX_PACKAGES = [
-    "numpy>=1.26.0,<2.0",  # NumPy 1.26.x for pyvideotrans compatibility
+    "numpy>=1.26.0",
     "librosa>=0.10.0",
 ]
 

@@ -612,7 +612,7 @@ def _get_packages_for_step(extras: list, exclude_names: set = None) -> list:
         exclude_names: Package names to exclude (e.g., torch for separate install)
 
     Returns:
-        List of pip install specs (e.g., "numpy>=1.26.0,<2.0")
+        List of pip install specs (e.g., "numpy>=1.26.0")
     """
     if not _REGISTRY_AVAILABLE:
         return []
@@ -672,10 +672,10 @@ def _get_core_deps_from_registry() -> list:
     if not _REGISTRY_AVAILABLE:
         # Fallback to hardcoded if registry not available
         return [
-            "numpy>=1.26.0,<2.0",
-            "scipy>=1.10.1",
-            "numba>=0.58.0",
-            "librosa>=0.10.0",
+            "numpy>=1.26.0",
+            "scipy>=1.12.0",
+            "numba>=0.59.0",
+            "librosa>=0.10.2",
             "soundfile",
             "pydub",
             "pyloudnorm",
@@ -1240,14 +1240,14 @@ def main():
         # Do NOT use --index-url — the CPU index provides x86_64-only builds
         run_pip(
             executor,
-            ["install", "torch", "torchaudio", "torchvision", "numpy>=1.26,<2"],
+            ["install", "torch", "torchaudio", "torchvision", "numpy>=1.26"],
             "Install PyTorch (Metal/MPS)"
         )
     else:
         torch_url = get_torch_index_url(cuda_version)
         run_pip(
             executor,
-            ["install", "torch", "torchaudio", "torchvision", "numpy>=1.26,<2", "--index-url", torch_url],
+            ["install", "torch", "torchaudio", "torchvision", "numpy>=1.26", "--index-url", torch_url],
             f"Install PyTorch ({cuda_version})"
         )
 

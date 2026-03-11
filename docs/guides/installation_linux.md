@@ -791,9 +791,9 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 **Symptom:** `ImportError: numba needs NumPy 1.x` or `Cannot import llvmlite`
 
 ```bash
-# Ensure numpy 1.26.x is installed (not 2.x)
-pip install "numpy>=1.26.0,<2.0"
-pip install --force-reinstall "numba>=0.58.0"
+# Reinstall numpy and numba
+pip install "numpy>=1.26.0"
+pip install --force-reinstall "numba>=0.59.0"
 ```
 
 ### Speech Enhancement Failures

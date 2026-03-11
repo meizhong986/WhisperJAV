@@ -221,10 +221,10 @@ If MPS is not available, see [Troubleshooting](#11-troubleshooting).
 
 ```bash
 # Scientific stack (order matters: numpy before numba)
-pip install "numpy>=1.26.0,<2.0" "scipy>=1.10.1" "numba>=0.58.0"
+pip install "numpy>=1.26.0" "scipy>=1.12.0" "numba>=0.59.0"
 
 # Audio processing
-pip install soundfile pydub "librosa>=0.10.0" pyloudnorm
+pip install soundfile pydub "librosa>=0.10.2" pyloudnorm
 
 # Subtitle processing
 pip install pysrt srt
@@ -658,7 +658,7 @@ source ~/.zshrc
    ```
 2. Try installing pre-built wheels:
    ```bash
-   pip install --only-binary=:all: "numpy>=1.26.0,<2.0"
+   pip install --only-binary=:all: "numpy>=1.26.0"
    ```
 
 ### pyaudio / PortAudio Errors
