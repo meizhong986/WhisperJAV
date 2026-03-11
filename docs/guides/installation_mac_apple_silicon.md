@@ -236,7 +236,7 @@ pip install tqdm colorama requests aiofiles regex
 pip install "pydantic>=2.0,<3.0" "PyYAML>=6.0" jsonschema
 
 # VAD (Voice Activity Detection)
-pip install pyaudio auditok "silero-vad>=6.0" ten-vad
+pip install pyaudio auditok "silero-vad>=6.2" ten-vad
 
 # Performance
 pip install "psutil>=5.9.0" "scikit-learn>=1.3.0"

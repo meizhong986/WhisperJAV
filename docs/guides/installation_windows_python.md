@@ -284,7 +284,7 @@ pip install tqdm colorama requests aiofiles regex jsonschema
 pip install "pydantic>=2.0,<3.0" "PyYAML>=6.0"
 
 REM VAD (Voice Activity Detection)
-pip install "silero-vad>=6.0" auditok ten-vad
+pip install "silero-vad>=6.2" auditok ten-vad
 
 REM Performance
 pip install "psutil>=5.9.0" "scikit-learn>=1.3.0"

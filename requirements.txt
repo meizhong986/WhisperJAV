@@ -30,7 +30,7 @@ faster-whisper>=1.1.0
 ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git
 soundfile
 auditok
-silero-vad>=6.0
+silero-vad>=6.2
 pydub
 
 # Speech segmentation backends (v1.7.2)

@@ -1405,7 +1405,7 @@ def main():
 
     if not vad_packages:
         # Fallback if registry query fails
-        vad_packages = ["silero-vad>=6.0", "auditok"]
+        vad_packages = ["silero-vad>=6.2", "auditok"]
 
     run_pip(executor, ["install"] + vad_packages, "Install VAD packages")
 
