@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-09 (rev3 — Groups B, C, D committed) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **25 open** on GitHub
+> Updated: 2026-03-11 (rev4 — v1.8.7 RELEASED, 3 new issues) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **28 open** on GitHub
 
 ---
 
@@ -8,277 +8,181 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **25** | Was 19 at last update; 5 new (#205-#209), 1 self-closed (#208) |
-| New issues since last update | 5 | #205, #206, #207, #208, #209 |
-| Self-closed by reporters | 1 | #208 (LLM server, user installed NVIDIA Toolkit) |
-| **Active bugs (need code work)** | 1 | #196 (LLM token limit STILL broken) |
-| **Active bugs (awaiting user confirmation)** | 5 | #204 (SSL fallback), #203 (serial mode), #209 (repetition fix committed), #198 (MPS fix committed), #143 (custom provider fix committed) |
-| **New bug reports on CLOSED issues** | 1 | #196 (zhstark: LLM still broken on Ubuntu/v1.8.7b1) |
-| **New duplicates** | 1 | #207 (dup of #96, settings persistence) |
-| **New feature requests** | 2 | #205 (VibeVoice ASR), #206 (grey out incompatible options) |
-| Fixed in v1.8.7b2 (all committed on main) | 12 | #198-MPS+kwargs, #195, #204, #159, #209, #143, setuptools pin, zipenhancer GUI, installer diagnostics, China mirror fallback |
-| Feature requests (open) | 13 | Added #205, #206 |
-| Deferred to v1.9+ | 10 | Added #205, #206 |
+| Total open on GitHub | **28** | Was 25 at last update; 3 new (#210, #211, #212) |
+| New issues since last update (rev3) | 3 | #210 (install DNS), #211 (startup warning), #212 (local LLM regex) |
+| **Active bugs (need code work)** | 2 | #196/#212 (LLM token overflow — CRITICAL), #198 (MPS beam search — still crashing on v1.8.7) |
+| **Active bugs (awaiting user confirmation)** | 3 | #204 (SSL fallback), #203 (serial mode), #209 (repetition fix) |
+| **Cosmetic / informational** | 2 | #211 (urllib3 warning — benign), #210 (China DNS — already responded) |
+| **New duplicates** | 1 | #212 (dup of #196 — same "No matches" LLM error) |
+| Fixed in v1.8.7 (all shipped) | 12 | See v1.8.7 release notes |
+| Feature requests (open) | 13 | Unchanged from rev3 |
+| Deferred to v1.9+ | 10 | Unchanged |
 
-### ALERT: Closed Issues With New Bug Reports (2026-03-09)
+### CRITICAL: MPS Beam Search Still Broken (#198)
 
-These 3 closed issues received new comments today reporting **unresolved or new bugs**. They need attention and may need to be reopened:
+The v1.8.7 fix (defer generate_kwargs to model defaults, commit `f0ad57a`) did **NOT** resolve the MPS crash. francetoastVN tested v1.8.7 on Mac M1 (2026-03-11) and gets the **same error**:
 
-| # | Reporter | Platform | Error | Key Detail |
-|---|----------|----------|-------|------------|
-| **#196** | zhstark | Ubuntu CLI, 5090 32GB, v1.8.7b1 | "No matches found in translation text" | Batch auto-reduced to 11 (fix IS working), but still hits token limit. `--max-batch-size 10` doesn't help either. |
-| **#198** | francetoastVN | macOS M1, v1.8.7b1 | LLM: "No matches found" / Transformers: no subtitle generated | Two separate failures: (1) Local LLM same token limit issue, (2) Transformers mode produces no output (attached log) |
-| **#143** | OdinShiva | Unknown platform | "Connection to custom failed: str expected, not NoneType" | Custom (OpenAI-compatible) provider with Ollama endpoint `http://localhost:11434/v1`, model `qwen3.5:4b`, API Key field **empty** → NoneType error |
+```
+torch.AcceleratorError: index -4785543516806487491 is out of bounds: 0, range 0 to 4
+```
+
+**This is NOT a WhisperJAV bug.** The traceback shows the crash inside HuggingFace `transformers` library (`generation_whisper.py → _beam_search → logits_process.py:2021`). Our fix correctly deferred to model defaults — the model itself uses beam search in its `generation_config.json`. The bug is in HF Transformers + MPS + beam search interaction.
+
+**Evidence**: v1.8.7 log shows `generate_kwargs` no longer forces `num_beams=5` — it's using model defaults. The crash still occurs because kotoba-whisper-bilingual-v1.0's own config specifies beam search, and HF's beam search code has an MPS-specific tensor indexing bug.
+
+**Action needed**: Either (a) force `num_beams=1` (greedy) when device is MPS as a workaround, or (b) wait for HF Transformers upstream fix.
 
 ---
 
 ## Cluster Analysis
 
-Issues are grouped by root cause / theme rather than by number. This reveals the real problem areas.
+### Cluster 1: Local LLM Translation — Token Overflow (CRITICAL)
 
-### Cluster 1: Network / SSL / Model Download Failures (5 issues)
+**Issues**: #196, #212 (NEW), #198-LLM, #132
+**Severity**: CRITICAL — affects ALL local LLM translation users across all platforms
+**v1.8.7 status**: FIX INCOMPLETE — 3 new reports confirm failure persists
 
-The most impactful cluster for Chinese users. HuggingFace model downloads fail through proxies.
+| # | Title | Reporter | Platform | State | Detail |
+|---|-------|----------|----------|-------|--------|
+| **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090? | **OPEN (NEW)** | Clean v1.8.7, llama-8b, 65 tps, batch 10. Fails scene 1 batch 1 immediately. |
+| **#196** | Local Translation Errors | destinyawaits | Ubuntu, 5090 32GB | CLOSED | zhstark report: v1.8.7b1, batch 30→11 (auto-batch works), still fails. |
+| **#198-LLM** | LLM on Mac M1 | francetoastVN | macOS M1 | CLOSED | v1.8.7, 31.7 tps CPU, batch 10, 637 lines/58 scenes. Fails scene 1 batch 1. |
+| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | Pre-v1.8.7. Partial success: 9/23 lines. Wall of `###` in batch 2. |
 
-| # | Title | Reporter | State | Root Cause | Status |
-|---|-------|----------|-------|------------|--------|
-| **#204** | VPN users (v2rayN) SSL failures | yangming2027 | **OPEN** | HF hub tries online model validation even when cache exists. SSL errors through proxies kill the run. | **FIXED** v1.8.7b1 — 3-step fallback (normal → cache → hf-mirror.com). Awaiting user confirmation. |
-| **#201** | Install SSL cert error on fresh Win10 | jl6564 | CLOSED | Missing root CA certs on fresh Windows. | Closed — env issue |
-| **#200** | NVML "Driver Not Loaded" on Optimus laptop | Ywocp | CLOSED | Dual-GPU Optimus: NVML can't load in non-GPU context. | Closed — documented |
-| ~~#191~~ | Pass2 missing — SSL error | yangming2027 | CLOSED | Same SSL/proxy issue as #204. | Closed as dup of #204 |
-| ~~#193~~ | How to update packages | Faraway-D | CLOSED | Support question — urllib3 warning. | Closed — answered |
+**Key observations from #212 log (v1.8.7, destinyawaits):**
+- Version: v1.8.7 confirmed (not beta)
+- Speed: 65.0 tps (fast GPU), 33 layers CUDA
+- max_tokens: 2692 (JAV/CJK-tuned, fix IS applied)
+- Streaming: True (fix IS applied)
+- Batch size: 10 (reasonable)
+- **Failure**: `WARNING: Hit API token limit, retrying batch without context...` → `No matches found` → batch fails → translation cancelled
+- **Resume**: `.subtrans` file present (was retrying from previous cancelled attempt)
+- Target: English, Tone: standard
 
-**Status:** v1.8.7b1 shipped with comprehensive fix. Two comments posted pointing users to the release. Awaiting confirmation from yangming2027 and weifu8435.
+**Key observations from #198-LLM log (v1.8.7, francetoastVN):**
+- Same exact failure pattern on Mac M1 CPU-only (31.7 tps)
+- Target: English, Tone: standard
+- Batch 10, 637 lines/58 scenes
+- Fails immediately on scene 1 batch 1 AND scene 1 batch 2
 
----
+**Root cause analysis (refined):**
 
-### Cluster 2: Local LLM Translation (6 issues) — PARTIALLY UNRESOLVED
+The v1.8.7b0/b1 fixes (max_tokens cap, streaming, auto-batch) are all working correctly. The problem is deeper:
 
-Recurring theme across versions. Token limits, server timeouts, parsing failures. **The v1.8.7b0/b1 fix did NOT fully resolve #196 — new reports confirm the "No matches found" error persists.**
+1. **Prompt is too large for 8K context even with batch=10**: The translation prompt includes system instructions + conversation history + 10 subtitle lines. For standard tone (shorter instructions), this still overflows 8K. The `max_tokens=2692` cap reserves output space, but the INPUT prompt itself exceeds the remaining ~5.3K tokens.
 
-| # | Title | Reporter | State | Root Cause | Status |
-|---|-------|----------|-------|------------|--------|
-| **#196** | Token limit + "No matches" | destinyawaits | CLOSED | Original: batch too large for 8K context. v1.8.7b1 fix: max_tokens cap + streaming + auto-batch. | **FIX INCOMPLETE** — zhstark reports same error on v1.8.7b1 Ubuntu, 5090 GPU. See details below. |
-| **#208** | LLM server AssertionError | Dark-Lord-9 | CLOSED | `llama_cpp` model failed to load — `assert self.model is not None`. User had missing NVIDIA Toolkit. | **Self-resolved** — user installed NVIDIA Toolkit, works now. |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | User reports partial translation success on Kaggle. Says "it used to work previously." Posted new debug_log.txt (2026-03-07) and Kaggle notebook. Uses `--provider local --model gemma-9b`. | **Active — needs investigation of new debug log** |
-| ~~#146~~ | Local server error | leefowan | CLOSED | Fixed v1.8.3. Stale 5+ weeks. | Closed — stale |
-| ~~#162~~ | Local model ggml.dll | aaxz886 | CLOSED | Fixed v1.8.4. Stale. | Closed — stale |
-| ~~#158~~ | Linux LLM build | parheliamm | CLOSED | Fixed hotfix3. | Closed — fixed |
+2. **Retry-without-context doesn't reduce batch size**: When token limit is hit, PySubtrans retries the SAME batch with context stripped. If the batch itself (10 lines of Japanese subtitle) + system instructions > context window, removing context doesn't help.
 
-**#196 — New report from zhstark (2026-03-09, Ubuntu, v1.8.7b1, 5090 32GB):**
+3. **The "No matches" error is a symptom, not the cause**: The LLM's response after hitting the token limit is garbage/truncated, so PySubtrans regex patterns can't parse it.
 
-Screenshots examined. Key observations from the logs:
-- Version confirmed: WhisperJAV 1.8.7b1
-- Platform: Ubuntu CLI, conda env, Python 3.12
-- GPU: 33 layers on CUDA (full offload), 221.7 tokens/sec (very fast 5090)
-- Batch auto-reduced from 30 → 11 (auto-batch fix IS working)
-- Output token limit: 2692 (JAV/CJK-tuned)
-- **Error**: `WARNING: Hit API token limit, retrying batch without context...`
-- **Error**: `Error translating scene X batch Y: No matches found in translation text using patterns: [...]`
-- User tried `--max-batch-size 10` manually — same error remains
-- Target language: Chinese, tone: pornify
-
-**Diagnosis (preliminary — needs verification):**
-The auto-batch reduction IS working (30→11), and the max_tokens cap IS applied (2692). But the translation still fails. Two hypotheses:
-1. Even batch size 11 produces output exceeding the 8K context with Chinese pornify tone (longer instructions, longer output)
-2. The retry-without-context path generates output that doesn't match PySubtrans regex patterns (the LLM response format is garbled or non-standard after the retry)
-
-This means **#196 is NOT fully fixed** and needs further investigation. The v1.8.7b1 fix improved the situation (auto-batch works) but didn't eliminate the root cause.
-
-**#198 — New report from francetoastVN (2026-03-09, macOS M1, v1.8.7b1):**
-
-Two separate failures reported in comments on the closed MPS issue:
-1. **Local LLM translation**: Same "No matches found" error as #196. Server starts fine (27.4 tps CPU only), batch size 10, 637 lines in 58 scenes, but immediately fails on scene 1 batch 1.
-2. **Transformers mode**: No subtitle generated at all. Attached log file `TransformerTest.txt` (not yet examined).
-
-**Analysis:** #196 is now the most critical open bug. The v1.8.7b1 fix was partial — auto-batch and max_tokens work, but the underlying "No matches found" parsing error still occurs. This affects at least 2 users on different platforms (Ubuntu 5090, macOS M1). #132 is a separate Kaggle-specific issue. #208 was self-resolved.
+**This is the #1 priority bug for v1.8.8.**
 
 ---
 
-### Cluster 3: GUI Settings Persistence (5 issues)
-
-Users repeatedly report settings lost on restart. Growing cluster.
+### Cluster 2: MPS / Apple Silicon (2 issues)
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#96** | Full settings persistence | sky9639 | OPEN | Translation + ensemble presets done. Full pipeline tab remaining. | **v1.9 — partial** |
-| **#207** | 1.86版本不能保存设置 | q864310563 | **OPEN** | "How to save settings in v1.8.6? Every restart resets all to defaults." Windows .exe installer. | **Duplicate of #96** — needs response referencing #96 |
-| ~~#176~~ | Translation settings lost | Ywocp | CLOSED | Fixed hotfix2 (file-based persistence). | Closed — fixed |
-| ~~#174~~ | Settings reset every time | wazzur1 | CLOSED | Duplicate of #96. | Closed as dup |
-| ~~#184~~ | Save configurations request | aikotanaka6699 | CLOSED | Duplicate of #96. | Closed as dup |
+| **#198** | Transformers MPS crash | francetoastVN | CLOSED | HF Transformers beam search + MPS = tensor index corruption | **FIX INCOMPLETE** — v1.8.7 deferred kwargs but model's own beam search still crashes on MPS. Need MPS-specific workaround. |
+| ~~#198~~ | MPS not detected | francetoastVN | CLOSED | Fixed v1.8.7b0 (MPS detection). | Done |
 
-**Analysis:** #207 is the 4th duplicate of #96. This keeps coming up — users find it frustrating. Translation and ensemble settings ARE saved (hotfix2+), but pipeline tab settings (model, sensitivity, scene detector, etc.) are not persisted yet. This is now the most frequently reported UX issue. Consider prioritizing for v1.8.7 or v1.8.8 rather than v1.9.
+**v1.8.7 test result (2026-03-11):** francetoastVN tested v1.8.7 Transformers mode on Mac M1 with kotoba-whisper-bilingual-v1.0. MPS IS detected (`Device: mps`), model loads fine, transcription starts, but crashes at ~4.5 minutes into a 2-hour file with `torch.AcceleratorError: index -4785543516806487491 is out of bounds`.
+
+**The crash is in `transformers/generation/logits_process.py:2021`** — inside `sampled_tokens.tolist()` during beam search. This is a known MPS numerical instability: beam search scores on MPS produce corrupted tensor indices.
+
+**Fix options:**
+1. **Force greedy decoding on MPS**: `num_beams=1` when device is MPS — simple, reliable, slight quality loss
+2. **CPU fallback for generation**: Run encoder on MPS, decoder on CPU — complex, slower
+3. **Wait for HF upstream fix** — unknown timeline
 
 ---
 
-### Cluster 4: Encoding / Unicode Crashes (4 issues) — RESOLVED
-
-All stem from non-UTF-8 data in subprocess I/O. **All fixed.**
+### Cluster 3: Network / Installation (3 issues)
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| ~~#195~~ | UnicodeDecodeError in audio extraction | v2lmmj04 | CLOSED | M4A/M4B with Japanese metadata. Fixed `55df512`. | Closed |
-| ~~#190~~ | GBK codec crash | MatteoHugo | CLOSED | Fixed v1.8.6 — process-wide UTF-8 mode. | Closed |
-| ~~#186~~ | UnicodeEncodeError subprocess | teijiIshida | CLOSED | Fixed hotfix1. | Closed |
-| ~~#177~~ | cp950 codec translation | stonecfc | CLOSED | Fixed hotfix1 + v1.8.6. | Closed |
+| **#210** | 安装失败 DNS error | iop335577 | **OPEN** | `Could not resolve host: github.com` — bundled git can't resolve DNS through proxy. | **RESPONDED** — meizhong986 pointed to v1.8.7 (proxy detection fix). yangming2027 commented: "network issue, try stable VPN." |
+| **#204** | VPN/v2rayN SSL failures | yangming2027 | **OPEN** | HF hub SSL errors through proxy. | **FIXED** v1.8.7 — 3-step fallback. meizhong986 responded. Awaiting confirmation. |
+| **#201** | Install SSL cert error | jl6564 | **OPEN** | Missing root CA certs on fresh Windows. | **RESPONDED** — v1.8.7 includes broadened error detection. |
 
-**Status:** Cluster fully resolved. No remaining issues.
+**Status**: All three have been responded to pointing to v1.8.7 fixes. No further code work needed — awaiting user confirmation.
 
 ---
 
-### Cluster 5: Ensemble Mode Issues (3 issues)
+### Cluster 4: GUI Settings Persistence (3 issues)
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#203** | Serial mode not working / logic complaint | yangming2027 | **OPEN** | User wants per-file serial processing. Feature exists (`--ensemble-serial` / "Finish each file"). | **REPLIED** — confirmed feature exists in v1.8.6. Awaiting user confirmation. |
-| ~~#189~~ | Smart Merge clears one pass | Ywocp | CLOSED | Fixed hotfix2. | Closed |
-| ~~#179~~ | Pass ordering request | yangming2027 | CLOSED | Fixed v1.8.6 `--ensemble-serial`. | Closed |
+| **#96** | Full settings persistence | sky9639 | OPEN | Translation + ensemble done. Pipeline tab remaining. | **v1.9** |
+| **#207** | 1.86不能保存设置 | q864310563 | **OPEN** | "Settings reset on restart" | **Dup of #96** — needs response |
+| ~~#176~~ | Translation settings lost | Ywocp | CLOSED | Fixed hotfix2. | Done |
 
-**Status:** #203 awaiting user reply. Same user as #179 — the feature they requested was built but they didn't realize it.
+**Status**: #207 has NO responses. Needs a reply explaining what IS saved (translation, ensemble) vs what isn't (pipeline tab settings). Reference #96.
 
 ---
 
-### Cluster 6: Platform Support — Apple Silicon / AMD (3 issues)
+### Cluster 5: Startup Warning (1 issue — COSMETIC)
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| ~~#198~~ | No MPS on M1 Mac | francetoastVN | CLOSED | Fixed v1.8.7b0 (MPS detection) + v1.8.7b2 (defer generate_kwargs to model defaults — root cause of beam search IndexError on MPS). | Done |
-| **#142** | AMD Radeon 9600XT not detected | MatthaisUK | OPEN | DirectML/ROCm not supported. | **Defer v1.9+** |
-| **#114** | DirectML for AMD/Intel | SingingDalong | OPEN | Major platform enablement. | **Defer v1.9+** |
+| **#211** | 启动报错 | WillChengCN | **OPEN (NEW)** | `RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!` | **BENIGN** — cosmetic warning from requests library. justantopair-ai confirms: "meizhong986 said this warning is nothing serious." |
+
+**Analysis**: This is a dependency version mismatch warning from the `requests` library. It has zero functional impact. The `urllib3` and `charset_normalizer` versions bundled by the installer are newer than what `requests` was tested with, but they work fine.
+
+**Action**: Respond explaining the warning is cosmetic and doesn't affect functionality. Can consider pinning requests or suppressing the warning in a future release if it causes confusion.
 
 ---
 
-### Cluster 7: Translation Provider Requests (5 issues)
+### Cluster 6: Whisper Repetition Hallucination (#209) — FIXED, BEING TESTED
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#143** | Custom local models | ymilv | CLOSED | VTT + custom model shipped v1.8.6. OdinShiva reported Custom+Ollama broken (os.getenv(None) crash). | **FIXED** `cd72de4` — custom provider added to early-return group in api.py + cli.py. Awaiting user confirmation. |
-| ~~#178~~ | Custom endpoint ignored | Ywocp | CLOSED | Fixed hotfix3. | Closed |
-| ~~#69~~ | Grok translation | lingyunlxh | CLOSED | Covered by custom provider. | Closed |
-| **#71** | Google Translate (free, no key) | x8086 | OPEN | Fragile unofficial API. | **Defer v1.9+** |
-| **#43** | DeepL provider | teijiIshida | OPEN | Non-LLM adapter. | **Defer v1.9+** |
+| **#209** | Single subtitle very long | weifu8435 | **OPEN** | RepetitionCleaner regex gaps. | **FIXED** `9317695` — shipped in v1.8.7. User is actively testing. |
 
-**#143 — New bug report from OdinShiva (2026-03-09):**
+**User update (2026-03-11):** weifu8435 responded positively:
+- "I started testing with the official 1.8.7 version today to see if any other hallucinations occur."
+- Claims to process "four subtitles a day, over 100 a month" — will provide comprehensive real-world testing.
+- Also posted additional example SRT files from v1.8.6 showing more repetition patterns.
 
-Screenshots examined:
-- GUI: AI SRT Translate tab, Provider = "Custom (OpenAI-compatible)"
-- Model = "Default", Override/Custom Model = `qwen3.5:4b`
-- API Key field: **empty** (placeholder text visible)
-- Custom Endpoint URL: `http://localhost:11434/v1` (standard Ollama endpoint)
-- "Test Connection" button shows **Failed** badge
-- Error message: `"Connection to custom failed: str expected, not NoneType"`
-- Second screenshot shows Ollama running with `qwen3.5:4b` model loaded
-
-**Root cause (confirmed and fixed):**
-PROVIDER_CONFIGS defines `custom.env_var = None` (explicit None, not missing key). `config.get('env_var', '')` returns None because the key EXISTS with value None. This None is passed to `os.getenv(None)` which raises TypeError. Two code paths affected: `webview_gui/api.py` (GUI Test Connection) and `translate/cli.py` (CLI translation). Fix: added `custom` to early-return group alongside `local` in both paths; guarded `os.getenv()` call. `service.py` was already safe. **Fixed in commit `cd72de4`.**
+**Status**: Actively being validated. User is engaged and testing.
 
 ---
 
-### NEW — Cluster 9: Whisper Hallucination / Repetition (#209)
+### Cluster 7: Encoding / Unicode — FULLY RESOLVED
 
-**This is a new cluster identified 2026-03-09.**
-
-| # | Title | Reporter | State | Root Cause | Status |
-|---|-------|----------|-------|------------|--------|
-| **#209** | Single subtitle often very long | weifu8435 | **OPEN** | Whisper repetition hallucinations not caught by RepetitionCleaner due to 4 architectural gaps in pattern matching. | **FIXED** `9317695` — 3-layer fix: regex gaps patched, generic safety net added, 200-char length limit. Awaiting user confirmation. |
-
-**Reporter**: weifu8435 (repeat user, previously #187, #185)
-**Platform**: Windows, Ensemble mode (Fidelity+Balanced, Large V2, "Finish each file")
-**Version**: v1.8.x (likely v1.8.6 based on GUI screenshot)
-
-**Evidence (5 screenshots + settings + 6 comments examined):**
-
-The user's SRT output contains extremely long subtitle entries with repetitive text. Four distinct patterns observed:
-
-| Example | SRT Line | Duration | Pattern Type | Text |
-|---------|----------|----------|-------------|------|
-| 1 | #279 | ~10s | Char+dakuten repetition | `あ゛あ゛あ゛あ゛あ゛あ゛...` (dozens of repetitions) |
-| 2 | #164 | ~7s | Short phrase + wave dash | `あ〜、あ〜、あ〜、あ〜...` (dozens of repetitions) |
-| 3 | #211 | ~7s | Medium phrase repetition (10+ chars) | `お腹が空いているときは、お腹が空いているときは...` (15+ repetitions) |
-| 4 | #9 | ~7s | Long phrase repetition (16+ chars) | `お母さんがお腹を張ってくれているので、お母さんがお腹を...` (10+ repetitions) |
-
-User asks: "Why is this happening? Is it due to some kind of interference?"
-
-**Root Cause Analysis — 4 Architectural Gaps in RepetitionCleaner:**
-
-The sanitizer IS called in all pipelines (including ensemble). The call chain is:
-```
-Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process()
-  → HallucinationRemover (exact/regex/fuzzy phrase matching)
-  → RepetitionCleaner (6 regex patterns) ← GAPS HERE
-  → CPS check (>20 chars/sec)
-```
-
-**Gap 1 — Dakuten marks break regex backreferences:**
-- File: `whisperjav/modules/repetition_cleaner.py` line 89
-- Pattern `single_char_flood`: `([ぁ-んァ-ン])\1{3,}` captures only base char `あ` (U+3042)
-- `あ゛` = U+3042 + U+309B (combining dakuten) — two codepoints
-- Backreference `\1` expects exact `あ` but finds `゛` → pattern never matches
-- **Result**: `あ゛あ゛あ゛あ゛...` passes through undetected
-
-**Gap 2 — Max phrase length too short (10 chars):**
-- File: `whisperjav/modules/repetition_cleaner.py` lines 59, 71
-- `phrase_with_comma` pattern: `{1,10}` char limit
-- `お腹が空いているときは` = 10+ chars, `お母さんがお腹を張ってくれているので` = 16 chars → exceed limit
-- **Result**: Long phrase repetitions pass through undetected
-
-**Gap 3 — Separator patterns too rigid:**
-- `vowel_extension` (line 95) expects consecutive dashes: `VOWEL+DASH+DASH+DASH`
-- Actual data: `あ〜、あ〜、あ〜` has comma between repetitions → NO MATCH
-- `phrase_with_separator` (line 59) expects separator WITHIN captured group, not between
-- **Result**: Mixed separator patterns pass through
-
-**Gap 4 — No general-purpose repetition safety net:**
-- A method `_is_all_repetition()` exists in code but is disabled (always returns True)
-- CPS check at 20 chars/sec doesn't trigger: 100-char text over 10s = 10 CPS (under threshold)
-- No "if >50% of text is a repeated substring, flag it" rule
-- **Result**: When specific patterns miss, nothing catches the extreme cases
-
-**Assessment**: This is an **architectural gap**, not a simple code error. The RepetitionCleaner was designed for short, known patterns but lacks a general-purpose detector for the long-tail of repetition variants that Whisper hallucinates. The fix needs to be at the safety-net level, not just adding more specific regex patterns.
-
-**Fix approach (3 layers):**
-1. **Generic substring repetition detector** — safety net that catches any repeated substring dominating the text
-2. **Fix specific pattern gaps** — dakuten support, increase phrase length limit to 30 chars
-3. **Absolute length sanity check** — Japanese subtitle lines are normally 10-40 chars; >200 chars is almost certainly hallucination
-
-**Files to modify:**
-- `whisperjav/modules/repetition_cleaner.py` — patterns + new safety net
-- `whisperjav/config/sanitization_constants.py` — add MAX_SUBTITLE_LENGTH
+All 4 issues fixed. No new reports.
 
 ---
 
-### Cluster 8: Feature Requests (Unclustered)
+### Cluster 8: Ensemble Mode (1 remaining)
+
+| # | Title | Reporter | State | Status |
+|---|-------|----------|-------|--------|
+| **#203** | Serial mode request | yangming2027 | **OPEN** | Replied — feature exists. Awaiting confirmation. |
+
+---
+
+### Cluster 9: Feature Requests (Unclustered)
 
 | # | Title | Reporter | State | Summary | Target |
 |---|-------|----------|-------|---------|--------|
-| **#206** | Grey out incompatible options | techguru0 | **OPEN** | Block/grey out options incompatible with each other or user's hardware. | **v1.9+** (feature request) |
-| **#205** | VibeVoice ASR support | kylesskim-sys | **OPEN** | Microsoft VibeVoice in transformers v5.3.0. Owner responded: VRAM too high (18GB std, 13GB FP16, FP4 poor quality). | **v1.9+** (feature request, owner responded) |
-| ~~#194~~ | M4B file support | v2lmmj04 | CLOSED | Done v1.8.6 commit `5769688`. | Closed |
-| **#181** | Frameless window | QQ804218 | OPEN | Cosmetic. PyWebView `frameless=True`. | v1.9+ |
-| **#180** | Multi-language GUI (i18n) | QQ804218 | OPEN | Full i18n framework. High effort. | v1.9+ |
-| **#175** | Chinese language GUI | yangming2027 | OPEN | Subset of #180. | v1.9+ |
-| **#164** | MPEG-TS + Google Drive | hosmallming | OPEN | MPEG-TS remux + Kaggle Drive. | v1.8.7 |
-| ~~#159~~ | CLI --vad-threshold | SingingDalong | CLOSED | **Fixed** `c092db9`. | Closed |
-| ~~#150~~ | Xiaomi Mimo API | rr79510 | CLOSED | Covered by custom provider. | Closed |
-| ~~#143~~ | Custom local models + VTT | ymilv | CLOSED | VTT done v1.8.6. Custom model path done. | Closed |
-| **#126** | Recursive directory | jl6564 | OPEN | Walk subdirectories. | v1.9+ |
-| **#99** | 4GB VRAM guidance | hosmallming | OPEN | Log GPU VRAM before model load. | v1.8.7 |
-| **#59** | Feature plans for 1.x | meizhong986 | OPEN | Meta-issue (roadmap). | Keep open |
-| **#51** | Batch translate wildcard | lingyunlxh | OPEN | Glob/directory in translate CLI. | v1.8.7 |
-| **#49** | Output SRT to source folder | meizhong986 | OPEN | `--output-dir source` exists. Docs gap. | v1.8.7 |
-| **#44** | GUI drag-drop filename only | lingyunlxh | OPEN | Drag-drop sends filename not full path. | v1.8.7+ |
-| **#33** | Linux pyaudio docs | org0ne | OPEN | Documentation gap. | v1.8.7 |
-
----
-
-### Remaining Unclustered
-
-| # | Title | Reporter | State | Category | Status |
-|---|-------|----------|-------|----------|--------|
-| ~~#187~~ | v1.8.5 can't generate | weifu8435 | CLOSED | Stale — fixed in hotfix2/v1.8.6. | Closed — stale |
-| ~~#185~~ | v1.8.4 regression | weifu8435 | CLOSED | Stale — fixed hotfix2. Same user as #187. | Closed — stale |
-| ~~#161~~ | Colab translate error | kokor594-ai | CLOSED | Stale since Feb. No response to info request. | Closed — stale |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | Active — user posted new debug log 2026-03-07. Partial success: "few lines getting translated." Needs investigation. | **Active** |
+| **#206** | Grey out incompatible options | techguru0 | **OPEN** | Block incompatible GUI choices. | v1.9+ |
+| **#205** | VibeVoice ASR | kylesskim-sys | **OPEN** | Microsoft VibeVoice. Owner: VRAM too high. | v1.9+ |
+| **#181** | Frameless window | QQ804218 | OPEN | Cosmetic. | v1.9+ |
+| **#180** | Multi-language GUI | QQ804218 | OPEN | Full i18n. | v1.9+ |
+| **#175** | Chinese GUI | yangming2027 | OPEN | Subset of #180. | v1.9+ |
+| **#164** | MPEG-TS + Drive | hosmallming | OPEN | Format + cloud. | v1.8.8 |
+| **#142** | AMD Radeon | MatthaisUK | OPEN | DirectML/ROCm. | v1.9+ |
+| **#126** | Recursive directory | jl6564 | OPEN | Walk subdirs. | v1.9+ |
+| **#114** | DirectML | SingingDalong | OPEN | AMD/Intel GPU. | v1.9+ |
+| **#99** | 4GB VRAM guidance | hosmallming | OPEN | Log VRAM. | v1.8.8 |
+| **#71** | Google Translate (free) | x8086 | OPEN | Fragile API. | v1.9+ |
+| **#59** | Feature plans | meizhong986 | OPEN | Meta roadmap. | Keep open |
+| **#51** | Batch translate wildcard | lingyunlxh | OPEN | Glob in translate CLI. | v1.8.8 |
+| **#49** | Output to source folder | meizhong986 | OPEN | Docs gap. | v1.8.8 |
+| **#44** | GUI drag-drop | lingyunlxh | OPEN | Filename vs path. | v1.8.8+ |
+| **#43** | DeepL provider | teijiIshida | OPEN | Non-LLM adapter. | v1.9+ |
+| **#33** | Linux pyaudio docs | org0ne | OPEN | Documentation. | v1.8.8 |
 
 ---
 
@@ -288,53 +192,58 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 
 | Status | Count | Issues |
 |--------|------:|--------|
-| **Active bugs needing code work** | 2 | #196 (LLM token limit STILL broken), #132 (Local LLM on Kaggle) |
-| **Active bugs awaiting user confirmation** | 5 | #204 (SSL fallback), #203 (serial mode), #209 (repetition fix), #198 (MPS/kwargs fix), #143 (custom provider fix) |
-| **New — needs response only** | 2 | #207 (dup of #96), #206 (feature request ack) |
-| **Feature requests (open, not done)** | 13 | #205, #206, #181, #180, #175, #164, #126, #99, #71, #51, #49, #44, #33 |
+| **CRITICAL bugs needing code work** | 1 | #196/#212 (LLM token overflow — affects all local LLM users) |
+| **HIGH bugs needing code work** | 1 | #198 (MPS beam search still crashes on v1.8.7) |
+| **Active bugs awaiting user confirmation** | 3 | #204 (SSL), #203 (serial), #209 (repetition) |
+| **Cosmetic — needs response only** | 3 | #211 (urllib3 warning), #210 (install DNS), #207 (settings dup) |
+| **Feature requests (open)** | 17 | See Cluster 9 |
 | **Meta / roadmap** | 1 | #59 |
 | **Deferred to v1.9+** | 10 | #96, #205, #206, #180, #175, #181, #142, #114, #126, #43 |
 
-### By Priority (Active Work Only)
+### By Priority (Active Work)
 
 | Priority | # | Issue | Effort | Why |
 |----------|---|-------|--------|-----|
-| **HIGH** | #196 | LLM "No matches found" STILL broken on v1.8.7b1 | Medium | Fix claimed shipped but 2 users on different platforms report failure. Credibility issue. |
-| **MEDIUM** | #207 | Settings persistence (dup of #96) | Tiny (reply) | Respond referencing #96, explain what IS saved |
-| **LOW** | #132 | Local LLM on Kaggle | Unknown | Needs investigation of new debug log; Kaggle is 4th priority platform |
-| **DONE** | #209 | Repetition hallucination — 3-layer fix | — | Fixed `9317695`. Awaiting user confirmation. |
-| **DONE** | #143 | Custom+Ollama os.getenv(None) crash | — | Fixed `cd72de4`. Awaiting user confirmation. |
-| **DONE** | #198 | MPS beam search — defer to model defaults | — | Fixed `f0ad57a`. Awaiting user confirmation. |
-| **WAITING** | #204 | SSL/China fallback | — | v1.8.7b1 shipped, awaiting user test |
-| **WAITING** | #203 | Serial mode exists | — | Replied, awaiting user confirmation |
+| **CRITICAL** | #196/#212 | LLM "No matches found" — token overflow | Medium-Large | 4 reporters, 3 platforms (Linux/Mac/Kaggle), all fail. #1 user pain point. |
+| **HIGH** | #198 | MPS beam search crash on v1.8.7 | Small | Straightforward workaround (force greedy on MPS). Single platform but user has tested thoroughly. |
+| **MEDIUM** | #211 | urllib3 warning (cosmetic) | Tiny (reply) | 2 users confused by it. Benign. |
+| **MEDIUM** | #207 | Settings persistence (dup #96) | Tiny (reply) | 4th duplicate — clearly frustrating users |
+| **LOW** | #210 | Install DNS through proxy | Tiny (reply) | Already responded, v1.8.7 fix applies |
+| **DONE** | #209 | Repetition hallucination | — | Shipped v1.8.7, user actively testing |
+| **DONE** | #143 | Custom provider NoneType | — | Shipped v1.8.7 |
+| **WAITING** | #204 | SSL/China fallback | — | v1.8.7 shipped, awaiting confirmation |
+| **WAITING** | #203 | Serial mode | — | Replied, awaiting confirmation |
 
 ---
 
-## v1.8.7 — Summary of Fixes (all committed on main)
+## v1.8.7 — Summary of Shipped Fixes
 
 | Commit | Issue | Summary |
 |--------|-------|---------|
 | `10fbf30` | #198 | MPS device detection for Apple Silicon |
-| `55df512` | #195 | `errors='replace'` in audio extraction subprocess |
+| `55df512` | #195 | `errors='replace'` in audio extraction |
 | `c092db9` | #159 | `--vad-threshold` and `--speech-pad-ms` CLI flags |
 | `7407ab6` `e5328c8` `090fd43` | #196 | Local LLM: max_tokens cap, streaming, CustomClient |
-| `f81d278` | — | zipenhancer GUI option fix |
-| `2abb3b3` | — | setuptools>=61.0,<82 pin (pkg_resources fix) |
-| `ffde153`+ | #204 | SSL/network 3-step fallback (normal → cache → hf-mirror.com) |
-| `cd72de4` | #143 | Custom provider os.getenv(None) crash — added custom to early-return in api.py + cli.py |
-| `9317695` | #209 | Repetition cleaner: 4 regex gaps fixed + generic safety net + 200-char length limit |
-| `f0ad57a` | #198 | HF Transformers: defer generate_kwargs to model defaults (removes forced num_beams=5) |
+| `f81d278` | — | ZipEnhancer GUI option fix |
+| `2abb3b3` | — | setuptools>=61.0,<82 pin |
+| `ffde153`+ | #204 | SSL/network 3-step fallback |
+| `cd72de4` | #143 | Custom provider os.getenv(None) crash |
+| `9317695` | #209 | Repetition cleaner: 4 regex gaps + safety net |
+| `f0ad57a` | #198 | HF Transformers: defer generate_kwargs to model defaults |
+| (installer) | #210 | Proxy detection for bundled git |
+| (installer) | — | GPU constraint numpy fix, torchvision Phase 3 |
 
-### v1.8.7 Remaining Work
+---
+
+## v1.8.8 — Planned Work
 
 | Priority | # | Description | Effort | Status |
 |----------|---|-------------|--------|--------|
-| **HIGH** | #196 | LLM "No matches found" — v1.8.7b1 fix incomplete | Medium | Need to investigate why auto-batch + max_tokens still fails |
-| ~~HIGH~~ | ~~#209~~ | ~~Repetition hallucination safety net~~ | — | **DONE** `9317695` |
-| ~~MEDIUM~~ | ~~#143~~ | ~~Custom+Ollama NoneType API key~~ | — | **DONE** `cd72de4` |
-| ~~MEDIUM~~ | ~~#198~~ | ~~Mac Transformers mode / beam search crash~~ | — | **DONE** `f0ad57a` |
+| **CRITICAL** | #196/#212 | LLM token overflow — dynamic batch sizing, retry with smaller batch, garbage output detection | Medium-Large | Not started |
+| **HIGH** | #198 | MPS beam search — force greedy decoding (`num_beams=1`) on MPS device | Small | Not started |
+| **MEDIUM** | #211 | Suppress or fix urllib3/charset_normalizer version warning | Tiny | Not started |
 | **MEDIUM** | #99 | Log GPU VRAM at INFO before model load | Tiny | Not started |
-| **MEDIUM** | #164 | MPEG-TS auto-remux | Small | Not started |
+| **LOW** | #164 | MPEG-TS auto-remux | Small | Not started |
 | **LOW** | #51 | Batch translate wildcard/directory | Medium | Not started |
 | **LOW** | #49 | Document `--output-dir source` | Tiny (docs) | Not started |
 | **LOW** | #33 | Linux pyaudio install docs | Tiny (docs) | Not started |
@@ -358,16 +267,105 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 
 ---
 
-## Recently Closed Issues
+## Pending GitHub Actions
 
-| # | Title | Closed | Resolution |
-|---|-------|--------|------------|
-| #208 | LLM server AssertionError | 2026-03-09 | Self-resolved — user installed NVIDIA Toolkit |
-| #201 | Install SSL cert error on fresh Win10 | 2026-03-07 | Environment issue — missing root CAs |
-| #200 | NVML dual-GPU Optimus detection | 2026-03-07 | Documented — Optimus limitation |
-| #198 | MPS not used on M1 Mac | 2026-03-07 | Fixed v1.8.7b0 — MPS detection added |
-| #197 | Installation problem v1.8.6 | 2026-03-08 | Closed by user after v1.8.7b0 comment |
-| #196 | Local LLM token limit | 2026-03-07 | Fixed v1.8.7b0 — 3 root causes addressed |
+### Needs Response (not yet responded)
+
+| # | Action | Priority |
+|---|--------|----------|
+| #212 | Respond: acknowledge this is the same root cause as #196 (LLM token overflow). Being investigated for v1.8.8. Workaround: use cloud translation provider for now. | **HIGH** |
+| #211 | Respond: urllib3/charset_normalizer warning is cosmetic and doesn't affect functionality. Safe to ignore. | **MEDIUM** |
+| #207 | Respond: reference #96, explain what IS saved (translation, ensemble) vs what isn't (pipeline). | **MEDIUM** |
+
+### Needs Follow-up
+
+| # | Action | Priority |
+|---|--------|----------|
+| #198 | Respond to francetoastVN: MPS beam search crash is an upstream HF Transformers bug. Our fix deferred kwargs correctly but the model's own beam search still triggers the MPS tensor bug. Working on MPS-specific workaround (force greedy decoding). LLM issue = same as #196. | **HIGH** |
+
+### Awaiting User Response
+
+| # | Last Response | Waiting Since |
+|---|--------------|---------------|
+| #204 | Pointed to v1.8.7 release | 2026-03-10 |
+| #203 | Confirmed serial mode exists | 2026-03-08 |
+| #209 | User actively testing v1.8.7 | 2026-03-11 |
+| #210 | meizhong986 pointed to v1.8.7 | 2026-03-10 |
+| #201 | meizhong986 pointed to v1.8.7 | 2026-03-10 |
+
+---
+
+## Cross-Cutting Analysis — Resolution Groups (Updated)
+
+### Group A (CRITICAL): Translation "No Matches Found" — Token Overflow
+
+**Issues**: #196 (zhstark), #212 (destinyawaits, NEW), #198-LLM (francetoastVN), #132 (TinyRick1489)
+**Status**: **NOT FIXED** — 4 reporters on 3 platforms confirm failure on v1.8.7
+
+**v1.8.7 fixes that ARE working:**
+- max_tokens cap: 2692 ✅
+- Streaming: True ✅
+- Auto-batch reduction: works (30→11) ✅
+- Custom server client: works ✅
+
+**Why it still fails (deeper analysis):**
+
+The core problem: **10 subtitle lines + system instructions + conversation history > 8K context window**
+
+Even with batch=10, the prompt sent to the LLM looks like:
+```
+System: [~2000 tokens of translation instructions]
+History: [~1000+ tokens of prior conversation context]
+User: [~1500+ tokens of 10 Japanese subtitle lines with formatting]
+= ~4500+ input tokens
+```
+With max_tokens=2692 reserved for output, total = ~7200 tokens. Add overhead and the first 8192-token request already overflows.
+
+**The retry-without-context path removes history but keeps batch=10**. If batch=10 itself + instructions > context, the retry also fails.
+
+**Fix plan (4 items for v1.8.8):**
+1. **Pre-flight token estimation**: Count approximate prompt tokens before sending. If estimated > 70% of context, reduce batch size proactively.
+2. **Retry with half batch**: When "Hit API token limit" occurs, halve batch size on retry instead of only removing context.
+3. **Minimum viable batch**: Allow batch=1 as final fallback. A single subtitle line should always fit in 8K.
+4. **Garbage output detection**: If LLM response is >50% non-alphanumeric or empty, report "model output was garbled" instead of cryptic regex failure.
+
+---
+
+### Group B (FIXED): Custom Provider API Key — SHIPPED v1.8.7
+
+**Issues**: #143
+**Status**: **FIXED** `cd72de4`. OdinShiva reported after closure with Ollama endpoint. Fix adds `custom` to early-return group.
+**Note**: OdinShiva's latest comment (2026-03-09) quotes our fix note — appears to have seen the response but hasn't confirmed fix works yet.
+
+---
+
+### Group C (FIXED, BEING TESTED): Repetition Hallucination — SHIPPED v1.8.7
+
+**Issues**: #209
+**Status**: **FIXED** `9317695`. weifu8435 actively testing v1.8.7 (2026-03-11). Processing 4 videos/day, 100+/month. Will report any remaining hallucinations.
+
+---
+
+### Group D (PARTIALLY FIXED): MPS Beam Search — NEEDS v1.8.8 WORKAROUND
+
+**Issues**: #198
+**Status**: v1.8.7 fix deferred generate_kwargs to model defaults (correct approach). **Still crashes** because kotoba-whisper's own `generation_config.json` uses beam search, and HF Transformers has a bug in beam search on MPS.
+
+**Fix for v1.8.8**: Force `num_beams=1` when device is MPS. This disables beam search entirely on Apple Silicon — slight quality impact but prevents crash.
+
+---
+
+### Group E (LOW-MEDIUM): GUI Settings & Usability
+
+**Issues**: #207, #96, #206, #211
+**Status**: #207 and #211 need responses. No code work for v1.8.8.
+
+---
+
+### Group F (WAITING): Network/SSL — China Users
+
+**Issues**: #204, #210, #201
+**Status**: All responded to. v1.8.7 shipped with fixes. Waiting for confirmation.
 
 ---
 
@@ -375,208 +373,48 @@ Pipeline.process() → SRTPostProcessor.process() → SubtitleSanitizer.process(
 
 | Cluster | Issues | Primary | Status |
 |---------|--------|---------|--------|
-| **Network/SSL/HF download** | #204, ~~#201~~, ~~#200~~, ~~#191~~, ~~#193~~ | **#204** | Fixed v1.8.7b1, awaiting confirmation |
-| **Local LLM translation** | **#196**, ~~#208~~, #132, ~~#162~~, ~~#146~~, ~~#158~~ | **#196 REOPENED** (fix incomplete), #132 active | **NOT resolved** — 2 users report failure on v1.8.7b1 |
-| **GUI settings** | #96, **#207**, ~~#176~~, ~~#174~~, ~~#184~~ | **#96** | Partial (v1.9); #207 is 4th dup |
-| **Encoding/Unicode** | ~~#195~~, ~~#190~~, ~~#186~~, ~~#177~~ | — | **Fully resolved** |
-| **Ensemble mode** | #203, ~~#189~~, ~~#179~~ | **#203** | Awaiting user reply |
-| **Repetition/Hallucination** | **#209** | **#209** | **FIXED** `9317695` — awaiting confirmation |
-| **Apple Silicon / MPS** | ~~#198~~ | Done | **FIXED** `10fbf30` (MPS detection) + `f0ad57a` (kwargs) |
+| **Local LLM token overflow** | **#196**, **#212** (NEW), #198-LLM, #132 | **#196** | **CRITICAL — NOT resolved** |
+| **MPS/Apple Silicon** | **#198** | **#198** | **PARTIAL** — detection done, beam search crash remains |
+| **Network/SSL/Install** | #204, #210, #201 | **#204** | Responded, awaiting confirmation |
+| **GUI settings** | #96, **#207** | **#96** | Partial (v1.9); #207 is 4th dup |
+| **Repetition/Hallucination** | **#209** | **#209** | **FIXED** v1.8.7 — actively tested |
+| **Encoding/Unicode** | ~~all closed~~ | — | **Fully resolved** |
+| **Ensemble** | #203 | **#203** | Awaiting reply |
+| **Startup warning** | **#211** | **#211** | Cosmetic — needs reply |
 | **AMD/non-NVIDIA** | #142, #114 | Deferred | v1.9+ |
-| **Translation providers** | **#143** (fixed), ~~#178~~, ~~#69~~, #71, #43 | **#143 FIXED** `cd72de4` | Awaiting confirmation, rest deferred v1.9+ |
+| **Translation providers** | #71, #43 | Deferred | v1.9+ |
 | **i18n** | #180, #175 | Deferred | v1.9+ |
 
 ---
 
-## Pending GitHub Actions
+## Recently Closed Issues
 
-### Needs Response (not yet responded)
-
-| # | Action | Priority |
-|---|--------|----------|
-| #196 | Respond to zhstark: acknowledge fix is incomplete, ask for full server log and the SRT file being translated. Need to understand why batch 11 still hits token limit. | **HIGH** |
-| #198 | Respond to francetoastVN: (1) LLM "No matches" is same issue as #196, being investigated. (2) Transformers mode: fix committed (`f0ad57a`) — forced beam search was root cause. Will be in next release. | **MEDIUM** |
-| #143 | Respond to OdinShiva: fix committed (`cd72de4`). Workaround for now: put any text in API Key field. Will be in next release. | **MEDIUM** |
-| #209 | Respond to weifu8435: fix committed (`9317695`) — 3-layer repetition cleaner fix. Will be in next release. | **MEDIUM** |
-| #207 | Respond: reference #96, explain what IS saved (translation, ensemble) vs what isn't (pipeline settings). | **LOW** |
-| #206 | Respond: acknowledge feature request, realistic about effort (needs compatibility matrix). | **LOW** |
-
-### Awaiting User Response
-
-| # | Last Response | Waiting Since |
-|---|--------------|---------------|
-| #204 | Pointed to v1.8.7b1 release | 2026-03-08 |
-| #203 | Confirmed serial mode exists | 2026-03-08 |
+| # | Title | Closed | Resolution |
+|---|-------|--------|------------|
+| #208 | LLM server AssertionError | 2026-03-09 | Self-resolved — user installed NVIDIA Toolkit |
+| #198 | MPS not used on M1 Mac | 2026-03-07 | Fixed v1.8.7b0 — MPS detection. **But beam search still crashes (new report)** |
+| #197 | Installation problem v1.8.6 | 2026-03-08 | Closed by user after v1.8.7b0 |
+| #196 | Local Translation Errors | 2026-03-07 | Fixed v1.8.7b0 — partial. **New reports confirm failure persists** |
+| #195 | UnicodeDecodeError audio extraction | 2026-03-08 | Fixed `55df512` |
+| #194 | M4B file support | 2026-03-08 | Fixed `5769688` |
+| #193 | Package update question | 2026-03-08 | Answered |
+| #192 | Update to latest dev | 2026-03-02 | Resolved |
+| #191 | Pass2 missing SSL | 2026-03-08 | Dup of #204 |
+| #190 | GBK codec crash | 2026-03-04 | Fixed v1.8.6 |
+| #189 | Smart Merge clears content | 2026-03-08 | Fixed hotfix2 |
+| #188 | Unknown provider Gemini | 2026-03-04 | Fixed hotfix2 |
 
 ---
 
-## Cross-Cutting Analysis — 6 Resolution Groups
+## Changelog
 
-> Added: 2026-03-09 | Based on full evidence review: 14 screenshots, 3 log files (1111 lines), 50+ comments across 10 issues
-
-Issues are re-grouped by **shared root cause and resolution path**, cutting across the per-topic clusters above. This determines the order of work.
-
-### Group A (CRITICAL): Translation "No Matches Found" — Cascading Token Overflow
-
-**Issues**: #196 (zhstark, Ubuntu 5090), #198-LLM (francetoastVN, Mac M1), #132 (TinyRick1489, Kaggle)
-**Severity**: HIGH — affects all platforms, all local LLM users
-**v1.8.7b1 fix status**: PARTIAL — auto-batch and max_tokens work, but root cause persists
-
-**Evidence summary:**
-- #196: Ubuntu v1.8.7b1, 5090 32GB, 221.7 tps. Batch auto-reduced 30→11 (fix works), max_tokens 2692 (fix works). Still hits `WARNING: Hit API token limit` → `No matches found`. Even `--max-batch-size 10` fails.
-- #198: Mac M1 v1.8.7b1, 27.4 tps CPU. Batch 10, 637 lines/58 scenes. Fails immediately on scene 1 batch 1.
-- #132: Kaggle pre-v1.8.7b1, gemma-9b, 29.5 tps. `'stream': False` (pre-fix). Batch 1 times out (300s), retries, succeeds 9/10 lines. Batch 2: LLM response is **a wall of `###########`** (thousands of `#` chars). 9/23 lines translated, 14 lost.
-
-**Cascading failure chain:**
-```
-1. Prompt too large for 8K context window
-   ↓
-2. LLM hits token limit mid-generation
-   ↓
-3. Retry-without-context: removes history but keeps same batch size
-   ↓
-4. LLM generates malformed output (wall of ###, truncated, garbled format)
-   ↓
-5. PySubtrans regex patterns can't match the garbage
-   ↓
-6. "No matches found" → batch fails → lines untranslated
-```
-
-**Why v1.8.7b1 fix is incomplete:**
-The auto-batch formula uses a **static calculation** that doesn't account for:
-- Variable instruction length per tone (pornify is much longer than standard)
-- Conversation history growth (accumulated context from prior batches)
-- Target language token expansion (Japanese→Chinese ≈ 1.5x)
-- The retry-without-context path keeps the same batch size — if batch was already too large, retry still fails
-
-**Fix plan (4 items):**
-1. **Dynamic batch sizing**: Count actual prompt tokens before sending (use tokenizer, not static formula)
-2. **Retry with half batch**: If retry-without-context fails, halve the batch size before giving up
-3. **Garbage output detection**: Check if LLM response is >50% non-alphanumeric before parsing. If so, report meaningful error instead of regex failure
-4. **Partial success acceptance**: If 9/10 lines match, accept the 9 instead of forcing full retranslation
-
-**Files to investigate/modify:**
-- `whisperjav/translate/core.py` — batch size calculation, retry logic
-- `whisperjav/translate/local_backend.py` — token counting, context management
-- PySubtrans library integration point — where regex matching happens
-
----
-
-### Group B (MEDIUM): Custom Provider API Key Handling — FIXED
-
-**Issues**: #143 (OdinShiva — Ollama)
-**Status**: **FIXED** in commit `cd72de4`
-
-**Root cause**: PROVIDER_CONFIGS defines `custom.env_var = None` (explicit None). `config.get('env_var', '')` returns None because the key EXISTS. `os.getenv(None)` raises TypeError. Two code paths affected.
-
-**Fix applied**: Added `custom` to early-return group alongside `local` in both `webview_gui/api.py` and `translate/cli.py`. Guarded `os.getenv()` with `if env_var` check. `service.py` was already safe.
-
-**Awaiting**: User confirmation that custom provider works with Ollama.
-
----
-
-### Group C (HIGH): Whisper Repetition Hallucination — FIXED
-
-**Issues**: #209 (weifu8435)
-**Status**: **FIXED** in commit `9317695`
-
-**Root cause**: 4 architectural gaps in RepetitionCleaner regex patterns (dakuten marks, phrase length limit 10→30, rigid separators, no safety net).
-
-**Fix applied (3 layers):**
-1. **Layer 1 — Regex patterns fixed**: dakuten support (U+309B/U+309C/U+3099/U+309A), phrase length {1,10}→{1,30}, new `wavedash_comma_phrase` pattern
-2. **Layer 2 — Generic substring repetition detector**: scans substrings at positions 0..sub_len-1, flags if any repeated 3+ times covers >50% of text
-3. **Layer 3 — 200-char absolute length limit**: truncates at sentence boundaries with 75% floor
-
-**False-positive testing verified**: All 10 LEGITIMATE_REPETITIONS pass through. 12 realistic JAV sounds (moans, 2x repetitions) pass through. All 4 dirty examples from #209 caught.
-
-**Pipeline coherence verified**: Sanitization pipeline order (HallucinationRemover → RepetitionCleaner → CPS check) is correct. CPS check operates on already-cleaned text (correct design). The fix is correctly placed in RepetitionCleaner.
-
-**Awaiting**: User confirmation with next release.
-
----
-
-### Group D (MEDIUM): MPS Beam Search Crash — FIXED (Architectural)
-
-**Issues**: #198-Transformers (francetoastVN — Mac M1)
-**Status**: **FIXED** in commit `f0ad57a`
-
-**Root cause (revised after deep investigation)**: NOT an upstream HF bug. WhisperJAV forced `num_beams=5` on all HF models including Kotoba-whisper-bilingual-v1.0, which was never tested with beam search (its reference code passes only `{"language": "ja", "task": "transcribe"}`). The forced beam search triggered an IndexError in HF's `split_by_batch_index` code path on MPS.
-
-**Architectural fix**: Defer to HF best practice — models ship with `generation_config.json` containing tested defaults. Only pass essential kwargs (`language`, `task`). All 6 other kwargs (num_beams, temperature, compression_ratio_threshold, logprob_threshold, no_speech_threshold, condition_on_prev_tokens) changed from hardcoded values to `Optional[None]` — only included in generate_kwargs if user explicitly sets them via CLI/GUI.
-
-**Changes across 4 files** (all callers aligned):
-- `transformers_asr.py` — defaults to None, conditional generate_kwargs, MPS fallback removed (no longer needed)
-- `transformers_pipeline.py` — hf_beam_size/hf_temperature defaults to None
-- `pass_worker.py` — DEFAULT_HF_PARAMS aligned
-- `main.py` — argparse defaults and getattr fallbacks aligned, batch_size 8→16
-
-**Awaiting**: User confirmation with next release.
-
----
-
-### Group E (LOW-MEDIUM): GUI Settings & Usability
-
-**Issues**: #207 (q864310563), #96 (sky9639), #206 (techguru0)
-**Severity**: LOW-MEDIUM — most frequently reported UX frustration (4 duplicates of #96)
-**Fix effort**: Reply only for now; pipeline persistence is Small effort for partial fix
-
-**Evidence**: #207 is the 4th independent duplicate of #96. Chinese user on .exe installer asks "how to save settings?" #206 is separate: feature request to grey out incompatible options.
-
-**What IS saved** (since hotfix2): Translation tab settings, Ensemble tab settings.
-**What is NOT saved**: Pipeline tab (model, sensitivity, scene detector, speech enhancer, speech segmenter).
-
-**Actions:**
-1. **#207**: Respond explaining what's saved vs not, reference #96
-2. **#206**: Acknowledge feature request, defer v1.9+
-3. **Consider**: Partial pipeline persistence in v1.8.8 — save dropdowns to existing settings file
-
----
-
-### Group F (WAITING): Network/SSL — China Users
-
-**Issues**: #204 (yangming2027)
-**Severity**: HIGH for Chinese user base, but fix already shipped
-**Status**: v1.8.7b1 released with 3-step fallback. Two comments pointing users to release. No user confirmation yet.
-
-**Action**: Wait. No code work needed.
-
----
-
-## Resolution Execution Order
-
-This is the recommended order for processing these groups:
-
-| Step | Group | Action | Effort | Status |
-|------|-------|--------|--------|--------|
-| 1 | **B** | ~~Fix #143 Ollama NoneType API key~~ | ~~Tiny~~ | **DONE** `cd72de4` |
-| 2 | **C** | ~~Fix #209 repetition hallucination (3-layer safety net)~~ | ~~Medium~~ | **DONE** `9317695` |
-| 3 | **D** | ~~Fix #198 MPS beam search — defer to model defaults~~ | ~~Small~~ | **DONE** `f0ad57a` |
-| 4 | **E** | Respond to #207, #206 on GitHub | Tiny (comments) | **Pending** |
-| 5 | **A** | Fix #196 translation token overflow cascade (dynamic batch + retry + garbage detection) | Medium | **Pending** — most impactful remaining fix |
-| 6 | **F** | Wait for #204 confirmation | None | **Waiting** |
-
----
-
-## Evidence Inventory
-
-All evidence examined during this analysis:
-
-| Source | Type | Lines/Size | Key Finding |
-|--------|------|------------|-------------|
-| #209 screenshot 1 (main) | SRT output | — | Line 279: `あ゛あ゛あ゛...` dakuten repetition |
-| #209 screenshot 2 (settings) | GUI | — | Ensemble mode, Fidelity+Balanced, Large V2 |
-| #209 screenshot 3 (line 164) | SRT output | — | `あ〜、あ〜...` wave-dash repetition |
-| #209 screenshot 4 (line 211) | SRT output | — | `お腹が空いているときは...` phrase repetition (10+ chars) |
-| #209 screenshot 5 (line 9) | SRT output | — | `お母さんがお腹を張って...` phrase repetition (16 chars) |
-| #196 screenshot 1 | Terminal | — | v1.8.7b1 confirmed, 221.7 tps, batch 30→11 |
-| #196 screenshot 2 | Terminal | — | LOCAL LLM ASSESSMENT: 33 layers CUDA, READY |
-| #196 screenshot 3 | Terminal | — | "No matches found" errors per scene |
-| #198 TransformerTest.txt | Log file | 166 lines | `IndexError: index 1077827584` — MPS beam search crash |
-| #198 LLM comment | Terminal paste | ~50 lines | Same "No matches found" as #196 |
-| #143 screenshot 1 (settings) | GUI | — | Custom provider, empty API key, Ollama endpoint |
-| #143 screenshot 2 (Ollama) | Ollama UI | — | qwen3.5:4b model running |
-| #132 debug_log.txt | Log file | 945 lines | Batch 2 response = wall of `###`, streaming=False, 9/23 translated |
-| GitHub comments sweep | API query | 60+ comments | All comments since 2026-03-08 00:00 |
+| Date | Changes |
+|------|---------|
+| 2026-03-11 | **v1.8.7 RELEASED.** 3 new issues (#210, #211, #212). #212 is dup of #196 (LLM token overflow, STILL broken — now 4 reporters). #198 MPS beam search STILL crashes on v1.8.7 (francetoastVN tested). #211 is cosmetic urllib3 warning. #209 user actively testing v1.8.7 (positive so far). Updated all clusters and priorities. |
+| 2026-03-09 | Groups B, C, D committed. #143, #209, #198 fixes shipped. |
+| 2026-03-09 | Full evidence review: 14 screenshots, 3 log files, 50+ comments. 6 resolution groups identified. |
+| 2026-03-08 | v1.8.7b1 released with China network fixes. |
+| 2026-02-27 | v1.8.5-hotfix2 released. |
 
 ---
 

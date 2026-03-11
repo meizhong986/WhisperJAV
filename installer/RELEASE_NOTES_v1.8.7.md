@@ -60,6 +60,17 @@ v1.8.7 is a stability and robustness release focused on installer reliability, d
 
 Total dependencies: 60 → 70
 
+## 中国用户网络改进
+
+v1.8.7 针对中国大陆及使用VPN/代理的用户做了以下改进：
+
+- **安装时自动检测系统代理**：安装程序会读取Windows系统代理设置（包括v2rayN等），自动传递给内置git，解决安装过程中DNS解析失败的问题 (#210)
+- **更全面的网络错误处理**：除了超时以外，现在也能自动检测并重试DNS解析失败、SSL证书错误、连接被拒绝等网络问题
+- **AI模型下载三级回退**：下载HuggingFace模型时，依次尝试：① 直接从huggingface.co下载 → ② 使用本地缓存 → ③ 从hf-mirror.com社区镜像下载 (#204)
+- **安装失败时提供详细诊断信息**：如果模型下载失败，日志会显示具体的URL、缓存路径和手动下载说明
+
+如果升级后仍有网络相关问题，请在GitHub Issues中反馈。
+
 ## Known Issues
 
 - **Group A (#196/#198/#132)**: LLM translation "No matches found" on long files — deferred to v1.8.8. Root cause analysis complete (cascading token overflow). Workaround: use shorter batch sizes or cloud translation providers.
@@ -75,6 +86,10 @@ CUDA:         12.1+ (12.4+ recommended)
 cuDNN:        9.x
 NumPy:        1.26.x
 ```
+
+## Installation
+
+For detailed installation instructions for all platforms (Windows, macOS, Linux, Colab/Kaggle), see the [Installation Guide](https://meizhong986.github.io/WhisperJAV/getting-started/).
 
 ## Upgrade
 
