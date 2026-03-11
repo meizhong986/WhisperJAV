@@ -150,7 +150,7 @@ if USE_UV:
     os.environ["UV_HTTP_TIMEOUT"] = "300"  # 5 minutes for large downloads
 
 MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (11, 8, 0)
-CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio torchvision numpy>=1.26"
+CPU_FALLBACK_COMMAND = "pip3 install torch torchaudio torchvision numpy>=2.0"
 
 
 class DriverMatrixEntry(NamedTuple):
@@ -190,13 +190,13 @@ TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
     DriverMatrixEntry(
         (570, 0, 0),
         "CUDA 12.8",
-        "pip3 install torch torchaudio torchvision numpy>=1.26 --index-url https://download.pytorch.org/whl/cu128"
+        "pip3 install torch torchaudio torchvision numpy>=2.0 --index-url https://download.pytorch.org/whl/cu128"
     ),
     # Driver 450+ → CUDA 11.8 (Universal fallback for all older drivers)
     DriverMatrixEntry(
         (450, 0, 0),
         "CUDA 11.8",
-        "pip3 install torch torchaudio torchvision numpy>=1.26 --index-url https://download.pytorch.org/whl/cu118"
+        "pip3 install torch torchaudio torchvision numpy>=2.0 --index-url https://download.pytorch.org/whl/cu118"
     ),
 )
 

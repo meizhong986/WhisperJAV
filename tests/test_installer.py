@@ -110,8 +110,8 @@ class TestRegistry:
         from whisperjav.installer.core.registry import Package, InstallSource, Platform
 
         # Simple package
-        pkg = Package(name="numpy", version=">=1.26.0")
-        assert pkg.pyproject_spec() == "numpy>=1.26.0"
+        pkg = Package(name="numpy", version=">=2.0.0")
+        assert pkg.pyproject_spec() == "numpy>=2.0.0"
 
         # Git package
         git_pkg = Package(

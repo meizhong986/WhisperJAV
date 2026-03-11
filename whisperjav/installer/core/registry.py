@@ -221,7 +221,7 @@ class Package:
         Generate pyproject.toml dependency specification.
 
         Returns string like:
-        - "numpy>=1.26.0"
+        - "numpy>=2.0.0"
         - "openai-whisper @ git+https://github.com/openai/whisper@main"
         - "pywin32>=305; sys_platform == 'win32'"
         """
@@ -367,25 +367,25 @@ PACKAGES: List[Package] = [
     #
     Package(
         name="numpy",
-        version=">=1.26.0",
+        version=">=2.0.0",
         extra=Extra.CLI,
         order=20,
         required=True,
-        reason="Scientific computing - MUST be before numba (ABI compatibility)",
+        reason="Scientific computing (numpy 2.x required) - MUST be before numba (ABI compatibility)",
     ),
     Package(
         name="scipy",
-        version=">=1.12.0",
+        version=">=1.13.0",
         extra=Extra.CLI,
         order=21,
-        reason="Signal processing and scientific computing",
+        reason="Signal processing and scientific computing - 1.13.0+ for numpy 2.x support",
     ),
     Package(
         name="numba",
-        version=">=0.59.0",
+        version=">=0.60.0",
         extra=Extra.CLI,
         order=22,
-        reason="JIT compilation for performance - 0.59.0+ supports NumPy 2.x",
+        reason="JIT compilation for performance - 0.60.0+ required for numpy 2.x binary support",
     ),
 
     # =========================================================================
@@ -450,10 +450,10 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="librosa",
-        version=">=0.10.2",
+        version=">=0.11.0",
         extra=Extra.CLI,
         order=42,
-        reason="Audio analysis (mel spectrograms, etc.) - 0.10+ for numba compat",
+        reason="Audio analysis (mel spectrograms, etc.) - 0.11.0+ required for numpy 2.x (0.10.x uses removed np.complex)",
     ),
     Package(
         name="pyloudnorm",
@@ -718,11 +718,11 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="opencv-python",
-        version=">=4.9.0",
+        version=">=4.10.0",
         extra=Extra.ENHANCE,
         order=77,
         import_name="cv2",
-        reason="Computer vision - required by ClearVoice (relaxed from ==4.10.0.84)",
+        reason="Computer vision - required by ClearVoice. 4.10.0+ for numpy 2.x support",
     ),
     Package(
         name="python-speech-features",

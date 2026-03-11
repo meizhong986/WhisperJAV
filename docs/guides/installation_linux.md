@@ -792,8 +792,8 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 ```bash
 # Reinstall numpy and numba
-pip install "numpy>=1.26.0"
-pip install --force-reinstall "numba>=0.59.0"
+pip install "numpy>=2.0.0"
+pip install --force-reinstall "numba>=0.60.0"
 ```
 
 ### Speech Enhancement Failures

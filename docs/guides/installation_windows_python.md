@@ -273,8 +273,8 @@ If `CUDA available: True` appears, GPU acceleration is working.
 
 ```cmd
 REM Scientific stack (numpy MUST be before numba)
-pip install "numpy>=1.26.0" "scipy>=1.12.0" "numba>=0.59.0"
-pip install "librosa>=0.10.2" soundfile pydub pyloudnorm
+pip install "numpy>=2.0.0" "scipy>=1.13.0" "numba>=0.60.0"
+pip install "librosa>=0.11.0" soundfile pydub pyloudnorm
 
 REM Subtitle processing
 pip install pysrt srt
@@ -675,8 +675,8 @@ This happens when numba is installed before numpy:
 
 ```cmd
 pip uninstall numpy numba -y
-pip install "numpy>=1.26.0"
-pip install "numba>=0.59.0"
+pip install "numpy>=2.0.0"
+pip install "numba>=0.60.0"
 ```
 
 ### FFmpeg Issues

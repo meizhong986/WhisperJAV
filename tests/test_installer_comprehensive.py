@@ -333,11 +333,11 @@ class TestBuildPipArgs:
         from whisperjav.installer.core.registry import Package, InstallSource
 
         executor = StepExecutor()
-        pkg = Package(name="numpy", version=">=1.26.0")
+        pkg = Package(name="numpy", version=">=2.0.0")
 
         args = executor._build_pip_args(pkg, "cu118")
         assert "install" in args
-        assert "numpy>=1.26.0" in args
+        assert "numpy>=2.0.0" in args
 
     def test_build_args_git(self):
         """Test pip args for Git package."""

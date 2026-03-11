@@ -22,7 +22,7 @@ auditok
 av>=13.0.0
 bs-roformer-infer
 colorama
-datasets>=2.14.0,<4.0
+datasets>=3.0.0,<=3.6.0
 faster-whisper>=1.1.0
 google-genai>=1.39.0
 hf_xet
@@ -31,11 +31,11 @@ huggingface-hub>=0.25.0
 imageio>=2.31.0
 imageio-ffmpeg>=0.4.9
 jsonschema
-librosa>=0.10.2
+librosa>=0.11.0
 matplotlib
 modelscope>=1.20
-numba>=0.59.0
-numpy>=1.26.0
+numba>=0.60.0
+numpy>=2.0.0
 onnxruntime>=1.16.0
 openai>=1.35.0
 oss2
@@ -55,7 +55,7 @@ qwen-asr>=0.0.6
 regex
 requests
 scikit-learn>=1.4.0
-scipy>=1.12.0
+scipy>=1.13.0
 silero-vad>=6.2
 simplejson
 sortedcontainers

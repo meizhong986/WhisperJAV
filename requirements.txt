@@ -40,7 +40,7 @@ ten-vad
 # Speech enhancement backends (v1.7.3)
 modelscope>=1.20                # ZipEnhancer 16kHz (recommended, lightweight SOTA)
 addict                          # ModelScope dependency (dict with attribute access)
-datasets>=2.14.0,<4.0           # 4.x breaks modelscope
+datasets>=3.0.0,<=3.6.0         # Must match modelscope constraint
 simplejson                      # ModelScope dependency (JSON parsing)
 sortedcontainers                # ModelScope dependency (sorted collections)
 packaging                       # ModelScope dependency (version parsing)
@@ -49,15 +49,15 @@ bs-roformer-infer               # BS-RoFormer vocal isolation (44.1kHz)
 onnxruntime>=1.16.0             # ONNX inference for ZipEnhancer ONNX mode
 
 # Utilities
-numpy>=1.26.0
-scipy>=1.12.0
+numpy>=2.0.0
+scipy>=1.13.0
 tqdm
 pysrt
 srt
 aiofiles
 jsonschema
 colorama
-librosa>=0.10.2
+librosa>=0.11.0
 pyloudnorm
 requests
 regex
@@ -66,7 +66,7 @@ regex
 pydantic>=2.0,<3.0
 
 # Optional: speed-up
-numba>=0.59.0
+numba>=0.60.0
 hf_xet                          # Faster HuggingFace downloads (Xet Storage)
 
 # GUI Framework (PyWebView)

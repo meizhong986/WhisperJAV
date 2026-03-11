@@ -67,8 +67,8 @@ GITHUB_REPO = os.environ.get(
 
 # Packages to fix AFTER main installation (ensure consistent versions)
 FIX_PACKAGES = [
-    "numpy>=1.26.0",
-    "librosa>=0.10.0",
+    "numpy>=2.0.0",
+    "librosa>=0.11.0",
 ]
 
 # Files to preserve during upgrade (user data)
