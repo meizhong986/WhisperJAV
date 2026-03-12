@@ -1050,6 +1050,12 @@ def run_pip(executor: StepExecutor, args: list, description: str, allow_fail: bo
             if attempt < retry_count:
                 log("    Retrying in 10 seconds...")
                 time.sleep(10)
+            elif allow_fail:
+                log(f"    [WARN] {description} - timed out (optional)")
+                return False
+            else:
+                log(f"    [ERROR] {description} - timed out after {retry_count} attempts")
+                return False
 
         except subprocess.CalledProcessError as e:
             error_output = ""
@@ -1084,7 +1090,7 @@ def run_pip(executor: StepExecutor, args: list, description: str, allow_fail: bo
                 return False
             else:
                 log(f"    [ERROR] {description} - failed after {retry_count} attempts")
-                raise
+                return False
 
         except Exception as e:
             log(f"    [!] Unexpected error: {e}")
@@ -1095,8 +1101,8 @@ def run_pip(executor: StepExecutor, args: list, description: str, allow_fail: bo
                 log(f"    [WARN] {description} - failed (optional)")
                 return False
             else:
-                log(f"    [ERROR] {description} - failed")
-                raise
+                log(f"    [ERROR] {description} - failed unexpectedly: {e}")
+                return False
 
     return False
 

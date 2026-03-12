@@ -101,6 +101,27 @@ IS_WINDOWS = platform.system() == 'Windows'
 
 
 # =============================================================================
+# GPU Protection
+# =============================================================================
+
+def _gpu_constraint_args(install_dir: Path) -> list:
+    """Return pip constraint args to protect GPU packages during upgrades.
+
+    The initial installer creates ``gpu_constraints.txt`` in the environment
+    prefix, pinning torch/torchaudio to their exact CUDA versions.  If we
+    don't pass ``-c gpu_constraints.txt`` on every ``pip install -U``, pip
+    may silently replace CUDA wheels with CPU-only versions from PyPI.
+
+    Returns:
+        ['-c', '<path>'] if constraints file exists, else [].
+    """
+    constraints_path = install_dir / "gpu_constraints.txt"
+    if constraints_path.exists():
+        return ['-c', str(constraints_path)]
+    return []
+
+
+# =============================================================================
 # Cross-Platform Helpers
 # =============================================================================
 
@@ -545,12 +566,15 @@ def upgrade_package(install_dir: Path) -> bool:
         return False
 
     # Upgrade whisperjav WITH dependencies (pip resolves versions naturally)
-    # PyTorch won't be reinstalled if already satisfied
+    # GPU protection: --constraint prevents pip from replacing CUDA wheels
+    gpu_args = _gpu_constraint_args(install_dir)
     print("      Installing whisperjav from GitHub (this may take several minutes)...")
     print("      (New dependencies will be downloaded as needed)")
+    if gpu_args:
+        print("      (GPU constraints active — CUDA wheels protected)")
     try:
         result = subprocess.run(
-            [str(pip_exe), 'install', '-U', GITHUB_REPO],
+            [str(pip_exe), 'install', '-U'] + gpu_args + [GITHUB_REPO],
             capture_output=True,
             text=True,
             timeout=1800  # 30 minute timeout for large downloads
@@ -573,8 +597,7 @@ def fix_package_versions(install_dir: Path) -> bool:
     """
     Fix package versions after main installation.
 
-    Ensures numpy and librosa are at the correct versions for pyvideotrans
-    compatibility (NumPy 1.26.x).
+    Ensures numpy and librosa are at the correct versions.
 
     Args:
         install_dir: Path to installation directory
@@ -587,10 +610,12 @@ def fix_package_versions(install_dir: Path) -> bool:
         print_error("pip not found in installation")
         return False
 
+    # GPU protection: --constraint prevents pip from replacing CUDA wheels
+    gpu_args = _gpu_constraint_args(install_dir)
     print("      Upgrading numpy and librosa to latest versions...")
     try:
         result = subprocess.run(
-            [str(pip_exe), 'install', '--upgrade'] + FIX_PACKAGES,
+            [str(pip_exe), 'install', '--upgrade'] + gpu_args + FIX_PACKAGES,
             capture_output=True,
             text=True,
             timeout=300
@@ -894,12 +919,16 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
         extras_str = ",".join(extras_list)
         install_spec = f"whisperjav[{extras_str}] @ {GITHUB_REPO}"
 
+    # GPU protection: --constraint prevents pip from replacing CUDA wheels
+    gpu_args = _gpu_constraint_args(install_dir)
     print(f"      Installing whisperjav[{extras}] from GitHub...")
     print("      (This may take several minutes)")
+    if gpu_args:
+        print("      (GPU constraints active — CUDA wheels protected)")
 
     try:
         result = subprocess.run(
-            [str(pip_exe), 'install', '-U', install_spec],
+            [str(pip_exe), 'install', '-U'] + gpu_args + [install_spec],
             capture_output=True,
             text=True,
             timeout=1800  # 30 minute timeout
