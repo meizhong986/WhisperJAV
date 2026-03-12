@@ -182,6 +182,27 @@ def _detect_cuda_for_source() -> str:
     return "cpu"
 
 
+def _detect_target_env_for_upgrade() -> tuple:
+    """Detect active environment for upgrade targeting.
+
+    Returns:
+        (env_path, is_external): env_path is the target environment path,
+        or None to let uv use .venv. is_external indicates whether the
+        env is one we didn't create (conda/venv) — used to decide --inexact.
+    """
+    # VIRTUAL_ENV first — more specific (user explicitly activated)
+    venv = os.environ.get("VIRTUAL_ENV")
+    if venv and Path(venv).is_dir():
+        return venv, True
+
+    # CONDA_PREFIX second — may be base env
+    conda = os.environ.get("CONDA_PREFIX")
+    if conda and Path(conda).is_dir():
+        return conda, True
+
+    return None, False  # No active env → uv uses .venv
+
+
 def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
     """Run git pull + uv sync for source installs.
 
@@ -221,7 +242,10 @@ def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
         print_error("git not found")
         return False
 
-    # Step 2: uv sync
+    # Step 2: Detect target environment
+    target_env, is_external = _detect_target_env_for_upgrade()
+
+    # Step 3: uv sync
     uv_exe = shutil.which("uv")
     if not uv_exe:
         print_error("uv not found — install from https://docs.astral.sh/uv/")
@@ -229,7 +253,19 @@ def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
 
     cuda_version = _detect_cuda_for_source()
 
+    # Build environment with UV_PROJECT_ENVIRONMENT if targeting an active env
+    env = dict(os.environ)
+    if target_env:
+        env["UV_PROJECT_ENVIRONMENT"] = target_env
+        env_type = "conda" if os.environ.get("CONDA_PREFIX") == target_env else "venv"
+        print(f"      Upgrading into {env_type} environment: {target_env}")
+
     cmd = ["uv", "sync"]
+
+    # --inexact for external envs: don't remove packages we didn't install
+    if is_external:
+        cmd.append("--inexact")
+
     if extras == "all":
         # Sync all extras
         cmd.extend(["--all-extras"])
@@ -248,6 +284,7 @@ def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
         result = subprocess.run(
             cmd,
             cwd=str(source_root),
+            env=env,
             capture_output=True, text=True, timeout=1800
         )
         if result.returncode != 0:

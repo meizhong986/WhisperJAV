@@ -22,6 +22,7 @@ Options:
     --no-speech-enhancement Skip speech enhancement packages
     --minimal               Minimal install (transcription only)
     --dev                   Install in development/editable mode
+    --local                 Force local .venv even if conda/venv is active
     --local-llm             Install local LLM support (prebuilt wheel)
     --local-llm-build       Install local LLM support (build from source if needed)
     --no-local-llm          Skip local LLM installation
@@ -168,6 +169,76 @@ def _uv_cmd() -> list:
     if shutil.which("uv"):
         return ["uv"]
     return [sys.executable, "-m", "uv"]
+
+
+# =============================================================================
+# Environment Detection
+# =============================================================================
+
+def _check_env_python_version(env_path: str) -> bool:
+    """Check if the Python in an environment is compatible (3.10-3.12).
+
+    Returns True if compatible or if check fails (fail-open — preflight
+    will catch hard failures later).
+    """
+    import subprocess
+
+    if sys.platform == "win32":
+        py = Path(env_path) / "Scripts" / "python.exe"
+    else:
+        py = Path(env_path) / "bin" / "python"
+
+    if not py.exists():
+        return True  # Can't check — let preflight handle it
+
+    try:
+        result = subprocess.run(
+            [str(py), "-c", "import sys; print(sys.version_info.major, sys.version_info.minor)"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            major, minor = map(int, result.stdout.strip().split())
+            if major == 3 and 10 <= minor <= 12:
+                return True
+            log(f"  [WARN] Active environment Python {major}.{minor} is outside "
+                f"supported range (3.10-3.12)")
+            log(f"         Environment: {env_path}")
+            log(f"         Falling back to local .venv instead.")
+            return False
+    except Exception:
+        pass
+    return True  # Fail-open
+
+
+def _detect_target_env(force_local: bool = False) -> tuple:
+    """Detect active environment for uv sync targeting.
+
+    Args:
+        force_local: If True, skip detection and use .venv (--local flag).
+
+    Returns:
+        (env_path, is_external): env_path is the target environment path,
+        or None to let uv create .venv. is_external indicates whether the
+        env is one we didn't create (conda/venv) — used to decide --inexact.
+    """
+    if force_local:
+        return None, False  # Let uv create .venv
+
+    # VIRTUAL_ENV first — more specific (user explicitly activated)
+    venv = os.environ.get("VIRTUAL_ENV")
+    if venv and Path(venv).is_dir():
+        if _check_env_python_version(venv):
+            return venv, True
+        return None, False  # Incompatible Python → fall back to .venv
+
+    # CONDA_PREFIX second — may be base env
+    conda = os.environ.get("CONDA_PREFIX")
+    if conda and Path(conda).is_dir():
+        if _check_env_python_version(conda):
+            return conda, True
+        return None, False  # Incompatible Python → fall back to .venv
+
+    return None, False  # No active env → uv creates .venv (safe default)
 
 
 # =============================================================================
@@ -374,24 +445,40 @@ def detect_cuda_version(args) -> str:
 # uv sync wrapper
 # =============================================================================
 
-def run_uv_sync(extras: list, cuda_version: str, dev: bool = False) -> bool:
+def run_uv_sync(extras: list, cuda_version: str, dev: bool = False,
+                target_env: str = None, is_external: bool = False) -> bool:
     """Run ``uv sync`` with the given extras and pytorch index override.
 
     Args:
         extras: List of extra names to install (e.g. ["cli", "gui"]).
         cuda_version: "cpu", "cu118", "cu128", or "metal".
         dev: If True, include dev dependencies.
+        target_env: Path to target environment (conda/venv), or None for .venv.
+        is_external: If True, the target env is one we didn't create — add --inexact.
 
     Returns:
         True on success, False on failure.
     """
     import subprocess
 
+    # Build environment with UV_PROJECT_ENVIRONMENT if targeting an active env
+    env = dict(os.environ)
+    if target_env:
+        env["UV_PROJECT_ENVIRONMENT"] = target_env
+        log(f"  Installing into active environment: {target_env}")
+    else:
+        log(f"  No active environment — installing into .venv")
+
     cmd = _uv_cmd() + ["sync"]
 
-    # Pin to the running Python interpreter so uv doesn't follow
-    # .python-version (which may request a different version).
-    cmd.extend(["--python", sys.executable])
+    # --inexact for external envs: don't remove packages we didn't install
+    if is_external:
+        cmd.append("--inexact")
+
+    # Pin to the running Python interpreter so uv doesn't download a different one.
+    # Only when NOT targeting an external env (--python conflicts with env targeting).
+    if not target_env:
+        cmd.extend(["--python", sys.executable])
 
     for extra in extras:
         cmd.extend(["--extra", extra])
@@ -418,6 +505,7 @@ def run_uv_sync(extras: list, cuda_version: str, dev: bool = False) -> bool:
         process = subprocess.Popen(
             cmd,
             cwd=str(_source_dir),
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,  # merge stderr into stdout
             text=True,
@@ -460,38 +548,53 @@ def run_uv_sync(extras: list, cuda_version: str, dev: bool = False) -> bool:
 # llama-cpp-python (special handling — CUDA wheel URL logic)
 # =============================================================================
 
+def run_uv_pip_install(args: list, description: str, allow_fail: bool = False) -> bool:
+    """Run uv pip install for one-off package installs.
+
+    Used for packages that can't go through uv sync (e.g., llama-cpp-python
+    with platform-specific wheel URLs).
+
+    Args:
+        args: Arguments to pass after 'uv pip install'.
+        description: Human-readable description for logging.
+        allow_fail: If True, log warning instead of error on failure.
+
+    Returns:
+        True on success.
+    """
+    import subprocess
+
+    cmd = _uv_cmd() + ["pip", "install"] + args
+    log(f"\n>>> {description}")
+    log(f"    {' '.join(cmd[:8])}{'...' if len(cmd) > 8 else ''}")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        if result.returncode != 0:
+            if allow_fail:
+                log(f"    [WARN] {description} — failed (optional)")
+                return False
+            log(f"    [ERROR] {description} — failed")
+            if result.stderr:
+                for line in result.stderr.strip().split('\n')[-5:]:
+                    log(f"    {line}")
+            return False
+        log(f"    [OK] {description}")
+        return True
+    except subprocess.TimeoutExpired:
+        log(f"    [WARN] {description} — timed out")
+        return False
+    except Exception as e:
+        log(f"    [WARN] {description} — {e}")
+        return False
+
+
 def _install_local_llm(build_from_source: bool):
     """Install llama-cpp-python with platform-specific handling."""
-    import subprocess
 
     log("\n    Installing llama-cpp-python for local LLM translation...")
 
     is_apple_silicon = (sys.platform == "darwin" and platform_module.machine() == "arm64")
     is_intel_mac = (sys.platform == "darwin" and platform_module.machine() != "arm64")
-
-    def _uv_pip_install(args: list, description: str, allow_fail: bool = False) -> bool:
-        cmd = _uv_cmd() + ["pip", "install"] + args
-        log(f"\n>>> {description}")
-        log(f"    {' '.join(cmd[:8])}{'...' if len(cmd) > 8 else ''}")
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
-            if result.returncode != 0:
-                if allow_fail:
-                    log(f"    [WARN] {description} — failed (optional)")
-                    return False
-                log(f"    [ERROR] {description} — failed")
-                if result.stderr:
-                    for line in result.stderr.strip().split('\n')[-5:]:
-                        log(f"    {line}")
-                return False
-            log(f"    [OK] {description}")
-            return True
-        except subprocess.TimeoutExpired:
-            log(f"    [WARN] {description} — timed out")
-            return False
-        except Exception as e:
-            log(f"    [WARN] {description} — {e}")
-            return False
 
     if is_apple_silicon:
         log("    Apple Silicon detected — checking for prebuilt Metal wheel...")
@@ -500,11 +603,11 @@ def _install_local_llm(build_from_source: bool):
             wheel_url, wheel_backend = get_prebuilt_wheel_url(verbose=True)
             if wheel_url:
                 log(f"    Found prebuilt wheel: {wheel_backend}")
-                prebuilt_installed = _uv_pip_install(
+                prebuilt_installed = run_uv_pip_install(
                     [wheel_url], f"Install llama-cpp-python ({wheel_backend})", allow_fail=True
                 )
                 if prebuilt_installed:
-                    _uv_pip_install(
+                    run_uv_pip_install(
                         ["llama-cpp-python[server]"],
                         "Install llama-cpp-python server extras", allow_fail=True
                     )
@@ -517,7 +620,7 @@ def _install_local_llm(build_from_source: bool):
                     os.environ[key] = value
                 if cmake_args:
                     os.environ["CMAKE_ARGS"] = cmake_args
-                _uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
+                run_uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
 
     elif is_intel_mac:
         if build_from_source and get_llama_cpp_source_info:
@@ -525,7 +628,7 @@ def _install_local_llm(build_from_source: bool):
             git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
             for key, value in env_vars.items():
                 os.environ[key] = value
-            _uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
+            run_uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
         else:
             log("    Intel Mac — no prebuilt wheels. Use --local-llm-build to build from source.")
 
@@ -535,8 +638,8 @@ def _install_local_llm(build_from_source: bool):
             wheel_url, wheel_backend = get_prebuilt_wheel_url(verbose=True)
             if wheel_url:
                 log(f"    Backend: {wheel_backend}")
-                _uv_pip_install([wheel_url], f"Install llama-cpp-python ({wheel_backend})", allow_fail=True)
-                _uv_pip_install(
+                run_uv_pip_install([wheel_url], f"Install llama-cpp-python ({wheel_backend})", allow_fail=True)
+                run_uv_pip_install(
                     ["llama-cpp-python[server]"],
                     "Install llama-cpp-python server extras", allow_fail=True
                 )
@@ -547,7 +650,7 @@ def _install_local_llm(build_from_source: bool):
                     os.environ[key] = value
                 if cmake_args:
                     os.environ["CMAKE_ARGS"] = cmake_args
-                _uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
+                run_uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
             else:
                 log("    No prebuilt wheel available. Use --local-llm-build to build from source.")
         else:
@@ -584,23 +687,32 @@ def timed_input(prompt: str, timeout_seconds: int, default_response: str) -> str
 # Verification
 # =============================================================================
 
-def _venv_python() -> str:
-    """Return the path to the venv Python created by uv sync."""
-    if sys.platform == "win32":
-        venv_py = _source_dir / ".venv" / "Scripts" / "python.exe"
+def _venv_python(target_env: str = None) -> str:
+    """Return the Python path for the target environment."""
+    if target_env:
+        # Active conda or venv
+        if sys.platform == "win32":
+            py = Path(target_env) / "Scripts" / "python.exe"
+        else:
+            py = Path(target_env) / "bin" / "python"
+        if py.exists():
+            return str(py)
     else:
-        venv_py = _source_dir / ".venv" / "bin" / "python"
-    if venv_py.exists():
-        return str(venv_py)
-    # Fallback to the running interpreter (e.g. if uv reused it)
+        # .venv created by uv
+        if sys.platform == "win32":
+            py = _source_dir / ".venv" / "Scripts" / "python.exe"
+        else:
+            py = _source_dir / ".venv" / "bin" / "python"
+        if py.exists():
+            return str(py)
     return sys.executable
 
 
-def _verify_installation():
+def _verify_installation(target_env: str = None):
     """Verify WhisperJAV was installed correctly."""
     import subprocess
 
-    python = _venv_python()
+    python = _venv_python(target_env)
     log(f"    Verifying with: {python}")
 
     try:
@@ -672,8 +784,13 @@ def main():
                         help="Skip local LLM installation")
     parser.add_argument("--skip-preflight", action="store_true",
                         help="Skip preflight checks")
+    parser.add_argument("--local", action="store_true",
+                        help="Force local .venv even if conda/venv is active")
     parser.add_argument("--log-file", type=str, default=None, metavar="PATH",
                         help="Custom log file path")
+    # Internal flags (used by upgrade.py)
+    parser.add_argument("--upgrade", action="store_true",
+                        help=argparse.SUPPRESS)
     # Legacy compat flags (still accepted, mapped internally)
     parser.add_argument("--cuda118", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--cuda128", action="store_true", help=argparse.SUPPRESS)
@@ -717,6 +834,15 @@ def main():
         log("Skipping preflight checks (--skip-preflight)")
 
     # -------------------------------------------------------------------------
+    # Environment detection
+    # -------------------------------------------------------------------------
+    target_env, is_external = _detect_target_env(force_local=args.local)
+
+    # --upgrade implies non-interactive mode
+    if args.upgrade:
+        args.no_local_llm = True
+
+    # -------------------------------------------------------------------------
     # GPU detection
     # -------------------------------------------------------------------------
     log_section("GPU Detection")
@@ -734,17 +860,25 @@ def main():
             extras.append("enhance")
 
     log_section("Installation Plan")
+    if target_env:
+        env_type = "conda" if os.environ.get("CONDA_PREFIX") == target_env else "venv"
+        log(f"  Target: {env_type} environment at {target_env}")
+    else:
+        log(f"  Target: project .venv (local)")
     log(f"  PyTorch: {cuda_version}")
     log(f"  Extras: {', '.join(extras)}")
     log(f"  Speech Enhancement: {'No' if args.no_speech_enhancement or args.minimal else 'Yes'}")
     log(f"  Mode: {'Development' if args.dev else 'Standard'}")
+    if is_external:
+        log(f"  --inexact: Yes (preserving existing packages)")
     log(f"  Log file: {_LOG_FILE}")
 
     # -------------------------------------------------------------------------
     # Run uv sync (single command replaces 6-stage pip pipeline)
     # -------------------------------------------------------------------------
     log_section("Installing Dependencies (uv sync)")
-    success = run_uv_sync(extras, cuda_version, dev=args.dev)
+    success = run_uv_sync(extras, cuda_version, dev=args.dev,
+                          target_env=target_env, is_external=is_external)
 
     if not success:
         # Retry without enhance (most common failure point)
@@ -752,7 +886,8 @@ def main():
             log("")
             log("    Retrying without speech enhancement...")
             extras_retry = [e for e in extras if e != "enhance"]
-            success = run_uv_sync(extras_retry, cuda_version, dev=args.dev)
+            success = run_uv_sync(extras_retry, cuda_version, dev=args.dev,
+                                  target_env=target_env, is_external=is_external)
             if success:
                 log("    [OK] Installation succeeded without speech enhancement.")
                 log("    You can install it later: uv sync --extra enhance")
@@ -789,27 +924,31 @@ def main():
     # Verification
     # -------------------------------------------------------------------------
     log_section("Verifying Installation")
-    _verify_installation()
+    _verify_installation(target_env)
 
     # -------------------------------------------------------------------------
     # Summary
     # -------------------------------------------------------------------------
     log_section("Installation Complete!")
     log("")
-    # Guide user to activate the venv created by uv sync
-    venv_dir = _source_dir / ".venv"
-    if venv_dir.exists():
-        log("  Packages were installed into the project's .venv.")
-        log("  Activate it before running WhisperJAV:")
-        log("")
-        if sys.platform == "win32":
-            log(f"    .venv\\Scripts\\activate")
-        else:
-            log(f"    source .venv/bin/activate")
-        log("")
-        log("  Or use 'uv run' to run commands in the venv:")
-        log("    uv run whisperjav video.mp4 --mode balanced")
-        log("    uv run whisperjav-gui")
+    if target_env:
+        env_type = "conda" if os.environ.get("CONDA_PREFIX") == target_env else "venv"
+        log(f"  Packages installed into your {env_type} environment at {target_env}")
+        log(f"  Run `whisperjav --help` to verify.")
+    else:
+        venv_dir = _source_dir / ".venv"
+        if venv_dir.exists():
+            log("  Packages installed into .venv.")
+            log("  Activate it before running WhisperJAV:")
+            log("")
+            if sys.platform == "win32":
+                log(f"    .venv\\Scripts\\activate")
+            else:
+                log(f"    source .venv/bin/activate")
+            log("")
+            log("  Or use 'uv run' to run commands in the venv:")
+            log("    uv run whisperjav video.mp4 --mode balanced")
+            log("    uv run whisperjav-gui")
     log("")
     log("  To run WhisperJAV:")
     log("    whisperjav video.mp4 --mode balanced")
