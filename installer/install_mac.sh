@@ -20,6 +20,7 @@
 #   --dev                   Install in development/editable mode
 #   --local-llm             Install local LLM support (prebuilt wheel)
 #   --local-llm-build       Install local LLM support (build from source)
+#   --no-local-llm          Skip local LLM installation
 #   --help                  Show help message
 #
 # Author: Senior Architect

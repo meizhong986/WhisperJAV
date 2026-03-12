@@ -101,9 +101,19 @@ dependencies = [
 
 [project.optional-dependencies]
 
+# PyTorch ecosystem (resolved from named 'pytorch' index, see [tool.uv.sources])
+# Install with: pip install whisperjav[torch]
+torch = [
+    "torch",
+    "torchaudio",
+]
+
 # CLI audio processing features
 # Install with: pip install whisperjav[cli]
 cli = [
+    # PyTorch dependency (GPU wheels via named index)
+    "whisperjav[torch]",
+
     # Audio I/O
     "soundfile",
     "pydub",
@@ -414,4 +424,33 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
+]
+
+# -----------------------------------------------------------------------------
+# Tool Configuration: uv (Package Manager)
+# -----------------------------------------------------------------------------
+# uv replaces pip's 6-stage installation with a single `uv sync` command.
+# Named indexes solve the GPU lock-in problem: torch/torchaudio resolve from
+# the PyTorch CUDA index while all other packages use PyPI.
+#
+# Override CUDA version at install time:
+#   uv sync --index pytorch=https://download.pytorch.org/whl/cu118
+#   uv sync --index pytorch=https://download.pytorch.org/whl/cpu
+
+[tool.uv]
+# Named index for PyTorch GPU wheels
+# Default: CUDA 12.8 (most common modern NVIDIA setup)
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true  # Only torch/torchaudio use this index, not numpy/scipy/etc.
+
+[tool.uv.sources]
+# macOS gets torch from default PyPI (has built-in MPS support for Apple Silicon)
+# Linux/Windows get torch from the named pytorch CUDA index
+torch = [
+    { index = "pytorch", marker = "sys_platform != 'darwin'" },
+]
+torchaudio = [
+    { index = "pytorch", marker = "sys_platform != 'darwin'" },
 ]

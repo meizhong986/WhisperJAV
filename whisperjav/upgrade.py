@@ -99,6 +99,167 @@ VALID_EXTRAS = [
 
 IS_WINDOWS = platform.system() == 'Windows'
 
+# PyTorch index URLs for uv sync (source installs)
+PYTORCH_INDEXES = {
+    "cpu": "https://download.pytorch.org/whl/cpu",
+    "cu118": "https://download.pytorch.org/whl/cu118",
+    "cu124": "https://download.pytorch.org/whl/cu124",
+    "cu128": "https://download.pytorch.org/whl/cu128",
+}
+
+
+# =============================================================================
+# Source Install Detection
+# =============================================================================
+
+def _find_source_root() -> Optional[Path]:
+    """Find the WhisperJAV source root (directory with pyproject.toml + whisperjav/).
+
+    For source installs (editable pip install or uv sync), the project root
+    is typically the cwd, or a parent/sibling of the install prefix.
+
+    Returns:
+        Path to source root, or None if not a source install.
+    """
+    candidates = [
+        Path.cwd(),
+        Path.cwd().parent,
+        Path(__file__).parent.parent,  # whisperjav/ -> project root
+    ]
+    for candidate in candidates:
+        if (candidate / "pyproject.toml").exists() and (candidate / "whisperjav").is_dir():
+            # Extra check: does it have uv.lock? (confirms uv project)
+            if (candidate / "uv.lock").exists():
+                return candidate
+    return None
+
+
+def _detect_cuda_for_source() -> str:
+    """Detect CUDA version for source-install upgrades.
+
+    Returns: "cpu", "cu118", "cu124", "cu128", or "metal".
+    """
+    # Apple Silicon
+    if sys.platform == "darwin" and platform.machine() == "arm64":
+        return "metal"
+
+    # Try nvidia-smi
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            capture_output=True, text=True, check=True, timeout=10
+        )
+        driver = result.stdout.strip().split('\n')[0]
+        if driver:
+            major = int(driver.split('.')[0])
+            if major >= 570:
+                return "cu128"
+            elif major >= 525:
+                return "cu124"
+            else:
+                return "cu118"
+    except Exception:
+        pass
+
+    # Try importing torch to check existing CUDA
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import torch; v = torch.version.cuda; print(v if v else 'cpu')"],
+            capture_output=True, text=True, check=True, timeout=15
+        )
+        cuda_ver = result.stdout.strip()
+        if cuda_ver and cuda_ver != "cpu":
+            # e.g. "12.8" -> "cu128"
+            normalized = cuda_ver.replace(".", "")
+            key = f"cu{normalized}"
+            if key in PYTORCH_INDEXES:
+                return key
+            return "cu128"
+    except Exception:
+        pass
+
+    return "cpu"
+
+
+def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
+    """Run git pull + uv sync for source installs.
+
+    Args:
+        source_root: Path to project root (has pyproject.toml + uv.lock).
+        extras: Comma-separated extras or "all".
+
+    Returns:
+        True if successful.
+    """
+    import shutil
+
+    # Step 1: git pull
+    print("      Pulling latest code from GitHub...")
+    try:
+        result = subprocess.run(
+            ["git", "pull", "--ff-only"],
+            cwd=str(source_root),
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode != 0:
+            # Try rebase if ff-only fails
+            result = subprocess.run(
+                ["git", "pull", "--rebase"],
+                cwd=str(source_root),
+                capture_output=True, text=True, timeout=120
+            )
+            if result.returncode != 0:
+                print_error(f"git pull failed: {result.stderr[:300]}")
+                return False
+        pull_msg = result.stdout.strip().split('\n')[-1] if result.stdout.strip() else "up to date"
+        print_success(f"git pull: {pull_msg}")
+    except subprocess.TimeoutExpired:
+        print_error("git pull timed out")
+        return False
+    except FileNotFoundError:
+        print_error("git not found")
+        return False
+
+    # Step 2: uv sync
+    uv_exe = shutil.which("uv")
+    if not uv_exe:
+        print_error("uv not found — install from https://docs.astral.sh/uv/")
+        return False
+
+    cuda_version = _detect_cuda_for_source()
+
+    cmd = ["uv", "sync"]
+    if extras == "all":
+        # Sync all extras
+        cmd.extend(["--all-extras"])
+    else:
+        for extra in extras.split(","):
+            extra = extra.strip()
+            if extra:
+                cmd.extend(["--extra", extra])
+
+    # Override pytorch index based on GPU
+    if cuda_version != "metal" and cuda_version in PYTORCH_INDEXES:
+        cmd.extend(["--index", f"pytorch={PYTORCH_INDEXES[cuda_version]}"])
+
+    print(f"      Running: {' '.join(cmd)}")
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(source_root),
+            capture_output=True, text=True, timeout=1800
+        )
+        if result.returncode != 0:
+            print_error(f"uv sync failed: {(result.stderr or '')[:500]}")
+            return False
+    except subprocess.TimeoutExpired:
+        print_error("uv sync timed out")
+        return False
+
+    print_success("uv sync completed successfully")
+    return True
+
 
 # =============================================================================
 # GPU Protection
@@ -554,19 +715,27 @@ def upgrade_package(install_dir: Path) -> bool:
     """
     Upgrade the whisperjav package from GitHub with all dependencies.
 
+    For source installs (has uv.lock), uses ``git pull && uv sync``.
+    For conda-constructor installs, uses pip with GPU constraints.
+
     Args:
         install_dir: Path to installation directory
 
     Returns:
         True if successful, False otherwise
     """
+    # Source install path: git pull + uv sync
+    source_root = _find_source_root()
+    if source_root:
+        print("      Source install detected — using git pull + uv sync")
+        return _run_uv_sync_upgrade(source_root, extras="all")
+
+    # Conda-constructor / pip install path: pip with GPU constraints
     pip_exe = _find_pip(install_dir)
     if pip_exe is None:
         print_error("pip not found in installation")
         return False
 
-    # Upgrade whisperjav WITH dependencies (pip resolves versions naturally)
-    # GPU protection: --constraint prevents pip from replacing CUDA wheels
     gpu_args = _gpu_constraint_args(install_dir)
     print("      Installing whisperjav from GitHub (this may take several minutes)...")
     print("      (New dependencies will be downloaded as needed)")
@@ -577,7 +746,7 @@ def upgrade_package(install_dir: Path) -> bool:
             [str(pip_exe), 'install', '-U'] + gpu_args + [GITHUB_REPO],
             capture_output=True,
             text=True,
-            timeout=1800  # 30 minute timeout for large downloads
+            timeout=1800
         )
         if result.returncode != 0:
             print_error(f"Package upgrade failed: {result.stderr[:500]}")
@@ -897,6 +1066,9 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
     """
     Upgrade the whisperjav package with specific extras.
 
+    For source installs (has uv.lock), uses ``git pull && uv sync``.
+    For conda-constructor installs, uses pip with GPU constraints.
+
     Args:
         install_dir: Path to installation directory.
         extras: Comma-separated extras or "all".
@@ -904,14 +1076,18 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
     Returns:
         True if successful, False otherwise.
     """
+    # Source install path: git pull + uv sync
+    source_root = _find_source_root()
+    if source_root:
+        print(f"      Source install detected — using git pull + uv sync [{extras}]")
+        return _run_uv_sync_upgrade(source_root, extras=extras)
+
+    # Conda-constructor / pip install path
     pip_exe = _find_pip(install_dir)
     if pip_exe is None:
         print_error("pip not found in installation")
         return False
 
-    # Build the install specifier using PEP 508 syntax.
-    # The legacy #egg= fragment does NOT support extras (brackets) and
-    # modern pip rejects it with "egg fragment is invalid" (#192).
     if extras == "all":
         install_spec = f"whisperjav[all] @ {GITHUB_REPO}"
     else:
@@ -919,7 +1095,6 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
         extras_str = ",".join(extras_list)
         install_spec = f"whisperjav[{extras_str}] @ {GITHUB_REPO}"
 
-    # GPU protection: --constraint prevents pip from replacing CUDA wheels
     gpu_args = _gpu_constraint_args(install_dir)
     print(f"      Installing whisperjav[{extras}] from GitHub...")
     print("      (This may take several minutes)")
@@ -931,7 +1106,7 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
             [str(pip_exe), 'install', '-U'] + gpu_args + [install_spec],
             capture_output=True,
             text=True,
-            timeout=1800  # 30 minute timeout
+            timeout=1800
         )
         if result.returncode != 0:
             print_error(f"Package upgrade failed: {result.stderr[:500]}")
@@ -1264,9 +1439,12 @@ def main() -> int:
                 print_error("Rollback failed - installation may be in inconsistent state")
         return 1
 
-    # Step 2: Fix package versions (numpy/librosa)
+    # Step 2: Fix package versions (numpy/librosa) — skipped for source installs
     print_step(2, total_steps, "Fixing package versions...")
-    fix_package_versions(install_dir)
+    if _find_source_root():
+        print_success("Source install — uv.lock handles version pinning")
+    else:
+        fix_package_versions(install_dir)
 
     # Step 3: Update launcher
     print_step(3, total_steps, "Updating launcher executable...")

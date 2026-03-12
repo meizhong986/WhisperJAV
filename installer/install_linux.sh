@@ -30,13 +30,13 @@
 #
 # Options (forwarded to install.py):
 #   --cpu-only              Install CPU-only PyTorch
-#   --cuda118               Install PyTorch for CUDA 11.8
-#   --cuda128               Install PyTorch for CUDA 12.8 (default)
+#   --cuda VERSION          Install PyTorch for specific CUDA (e.g. cu118, cu124, cu128)
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Minimal install (transcription only)
 #   --dev                   Install in development/editable mode
 #   --local-llm             Install local LLM support (prebuilt wheel)
 #   --local-llm-build       Install local LLM support (build from source)
+#   --no-local-llm          Skip local LLM installation
 #   --help                  Show help message
 #
 # Author: Senior Architect

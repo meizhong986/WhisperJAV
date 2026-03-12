@@ -29,13 +29,13 @@ REM   - whisperjav/installer/ - Unified installer module
 REM
 REM Options (forwarded to install.py):
 REM   --cpu-only              Install CPU-only PyTorch
-REM   --cuda118               Install PyTorch for CUDA 11.8
-REM   --cuda128               Install PyTorch for CUDA 12.8 (default)
+REM   --cuda VERSION          Install PyTorch for specific CUDA (e.g. cu118, cu124, cu128)
 REM   --no-speech-enhancement Skip speech enhancement packages
 REM   --minimal               Minimal install (transcription only)
 REM   --dev                   Install in development/editable mode
 REM   --local-llm             Install local LLM support (prebuilt wheel)
 REM   --local-llm-build       Install local LLM support (build from source)
+REM   --no-local-llm          Skip local LLM installation
 REM   --help                  Show help message
 REM
 REM Author: Senior Architect

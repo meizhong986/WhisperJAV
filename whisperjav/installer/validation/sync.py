@@ -153,6 +153,7 @@ def validate_pyproject_sync(pyproject_path: Path = None) -> List[str]:
     #
     KNOWN_COMPOSITE_EXTRAS = {
         "all",      # All extras combined
+        "torch",    # PyTorch ecosystem (uv resolves from named pytorch index)
         "colab",    # Google Colab optimized
         "kaggle",   # Kaggle optimized
         "unix",     # Linux/macOS CLI focused
