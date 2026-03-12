@@ -14,7 +14,14 @@
 
 ### Windows — Standalone Installer (.exe)
 
-No new .exe for this beta — the changes are in the source install scripts only. Standalone installer users should stay on [v1.8.7](https://github.com/meizhong986/WhisperJAV/releases/tag/v1.8.7). A new .exe will ship with the stable v1.8.8 release.
+The easiest way. No Python knowledge needed.
+
+1. Download **WhisperJAV-1.8.8b1-Windows-x86_64.exe** from the Assets below
+2. Run the installer (no admin rights required)
+3. Wait 10-20 minutes for setup to complete
+4. Launch from the Desktop shortcut
+
+Installs to `%LOCALAPPDATA%\WhisperJAV`. A desktop shortcut is created automatically. Your GPU is detected automatically.
 
 ### Windows — Source Install
 
