@@ -20,11 +20,11 @@ The easiest way. No Python knowledge needed.
 3. Wait 10-20 minutes for setup to complete
 4. Launch from the Desktop shortcut
 
-Your GPU is detected automatically. The installer picks the right PyTorch version for your NVIDIA driver.
+Installs to `%LOCALAPPDATA%\WhisperJAV`. Your GPU is detected automatically.
 
 ### Windows — Source Install
 
-If you manage your own Python environment.
+Requires [Git](https://git-scm.com/downloads) and [Python 3.10-3.12](https://www.python.org/downloads/).
 
 ```
 git clone https://github.com/meizhong986/whisperjav.git
@@ -33,7 +33,11 @@ git checkout v1.8.8b1
 installer\install_windows.bat
 ```
 
+Installs into the `whisperjav` folder you cloned into.
+
 ### macOS
+
+Requires [Git](https://git-scm.com/downloads). The script checks for everything else (Xcode CLI Tools, Python, FFmpeg, PortAudio) and tells you what to install if anything is missing.
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
@@ -42,9 +46,11 @@ git checkout v1.8.8b1
 installer/install_mac.sh
 ```
 
-The script checks for prerequisites (Xcode CLI Tools, Homebrew, Python, FFmpeg, PortAudio) and tells you what to install if anything is missing.
+Installs into the `whisperjav` folder you cloned into.
 
 ### Linux
+
+Requires Git and Python 3.10-3.12. The script handles PEP 668 (externally-managed) environments on Debian 12+ / Ubuntu 24.04+.
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
@@ -53,7 +59,7 @@ git checkout v1.8.8b1
 installer/install_linux.sh
 ```
 
-The script checks for Python and handles PEP 668 (externally-managed) environments on Debian 12+ / Ubuntu 24.04+.
+Installs into the `whisperjav` folder you cloned into.
 
 ### Google Colab / Kaggle
 
