@@ -9,18 +9,24 @@ from datetime import datetime
 import numpy as np
 
 def convert_numpy_for_json(obj):
-    """Convert numpy objects to JSON-serializable types."""
-    if isinstance(obj, (np.integer, np.int_, np.intc, np.intp, np.int8,
-                        np.int16, np.int32, np.int64, np.uint8,
-                        np.uint16, np.uint32, np.uint64)):
+    """Convert numpy objects to JSON-serializable types.
+
+    Used as ``json.dump(..., default=convert_numpy_for_json)``.
+
+    Uses numpy abstract base classes (np.integer, np.floating, np.bool_)
+    which cover ALL concrete dtypes and are stable across numpy 1.x and 2.x.
+    Listing concrete types (np.int8, np.int64, etc.) is unnecessary because
+    they are all subclasses of np.integer/np.floating.
+    """
+    if isinstance(obj, np.integer):
         return int(obj)
-    elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
+    elif isinstance(obj, np.floating):
         if np.isnan(obj) or np.isinf(obj):
-            return None 
+            return None
         return float(obj)
-    elif isinstance(obj, (np.ndarray,)):
+    elif isinstance(obj, np.ndarray):
         return obj.tolist()
-    elif isinstance(obj, (np.bool_)):
+    elif isinstance(obj, np.bool_):
         return bool(obj)
     elif isinstance(obj, Path):
         return str(obj)
