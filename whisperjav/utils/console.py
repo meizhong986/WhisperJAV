@@ -192,6 +192,7 @@ def suppress_dependency_warnings() -> None:
     - pkg_resources deprecation warnings
     - PyTorch dtype warnings
     - Various experimental feature warnings
+    - requests chardet/urllib3 version mismatch (cosmetic)
 
     Should be called early in application startup.
 
@@ -226,6 +227,15 @@ def suppress_dependency_warnings() -> None:
         category=DeprecationWarning,
         module="pkg_resources"
     )
+
+    # Suppress requests' overly strict version check for chardet/urllib3.
+    # requests 2.32.x caps chardet < 6.0.0 but pysrt pulls in chardet 7.x
+    # which works fine — the check is just too conservative.
+    try:
+        from requests.exceptions import RequestsDependencyWarning
+        warnings.filterwarnings("ignore", category=RequestsDependencyWarning)
+    except ImportError:
+        pass
 
 
 def setup_console() -> None:
