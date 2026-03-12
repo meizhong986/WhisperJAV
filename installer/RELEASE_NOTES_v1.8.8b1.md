@@ -36,26 +36,24 @@ installer\install_windows.bat
 ### macOS
 
 ```bash
-# Install prerequisites (if not already installed)
-xcode-select --install
-brew install python@3.12 ffmpeg portaudio git
-
-# Install WhisperJAV
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 git checkout v1.8.8b1
 installer/install_mac.sh
 ```
 
+The script checks for prerequisites (Xcode CLI Tools, Homebrew, Python, FFmpeg, PortAudio) and tells you what to install if anything is missing.
+
 ### Linux
 
 ```bash
-# Install WhisperJAV
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 git checkout v1.8.8b1
 installer/install_linux.sh
 ```
+
+The script checks for Python and handles PEP 668 (externally-managed) environments on Debian 12+ / Ubuntu 24.04+.
 
 ### Google Colab / Kaggle
 
