@@ -5,13 +5,13 @@
 __version__ = "1.8.8b1"
 
 # Human-readable version for display in UI
-__version_display__ = "1.8.8 beta 1"
+__version_display__ = "1.8.8-beta"
 
 # Version metadata
 __version_info__ = {
     "major": 1,
     "minor": 8,
     "patch": 8,
-    "release": "b1",
+    "release": "beta",
     "architecture": "v4.4"
 }
