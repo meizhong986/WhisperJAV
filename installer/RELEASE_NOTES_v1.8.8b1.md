@@ -20,46 +20,64 @@ The easiest way. No Python knowledge needed.
 3. Wait 10-20 minutes for setup to complete
 4. Launch from the Desktop shortcut
 
-Installs to `%LOCALAPPDATA%\WhisperJAV`. Your GPU is detected automatically.
+Installs to `%LOCALAPPDATA%\WhisperJAV`. A desktop shortcut is created automatically. Your GPU is detected automatically.
 
 ### Windows — Source Install
 
-Requires [Git](https://git-scm.com/downloads) and [Python 3.10-3.12](https://www.python.org/downloads/).
+Requires [Git](https://git-scm.com/downloads) and [Python 3.10-3.12](https://www.python.org/downloads/). Open a terminal and run:
 
 ```
+cd %USERPROFILE%
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 git checkout v1.8.8b1
 installer\install_windows.bat
 ```
 
-Installs into the `whisperjav` folder you cloned into.
+This creates a `whisperjav` folder in your home directory (e.g. `C:\Users\YourName\whisperjav`) and installs all packages into a `.venv` folder inside it. After installation, activate and launch:
+
+```
+.venv\Scripts\activate
+whisperjav-gui
+```
 
 ### macOS
 
-Requires [Git](https://git-scm.com/downloads). The script checks for everything else (Xcode CLI Tools, Python, FFmpeg, PortAudio) and tells you what to install if anything is missing.
+Requires [Git](https://git-scm.com/downloads). The install script checks for everything else (Xcode CLI Tools, Python, FFmpeg, PortAudio) and tells you exactly what to install if anything is missing. Open Terminal and run:
 
 ```bash
+cd ~
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 git checkout v1.8.8b1
 installer/install_mac.sh
 ```
 
-Installs into the `whisperjav` folder you cloned into.
+This creates a `whisperjav` folder in your home directory (e.g. `~/whisperjav`) and installs all packages into a `.venv` folder inside it. After installation, activate and launch:
+
+```bash
+source .venv/bin/activate
+whisperjav-gui
+```
 
 ### Linux
 
-Requires Git and Python 3.10-3.12. The script handles PEP 668 (externally-managed) environments on Debian 12+ / Ubuntu 24.04+.
+Requires Git and Python 3.10-3.12. The install script handles PEP 668 (externally-managed) environments on Debian 12+ / Ubuntu 24.04+. Open a terminal and run:
 
 ```bash
+cd ~
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 git checkout v1.8.8b1
 installer/install_linux.sh
 ```
 
-Installs into the `whisperjav` folder you cloned into.
+This creates a `whisperjav` folder in your home directory (e.g. `~/whisperjav`) and installs all packages into a `.venv` folder inside it. After installation, activate and launch:
+
+```bash
+source .venv/bin/activate
+whisperjav-gui
+```
 
 ### Google Colab / Kaggle
 
@@ -86,18 +104,6 @@ git checkout v1.8.8b1
 installer\install_windows.bat        # Windows
 installer/install_mac.sh             # macOS
 installer/install_linux.sh           # Linux
-```
-
-### After Installation
-
-Launch the GUI:
-```
-whisperjav-gui
-```
-
-Or use the command line:
-```
-whisperjav video.mp4 --mode balanced
 ```
 
 ## What Changed (Technical Details)
