@@ -1,6 +1,537 @@
 WhisperJAV Installation Log
-Started: 2026-02-27 20:07:26
+Started: 2026-03-12 13:59:54
 ================================================================================
 
-[20:07:26]   Checking for Visual C++ Redistributable...
-[20:07:26]   [OK] Visual C++ Redistributable detected
+[13:59:54] 
+[13:59:54] ============================================================
+[13:59:54]   WhisperJAV Source Installation (uv)
+[13:59:54] ============================================================
+[13:59:54] Python: 3.12.12 | packaged by Anaconda, Inc. | (main, Oct 21 2025, 20:05:38) [MSC v.1929 64 bit (AMD64)]
+[13:59:54] Platform: win32
+[13:59:54] Source: C:\BIN\git\whisperJav_V1_Minami_Edition
+[13:59:54] 
+[13:59:54] ============================================================
+[13:59:54]   Preflight Checks
+[13:59:54] ============================================================
+[13:59:54]   [OK] uv found: uv 0.9.26 (ee4f00362 2026-01-15)
+[13:59:54]   Disk free space: 90.4 GB (minimum: 8 GB)
+[13:59:54]   [OK] Disk space sufficient
+[13:59:54]   Checking network connectivity...
+[13:59:54]   [OK] Network connectivity to PyPI
+[13:59:54]   [OK] Python 3.12 - OK
+[13:59:54]   [OK] FFmpeg 8.0-full_build-www.gyan.dev - OK
+[13:59:54]   [OK] Git 2.42.0.windows.2 - OK
+[13:59:54] 
+[13:59:54]   All preflight checks passed!
+[13:59:54] 
+[13:59:54] ============================================================
+[13:59:54]   GPU Detection
+[13:59:54] ============================================================
+[13:59:54]   GPU detected: NVIDIA GeForce RTX 3060
+[13:59:54]   Driver: 581.57
+[13:59:54]   Selected: cu128
+[13:59:54] 
+[13:59:54] ============================================================
+[13:59:54]   Installation Plan
+[13:59:54] ============================================================
+[13:59:54]   Target: conda environment at C:\Users\MK\anaconda3\envs\WJ_TEST
+[13:59:54]   PyTorch: cu128
+[13:59:54]   Extras: cli, gui, translate, llm, huggingface, qwen, analysis, compatibility, enhance
+[13:59:54]   Speech Enhancement: Yes
+[13:59:54]   Mode: Development
+[13:59:54]   --inexact: Yes (preserving existing packages)
+[13:59:54]   Log file: C:\BIN\git\whisperJav_V1_Minami_Edition\install_log.txt
+[13:59:54] 
+[13:59:54] ============================================================
+[13:59:54]   Installing Dependencies (uv sync)
+[13:59:54] ============================================================
+[13:59:54]   Installing into active environment: C:\Users\MK\anaconda3\envs\WJ_TEST
+[13:59:54] 
+>>> Running: uv sync --inexact --extra cli --extra gui --extra translate --extra llm --extra huggingface --extra qwen --extra analysis --extra compatibility --extra enhance --index pytorch=https://download.pytorch.org/whl/cu128 --extra dev --verbose
+    DEBUG uv 0.9.26 (ee4f00362 2026-01-15)
+    DEBUG Acquired shared lock for `C:\Users\MK\AppData\Local\uv\cache`
+    DEBUG Found project root: `C:\BIN\git\whisperJav_V1_Minami_Edition`
+    DEBUG No workspace root found, using project root
+    DEBUG Acquired exclusive lock for `C:\BIN\git\whisperJav_V1_Minami_Edition`
+    DEBUG No Python version file found in workspace: C:\BIN\git\whisperJav_V1_Minami_Edition
+    DEBUG Using Python request `>=3.10, <3.13` from `requires-python` metadata
+    DEBUG Checking for Python environment at: `C:\Users\MK\anaconda3\envs\WJ_TEST`
+    DEBUG The project environment's Python version satisfies the request: `Python >=3.10, <3.13`
+    DEBUG Released lock at `C:\Users\MK\AppData\Local\Temp\uv-589df321bd647267.lock`
+    DEBUG Acquired exclusive lock for `C:\Users\MK\anaconda3\envs\WJ_TEST`
+    DEBUG Using request timeout of 30s
+    DEBUG Found static `requires-dist` for: C:\BIN\git\whisperJav_V1_Minami_Edition\
+    DEBUG No workspace root found, using project root
+    DEBUG Static `provides-extra` for `whisperjav @ editable+.` is up-to-date
+    DEBUG Static `requires-dist` for `whisperjav @ editable+.` is up-to-date
+    DEBUG Existing `uv.lock` satisfies workspace requirements
+    Resolved 246 packages in 59ms
+    DEBUG Using request timeout of 30s
+    DEBUG Computed cache info: Timestamp(SystemTime { intervals: 134177514218235544 }), None, None, {}, {"src": None}. Most recently modified: pyproject.toml
+    DEBUG Directory source requirement already cached: whisperjav==1.8.7 (from file:///C:/BIN/git/whisperJav_V1_Minami_Edition)
+    DEBUG Registry requirement already cached: aiofiles==24.1.0
+    DEBUG Registry requirement already cached: colorama==0.4.6
+    DEBUG Registry requirement already cached: faster-whisper==1.2.1
+    DEBUG Git source requirement already cached: ffmpeg-python==0.2.0 (from git+https://github.com/kkroening/ffmpeg-python.git@df129c7ba30aaa9ffffb81a48f53aa7253b0b4e6)
+    DEBUG Registry requirement already cached: jsonschema==4.26.0
+    DEBUG Registry requirement already cached: more-itertools==10.8.0
+    DEBUG Git source requirement already cached: openai-whisper==20250625 (from git+https://github.com/openai/whisper@c0d2f624c09dc18e709e37c2ad90c039a4eb72a2)
+    DEBUG Registry requirement already cached: pydantic==2.12.5
+    DEBUG Registry requirement already cached: pysrt==1.1.2
+    DEBUG Registry requirement already cached: pyyaml==6.0.3
+    DEBUG Registry requirement already cached: regex==2026.2.28
+    DEBUG Registry requirement already cached: requests==2.32.5
+    DEBUG Registry requirement already cached: srt==3.5.3
+    DEBUG Git source requirement already cached: stable-ts==2.20.4 (from git+https://github.com/meizhong986/stable-ts-fix-setup.git@db1358dcc5f4ef7b252a64cdfa7f885e4d60d999)
+    DEBUG Registry requirement already cached: tiktoken==0.12.0
+    DEBUG Registry requirement already cached: tqdm==4.67.3
+    DEBUG Registry requirement already cached: matplotlib==3.10.8
+    DEBUG Registry requirement already cached: auditok==0.3.0
+    DEBUG Registry requirement already cached: librosa==0.11.0
+    DEBUG Registry requirement already cached: numba==0.64.0
+    DEBUG Registry requirement already cached: numpy==2.4.3
+    DEBUG Registry requirement already cached: psutil==7.2.2
+    DEBUG Registry requirement already cached: pydub==0.25.1
+    DEBUG Registry requirement already cached: pyloudnorm==0.2.0
+    DEBUG Registry requirement already cached: scikit-learn==1.8.0
+    DEBUG Registry requirement already cached: scipy==1.17.1
+    DEBUG Registry requirement already cached: silero-vad==6.2.1
+    DEBUG Registry requirement already cached: soundfile==0.12.1
+    DEBUG Registry requirement already cached: ten-vad==1.0.6.8
+    DEBUG Registry requirement already cached: torch==2.10.0+cu128
+    DEBUG Registry requirement already cached: torchaudio==2.10.0+cu128
+    DEBUG Registry requirement already cached: av==16.1.0
+    DEBUG Registry requirement already cached: httpx==0.28.1
+    DEBUG Registry requirement already cached: imageio==2.37.3
+    DEBUG Registry requirement already cached: imageio-ffmpeg==0.6.0
+    DEBUG Registry requirement already cached: soxr==1.0.0
+    DEBUG Registry requirement already cached: websockets==16.0
+    DEBUG Registry requirement already cached: pre-commit==4.5.1
+    DEBUG Registry requirement already cached: pytest==9.0.2
+    DEBUG Registry requirement already cached: pytest-cov==7.0.0
+    DEBUG Registry requirement already cached: ruff==0.15.5
+    DEBUG Registry requirement already cached: accelerate==1.12.0
+    DEBUG Registry requirement already cached: addict==2.4.0
+    DEBUG Registry requirement already cached: attrs==25.4.0
+    DEBUG Registry requirement already cached: bs-roformer-infer==0.1.1
+    DEBUG Git source requirement already cached: clearvoice==0.1.3 (from git+https://github.com/meizhong986/ClearerVoice-Studio.git@c5db55114ba47b5ee0cd40fd624228b3635e2b36#subdirectory=clearvoice)
+    DEBUG Registry requirement already cached: datasets==3.6.0
+    DEBUG Registry requirement already cached: einops==0.8.2
+    DEBUG Registry requirement already cached: gdown==5.2.1
+    DEBUG Registry requirement already cached: hf-xet==1.4.0
+    DEBUG Registry requirement already cached: huggingface-hub==0.36.2
+    DEBUG Registry requirement already cached: joblib==1.5.3
+    DEBUG Registry requirement already cached: modelscope==1.34.0
+    DEBUG Registry requirement already cached: onnxruntime==1.24.3
+    DEBUG Registry requirement already cached: opencv-python==4.10.0.84
+    DEBUG Registry requirement already cached: oss2==2.19.1
+    DEBUG Distribution type mismatch for packaging: InstalledDist { kind: Url(InstalledDirectUrlDist { name: PackageName("packaging"), version: "25.0", direct_url: LocalDirectory { url: "file:///C:/miniconda3/conda-bld/packaging_1761049137378/work", dir_info: DirInfo { editable: None }, subdirectory: None }, url: DisplaySafeUrl { scheme: "file", cannot_be_a_base: false, username: "", password: None, host: None, port: None, path: "/C:/miniconda3/conda-bld/packaging_1761049137378/work", query: None, fragment: None }, editable: false, path: "C:\\Users\\MK\\anaconda3\\envs\\WJ_TEST\\Lib\\site-packages\\packaging-25.0.dist-info", cache_info: None, build_info: None }), metadata_cache: OnceLock(<uninit>), tags_cache: OnceLock(<uninit>) }
+    DEBUG Requirement installed, but mismatched:
+      Installed: InstalledDist { kind: Url(InstalledDirectUrlDist { name: PackageName("packaging"), version: "25.0", direct_url: LocalDirectory { url: "file:///C:/miniconda3/conda-bld/packaging_1761049137378/work", dir_info: DirInfo { editable: None }, subdirectory: None }, url: DisplaySafeUrl { scheme: "file", cannot_be_a_base: false, username: "", password: None, host: None, port: None, path: "/C:/miniconda3/conda-bld/packaging_1761049137378/work", query: None, fragment: None }, editable: false, path: "C:\\Users\\MK\\anaconda3\\envs\\WJ_TEST\\Lib\\site-packages\\packaging-25.0.dist-info", cache_info: None, build_info: None }), metadata_cache: OnceLock(<uninit>), tags_cache: OnceLock(<uninit>) }
+      Requested: Registry { specifier: VersionSpecifiers([VersionSpecifier { operator: Equal, version: "26.0" }]), index: Some(IndexMetadata { url: Pypi(VerbatimUrl { url: DisplaySafeUrl { scheme: "https", cannot_be_a_base: false, username: "", password: None, host: Some(Domain("pypi.org")), port: None, path: "/simple", query: None, fragment: None }, given: None }), format: Simple }), conflict: None }
+    DEBUG Registry requirement already cached: packaging==26.0
+    DEBUG Registry requirement already cached: pillow==12.1.1
+    DEBUG Registry requirement already cached: python-speech-features==0.6
+    DEBUG Registry requirement already cached: rotary-embedding-torch==0.8.3
+    DEBUG Registry requirement already cached: scenedetect==0.6.6
+    DEBUG Distribution type mismatch for setuptools: InstalledDist { kind: EggInfoDirectory(InstalledEggInfoDirectory { name: PackageName("setuptools"), version: "80.10.2", path: "C:\\Users\\MK\\anaconda3\\envs\\WJ_TEST\\Lib\\site-packages\\setuptools-80.10.2-py3.12.egg-info" }), metadata_cache: OnceLock(<uninit>), tags_cache: OnceLock(<uninit>) }
+    DEBUG Requirement installed, but mismatched:
+      Installed: InstalledDist { kind: EggInfoDirectory(InstalledEggInfoDirectory { name: PackageName("setuptools"), version: "80.10.2", path: "C:\\Users\\MK\\anaconda3\\envs\\WJ_TEST\\Lib\\site-packages\\setuptools-80.10.2-py3.12.egg-info" }), metadata_cache: OnceLock(<uninit>), tags_cache: OnceLock(<uninit>) }
+      Requested: Registry { specifier: VersionSpecifiers([VersionSpecifier { operator: Equal, version: "81.0.0" }]), index: Some(IndexMetadata { url: Pypi(VerbatimUrl { url: DisplaySafeUrl { scheme: "https", cannot_be_a_base: false, username: "", password: None, host: Some(Domain("pypi.org")), port: None, path: "/simple", query: None, fragment: None }, given: None }), format: Simple }), conflict: None }
+    DEBUG Registry requirement already cached: setuptools==81.0.0
+    DEBUG Registry requirement already cached: simplejson==3.20.2
+    DEBUG Registry requirement already cached: sortedcontainers==2.4.0
+    DEBUG Registry requirement already cached: torchinfo==1.8.0
+    DEBUG Registry requirement already cached: transformers==4.57.6
+    DEBUG Registry requirement already cached: yamlargparse==1.31.1
+    DEBUG Registry requirement already cached: pythonnet==3.0.5
+    DEBUG Registry requirement already cached: pywebview==6.1
+    DEBUG Registry requirement already cached: pywin32==311
+    DEBUG Registry requirement already cached: fastapi==0.135.1
+    DEBUG Registry requirement already cached: pydantic-settings==2.13.1
+    DEBUG Registry requirement already cached: sse-starlette==3.3.2
+    DEBUG Registry requirement already cached: starlette-context==0.3.6
+    DEBUG Registry requirement already cached: uvicorn==0.41.0
+    DEBUG Registry requirement already cached: qwen-asr==0.0.6
+    DEBUG Registry requirement already cached: google-api-core==2.30.0
+    DEBUG Registry requirement already cached: google-genai==1.66.0
+    DEBUG Registry requirement already cached: openai==2.26.0
+    DEBUG Registry requirement already cached: pysubtrans==1.5.8
+    DEBUG Registry requirement already cached: ctranslate2==4.7.1
+    DEBUG Registry requirement already cached: tokenizers==0.22.2
+    DEBUG Registry requirement already cached: future==1.0.0
+    DEBUG Registry requirement already cached: jsonschema-specifications==2025.9.1
+    DEBUG Registry requirement already cached: referencing==0.37.0
+    DEBUG Registry requirement already cached: rpds-py==0.30.0
+    DEBUG Registry requirement already cached: annotated-types==0.7.0
+    DEBUG Registry requirement already cached: pydantic-core==2.41.5
+    DEBUG Registry requirement already cached: typing-extensions==4.15.0
+    DEBUG Registry requirement already cached: typing-inspection==0.4.2
+    DEBUG Registry requirement already cached: chardet==7.1.0
+    DEBUG Registry requirement already cached: certifi==2026.2.25
+    DEBUG Registry requirement already cached: charset-normalizer==3.4.5
+    DEBUG Registry requirement already cached: idna==3.11
+    DEBUG Registry requirement already cached: urllib3==2.6.3
+    DEBUG Registry requirement already cached: contourpy==1.3.3
+    DEBUG Registry requirement already cached: cycler==0.12.1
+    DEBUG Registry requirement already cached: fonttools==4.62.0
+    DEBUG Registry requirement already cached: kiwisolver==1.5.0
+    DEBUG Registry requirement already cached: pyparsing==3.3.2
+    DEBUG Registry requirement already cached: python-dateutil==2.9.0.post0
+    DEBUG Registry requirement already cached: pyaudio==0.2.14
+    DEBUG Registry requirement already cached: audioread==3.1.0
+    DEBUG Registry requirement already cached: decorator==5.2.1
+    DEBUG Registry requirement already cached: lazy-loader==0.5
+    DEBUG Registry requirement already cached: msgpack==1.1.2
+    DEBUG Registry requirement already cached: pooch==1.9.0
+    DEBUG Registry requirement already cached: llvmlite==0.46.0
+    DEBUG Registry requirement already cached: threadpoolctl==3.6.0
+    DEBUG Registry requirement already cached: cffi==2.0.0
+    DEBUG Registry requirement already cached: filelock==3.25.2
+    DEBUG Registry requirement already cached: fsspec==2025.3.0
+    DEBUG Registry requirement already cached: jinja2==3.1.6
+    DEBUG Registry requirement already cached: networkx==3.6.1
+    DEBUG Registry requirement already cached: sympy==1.14.0
+    DEBUG Registry requirement already cached: anyio==4.12.1
+    DEBUG Registry requirement already cached: httpcore==1.0.9
+    DEBUG Registry requirement already cached: cfgv==3.5.0
+    DEBUG Registry requirement already cached: identify==2.6.17
+    DEBUG Registry requirement already cached: nodeenv==1.10.0
+    DEBUG Registry requirement already cached: virtualenv==21.2.0
+    DEBUG Registry requirement already cached: iniconfig==2.3.0
+    DEBUG Registry requirement already cached: pluggy==1.6.0
+    DEBUG Registry requirement already cached: pygments==2.19.2
+    DEBUG Registry requirement already cached: coverage==7.13.4
+    DEBUG Registry requirement already cached: safetensors==0.7.0
+    DEBUG Registry requirement already cached: beartype==0.22.9
+    DEBUG Registry requirement already cached: ml-collections==1.1.0
+    DEBUG Registry requirement already cached: torchvision==0.25.0
+    DEBUG Registry requirement already cached: dill==0.3.8
+    DEBUG Registry requirement already cached: multiprocess==0.70.16
+    DEBUG Registry requirement already cached: pandas==3.0.1
+    DEBUG Registry requirement already cached: pyarrow==23.0.1
+    DEBUG Registry requirement already cached: xxhash==3.6.0
+    DEBUG Registry requirement already cached: beautifulsoup4==4.14.3
+    DEBUG Registry requirement already cached: flatbuffers==25.12.19
+    DEBUG Registry requirement already cached: protobuf==6.33.5
+    DEBUG Registry requirement already cached: aliyun-python-sdk-core==2.16.0
+    DEBUG Registry requirement already cached: aliyun-python-sdk-kms==2.16.5
+    DEBUG Registry requirement already cached: crcmod==1.7
+    DEBUG Registry requirement already cached: pycryptodome==3.23.0
+    DEBUG Registry requirement already cached: six==1.17.0
+    DEBUG Registry requirement already cached: click==8.3.1
+    DEBUG Registry requirement already cached: platformdirs==4.9.4
+    DEBUG Registry requirement already cached: clr-loader==0.2.10
+    DEBUG Registry requirement already cached: bottle==0.13.4
+    DEBUG Registry requirement already cached: proxy-tools==0.1.0
+    DEBUG Registry requirement already cached: annotated-doc==0.0.4
+    DEBUG Registry requirement already cached: starlette==0.52.1
+    DEBUG Registry requirement already cached: python-dotenv==1.2.2
+    DEBUG Registry requirement already cached: h11==0.16.0
+    DEBUG Registry requirement already cached: flask==3.1.3
+    DEBUG Registry requirement already cached: gradio==6.9.0
+    DEBUG Registry requirement already cached: nagisa==0.2.11
+    DEBUG Registry requirement already cached: pytz==2026.1.post1
+    DEBUG Registry requirement already cached: qwen-omni-utils==0.0.9
+    DEBUG Registry requirement already cached: sox==1.5.0
+    DEBUG Registry requirement already cached: soynlp==0.0.493
+    DEBUG Registry requirement already cached: google-auth==2.49.0
+    DEBUG Registry requirement already cached: googleapis-common-protos==1.73.0
+    DEBUG Registry requirement already cached: proto-plus==1.27.1
+    DEBUG Registry requirement already cached: distro==1.9.0
+    DEBUG Registry requirement already cached: sniffio==1.3.1
+    DEBUG Registry requirement already cached: tenacity==9.1.4
+    DEBUG Registry requirement already cached: jiter==0.13.0
+    DEBUG Registry requirement already cached: appdirs==1.4.4
+    DEBUG Registry requirement already cached: babel==2.18.0
+    DEBUG Registry requirement already cached: blinker==1.9.0
+    DEBUG Registry requirement already cached: pysubs2==1.8.0
+    DEBUG Registry requirement already cached: pycparser==3.0
+    DEBUG Registry requirement already cached: markupsafe==3.0.3
+    DEBUG Registry requirement already cached: mpmath==1.3.0
+    DEBUG Registry requirement already cached: distlib==0.4.0
+    DEBUG Registry requirement already cached: python-discovery==1.1.3
+    DEBUG Registry requirement already cached: absl-py==2.4.0
+    DEBUG Registry requirement already cached: aiohttp==3.13.3
+    DEBUG Registry requirement already cached: tzdata==2025.3
+    DEBUG Registry requirement already cached: soupsieve==2.8.3
+    DEBUG Registry requirement already cached: pysocks==1.7.1
+    DEBUG Registry requirement already cached: cryptography==46.0.5
+    DEBUG Registry requirement already cached: jmespath==0.10.0
+    DEBUG Registry requirement already cached: itsdangerous==2.2.0
+    DEBUG Registry requirement already cached: werkzeug==3.1.6
+    DEBUG Registry requirement already cached: brotli==1.2.0
+    DEBUG Registry requirement already cached: ffmpy==1.0.0
+    DEBUG Registry requirement already cached: gradio-client==2.3.0
+    DEBUG Registry requirement already cached: groovy==0.1.2
+    DEBUG Registry requirement already cached: orjson==3.11.7
+    DEBUG Registry requirement already cached: python-multipart==0.0.22
+    DEBUG Registry requirement already cached: safehttpx==0.1.7
+    DEBUG Registry requirement already cached: semantic-version==2.10.0
+    DEBUG Registry requirement already cached: tomlkit==0.13.3
+    DEBUG Registry requirement already cached: typer==0.24.1
+    DEBUG Registry requirement already cached: dynet38==2.2
+    DEBUG Registry requirement already cached: pyasn1-modules==0.4.2
+    DEBUG Registry requirement already cached: rsa==4.9.1
+    DEBUG Registry requirement already cached: socksio==1.0.0
+    DEBUG Registry requirement already cached: aiohappyeyeballs==2.6.1
+    DEBUG Registry requirement already cached: aiosignal==1.4.0
+    DEBUG Registry requirement already cached: frozenlist==1.8.0
+    DEBUG Registry requirement already cached: multidict==6.7.1
+    DEBUG Registry requirement already cached: propcache==0.4.1
+    DEBUG Registry requirement already cached: yarl==1.23.0
+    DEBUG Registry requirement already cached: rich==14.3.3
+    DEBUG Registry requirement already cached: shellingham==1.5.4
+    DEBUG Registry requirement already cached: cython==3.2.4
+    DEBUG Registry requirement already cached: pyasn1==0.6.2
+    DEBUG Registry requirement already cached: markdown-it-py==4.0.0
+    DEBUG Registry requirement already cached: mdurl==0.1.2
+    DEBUG Preserving seed package: pip==26.0.1 (from file:///home/task_177071101768311/croot/pip_1770711076895/work)
+    DEBUG Unnecessary package: wheel==0.46.3
+    DEBUG Uninstalled packaging (42 files, 6 directories)
+    DEBUG Uninstalled setuptools (0 files, 4 directories)
+    Uninstalled 2 packages in 210ms
+    DEBUG File already exists (initial attempt), overwriting: C:\Users\MK\anaconda3\envs\WJ_TEST\Lib\site-packages\distutils-precedence.pth
+    Installed 210 packages in 16.21s
+     + absl-py==2.4.0
+     + accelerate==1.12.0
+     + addict==2.4.0
+     + aiofiles==24.1.0
+     + aiohappyeyeballs==2.6.1
+     + aiohttp==3.13.3
+     + aiosignal==1.4.0
+     + aliyun-python-sdk-core==2.16.0
+     + aliyun-python-sdk-kms==2.16.5
+     + annotated-doc==0.0.4
+     + annotated-types==0.7.0
+     + anyio==4.12.1
+     + appdirs==1.4.4
+     + attrs==25.4.0
+     + audioread==3.1.0
+     + auditok==0.3.0
+     + av==16.1.0
+     + babel==2.18.0
+     + beartype==0.22.9
+     + beautifulsoup4==4.14.3
+     + blinker==1.9.0
+     + bottle==0.13.4
+     + brotli==1.2.0
+     + bs-roformer-infer==0.1.1
+     + certifi==2026.2.25
+     + cffi==2.0.0
+     + cfgv==3.5.0
+     + chardet==7.1.0
+     + charset-normalizer==3.4.5
+     + clearvoice==0.1.3 (from git+https://github.com/meizhong986/ClearerVoice-Studio.git@c5db55114ba47b5ee0cd40fd624228b3635e2b36#subdirectory=clearvoice)
+     + click==8.3.1
+     + clr-loader==0.2.10
+     + colorama==0.4.6
+     + contourpy==1.3.3
+     + coverage==7.13.4
+     + crcmod==1.7
+     + cryptography==46.0.5
+     + ctranslate2==4.7.1
+     + cycler==0.12.1
+     + cython==3.2.4
+     + datasets==3.6.0
+     + decorator==5.2.1
+     + dill==0.3.8
+     + distlib==0.4.0
+     + distro==1.9.0
+     + dynet38==2.2
+     + einops==0.8.2
+     + fastapi==0.135.1
+     + faster-whisper==1.2.1
+     + ffmpeg-python==0.2.0 (from git+https://github.com/kkroening/ffmpeg-python.git@df129c7ba30aaa9ffffb81a48f53aa7253b0b4e6)
+     + ffmpy==1.0.0
+     + filelock==3.25.2
+     + flask==3.1.3
+     + flatbuffers==25.12.19
+     + fonttools==4.62.0
+     + frozenlist==1.8.0
+     + fsspec==2025.3.0
+     + future==1.0.0
+     + gdown==5.2.1
+     + google-api-core==2.30.0
+     + google-auth==2.49.0
+     + google-genai==1.66.0
+     + googleapis-common-protos==1.73.0
+     + gradio==6.9.0
+     + gradio-client==2.3.0
+     + groovy==0.1.2
+     + h11==0.16.0
+     + hf-xet==1.4.0
+     + httpcore==1.0.9
+     + httpx==0.28.1
+     + huggingface-hub==0.36.2
+     + identify==2.6.17
+     + idna==3.11
+     + imageio==2.37.3
+     + imageio-ffmpeg==0.6.0
+     + iniconfig==2.3.0
+     + itsdangerous==2.2.0
+     + jinja2==3.1.6
+     + jiter==0.13.0
+     + jmespath==0.10.0
+     + joblib==1.5.3
+     + jsonschema==4.26.0
+     + jsonschema-specifications==2025.9.1
+     + kiwisolver==1.5.0
+     + lazy-loader==0.5
+     + librosa==0.11.0
+     + llvmlite==0.46.0
+     + markdown-it-py==4.0.0
+     + markupsafe==3.0.3
+     + matplotlib==3.10.8
+     + mdurl==0.1.2
+     + ml-collections==1.1.0
+     + modelscope==1.34.0
+     + more-itertools==10.8.0
+     + mpmath==1.3.0
+     + msgpack==1.1.2
+     + multidict==6.7.1
+     + multiprocess==0.70.16
+     + nagisa==0.2.11
+     + networkx==3.6.1
+     + nodeenv==1.10.0
+     + numba==0.64.0
+     + numpy==2.4.3
+     + onnxruntime==1.24.3
+     + openai==2.26.0
+     + openai-whisper==20250625 (from git+https://github.com/openai/whisper@c0d2f624c09dc18e709e37c2ad90c039a4eb72a2)
+     + opencv-python==4.10.0.84
+     + orjson==3.11.7
+     + oss2==2.19.1
+     - packaging==25.0 (from file:///C:/miniconda3/conda-bld/packaging_1761049137378/work)
+     + packaging==26.0
+     + pandas==3.0.1
+     + pillow==12.1.1
+     + platformdirs==4.9.4
+     + pluggy==1.6.0
+     + pooch==1.9.0
+     + pre-commit==4.5.1
+     + propcache==0.4.1
+     + proto-plus==1.27.1
+     + protobuf==6.33.5
+     + proxy-tools==0.1.0
+     + psutil==7.2.2
+     + pyarrow==23.0.1
+     + pyasn1==0.6.2
+     + pyasn1-modules==0.4.2
+     + pyaudio==0.2.14
+     + pycparser==3.0
+     + pycryptodome==3.23.0
+     + pydantic==2.12.5
+     + pydantic-core==2.41.5
+     + pydantic-settings==2.13.1
+     + pydub==0.25.1
+     + pygments==2.19.2
+     + pyloudnorm==0.2.0
+     + pyparsing==3.3.2
+     + pysocks==1.7.1
+     + pysrt==1.1.2
+     + pysubs2==1.8.0
+     + pysubtrans==1.5.8
+     + pytest==9.0.2
+     + pytest-cov==7.0.0
+     + python-dateutil==2.9.0.post0
+     + python-discovery==1.1.3
+     + python-dotenv==1.2.2
+     + python-multipart==0.0.22
+     + python-speech-features==0.6
+     + pythonnet==3.0.5
+     + pytz==2026.1.post1
+     + pywebview==6.1
+     + pywin32==311
+     + pyyaml==6.0.3
+     + qwen-asr==0.0.6
+     + qwen-omni-utils==0.0.9
+     + referencing==0.37.0
+     + regex==2026.2.28
+     + requests==2.32.5
+     + rich==14.3.3
+     + rotary-embedding-torch==0.8.3
+     + rpds-py==0.30.0
+     + rsa==4.9.1
+     + ruff==0.15.5
+     + safehttpx==0.1.7
+     + safetensors==0.7.0
+     + scenedetect==0.6.6
+     + scikit-learn==1.8.0
+     + scipy==1.17.1
+     + semantic-version==2.10.0
+     - setuptools==80.10.2
+     + setuptools==81.0.0
+     + shellingham==1.5.4
+     + silero-vad==6.2.1
+     + simplejson==3.20.2
+     + six==1.17.0
+     + sniffio==1.3.1
+     + socksio==1.0.0
+     + sortedcontainers==2.4.0
+     + soundfile==0.12.1
+     + soupsieve==2.8.3
+     + sox==1.5.0
+     + soxr==1.0.0
+     + soynlp==0.0.493
+     + srt==3.5.3
+     + sse-starlette==3.3.2
+     + stable-ts==2.20.4 (from git+https://github.com/meizhong986/stable-ts-fix-setup.git@db1358dcc5f4ef7b252a64cdfa7f885e4d60d999)
+     + starlette==0.52.1
+     + starlette-context==0.3.6
+     + sympy==1.14.0
+     + ten-vad==1.0.6.8
+     + tenacity==9.1.4
+     + threadpoolctl==3.6.0
+     + tiktoken==0.12.0
+     + tokenizers==0.22.2
+     + tomlkit==0.13.3
+     + torch==2.10.0+cu128
+     + torchaudio==2.10.0+cu128
+     + torchinfo==1.8.0
+     + torchvision==0.25.0
+     + tqdm==4.67.3
+     + transformers==4.57.6
+     + typer==0.24.1
+     + typing-extensions==4.15.0
+     + typing-inspection==0.4.2
+     + tzdata==2025.3
+     + urllib3==2.6.3
+     + uvicorn==0.41.0
+     + virtualenv==21.2.0
+     + websockets==16.0
+     + werkzeug==3.1.6
+     + whisperjav==1.8.7 (from file:///C:/BIN/git/whisperJav_V1_Minami_Edition)
+     + xxhash==3.6.0
+     + yamlargparse==1.31.1
+     + yarl==1.23.0
+    DEBUG Released lock at `C:\Users\MK\AppData\Local\Temp\uv-580814b12653c726.lock`
+    DEBUG Released lock at `C:\Users\MK\AppData\Local\uv\cache\.lock`
+[14:00:15]     [OK] uv sync completed successfully
+[14:00:15] 
+    Skipping local LLM (--no-local-llm specified)
+[14:00:15] 
+[14:00:15] ============================================================
+[14:00:15]   Verifying Installation
+[14:00:15] ============================================================
+[14:00:15]     Verifying with: C:\Users\MK\anaconda3\envs\WJ_TEST\python.exe
+[14:00:15]     [OK] WhisperJAV 1.8.7 installed successfully!
+[14:00:24]     [OK] torch 2.10.0+cu128, CUDA=True, device=NVIDIA GeForce RTX 3060
+[14:00:24] 
+[14:00:24] ============================================================
+[14:00:24]   Installation Complete!
+[14:00:24] ============================================================
+[14:00:24] 
+[14:00:24]   Packages installed into your conda environment at C:\Users\MK\anaconda3\envs\WJ_TEST
+[14:00:24]   Run `whisperjav --help` to verify.
+[14:00:24] 
+[14:00:24]   To run WhisperJAV:
+[14:00:24]     whisperjav video.mp4 --mode balanced
+[14:00:24] 
+[14:00:24]   To run with GUI:
+[14:00:24]     whisperjav-gui
+[14:00:24] 
+[14:00:24]   For help:
+[14:00:24]     whisperjav --help
+[14:00:24] 
+[14:00:24]   Installation log: C:\BIN\git\whisperJav_V1_Minami_Edition\install_log.txt

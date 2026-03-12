@@ -14,14 +14,7 @@
 
 ### Windows — Standalone Installer (.exe)
 
-The easiest way. No Python knowledge needed.
-
-1. Download **WhisperJAV-1.8.8b1-Windows-x86_64.exe** from the Assets below
-2. Run the installer (no admin rights required)
-3. Wait 10-20 minutes for setup to complete
-4. Launch from the Desktop shortcut
-
-Installs to `%LOCALAPPDATA%\WhisperJAV`. A desktop shortcut is created automatically. Your GPU is detected automatically.
+No new .exe for this beta — the changes are in the source install scripts only. Standalone installer users should stay on [v1.8.7](https://github.com/meizhong986/WhisperJAV/releases/tag/v1.8.7). A new .exe will ship with the stable v1.8.8 release.
 
 ### Windows — Source Install
 
@@ -98,6 +91,7 @@ installer/install_linux.sh           # Linux
 ## What Changed (Technical Details)
 
 ### Installation Improvements
+- GUI launcher: install scripts create a double-clickable launcher file per platform (`.command`, `.bat`, `.sh`)
 - Environment detection: installs into your active conda/venv instead of always creating `.venv`
 - New `--local` flag to force a project-local `.venv` when you want one
 - Existing packages in your environment (pandas, scikit-learn, etc.) are preserved automatically
