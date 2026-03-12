@@ -109,6 +109,38 @@ if %EXIT_CODE% NEQ 0 (
     echo   Check the output above for error details.
     echo   For help: python install.py --help
     echo.
+    exit /b %EXIT_CODE%
 )
 
-exit /b %EXIT_CODE%
+REM ==============================================================================
+REM Create GUI launcher
+REM ==============================================================================
+
+if exist ".venv\Scripts\activate.bat" (
+    (
+        echo @echo off
+        echo cd /d "%%~dp0"
+        echo call .venv\Scripts\activate.bat
+        echo whisperjav-gui %%*
+    ) > "WhisperJAV.bat"
+    echo.
+    echo GUI launcher created: WhisperJAV.bat
+)
+
+echo.
+echo ============================================================
+echo   Installation complete!
+echo ============================================================
+echo.
+echo   WhisperJAV is installed at: %CD%
+echo.
+if exist "WhisperJAV.bat" (
+    echo   To launch the GUI:
+    echo     Double-click WhisperJAV.bat
+    echo.
+)
+echo   Or from Terminal:
+echo     whisperjav-gui
+echo.
+
+exit /b 0

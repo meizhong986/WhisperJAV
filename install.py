@@ -949,7 +949,27 @@ def main():
             log("  Or use 'uv run' to run commands in the venv:")
             log("    uv run whisperjav video.mp4 --mode balanced")
             log("    uv run whisperjav-gui")
-    log("")
+    # Check for GUI launcher (created by platform shell wrapper after install.py returns)
+    if sys.platform == "darwin":
+        launcher = _source_dir / "WhisperJAV.command"
+        if launcher.exists():
+            log("  To launch the GUI:")
+            log("    Double-click WhisperJAV.command in Finder")
+            log("    (Tip: drag it to your Dock for easy access)")
+            log("")
+    elif sys.platform == "win32":
+        launcher = _source_dir / "WhisperJAV.bat"
+        if launcher.exists():
+            log("  To launch the GUI:")
+            log("    Double-click WhisperJAV.bat")
+            log("")
+    else:
+        launcher = _source_dir / "WhisperJAV.sh"
+        if launcher.exists():
+            log("  To launch the GUI:")
+            log("    Run: ./WhisperJAV.sh")
+            log("")
+
     log("  To run WhisperJAV:")
     log("    whisperjav video.mp4 --mode balanced")
     log("")

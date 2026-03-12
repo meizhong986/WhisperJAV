@@ -4,6 +4,7 @@
 
 ## What's New
 
+- **GUI launcher for source installs** — Install scripts now create a double-clickable launcher file (`WhisperJAV.command` on macOS, `WhisperJAV.bat` on Windows, `WhisperJAV.sh` on Linux). No more remembering terminal commands or venv activation
 - **Smarter installation** — The installer now detects your active conda or venv environment and installs directly into it, instead of always creating a separate `.venv` folder
 - **numpy 2.x support** — Lifted the numpy < 2.0 restriction. All internal code updated for numpy 2.x
 - **Apple Silicon fix** — Fixed a crash when using beam search on MPS devices (#198)
@@ -34,12 +35,7 @@ git checkout v1.8.8b1
 installer\install_windows.bat
 ```
 
-This creates a `whisperjav` folder in your home directory (e.g. `C:\Users\YourName\whisperjav`) and installs all packages into a `.venv` folder inside it. After installation, activate and launch:
-
-```
-.venv\Scripts\activate
-whisperjav-gui
-```
+After installation, double-click **WhisperJAV.bat** to launch the GUI.
 
 ### macOS
 
@@ -53,12 +49,10 @@ git checkout v1.8.8b1
 installer/install_mac.sh
 ```
 
-This creates a `whisperjav` folder in your home directory (e.g. `~/whisperjav`) and installs all packages into a `.venv` folder inside it. After installation, activate and launch:
-
-```bash
-source .venv/bin/activate
-whisperjav-gui
-```
+The script checks for all prerequisites and installs everything.
+After installation, open the `whisperjav` folder in Finder and
+double-click **WhisperJAV.command** to launch the GUI.
+Drag it to your Dock for easy access.
 
 ### Linux
 
@@ -72,12 +66,7 @@ git checkout v1.8.8b1
 installer/install_linux.sh
 ```
 
-This creates a `whisperjav` folder in your home directory (e.g. `~/whisperjav`) and installs all packages into a `.venv` folder inside it. After installation, activate and launch:
-
-```bash
-source .venv/bin/activate
-whisperjav-gui
-```
+After installation, launch the GUI with `./WhisperJAV.sh`.
 
 ### Google Colab / Kaggle
 

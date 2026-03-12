@@ -307,9 +307,6 @@ if python3 -c "import webview" 2>/dev/null; then
     echo -e "${GREEN}  GUI: ready${NC}"
     echo "  pywebview is installed. The GUI uses macOS WebKit — no"
     echo "  additional downloads or runtimes needed."
-    echo ""
-    echo "  Launch the GUI with:"
-    echo -e "    ${GREEN}whisperjav-gui${NC}"
 else
     echo -e "${YELLOW}  GUI: pywebview did not install successfully${NC}"
     echo ""
@@ -324,10 +321,67 @@ else
     echo "    whisperjav video.mp4 --mode balanced"
 fi
 
+# ==============================================================================
+# Create GUI launcher
+# ==============================================================================
+
+LAUNCHER="$REPO_ROOT/WhisperJAV.command"
+
+if [[ -d "$REPO_ROOT/.venv" ]]; then
+    # Packages installed into local .venv
+    cat > "$LAUNCHER" <<'LAUNCHER_EOF'
+#!/bin/bash
+# WhisperJAV GUI Launcher — double-click to start, or drag to Dock
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$DIR"
+source .venv/bin/activate
+whisperjav-gui "$@"
+LAUNCHER_EOF
+elif [[ -n "$VIRTUAL_ENV" ]]; then
+    # Packages installed into user's active venv
+    cat > "$LAUNCHER" <<LAUNCHER_EOF
+#!/bin/bash
+# WhisperJAV GUI Launcher — double-click to start, or drag to Dock
+source "$VIRTUAL_ENV/bin/activate"
+whisperjav-gui "\$@"
+LAUNCHER_EOF
+elif [[ -n "$CONDA_PREFIX" ]]; then
+    # Packages installed into user's active conda env
+    CONDA_ENV_NAME="$(basename "$CONDA_PREFIX")"
+    cat > "$LAUNCHER" <<LAUNCHER_EOF
+#!/bin/bash
+# WhisperJAV GUI Launcher — double-click to start, or drag to Dock
+eval "\$(conda shell.bash hook 2>/dev/null)"
+conda activate "$CONDA_ENV_NAME"
+whisperjav-gui "\$@"
+LAUNCHER_EOF
+fi
+
+if [[ -f "$LAUNCHER" ]]; then
+    chmod +x "$LAUNCHER"
+    echo ""
+    echo -e "${GREEN}GUI launcher created: $LAUNCHER${NC}"
+fi
+
+# ==============================================================================
+# Success banner
+# ==============================================================================
+
 echo ""
 echo -e "${GREEN}============================================================${NC}"
 echo -e "${GREEN}  Installation complete!${NC}"
 echo -e "${GREEN}============================================================${NC}"
+echo ""
+echo "  WhisperJAV is installed at: $REPO_ROOT"
+echo ""
+if [[ -f "$LAUNCHER" ]]; then
+    echo "  To launch the GUI:"
+    echo -e "    Double-click ${GREEN}WhisperJAV.command${NC} in Finder"
+    echo "    (Tip: drag it to your Dock for easy access)"
+    echo ""
+fi
+echo "  Or from Terminal:"
+echo -e "    ${GREEN}whisperjav-gui${NC}"
 echo ""
 
 exit 0

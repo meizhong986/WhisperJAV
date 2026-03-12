@@ -135,5 +135,10 @@ checkpoints/
 .wheels/
 *.whl
 
+# Generated GUI launchers (created by install scripts)
+WhisperJAV.command
+WhisperJAV.sh
+WhisperJAV.bat
+
 
 

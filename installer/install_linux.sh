@@ -196,6 +196,66 @@ if [[ $EXIT_CODE -ne 0 ]]; then
     echo "  Check the output above for error details."
     echo "  For help: python3 install.py --help"
     echo ""
+    exit $EXIT_CODE
 fi
 
-exit $EXIT_CODE
+# ==============================================================================
+# Create GUI launcher
+# ==============================================================================
+
+LAUNCHER="$REPO_ROOT/WhisperJAV.sh"
+
+if [[ -d "$REPO_ROOT/.venv" ]]; then
+    cat > "$LAUNCHER" <<'LAUNCHER_EOF'
+#!/bin/bash
+# WhisperJAV GUI Launcher
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$DIR"
+source .venv/bin/activate
+whisperjav-gui "$@"
+LAUNCHER_EOF
+elif [[ -n "$VIRTUAL_ENV" ]]; then
+    cat > "$LAUNCHER" <<LAUNCHER_EOF
+#!/bin/bash
+# WhisperJAV GUI Launcher
+source "$VIRTUAL_ENV/bin/activate"
+whisperjav-gui "\$@"
+LAUNCHER_EOF
+elif [[ -n "$CONDA_PREFIX" ]]; then
+    CONDA_ENV_NAME="$(basename "$CONDA_PREFIX")"
+    cat > "$LAUNCHER" <<LAUNCHER_EOF
+#!/bin/bash
+# WhisperJAV GUI Launcher
+eval "\$(conda shell.bash hook 2>/dev/null)"
+conda activate "$CONDA_ENV_NAME"
+whisperjav-gui "\$@"
+LAUNCHER_EOF
+fi
+
+if [[ -f "$LAUNCHER" ]]; then
+    chmod +x "$LAUNCHER"
+    echo ""
+    echo -e "${GREEN}GUI launcher created: $LAUNCHER${NC}"
+fi
+
+# ==============================================================================
+# Success banner
+# ==============================================================================
+
+echo ""
+echo -e "${GREEN}============================================================${NC}"
+echo -e "${GREEN}  Installation complete!${NC}"
+echo -e "${GREEN}============================================================${NC}"
+echo ""
+echo "  WhisperJAV is installed at: $REPO_ROOT"
+echo ""
+if [[ -f "$LAUNCHER" ]]; then
+    echo "  To launch the GUI:"
+    echo -e "    ${GREEN}./WhisperJAV.sh${NC}"
+    echo ""
+fi
+echo "  Or from Terminal:"
+echo -e "    ${GREEN}whisperjav-gui${NC}"
+echo ""
+
+exit 0
