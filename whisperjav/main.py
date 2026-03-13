@@ -32,6 +32,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resou
 warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
 warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
 warnings.filterwarnings("ignore", message=".*sparse_softmax_cross_entropy.*deprecated.*")
+# requests warns about urllib3/chardet versions — cosmetic, not a real problem
+warnings.filterwarnings("ignore", message=r".*urllib3.*or chardet.*doesn't match a supported version")
 # ===========================================================================
 
 import argparse

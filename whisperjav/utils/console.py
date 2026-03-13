@@ -231,11 +231,13 @@ def suppress_dependency_warnings() -> None:
     # Suppress requests' overly strict version check for chardet/urllib3.
     # requests 2.32.x caps chardet < 6.0.0 but pysrt pulls in chardet 7.x
     # which works fine — the check is just too conservative.
-    try:
-        from requests.exceptions import RequestsDependencyWarning
-        warnings.filterwarnings("ignore", category=RequestsDependencyWarning)
-    except ImportError:
-        pass
+    # IMPORTANT: Must use message-based filter, NOT category-based.
+    # Importing RequestsDependencyWarning triggers `import requests`
+    # which fires the very warning we're trying to suppress.
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*urllib3.*or chardet.*doesn't match a supported version",
+    )
 
 
 def setup_console() -> None:
