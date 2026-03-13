@@ -1,6 +1,18 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-12 (rev5 — v1.8.8b1 pre-release, 5 new issues since rev4) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **32 open** on GitHub
+> Updated: 2026-03-13 (rev6 — v1.8.8 code complete, 3 new issues since rev5) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **35 open** on GitHub
+
+---
+
+## Status Legend
+
+| Label | Meaning |
+|-------|---------|
+| `FIX IMPLEMENTED` | Code written and tested locally. NOT yet verified by user or in production. |
+| `FIX VERIFIED` | User confirmed the fix resolves their issue. Safe to close the GitHub issue. |
+| `AWAITING CONFIRMATION` | Fix shipped in a release. Waiting for user to confirm. |
+| `NEEDS RESPONSE` | Issue has no response or needs a follow-up reply. |
+| `DEFERRED` | Moved to a future release. |
 
 ---
 
@@ -8,22 +20,43 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **32** | Was 28 at rev4; 4 new (#213, #214, #215, #217), #200 still open |
-| New issues since rev4 | 5 | #213 (Intel GPU), #214 (local LLM 502), #215 (Qwen3 subtitle quality), #217 (can't find GUI exe) |
-| **Active bugs (need code work)** | 2 | #196/#212/#214 (LLM — CRITICAL), #198 (MPS beam search — FIX COMMITTED in v1.8.8b1) |
-| **Active bugs (awaiting user confirmation)** | 3 | #204 (SSL fallback), #209 (repetition fix), #200 (NVML Optimus) |
-| **Cosmetic / informational** | 3 | #211 (urllib3 warning), #207 (settings dup), #215 (Qwen3 question) |
-| **New issues needing response** | 3 | #214 (local LLM 502), #215 (Qwen3 quality), #217 (GUI exe) |
-| Fixed in v1.8.8b1 | 2 | #198 MPS beam search (greedy on MPS), numpy 2.x migration |
-| Feature requests (open) | 15 | +1 new (#213 Intel GPU) |
-| Deferred to v1.9+ | 11 | +1 (#213) |
+| Total open on GitHub | **35** | Was 32 at rev5; 3 new (#218, #219, #220) |
+| New issues since rev5 | 3 | #218 (uv cu118 wheel), #219 (MossFormer2 stereo crash), #220 (install stalls) |
+| **Active bugs — FIX IMPLEMENTED (not yet verified)** | 6 | LLM cluster (#196/#212/#214/#132), #200 (Optimus), #209 (repetition), #218 (cu118 wheel), #219 (MossFormer2 SS) |
+| **Shipped fixes — AWAITING CONFIRMATION** | 2 | #198 (MPS beam search), #211 (urllib3 warning) |
+| **Responded (awaiting user reply)** | 7 | #220, #219, #218, #217, #215, #214, #207 — all replied 2026-03-13 |
+| **Awaiting user response** | 4 | #204, #203, #201, #210 |
+| Feature requests (open) | 16 | Including #213 Intel GPU, #198-FR English dropdown |
+| Deferred to v1.9+ | 11 | See v1.9+ Backlog |
 
-### v1.8.8b1 Shipped Fixes
-- **MPS beam search (#198)**: Force `num_beams=1` when device is MPS — commit `9dc8f1f`
-- **numpy 2.x migration**: Hard requirement numpy>=2.0.0, all internal code updated — commits `d5b8296` + `dea0fa2`
-- **np.int_ crash fix**: Remove `np.int_` usage in metadata_manager.py — commit `dea0fa2`
-- **Installation improvements**: GUI launcher creation, env detection, `--local` flag
-- **Suppress RequestsDependencyWarning**: urllib3/chardet version mismatch warning silenced
+---
+
+## v1.8.8 Stable — Implementation Status
+
+All Track A, B, C code is complete. Changes are uncommitted pending verification.
+
+| ID | Issue(s) | Description | Status | Notes |
+|----|----------|-------------|--------|-------|
+| A1 | #212/#214/#132 | Diagnostic token logging (batch stats, "No matches" handler) | `FIX IMPLEMENTED` | Needs user validation via diagnostic data |
+| A2 | #212 | .subtrans stale settings override (version-stamp, auto-delete) | `FIX IMPLEMENTED` | Needs validation from zhstark's scenario |
+| A3 | **#218** | cu118 wheel version mismatch (`UV_SKIP_WHEEL_FILENAME_CHECK=1`) | `FIX IMPLEMENTED` | Exact error from WillChengCN's log. Needs #218 user to confirm. |
+| A4 | #212/#214 | Reduce max_tokens 2x→1x multiplier (2392→1820 for 8K ctx) | `FIX IMPLEMENTED` | Needs real-world validation via A1 diagnostic data |
+| A5 | #214 | pornify.txt → sectioned format with format example | `DONE (no issue)` | Internal improvement |
+| A6 | — | `--provider ollama` preview (auto-detect, num_ctx=8192, streaming) | `FIX IMPLEMENTED` | Needs manual testing with Ollama installed |
+| B1 | **#200** | NVML Optimus laptop fallback (`--force-cuda` flag, guidance text) | `FIX IMPLEMENTED` | Needs Ywocp to confirm |
+| C1 | **#209** | Repetition cleaner pattern #8 (`sentence_phrase_repetition`) | `FIX IMPLEMENTED` | Tested: 192→42 chars. Needs weifu8435 to confirm on v1.8.8 |
+
+### Shipped in v1.8.8b1 (2026-03-12)
+
+| Commit | Issue | Summary | Status |
+|--------|-------|---------|--------|
+| `9dc8f1f` | #198 | Force greedy decoding (`num_beams=1`) on MPS | `AWAITING CONFIRMATION` |
+| `d5b8296` | — | numpy 2.x migration (all internal code) | `DONE` |
+| `dea0fa2` | — | Remove `np.int_` usage (numpy 2.x crash) | `DONE` |
+| `32c3711` | — | Phase 1a installer: env detection, `--local`, `--inexact` | `DONE` |
+| `18be938` | — | GUI launcher creation in install scripts | `DONE` |
+| `5cc5ad2` | — | Version bump to 1.8.8b1 | `DONE` |
+| — | #211 | urllib3/chardet warning suppressed | `AWAITING CONFIRMATION` (justantopair-ai: "nothing serious") |
 
 ---
 
@@ -31,34 +64,28 @@
 
 ### Cluster A: Local LLM Translation — CRITICAL (4 issues)
 
-**Issues**: #196, #212, #214 (NEW), #132
+**Issues**: #196 (closed), #212, #214, #132
 **Severity**: CRITICAL — affects ALL local LLM translation users across all platforms
-**Status**: NOT FIXED — new report #214 confirms 502 server error on v1.8.7
+**Status**: `FIX IMPLEMENTED` (A1 diagnostics, A2 .subtrans fix, A4 max_tokens reduction) — NOT YET VERIFIED
 
 | # | Title | Reporter | Platform | State | Detail |
 |---|-------|----------|----------|-------|--------|
-| **#214** | 1.8.7 localLLM fail | KenZP12 | Windows, cu128 | **OPEN (NEW)** | gemma-9b, 12.3 tps, batch auto-reduced 30→11, 3281 lines/8 scenes. Server 502 error immediately. |
-| **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090 | **OPEN** | llama-8b AND gemma-9b both fail. User switched to DeepSeek cloud. Confirms CUDA doesn't work on Windows 11 either. |
-| **#196** | Local Translation Errors | destinyawaits | Ubuntu, 5090 32GB | CLOSED | zhstark: v1.8.7b1, batch 30→11, still fails. |
+| **#214** | 1.8.7 localLLM fail | KenZP12 | Windows, cu128 | **OPEN — NEEDS RESPONSE** | gemma-9b, 12.3 tps, batch auto-reduced 30→11. Server 502 error immediately. `max_tokens: 2392`. |
+| **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090 | **OPEN** | llama-8b AND gemma-9b both fail. User switched to DeepSeek cloud. Latest comment confirms same issue with gemma-9b. |
+| **#196** | Local Translation Errors | destinyawaits | Ubuntu, 5090 32GB | CLOSED | Related to #212. zhstark: batch 30→11, still fails. |
 | **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | TinyRick1489 posted debug log (2026-03-07). meizhong986 responded "working on fix." |
 
-**Key new data from #214 (KenZP12, v1.8.7):**
-- Server starts fine, model loads, speed measured at 12.3 tps
-- Auto-batch reduction working (30→11)
-- **But: 502 server error on first actual translation request**
-- This is a DIFFERENT failure mode from #212 (which gets "No matches found")
-- 502 = server crashed or timed out during the actual translation batch
-- `max_tokens: 2392` (JAV/CJK-tuned cap IS applied)
-- Streaming: True
-- 3281 lines is a VERY large file (8 scenes) — but fails on first batch
+**Two distinct failure modes:**
+1. **502 Server Error** (#214): Server crashes/times out during translation.
+2. **"No matches found"** (#212, #196, #132): Server responds but output is garbled/unparseable.
 
-**Two distinct failure modes identified:**
-1. **502 Server Error** (#214): Server crashes/times out during translation. Possibly context window overflow crashing llama.cpp server.
-2. **"No matches found"** (#212, #196, #132): Server responds but output is garbled/unparseable by PySubtrans regex.
+**v1.8.8 tactical fixes** (bridge to v1.9.0 Ollama migration):
+- A1: Diagnostic logging to capture actual token usage and raw model output
+- A2: .subtrans stale settings fix (prevents old settings from overriding CLI args)
+- A4: max_tokens 2x→1x reduction (less room for verbose/garbled output)
+- A6: `--provider ollama` preview as an immediate alternative for local LLM users
 
-Both trace back to the same root: **8K context window is too small for the translation prompt + batch**.
-
-**This remains the #1 priority for v1.8.8 stable.**
+**Strategic direction**: v1.9.0 will deprecate llama-cpp-python entirely and complete Ollama migration.
 
 ---
 
@@ -66,20 +93,22 @@ Both trace back to the same root: **8K context window is too small for the trans
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#198** | Transformers MPS crash | francetoastVN | CLOSED | **FIXED in v1.8.8b1** — `num_beams=1` on MPS (commit `9dc8f1f`). Awaiting user confirmation. |
+| **#198** | Transformers MPS crash | francetoastVN | CLOSED | `AWAITING CONFIRMATION` — fixed in v1.8.8b1 (`num_beams=1` on MPS, commit `9dc8f1f`) |
 
-**Additional**: francetoastVN asked (2026-03-11) about adding English translation option to Ensemble and AI SRT Translate dropdown menus. This is a **feature request**, not a bug.
+francetoastVN also requested (2026-03-11) adding English translation option to Ensemble and AI SRT Translate dropdown menus — tracked as feature request #198-FR.
 
 ---
 
-### Cluster C: Network / Installation (4 issues)
+### Cluster C: Network / Installation (5 issues)
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#217** | 找不到WhisperJAV-GUI.exe | loveGEM | **OPEN (NEW)** | Can't find GUI exe after v1.8.7 install | **NEEDS RESPONSE** — likely user confusion about exe location vs launcher |
-| **#210** | 安装失败 DNS error | iop335577 | **OPEN** | DNS through proxy | Responded, v1.8.7 fix |
-| **#204** | VPN/v2rayN SSL failures | yangming2027 | **OPEN** | HF hub SSL errors | Responded, v1.8.7 fix, awaiting confirmation |
-| **#201** | Install SSL cert error | jl6564 | **OPEN** | Missing root CA certs | Responded, v1.8.7 fix |
+| **#220** | 安装卡着不动 (install stalls) | libinghui20001231-debug | **OPEN (NEW)** | Install stalls during PyTorch download. GTX 1650, driver 462, cu118 correct. Likely slow network (~2GB wheels). | `NEEDS RESPONSE` — guidance only, no code fix |
+| **#218** | 安装错误 (uv cu118 wheel) | WillChengCN | **OPEN (NEW)** | uv rejects cu118 llama-cpp wheel: internal version `0.2.26+cu118` ≠ filename `0.2.26` | `FIX IMPLEMENTED` (A3: `UV_SKIP_WHEEL_FILENAME_CHECK=1`) |
+| **#217** | 找不到WhisperJAV-GUI.exe | loveGEM | **OPEN** | Can't find GUI exe after v1.8.7 install | `NEEDS RESPONSE` — explain exe location |
+| **#210** | 安装失败 DNS error | iop335577 | **OPEN** | DNS through proxy | Responded, `AWAITING CONFIRMATION` |
+| **#204** | VPN/v2rayN SSL failures | yangming2027 | **OPEN** | HF hub SSL errors | Responded, `AWAITING CONFIRMATION` |
+| **#201** | Install SSL cert error | jl6564 | **OPEN** | Missing root CA certs | Responded, `AWAITING CONFIRMATION` |
 
 ---
 
@@ -87,12 +116,8 @@ Both trace back to the same root: **8K context window is too small for the trans
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#200** | NVML "Driver Not Loaded" on Optimus laptop | Ywocp | **OPEN** | Laptop dual GPU (AMD iGPU + NVIDIA dGPU). NVML can't initialize in Optimus config. | **NEEDS WORK** — need nvidia-smi fallback in installer GPU detection |
-| **#213** | Intel GPU support | DDXDB | **OPEN (NEW)** | Requests `torch.xpu` support via PyTorch XPU wheels | **Feature request** — deferred to v1.9+ |
-
-**#200 analysis**: Detailed report from Ywocp. NVIDIA driver works fine for other AI apps, but NVML specifically fails with "Driver Not Loaded" on Optimus architecture. User suggests fallback detection (nvidia-smi, Device Manager). This is a legitimate installer bug — our GPU detection relies solely on NVML.
-
-**Fix for v1.8.8 stable**: Add `nvidia-smi` fallback when NVML fails. Also add `--force-cuda` CLI flag for manual override.
+| **#200** | NVML "Driver Not Loaded" on Optimus laptop | Ywocp | **OPEN** | Dual GPU (AMD iGPU + NVIDIA dGPU). NVML fails on Optimus config. | `FIX IMPLEMENTED` (B1: `--force-cuda` flag + improved guidance text) |
+| **#213** | Intel GPU support | DDXDB | **OPEN** | Requests `torch.xpu` support via PyTorch XPU wheels | `DEFERRED` to v1.9+ |
 
 ---
 
@@ -100,8 +125,8 @@ Both trace back to the same root: **8K context window is too small for the trans
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#207** | 1.86不能保存设置 | q864310563 | **OPEN** | **0 comments — NEEDS RESPONSE**. Dup of #96. |
-| **#96** | Full settings persistence | sky9639 | OPEN | v1.9.0 — translation + ensemble done, pipeline tab remaining |
+| **#207** | 1.86不能保存设置 | q864310563 | **OPEN** | `NEEDS RESPONSE` — 0 comments. Dup of #96. |
+| **#96** | Full settings persistence | sky9639 | OPEN | `DEFERRED` to v1.9 — translation + ensemble done, pipeline tab remaining |
 
 ---
 
@@ -109,43 +134,49 @@ Both trace back to the same root: **8K context window is too small for the trans
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#209** | Single subtitle very long (repetition) | weifu8435 | **OPEN** | **FIXED v1.8.7, actively testing.** User posted NEW hallucination example (2026-03-12): FC2-PPV-4025269 line 52. Needs analysis. |
-| **#215** | Qwen3-ASR subtitle quality | yangming2027 | **OPEN (NEW)** | Qwen3-ASR produces very few/small subtitles, bad for ensemble pass2 accuracy. **NEEDS RESPONSE.** |
-
-**#209 update**: weifu8435 is stress-testing v1.8.7 (4 videos/day, 100+/month). Posted new hallucination sample on 2026-03-12. This may be a pattern not yet caught by the repetition cleaner — needs investigation.
-
-**#215 analysis**: yangming2027 asking why Qwen3-ASR generates fewer subtitles than Whisper. This could be by design (Qwen3 is more conservative) or a configuration issue. Needs a knowledgeable response.
+| **#209** | Single subtitle very long (repetition) | weifu8435 | **OPEN** | `FIX IMPLEMENTED` (C1: pattern #8 `sentence_phrase_repetition`). Tested on FC2-PPV-4025269 line 52: 192→42 chars. Needs weifu8435 to confirm on v1.8.8. |
+| **#215** | Qwen3-ASR subtitle quality | yangming2027 | **OPEN** | `NEEDS RESPONSE` — Qwen3-ASR produces fewer/smaller subtitles. Expected behavior (different architecture). |
 
 ---
 
-### Cluster G: Startup Warning — COSMETIC
+### Cluster G: Speech Enhancement — NEW BUG
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#211** | 启动报错 (urllib3 warning) | WillChengCN | **OPEN** | Benign. justantopair-ai confirms "nothing serious." **Suppressed in v1.8.8b1.** |
+| **#219** | MossFormer2_SS_16K "too many dimensions" error | anon12642 | **OPEN (NEW)** | `FIX IMPLEMENTED` (C2) — Speech separation model outputs 3D tensor `(num_sources, batch, length)`. Fix takes first separated source. `NEEDS RESPONSE` on GitHub. |
+
+**Root cause**: MossFormer2_SS_16K is a speech **separation** model (not enhancement). It outputs multiple audio streams as `(num_sources, 1, length)`. The code only handled 2D output, so the 3D array propagated to `sf.write()` which raised "Invalid shape". Fix: take first separated source (primary speaker) from the 3D output.
 
 ---
 
-### Cluster H: Ensemble Mode — RESOLVED
+### Cluster H: Startup Warning — COSMETIC
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#203** | Serial mode request | yangming2027 | **OPEN** | Feature already exists ("Finish each file"). meizhong986 confirmed (2026-03-08). yangming2027 asked "so it's already done?" — **may need one more confirmation reply.** |
+| **#211** | 启动报错 (urllib3 warning) | WillChengCN | **OPEN** | `AWAITING CONFIRMATION` — Suppressed in v1.8.8b1. justantopair-ai confirms "nothing serious." |
 
 ---
 
-### Cluster I: Feature Requests
+### Cluster I: Ensemble Mode — RESOLVED
+
+| # | Title | Reporter | State | Status |
+|---|-------|----------|-------|--------|
+| **#203** | Serial mode request | yangming2027 | **OPEN** | Feature already exists. meizhong986 confirmed. `AWAITING CONFIRMATION` from user. |
+
+---
+
+### Cluster J: Feature Requests
 
 | # | Title | Reporter | State | Summary | Target |
 |---|-------|----------|-------|---------|--------|
-| **#213** | Intel GPU (XPU) support | DDXDB | **OPEN (NEW)** | torch.xpu via PyTorch XPU wheels | v1.9+ |
+| **#213** | Intel GPU (XPU) support | DDXDB | OPEN | torch.xpu via PyTorch XPU wheels | v1.9+ |
 | **#206** | Grey out incompatible options | techguru0 | OPEN | Block incompatible GUI choices | v1.9+ |
 | **#205** | VibeVoice ASR | kylesskim-sys | OPEN | Microsoft VibeVoice. VRAM too high. | v1.9+ |
 | **#181** | Frameless window | QQ804218 | OPEN | Cosmetic | v1.9+ |
 | **#180** | Multi-language GUI | QQ804218 | OPEN | Full i18n | v1.9+ |
 | **#175** | Chinese GUI | yangming2027 | OPEN | Subset of #180 | v1.9+ |
 | **#164** | MPEG-TS + Drive | hosmallming | OPEN | Format + cloud | Backlog |
-| **#142** | AMD Radeon | MatthaisUK | OPEN | DirectML/ROCm | v1.9+ |
+| **#142** | AMD Radeon | MatthaisUK | OPEN | DirectML/ROCm. New comment from FishYu-OWO re AMD/ROCm on Windows. | v1.9+ |
 | **#126** | Recursive directory | jl6564 | OPEN | Walk subdirs | v1.9+ |
 | **#114** | DirectML | SingingDalong | OPEN | AMD/Intel GPU | v1.9+ |
 | **#99** | 4GB VRAM guidance | hosmallming | OPEN | Log VRAM | Backlog |
@@ -156,7 +187,7 @@ Both trace back to the same root: **8K context window is too small for the trans
 | **#44** | GUI drag-drop | lingyunlxh | OPEN | Filename vs path | Backlog |
 | **#43** | DeepL provider | teijiIshida | OPEN | Non-LLM adapter | v1.9+ |
 | **#33** | Linux pyaudio docs | org0ne | OPEN | Documentation | Backlog |
-| **#198-FR** | English in Ensemble/Translate dropdown | francetoastVN | (comment) | Feature request from #198 comment | Backlog |
+| **#198-FR** | English in Ensemble/Translate dropdown | francetoastVN | (comment) | Feature request from #198 | Backlog |
 
 ---
 
@@ -166,57 +197,97 @@ Both trace back to the same root: **8K context window is too small for the trans
 
 | Status | Count | Issues |
 |--------|------:|--------|
-| **CRITICAL bugs needing code work** | 1 cluster | #196/#212/#214/#132 (LLM translation — 5 reporters, 3 platforms) |
-| **Installer bug needing code work** | 1 | #200 (NVML Optimus laptop detection) |
-| **Fixed in v1.8.8b1, awaiting confirmation** | 2 | #198 (MPS), #211 (urllib3 warning suppressed) |
-| **Fixed in v1.8.7, actively testing** | 1 | #209 (repetition — new sample posted) |
-| **Awaiting user confirmation** | 3 | #204 (SSL), #203 (serial mode), #201 (SSL) |
-| **Needs response (no comments)** | 3 | #214 (LLM 502), #215 (Qwen3 quality), #217 (GUI exe location) |
-| **Needs response (has comments)** | 1 | #207 (settings dup — 0 responses) |
-| **Feature requests (open)** | 18 | See Cluster I |
-| **Cosmetic / DNS / responded** | 1 | #210 |
-| **Deferred to v1.9+** | 11 | #96, #205, #206, #213, #180, #175, #181, #142, #114, #126, #43 |
+| **FIX IMPLEMENTED — needs user verification** | 6 | LLM cluster (#212/#214/#132), #200 (Optimus), #209 (repetition), #218 (cu118 wheel), #219 (MossFormer2 SS) |
+| **Shipped, AWAITING CONFIRMATION** | 2 | #198 (MPS), #211 (urllib3 warning) |
+| **AWAITING user response (responded)** | 4 | #204, #203, #201, #210 |
+| **Responded, AWAITING user reply** | 7 | #220, #219, #218, #217, #215, #214, #207 — all replied 2026-03-13 |
+| **Feature requests (open)** | 19 | See Cluster J |
+| **DEFERRED to v1.9+** | 11 | #96, #205, #206, #213, #180, #175, #181, #142, #114, #126, #43 |
 
 ### By Priority (Active Work)
 
-| Priority | # | Issue | Effort | Why |
+| Priority | # | Issue | Status | Why |
 |----------|---|-------|--------|-----|
-| **CRITICAL** | #196/#212/#214/#132 | LLM translation failures (502 + "No matches") | Medium-Large | 5 reporters, 3 platforms. #1 user pain point. Two failure modes. |
-| **HIGH** | #200 | NVML Optimus laptop GPU detection | Small-Medium | Detailed report from Ywocp. Blocks GPU install on all Optimus laptops. |
-| **HIGH** | #209 | New hallucination sample (v1.8.7) | Small | weifu8435 posted new example. May need additional regex pattern. |
-| **MEDIUM** | #215 | Qwen3-ASR subtitle quality question | Tiny (reply) | yangming2027 — active community member. |
-| **MEDIUM** | #217 | Can't find GUI exe after install | Tiny (reply) | Likely user confusion. Needs response. |
-| **MEDIUM** | #214 | Local LLM 502 server error | Tiny (reply) | Same cluster as #212. Acknowledge + link to known issue. |
-| **MEDIUM** | #207 | Settings persistence question | Tiny (reply) | 0 responses — dup of #96. |
-| **DONE** | #198 | MPS beam search | — | Fixed v1.8.8b1 (`9dc8f1f`). Awaiting confirmation. |
-| **DONE** | #211 | urllib3 warning | — | Suppressed in v1.8.8b1. |
-| **WAITING** | #204 | SSL/China fallback | — | v1.8.7 shipped, awaiting confirmation |
-| **WAITING** | #203 | Serial mode | — | Confirmed exists. May need one more reply. |
-| **WAITING** | #201 | SSL cert error | — | v1.8.7 shipped, awaiting confirmation |
+| **CRITICAL** | #212/#214/#132 | LLM translation (502 + "No matches") | `FIX IMPLEMENTED` (A1,A2,A4,A6) | 5 reporters, 3 platforms. Tactical fixes + Ollama preview. |
+| **HIGH** | #200 | NVML Optimus laptop GPU detection | `FIX IMPLEMENTED` (B1) | `--force-cuda` flag + improved guidance. Needs Ywocp confirmation. |
+| **HIGH** | #209 | Repetition cleaner new pattern | `FIX IMPLEMENTED` (C1) | Pattern #8 added. Needs weifu8435 confirmation. |
+| **HIGH** | #218 | uv cu118 wheel version mismatch | `FIX IMPLEMENTED` (A3) | Exact match for WillChengCN's error. |
+| **HIGH** | #219 | MossFormer2 speech separation 3D output | `FIX IMPLEMENTED` (C2) | Takes first separated source from 3D output. Needs user confirmation. |
+| **MEDIUM** | #220 | Install stalls during PyTorch download | `NEEDS RESPONSE` | Guidance only, no code fix. Slow network. |
+| **MEDIUM** | #217 | Can't find GUI exe after install | `NEEDS RESPONSE` | Explain exe location. |
+| **MEDIUM** | #215 | Qwen3-ASR subtitle quality question | `NEEDS RESPONSE` | Expected behavior — different model architecture. |
+| **MEDIUM** | #214 | Local LLM 502 server error | `NEEDS RESPONSE` | Acknowledge + link to v1.8.8 fixes. |
+| **MEDIUM** | #207 | Settings persistence question | `NEEDS RESPONSE` | 0 responses — dup of #96. |
+| **DONE** | #198 | MPS beam search | `AWAITING CONFIRMATION` | Fixed v1.8.8b1 (`9dc8f1f`). |
+| **DONE** | #211 | urllib3 warning | `AWAITING CONFIRMATION` | Suppressed in v1.8.8b1. |
 
 ---
 
-## v1.8.8b1 — Shipped Fixes
+## Pending GitHub Actions
 
-| Commit | Issue | Summary |
-|--------|-------|---------|
-| `9dc8f1f` | #198 | Force greedy decoding (`num_beams=1`) on MPS |
-| `d5b8296` | — | numpy 2.x migration (all internal code) |
-| `dea0fa2` | — | Remove `np.int_` usage (numpy 2.x crash) |
-| `32c3711` | — | Phase 1a installer: env detection, `--local`, `--inexact` |
-| `18be938` | — | GUI launcher creation in install scripts |
-| `5cc5ad2` | — | Version bump to 1.8.8b1 |
+### Responded (Track D1 — DONE, 7 issues replied 2026-03-13)
+
+| # | Response Summary | Status |
+|---|-----------------|--------|
+| **#220** | Explained PyTorch download stall, confirmed cu118 is correct | `AWAITING CONFIRMATION` |
+| **#219** | Acknowledged speech separation bug, fix ready for v1.8.8 | `FIX IMPLEMENTED` |
+| **#218** | Explained cu118 wheel issue, provided env var workaround | `FIX IMPLEMENTED` |
+| **#217** | Explained exe location (`%LOCALAPPDATA%\WhisperJAV`), asked for install log | `AWAITING CONFIRMATION` |
+| **#215** | Explained Qwen3-ASR generates fewer subtitles by design | `AWAITING CONFIRMATION` |
+| **#214** | Acknowledged 502 error, linked to #212/#196, mentioned v1.8.8 improvements | `FIX IMPLEMENTED` |
+| **#207** | Referenced #96, explained partial settings save, planned for future | `AWAITING CONFIRMATION` |
+
+### Awaiting User Response
+
+| # | Last Response | Waiting Since |
+|---|--------------|---------------|
+| #204 | Pointed to v1.8.7 release | 2026-03-10 |
+| #203 | meizhong986 confirmed feature exists | 2026-03-08 |
+| #201 | Pointed to v1.8.7 release | 2026-03-10 |
+| #210 | meizhong986 + community responded | 2026-03-11 |
+| #198 | Fixed in v1.8.8b1 | 2026-03-12 |
+
+### Candidates for Closing (Track D2)
+
+| # | Condition | Notes |
+|---|-----------|-------|
+| #211 | justantopair-ai confirms "nothing serious" + suppressed in v1.8.8b1 | Can close with note |
+| #203 | Feature confirmed to exist, user asked "so it's already done?" | One more confirmation, then close |
+| #204 | If yangming2027 confirms v1.8.7 fix works | Waiting since 2026-03-10 |
+| #201 | If jl6564 confirms v1.8.7 fix works | Waiting since 2026-03-10 |
+| #210 | If iop335577 confirms DNS issue resolved | Waiting since 2026-03-11 |
 
 ---
 
-## v1.8.8 Stable — Planned Work
+## Duplicate / Related Issue Map
 
-| Priority | # | Description | Effort | Status |
-|----------|---|-------------|--------|--------|
-| **CRITICAL** | #196/#212/#214/#132 | LLM translation: dynamic batch sizing, retry with half batch, garbage output detection, 502 handling | Medium-Large | **Not started** — #1 priority |
-| **HIGH** | #200 | NVML Optimus fallback: nvidia-smi detection + `--force-cuda` flag | Small-Medium | Not started |
-| **HIGH** | #209 | Investigate new hallucination sample from weifu8435 | Small | Not started |
-| **LOW** | #99 | Log GPU VRAM at INFO before model load | Tiny | Not started |
+| Cluster | Issues | Primary | Status |
+|---------|--------|---------|--------|
+| **Local LLM translation** | #196 (closed), **#212**, **#214**, #132 | **#212** | `FIX IMPLEMENTED` — tactical fixes A1/A2/A4 + Ollama preview A6 |
+| **MPS/Apple Silicon** | **#198** | **#198** | `AWAITING CONFIRMATION` |
+| **Network/SSL/Install** | **#220** (NEW), **#218** (NEW), #217, #204, #210, #201 | **#204** | Mixed — #218 `FIX IMPLEMENTED`, #220/#217 need response, others awaiting |
+| **GPU detection** | **#200**, **#213** | **#200** | `FIX IMPLEMENTED` (B1); #213 deferred |
+| **GUI settings** | #96, **#207** | **#96** | `DEFERRED` (v1.9); #207 needs response |
+| **Whisper quality** | **#209**, **#215** | **#209** | `FIX IMPLEMENTED` (C1); #215 needs response |
+| **Speech enhancement** | **#219** (NEW) | **#219** | **NEW BUG** — needs investigation |
+| **Startup warning** | **#211** | **#211** | `AWAITING CONFIRMATION` |
+| **Ensemble** | #203 | **#203** | Resolved, awaiting final confirmation |
+| **AMD/Intel GPU** | #142, #114, **#213** | Deferred | v1.9+ |
+| **Translation providers** | #71, #43 | Deferred | v1.9+ |
+| **i18n** | #180, #175 | Deferred | v1.9+ |
+
+---
+
+## Recently Closed Issues
+
+| # | Title | Closed | Resolution |
+|---|-------|--------|------------|
+| #208 | LLM server AssertionError | 2026-03-09 | Self-resolved — user installed NVIDIA Toolkit |
+| #198 | MPS not used on M1 Mac | 2026-03-07 | Fixed v1.8.7b0 (detection) + v1.8.8b1 (beam search) |
+| #197 | Installation problem v1.8.6 | 2026-03-08 | Closed by user after v1.8.7b0 |
+| #196 | Local Translation Errors | 2026-03-07 | Partial fix v1.8.7. **Still broken — see #212/#214** |
+| #195 | UnicodeDecodeError audio extraction | 2026-03-08 | Fixed `55df512` |
+| #194 | M4B file support | 2026-03-08 | Fixed `5769688` |
 
 ---
 
@@ -238,74 +309,13 @@ Both trace back to the same root: **8K context window is too small for the trans
 
 ---
 
-## Pending GitHub Actions
-
-### Needs Response (not yet responded)
-
-| # | Action | Priority |
-|---|--------|----------|
-| **#217** | Respond: explain where GUI exe is located (`%LOCALAPPDATA%\WhisperJAV`), or if source install, explain launcher file. Ask for install log. | **MEDIUM** |
-| **#215** | Respond: explain Qwen3-ASR behavior — fewer subtitles is expected (different model architecture). Suggest using Whisper for pass2 if ensemble accuracy is the goal. | **MEDIUM** |
-| **#214** | Respond: acknowledge 502 error, same root cause family as #212/#196. Being investigated for v1.8.8. Workaround: use cloud provider (DeepSeek). | **MEDIUM** |
-| **#207** | Respond: reference #96, explain what IS saved (translation, ensemble) vs what isn't (pipeline). Planned for v1.9. | **MEDIUM** |
-
-### Needs Follow-up
-
-| # | Action | Priority |
-|---|--------|----------|
-| **#209** | Investigate new hallucination sample (FC2-PPV-4025269 line 52) posted 2026-03-12. | **HIGH** |
-| **#203** | yangming2027 asked "so it's already done?" — may need one final confirmation. | **LOW** |
-
-### Awaiting User Response
-
-| # | Last Response | Waiting Since |
-|---|--------------|---------------|
-| #204 | Pointed to v1.8.7 release | 2026-03-10 |
-| #201 | Pointed to v1.8.7 release | 2026-03-10 |
-| #209 | User actively testing v1.8.7 | 2026-03-12 (new sample posted) |
-| #210 | meizhong986 + community responded | 2026-03-11 |
-| #198 | meizhong986 posted MPS fix coming | 2026-03-11 |
-
----
-
-## Duplicate / Related Issue Map
-
-| Cluster | Issues | Primary | Status |
-|---------|--------|---------|--------|
-| **Local LLM translation** | **#196**, **#212**, **#214** (NEW), #132 | **#212** | **CRITICAL — 2 failure modes (502 + regex)** |
-| **MPS/Apple Silicon** | **#198** | **#198** | **FIXED v1.8.8b1** — awaiting confirmation |
-| **Network/SSL/Install** | #204, #210, #201 | **#204** | Responded, awaiting confirmation |
-| **GPU detection** | **#200**, **#213** | **#200** | #200 needs fallback code; #213 is feature request |
-| **GUI settings** | #96, **#207** | **#96** | Partial (v1.9); #207 needs response |
-| **Whisper quality** | **#209**, **#215** | **#209** | #209 testing, new sample; #215 is question |
-| **Startup warning** | **#211** | **#211** | **Suppressed in v1.8.8b1** |
-| **Ensemble** | #203 | **#203** | Resolved, needs final confirmation |
-| **Installer location** | **#217** | **#217** | Needs response |
-| **AMD/Intel GPU** | #142, #114, **#213** | Deferred | v1.9+ |
-| **Translation providers** | #71, #43 | Deferred | v1.9+ |
-| **i18n** | #180, #175 | Deferred | v1.9+ |
-
----
-
-## Recently Closed Issues
-
-| # | Title | Closed | Resolution |
-|---|-------|--------|------------|
-| #208 | LLM server AssertionError | 2026-03-09 | Self-resolved — user installed NVIDIA Toolkit |
-| #198 | MPS not used on M1 Mac | 2026-03-07 | Fixed v1.8.7b0 (detection) + v1.8.8b1 (beam search) |
-| #197 | Installation problem v1.8.6 | 2026-03-08 | Closed by user after v1.8.7b0 |
-| #196 | Local Translation Errors | 2026-03-07 | Partial fix v1.8.7. **Still broken — see #212/#214** |
-| #195 | UnicodeDecodeError audio extraction | 2026-03-08 | Fixed `55df512` |
-| #194 | M4B file support | 2026-03-08 | Fixed `5769688` |
-
----
-
 ## Changelog
 
 | Date | Changes |
 |------|---------|
-| 2026-03-12 | **rev5.** v1.8.8b1 pre-release. 5 new issues (#213 Intel GPU, #214 LLM 502, #215 Qwen3 quality, #217 GUI exe location, #200 Optimus). #198 MPS FIXED (v1.8.8b1). #214 new LLM failure mode (502 vs regex). #209 new hallucination sample. Updated all clusters. |
-| 2026-03-11 | rev4. v1.8.7 RELEASED. 3 new issues (#210, #211, #212). #212 dup of #196. #198 MPS still crashes. |
+| 2026-03-13 | **rev6.** All Track A/B/C code complete (9 items). 3 new issues (#218 cu118 wheel, #219 MossFormer2 stereo, #220 install stall). Added status legend (FIX IMPLEMENTED vs FIX VERIFIED vs AWAITING CONFIRMATION). #218 already fixed by A3. #219 new bug (stereo→mono). #220 guidance only. Updated all clusters. Added Cluster G (Speech Enhancement). 7 issues need response (Track D1). |
+| 2026-03-12 | rev5. v1.8.8b1 pre-release. 5 new issues (#213-#217). #198 MPS FIXED. #214 new LLM failure mode (502). #209 new hallucination sample. |
+| 2026-03-11 | rev4. v1.8.7 RELEASED. 3 new issues (#210, #211, #212). #212 dup of #196. |
 | 2026-03-09 | Groups B, C, D committed. #143, #209, #198 fixes shipped. |
 | 2026-03-09 | Full evidence review: 14 screenshots, 3 log files, 50+ comments. |
 | 2026-03-08 | v1.8.7b1 released with China network fixes. |

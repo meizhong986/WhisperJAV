@@ -266,6 +266,16 @@ class ClearVoiceSpeechEnhancer:
         # Second param False = online_write disabled (return numpy array instead of writing to file)
         output_wav = self._clearvoice(audio, False)
 
+        # Speech separation models (e.g. MossFormer2_SS_16K) output
+        # [num_sources, batch, length] — take the first separated source
+        # (typically the primary/loudest speaker)
+        if output_wav.ndim == 3:
+            logger.debug(
+                f"Speech separation output shape {output_wav.shape}, "
+                f"using first source"
+            )
+            output_wav = output_wav[0]
+
         # Extract from batch shape [batch, length] -> [length]
         if output_wav.ndim == 2:
             output_wav = output_wav[0, :]
