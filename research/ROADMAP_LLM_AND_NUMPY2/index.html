@@ -1,0 +1,2225 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/research/ROADMAP_LLM_AND_NUMPY2/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>WhisperJAV Roadmap: LLM Backend Migration & NumPy 2 Upgrade - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-roadmap-llm-backend-migration-numpy-2-upgrade" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperJAV Roadmap: LLM Backend Migration &amp; NumPy 2 Upgrade
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#strategic-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategic Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#release-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release Plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v188-stability-groundwork-near-term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.8 — Stability + Groundwork (Near-term)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1.8.8 — Stability + Groundwork (Near-term)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-fix-llm-context-overflow-bug-critical-196-212-132" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Fix LLM Context Overflow Bug (Critical — #196, #212, #132)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-lift-numpy2-pin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Lift numpy&lt;2 Pin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-fix-mps-beam-search-crash-198" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Fix MPS Beam Search Crash (#198)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d-add-provider-ollama-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D. Add --provider ollama (Preview)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v190-llm-backend-migration-medium-term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.9.0 — LLM Backend Migration (Medium-term)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1.9.0 — LLM Backend Migration (Medium-term)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-backend-abstraction-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Backend Abstraction Layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-ollama-backend-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Ollama Backend Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-llamacpp-server-as-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: llama.cpp Server as Fallback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-backend-selection-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Backend Selection Logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-deprecate-llama-cpp-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Deprecate llama-cpp-python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v19x-polish-ecosystem-follow-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.9.x — Polish &amp; Ecosystem (Follow-up)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1.9.x — Polish &amp; Ecosystem (Follow-up)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#numpy-2-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        numpy 2 Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-mlx-backend-for-mac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional: MLX Backend for Mac
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#user-experience-vision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        User Experience Vision
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="User Experience Vision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-v187-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before (v1.8.7 — Current)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#after-v190-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After (v1.9.0 — Target)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risk-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependency-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency Impact
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependency Impact">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-gets-added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What gets added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-gets-removed-v190" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What gets removed (v1.9.0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-gets-updated-v188" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What gets updated (v1.8.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Priority
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/research/ROADMAP_LLM_AND_NUMPY2.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-roadmap-llm-backend-migration-numpy-2-upgrade">WhisperJAV Roadmap: LLM Backend Migration &amp; NumPy 2 Upgrade<a class="headerlink" href="#whisperjav-roadmap-llm-backend-migration-numpy-2-upgrade" title="Permanent link">&para;</a></h1>
+<p><strong>Date</strong>: 2026-03-11
+<strong>Based on</strong>: 4 research reports (llm_backend_best_practices.md, llm_backend_candidates.md, numpy2_modelscope_feasibility.md, numpy2_test_suite_report.md)</p>
+<hr />
+<h2 id="strategic-overview">Strategic Overview<a class="headerlink" href="#strategic-overview" title="Permanent link">&para;</a></h2>
+<p>Two major technical debts have been identified. The good news: they reinforce each other and can be addressed in a coordinated sequence.</p>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Current State</th>
+<th>Target State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LLM backend</strong></td>
+<td>llama-cpp-python (fragile DLL loading, CUDA compilation)</td>
+<td>Ollama (prebuilt Go binary, zero Python deps)</td>
+</tr>
+<tr>
+<td><strong>numpy pin</strong></td>
+<td><code>numpy&lt;2.0</code> (outdated, blocks modern AI packages)</td>
+<td><code>numpy&gt;=1.26.0</code> (lift pin, allow both 1.x and 2.x)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key insight</strong>: Migrating the LLM backend to Ollama <em>removes</em> it from Python dependency resolution entirely (Go binary, no pip). This makes the numpy 2 migration simpler — one fewer source of conflicts.</p>
+<hr />
+<h2 id="release-plan">Release Plan<a class="headerlink" href="#release-plan" title="Permanent link">&para;</a></h2>
+<h3 id="v188-stability-groundwork-near-term">v1.8.8 — Stability + Groundwork (Near-term)<a class="headerlink" href="#v188-stability-groundwork-near-term" title="Permanent link">&para;</a></h3>
+<p><strong>Theme</strong>: Fix immediate user-facing bugs, lay groundwork for the bigger changes.</p>
+<h4 id="a-fix-llm-context-overflow-bug-critical-196-212-132">A. Fix LLM Context Overflow Bug (Critical — #196, #212, #132)<a class="headerlink" href="#a-fix-llm-context-overflow-bug-critical-196-212-132" title="Permanent link">&para;</a></h4>
+<p>This is the most-reported bug. Users get "No matches found" on long files because PySubtrans overflows the 8K context window with system instructions + conversation history + subtitle lines.</p>
+<p><strong>Fix approach</strong> (does not require backend migration):
+1. Reduce system prompt token count (currently bloated)
+2. Implement dynamic batch sizing — measure available context, adjust subtitle batch size accordingly
+3. Add retry with smaller batch on "No matches found" error
+4. These fixes work regardless of backend (llama-cpp-python, Ollama, cloud)</p>
+<p><strong>Files</strong>: <code>whisperjav/translate/core.py</code>, <code>whisperjav/translate/instructions.py</code></p>
+<h4 id="b-lift-numpy2-pin">B. Lift numpy&lt;2 Pin<a class="headerlink" href="#b-lift-numpy2-pin" title="Permanent link">&para;</a></h4>
+<p><strong>Research finding</strong>: The pin is unnecessary. ModelScope doesn't constrain numpy. ClearVoice fork already removed the pin. Only 1 line of WhisperJAV code needs fixing.</p>
+<p><strong>Changes</strong>:
+| File | Change |
+|------|--------|
+| <code>pyproject.toml</code> | <code>numpy&gt;=1.26.0,&lt;2.0</code> → <code>numpy&gt;=1.26.0</code> |
+| <code>requirements.txt</code> | Same |
+| <code>whisperjav/upgrade.py</code> | Same |
+| <code>whisperjav/utils/metadata_manager.py</code> | Remove <code>np.int_</code> from isinstance check |
+| <code>pyproject.toml</code> | Bump: <code>scipy&gt;=1.12.0</code>, <code>numba&gt;=0.59.0</code>, <code>librosa&gt;=0.10.2</code>, <code>scikit-learn&gt;=1.4.0</code>, <code>opencv-python&gt;=4.9.0</code> |</p>
+<p><strong>Risk</strong>: Low. Allows pip to resolve numpy 1.x or 2.x based on environment. No forced upgrade.</p>
+<h4 id="c-fix-mps-beam-search-crash-198">C. Fix MPS Beam Search Crash (#198)<a class="headerlink" href="#c-fix-mps-beam-search-crash-198" title="Permanent link">&para;</a></h4>
+<p>Force <code>num_beams=1</code> on MPS device in TransformersASR. The HuggingFace beam search implementation crashes on Apple Silicon with out-of-bounds index errors.</p>
+<p><strong>File</strong>: <code>whisperjav/modules/whisper_pro_asr.py</code></p>
+<h4 id="d-add-provider-ollama-preview">D. Add <code>--provider ollama</code> (Preview)<a class="headerlink" href="#d-add-provider-ollama-preview" title="Permanent link">&para;</a></h4>
+<p>Add Ollama as a recognized provider alongside the existing <code>custom</code> provider. This is a thin convenience layer — users can already use Ollama via <code>--provider custom --translate-server-address http://localhost:11434 --translate-endpoint /v1/chat/completions</code>. Making it a first-class provider improves discoverability.</p>
+<p><strong>Changes</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># providers.py — add:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="s1">&#39;ollama&#39;</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s1">&#39;pysubtrans_name&#39;</span><span class="p">:</span> <span class="s1">&#39;Custom Server&#39;</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="s1">&#39;llama3.1:8b&#39;</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s1">&#39;env_var&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s1">&#39;server_address&#39;</span><span class="p">:</span> <span class="s1">&#39;http://localhost:11434&#39;</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s1">&#39;endpoint&#39;</span><span class="p">:</span> <span class="s1">&#39;/v1/chat/completions&#39;</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">},</span>
+</code></pre></div></p>
+<p>Plus: auto-detection of running Ollama server, friendly error message if not found.</p>
+<p><strong>This is NOT the full migration</strong> — just making Ollama easily accessible while llama-cpp-python remains the <code>local</code> provider.</p>
+<hr />
+<h3 id="v190-llm-backend-migration-medium-term">v1.9.0 — LLM Backend Migration (Medium-term)<a class="headerlink" href="#v190-llm-backend-migration-medium-term" title="Permanent link">&para;</a></h3>
+<p><strong>Theme</strong>: Replace llama-cpp-python with Ollama as the primary local LLM backend.</p>
+<h4 id="phase-1-backend-abstraction-layer">Phase 1: Backend Abstraction Layer<a class="headerlink" href="#phase-1-backend-abstraction-layer" title="Permanent link">&para;</a></h4>
+<p>Create a clean interface that decouples translation from the LLM server implementation.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># whisperjav/translate/llm_backend.py (new)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">LLMBackend</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Interface for local LLM server backends.&quot;&quot;&quot;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">detect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>           <span class="c1"># Is this backend available?</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span> <span class="c1"># Start server, return base_url</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>             <span class="c1"># Stop server</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">health_check</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>     <span class="c1"># Is server ready?</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">list_models</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span> <span class="c1"># Available models</span>
+</code></pre></div>
+<p>Refactor <code>local_backend.py</code> (2423 lines) into:
+- <code>llm_backend.py</code> — Protocol + factory (~100 lines)
+- <code>backends/llama_cpp_python.py</code> — Current implementation, refactored (~800 lines)
+- <code>backends/ollama.py</code> — New Ollama backend (~200 lines)
+- <code>backends/llama_server.py</code> — Direct llama.cpp server binary (~250 lines)</p>
+<p><strong>What gets deleted</strong>: DLL path hacking, CUDA wheel management, AVX2 detection, build-from-source logic — everything that makes the current approach fragile. Approximately <strong>1500 lines</strong> of workaround code.</p>
+<h4 id="phase-2-ollama-backend-implementation">Phase 2: Ollama Backend Implementation<a class="headerlink" href="#phase-2-ollama-backend-implementation" title="Permanent link">&para;</a></h4>
+<p>The Ollama backend is simple because Ollama handles all the hard parts:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Detection:    GET http://localhost:11434/       → &quot;Ollama is running&quot;
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Models:       GET http://localhost:11434/api/tags → list of pulled models
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Model pull:   POST http://localhost:11434/api/pull → download with progress
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>Health:       GET http://localhost:11434/v1/models → model loaded and ready
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>Translation:  POST http://localhost:11434/v1/chat/completions → standard OpenAI API
+</code></pre></div>
+<p><strong>Key decisions</strong>:
+- <strong>Don't bundle Ollama</strong> (~3-4GB is too large). Instead, detect installed Ollama or guide user to install it.
+- <strong>Support custom GGUF models</strong> via Ollama's Modelfile mechanism (<code>ollama create mymodel -f Modelfile</code>)
+- <strong>Auto-detect</strong>: Probe localhost:11434 (Ollama), localhost:1234 (LM Studio), then user-configured URL
+- <strong>Context window</strong>: Configure explicitly (Ollama defaults to 2048, our models support 8192+)</p>
+<h4 id="phase-3-llamacpp-server-as-fallback">Phase 3: llama.cpp Server as Fallback<a class="headerlink" href="#phase-3-llamacpp-server-as-fallback" title="Permanent link">&para;</a></h4>
+<p>For users who can't or won't install Ollama, provide a lightweight fallback:
+- Download pre-built <code>llama-server</code> binary from llama.cpp GitHub releases (~100-400MB)
+- Detect GPU: CUDA version → pick CUDA binary; no CUDA → Vulkan binary; nothing → CPU binary
+- Manage as subprocess, same OpenAI-compatible API
+- Reuse existing GGUF model download pipeline</p>
+<p><strong>Vulkan support</strong> is the key differentiator here — it works across NVIDIA, AMD, and Intel GPUs without vendor-specific drivers.</p>
+<h4 id="phase-4-backend-selection-logic">Phase 4: Backend Selection Logic<a class="headerlink" href="#phase-4-backend-selection-logic" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>User clicks &quot;Translate&quot; with --provider local (or GUI equivalent)
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    │
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    ├─ 1. Ollama running on localhost:11434?
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    │     → Yes: Use OllamaBackend
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    │     → Ollama installed but not running? Start it.
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    │
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    ├─ 2. LM Studio running on localhost:1234?
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    │     → Yes: Use as OpenAI-compatible server
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    │
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    ├─ 3. Neither found?
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    │     → Download llama-server binary (one-time, ~200MB)
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    │     → Start LlamaCppServerBackend
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    │
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    ├─ 4. User override: --llm-backend ollama|llama-server|legacy
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    │
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    └─ 5. GUI: Show detected server status, offer Ollama install link
+</code></pre></div>
+<h4 id="phase-5-deprecate-llama-cpp-python">Phase 5: Deprecate llama-cpp-python<a class="headerlink" href="#phase-5-deprecate-llama-cpp-python" title="Permanent link">&para;</a></h4>
+<p>Once v1.9.0 is stable:
+1. Move llama-cpp-python to <code>[legacy]</code> extra (not installed by default)
+2. Remove from default requirements
+3. Show deprecation warning if <code>--llm-backend legacy</code> is used
+4. Full removal in v1.10.0</p>
+<p><strong>Code impact</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Lines</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>New: <code>llm_backend.py</code> (protocol + factory)</td>
+<td>+100</td>
+<td>New file</td>
+</tr>
+<tr>
+<td>New: <code>backends/ollama.py</code></td>
+<td>+200</td>
+<td>New file</td>
+</tr>
+<tr>
+<td>New: <code>backends/llama_server.py</code></td>
+<td>+250</td>
+<td>New file</td>
+</tr>
+<tr>
+<td>Refactored: <code>backends/llama_cpp_python.py</code></td>
+<td>~800</td>
+<td>From local_backend.py</td>
+</tr>
+<tr>
+<td>Deleted: DLL workarounds, build utils</td>
+<td><strong>-1500</strong></td>
+<td>From local_backend.py, llama_build_utils.py, llama_cuda_config.py</td>
+</tr>
+<tr>
+<td>Modified: <code>service.py</code>, <code>core.py</code></td>
+<td>~100</td>
+<td>Backend selection</td>
+</tr>
+<tr>
+<td>Modified: <code>providers.py</code></td>
+<td>+20</td>
+<td>Add ollama provider</td>
+</tr>
+<tr>
+<td>Modified: GUI frontend</td>
+<td>~50</td>
+<td>Server status display</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Net</strong>: Remove ~1000 lines of fragile platform-specific code, replace with ~550 lines of clean HTTP client code.</p>
+<hr />
+<h3 id="v19x-polish-ecosystem-follow-up">v1.9.x — Polish &amp; Ecosystem (Follow-up)<a class="headerlink" href="#v19x-polish-ecosystem-follow-up" title="Permanent link">&para;</a></h3>
+<h4 id="numpy-2-validation">numpy 2 Validation<a class="headerlink" href="#numpy-2-validation" title="Permanent link">&para;</a></h4>
+<p>After v1.8.8 lifts the pin and v1.9.0 removes llama-cpp-python from default deps:
+- Run the test suite from <code>tests/research/test_numpy2_*.py</code>
+- Test all 5 enhancement backends with numpy 2.2.x
+- If all clear, consider requiring <code>numpy&gt;=2.0</code> in v1.10.0</p>
+<h4 id="optional-mlx-backend-for-mac">Optional: MLX Backend for Mac<a class="headerlink" href="#optional-mlx-backend-for-mac" title="Permanent link">&para;</a></h4>
+<p>For Apple Silicon users who want maximum performance:
+- MLX is 2.17x faster than llama.cpp on M3 Ultra
+- Could be an optional <code>--llm-backend mlx</code> for macOS
+- Lower priority — Ollama with Metal is already good on Mac</p>
+<h4 id="model-recommendations">Model Recommendations<a class="headerlink" href="#model-recommendations" title="Permanent link">&para;</a></h4>
+<p>Build intelligence into the model selection:
+- Detect available VRAM → suggest appropriate model size
+- 8GB+ VRAM → llama3.1:8b (best quality for translation)
+- 4-6GB → llama3.2:3b (good balance)
+- &lt;4GB or CPU → phi3:mini or cloud provider suggestion</p>
+<hr />
+<h2 id="user-experience-vision">User Experience Vision<a class="headerlink" href="#user-experience-vision" title="Permanent link">&para;</a></h2>
+<h3 id="before-v187-current">Before (v1.8.7 — Current)<a class="headerlink" href="#before-v187-current" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>User: Clicks &quot;Translate&quot; with local provider
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>→ WhisperJAV: Tries to load llama-cpp-python
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>→ DLL loading fails (CUDA version mismatch)
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>→ Tries to build from source (no compiler found)
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>→ ERROR: &quot;Failed to load local LLM server&quot;
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>→ User: Confused, gives up
+</code></pre></div>
+<h3 id="after-v190-target">After (v1.9.0 — Target)<a class="headerlink" href="#after-v190-target" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>User: Clicks &quot;Translate&quot; with local provider
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>→ WhisperJAV: Checks localhost:11434... Ollama found!
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>→ Checks models... llama3.1:8b loaded, 8GB VRAM detected
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>→ Translation runs via standard OpenAI API
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>→ Done. 30 seconds for a subtitle file.
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>-- OR if Ollama not installed --
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>→ WhisperJAV: No local LLM server detected.
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>→ Shows friendly dialog:
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  &quot;For local translation, install Ollama (free, 1 click):
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>   → Download: ollama.com
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>   → Then run: ollama pull llama3.1:8b
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>   Or use cloud translation:
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>   → DeepSeek ($0.001/file): --provider deepseek&quot;
+</code></pre></div>
+<hr />
+<h2 id="risk-matrix">Risk Matrix<a class="headerlink" href="#risk-matrix" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ollama API breaking change</td>
+<td>Low</td>
+<td>Medium</td>
+<td>Pin minimum Ollama version, version check on startup</td>
+</tr>
+<tr>
+<td>Ollama not installed by user</td>
+<td>High</td>
+<td>Medium</td>
+<td>Friendly guidance + llama-server fallback</td>
+</tr>
+<tr>
+<td>llama-server binary variant wrong for user's GPU</td>
+<td>Medium</td>
+<td>Low</td>
+<td>Vulkan as universal fallback, clear error message</td>
+</tr>
+<tr>
+<td>numpy 2 breaks undiscovered transitive dep</td>
+<td>Low</td>
+<td>Medium</td>
+<td>Keep <code>&gt;=1.26.0</code> (not <code>&gt;=2.0</code>), let pip resolve</td>
+</tr>
+<tr>
+<td>ModelScope breaks with numpy 2</td>
+<td>Low</td>
+<td>Low</td>
+<td>Enhancement module has graceful fallback</td>
+</tr>
+<tr>
+<td>Ollama context window default (2048) too small</td>
+<td>High</td>
+<td>High</td>
+<td>Always set explicit <code>num_ctx</code> parameter</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="dependency-impact">Dependency Impact<a class="headerlink" href="#dependency-impact" title="Permanent link">&para;</a></h2>
+<h3 id="what-gets-added">What gets added<a class="headerlink" href="#what-gets-added" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Nothing to pip requirements (Ollama is external, <code>openai</code> package already installed)</li>
+<li>Optional: <code>ollama</code> Python client library (pure Python, minimal deps) — but <code>requests</code> works fine</li>
+</ul>
+<h3 id="what-gets-removed-v190">What gets removed (v1.9.0)<a class="headerlink" href="#what-gets-removed-v190" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>llama-cpp-python</code> (from default install)</li>
+<li><code>fastapi</code> (was only for local LLM server)</li>
+<li><code>uvicorn</code> (was only for local LLM server)</li>
+<li><code>sse-starlette</code> (was only for local LLM server)</li>
+<li><code>cmake</code> / build tools (no longer needed)</li>
+</ul>
+<h3 id="what-gets-updated-v188">What gets updated (v1.8.8)<a class="headerlink" href="#what-gets-updated-v188" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>numpy&gt;=1.26.0</code> (remove <code>&lt;2.0</code> upper bound)</li>
+<li><code>scipy&gt;=1.12.0</code></li>
+<li><code>numba&gt;=0.59.0</code></li>
+<li><code>librosa&gt;=0.10.2</code></li>
+<li><code>scikit-learn&gt;=1.4.0</code></li>
+<li><code>opencv-python&gt;=4.9.0</code></li>
+</ul>
+<hr />
+<h2 id="implementation-priority">Implementation Priority<a class="headerlink" href="#implementation-priority" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Item</th>
+<th>Release</th>
+<th>Effort</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P0</strong></td>
+<td>Fix LLM context overflow (#196/#212)</td>
+<td>v1.8.8</td>
+<td>Medium</td>
+<td>Critical — most-reported bug</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td>Fix MPS beam search (#198)</td>
+<td>v1.8.8</td>
+<td>Low</td>
+<td>Critical — Mac users blocked</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Lift numpy&lt;2 pin</td>
+<td>v1.8.8</td>
+<td>Low</td>
+<td>High — unblocks ecosystem</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Add <code>--provider ollama</code> preview</td>
+<td>v1.8.8</td>
+<td>Low</td>
+<td>High — immediate relief for LLM users</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Backend abstraction layer</td>
+<td>v1.9.0</td>
+<td>Medium</td>
+<td>Foundation for migration</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Ollama backend implementation</td>
+<td>v1.9.0</td>
+<td>Medium</td>
+<td>The main migration</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>llama.cpp server fallback</td>
+<td>v1.9.0</td>
+<td>Medium</td>
+<td>Safety net</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>Deprecate llama-cpp-python</td>
+<td>v1.9.0</td>
+<td>Low</td>
+<td>Cleanup</td>
+</tr>
+<tr>
+<td><strong>P4</strong></td>
+<td>MLX backend for Mac</td>
+<td>v1.9.x</td>
+<td>Medium</td>
+<td>Nice-to-have</td>
+</tr>
+<tr>
+<td><strong>P4</strong></td>
+<td>Require numpy&gt;=2.0</td>
+<td>v1.10.0</td>
+<td>Low</td>
+<td>Future cleanup</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="success-metrics">Success Metrics<a class="headerlink" href="#success-metrics" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Current (v1.8.7)</th>
+<th>Target (v1.9.0)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLM-related GitHub issues</td>
+<td>5+ open (#196, #212, #132, #198-LLM, etc.)</td>
+<td>0 open</td>
+</tr>
+<tr>
+<td>"DLL not found" / build failures</td>
+<td>Recurring</td>
+<td>Eliminated</td>
+</tr>
+<tr>
+<td>Local translation setup steps</td>
+<td>0 (auto, but fails)</td>
+<td>1 (install Ollama)</td>
+</tr>
+<tr>
+<td>Platform coverage (local LLM)</td>
+<td>Windows+NVIDIA only (reliably)</td>
+<td>Windows, Mac, Linux, AMD</td>
+</tr>
+<tr>
+<td>numpy version</td>
+<td>1.26.x only</td>
+<td>1.26.x or 2.x (user's choice)</td>
+</tr>
+<tr>
+<td>Lines of DLL/build workaround code</td>
+<td>~1500</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="open-questions">Open Questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Should WhisperJAV auto-install Ollama?</strong> Or just detect + guide? Recommendation: detect + guide. Auto-installing a 3-4GB binary without consent is hostile UX.</p>
+</li>
+<li>
+<p><strong>Custom uncensored models</strong>: Current approach downloads a specific uncensored GGUF from HuggingFace. With Ollama, options are: (a) publish to Ollama registry, (b) create Modelfile from local GGUF, (c) use <code>ollama pull hf.co/user/model:Q4_K_M</code>. Need to decide which path.</p>
+</li>
+<li>
+<p><strong>Ollama context window</strong>: Default is 2048 tokens — too small for translation with system prompt. Must set <code>num_ctx: 8192</code> explicitly via API parameter or Modelfile. This is a must-fix before shipping.</p>
+</li>
+<li>
+<p><strong>Backward compatibility</strong>: Users who have working llama-cpp-python setups shouldn't be broken. Keep <code>--provider local</code> working via legacy backend, add <code>--provider ollama</code> as the recommended path.</p>
+</li>
+</ol>
+<hr />
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>docs/research/llm_backend_best_practices.md</code> — Architecture patterns from 10+ projects</li>
+<li><code>docs/research/llm_backend_candidates.md</code> — Detailed evaluation of 7 candidates</li>
+<li><code>docs/research/numpy2_modelscope_feasibility.md</code> — ModelScope + numpy 2 analysis</li>
+<li><code>docs/research/numpy2_test_suite_report.md</code> — Code audit + test suite</li>
+<li><code>tests/research/test_numpy2_*.py</code> — Runnable numpy 2 compatibility tests</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

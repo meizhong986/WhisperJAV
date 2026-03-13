@@ -1,0 +1,3476 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/V3-IMPL-001-subtitle-pipeline-convergence%20-%20Copy/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>IMPL-001: Subtitle Pipeline Convergence — Implementation Plan - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#impl-001-subtitle-pipeline-convergence-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              IMPL-001: Subtitle Pipeline Convergence — Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#revision-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revision History
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Revision History">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-changed-v2-v3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Changed v2 → v3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-context-for-external-reviewers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Context for External Reviewers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Context for External Reviewers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-what-is-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 What Is WhisperJAV?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-the-product-vision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 The Product Vision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-what-exists-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 What Exists Today
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-key-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 Key Documents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-strategic-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Strategic Direction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Strategic Direction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-integrated-aligner-limitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The Integrated Aligner Limitation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-the-stabilize-strangulate-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 The "Stabilize &amp; Strangulate" Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-why-this-is-the-right-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Why This Is the Right Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Current State
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Current State">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-architecture-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Architecture Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-three-features-the-vision-requires-that-also-happen-to-exist-in-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Three Features the Vision Requires (That Also Happen to Exist in Legacy)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-target-state-the-vision-delivered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Target State: The Vision Delivered
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Target State: The Vision Delivered">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-architecture-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Architecture Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-what-vision-delivered-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 What "Vision Delivered" Means
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-phase-overview-strangulation-milestones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Phase Overview &amp; Strangulation Milestones
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Phase Overview &amp; Strangulation Milestones">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strangulation-milestones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strangulation Milestones
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-phase-1-assembly-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Phase 1: Assembly Parity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Phase 1: Assembly Parity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-objective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Objective
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-task-11-fix-context-propagation-in-orchestrator-brk-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Task 1.1: Fix Context Propagation in Orchestrator (BRK-4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-task-12-wire-framer-selection-to-assembly-mode-gap-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Task 1.2: Wire Framer Selection to Assembly Mode (GAP-5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-task-13-switch-default-mode-to-assembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Task 1.3: Switch Default Mode to Assembly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-task-14-minor-cleanups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 Task 1.4: Minor Cleanups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-phase-1-exit-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 Phase 1 Exit Criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-phase-2-superiority-vision-enablement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Phase 2: Superiority &amp; Vision Enablement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Phase 2: Superiority &amp; Vision Enablement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-objective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Objective
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workstream-a-step-down-retry-in-orchestrator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workstream A: Step-Down Retry in Orchestrator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-how-step-down-works-today-vad_slicing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 How Step-Down Works Today (VAD_SLICING)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-how-step-down-should-work-in-the-orchestrator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 How Step-Down Should Work in the Orchestrator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-task-2a1-add-stepdownconfig-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Task 2A.1: Add StepDownConfig Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#76-task-2a2-add-reframe-to-vadgroupedframer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.6 Task 2A.2: Add reframe() to VadGroupedFramer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#77-task-2a3-implement-batched-step-down-in-orchestrator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.7 Task 2A.3: Implement Batched Step-Down in Orchestrator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#78-task-2a4-wire-step-down-to-qwenpipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.8 Task 2A.4: Wire Step-Down to QwenPipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#79-task-2a5-define-canonical-diagnostics-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.9 Task 2A.5: Define Canonical Diagnostics Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workstream-b-generic-pipeline-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workstream B: Generic Pipeline Entry Point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#710-task-2b1-create-decoupledpipeline-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.10 Task 2B.1: Create DecoupledPipeline Class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#711-task-2b2-wire-to-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.11 Task 2B.2: Wire to CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#712-task-2b3-yaml-configuration-support-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.12 Task 2B.3: YAML Configuration Support (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#713-phase-2-exit-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.13 Phase 2 Exit Criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-phase-3-strangulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Phase 3: Strangulation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Phase 3: Strangulation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-objective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Objective
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-task-31-map-legacy-input-mode-names-to-assembly-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Task 3.1: Map Legacy Input Mode Names to Assembly Configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-task-32-delete-inline-coupled-mode-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Task 3.2: Delete Inline Coupled Mode Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#85-task-33-update-ensemble-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.5 Task 3.3: Update Ensemble Defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#86-task-34-update-gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.6 Task 3.4: Update GUI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#87-phase-3-exit-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.7 Phase 3 Exit Criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-future-new-backends-and-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Future: New Backends and Workflows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Future: New Backends and Workflows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-whispersegmentframer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 WhisperSegmentFramer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-transformerstextgenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 TransformersTextGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-vllmtextgenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 VLLMTextGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-cross-model-benchmarking-utility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Cross-Model Benchmarking Utility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-testing-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Testing Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Testing Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-per-phase-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Per-Phase Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-equivalence-validation-critical-gate-for-phase-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Equivalence Validation (Critical Gate for Phase 3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-continuous" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Continuous
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-risk-register" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Risk Register
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-decision-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Decision Log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-scope-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Scope Boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Scope Boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#in-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-dependencies-and-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Dependencies and Prerequisites
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Dependencies and Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#external-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/V3-IMPL-001-subtitle-pipeline-convergence - Copy.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="impl-001-subtitle-pipeline-convergence-implementation-plan">IMPL-001: Subtitle Pipeline Convergence — Implementation Plan<a class="headerlink" href="#impl-001-subtitle-pipeline-convergence-implementation-plan" title="Permanent link">&para;</a></h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>DRAFT v3</td>
+</tr>
+<tr>
+<td><strong>Date</strong></td>
+<td>2026-02-19</td>
+</tr>
+<tr>
+<td><strong>Authors</strong></td>
+<td>MK (product vision &amp; strategic direction), Claude (architecture &amp; implementation plan)</td>
+</tr>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>ADR-006, Audit documents S1–S5, Reviewer inputs (1st and 2nd)</td>
+</tr>
+<tr>
+<td><strong>Goal</strong></td>
+<td>Build the Decoupled Subtitle Pipeline into the sole, vision-complete production path for all ASR models — then delete the legacy coupled code</td>
+</tr>
+<tr>
+<td><strong>Strategy</strong></td>
+<td><strong>Stabilize &amp; Strangulate</strong> — All engineering effort serves the decoupled pipeline. Zero effort on legacy fixes. Legacy modes are frozen, then killed.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="revision-history">Revision History<a class="headerlink" href="#revision-history" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>v1</td>
+<td>2026-02-18</td>
+<td>Initial 6-phase plan. Included BRK-1 fix (coupled mode text cleaning).</td>
+</tr>
+<tr>
+<td>v2</td>
+<td>2026-02-19</td>
+<td>Partial revision: removed BRK-1, reordered to 4 phases. <strong>REJECTED</strong> — still framed as "catching up to legacy" rather than "building the vision"; strangulation not formalized; Generic Entry Point delayed unnecessarily; deprecation stance too gentle.</td>
+</tr>
+<tr>
+<td>v3</td>
+<td>2026-02-19</td>
+<td>Full strategic rewrite. Vision-first framing. 3 phases. Formalized strangulation milestones. Generic Entry Point parallelized with step-down. No deprecation grace period.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-changed-v2-v3">What Changed v2 → v3<a class="headerlink" href="#what-changed-v2-v3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>v2 (Rejected)</th>
+<th>v3 (Current)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Framing</strong></td>
+<td>"Close gaps vs coupled modes"</td>
+<td>"Build the vision's feature set"</td>
+</tr>
+<tr>
+<td><strong>Phase count</strong></td>
+<td>4 sequential phases</td>
+<td>3 phases (Phase 2 has parallel workstreams)</td>
+</tr>
+<tr>
+<td><strong>Generic Entry Point</strong></td>
+<td>Phase 3 (after step-down)</td>
+<td>Phase 2B (parallel with step-down)</td>
+</tr>
+<tr>
+<td><strong>Default mode switch</strong></td>
+<td>Phase 4 (at the end)</td>
+<td><strong>Phase 1</strong> (immediately on parity)</td>
+</tr>
+<tr>
+<td><strong>Deprecation stance</strong></td>
+<td>"One-release deprecation warning" (D3)</td>
+<td>No grace period. Assembly is default. Coupled modes issue warning. Deleted in Phase 3.</td>
+</tr>
+<tr>
+<td><strong>Strangulation</strong></td>
+<td>Label only ("Stabilize &amp; Strangulate" title, no milestones)</td>
+<td><strong>Formalized</strong>: explicit milestones at each phase exit</td>
+</tr>
+<tr>
+<td><strong>Risk register</strong></td>
+<td>4 tactical risks</td>
+<td>Added strategic risk: "Legacy effort delays migration"</td>
+</tr>
+<tr>
+<td><strong>CONTEXT_AWARE debate</strong></td>
+<td>Implied it might be kept</td>
+<td>Explicitly killed alongside VAD_SLICING</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-context-for-external-reviewers">Context for External Reviewers</a></li>
+<li><a href="#2-strategic-direction">Strategic Direction</a></li>
+<li><a href="#3-current-state">Current State</a></li>
+<li><a href="#4-target-state-the-vision-delivered">Target State: The Vision Delivered</a></li>
+<li><a href="#5-phase-overview--strangulation-milestones">Phase Overview &amp; Strangulation Milestones</a></li>
+<li><a href="#6-phase-1-assembly-parity">Phase 1: Assembly Parity</a></li>
+<li><a href="#7-phase-2-superiority--vision-enablement">Phase 2: Superiority &amp; Vision Enablement</a></li>
+<li><a href="#8-phase-3-strangulation">Phase 3: Strangulation</a></li>
+<li><a href="#9-future-new-backends-and-workflows">Future: New Backends and Workflows</a></li>
+<li><a href="#10-testing-strategy">Testing Strategy</a></li>
+<li><a href="#11-risk-register">Risk Register</a></li>
+<li><a href="#12-decision-log">Decision Log</a></li>
+<li><a href="#13-scope-boundaries">Scope Boundaries</a></li>
+<li><a href="#14-dependencies-and-prerequisites">Dependencies and Prerequisites</a></li>
+</ol>
+<hr />
+<h2 id="1-context-for-external-reviewers">1. Context for External Reviewers<a class="headerlink" href="#1-context-for-external-reviewers" title="Permanent link">&para;</a></h2>
+<h3 id="11-what-is-whisperjav">1.1 What Is WhisperJAV?<a class="headerlink" href="#11-what-is-whisperjav" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV is a subtitle generation tool optimized for Japanese content. It takes video/audio input and produces SRT subtitle files using AI-powered speech recognition.</p>
+<h3 id="12-the-product-vision">1.2 The Product Vision<a class="headerlink" href="#12-the-product-vision" title="Permanent link">&para;</a></h3>
+<p>Many excellent ASR models produce high-quality text transcription but <strong>do not output timestamps</strong>. Without timestamps, you can't make SRT subtitle files. These models need auxiliary capabilities — temporal framing, forced alignment, timestamp hardening — to produce reliable subtitles.</p>
+<p>The vision is a <strong>reusable, modular pipeline</strong> that works with <strong>any such model</strong>:</p>
+<ol>
+<li>Local transformers models (HuggingFace)</li>
+<li>Remote vLLM-served models (OpenAI-compatible API)</li>
+<li>Any future inference pattern</li>
+</ol>
+<p>Qwen3-ASR is the first (reference) implementation. The architecture must make adding the next model trivial: write one <code>TextGenerator</code> class (~100-200 lines), register it in a factory (one line), done.</p>
+<h3 id="13-what-exists-today">1.3 What Exists Today<a class="headerlink" href="#13-what-exists-today" title="Permanent link">&para;</a></h3>
+<p>A module called <code>subtitle_pipeline</code> (<code>whisperjav/modules/subtitle_pipeline/</code>) implements this vision via:
+- <strong>4 protocol domains</strong>: TemporalFramer, TextGenerator, TextCleaner, TextAligner
+- <strong>Factory pattern</strong> per domain for pluggable backends
+- <strong>DecoupledSubtitlePipeline orchestrator</strong> composing all components
+- <strong>Shared hardening</strong> for timestamp resolution and boundary clamping</p>
+<p>However, only <strong>one of three</strong> pipeline input modes (Assembly) uses this architecture. The other two modes (CONTEXT_AWARE, VAD_SLICING) still operate as inline procedural code (~564 LOC) inside <code>qwen_pipeline.py</code>. This plan eliminates that duplication.</p>
+<h3 id="14-key-documents">1.4 Key Documents<a class="headerlink" href="#14-key-documents" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Location</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ADR-006</td>
+<td><code>docs/architecture/ADR-006-decoupled-subtitle-pipeline.md</code></td>
+<td>Architectural vision, protocol domains, orchestrator design</td>
+</tr>
+<tr>
+<td>S1–S5</td>
+<td><code>docs/audit/S1_*.md</code> through <code>S5_*.md</code></td>
+<td>Audit trail: module studies, gap analysis, vision feasibility</td>
+</tr>
+<tr>
+<td>Reviewer Input 1</td>
+<td><code>docs/architecture/reviewer_input_to_IMPL001.txt</code></td>
+<td>Strategic correction: BRK-1 is physically impossible</td>
+</tr>
+<tr>
+<td>Reviewer Input 2</td>
+<td><code>docs/architecture/reviewer_2nd_input_to_IMPL001.txt</code></td>
+<td>Strategic correction: formalize strangulation, accelerate Generic Entry Point, no deprecation grace period</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-strategic-direction">2. Strategic Direction<a class="headerlink" href="#2-strategic-direction" title="Permanent link">&para;</a></h2>
+<h3 id="21-the-integrated-aligner-limitation">2.1 The Integrated Aligner Limitation<a class="headerlink" href="#21-the-integrated-aligner-limitation" title="Permanent link">&para;</a></h3>
+<p>In coupled modes, <code>QwenASR.transcribe()</code> runs text generation AND forced alignment as a <strong>single atomic operation</strong>. There is no intervention point between them. The aligner receives uncleaned, potentially hallucinated text as part of the same model call. By the time we get a result back, the alignment collapse caused by hallucinations has already happened.</p>
+<p><strong>Cleaning the result text after the combined call is cosmetic</strong> — it doesn't prevent the collapse. The only architecture that CAN prevent this is the <strong>decoupled pipeline</strong>, where text generation and alignment are separate VRAM-exclusive phases with text cleaning between them.</p>
+<p>This means: <strong>fixing coupled modes is physically impossible.</strong> Any engineering time spent on them is wasted.</p>
+<h3 id="22-the-stabilize-strangulate-strategy">2.2 The "Stabilize &amp; Strangulate" Strategy<a class="headerlink" href="#22-the-stabilize-strangulate-strategy" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Principle</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Zero effort on legacy</strong></td>
+<td>Coupled modes (CONTEXT_AWARE, VAD_SLICING) receive no fixes, no improvements, no attention. They are frozen as-is.</td>
+</tr>
+<tr>
+<td><strong>All effort on the vision</strong></td>
+<td>Every line of code serves the decoupled pipeline — the architecture that delivers the product vision.</td>
+</tr>
+<tr>
+<td><strong>Assembly is the default</strong></td>
+<td>As soon as the decoupled pipeline reaches functional parity (Phase 1), Assembly becomes the default mode. Users who stay on legacy modes do so at their own risk.</td>
+</tr>
+<tr>
+<td><strong>No deprecation grace period</strong></td>
+<td>Coupled modes are not "deprecated with a transition period." They are replaced by a superior architecture and then deleted.</td>
+</tr>
+<tr>
+<td><strong>Delete, don't maintain</strong></td>
+<td>Once the decoupled pipeline is superior (Phase 2), the coupled code is deleted (Phase 3). No keeping it around "just in case."</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-why-this-is-the-right-strategy">2.3 Why This Is the Right Strategy<a class="headerlink" href="#23-why-this-is-the-right-strategy" title="Permanent link">&para;</a></h3>
+<p>The decoupled pipeline isn't just a refactor — it's the <strong>only architecture that can deliver the product vision</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Decoupled Pipeline</th>
+<th>Coupled Modes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mid-pipeline text cleaning (prevents aligner collapse)</td>
+<td>YES</td>
+<td><strong>IMPOSSIBLE</strong></td>
+</tr>
+<tr>
+<td>VRAM-exclusive phases (one model on GPU at a time)</td>
+<td>YES</td>
+<td>NO</td>
+</tr>
+<tr>
+<td>Batch processing (throughput)</td>
+<td>YES</td>
+<td>NO</td>
+</tr>
+<tr>
+<td>New model deployment (plug in any TextGenerator)</td>
+<td>YES</td>
+<td>NO — hardcoded to QwenASR</td>
+</tr>
+<tr>
+<td>vLLM backend support</td>
+<td>YES — <code>load()</code>/<code>unload()</code> become no-ops</td>
+<td>NO</td>
+</tr>
+<tr>
+<td>Step-down retry (quality recovery)</td>
+<td>Will have (Phase 2)</td>
+<td>Only VAD_SLICING has it</td>
+</tr>
+<tr>
+<td>Framer flexibility (VAD-grouped, SRT-source, etc.)</td>
+<td>YES — any framer via factory</td>
+<td>NO — hardcoded framing logic</td>
+</tr>
+</tbody>
+</table>
+<p>Engineering time spent on coupled modes is time NOT spent making this vision real. The coupled modes cannot evolve toward the vision — they are architecturally dead ends.</p>
+<hr />
+<h2 id="3-current-state">3. Current State<a class="headerlink" href="#3-current-state" title="Permanent link">&para;</a></h2>
+<h3 id="31-architecture-diagram">3.1 Architecture Diagram<a class="headerlink" href="#31-architecture-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                      QwenPipeline
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                    (Phases 1-4, 6-9 shared)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                           │
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>          ┌────────────────┼────────────────────┐
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>          │                │                     │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    ┌─────┴──────┐   ┌────┴─────┐   ┌──────────┴──────────┐
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    │  ASSEMBLY   │   │ CONTEXT  │   │     VAD_SLICING      │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    │  (60 LOC)   │   │ _AWARE   │   │     (434 LOC)        │
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    │  Delegates  │   │ (130 LOC)│   │  Inline procedural   │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    │  to orch.   │   │ Inline   │   │  w/ step-down retry  │
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    └─────┬───────┘   └────┬─────┘   └──────────┬───────────┘
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>          │                │                     │
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    ┌─────┴─────────┐     │                     │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    │subtitle_pipeline│    │                     │
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    │ (orchestrator) ├─────┤─────────────────────┤
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    │ + hardening    │  (shared: hardening, reconstruction, types)
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    └───────────────┘
+</code></pre></div>
+<h3 id="32-three-features-the-vision-requires-that-also-happen-to-exist-in-legacy">3.2 Three Features the Vision Requires (That Also Happen to Exist in Legacy)<a class="headerlink" href="#32-three-features-the-vision-requires-that-also-happen-to-exist-in-legacy" title="Permanent link">&para;</a></h3>
+<p>These are NOT "features to port from coupled modes." These are <strong>features the vision demands</strong> that the decoupled pipeline must have regardless of whether legacy modes exist:</p>
+<table>
+<thead>
+<tr>
+<th>Vision Requirement</th>
+<th>Current Gap</th>
+<th>Gap ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Context propagation</strong> — user-provided cast names, terminology, domain hints must reach the text generator</td>
+<td>Orchestrator constructor has no <code>context</code> parameter; <code>_step2_4_generate_and_clean()</code> doesn't pass context to <code>generate_batch()</code></td>
+<td>BRK-4</td>
+</tr>
+<tr>
+<td><strong>Flexible temporal framing</strong> — different content needs different framing strategies (full-scene for clean audio, VAD-grouped for noisy/multi-speaker)</td>
+<td><code>_build_subtitle_pipeline()</code> hardcodes <code>FullSceneFramer</code> (line 365). Orchestrator supports any framer, but the wiring doesn't expose the choice.</td>
+<td>GAP-5</td>
+</tr>
+<tr>
+<td><strong>Step-down retry</strong> — when forced alignment collapses, automatically re-process with tighter framing</td>
+<td>Orchestrator has no retry logic. This capability exists only in VAD_SLICING's inline code (~434 LOC).</td>
+<td>GAP-2</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Once these three features are built into the orchestrator, the decoupled pipeline delivers the full vision. The coupled modes have zero remaining value.</strong></p>
+<hr />
+<h2 id="4-target-state-the-vision-delivered">4. Target State: The Vision Delivered<a class="headerlink" href="#4-target-state-the-vision-delivered" title="Permanent link">&para;</a></h2>
+<h3 id="41-architecture-diagram">4.1 Architecture Diagram<a class="headerlink" href="#41-architecture-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>                      QwenPipeline                DecoupledPipeline
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                   (backward compat)              (vision entry point)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                           │                            │
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                           └────────────┬───────────────┘
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                                        │
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>                                 ┌──────┴──────┐
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>                                 │ subtitle_   │
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>                                 │ pipeline    │
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>                                 │ orchestrator│
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>                                 │             │
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>                                 │ + context   │
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>                                 │ + step-down │
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>                                 │ + any framer│
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>                                 └──────┬──────┘
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>                                        │
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>                  ┌─────────────────────┼──────────────────────┐
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>                  │                     │                       │
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>           ┌──────┴──────┐      ┌──────┴──────┐      ┌────────┴────────┐
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>           │ full-scene   │      │ vad-grouped  │      │ future:         │
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>           │ framer       │      │ framer       │      │ whisper-segment │
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>           │              │      │ + step-down  │      │ srt-source      │
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>           └──────────────┘      └──────────────┘      └─────────────────┘
+</code></pre></div>
+<h3 id="42-what-vision-delivered-means">4.2 What "Vision Delivered" Means<a class="headerlink" href="#42-what-vision-delivered-means" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>One orchestrator</strong> for all configurations — zero inline mode-specific ASR code</li>
+<li><strong>Context propagation</strong> works for all configurations</li>
+<li><strong>Step-down retry</strong> in orchestrator — available to any framer that supports reframing</li>
+<li><strong>Mid-pipeline text cleaning</strong> applies to all configurations (the architectural advantage that makes this worth doing)</li>
+<li><strong>Generic entry point</strong> (<code>DecoupledPipeline</code>) — user selects components via CLI/YAML, no code changes</li>
+<li><strong>New models</strong> added by registering one TextGenerator backend — orchestrator unchanged</li>
+<li><strong>Coupled mode code deleted</strong> — ~600 LOC removed from qwen_pipeline.py</li>
+<li><strong>Adding the next ASR model</strong>:</li>
+<li>Write one <code>TextGenerator</code> class (~100-200 lines)</li>
+<li>Optionally write one <code>TextCleaner</code> for model-specific artifacts</li>
+<li>Register both in their respective factories (one line each)</li>
+<li>User selects the new model via CLI/GUI</li>
+<li>No orchestrator changes. No hardening changes. No framer changes.</li>
+</ol>
+<hr />
+<h2 id="5-phase-overview-strangulation-milestones">5. Phase Overview &amp; Strangulation Milestones<a class="headerlink" href="#5-phase-overview-strangulation-milestones" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Phase 1 (Parity) ──→ Phase 2 (Superiority &amp; Expansion) ──→ Phase 3 (Strangulation)
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>                           │                │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                      Workstream A      Workstream B
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                      (Step-Down)    (Generic Entry Point)
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                      [independent]    [independent]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Objective</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1: Assembly Parity</strong></td>
+<td>Build context propagation + framer flexibility into orchestrator. Assembly becomes functionally equivalent to coupled modes (except step-down). <strong>Assembly becomes the default mode.</strong></td>
+<td>Small-Medium</td>
+</tr>
+<tr>
+<td><strong>2: Superiority &amp; Vision Enablement</strong></td>
+<td>Two parallel workstreams: (A) Step-down retry makes Assembly superior to VAD_SLICING. (B) Generic DecoupledPipeline enables any-model deployment.</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>3: Strangulation</strong></td>
+<td>Delete all coupled mode code. Update ensemble/GUI. Coupled modes cease to exist.</td>
+<td>Small</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Each phase is independently valuable and independently shippable.</strong></p>
+<h3 id="strangulation-milestones">Strangulation Milestones<a class="headerlink" href="#strangulation-milestones" title="Permanent link">&para;</a></h3>
+<p>These are non-negotiable deliverables at each phase boundary. They are what makes the strategy real, not just a label.</p>
+<table>
+<thead>
+<tr>
+<th>Phase Exit</th>
+<th>Strangulation Milestone</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Phase 1</strong></td>
+<td><strong>Assembly is the default mode.</strong></td>
+<td>Change <code>qwen_input_mode</code> default from <code>"vad_slicing"</code> to <code>"assembly"</code> in constructor, CLI, and GUI. Coupled modes still work but are no longer the default path.</td>
+</tr>
+<tr>
+<td><strong>Phase 2</strong></td>
+<td><strong>Coupled modes have zero unique value.</strong></td>
+<td>Assembly + vad-grouped + step-down ≥ VAD_SLICING in every dimension. Assembly + full-scene ≥ CONTEXT_AWARE. Log a deprecation warning when coupled modes are explicitly selected.</td>
+</tr>
+<tr>
+<td><strong>Phase 3</strong></td>
+<td><strong>Coupled mode code is deleted.</strong></td>
+<td>Remove <code>CONTEXT_AWARE</code> and <code>VAD_SLICING</code> enum values, delete ~600 LOC of inline Phase 5 code, delete <code>_transcribe_speech_regions()</code>. Old mode names in CLI map to assembly + appropriate framer config (backward-compat mapping, not coupled code).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-phase-1-assembly-parity">6. Phase 1: Assembly Parity<a class="headerlink" href="#6-phase-1-assembly-parity" title="Permanent link">&para;</a></h2>
+<h3 id="61-objective">6.1 Objective<a class="headerlink" href="#61-objective" title="Permanent link">&para;</a></h3>
+<p>Build context propagation and framer flexibility into the decoupled pipeline — two features the vision requires. After this phase, Assembly can do everything coupled modes can do except step-down retry. <strong>Assembly becomes the default mode.</strong></p>
+<h3 id="62-prerequisites">6.2 Prerequisites<a class="headerlink" href="#62-prerequisites" title="Permanent link">&para;</a></h3>
+<p>None. This is the starting point.</p>
+<h3 id="63-task-11-fix-context-propagation-in-orchestrator-brk-4">6.3 Task 1.1: Fix Context Propagation in Orchestrator (BRK-4)<a class="headerlink" href="#63-task-11-fix-context-propagation-in-orchestrator-brk-4" title="Permanent link">&para;</a></h3>
+<p><strong>Why (vision framing)</strong>: Context propagation is essential for real-world ASR quality. Every model benefits from hints about expected content. The <code>TextGenerator</code> protocol already accepts <code>context</code> — the orchestrator just doesn't pass it through. This is a gap in the vision's infrastructure, not a "coupled mode feature to port."</p>
+<p><strong>Files to change</strong>:
+- <code>whisperjav/modules/subtitle_pipeline/orchestrator.py</code>
+- <code>whisperjav/pipelines/qwen_pipeline.py</code></p>
+<p><strong>Changes to orchestrator.py</strong>:</p>
+<ol>
+<li>Add <code>context: str = ""</code> parameter to <code>__init__()</code> (after <code>language</code>, line 68):</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">framer</span><span class="p">:</span> <span class="n">TemporalFramer</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">generator</span><span class="p">:</span> <span class="n">TextGenerator</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">cleaner</span><span class="p">:</span> <span class="n">TextCleaner</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">aligner</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextAligner</span><span class="p">],</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">hardening_config</span><span class="p">:</span> <span class="n">HardeningConfig</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">artifacts_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">context</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>          <span class="c1"># User context for ASR (cast names, terminology)</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="p">):</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="o">...</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span>
+</code></pre></div>
+<ol>
+<li>In <code>_step2_4_generate_and_clean()</code>, pass context to generation calls.</li>
+</ol>
+<p>Batch generation path (around line 300):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">gen_contexts</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">gen_audio_paths</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">gen_results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generator</span><span class="o">.</span><span class="n">generate_batch</span><span class="p">(</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">audio_paths</span><span class="o">=</span><span class="n">gen_audio_paths</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">language</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">language</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">contexts</span><span class="o">=</span><span class="n">gen_contexts</span><span class="p">,</span>                    <span class="c1"># NEW</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">audio_durations</span><span class="o">=</span><span class="p">[</span><span class="n">frames</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">duration</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">gen_indices</span><span class="p">],</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">)</span>
+</code></pre></div>
+<p>Per-frame fallback path (around line 316):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generator</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">audio_path</span><span class="o">=</span><span class="n">gen_audio_paths</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">language</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">language</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>    <span class="c1"># NEW</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Changes to qwen_pipeline.py</strong>:</p>
+<p>In <code>_build_subtitle_pipeline()</code> (line 406), pass context:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">return</span> <span class="n">DecoupledSubtitlePipeline</span><span class="p">(</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">framer</span><span class="o">=</span><span class="n">framer</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">cleaner</span><span class="o">=</span><span class="n">cleaner</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">aligner</span><span class="o">=</span><span class="n">aligner</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">hardening_config</span><span class="o">=</span><span class="n">HardeningConfig</span><span class="p">(</span><span class="n">timestamp_mode</span><span class="o">=</span><span class="n">new_ts_mode</span><span class="p">),</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">language</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;language&quot;</span><span class="p">,</span> <span class="s2">&quot;ja&quot;</span><span class="p">),</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">context</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>    <span class="c1"># NEW</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Acceptance criteria</strong>:
+- [ ] User-provided <code>--context</code> reaches the TextGenerator in assembly mode
+- [ ] Context is passed to both batch and per-frame generation paths
+- [ ] Empty context (<code>""</code>) produces no errors or unnecessary parameter passing</p>
+<p><strong>Test</strong>: Construct orchestrator with <code>context="test"</code>. Mock generator. Assert <code>generate_batch()</code> receives <code>contexts=["test", ...]</code>.</p>
+<h3 id="64-task-12-wire-framer-selection-to-assembly-mode-gap-5">6.4 Task 1.2: Wire Framer Selection to Assembly Mode (GAP-5)<a class="headerlink" href="#64-task-12-wire-framer-selection-to-assembly-mode-gap-5" title="Permanent link">&para;</a></h3>
+<p><strong>Why (vision framing)</strong>: The vision requires flexible temporal framing — different content needs different strategies. The orchestrator already supports any framer via the TemporalFramer protocol, but <code>_build_subtitle_pipeline()</code> hardcodes <code>FullSceneFramer</code> (line 365). Exposing framer selection allows the decoupled pipeline to handle the same use cases as VAD_SLICING, immediately making that legacy mode redundant for daily use (except step-down).</p>
+<p><strong>Files to change</strong>:
+- <code>whisperjav/pipelines/qwen_pipeline.py</code> — constructor + <code>_build_subtitle_pipeline()</code>
+- <code>whisperjav/main.py</code> — CLI argument</p>
+<p><strong>Changes to qwen_pipeline.py</strong>:</p>
+<ol>
+<li>Add <code>qwen_framer: str = "full-scene"</code> parameter to constructor:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="o">...</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">qwen_framer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;full-scene&quot;</span><span class="p">,</span>    <span class="c1"># &quot;full-scene&quot;, &quot;vad-grouped&quot;, &quot;srt-source&quot;, &quot;manual&quot;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="o">...</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">):</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="o">...</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">framer_backend</span> <span class="o">=</span> <span class="n">qwen_framer</span>
+</code></pre></div>
+<ol>
+<li>In <code>_build_subtitle_pipeline()</code>, replace the hardcoded framer creation (line 365):</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># BEFORE:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">framer</span> <span class="o">=</span> <span class="n">TemporalFramerFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;full-scene&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># AFTER:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">framer_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">framer_backend</span> <span class="o">==</span> <span class="s2">&quot;vad-grouped&quot;</span><span class="p">:</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">framer_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>        <span class="s2">&quot;segmenter_backend&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">segmenter_backend</span><span class="p">,</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>        <span class="s2">&quot;max_group_duration_s&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">segmenter_max_group_duration</span><span class="p">,</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>        <span class="s2">&quot;segmenter_config&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">segmenter_config</span><span class="p">,</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="p">}</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">framer_backend</span> <span class="o">==</span> <span class="s2">&quot;srt-source&quot;</span><span class="p">:</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;framer_srt_path&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">framer_srt_path</span><span class="p">:</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;--qwen-framer srt-source requires --qwen-framer-srt-path&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>    <span class="n">framer_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;srt_path&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">framer_srt_path</span><span class="p">}</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="n">framer</span> <span class="o">=</span> <span class="n">TemporalFramerFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">framer_backend</span><span class="p">,</span> <span class="o">**</span><span class="n">framer_kwargs</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Changes to main.py</strong>:</p>
+<p>Add to <code>qwen_group</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">qwen_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--qwen-framer&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;full-scene&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>                        <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;full-scene&quot;</span><span class="p">,</span> <span class="s2">&quot;vad-grouped&quot;</span><span class="p">,</span> <span class="s2">&quot;srt-source&quot;</span><span class="p">,</span> <span class="s2">&quot;manual&quot;</span><span class="p">],</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Temporal framing for assembly mode: &quot;</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>                             <span class="s2">&quot;&#39;full-scene&#39; (default), &#39;vad-grouped&#39; (VAD dialogue chunks)&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">qwen_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--qwen-framer-srt-path&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;SRT file path for srt-source framer&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Wire to pipeline construction:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="s2">&quot;qwen_framer&quot;</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;qwen_framer&#39;</span><span class="p">,</span> <span class="s1">&#39;full-scene&#39;</span><span class="p">),</span>
+</code></pre></div>
+<p><strong>Acceptance criteria</strong>:
+- [ ] <code>--qwen-input-mode assembly --qwen-framer full-scene</code> produces identical results to current assembly
+- [ ] <code>--qwen-input-mode assembly --qwen-framer vad-grouped</code> runs the orchestrator with VadGroupedFramer
+- [ ] VadGroupedFramer respects <code>--speech-segmenter</code>, <code>--qwen-max-group-duration</code> settings
+- [ ] <code>--qwen-framer srt-source --qwen-framer-srt-path path.srt</code> works</p>
+<p><strong>Test</strong>: Run same audio through <code>assembly + vad-grouped</code> and <code>vad_slicing</code>. Compare segment count and timing coverage (not identical — different code paths — but comparable).</p>
+<h3 id="65-task-13-switch-default-mode-to-assembly">6.5 Task 1.3: Switch Default Mode to Assembly<a class="headerlink" href="#65-task-13-switch-default-mode-to-assembly" title="Permanent link">&para;</a></h3>
+<p><strong>Why</strong>: This is the first strangulation milestone. Assembly is now functionally equivalent to coupled modes for daily use. Making it the default steers all users toward the architecture that can actually deliver quality results (mid-pipeline text cleaning prevents aligner collapse).</p>
+<p><strong>Files to change</strong>:
+- <code>whisperjav/pipelines/qwen_pipeline.py</code> — constructor default + fallback
+- <code>whisperjav/main.py</code> — CLI default
+- <code>whisperjav/webview_gui/assets/app.js</code> — GUI default</p>
+<p><strong>Changes</strong>:</p>
+<ol>
+<li>
+<p>Constructor default (line ~150):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># BEFORE:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">qwen_input_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;vad_slicing&quot;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># AFTER:</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">qwen_input_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;assembly&quot;</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Fallback mode (line 215):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># BEFORE:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="bp">self</span><span class="o">.</span><span class="n">input_mode</span> <span class="o">=</span> <span class="n">InputMode</span><span class="o">.</span><span class="n">CONTEXT_AWARE</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># AFTER:</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="bp">self</span><span class="o">.</span><span class="n">input_mode</span> <span class="o">=</span> <span class="n">InputMode</span><span class="o">.</span><span class="n">ASSEMBLY</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>CLI default in <code>main.py</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># BEFORE:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">default</span><span class="o">=</span><span class="s2">&quot;vad_slicing&quot;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># AFTER:</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">default</span><span class="o">=</span><span class="s2">&quot;assembly&quot;</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>GUI default in <code>app.js</code>: Update the Qwen input mode selector default.</p>
+</li>
+<li>
+<p>Add warning when coupled modes are explicitly selected:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_mode</span> <span class="ow">in</span> <span class="p">(</span><span class="n">InputMode</span><span class="o">.</span><span class="n">CONTEXT_AWARE</span><span class="p">,</span> <span class="n">InputMode</span><span class="o">.</span><span class="n">VAD_SLICING</span><span class="p">):</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>        <span class="s2">&quot;input_mode=&#39;</span><span class="si">%s</span><span class="s2">&#39; uses legacy coupled architecture. &quot;</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>        <span class="s2">&quot;For best quality, use input_mode=&#39;assembly&#39; with --qwen-framer. &quot;</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>        <span class="s2">&quot;Coupled modes will be removed in a future release.&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">input_mode</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="p">)</span>
+</code></pre></div></p>
+</li>
+</ol>
+<p><strong>Acceptance criteria</strong>:
+- [ ] Running <code>whisperjav video.mp4 --mode qwen</code> without <code>--qwen-input-mode</code> uses Assembly
+- [ ] Running with <code>--qwen-input-mode vad_slicing</code> still works but logs a warning
+- [ ] GUI defaults to Assembly</p>
+<h3 id="66-task-14-minor-cleanups">6.6 Task 1.4: Minor Cleanups<a class="headerlink" href="#66-task-14-minor-cleanups" title="Permanent link">&para;</a></h3>
+<p>Small, low-risk changes done alongside the main tasks:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CON-1: Duplicate TimestampMode</td>
+<td><code>qwen_pipeline.py</code></td>
+<td>Delete local enum (lines 85-117), import from <code>subtitle_pipeline.types</code></td>
+</tr>
+<tr>
+<td>CON-3: Inline VRAM cleanup</td>
+<td><code>qwen_pipeline.py</code></td>
+<td>Replace <code>gc.collect() + torch.cuda.empty_cache()</code> (lines 569-575, 981-986) with <code>safe_cuda_cleanup()</code></td>
+</tr>
+<tr>
+<td>ANO-2: Fallback mode mismatch</td>
+<td><code>qwen_pipeline.py:215</code></td>
+<td>Change fallback to <code>InputMode.ASSEMBLY</code> (done in Task 1.3)</td>
+</tr>
+<tr>
+<td>ANO-5: Stale docstring</td>
+<td><code>qwen_pipeline.py:9</code></td>
+<td>"8-Phase" → "9-Phase"</td>
+</tr>
+<tr>
+<td>ANO-1: Future version refs</td>
+<td><code>qwen_pipeline.py</code></td>
+<td>Remove misleading <code>v1.8.7+</code>, <code>v1.8.9+</code>, <code>v1.8.10+</code> annotations</td>
+</tr>
+</tbody>
+</table>
+<h3 id="67-phase-1-exit-criteria">6.7 Phase 1 Exit Criteria<a class="headerlink" href="#67-phase-1-exit-criteria" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Context propagation works in orchestrator (BRK-4 closed)</li>
+<li>[ ] Framer selection exposed in assembly mode (GAP-5 closed)</li>
+<li>[ ] Assembly is the default mode in constructor, CLI, and GUI</li>
+<li>[ ] Coupled modes log deprecation warning when explicitly selected</li>
+<li>[ ] Minor cleanups complete (CON-1, CON-3, ANO-1, ANO-2, ANO-5)</li>
+<li>[ ] <code>pytest tests/</code> passes</li>
+<li>[ ] <code>ruff check whisperjav/</code> passes</li>
+</ul>
+<p><strong>Strangulation milestone achieved</strong>: Assembly is the default. Users must opt-in to legacy modes.</p>
+<hr />
+<h2 id="7-phase-2-superiority-vision-enablement">7. Phase 2: Superiority &amp; Vision Enablement<a class="headerlink" href="#7-phase-2-superiority-vision-enablement" title="Permanent link">&para;</a></h2>
+<h3 id="71-objective">7.1 Objective<a class="headerlink" href="#71-objective" title="Permanent link">&para;</a></h3>
+<p>Two parallel, independent workstreams:</p>
+<ul>
+<li><strong>Workstream A (Step-Down)</strong>: Add step-down retry to the orchestrator. Makes Assembly provably superior to VAD_SLICING in every dimension.</li>
+<li><strong>Workstream B (Generic Entry Point)</strong>: Create the <code>DecoupledPipeline</code> class — the configuration-driven pipeline that enables any-model deployment. This is the vision's core deliverable.</li>
+</ul>
+<p>These are independent because:
+- The <code>DecoupledPipeline</code> class doesn't need step-down to be useful (new models can ship without it)
+- Step-down doesn't need the <code>DecoupledPipeline</code> class (QwenPipeline already uses the orchestrator)
+- Both depend only on Phase 1 (framer flexibility + context propagation)</p>
+<h3 id="72-prerequisites">7.2 Prerequisites<a class="headerlink" href="#72-prerequisites" title="Permanent link">&para;</a></h3>
+<p>Phase 1 complete (framer flexibility is required for step-down; context propagation is required for the generic entry point to be complete).</p>
+<hr />
+<h3 id="workstream-a-step-down-retry-in-orchestrator">Workstream A: Step-Down Retry in Orchestrator<a class="headerlink" href="#workstream-a-step-down-retry-in-orchestrator" title="Permanent link">&para;</a></h3>
+<h3 id="73-how-step-down-works-today-vad_slicing">7.3 How Step-Down Works Today (VAD_SLICING)<a class="headerlink" href="#73-how-step-down-works-today-vad_slicing" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>1. Group speech segments into Tier 1 groups (e.g., 6s max)
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>2. Transcribe each group (coupled ASR — text + alignment as one atomic call)
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>3. If sentinel detects COLLAPSED: defer recovery, queue raw segments
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>4. Re-group collapsed segments into Tier 2 groups (tighter)
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>5. Transcribe Tier 2 groups
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>6. If still collapsed: apply proportional recovery (last resort)
+</code></pre></div>
+<p>This logic lives in <code>_transcribe_speech_regions()</code> (lines 1171-1605, 434 LOC of inline code). It is valuable but trapped inside legacy code that is architecturally constrained.</p>
+<h3 id="74-how-step-down-should-work-in-the-orchestrator">7.4 How Step-Down Should Work in the Orchestrator<a class="headerlink" href="#74-how-step-down-should-work-in-the-orchestrator" title="Permanent link">&para;</a></h3>
+<p>The orchestrator processes all scenes in batch. Step-down is a <strong>second-pass retry</strong> for collapsed scenes:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Pass 1 (normal):
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  framer.frame() all scenes
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>  generator.load() → generate ALL scenes → generator.unload()
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>  cleaner.clean_batch()
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>  aligner.load() → align ALL scenes → aligner.unload()
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>  sentinel: identify collapsed scenes → collect indices
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>Pass 2 (step-down, only for collapsed scenes):
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>  Re-frame collapsed scenes with tighter framer parameters
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>  generator.load() → generate retried frames → generator.unload()
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>  cleaner.clean_batch()
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>  aligner.load() → align retried frames → aligner.unload()
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>  sentinel: final assessment
+<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>  If still collapsed: proportional recovery (last resort)
+<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>
+<a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>Replace Pass 1 results for retried scenes with Pass 2 results
+</code></pre></div>
+<p><strong>Why batched retry</strong>: This preserves the VRAM-efficient batch load/unload pattern. Per-scene VRAM loading would be too slow.</p>
+<h3 id="75-task-2a1-add-stepdownconfig-type">7.5 Task 2A.1: Add StepDownConfig Type<a class="headerlink" href="#75-task-2a1-add-stepdownconfig-type" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/modules/subtitle_pipeline/types.py</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">StepDownConfig</span><span class="p">:</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Configuration for step-down retry on alignment collapse.&quot;&quot;&quot;</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">fallback_max_group_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">6.0</span>   <span class="c1"># Tighter grouping for retry</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>                <span class="c1"># Number of retry passes</span>
+</code></pre></div>
+<h3 id="76-task-2a2-add-reframe-to-vadgroupedframer">7.6 Task 2A.2: Add <code>reframe()</code> to VadGroupedFramer<a class="headerlink" href="#76-task-2a2-add-reframe-to-vadgroupedframer" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/modules/subtitle_pipeline/framers/vad_grouped.py</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">reframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>            <span class="n">max_group_duration_s</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FramingResult</span><span class="p">:</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Re-frame with tighter grouping parameters (for step-down retry).&quot;&quot;&quot;</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">original</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_group_duration_s</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">max_group_duration_s</span> <span class="o">=</span> <span class="n">max_group_duration_s</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="k">finally</span><span class="p">:</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">max_group_duration_s</span> <span class="o">=</span> <span class="n">original</span>
+</code></pre></div>
+<h3 id="77-task-2a3-implement-batched-step-down-in-orchestrator">7.7 Task 2A.3: Implement Batched Step-Down in Orchestrator<a class="headerlink" href="#77-task-2a3-implement-batched-step-down-in-orchestrator" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/modules/subtitle_pipeline/orchestrator.py</code></p>
+<p>This is the most significant change in the plan. The orchestrator needs:</p>
+<ol>
+<li>
+<p><strong>Constructor</strong>: Accept <code>stepdown_config: Optional[StepDownConfig] = None</code></p>
+</li>
+<li>
+<p><strong>Refactor <code>process_scenes()</code> into <code>_run_pass()</code></strong>: Extract the current body (steps 1-9) into <code>_run_pass()</code>. This is a pure refactor — no new logic. <code>process_scenes()</code> becomes the outer driver that calls <code>_run_pass()</code> and then optionally runs step-down.</p>
+</li>
+<li>
+<p><strong>Add step-down logic to <code>process_scenes()</code></strong>:</p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_scenes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scene_audio_paths</span><span class="p">,</span> <span class="n">scene_durations</span><span class="p">,</span> <span class="n">scene_speech_regions</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="c1"># --- Pass 1: Normal processing ---</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="n">results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_pass</span><span class="p">(</span><span class="n">scene_audio_paths</span><span class="p">,</span> <span class="n">scene_durations</span><span class="p">,</span> <span class="n">scene_speech_regions</span><span class="p">)</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="c1"># --- Pass 2: Step-down retry for collapsed scenes ---</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepdown_config</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">stepdown_config</span><span class="o">.</span><span class="n">enabled</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">framer</span><span class="p">,</span> <span class="s1">&#39;reframe&#39;</span><span class="p">):</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>        <span class="n">collapsed_indices</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>            <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">diag</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_collapsed</span><span class="p">(</span><span class="n">diag</span><span class="p">)</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>        <span class="p">]</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>        <span class="k">if</span> <span class="n">collapsed_indices</span><span class="p">:</span>
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>                <span class="s2">&quot;[DecoupledPipeline] Step-down: </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> scenes collapsed, &quot;</span>
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>                <span class="s2">&quot;retrying with tighter framing (</span><span class="si">%.1f</span><span class="s2">s max group)&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>                <span class="nb">len</span><span class="p">(</span><span class="n">collapsed_indices</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">),</span>
+<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">stepdown_config</span><span class="o">.</span><span class="n">fallback_max_group_s</span><span class="p">,</span>
+<a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a>            <span class="p">)</span>
+<a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a>            <span class="n">retry_results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_stepdown_pass</span><span class="p">(</span>
+<a id="__codelineno-19-20" name="__codelineno-19-20" href="#__codelineno-19-20"></a>                <span class="n">collapsed_indices</span><span class="p">,</span> <span class="n">scene_audio_paths</span><span class="p">,</span> <span class="n">scene_durations</span><span class="p">,</span> <span class="n">scene_speech_regions</span><span class="p">,</span>
+<a id="__codelineno-19-21" name="__codelineno-19-21" href="#__codelineno-19-21"></a>            <span class="p">)</span>
+<a id="__codelineno-19-22" name="__codelineno-19-22" href="#__codelineno-19-22"></a>            <span class="c1"># Replace original results with retry results</span>
+<a id="__codelineno-19-23" name="__codelineno-19-23" href="#__codelineno-19-23"></a>            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">retry_result</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">collapsed_indices</span><span class="p">,</span> <span class="n">retry_results</span><span class="p">):</span>
+<a id="__codelineno-19-24" name="__codelineno-19-24" href="#__codelineno-19-24"></a>                <span class="n">results</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">retry_result</span>
+<a id="__codelineno-19-25" name="__codelineno-19-25" href="#__codelineno-19-25"></a>
+<a id="__codelineno-19-26" name="__codelineno-19-26" href="#__codelineno-19-26"></a>    <span class="k">return</span> <span class="n">results</span>
+</code></pre></div>
+<ol>
+<li><strong><code>_run_stepdown_pass()</code></strong>: New method that re-frames collapsed scenes:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_run_stepdown_pass</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">collapsed_indices</span><span class="p">,</span> <span class="n">scene_audio_paths</span><span class="p">,</span> <span class="n">scene_durations</span><span class="p">,</span> <span class="n">scene_speech_regions</span><span class="p">):</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Re-process collapsed scenes with tighter framing.&quot;&quot;&quot;</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="n">retry_audio_paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">scene_audio_paths</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">collapsed_indices</span><span class="p">]</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="n">retry_durations</span> <span class="o">=</span> <span class="p">[</span><span class="n">scene_durations</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">collapsed_indices</span><span class="p">]</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    <span class="n">retry_speech_regions</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>        <span class="p">[</span><span class="n">scene_speech_regions</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">collapsed_indices</span><span class="p">]</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>        <span class="k">if</span> <span class="n">scene_speech_regions</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="p">)</span>
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_pass</span><span class="p">(</span>
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>        <span class="n">retry_audio_paths</span><span class="p">,</span> <span class="n">retry_durations</span><span class="p">,</span> <span class="n">retry_speech_regions</span><span class="p">,</span>
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>        <span class="n">framer_override_max_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">stepdown_config</span><span class="o">.</span><span class="n">fallback_max_group_s</span><span class="p">,</span>
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>    <span class="p">)</span>
+</code></pre></div>
+<ol>
+<li><strong><code>_run_pass()</code></strong>: Accepts optional <code>framer_override_max_group</code> parameter. When present, calls <code>framer.reframe(audio, sr, max_group_duration_s=override)</code> instead of <code>framer.frame(audio, sr)</code>.</li>
+</ol>
+<p><strong>Implementation order</strong> (minimize regression risk):
+1. Extract <code>_run_pass()</code> as pure refactor — <code>process_scenes()</code> calls it, behavior identical
+2. Add <code>stepdown_config</code> to constructor (no-op when disabled)
+3. Add step-down logic
+4. Test</p>
+<p><strong>Estimated complexity</strong>: ~100-150 lines of new orchestrator code, plus refactoring existing <code>process_scenes()</code> into <code>_run_pass()</code>.</p>
+<h3 id="78-task-2a4-wire-step-down-to-qwenpipeline">7.8 Task 2A.4: Wire Step-Down to QwenPipeline<a class="headerlink" href="#78-task-2a4-wire-step-down-to-qwenpipeline" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/pipelines/qwen_pipeline.py</code></p>
+<p>In <code>_build_subtitle_pipeline()</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">whisperjav.modules.subtitle_pipeline.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">StepDownConfig</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">stepdown_cfg</span> <span class="o">=</span> <span class="n">StepDownConfig</span><span class="p">(</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">enabled</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">framer_backend</span> <span class="o">==</span> <span class="s2">&quot;vad-grouped&quot;</span><span class="p">,</span>  <span class="c1"># Step-down only makes sense with VAD framing</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>    <span class="n">fallback_max_group_s</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">stepdown_fallback_group</span><span class="p">,</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="p">)</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="k">return</span> <span class="n">DecoupledSubtitlePipeline</span><span class="p">(</span>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>    <span class="o">...</span><span class="p">,</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>    <span class="n">stepdown_config</span><span class="o">=</span><span class="n">stepdown_cfg</span><span class="p">,</span>
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="79-task-2a5-define-canonical-diagnostics-schema">7.9 Task 2A.5: Define Canonical Diagnostics Schema<a class="headerlink" href="#79-task-2a5-define-canonical-diagnostics-schema" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/modules/subtitle_pipeline/types.py</code></p>
+<p>Add a <code>SceneDiagnostics</code> dataclass that all paths produce:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">SceneDiagnostics</span><span class="p">:</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Canonical per-scene diagnostics.&quot;&quot;&quot;</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="n">schema_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;2.0.0&quot;</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="n">scene_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="n">scene_duration_sec</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">framer_backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>    <span class="n">frame_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>    <span class="n">word_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>    <span class="n">segment_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>    <span class="n">sentinel_status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;N/A&quot;</span>
+<a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>    <span class="n">sentinel_triggers</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+<a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a>    <span class="n">sentinel_recovery</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>    <span class="n">timing_aligner_native</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a>    <span class="n">timing_interpolated</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-16" name="__codelineno-22-16" href="#__codelineno-22-16"></a>    <span class="n">timing_vad_fallback</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-17" name="__codelineno-22-17" href="#__codelineno-22-17"></a>    <span class="n">timing_total_segments</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-18" name="__codelineno-22-18" href="#__codelineno-22-18"></a>    <span class="n">hardening_clamped</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-22-19" name="__codelineno-22-19" href="#__codelineno-22-19"></a>    <span class="n">hardening_sorted</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-22-20" name="__codelineno-22-20" href="#__codelineno-22-20"></a>    <span class="n">stepdown</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>    <span class="c1"># {&quot;attempted&quot;: True, &quot;improved&quot;: True/False}</span>
+<a id="__codelineno-22-21" name="__codelineno-22-21" href="#__codelineno-22-21"></a>    <span class="n">vad_regions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-22-22" name="__codelineno-22-22" href="#__codelineno-22-22"></a>    <span class="n">group_details</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-22-23" name="__codelineno-22-23" href="#__codelineno-22-23"></a>    <span class="n">error</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+<p>Update orchestrator step 9 to build <code>SceneDiagnostics</code> instead of ad-hoc dict.</p>
+<p><strong>Acceptance criteria for Workstream A</strong>:
+- [ ] Step-down triggers only for collapsed scenes (sentinel-detected)
+- [ ] Retried scenes use tighter framing parameters
+- [ ] VRAM lifecycle preserved (batch load/unload, not per-scene)
+- [ ] Proportional recovery is last resort (if still collapsed after retry)
+- [ ] Normal (non-collapsed) processing is unaffected
+- [ ] Assembly + vad-grouped + step-down produces comparable or better results than VAD_SLICING on the same audio</p>
+<hr />
+<h3 id="workstream-b-generic-pipeline-entry-point">Workstream B: Generic Pipeline Entry Point<a class="headerlink" href="#workstream-b-generic-pipeline-entry-point" title="Permanent link">&para;</a></h3>
+<h3 id="710-task-2b1-create-decoupledpipeline-class">7.10 Task 2B.1: Create DecoupledPipeline Class<a class="headerlink" href="#710-task-2b1-create-decoupledpipeline-class" title="Permanent link">&para;</a></h3>
+<p><strong>New file</strong>: <code>whisperjav/pipelines/decoupled_pipeline.py</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">DecoupledPipeline</span><span class="p">(</span><span class="n">BasePipeline</span><span class="p">):</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="sd">    Configuration-driven pipeline using the DecoupledSubtitlePipeline orchestrator.</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="sd">    Phases 1-4 and 6-9 are standard (shared with QwenPipeline).</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="sd">    Phase 5 delegates to the orchestrator with user-selected component backends.</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="sd">    This is the forward-looking entry point for all ASR models.</span>
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="sd">    QwenPipeline remains for Qwen3-specific backward compatibility.</span>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>        <span class="c1"># Component backend selection</span>
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>        <span class="n">generator_backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;qwen3&quot;</span><span class="p">,</span>
+<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>        <span class="n">framer_backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;full-scene&quot;</span><span class="p">,</span>
+<a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a>        <span class="n">cleaner_backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;qwen3&quot;</span><span class="p">,</span>
+<a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a>        <span class="n">aligner_backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;qwen3&quot;</span><span class="p">,</span>
+<a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a>
+<a id="__codelineno-23-20" name="__codelineno-23-20" href="#__codelineno-23-20"></a>        <span class="c1"># Component-specific configs (passed to factory.create())</span>
+<a id="__codelineno-23-21" name="__codelineno-23-21" href="#__codelineno-23-21"></a>        <span class="n">generator_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-23-22" name="__codelineno-23-22" href="#__codelineno-23-22"></a>        <span class="n">framer_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-23-23" name="__codelineno-23-23" href="#__codelineno-23-23"></a>        <span class="n">cleaner_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-23-24" name="__codelineno-23-24" href="#__codelineno-23-24"></a>        <span class="n">aligner_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-23-25" name="__codelineno-23-25" href="#__codelineno-23-25"></a>
+<a id="__codelineno-23-26" name="__codelineno-23-26" href="#__codelineno-23-26"></a>        <span class="c1"># Pipeline-level config</span>
+<a id="__codelineno-23-27" name="__codelineno-23-27" href="#__codelineno-23-27"></a>        <span class="n">timestamp_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;aligner_interpolation&quot;</span><span class="p">,</span>
+<a id="__codelineno-23-28" name="__codelineno-23-28" href="#__codelineno-23-28"></a>        <span class="n">stepdown_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-23-29" name="__codelineno-23-29" href="#__codelineno-23-29"></a>        <span class="n">stepdown_fallback_group_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">6.0</span><span class="p">,</span>
+<a id="__codelineno-23-30" name="__codelineno-23-30" href="#__codelineno-23-30"></a>        <span class="n">context</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+<a id="__codelineno-23-31" name="__codelineno-23-31" href="#__codelineno-23-31"></a>        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-23-32" name="__codelineno-23-32" href="#__codelineno-23-32"></a>
+<a id="__codelineno-23-33" name="__codelineno-23-33" href="#__codelineno-23-33"></a>        <span class="c1"># Standard pipeline params</span>
+<a id="__codelineno-23-34" name="__codelineno-23-34" href="#__codelineno-23-34"></a>        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<a id="__codelineno-23-35" name="__codelineno-23-35" href="#__codelineno-23-35"></a>    <span class="p">):</span>
+<a id="__codelineno-23-36" name="__codelineno-23-36" href="#__codelineno-23-36"></a>        <span class="o">...</span>
+</code></pre></div>
+<p><strong>Design principle</strong>: <code>DecoupledPipeline</code> is model-agnostic. It doesn't know about Qwen3, VAD_SLICING, or CONTEXT_AWARE. The "behavior" is determined by the combination of components selected.</p>
+<p><strong>Equivalent configurations</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Use Case</th>
+<th>DecoupledPipeline Config</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Current assembly default</td>
+<td><code>generator=qwen3, framer=full-scene, aligner=qwen3</code></td>
+</tr>
+<tr>
+<td>Assembly + VAD framing</td>
+<td><code>generator=qwen3, framer=vad-grouped, aligner=qwen3</code></td>
+</tr>
+<tr>
+<td>Fast mode (no aligner)</td>
+<td><code>generator=qwen3, framer=vad-grouped, aligner=none</code></td>
+</tr>
+<tr>
+<td>Future: Whisper-guided Qwen</td>
+<td><code>generator=qwen3, framer=whisper-segment, aligner=none</code></td>
+</tr>
+<tr>
+<td>Future: vLLM model</td>
+<td><code>generator=vllm, framer=vad-grouped, aligner=none</code></td>
+</tr>
+<tr>
+<td>Future: HuggingFace model</td>
+<td><code>generator=transformers, framer=full-scene, aligner=none</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="711-task-2b2-wire-to-cli">7.11 Task 2B.2: Wire to CLI<a class="headerlink" href="#711-task-2b2-wire-to-cli" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/main.py</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--pipeline&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>                    <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;decoupled&quot;</span><span class="p">],</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>                    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Use the generic decoupled pipeline with component selection&quot;</span><span class="p">)</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--generator&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;qwen3&quot;</span><span class="p">,</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>                    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;TextGenerator backend (default: qwen3)&quot;</span><span class="p">)</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--framer&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;full-scene&quot;</span><span class="p">,</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>                    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;TemporalFramer backend (default: full-scene)&quot;</span><span class="p">)</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--aligner&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;qwen3&quot;</span><span class="p">,</span>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>                    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;TextAligner backend (default: qwen3, &#39;none&#39; to skip)&quot;</span><span class="p">)</span>
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--cleaner&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;qwen3&quot;</span><span class="p">,</span>
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>                    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;TextCleaner backend (default: qwen3)&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="712-task-2b3-yaml-configuration-support-optional">7.12 Task 2B.3: YAML Configuration Support (Optional)<a class="headerlink" href="#712-task-2b3-yaml-configuration-support-optional" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/config/v4/ecosystems/pipelines/decoupled.yaml</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nt">pipeline</span><span class="p">:</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">decoupled</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">  </span><span class="nt">generator</span><span class="p">:</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">    </span><span class="nt">backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span><span class="nt">model_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Qwen/Qwen3-ASR-1.7B&quot;</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">  </span><span class="nt">framer</span><span class="p">:</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">    </span><span class="nt">backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vad-grouped</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="w">    </span><span class="nt">max_group_duration_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6.0</span>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="w">  </span><span class="nt">cleaner</span><span class="p">:</span>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="w">    </span><span class="nt">backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a><span class="w">  </span><span class="nt">aligner</span><span class="p">:</span>
+<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="w">    </span><span class="nt">backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3</span>
+<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="w">  </span><span class="nt">stepdown</span><span class="p">:</span>
+<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a><span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a><span class="w">    </span><span class="nt">fallback_max_group_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6.0</span>
+</code></pre></div>
+<p><strong>Acceptance criteria for Workstream B</strong>:
+- [ ] <code>DecoupledPipeline</code> constructs correctly from component names
+- [ ] CLI <code>--pipeline decoupled --generator qwen3 --framer vad-grouped</code> produces valid SRT
+- [ ] <code>DecoupledPipeline</code> with <code>aligner=none</code> works (aligner-free workflow)
+- [ ] Registering a new generator backend in factory makes it available via CLI without code changes</p>
+<h3 id="713-phase-2-exit-criteria">7.13 Phase 2 Exit Criteria<a class="headerlink" href="#713-phase-2-exit-criteria" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Step-down retry works in orchestrator (Workstream A)</li>
+<li>[ ] Assembly + vad-grouped + step-down ≥ VAD_SLICING on test audio</li>
+<li>[ ] Assembly + full-scene ≥ CONTEXT_AWARE on test audio</li>
+<li>[ ] <code>DecoupledPipeline</code> exists and works end-to-end (Workstream B)</li>
+<li>[ ] Canonical <code>SceneDiagnostics</code> schema in use</li>
+<li>[ ] <code>pytest tests/</code> passes</li>
+<li>[ ] <code>ruff check whisperjav/</code> passes</li>
+</ul>
+<p><strong>Strangulation milestone achieved</strong>: Coupled modes have zero unique value. They are provably inferior to the decoupled pipeline.</p>
+<hr />
+<h2 id="8-phase-3-strangulation">8. Phase 3: Strangulation<a class="headerlink" href="#8-phase-3-strangulation" title="Permanent link">&para;</a></h2>
+<h3 id="81-objective">8.1 Objective<a class="headerlink" href="#81-objective" title="Permanent link">&para;</a></h3>
+<p>Delete the coupled mode code. This is not "cleanup" — this is the completion of the strategic objective. The legacy code is dead weight: it cannot deliver the product vision, it confuses users with a false choice, and it doubles the maintenance surface of Phase 5.</p>
+<h3 id="82-prerequisites">8.2 Prerequisites<a class="headerlink" href="#82-prerequisites" title="Permanent link">&para;</a></h3>
+<p>Phase 2 Workstream A complete (Assembly is provably superior). Equivalence validation confirms output quality is equal or better.</p>
+<h3 id="83-task-31-map-legacy-input-mode-names-to-assembly-configs">8.3 Task 3.1: Map Legacy Input Mode Names to Assembly Configs<a class="headerlink" href="#83-task-31-map-legacy-input-mode-names-to-assembly-configs" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/pipelines/qwen_pipeline.py</code></p>
+<p>All input modes now construct the orchestrator. Legacy mode names become convenience aliases:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># ALL modes use the orchestrator — legacy names map to framer configs</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_mode</span> <span class="o">==</span> <span class="n">InputMode</span><span class="o">.</span><span class="n">ASSEMBLY</span><span class="p">:</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>    <span class="n">framer_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">framer_backend</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_mode</span> <span class="o">==</span> <span class="n">InputMode</span><span class="o">.</span><span class="n">VAD_SLICING</span><span class="p">:</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>    <span class="n">framer_name</span> <span class="o">=</span> <span class="s2">&quot;vad-grouped&quot;</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>        <span class="s2">&quot;input_mode=&#39;vad_slicing&#39; is removed. &quot;</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>        <span class="s2">&quot;Automatically using assembly mode with vad-grouped framer.&quot;</span>
+<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>    <span class="p">)</span>
+<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a><span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_mode</span> <span class="o">==</span> <span class="n">InputMode</span><span class="o">.</span><span class="n">CONTEXT_AWARE</span><span class="p">:</span>
+<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a>    <span class="n">framer_name</span> <span class="o">=</span> <span class="s2">&quot;full-scene&quot;</span>
+<a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a>        <span class="s2">&quot;input_mode=&#39;context_aware&#39; is removed. &quot;</span>
+<a id="__codelineno-26-14" name="__codelineno-26-14" href="#__codelineno-26-14"></a>        <span class="s2">&quot;Automatically using assembly mode with full-scene framer.&quot;</span>
+<a id="__codelineno-26-15" name="__codelineno-26-15" href="#__codelineno-26-15"></a>    <span class="p">)</span>
+<a id="__codelineno-26-16" name="__codelineno-26-16" href="#__codelineno-26-16"></a>
+<a id="__codelineno-26-17" name="__codelineno-26-17" href="#__codelineno-26-17"></a><span class="bp">self</span><span class="o">.</span><span class="n">_subtitle_pipeline</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_subtitle_pipeline</span><span class="p">(</span><span class="n">framer_name</span><span class="o">=</span><span class="n">framer_name</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="84-task-32-delete-inline-coupled-mode-code">8.4 Task 3.2: Delete Inline Coupled Mode Code<a class="headerlink" href="#84-task-32-delete-inline-coupled-mode-code" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/pipelines/qwen_pipeline.py</code></p>
+<p>Delete:
+- The entire <code>else</code> branch in Phase 5 (lines ~725-1000) — coupled mode processing
+- <code>_transcribe_speech_regions()</code> method (lines 1171-1605) — 434 LOC
+- <code>_offset_result_timestamps()</code> static method (lines 1607-1628)
+- All imports only used by coupled mode code paths</p>
+<p><strong>Expected reduction</strong>: ~600 lines removed from qwen_pipeline.py.</p>
+<h3 id="85-task-33-update-ensemble-defaults">8.5 Task 3.3: Update Ensemble Defaults<a class="headerlink" href="#85-task-33-update-ensemble-defaults" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>whisperjav/ensemble/pass_worker.py</code></p>
+<p>Update default <code>qwen_input_mode</code> from <code>"vad_slicing"</code> to <code>"assembly"</code> (with <code>framer=vad-grouped</code> to preserve behavior).</p>
+<h3 id="86-task-34-update-gui">8.6 Task 3.4: Update GUI<a class="headerlink" href="#86-task-34-update-gui" title="Permanent link">&para;</a></h3>
+<p><strong>Files</strong>: <code>whisperjav/webview_gui/assets/app.js</code>, <code>index.html</code></p>
+<ul>
+<li>Remove "context_aware" and "vad_slicing" from input mode dropdown</li>
+<li>Replace with framer selection (full-scene, vad-grouped) as the primary UX</li>
+<li>The concept of "input modes" is gone — users choose a framer strategy</li>
+</ul>
+<h3 id="87-phase-3-exit-criteria">8.7 Phase 3 Exit Criteria<a class="headerlink" href="#87-phase-3-exit-criteria" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] All Phase 5 code paths go through the orchestrator</li>
+<li>[ ] <code>qwen_pipeline.py</code> is ~1000 LOC (down from ~1630)</li>
+<li>[ ] Legacy mode names still accepted in CLI (mapped to assembly configs, with warning)</li>
+<li>[ ] Ensemble uses assembly mode</li>
+<li>[ ] GUI offers framer selection instead of input mode selection</li>
+<li>[ ] <code>pytest tests/</code> passes</li>
+<li>[ ] <code>ruff check whisperjav/</code> passes</li>
+</ul>
+<p><strong>Strangulation milestone achieved</strong>: Coupled mode code no longer exists. One code path. One architecture.</p>
+<hr />
+<h2 id="9-future-new-backends-and-workflows">9. Future: New Backends and Workflows<a class="headerlink" href="#9-future-new-backends-and-workflows" title="Permanent link">&para;</a></h2>
+<p>These are independent items that can be built after Phase 2B (generic entry point exists). Each is small and self-contained. They represent the product vision being realized.</p>
+<h3 id="91-whispersegmentframer">9.1 WhisperSegmentFramer<a class="headerlink" href="#91-whispersegmentframer" title="Permanent link">&para;</a></h3>
+<p><strong>New file</strong>: <code>whisperjav/modules/subtitle_pipeline/framers/whisper_segment.py</code></p>
+<p>Runs faster-whisper, extracts segment boundaries as TemporalFrames. Enables "Whisper-Guided Qwen" — Whisper's reliable timing + Qwen's superior Japanese text + no aligner needed.</p>
+<h3 id="92-transformerstextgenerator">9.2 TransformersTextGenerator<a class="headerlink" href="#92-transformerstextgenerator" title="Permanent link">&para;</a></h3>
+<p><strong>New file</strong>: <code>whisperjav/modules/subtitle_pipeline/generators/transformers_generic.py</code></p>
+<p>Generic HuggingFace ASR pipeline adapter. Any model on HuggingFace that does ASR can be used. <code>load()</code> loads the model to GPU, <code>generate()</code> runs inference, <code>unload()</code> frees VRAM.</p>
+<h3 id="93-vllmtextgenerator">9.3 VLLMTextGenerator<a class="headerlink" href="#93-vllmtextgenerator" title="Permanent link">&para;</a></h3>
+<p><strong>New file</strong>: <code>whisperjav/modules/subtitle_pipeline/generators/vllm_client.py</code></p>
+<p>HTTP client for vLLM-served audio-language models. <code>load()</code>/<code>unload()</code> are no-ops (server manages VRAM). <code>generate()</code> sends HTTP request to vLLM server.</p>
+<h3 id="94-cross-model-benchmarking-utility">9.4 Cross-Model Benchmarking Utility<a class="headerlink" href="#94-cross-model-benchmarking-utility" title="Permanent link">&para;</a></h3>
+<p>CLI tool that runs multiple generator/aligner configurations on the same audio, compares against ground-truth SRT, reports per-scene accuracy metrics.</p>
+<hr />
+<h2 id="10-testing-strategy">10. Testing Strategy<a class="headerlink" href="#10-testing-strategy" title="Permanent link">&para;</a></h2>
+<h3 id="101-per-phase-testing">10.1 Per-Phase Testing<a class="headerlink" href="#101-per-phase-testing" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Tests</th>
+<th>What to Validate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Unit + integration</td>
+<td>Context reaches generator; vad-grouped framer produces reasonable output; default mode is assembly</td>
+</tr>
+<tr>
+<td>2A</td>
+<td>Integration</td>
+<td>Step-down triggers on collapsed scenes; retried results are better; VRAM lifecycle preserved</td>
+</tr>
+<tr>
+<td>2B</td>
+<td>Integration</td>
+<td>DecoupledPipeline constructs correctly from config; produces valid SRT</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Regression</td>
+<td>No quality degradation after coupled mode removal; legacy mode names map correctly</td>
+</tr>
+</tbody>
+</table>
+<h3 id="102-equivalence-validation-critical-gate-for-phase-3">10.2 Equivalence Validation (Critical Gate for Phase 3)<a class="headerlink" href="#102-equivalence-validation-critical-gate-for-phase-3" title="Permanent link">&para;</a></h3>
+<p>Before deleting coupled mode code, run a comparison:
+1. Process 3-5 audio files through <code>vad_slicing</code> mode (old)
+2. Process same files through <code>assembly + vad-grouped + step-down</code> (new)
+3. Compare: segment count, timing coverage, text quality, collapse rate
+4. New pipeline must be equal or better on all metrics
+5. <strong>This validation gates Phase 3. No deletion until equivalence is demonstrated.</strong></p>
+<h3 id="103-continuous">10.3 Continuous<a class="headerlink" href="#103-continuous" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>pytest tests/</code> passes at every phase boundary</li>
+<li><code>ruff check whisperjav/</code> passes</li>
+<li>Manual smoke test with known audio file</li>
+</ul>
+<hr />
+<h2 id="11-risk-register">11. Risk Register<a class="headerlink" href="#11-risk-register" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Risk</th>
+<th>Impact</th>
+<th>Likelihood</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td>Phase 2A step-down restructures orchestrator too aggressively</td>
+<td>Regression in normal (non-step-down) path</td>
+<td>Medium</td>
+<td>Extract <code>_run_pass()</code> as pure refactor first (no logic change), verify tests pass, then add retry logic</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Phase 3 deletion causes quality regression</td>
+<td>Users see worse results</td>
+<td>Medium</td>
+<td>Extensive equivalence testing before deletion (Section 10.2). Phase 3 is gated on validation.</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>VadGroupedFramer in assembly produces different results than VAD_SLICING</td>
+<td>User confusion during transition</td>
+<td>Low</td>
+<td>Expected — different code paths. Validate "comparable or better, not identical"</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>Ensemble system depends on coupled mode internals</td>
+<td>Ensemble breaks after Phase 3</td>
+<td>Low</td>
+<td>Audit <code>pass_worker.py</code> during Phase 3</td>
+</tr>
+<tr>
+<td><strong>R5</strong></td>
+<td><strong>Effort spent on legacy coupled modes delays migration to the vision</strong></td>
+<td><strong>Strategic: delays the product vision, wastes engineering time on dead-end code</strong></td>
+<td><strong>High (if not managed)</strong></td>
+<td><strong>This plan's core mitigation: zero effort on legacy fixes. All effort serves the decoupled pipeline. Phase 1 strangulation milestone (default switch) formalizes the commitment.</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12-decision-log">12. Decision Log<a class="headerlink" href="#12-decision-log" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Decision</th>
+<th>Phase</th>
+<th>Chosen</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D1</td>
+<td>Step-down retry approach</td>
+<td>2A</td>
+<td>Batched retry</td>
+<td>Preserves VRAM-efficient batch load/unload pattern. Per-scene loading too slow.</td>
+</tr>
+<tr>
+<td>D2</td>
+<td>Generic entry point: new class vs extending QwenPipeline</td>
+<td>2B</td>
+<td>New <code>DecoupledPipeline</code> class</td>
+<td>Model-agnostic by design. QwenPipeline remains for backward compat but new work goes through DecoupledPipeline.</td>
+</tr>
+<tr>
+<td>D3</td>
+<td>Deprecation period for coupled modes</td>
+<td>1 → 3</td>
+<td><strong>No grace period.</strong> Default switches in Phase 1. Code deleted in Phase 3.</td>
+<td>Legacy modes are architecturally constrained (integrated aligner limitation). Extended coexistence wastes maintenance effort and confuses users.</td>
+</tr>
+<tr>
+<td>D4</td>
+<td>CLI UX for component selection</td>
+<td>2B</td>
+<td>Both flat args and YAML</td>
+<td>Flat args for common use (<code>--generator qwen3 --framer vad-grouped</code>). YAML for complex configurations.</td>
+</tr>
+<tr>
+<td>D5</td>
+<td>Whether to keep CONTEXT_AWARE mode</td>
+<td>3</td>
+<td><strong>Delete it.</strong></td>
+<td>CONTEXT_AWARE = assembly + full-scene framer. No unique capability. Legacy name maps to assembly config.</td>
+</tr>
+<tr>
+<td>D6</td>
+<td>When Assembly becomes default</td>
+<td>1</td>
+<td><strong>Phase 1 exit.</strong></td>
+<td>The decoupled pipeline is the only architecture that prevents aligner collapse (mid-pipeline cleaning). Users should be on it by default as early as possible.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="13-scope-boundaries">13. Scope Boundaries<a class="headerlink" href="#13-scope-boundaries" title="Permanent link">&para;</a></h2>
+<h3 id="in-scope">In Scope<a class="headerlink" href="#in-scope" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Orchestrator feature completeness (context, framer flexibility, step-down, diagnostics)</li>
+<li>Generic pipeline entry point (<code>DecoupledPipeline</code> class)</li>
+<li>Default mode switch to Assembly (Phase 1)</li>
+<li>Coupled mode code deletion (Phase 3)</li>
+<li>CLI changes for new parameters</li>
+<li>Ensemble default updates</li>
+<li>GUI updates (Phase 3)</li>
+</ul>
+<h3 id="out-of-scope">Out of Scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Changes to Phases 1-4 (audio extraction, scene detection, enhancement, VAD)</li>
+<li>Changes to Phases 6-9 (SRT generation, stitching, sanitization, analytics)</li>
+<li>Non-Qwen pipelines (faster, fast, balanced, pro, stable)</li>
+<li><code>qwen_asr.py</code> internals (only external API used)</li>
+<li>Installer or build system changes</li>
+<li>New model backends (TransformersGenerator, VLLMGenerator) — these are "Future" items enabled by Phase 2B</li>
+</ul>
+<hr />
+<h2 id="14-dependencies-and-prerequisites">14. Dependencies and Prerequisites<a class="headerlink" href="#14-dependencies-and-prerequisites" title="Permanent link">&para;</a></h2>
+<h3 id="external-dependencies">External Dependencies<a class="headerlink" href="#external-dependencies" title="Permanent link">&para;</a></h3>
+<ul>
+<li>No new packages for Phases 1-3</li>
+<li>Future backends: <code>transformers</code> (existing optional dep), <code>httpx</code> (new for vLLM)</li>
+</ul>
+<h3 id="phase-dependencies">Phase Dependencies<a class="headerlink" href="#phase-dependencies" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>Phase 1 (Parity)
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    │
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>    ├──→ Phase 2A (Step-Down)  ──┐
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>    │                             ├──→ Phase 3 (Strangulation)
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>    └──→ Phase 2B (Entry Point) ──┘
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>          [parallel / independent]
+</code></pre></div>
+<ul>
+<li><strong>Phase 1</strong>: No dependencies (starting point)</li>
+<li><strong>Phase 2A</strong>: Depends on Phase 1 (framer flexibility needed for step-down)</li>
+<li><strong>Phase 2B</strong>: Depends on Phase 1 (context propagation + framer selection needed for complete entry point)</li>
+<li><strong>Phase 2A and 2B are independent of each other</strong> — can be built in parallel or in either order</li>
+<li><strong>Phase 3</strong>: Depends on Phase 2A (must be provably superior before deleting legacy). Does NOT depend on Phase 2B (generic entry point is a bonus, not a gate for strangulation)</li>
+</ul>
+<hr />
+<p><em>End of IMPL-001 v3</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

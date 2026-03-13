@@ -1,0 +1,2922 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/ISSUE_TRACKER_v1.8.x/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>WhisperJAV Issue Tracker — v1.8.x Cycle - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-issue-tracker-v18x-cycle" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperJAV Issue Tracker — v1.8.x Cycle
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#status-legend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Legend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v188-stable-implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.8.8 Stable — Implementation Status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1.8.8 Stable — Implementation Status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shipped-in-v188b1-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shipped in v1.8.8b1 (2026-03-12)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cluster-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster Analysis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cluster Analysis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cluster-a-local-llm-translation-critical-4-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster A: Local LLM Translation — CRITICAL (4 issues)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-b-mps-apple-silicon-1-issue-fix-shipped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster B: MPS / Apple Silicon (1 issue) — FIX SHIPPED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-c-network-installation-5-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster C: Network / Installation (5 issues)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-d-gpu-detection-2-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster D: GPU Detection (2 issues)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-e-gui-settings-persistence-2-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster E: GUI Settings Persistence (2 issues)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-f-whisper-output-quality-2-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster F: Whisper Output Quality (2 issues)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-g-speech-enhancement-new-bug" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster G: Speech Enhancement — NEW BUG
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-h-startup-warning-cosmetic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster H: Startup Warning — COSMETIC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-i-ensemble-mode-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster I: Ensemble Mode — RESOLVED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-j-feature-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster J: Feature Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tally
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tally">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#by-resolution-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By Resolution Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-priority-active-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By Priority (Active Work)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pending-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pending GitHub Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pending GitHub Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#responded-track-d1-done-7-issues-replied-2026-03-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responded (Track D1 — DONE, 7 issues replied 2026-03-13)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#awaiting-user-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Awaiting User Response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#candidates-for-closing-track-d2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidates for Closing (Track D2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duplicate-related-issue-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate / Related Issue Map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recently-closed-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recently Closed Issues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v19-backlog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.9+ Backlog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/ISSUE_TRACKER_v1.8.x.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-issue-tracker-v18x-cycle">WhisperJAV Issue Tracker — v1.8.x Cycle<a class="headerlink" href="#whisperjav-issue-tracker-v18x-cycle" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>Updated: 2026-03-13 (rev6 — v1.8.8 code complete, 3 new issues since rev5) | Source: <a href="https://github.com/meizhong986/WhisperJAV/issues">GitHub Issues</a> | <strong>35 open</strong> on GitHub</p>
+</blockquote>
+<hr />
+<h2 id="status-legend">Status Legend<a class="headerlink" href="#status-legend" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Code written and tested locally. NOT yet verified by user or in production.</td>
+</tr>
+<tr>
+<td><code>FIX VERIFIED</code></td>
+<td>User confirmed the fix resolves their issue. Safe to close the GitHub issue.</td>
+</tr>
+<tr>
+<td><code>AWAITING CONFIRMATION</code></td>
+<td>Fix shipped in a release. Waiting for user to confirm.</td>
+</tr>
+<tr>
+<td><code>NEEDS RESPONSE</code></td>
+<td>Issue has no response or needs a follow-up reply.</td>
+</tr>
+<tr>
+<td><code>DEFERRED</code></td>
+<td>Moved to a future release.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="quick-stats">Quick Stats<a class="headerlink" href="#quick-stats" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th style="text-align: right;">Count</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Total open on GitHub</td>
+<td style="text-align: right;"><strong>35</strong></td>
+<td>Was 32 at rev5; 3 new (#218, #219, #220)</td>
+</tr>
+<tr>
+<td>New issues since rev5</td>
+<td style="text-align: right;">3</td>
+<td>#218 (uv cu118 wheel), #219 (MossFormer2 stereo crash), #220 (install stalls)</td>
+</tr>
+<tr>
+<td><strong>Active bugs — FIX IMPLEMENTED (not yet verified)</strong></td>
+<td style="text-align: right;">6</td>
+<td>LLM cluster (#196/#212/#214/#132), #200 (Optimus), #209 (repetition), #218 (cu118 wheel), #219 (MossFormer2 SS)</td>
+</tr>
+<tr>
+<td><strong>Shipped fixes — AWAITING CONFIRMATION</strong></td>
+<td style="text-align: right;">2</td>
+<td>#198 (MPS beam search), #211 (urllib3 warning)</td>
+</tr>
+<tr>
+<td><strong>Responded (awaiting user reply)</strong></td>
+<td style="text-align: right;">7</td>
+<td>#220, #219, #218, #217, #215, #214, #207 — all replied 2026-03-13</td>
+</tr>
+<tr>
+<td><strong>Awaiting user response</strong></td>
+<td style="text-align: right;">4</td>
+<td>#204, #203, #201, #210</td>
+</tr>
+<tr>
+<td>Feature requests (open)</td>
+<td style="text-align: right;">16</td>
+<td>Including #213 Intel GPU, #198-FR English dropdown</td>
+</tr>
+<tr>
+<td>Deferred to v1.9+</td>
+<td style="text-align: right;">11</td>
+<td>See v1.9+ Backlog</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="v188-stable-implementation-status">v1.8.8 Stable — Implementation Status<a class="headerlink" href="#v188-stable-implementation-status" title="Permanent link">&para;</a></h2>
+<p>All Track A, B, C code is complete. Changes are uncommitted pending verification.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Issue(s)</th>
+<th>Description</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>#212/#214/#132</td>
+<td>Diagnostic token logging (batch stats, "No matches" handler)</td>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Needs user validation via diagnostic data</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>#212</td>
+<td>.subtrans stale settings override (version-stamp, auto-delete)</td>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Needs validation from zhstark's scenario</td>
+</tr>
+<tr>
+<td>A3</td>
+<td><strong>#218</strong></td>
+<td>cu118 wheel version mismatch (<code>UV_SKIP_WHEEL_FILENAME_CHECK=1</code>)</td>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Exact error from WillChengCN's log. Needs #218 user to confirm.</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>#212/#214</td>
+<td>Reduce max_tokens 2x→1x multiplier (2392→1820 for 8K ctx)</td>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Needs real-world validation via A1 diagnostic data</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>#214</td>
+<td>pornify.txt → sectioned format with format example</td>
+<td><code>DONE (no issue)</code></td>
+<td>Internal improvement</td>
+</tr>
+<tr>
+<td>A6</td>
+<td>—</td>
+<td><code>--provider ollama</code> preview (auto-detect, num_ctx=8192, streaming)</td>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Needs manual testing with Ollama installed</td>
+</tr>
+<tr>
+<td>B1</td>
+<td><strong>#200</strong></td>
+<td>NVML Optimus laptop fallback (<code>--force-cuda</code> flag, guidance text)</td>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Needs Ywocp to confirm</td>
+</tr>
+<tr>
+<td>C1</td>
+<td><strong>#209</strong></td>
+<td>Repetition cleaner pattern #8 (<code>sentence_phrase_repetition</code>)</td>
+<td><code>FIX IMPLEMENTED</code></td>
+<td>Tested: 192→42 chars. Needs weifu8435 to confirm on v1.8.8</td>
+</tr>
+</tbody>
+</table>
+<h3 id="shipped-in-v188b1-2026-03-12">Shipped in v1.8.8b1 (2026-03-12)<a class="headerlink" href="#shipped-in-v188b1-2026-03-12" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Commit</th>
+<th>Issue</th>
+<th>Summary</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>9dc8f1f</code></td>
+<td>#198</td>
+<td>Force greedy decoding (<code>num_beams=1</code>) on MPS</td>
+<td><code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><code>d5b8296</code></td>
+<td>—</td>
+<td>numpy 2.x migration (all internal code)</td>
+<td><code>DONE</code></td>
+</tr>
+<tr>
+<td><code>dea0fa2</code></td>
+<td>—</td>
+<td>Remove <code>np.int_</code> usage (numpy 2.x crash)</td>
+<td><code>DONE</code></td>
+</tr>
+<tr>
+<td><code>32c3711</code></td>
+<td>—</td>
+<td>Phase 1a installer: env detection, <code>--local</code>, <code>--inexact</code></td>
+<td><code>DONE</code></td>
+</tr>
+<tr>
+<td><code>18be938</code></td>
+<td>—</td>
+<td>GUI launcher creation in install scripts</td>
+<td><code>DONE</code></td>
+</tr>
+<tr>
+<td><code>5cc5ad2</code></td>
+<td>—</td>
+<td>Version bump to 1.8.8b1</td>
+<td><code>DONE</code></td>
+</tr>
+<tr>
+<td>—</td>
+<td>#211</td>
+<td>urllib3/chardet warning suppressed</td>
+<td><code>AWAITING CONFIRMATION</code> (justantopair-ai: "nothing serious")</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="cluster-analysis">Cluster Analysis<a class="headerlink" href="#cluster-analysis" title="Permanent link">&para;</a></h2>
+<h3 id="cluster-a-local-llm-translation-critical-4-issues">Cluster A: Local LLM Translation — CRITICAL (4 issues)<a class="headerlink" href="#cluster-a-local-llm-translation-critical-4-issues" title="Permanent link">&para;</a></h3>
+<p><strong>Issues</strong>: #196 (closed), #212, #214, #132
+<strong>Severity</strong>: CRITICAL — affects ALL local LLM translation users across all platforms
+<strong>Status</strong>: <code>FIX IMPLEMENTED</code> (A1 diagnostics, A2 .subtrans fix, A4 max_tokens reduction) — NOT YET VERIFIED</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>Platform</th>
+<th>State</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#214</strong></td>
+<td>1.8.7 localLLM fail</td>
+<td>KenZP12</td>
+<td>Windows, cu128</td>
+<td><strong>OPEN — NEEDS RESPONSE</strong></td>
+<td>gemma-9b, 12.3 tps, batch auto-reduced 30→11. Server 502 error immediately. <code>max_tokens: 2392</code>.</td>
+</tr>
+<tr>
+<td><strong>#212</strong></td>
+<td>Regex Error - Local Translation v1.8.7</td>
+<td>destinyawaits</td>
+<td>Linux, 5090</td>
+<td><strong>OPEN</strong></td>
+<td>llama-8b AND gemma-9b both fail. User switched to DeepSeek cloud. Latest comment confirms same issue with gemma-9b.</td>
+</tr>
+<tr>
+<td><strong>#196</strong></td>
+<td>Local Translation Errors</td>
+<td>destinyawaits</td>
+<td>Ubuntu, 5090 32GB</td>
+<td>CLOSED</td>
+<td>Related to #212. zhstark: batch 30→11, still fails.</td>
+</tr>
+<tr>
+<td><strong>#132</strong></td>
+<td>Local LLM on Kaggle</td>
+<td>TinyRick1489</td>
+<td>Kaggle</td>
+<td><strong>OPEN</strong></td>
+<td>TinyRick1489 posted debug log (2026-03-07). meizhong986 responded "working on fix."</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Two distinct failure modes:</strong>
+1. <strong>502 Server Error</strong> (#214): Server crashes/times out during translation.
+2. <strong>"No matches found"</strong> (#212, #196, #132): Server responds but output is garbled/unparseable.</p>
+<p><strong>v1.8.8 tactical fixes</strong> (bridge to v1.9.0 Ollama migration):
+- A1: Diagnostic logging to capture actual token usage and raw model output
+- A2: .subtrans stale settings fix (prevents old settings from overriding CLI args)
+- A4: max_tokens 2x→1x reduction (less room for verbose/garbled output)
+- A6: <code>--provider ollama</code> preview as an immediate alternative for local LLM users</p>
+<p><strong>Strategic direction</strong>: v1.9.0 will deprecate llama-cpp-python entirely and complete Ollama migration.</p>
+<hr />
+<h3 id="cluster-b-mps-apple-silicon-1-issue-fix-shipped">Cluster B: MPS / Apple Silicon (1 issue) — FIX SHIPPED<a class="headerlink" href="#cluster-b-mps-apple-silicon-1-issue-fix-shipped" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#198</strong></td>
+<td>Transformers MPS crash</td>
+<td>francetoastVN</td>
+<td>CLOSED</td>
+<td><code>AWAITING CONFIRMATION</code> — fixed in v1.8.8b1 (<code>num_beams=1</code> on MPS, commit <code>9dc8f1f</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>francetoastVN also requested (2026-03-11) adding English translation option to Ensemble and AI SRT Translate dropdown menus — tracked as feature request #198-FR.</p>
+<hr />
+<h3 id="cluster-c-network-installation-5-issues">Cluster C: Network / Installation (5 issues)<a class="headerlink" href="#cluster-c-network-installation-5-issues" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Root Cause</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#220</strong></td>
+<td>安装卡着不动 (install stalls)</td>
+<td>libinghui20001231-debug</td>
+<td><strong>OPEN (NEW)</strong></td>
+<td>Install stalls during PyTorch download. GTX 1650, driver 462, cu118 correct. Likely slow network (~2GB wheels).</td>
+<td><code>NEEDS RESPONSE</code> — guidance only, no code fix</td>
+</tr>
+<tr>
+<td><strong>#218</strong></td>
+<td>安装错误 (uv cu118 wheel)</td>
+<td>WillChengCN</td>
+<td><strong>OPEN (NEW)</strong></td>
+<td>uv rejects cu118 llama-cpp wheel: internal version <code>0.2.26+cu118</code> ≠ filename <code>0.2.26</code></td>
+<td><code>FIX IMPLEMENTED</code> (A3: <code>UV_SKIP_WHEEL_FILENAME_CHECK=1</code>)</td>
+</tr>
+<tr>
+<td><strong>#217</strong></td>
+<td>找不到WhisperJAV-GUI.exe</td>
+<td>loveGEM</td>
+<td><strong>OPEN</strong></td>
+<td>Can't find GUI exe after v1.8.7 install</td>
+<td><code>NEEDS RESPONSE</code> — explain exe location</td>
+</tr>
+<tr>
+<td><strong>#210</strong></td>
+<td>安装失败 DNS error</td>
+<td>iop335577</td>
+<td><strong>OPEN</strong></td>
+<td>DNS through proxy</td>
+<td>Responded, <code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><strong>#204</strong></td>
+<td>VPN/v2rayN SSL failures</td>
+<td>yangming2027</td>
+<td><strong>OPEN</strong></td>
+<td>HF hub SSL errors</td>
+<td>Responded, <code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><strong>#201</strong></td>
+<td>Install SSL cert error</td>
+<td>jl6564</td>
+<td><strong>OPEN</strong></td>
+<td>Missing root CA certs</td>
+<td>Responded, <code>AWAITING CONFIRMATION</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="cluster-d-gpu-detection-2-issues">Cluster D: GPU Detection (2 issues)<a class="headerlink" href="#cluster-d-gpu-detection-2-issues" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Root Cause</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#200</strong></td>
+<td>NVML "Driver Not Loaded" on Optimus laptop</td>
+<td>Ywocp</td>
+<td><strong>OPEN</strong></td>
+<td>Dual GPU (AMD iGPU + NVIDIA dGPU). NVML fails on Optimus config.</td>
+<td><code>FIX IMPLEMENTED</code> (B1: <code>--force-cuda</code> flag + improved guidance text)</td>
+</tr>
+<tr>
+<td><strong>#213</strong></td>
+<td>Intel GPU support</td>
+<td>DDXDB</td>
+<td><strong>OPEN</strong></td>
+<td>Requests <code>torch.xpu</code> support via PyTorch XPU wheels</td>
+<td><code>DEFERRED</code> to v1.9+</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="cluster-e-gui-settings-persistence-2-issues">Cluster E: GUI Settings Persistence (2 issues)<a class="headerlink" href="#cluster-e-gui-settings-persistence-2-issues" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#207</strong></td>
+<td>1.86不能保存设置</td>
+<td>q864310563</td>
+<td><strong>OPEN</strong></td>
+<td><code>NEEDS RESPONSE</code> — 0 comments. Dup of #96.</td>
+</tr>
+<tr>
+<td><strong>#96</strong></td>
+<td>Full settings persistence</td>
+<td>sky9639</td>
+<td>OPEN</td>
+<td><code>DEFERRED</code> to v1.9 — translation + ensemble done, pipeline tab remaining</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="cluster-f-whisper-output-quality-2-issues">Cluster F: Whisper Output Quality (2 issues)<a class="headerlink" href="#cluster-f-whisper-output-quality-2-issues" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#209</strong></td>
+<td>Single subtitle very long (repetition)</td>
+<td>weifu8435</td>
+<td><strong>OPEN</strong></td>
+<td><code>FIX IMPLEMENTED</code> (C1: pattern #8 <code>sentence_phrase_repetition</code>). Tested on FC2-PPV-4025269 line 52: 192→42 chars. Needs weifu8435 to confirm on v1.8.8.</td>
+</tr>
+<tr>
+<td><strong>#215</strong></td>
+<td>Qwen3-ASR subtitle quality</td>
+<td>yangming2027</td>
+<td><strong>OPEN</strong></td>
+<td><code>NEEDS RESPONSE</code> — Qwen3-ASR produces fewer/smaller subtitles. Expected behavior (different architecture).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="cluster-g-speech-enhancement-new-bug">Cluster G: Speech Enhancement — NEW BUG<a class="headerlink" href="#cluster-g-speech-enhancement-new-bug" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#219</strong></td>
+<td>MossFormer2_SS_16K "too many dimensions" error</td>
+<td>anon12642</td>
+<td><strong>OPEN (NEW)</strong></td>
+<td><code>FIX IMPLEMENTED</code> (C2) — Speech separation model outputs 3D tensor <code>(num_sources, batch, length)</code>. Fix takes first separated source. <code>NEEDS RESPONSE</code> on GitHub.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Root cause</strong>: MossFormer2_SS_16K is a speech <strong>separation</strong> model (not enhancement). It outputs multiple audio streams as <code>(num_sources, 1, length)</code>. The code only handled 2D output, so the 3D array propagated to <code>sf.write()</code> which raised "Invalid shape". Fix: take first separated source (primary speaker) from the 3D output.</p>
+<hr />
+<h3 id="cluster-h-startup-warning-cosmetic">Cluster H: Startup Warning — COSMETIC<a class="headerlink" href="#cluster-h-startup-warning-cosmetic" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#211</strong></td>
+<td>启动报错 (urllib3 warning)</td>
+<td>WillChengCN</td>
+<td><strong>OPEN</strong></td>
+<td><code>AWAITING CONFIRMATION</code> — Suppressed in v1.8.8b1. justantopair-ai confirms "nothing serious."</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="cluster-i-ensemble-mode-resolved">Cluster I: Ensemble Mode — RESOLVED<a class="headerlink" href="#cluster-i-ensemble-mode-resolved" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#203</strong></td>
+<td>Serial mode request</td>
+<td>yangming2027</td>
+<td><strong>OPEN</strong></td>
+<td>Feature already exists. meizhong986 confirmed. <code>AWAITING CONFIRMATION</code> from user.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="cluster-j-feature-requests">Cluster J: Feature Requests<a class="headerlink" href="#cluster-j-feature-requests" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Reporter</th>
+<th>State</th>
+<th>Summary</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#213</strong></td>
+<td>Intel GPU (XPU) support</td>
+<td>DDXDB</td>
+<td>OPEN</td>
+<td>torch.xpu via PyTorch XPU wheels</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#206</strong></td>
+<td>Grey out incompatible options</td>
+<td>techguru0</td>
+<td>OPEN</td>
+<td>Block incompatible GUI choices</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#205</strong></td>
+<td>VibeVoice ASR</td>
+<td>kylesskim-sys</td>
+<td>OPEN</td>
+<td>Microsoft VibeVoice. VRAM too high.</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#181</strong></td>
+<td>Frameless window</td>
+<td>QQ804218</td>
+<td>OPEN</td>
+<td>Cosmetic</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#180</strong></td>
+<td>Multi-language GUI</td>
+<td>QQ804218</td>
+<td>OPEN</td>
+<td>Full i18n</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#175</strong></td>
+<td>Chinese GUI</td>
+<td>yangming2027</td>
+<td>OPEN</td>
+<td>Subset of #180</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#164</strong></td>
+<td>MPEG-TS + Drive</td>
+<td>hosmallming</td>
+<td>OPEN</td>
+<td>Format + cloud</td>
+<td>Backlog</td>
+</tr>
+<tr>
+<td><strong>#142</strong></td>
+<td>AMD Radeon</td>
+<td>MatthaisUK</td>
+<td>OPEN</td>
+<td>DirectML/ROCm. New comment from FishYu-OWO re AMD/ROCm on Windows.</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#126</strong></td>
+<td>Recursive directory</td>
+<td>jl6564</td>
+<td>OPEN</td>
+<td>Walk subdirs</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#114</strong></td>
+<td>DirectML</td>
+<td>SingingDalong</td>
+<td>OPEN</td>
+<td>AMD/Intel GPU</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#99</strong></td>
+<td>4GB VRAM guidance</td>
+<td>hosmallming</td>
+<td>OPEN</td>
+<td>Log VRAM</td>
+<td>Backlog</td>
+</tr>
+<tr>
+<td><strong>#71</strong></td>
+<td>Google Translate (free)</td>
+<td>x8086</td>
+<td>OPEN</td>
+<td>Fragile API</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#59</strong></td>
+<td>Feature plans</td>
+<td>meizhong986</td>
+<td>OPEN</td>
+<td>Meta roadmap</td>
+<td>Keep open</td>
+</tr>
+<tr>
+<td><strong>#51</strong></td>
+<td>Batch translate wildcard</td>
+<td>lingyunlxh</td>
+<td>OPEN</td>
+<td>Glob in translate CLI</td>
+<td>Backlog</td>
+</tr>
+<tr>
+<td><strong>#49</strong></td>
+<td>Output to source folder</td>
+<td>meizhong986</td>
+<td>OPEN</td>
+<td>Docs gap</td>
+<td>Backlog</td>
+</tr>
+<tr>
+<td><strong>#44</strong></td>
+<td>GUI drag-drop</td>
+<td>lingyunlxh</td>
+<td>OPEN</td>
+<td>Filename vs path</td>
+<td>Backlog</td>
+</tr>
+<tr>
+<td><strong>#43</strong></td>
+<td>DeepL provider</td>
+<td>teijiIshida</td>
+<td>OPEN</td>
+<td>Non-LLM adapter</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>#33</strong></td>
+<td>Linux pyaudio docs</td>
+<td>org0ne</td>
+<td>OPEN</td>
+<td>Documentation</td>
+<td>Backlog</td>
+</tr>
+<tr>
+<td><strong>#198-FR</strong></td>
+<td>English in Ensemble/Translate dropdown</td>
+<td>francetoastVN</td>
+<td>(comment)</td>
+<td>Feature request from #198</td>
+<td>Backlog</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="tally">Tally<a class="headerlink" href="#tally" title="Permanent link">&para;</a></h2>
+<h3 id="by-resolution-status">By Resolution Status<a class="headerlink" href="#by-resolution-status" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th style="text-align: right;">Count</th>
+<th>Issues</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FIX IMPLEMENTED — needs user verification</strong></td>
+<td style="text-align: right;">6</td>
+<td>LLM cluster (#212/#214/#132), #200 (Optimus), #209 (repetition), #218 (cu118 wheel), #219 (MossFormer2 SS)</td>
+</tr>
+<tr>
+<td><strong>Shipped, AWAITING CONFIRMATION</strong></td>
+<td style="text-align: right;">2</td>
+<td>#198 (MPS), #211 (urllib3 warning)</td>
+</tr>
+<tr>
+<td><strong>AWAITING user response (responded)</strong></td>
+<td style="text-align: right;">4</td>
+<td>#204, #203, #201, #210</td>
+</tr>
+<tr>
+<td><strong>Responded, AWAITING user reply</strong></td>
+<td style="text-align: right;">7</td>
+<td>#220, #219, #218, #217, #215, #214, #207 — all replied 2026-03-13</td>
+</tr>
+<tr>
+<td><strong>Feature requests (open)</strong></td>
+<td style="text-align: right;">19</td>
+<td>See Cluster J</td>
+</tr>
+<tr>
+<td><strong>DEFERRED to v1.9+</strong></td>
+<td style="text-align: right;">11</td>
+<td>#96, #205, #206, #213, #180, #175, #181, #142, #114, #126, #43</td>
+</tr>
+</tbody>
+</table>
+<h3 id="by-priority-active-work">By Priority (Active Work)<a class="headerlink" href="#by-priority-active-work" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>#</th>
+<th>Issue</th>
+<th>Status</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CRITICAL</strong></td>
+<td>#212/#214/#132</td>
+<td>LLM translation (502 + "No matches")</td>
+<td><code>FIX IMPLEMENTED</code> (A1,A2,A4,A6)</td>
+<td>5 reporters, 3 platforms. Tactical fixes + Ollama preview.</td>
+</tr>
+<tr>
+<td><strong>HIGH</strong></td>
+<td>#200</td>
+<td>NVML Optimus laptop GPU detection</td>
+<td><code>FIX IMPLEMENTED</code> (B1)</td>
+<td><code>--force-cuda</code> flag + improved guidance. Needs Ywocp confirmation.</td>
+</tr>
+<tr>
+<td><strong>HIGH</strong></td>
+<td>#209</td>
+<td>Repetition cleaner new pattern</td>
+<td><code>FIX IMPLEMENTED</code> (C1)</td>
+<td>Pattern #8 added. Needs weifu8435 confirmation.</td>
+</tr>
+<tr>
+<td><strong>HIGH</strong></td>
+<td>#218</td>
+<td>uv cu118 wheel version mismatch</td>
+<td><code>FIX IMPLEMENTED</code> (A3)</td>
+<td>Exact match for WillChengCN's error.</td>
+</tr>
+<tr>
+<td><strong>HIGH</strong></td>
+<td>#219</td>
+<td>MossFormer2 speech separation 3D output</td>
+<td><code>FIX IMPLEMENTED</code> (C2)</td>
+<td>Takes first separated source from 3D output. Needs user confirmation.</td>
+</tr>
+<tr>
+<td><strong>MEDIUM</strong></td>
+<td>#220</td>
+<td>Install stalls during PyTorch download</td>
+<td><code>NEEDS RESPONSE</code></td>
+<td>Guidance only, no code fix. Slow network.</td>
+</tr>
+<tr>
+<td><strong>MEDIUM</strong></td>
+<td>#217</td>
+<td>Can't find GUI exe after install</td>
+<td><code>NEEDS RESPONSE</code></td>
+<td>Explain exe location.</td>
+</tr>
+<tr>
+<td><strong>MEDIUM</strong></td>
+<td>#215</td>
+<td>Qwen3-ASR subtitle quality question</td>
+<td><code>NEEDS RESPONSE</code></td>
+<td>Expected behavior — different model architecture.</td>
+</tr>
+<tr>
+<td><strong>MEDIUM</strong></td>
+<td>#214</td>
+<td>Local LLM 502 server error</td>
+<td><code>NEEDS RESPONSE</code></td>
+<td>Acknowledge + link to v1.8.8 fixes.</td>
+</tr>
+<tr>
+<td><strong>MEDIUM</strong></td>
+<td>#207</td>
+<td>Settings persistence question</td>
+<td><code>NEEDS RESPONSE</code></td>
+<td>0 responses — dup of #96.</td>
+</tr>
+<tr>
+<td><strong>DONE</strong></td>
+<td>#198</td>
+<td>MPS beam search</td>
+<td><code>AWAITING CONFIRMATION</code></td>
+<td>Fixed v1.8.8b1 (<code>9dc8f1f</code>).</td>
+</tr>
+<tr>
+<td><strong>DONE</strong></td>
+<td>#211</td>
+<td>urllib3 warning</td>
+<td><code>AWAITING CONFIRMATION</code></td>
+<td>Suppressed in v1.8.8b1.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="pending-github-actions">Pending GitHub Actions<a class="headerlink" href="#pending-github-actions" title="Permanent link">&para;</a></h2>
+<h3 id="responded-track-d1-done-7-issues-replied-2026-03-13">Responded (Track D1 — DONE, 7 issues replied 2026-03-13)<a class="headerlink" href="#responded-track-d1-done-7-issues-replied-2026-03-13" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Response Summary</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>#220</strong></td>
+<td>Explained PyTorch download stall, confirmed cu118 is correct</td>
+<td><code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><strong>#219</strong></td>
+<td>Acknowledged speech separation bug, fix ready for v1.8.8</td>
+<td><code>FIX IMPLEMENTED</code></td>
+</tr>
+<tr>
+<td><strong>#218</strong></td>
+<td>Explained cu118 wheel issue, provided env var workaround</td>
+<td><code>FIX IMPLEMENTED</code></td>
+</tr>
+<tr>
+<td><strong>#217</strong></td>
+<td>Explained exe location (<code>%LOCALAPPDATA%\WhisperJAV</code>), asked for install log</td>
+<td><code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><strong>#215</strong></td>
+<td>Explained Qwen3-ASR generates fewer subtitles by design</td>
+<td><code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><strong>#214</strong></td>
+<td>Acknowledged 502 error, linked to #212/#196, mentioned v1.8.8 improvements</td>
+<td><code>FIX IMPLEMENTED</code></td>
+</tr>
+<tr>
+<td><strong>#207</strong></td>
+<td>Referenced #96, explained partial settings save, planned for future</td>
+<td><code>AWAITING CONFIRMATION</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="awaiting-user-response">Awaiting User Response<a class="headerlink" href="#awaiting-user-response" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Last Response</th>
+<th>Waiting Since</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>#204</td>
+<td>Pointed to v1.8.7 release</td>
+<td>2026-03-10</td>
+</tr>
+<tr>
+<td>#203</td>
+<td>meizhong986 confirmed feature exists</td>
+<td>2026-03-08</td>
+</tr>
+<tr>
+<td>#201</td>
+<td>Pointed to v1.8.7 release</td>
+<td>2026-03-10</td>
+</tr>
+<tr>
+<td>#210</td>
+<td>meizhong986 + community responded</td>
+<td>2026-03-11</td>
+</tr>
+<tr>
+<td>#198</td>
+<td>Fixed in v1.8.8b1</td>
+<td>2026-03-12</td>
+</tr>
+</tbody>
+</table>
+<h3 id="candidates-for-closing-track-d2">Candidates for Closing (Track D2)<a class="headerlink" href="#candidates-for-closing-track-d2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Condition</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>#211</td>
+<td>justantopair-ai confirms "nothing serious" + suppressed in v1.8.8b1</td>
+<td>Can close with note</td>
+</tr>
+<tr>
+<td>#203</td>
+<td>Feature confirmed to exist, user asked "so it's already done?"</td>
+<td>One more confirmation, then close</td>
+</tr>
+<tr>
+<td>#204</td>
+<td>If yangming2027 confirms v1.8.7 fix works</td>
+<td>Waiting since 2026-03-10</td>
+</tr>
+<tr>
+<td>#201</td>
+<td>If jl6564 confirms v1.8.7 fix works</td>
+<td>Waiting since 2026-03-10</td>
+</tr>
+<tr>
+<td>#210</td>
+<td>If iop335577 confirms DNS issue resolved</td>
+<td>Waiting since 2026-03-11</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="duplicate-related-issue-map">Duplicate / Related Issue Map<a class="headerlink" href="#duplicate-related-issue-map" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Cluster</th>
+<th>Issues</th>
+<th>Primary</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Local LLM translation</strong></td>
+<td>#196 (closed), <strong>#212</strong>, <strong>#214</strong>, #132</td>
+<td><strong>#212</strong></td>
+<td><code>FIX IMPLEMENTED</code> — tactical fixes A1/A2/A4 + Ollama preview A6</td>
+</tr>
+<tr>
+<td><strong>MPS/Apple Silicon</strong></td>
+<td><strong>#198</strong></td>
+<td><strong>#198</strong></td>
+<td><code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><strong>Network/SSL/Install</strong></td>
+<td><strong>#220</strong> (NEW), <strong>#218</strong> (NEW), #217, #204, #210, #201</td>
+<td><strong>#204</strong></td>
+<td>Mixed — #218 <code>FIX IMPLEMENTED</code>, #220/#217 need response, others awaiting</td>
+</tr>
+<tr>
+<td><strong>GPU detection</strong></td>
+<td><strong>#200</strong>, <strong>#213</strong></td>
+<td><strong>#200</strong></td>
+<td><code>FIX IMPLEMENTED</code> (B1); #213 deferred</td>
+</tr>
+<tr>
+<td><strong>GUI settings</strong></td>
+<td>#96, <strong>#207</strong></td>
+<td><strong>#96</strong></td>
+<td><code>DEFERRED</code> (v1.9); #207 needs response</td>
+</tr>
+<tr>
+<td><strong>Whisper quality</strong></td>
+<td><strong>#209</strong>, <strong>#215</strong></td>
+<td><strong>#209</strong></td>
+<td><code>FIX IMPLEMENTED</code> (C1); #215 needs response</td>
+</tr>
+<tr>
+<td><strong>Speech enhancement</strong></td>
+<td><strong>#219</strong> (NEW)</td>
+<td><strong>#219</strong></td>
+<td><strong>NEW BUG</strong> — needs investigation</td>
+</tr>
+<tr>
+<td><strong>Startup warning</strong></td>
+<td><strong>#211</strong></td>
+<td><strong>#211</strong></td>
+<td><code>AWAITING CONFIRMATION</code></td>
+</tr>
+<tr>
+<td><strong>Ensemble</strong></td>
+<td>#203</td>
+<td><strong>#203</strong></td>
+<td>Resolved, awaiting final confirmation</td>
+</tr>
+<tr>
+<td><strong>AMD/Intel GPU</strong></td>
+<td>#142, #114, <strong>#213</strong></td>
+<td>Deferred</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>Translation providers</strong></td>
+<td>#71, #43</td>
+<td>Deferred</td>
+<td>v1.9+</td>
+</tr>
+<tr>
+<td><strong>i18n</strong></td>
+<td>#180, #175</td>
+<td>Deferred</td>
+<td>v1.9+</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="recently-closed-issues">Recently Closed Issues<a class="headerlink" href="#recently-closed-issues" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Title</th>
+<th>Closed</th>
+<th>Resolution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>#208</td>
+<td>LLM server AssertionError</td>
+<td>2026-03-09</td>
+<td>Self-resolved — user installed NVIDIA Toolkit</td>
+</tr>
+<tr>
+<td>#198</td>
+<td>MPS not used on M1 Mac</td>
+<td>2026-03-07</td>
+<td>Fixed v1.8.7b0 (detection) + v1.8.8b1 (beam search)</td>
+</tr>
+<tr>
+<td>#197</td>
+<td>Installation problem v1.8.6</td>
+<td>2026-03-08</td>
+<td>Closed by user after v1.8.7b0</td>
+</tr>
+<tr>
+<td>#196</td>
+<td>Local Translation Errors</td>
+<td>2026-03-07</td>
+<td>Partial fix v1.8.7. <strong>Still broken — see #212/#214</strong></td>
+</tr>
+<tr>
+<td>#195</td>
+<td>UnicodeDecodeError audio extraction</td>
+<td>2026-03-08</td>
+<td>Fixed <code>55df512</code></td>
+</tr>
+<tr>
+<td>#194</td>
+<td>M4B file support</td>
+<td>2026-03-08</td>
+<td>Fixed <code>5769688</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="v19-backlog">v1.9+ Backlog<a class="headerlink" href="#v19-backlog" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>Category</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>#96</td>
+<td>Full GUI settings persistence (pipeline tab)</td>
+<td>Enhancement</td>
+</tr>
+<tr>
+<td>#213</td>
+<td>Intel GPU (XPU) support</td>
+<td>Platform</td>
+</tr>
+<tr>
+<td>#205</td>
+<td>VibeVoice ASR</td>
+<td>Feature</td>
+</tr>
+<tr>
+<td>#206</td>
+<td>Grey out incompatible GUI options</td>
+<td>Feature</td>
+</tr>
+<tr>
+<td>#180/#175</td>
+<td>Multi-language GUI (i18n)</td>
+<td>Enhancement</td>
+</tr>
+<tr>
+<td>#114/#142</td>
+<td>DirectML / ROCm for AMD/Intel GPUs</td>
+<td>Platform</td>
+</tr>
+<tr>
+<td>#126</td>
+<td>Recursive directory + mirror output</td>
+<td>Feature</td>
+</tr>
+<tr>
+<td>#181</td>
+<td>Frameless window</td>
+<td>Cosmetic</td>
+</tr>
+<tr>
+<td>#43</td>
+<td>DeepL translation provider</td>
+<td>Feature</td>
+</tr>
+<tr>
+<td>#71</td>
+<td>Google Translate (no API key)</td>
+<td>Feature</td>
+</tr>
+<tr>
+<td>#198-FR</td>
+<td>English in Ensemble/Translate dropdown</td>
+<td>Feature</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-03-13</td>
+<td><strong>rev6.</strong> All Track A/B/C code complete (9 items). 3 new issues (#218 cu118 wheel, #219 MossFormer2 stereo, #220 install stall). Added status legend (FIX IMPLEMENTED vs FIX VERIFIED vs AWAITING CONFIRMATION). #218 already fixed by A3. #219 new bug (stereo→mono). #220 guidance only. Updated all clusters. Added Cluster G (Speech Enhancement). 7 issues need response (Track D1).</td>
+</tr>
+<tr>
+<td>2026-03-12</td>
+<td>rev5. v1.8.8b1 pre-release. 5 new issues (#213-#217). #198 MPS FIXED. #214 new LLM failure mode (502). #209 new hallucination sample.</td>
+</tr>
+<tr>
+<td>2026-03-11</td>
+<td>rev4. v1.8.7 RELEASED. 3 new issues (#210, #211, #212). #212 dup of #196.</td>
+</tr>
+<tr>
+<td>2026-03-09</td>
+<td>Groups B, C, D committed. #143, #209, #198 fixes shipped.</td>
+</tr>
+<tr>
+<td>2026-03-09</td>
+<td>Full evidence review: 14 screenshots, 3 log files, 50+ comments.</td>
+</tr>
+<tr>
+<td>2026-03-08</td>
+<td>v1.8.7b1 released with China network fixes.</td>
+</tr>
+<tr>
+<td>2026-02-27</td>
+<td>v1.8.5-hotfix2 released.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>This tracker is a point-in-time analysis. For live status, see <a href="https://github.com/meizhong986/WhisperJAV/issues">GitHub Issues</a>.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

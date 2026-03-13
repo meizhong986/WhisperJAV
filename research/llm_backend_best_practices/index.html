@@ -1,0 +1,3198 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/research/llm_backend_best_practices/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>LLM Backend Architecture Best Practices - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#llm-backend-architecture-best-practices" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              LLM Backend Architecture Best Practices
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-industry-standard-openai-compatible-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Industry Standard: OpenAI-Compatible API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Industry Standard: OpenAI-Compatible API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relevant-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relevant Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#front-end-back-end-separation-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Front-End / Back-End Separation Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Front-End / Back-End Separation Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pattern-1-delegate-to-external-server-aider-continuedev-open-webui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 1: "Delegate to External Server" (Aider, Continue.dev, Open WebUI)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-2-managed-subprocess-anythingllm-janai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 2: "Managed Subprocess" (AnythingLLM, Jan.ai)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-3-hub-and-spoke-text-generation-webui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern 3: "Hub and Spoke" (text-generation-webui)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verdict-for-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verdict for WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#process-isolation-and-lifecycle-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process Isolation and Lifecycle Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Process Isolation and Lifecycle Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-process-isolation-matters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Process Isolation Matters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ollamas-lifecycle-management-reference-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ollama's Lifecycle Management (Reference Implementation)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-check-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Check Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lifecycle-management-code-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle Management Code Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-backend-abstraction-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Backend Abstraction Layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Multi-Backend Abstraction Layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-spectrum-of-abstraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Spectrum of Abstraction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Spectrum of Abstraction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#level-1-configuration-based-switching-anythingllm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Level 1: Configuration-Based Switching (AnythingLLM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#level-2-unified-sdk-litellm-used-by-aider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Level 2: Unified SDK (LiteLLM, used by Aider)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#level-3-interface-base-class-continuedev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Level 3: Interface + Base Class (Continue.dev)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendation-for-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation for WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-detection-and-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU Detection and Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU Detection and Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-ollama-does-it-best-in-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Ollama Does It (Best-in-Class)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-pytorch-pattern-used-by-most-python-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The PyTorch Pattern (Used by Most Python Projects)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-prebuilt-binary-approach-ollama-lm-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Prebuilt Binary Approach (Ollama, LM Studio)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whisperjav-implication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WhisperJAV Implication
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#user-experience-patterns-for-non-technical-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        User Experience Patterns for Non-Technical Users
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="User Experience Patterns for Non-Technical Users">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tier-1-it-just-works-ollama-desktop-lm-studio-anythingllm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1: "It Just Works" (Ollama Desktop, LM Studio, AnythingLLM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-2-guided-setup-janai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: "Guided Setup" (Jan.ai)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-3-technical-but-documented-text-generation-webui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 3: "Technical but Documented" (text-generation-webui)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-ux-lessons-for-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key UX Lessons for WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-detect-external-server-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "Detect External Server" Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project-by-project-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project-by-Project Analysis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Project-by-Project Analysis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ollama" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ollama
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-webui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open WebUI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#text-generation-webui-oobabooga" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        text-generation-webui (oobabooga)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lm-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LM Studio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#janai-cortex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Jan.ai / Cortex
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#localai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LocalAI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anythingllm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AnythingLLM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuedev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continue.dev
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#anti-patterns-and-what-doesnt-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Patterns and What Doesn't Work
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Anti-Patterns and What Doesn&#39;t Work">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#anti-pattern-1-requiring-users-to-compile-c-with-gpu-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Pattern 1: Requiring Users to Compile C++ with GPU Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-pattern-2-embedding-llm-inference-in-process-via-python-bindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Pattern 2: Embedding LLM Inference In-Process via Python Bindings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-pattern-3-building-your-own-model-registrydownloader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Pattern 3: Building Your Own Model Registry/Downloader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-pattern-4-trying-to-support-every-gpu-backend-in-your-own-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Pattern 4: Trying to Support Every GPU Backend in Your Own Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-pattern-5-silent-fallback-without-user-awareness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Pattern 5: Silent Fallback Without User Awareness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anti-pattern-6-monolithic-all-in-one-packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anti-Pattern 6: Monolithic "All-in-One" Packaging
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommendations-for-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendations for WhisperJAV
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recommendations for WhisperJAV">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-architecture-detect-delegate-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Architecture: "Detect + Delegate + Fallback"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-this-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why This Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Phases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Phases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-add-ollama-support-low-effort-high-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Add Ollama Support (Low effort, high impact)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-deprecate-llama-cpp-python-medium-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Deprecate llama-cpp-python (Medium effort)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-optional-server-bundling-future-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Optional Server Bundling (Future, if needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-detection-implementation-sketch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Detection Implementation Sketch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-recommendation-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Recommendation Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-this-eliminates-from-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What This Eliminates from WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-takeaways" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Takeaways
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/research/llm_backend_best_practices.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="llm-backend-architecture-best-practices">LLM Backend Architecture Best Practices<a class="headerlink" href="#llm-backend-architecture-best-practices" title="Permanent link">&para;</a></h1>
+<p><strong>Date</strong>: 2026-03-11
+<strong>Purpose</strong>: Research document analyzing how state-of-the-art open-source projects architect their LLM backends, with recommendations for WhisperJAV's local translation feature.</p>
+<p><strong>WhisperJAV context</strong>: Non-technical GUI users, Windows+NVIDIA primary, subtitle translation via OpenAI-compatible API, current llama-cpp-python approach is fragile due to compilation/DLL issues.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#executive-summary">Executive Summary</a></li>
+<li><a href="#the-industry-standard-openai-compatible-api">The Industry Standard: OpenAI-Compatible API</a></li>
+<li><a href="#front-end--back-end-separation-patterns">Front-End / Back-End Separation Patterns</a></li>
+<li><a href="#process-isolation-and-lifecycle-management">Process Isolation and Lifecycle Management</a></li>
+<li><a href="#multi-backend-abstraction-layers">Multi-Backend Abstraction Layers</a></li>
+<li><a href="#gpu-detection-and-management">GPU Detection and Management</a></li>
+<li><a href="#user-experience-patterns-for-non-technical-users">User Experience Patterns for Non-Technical Users</a></li>
+<li><a href="#project-by-project-analysis">Project-by-Project Analysis</a></li>
+<li><a href="#anti-patterns-and-what-doesnt-work">Anti-Patterns and What Doesn't Work</a></li>
+<li><a href="#recommendations-for-whisperjav">Recommendations for WhisperJAV</a></li>
+</ol>
+<hr />
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>After analyzing 10+ major open-source LLM projects, clear patterns emerge:</p>
+<ol>
+<li>
+<p><strong>The OpenAI Chat Completions API is the universal contract.</strong> Every successful project either implements it or consumes it. This is the only API format supported by dozens of both servers and clients.</p>
+</li>
+<li>
+<p><strong>Process isolation is non-negotiable.</strong> Every production-grade project runs the LLM engine as a separate process, communicating over HTTP. No successful project embeds the inference engine in-process for user-facing applications.</p>
+</li>
+<li>
+<p><strong>Prebuilt binaries beat compilation.</strong> Projects that require users to compile C++ code with GPU support (like llama-cpp-python) consistently generate the most support issues. Projects that ship prebuilt binaries with automatic GPU detection (Ollama, LM Studio) have the best user experience.</p>
+</li>
+<li>
+<p><strong>The "delegate to external server" pattern dominates.</strong> Rather than embedding LLM inference, successful applications detect whether an external LLM server (Ollama, LM Studio, etc.) is available and connect to it.</p>
+</li>
+<li>
+<p><strong>Fallback chains are essential.</strong> The best UX comes from: try local GPU → try local CPU → suggest cloud API → provide clear error with next steps.</p>
+</li>
+</ol>
+<hr />
+<h2 id="the-industry-standard-openai-compatible-api">The Industry Standard: OpenAI-Compatible API<a class="headerlink" href="#the-industry-standard-openai-compatible-api" title="Permanent link">&para;</a></h2>
+<p>The OpenAI Chat Completions API has become the de facto standard for LLM interaction. It is the <strong>only</strong> API format that meets all three criteria simultaneously:</p>
+<ul>
+<li>Dozens of LLM <strong>servers</strong> implement it (Ollama, vLLM, LM Studio, LocalAI, llama.cpp server, Jan/Cortex, text-generation-webui)</li>
+<li>Dozens of LLM <strong>client applications</strong> consume it (Aider, Continue.dev, AnythingLLM, Open WebUI, LangChain, LlamaIndex)</li>
+<li>It works identically for <strong>both local and cloud</strong> models</li>
+</ul>
+<h3 id="the-pattern">The Pattern<a class="headerlink" href="#the-pattern" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">openai</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAI</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Cloud API</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">client</span> <span class="o">=</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;sk-...&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Local Ollama — same code, different base_url</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">client</span> <span class="o">=</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434/v1/&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;ollama&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Local LM Studio — same code</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">client</span> <span class="o">=</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:1234/v1/&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;lm-studio&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># Local llama.cpp server — same code</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">client</span> <span class="o">=</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:8080/v1/&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>The key insight: <strong>if your application speaks OpenAI Chat Completions, it works with every backend.</strong> This is exactly what WhisperJAV already does via PySubtrans — the architecture is correct, the problem is the server-side (llama-cpp-python compilation).</p>
+<h3 id="relevant-endpoints">Relevant Endpoints<a class="headerlink" href="#relevant-endpoints" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Purpose</th>
+<th>Universally Supported?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /v1/chat/completions</code></td>
+<td>Chat/translation</td>
+<td>Yes — every server</td>
+</tr>
+<tr>
+<td><code>GET /v1/models</code></td>
+<td>List available models</td>
+<td>Yes — used for health/readiness</td>
+</tr>
+<tr>
+<td><code>GET /health</code> or <code>GET /</code></td>
+<td>Server liveness</td>
+<td>Most servers</td>
+</tr>
+<tr>
+<td><code>POST /v1/embeddings</code></td>
+<td>Embeddings</td>
+<td>Most servers</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Sources:</strong>
+- <a href="https://bentoml.com/llm/llm-inference-basics/openai-compatible-api">OpenAI-compatible API — LLM Inference Handbook (BentoML)</a>
+- <a href="https://ollama.com/blog/openai-compatibility">Ollama OpenAI Compatibility</a>
+- <a href="https://medium.com/@rosgluk/local-llm-hosting-complete-2025-guide-ollama-vllm-localai-jan-lm-studio-more-f98136ce7e4a">Local LLM Hosting Complete 2025 Guide</a></p>
+<hr />
+<h2 id="front-end-back-end-separation-patterns">Front-End / Back-End Separation Patterns<a class="headerlink" href="#front-end-back-end-separation-patterns" title="Permanent link">&para;</a></h2>
+<h3 id="pattern-1-delegate-to-external-server-aider-continuedev-open-webui">Pattern 1: "Delegate to External Server" (Aider, Continue.dev, Open WebUI)<a class="headerlink" href="#pattern-1-delegate-to-external-server-aider-continuedev-open-webui" title="Permanent link">&para;</a></h3>
+<p>The application assumes an LLM server already exists somewhere and connects to it via HTTP.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>[Application] --HTTP/OpenAI API--&gt; [External LLM Server]
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                                    (Ollama, LM Studio, vLLM, cloud API)
+</code></pre></div>
+<p><strong>How it works:</strong>
+- Application configuration specifies a <code>base_url</code> and <code>model</code> name
+- Application uses the <code>openai</code> Python library (or equivalent) to make requests
+- Zero LLM engine code in the application itself
+- User is responsible for running the server (or it's a cloud API)</p>
+<p><strong>Who uses this:</strong>
+- <strong>Aider</strong>: Uses LiteLLM to abstract 100+ providers behind a unified <code>completion()</code> call. User configures model name and API key; Aider never touches inference.
+- <strong>Continue.dev</strong>: Implements <code>ILLM</code> interface with <code>BaseLLM</code> base class. 40+ providers added by extending BaseLLM with provider-specific streaming. All message compilation, capability detection, and logging handled automatically.
+- <strong>Open WebUI</strong>: Supports "Ollama and OpenAI-compatible Protocols" — connects to any server that speaks the standard API. Uses a "Pipelines" plugin system for extensibility.</p>
+<p><strong>Pros:</strong> Zero maintenance burden for inference engine, maximum flexibility, users can pick their preferred backend.
+<strong>Cons:</strong> Requires user to set up an LLM server separately.</p>
+<h3 id="pattern-2-managed-subprocess-anythingllm-janai">Pattern 2: "Managed Subprocess" (AnythingLLM, Jan.ai)<a class="headerlink" href="#pattern-2-managed-subprocess-anythingllm-janai" title="Permanent link">&para;</a></h3>
+<p>The application ships a bundled LLM engine and manages it as a subprocess.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[Application Process]
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    |
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    ├── starts/stops --&gt; [LLM Engine Subprocess] (llama.cpp, Cortex)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    |                         ↕ HTTP API
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    └── sends requests -------┘
+</code></pre></div>
+<p><strong>How it works:</strong>
+- Application bundles a prebuilt binary (not Python bindings)
+- On startup, spawns the engine as a subprocess with appropriate flags
+- Communicates over localhost HTTP (OpenAI-compatible)
+- Manages lifecycle: start, health check, graceful shutdown, crash recovery</p>
+<p><strong>Who uses this:</strong>
+- <strong>AnythingLLM Desktop</strong>: Ships a built-in LLM engine. One-click install, no configuration needed. Downloads models on demand. Uses factory pattern (<code>getLLMProvider()</code>) for instantiation.
+- <strong>Jan.ai</strong>: Powered by Cortex (C++ CLI), which runs llama.cpp under the hood. Supports multiple engine backends (llama.cpp, ONNX, TensorRT-LLM) loaded at runtime.
+- <strong>LM Studio</strong>: Bundles llama.cpp as its engine with "llmster" daemon for headless operation. Manages concurrent requests via continuous batching.</p>
+<p><strong>Pros:</strong> "Just works" for users, no separate server setup.
+<strong>Cons:</strong> Must bundle and maintain the binary, handle platform-specific builds.</p>
+<h3 id="pattern-3-hub-and-spoke-text-generation-webui">Pattern 3: "Hub and Spoke" (text-generation-webui)<a class="headerlink" href="#pattern-3-hub-and-spoke-text-generation-webui" title="Permanent link">&para;</a></h3>
+<p>The application IS the LLM server, with multiple backend loaders.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[text-generation-webui]
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    ├── Transformers loader
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    ├── ExLlamaV3 loader
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    ├── llama.cpp loader
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    └── TensorRT-LLM loader
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    All expose: Gradio UI + OpenAI-compatible API
+</code></pre></div>
+<p><strong>How it works:</strong>
+- <code>shared.py</code> holds global state (model, tokenizer, args)
+- <code>models.py</code> provides <code>load_model()</code> facade that dispatches to the correct backend
+- Each loader implements model loading for its specific format
+- A single API extension provides OpenAI-compatible endpoints</p>
+<p><strong>Who uses this:</strong>
+- <strong>text-generation-webui (oobabooga)</strong>: Supports llama.cpp, Transformers, ExLlamaV3, TensorRT-LLM through a unified <code>load_model()</code> interface. Users select loader in the UI.</p>
+<p><strong>Pros:</strong> Maximum backend flexibility, power-user friendly.
+<strong>Cons:</strong> Complex, maintenance-heavy, not suitable for embedding in other apps.</p>
+<h3 id="verdict-for-whisperjav">Verdict for WhisperJAV<a class="headerlink" href="#verdict-for-whisperjav" title="Permanent link">&para;</a></h3>
+<p><strong>Pattern 1 (delegate) + Pattern 2 (managed subprocess) hybrid</strong> is the right approach:</p>
+<ol>
+<li>Primary: Detect if Ollama/LM Studio is already running → use it (Pattern 1)</li>
+<li>Fallback: If no server found, offer to use cloud API (Pattern 1)</li>
+<li>Future: Optionally bundle a lightweight server binary (Pattern 2)</li>
+</ol>
+<p><strong>Sources:</strong>
+- <a href="https://deepwiki.com/Aider-AI/aider/6.3-multi-provider-llm-integration">Aider — Multi-Provider LLM Integration (DeepWiki)</a>
+- <a href="https://deepwiki.com/continuedev/continue/4.1-extension-architecture">Continue.dev — LLM Abstraction Layer (DeepWiki)</a>
+- <a href="https://deepwiki.com/Mintplex-Labs/anything-llm/5-vector-database-system">AnythingLLM — LLM Provider Integration (DeepWiki)</a>
+- <a href="https://deepwiki.com/oobabooga/text-generation-webui">oobabooga/text-generation-webui (DeepWiki)</a>
+- <a href="https://github.com/janhq/jan">Jan.ai Desktop (GitHub)</a></p>
+<hr />
+<h2 id="process-isolation-and-lifecycle-management">Process Isolation and Lifecycle Management<a class="headerlink" href="#process-isolation-and-lifecycle-management" title="Permanent link">&para;</a></h2>
+<h3 id="why-process-isolation-matters">Why Process Isolation Matters<a class="headerlink" href="#why-process-isolation-matters" title="Permanent link">&para;</a></h3>
+<p>Every production LLM project runs inference in a <strong>separate process</strong> from the application logic. Reasons:</p>
+<ol>
+<li><strong>Crash isolation</strong>: LLM inference engines can segfault (CUDA errors, memory corruption). A crash in a subprocess doesn't kill the main application.</li>
+<li><strong>Memory management</strong>: LLMs consume multi-GB of VRAM/RAM. A separate process allows clean release on shutdown.</li>
+<li><strong>Language boundary</strong>: Best inference engines are C/C++/Go. Separate process avoids Python GIL issues and complex FFI bindings.</li>
+<li><strong>Restartability</strong>: If the LLM server hangs, the application can kill and restart it without losing user state.</li>
+</ol>
+<h3 id="ollamas-lifecycle-management-reference-implementation">Ollama's Lifecycle Management (Reference Implementation)<a class="headerlink" href="#ollamas-lifecycle-management-reference-implementation" title="Permanent link">&para;</a></h3>
+<p>Ollama is the gold standard for LLM server lifecycle management:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Server Start
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    → GPU Discovery (subprocess probe per backend: CUDA, ROCm, Metal, Vulkan)
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    → Backend Selection (priority: CUDA/ROCm &gt; Vulkan &gt; CPU)
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    → Library Loading (bundled GPU libs prepended to system PATH)
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    → Model Loading (on first request, not startup)
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    → Session Timer (5 min default idle timeout)
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    → Expiry → Runner Close → Memory Free
+</code></pre></div>
+<p>Key design decisions:
+- <strong>Subprocess probes for GPU detection</strong>: Ollama spawns a separate process per backend type (CUDA, ROCm, etc.) to test GPU availability. If the probe crashes (unsupported GPU), the main server is unaffected.
+- <strong>Deduplication</strong>: Same physical GPU may be detected by multiple backends (CUDA and Vulkan). Ollama deduplicates by PCI ID, preferring CUDA/ROCm over Vulkan.
+- <strong>Bundled libraries</strong>: Ollama prepends its own GPU libraries to the path, preventing version conflicts with system-installed CUDA.
+- <strong>Lazy model loading</strong>: Models load on first request, not server startup. Reduces startup time.
+- <strong>Idle unloading</strong>: After <code>sessionDuration</code> (default 5 min) with no requests, the model is unloaded to free VRAM.</p>
+<h3 id="health-check-patterns">Health Check Patterns<a class="headerlink" href="#health-check-patterns" title="Permanent link">&para;</a></h3>
+<p>Best practice from vLLM and LiteLLM:</p>
+<table>
+<thead>
+<tr>
+<th>Probe</th>
+<th>Endpoint</th>
+<th>Purpose</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Liveness</strong></td>
+<td><code>GET /health</code></td>
+<td>"Is the process alive?"</td>
+<td>Continuous</td>
+</tr>
+<tr>
+<td><strong>Readiness</strong></td>
+<td><code>GET /v1/models</code></td>
+<td>"Is a model loaded and ready?"</td>
+<td>Before sending requests</td>
+</tr>
+<tr>
+<td><strong>Warmup</strong></td>
+<td><code>POST /v1/chat/completions</code> (1 token)</td>
+<td>"Can it actually generate?"</td>
+<td>After initial load</td>
+</tr>
+</tbody>
+</table>
+<p>LiteLLM recommends using <code>max_tokens=1</code> for health checks to minimize cost and latency.</p>
+<h3 id="lifecycle-management-code-pattern">Lifecycle Management Code Pattern<a class="headerlink" href="#lifecycle-management-code-pattern" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">LLMServerManager</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Manages an external LLM server process.&quot;&quot;&quot;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">gpu_layers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Start server, return base_url.&quot;&quot;&quot;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">([</span><span class="o">...</span><span class="p">])</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_wait_for_ready</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>  <span class="c1"># Poll /v1/models</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;http://localhost:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_port</span><span class="si">}</span><span class="s2">/v1/&quot;</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">health_check</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if server is alive and model is loaded.&quot;&quot;&quot;</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>            <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">base_url</span><span class="si">}</span><span class="s2">/models&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>            <span class="k">return</span> <span class="n">resp</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>        <span class="k">except</span><span class="p">:</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>            <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Graceful shutdown with force-kill fallback.&quot;&quot;&quot;</span>
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process</span><span class="p">:</span>
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_process</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>            <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_process</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>            <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">:</span>
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_process</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Sources:</strong>
+- <a href="https://deepwiki.com/ollama/ollama/2-architecture">Ollama Architecture (DeepWiki)</a>
+- <a href="https://deepwiki.com/ollama/ollama/6.1-gpu-discovery-and-backend-loading">Ollama GPU Discovery and Backend Loading (DeepWiki)</a>
+- <a href="https://llm-d.ai/docs/usage/readiness-probes">vLLM Model-Aware Readiness Probes</a>
+- <a href="https://docs.litellm.ai/docs/proxy/health">LiteLLM Health Checks</a></p>
+<hr />
+<h2 id="multi-backend-abstraction-layers">Multi-Backend Abstraction Layers<a class="headerlink" href="#multi-backend-abstraction-layers" title="Permanent link">&para;</a></h2>
+<h3 id="the-spectrum-of-abstraction">The Spectrum of Abstraction<a class="headerlink" href="#the-spectrum-of-abstraction" title="Permanent link">&para;</a></h3>
+<p>Projects use different levels of abstraction depending on their needs:</p>
+<h4 id="level-1-configuration-based-switching-anythingllm">Level 1: Configuration-Based Switching (AnythingLLM)<a class="headerlink" href="#level-1-configuration-based-switching-anythingllm" title="Permanent link">&para;</a></h4>
+<p>The simplest pattern. A factory function reads config and returns the right client:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_llm_provider</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory pattern — config determines provider.&quot;&quot;&quot;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">provider</span> <span class="o">==</span> <span class="s2">&quot;ollama&quot;</span><span class="p">:</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="k">return</span> <span class="n">OllamaProvider</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">base_url</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">provider</span> <span class="o">==</span> <span class="s2">&quot;openai&quot;</span><span class="p">:</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="k">return</span> <span class="n">OpenAIProvider</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">api_key</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">provider</span> <span class="o">==</span> <span class="s2">&quot;local&quot;</span><span class="p">:</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="k">return</span> <span class="n">LocalProvider</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model_path</span><span class="p">)</span>
+</code></pre></div>
+<p>AnythingLLM uses this exact pattern with <code>getLLMProvider()</code>, supporting 30+ providers. Each provider implements a common interface for chat completion, streaming, and embedding.</p>
+<p><strong>Key feature</strong>: Workspace-level overrides — each workspace can use a different LLM provider/model, while a system-wide default exists.</p>
+<h4 id="level-2-unified-sdk-litellm-used-by-aider">Level 2: Unified SDK (LiteLLM, used by Aider)<a class="headerlink" href="#level-2-unified-sdk-litellm-used-by-aider" title="Permanent link">&para;</a></h4>
+<p>A library that translates between your code and 100+ provider APIs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">litellm</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># All these use the same function signature</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">response</span> <span class="o">=</span> <span class="n">litellm</span><span class="o">.</span><span class="n">completion</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;ollama/llama3.1&quot;</span><span class="p">,</span> <span class="n">messages</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">response</span> <span class="o">=</span> <span class="n">litellm</span><span class="o">.</span><span class="n">completion</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o&quot;</span><span class="p">,</span> <span class="n">messages</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">response</span> <span class="o">=</span> <span class="n">litellm</span><span class="o">.</span><span class="n">completion</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;claude-3-opus&quot;</span><span class="p">,</span> <span class="n">messages</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">response</span> <span class="o">=</span> <span class="n">litellm</span><span class="o">.</span><span class="n">completion</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;deepseek/deepseek-chat&quot;</span><span class="p">,</span> <span class="n">messages</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+</code></pre></div>
+<p>LiteLLM handles authentication, streaming format differences, error normalization, cost tracking, and retry logic. Available as both:
+- <strong>Python SDK</strong>: In-process library (simplest integration)
+- <strong>Proxy Server</strong>: Standalone gateway with admin UI, budget tracking, rate limiting</p>
+<h4 id="level-3-interface-base-class-continuedev">Level 3: Interface + Base Class (Continue.dev)<a class="headerlink" href="#level-3-interface-base-class-continuedev" title="Permanent link">&para;</a></h4>
+<p>A more formal OOP abstraction:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">interface</span><span class="w"> </span><span class="nx">ILLM</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nx">complete</span><span class="p">(</span><span class="nx">prompt</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">options</span><span class="o">:</span><span class="w"> </span><span class="kt">CompletionOptions</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nx">AsyncGenerator</span><span class="o">&lt;</span><span class="kt">string</span><span class="o">&gt;</span><span class="p">;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nx">chat</span><span class="p">(</span><span class="nx">messages</span><span class="o">:</span><span class="w"> </span><span class="kt">Message</span><span class="p">[],</span><span class="w"> </span><span class="nx">options</span><span class="o">:</span><span class="w"> </span><span class="kt">ChatOptions</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nx">AsyncGenerator</span><span class="o">&lt;</span><span class="kt">string</span><span class="o">&gt;</span><span class="p">;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nx">listModels</span><span class="p">()</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">[]</span><span class="o">&gt;</span><span class="p">;</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nx">supportsFim</span><span class="p">()</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span><span class="w">  </span><span class="c1">// Capability detection</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">}</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="kd">class</span><span class="w"> </span><span class="nx">BaseLLM</span><span class="w"> </span><span class="k">implements</span><span class="w"> </span><span class="nx">ILLM</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="c1">// Common: token counting, message compilation, logging, error handling</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="c1">// Abstract: _streamChat(), _streamComplete() — provider-specific</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="p">}</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="kd">class</span><span class="w"> </span><span class="nx">OllamaLLM</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nx">BaseLLM</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* Ollama-specific streaming */</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="kd">class</span><span class="w"> </span><span class="nx">OpenAILLM</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nx">BaseLLM</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* OpenAI-specific streaming */</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Continue.dev supports 40+ providers through this pattern. Adding a new provider requires only implementing the streaming methods — everything else (message compilation, capability detection, logging) is inherited.</p>
+<h3 id="recommendation-for-whisperjav">Recommendation for WhisperJAV<a class="headerlink" href="#recommendation-for-whisperjav" title="Permanent link">&para;</a></h3>
+<p><strong>Level 1 (factory pattern) is sufficient.</strong> WhisperJAV's translation use case is simple: send chat completions, receive translated text. The existing PySubtrans integration already uses the OpenAI SDK, so the abstraction layer is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_translation_client</span><span class="p">(</span><span class="n">provider</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OpenAI</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an OpenAI-compatible client for the configured provider.&quot;&quot;&quot;</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="k">if</span> <span class="n">provider</span> <span class="o">==</span> <span class="s2">&quot;ollama&quot;</span><span class="p">:</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>        <span class="k">return</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434/v1/&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;ollama&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">elif</span> <span class="n">provider</span> <span class="o">==</span> <span class="s2">&quot;lm-studio&quot;</span><span class="p">:</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>        <span class="k">return</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:1234/v1/&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;lm-studio&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="k">elif</span> <span class="n">provider</span> <span class="o">==</span> <span class="s2">&quot;local-server&quot;</span><span class="p">:</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>        <span class="k">return</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;base_url&quot;</span><span class="p">],</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="k">elif</span> <span class="n">provider</span> <span class="o">==</span> <span class="s2">&quot;deepseek&quot;</span><span class="p">:</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="k">return</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;https://api.deepseek.com/v1&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;api_key&quot;</span><span class="p">])</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="c1"># ... etc</span>
+</code></pre></div>
+<p>No need for LiteLLM's complexity — WhisperJAV doesn't need cost tracking, rate limiting, or 100-provider support.</p>
+<p><strong>Sources:</strong>
+- <a href="https://docs.useanything.com/setup/llm-configuration/overview">AnythingLLM LLM Configuration Overview</a>
+- <a href="https://docs.litellm.ai/docs/">LiteLLM Getting Started</a>
+- <a href="https://docs.continue.dev/customize/model-providers/overview">Continue.dev Model Providers Overview</a>
+- <a href="https://medium.com/@mrutyunjaya.mohapatra/litellm-a-unified-llm-api-gateway-for-enterprise-ai-de23e29e9e68">LiteLLM — A Unified LLM API Gateway (Medium)</a></p>
+<hr />
+<h2 id="gpu-detection-and-management">GPU Detection and Management<a class="headerlink" href="#gpu-detection-and-management" title="Permanent link">&para;</a></h2>
+<h3 id="how-ollama-does-it-best-in-class">How Ollama Does It (Best-in-Class)<a class="headerlink" href="#how-ollama-does-it-best-in-class" title="Permanent link">&para;</a></h3>
+<p>Ollama's GPU detection is the industry reference implementation:</p>
+<ol>
+<li><strong>Discovery phase</strong>: For each supported backend (CUDA, ROCm, Metal, Vulkan), Ollama spawns a <strong>bootstrap subprocess</strong> that:</li>
+<li>Sets <code>LD_LIBRARY_PATH</code>/<code>PATH</code> to bundled GPU libraries</li>
+<li>Initializes the backend</li>
+<li>Queries available devices (memory, compute capability, PCI ID)</li>
+<li>Returns device info via HTTP (<code>GET /info</code> → <code>DeviceInfo[]</code>)</li>
+<li>
+<p>Has a timeout: 30s on Linux/macOS, 90s on Windows (Defender DLL scanning)</p>
+</li>
+<li>
+<p><strong>Deep validation</strong>: For CUDA and ROCm, sets <code>GGML_CUDA_INIT=1</code> to force immediate GPU initialization. If the subprocess crashes (unsupported architecture), it's caught cleanly.</p>
+</li>
+<li>
+<p><strong>Deduplication</strong>: Same physical GPU may appear in multiple backends. Ollama deduplicates by PCI ID, with priority: CUDA/ROCm &gt; Vulkan &gt; CPU.</p>
+</li>
+<li>
+<p><strong>Library resolution</strong>: Ollama prepends its bundled GPU libs to <code>PATH</code>/<code>LD_LIBRARY_PATH</code> before system libs, preventing version conflicts.</p>
+</li>
+<li>
+<p><strong>Fallback</strong>: If no GPU libraries found → CPU inference with <code>libggml-cpu</code>.</p>
+</li>
+</ol>
+<h3 id="the-pytorch-pattern-used-by-most-python-projects">The PyTorch Pattern (Used by Most Python Projects)<a class="headerlink" href="#the-pytorch-pattern-used-by-most-python-projects" title="Permanent link">&para;</a></h3>
+<p>Most Python ML projects rely on PyTorch's device detection:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda&quot;</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="p">,</span> <span class="s2">&quot;mps&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;mps&quot;</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span>
+</code></pre></div>
+<p><strong>MPS (Apple Silicon) caveats:</strong>
+- Not all operators are implemented; PyTorch silently falls back to CPU for missing ops
+- Can be slower than CPU for some workloads due to these fallbacks
+- Profiling recommended: "always establish a CPU baseline before optimizing for MPS"</p>
+<p><strong>ROCm (AMD) caveats:</strong>
+- <code>rocm_agent_enumerator</code> utility can crash if GPU permissions are wrong
+- PyTorch ROCm wheels only support specific AMD GPU families
+- Building ROCm from source on Windows is still experimental as of 2026</p>
+<h3 id="the-prebuilt-binary-approach-ollama-lm-studio">The Prebuilt Binary Approach (Ollama, LM Studio)<a class="headerlink" href="#the-prebuilt-binary-approach-ollama-lm-studio" title="Permanent link">&para;</a></h3>
+<p>The most reliable GPU management comes from projects that:
+1. Ship prebuilt binaries for each GPU backend (CUDA 12, CUDA 13, ROCm, Vulkan, CPU)
+2. Auto-detect hardware at runtime
+3. Dynamically load the correct backend library</p>
+<p>This avoids the compilation problem entirely — users never need to install CUDA Toolkit, Visual Studio, or compile anything.</p>
+<h3 id="whisperjav-implication">WhisperJAV Implication<a class="headerlink" href="#whisperjav-implication" title="Permanent link">&para;</a></h3>
+<p>The current approach (llama-cpp-python with CUDA compilation) is an anti-pattern. The fix is not better compilation — it's eliminating compilation entirely by delegating to a project that ships prebuilt GPU-accelerated binaries (Ollama).</p>
+<p><strong>Sources:</strong>
+- <a href="https://deepwiki.com/ollama/ollama/6.1-gpu-discovery-and-backend-loading">Ollama GPU Discovery (DeepWiki)</a>
+- <a href="https://docs.ollama.com/gpu">Ollama Hardware Support</a>
+- <a href="https://github.com/pytorch/pytorch/issues/109457">PyTorch MPS Backend Issues</a>
+- <a href="https://deepwiki.com/codeproject/CodeProject.AI-Server/3.4-gpu-support-configuration">CodeProject.AI — GPU Support Configuration (DeepWiki)</a></p>
+<hr />
+<h2 id="user-experience-patterns-for-non-technical-users">User Experience Patterns for Non-Technical Users<a class="headerlink" href="#user-experience-patterns-for-non-technical-users" title="Permanent link">&para;</a></h2>
+<h3 id="tier-1-it-just-works-ollama-desktop-lm-studio-anythingllm">Tier 1: "It Just Works" (Ollama Desktop, LM Studio, AnythingLLM)<a class="headerlink" href="#tier-1-it-just-works-ollama-desktop-lm-studio-anythingllm" title="Permanent link">&para;</a></h3>
+<p>These projects achieve the lowest friction by:</p>
+<ol>
+<li><strong>Single installer</strong>: One download, one click, done. No command line.</li>
+<li><strong>Bundled GPU libraries</strong>: No "install CUDA Toolkit" step.</li>
+<li><strong>Auto GPU detection</strong>: Application discovers hardware automatically.</li>
+<li><strong>Model browser/downloader</strong>: Users pick models from a gallery, not HuggingFace URLs.</li>
+<li><strong>Health feedback</strong>: Clear indication of what's running, what's loaded, GPU vs CPU status.</li>
+</ol>
+<p><strong>Ollama Desktop</strong> (v0.10.0, July 2025): First native GUI. Model dropdown, prompt box, streaming responses. Finds existing models from CLI. Drag-and-drop file upload. Alpha-grade but functional.</p>
+<p><strong>LM Studio</strong>: Polished desktop app. Model search and download built-in. One-click server start. Shows GPU utilization in real-time. "llmster" daemon for headless use.</p>
+<p><strong>AnythingLLM Desktop</strong>: Built-in LLM engine with zero configuration. Downloads popular models (Llama 3, Phi-3) on demand. CPU+GPU support. One-click install.</p>
+<h3 id="tier-2-guided-setup-janai">Tier 2: "Guided Setup" (Jan.ai)<a class="headerlink" href="#tier-2-guided-setup-janai" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Desktop app with setup wizard</li>
+<li>Prompts user to download a model on first launch</li>
+<li>Auto-detects GPU but shows the detection result</li>
+<li>Offers "recommended" model based on hardware</li>
+</ul>
+<h3 id="tier-3-technical-but-documented-text-generation-webui">Tier 3: "Technical but Documented" (text-generation-webui)<a class="headerlink" href="#tier-3-technical-but-documented-text-generation-webui" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Provides one-click installers (batch scripts) per platform</li>
+<li>User must select model loader</li>
+<li>Requires understanding of quantization formats</li>
+<li>Power-user focused</li>
+</ul>
+<h3 id="key-ux-lessons-for-whisperjav">Key UX Lessons for WhisperJAV<a class="headerlink" href="#key-ux-lessons-for-whisperjav" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Never ask users to compile anything.</strong> The #1 source of support issues.</li>
+<li><strong>Detect, don't ask.</strong> Auto-detect GPU, VRAM, available servers. Present findings, not questions.</li>
+<li><strong>Provide a "recommended" path.</strong> "Ollama detected with 8GB VRAM → using Llama 3.1 8B" is better than a configuration form.</li>
+<li><strong>Fail gracefully with actionable messages.</strong> Not "ConnectionError" but "Local LLM server not found. Install Ollama (ollama.com) or use cloud translation (--provider deepseek)."</li>
+<li><strong>Show progress.</strong> Model downloads are multi-GB. Show download progress, estimated time, and disk space required.</li>
+</ol>
+<h3 id="the-detect-external-server-pattern">The "Detect External Server" Pattern<a class="headerlink" href="#the-detect-external-server-pattern" title="Permanent link">&para;</a></h3>
+<p>For applications that don't want to bundle an LLM engine, the best UX is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>1. Check localhost:11434 (Ollama) → found? Use it.
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>2. Check localhost:1234 (LM Studio) → found? Use it.
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>3. Check user-configured URL → found? Use it.
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>4. Not found → Show friendly message:
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>   &quot;No local LLM server detected. Options:
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    a) Install Ollama (free, recommended): ollama.com
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    b) Use cloud translation: --provider deepseek ($0.001/subtitle file)&quot;
+</code></pre></div>
+<p>This is exactly how AnythingLLM handles Ollama detection — auto-detect if possible, prompt for manual URL if not.</p>
+<p><strong>Sources:</strong>
+- <a href="https://www.databasemart.com/blog/intro-to-ollama-app-v0100">Ollama v0.10.0 Native GUI (DatabaseMart)</a>
+- <a href="https://lmstudio.ai/blog/0.4.0">LM Studio 0.4.0 (Blog)</a>
+- <a href="https://anythingllm.com/desktop">AnythingLLM Desktop</a>
+- <a href="https://docs.anythingllm.com/setup/llm-configuration/local/built-in">AnythingLLM Built-in LLM (Docs)</a></p>
+<hr />
+<h2 id="project-by-project-analysis">Project-by-Project Analysis<a class="headerlink" href="#project-by-project-analysis" title="Permanent link">&para;</a></h2>
+<h3 id="ollama">Ollama<a class="headerlink" href="#ollama" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>Local LLM server with model management</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>llama.cpp (Go wrapper around C/C++ engine)</td>
+</tr>
+<tr>
+<td><strong>GPU support</strong></td>
+<td>CUDA, ROCm, Metal, Vulkan — all auto-detected, prebuilt</td>
+</tr>
+<tr>
+<td><strong>API</strong></td>
+<td>OpenAI-compatible <code>/v1/chat/completions</code>, native <code>/api/chat</code></td>
+</tr>
+<tr>
+<td><strong>Process model</strong></td>
+<td>Standalone server process, client connects via HTTP</td>
+</tr>
+<tr>
+<td><strong>Model management</strong></td>
+<td>Built-in registry, <code>ollama pull model_name</code></td>
+</tr>
+<tr>
+<td><strong>Binary size</strong></td>
+<td>~3-4GB with GPU libraries</td>
+</tr>
+<tr>
+<td><strong>Key strength</strong></td>
+<td>Zero-compilation GPU support, excellent auto-detection</td>
+</tr>
+<tr>
+<td><strong>Key weakness</strong></td>
+<td>Large binary size, no multi-GPU tensor parallelism</td>
+</tr>
+<tr>
+<td><strong>Stars</strong></td>
+<td>~162k</td>
+</tr>
+<tr>
+<td><strong>Release cadence</strong></td>
+<td>Every 2-3 days</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: Ollama's Go binary bundles precompiled llama.cpp backends for every supported GPU. At startup, it probes each backend via subprocess and selects the best one. This eliminates compilation entirely — the user just downloads and runs.</p>
+<p><strong>v0.17.5 (March 2026)</strong>: Cloud model offloading, web search, multimodal, streaming tool calls, thinking models.</p>
+<h3 id="open-webui">Open WebUI<a class="headerlink" href="#open-webui" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>Web-based ChatGPT-like interface for local/cloud LLMs</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>None — connects to external servers (Ollama, OpenAI-compatible)</td>
+</tr>
+<tr>
+<td><strong>Abstraction</strong></td>
+<td>"Supports Ollama and OpenAI-compatible Protocols"</td>
+</tr>
+<tr>
+<td><strong>Key pattern</strong></td>
+<td>Pure frontend — delegates all inference to external servers</td>
+</tr>
+<tr>
+<td><strong>Extensibility</strong></td>
+<td>"Pipelines" plugin system, 9 vector DB backends via VectorDBBase</td>
+</tr>
+<tr>
+<td><strong>Stars</strong></td>
+<td>~80k+</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: Open WebUI is protocol-first — it doesn't care what's behind the API, only that it speaks OpenAI-compatible. This makes it work with Ollama, LM Studio, vLLM, cloud APIs, and anything else that implements the standard.</p>
+<h3 id="text-generation-webui-oobabooga">text-generation-webui (oobabooga)<a class="headerlink" href="#text-generation-webui-oobabooga" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>Gradio web UI for running LLMs locally</td>
+</tr>
+<tr>
+<td><strong>Backends</strong></td>
+<td>llama.cpp, Transformers, ExLlamaV3, TensorRT-LLM</td>
+</tr>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>Hub-and-spoke: <code>shared.py</code> global state, <code>models.py</code> loader facade</td>
+</tr>
+<tr>
+<td><strong>API</strong></td>
+<td>OpenAI-compatible extension, ~85ms overhead</td>
+</tr>
+<tr>
+<td><strong>Process model</strong></td>
+<td>Single process, multiple backend loaders</td>
+</tr>
+<tr>
+<td><strong>Key strength</strong></td>
+<td>Maximum backend flexibility, power-user features</td>
+</tr>
+<tr>
+<td><strong>Key weakness</strong></td>
+<td>Complex, requires technical knowledge</td>
+</tr>
+<tr>
+<td><strong>Stars</strong></td>
+<td>~45k+</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: The <code>load_model()</code> function in <code>models.py</code> is a facade that dispatches to the correct backend loader based on model type. Each loader handles its own GPU configuration. Recent versions dropped ExLlamaV2 in favor of ExLlamaV3 for better quantization.</p>
+<h3 id="lm-studio">LM Studio<a class="headerlink" href="#lm-studio" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>Desktop app for running local LLMs</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>llama.cpp (embedded, custom "llm-engine" wrapper)</td>
+</tr>
+<tr>
+<td><strong>API</strong></td>
+<td>OpenAI-compatible REST API, streaming, embeddings, function calling</td>
+</tr>
+<tr>
+<td><strong>Process model</strong></td>
+<td>App + "llmster" daemon (headless mode)</td>
+</tr>
+<tr>
+<td><strong>Key strength</strong></td>
+<td>Polished UX, GPU visualization, concurrent request handling</td>
+</tr>
+<tr>
+<td><strong>Key weakness</strong></td>
+<td>Closed-source, not embeddable</td>
+</tr>
+<tr>
+<td><strong>Notable</strong></td>
+<td>Continuous batching, unified KV cache, concurrent inference</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: LM Studio 0.4.0 introduced concurrent inference via llama.cpp's continuous batching. The "llmster" daemon allows headless server operation on machines without displays — useful for home servers.</p>
+<h3 id="janai-cortex">Jan.ai / Cortex<a class="headerlink" href="#janai-cortex" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>Desktop app + Cortex engine (CLI alternative to Ollama)</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>Cortex (C++ CLI): llama.cpp, ONNX, TensorRT-LLM</td>
+</tr>
+<tr>
+<td><strong>Multi-engine</strong></td>
+<td>Runtime engine selection — swap backends without reinstall</td>
+</tr>
+<tr>
+<td><strong>API</strong></td>
+<td>OpenAI-compatible</td>
+</tr>
+<tr>
+<td><strong>Key strength</strong></td>
+<td>Multi-engine architecture, cross-platform</td>
+</tr>
+<tr>
+<td><strong>Notable</strong></td>
+<td>Cortex can be used independently of Jan</td>
+</tr>
+</tbody>
+</table>
+<h3 id="localai">LocalAI<a class="headerlink" href="#localai" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>Self-hosted OpenAI-compatible API server</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>Multiple: llama.cpp, vLLM, Transformers, Diffusers</td>
+</tr>
+<tr>
+<td><strong>Deployment</strong></td>
+<td>Docker-first (not a desktop app)</td>
+</tr>
+<tr>
+<td><strong>GPU support</strong></td>
+<td>CUDA 12/13, ROCm, Intel SYCL, Vulkan, Metal, CPU</td>
+</tr>
+<tr>
+<td><strong>Key strength</strong></td>
+<td>Broadest backend and GPU support</td>
+</tr>
+<tr>
+<td><strong>Key weakness</strong></td>
+<td>Docker requirement, not suitable for desktop users</td>
+</tr>
+<tr>
+<td><strong>Stars</strong></td>
+<td>~43k</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: LocalAI auto-detects GPU vendor and downloads the correct backend version. It supports parallel requests via both vLLM and llama.cpp backends. Model gallery provides one-click model installation.</p>
+<h3 id="anythingllm">AnythingLLM<a class="headerlink" href="#anythingllm" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>All-in-one AI desktop app with RAG</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>Built-in LLM engine + 30+ external provider support</td>
+</tr>
+<tr>
+<td><strong>Abstraction</strong></td>
+<td>Factory pattern <code>getLLMProvider()</code>, common interface</td>
+</tr>
+<tr>
+<td><strong>Key feature</strong></td>
+<td>Workspace-level provider switching (per-workspace LLM)</td>
+</tr>
+<tr>
+<td><strong>Key strength</strong></td>
+<td>Zero-config local mode, extensive provider support</td>
+</tr>
+<tr>
+<td><strong>Stars</strong></td>
+<td>~40k+</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: AnythingLLM's provider abstraction uses a connection-based architecture — each workspace can have its own LLM connection (provider + model + settings). The factory pattern with environment-based configuration makes adding new providers straightforward.</p>
+<h3 id="aider">Aider<a class="headerlink" href="#aider" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>AI pair programming in terminal</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>LiteLLM (100+ providers via unified SDK)</td>
+</tr>
+<tr>
+<td><strong>Abstraction</strong></td>
+<td><code>litellm.completion()</code> — single function for all providers</td>
+</tr>
+<tr>
+<td><strong>Key strength</strong></td>
+<td>Works with any LLM, cloud or local</td>
+</tr>
+<tr>
+<td><strong>Local support</strong></td>
+<td>Ollama, LM Studio, llama.cpp server via OpenAI-compatible URL</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: Aider delegates all LLM complexity to LiteLLM. Adding a new provider means adding it to LiteLLM, not to Aider. This is the "thinnest possible" integration — just model name + API key.</p>
+<h3 id="continuedev">Continue.dev<a class="headerlink" href="#continuedev" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it is</strong></td>
+<td>AI coding assistant (VS Code / JetBrains)</td>
+</tr>
+<tr>
+<td><strong>Abstraction</strong></td>
+<td><code>ILLM</code> interface + <code>BaseLLM</code> base class, 40+ providers</td>
+</tr>
+<tr>
+<td><strong>Config</strong></td>
+<td>YAML-based <code>config.yaml</code> with provider/model specification</td>
+</tr>
+<tr>
+<td><strong>Key pattern</strong></td>
+<td>Dual-layer: interface contract + shared base implementation</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Architecture insight</strong>: Continue.dev's abstraction is more formal than Aider's. The <code>BaseLLM</code> handles all common operations (token counting, message compilation, capability detection), while provider subclasses only implement streaming. New providers added with ~50 lines of code.</p>
+<p><strong>Sources:</strong>
+- <a href="https://github.com/ollama/ollama">Ollama GitHub</a>
+- <a href="https://github.com/open-webui/open-webui">Open WebUI GitHub</a>
+- <a href="https://github.com/oobabooga/text-generation-webui">text-generation-webui GitHub</a>
+- <a href="https://lmstudio.ai/blog/0.4.0">LM Studio 0.4.0 Blog</a>
+- <a href="https://github.com/janhq/jan">Jan.ai GitHub</a>
+- <a href="https://localai.io/features/index.print">LocalAI Features</a>
+- <a href="https://github.com/Mintplex-Labs/anything-llm">AnythingLLM GitHub</a>
+- <a href="https://github.com/Aider-AI/aider">Aider GitHub</a>
+- <a href="https://docs.continue.dev/customize/model-providers/overview">Continue.dev Model Providers</a></p>
+<hr />
+<h2 id="anti-patterns-and-what-doesnt-work">Anti-Patterns and What Doesn't Work<a class="headerlink" href="#anti-patterns-and-what-doesnt-work" title="Permanent link">&para;</a></h2>
+<h3 id="anti-pattern-1-requiring-users-to-compile-c-with-gpu-support">Anti-Pattern 1: Requiring Users to Compile C++ with GPU Support<a class="headerlink" href="#anti-pattern-1-requiring-users-to-compile-c-with-gpu-support" title="Permanent link">&para;</a></h3>
+<p><strong>This is WhisperJAV's current problem.</strong> llama-cpp-python requires:
+- C++ compiler (MSVC on Windows, GCC on Linux)
+- CUDA Toolkit (not just the driver) for GPU support
+- Correct compiler version matching CUDA version
+- CMAKE flags for architecture-specific optimization
+- Pre-built wheels exist but often have DLL loading failures due to CUDA version mismatches</p>
+<p><strong>Evidence</strong>: The llama-cpp-python GitHub issues are dominated by build failures:
+- RTX 50 Blackwell GPU users can't build due to CUDA architecture support (#2028)
+- GCC version incompatibilities (#2081)
+- "ggml.dll not found" DLL loading failures
+- Metal performance regressions between versions</p>
+<p><strong>Every project that has moved away from this pattern has seen reduced support burden.</strong></p>
+<h3 id="anti-pattern-2-embedding-llm-inference-in-process-via-python-bindings">Anti-Pattern 2: Embedding LLM Inference In-Process via Python Bindings<a class="headerlink" href="#anti-pattern-2-embedding-llm-inference-in-process-via-python-bindings" title="Permanent link">&para;</a></h3>
+<p>Running inference inside the application process (via Python C bindings) causes:
+- Python GIL contention
+- Application hangs during inference
+- Crashes in C code kill the entire application
+- Memory leaks from C++ objects not properly freed by Python GC
+- Platform-specific DLL/dylib loading nightmares</p>
+<p><strong>Better</strong>: Always use a separate process with HTTP communication.</p>
+<h3 id="anti-pattern-3-building-your-own-model-registrydownloader">Anti-Pattern 3: Building Your Own Model Registry/Downloader<a class="headerlink" href="#anti-pattern-3-building-your-own-model-registrydownloader" title="Permanent link">&para;</a></h3>
+<p>Several projects tried to implement custom model download systems from HuggingFace. Problems:
+- Authentication complexity (gated models)
+- Partial download recovery
+- Disk space management
+- Model format compatibility checking</p>
+<p><strong>Better</strong>: Delegate to Ollama's model management (<code>ollama pull</code>) or use well-tested libraries (huggingface_hub).</p>
+<h3 id="anti-pattern-4-trying-to-support-every-gpu-backend-in-your-own-code">Anti-Pattern 4: Trying to Support Every GPU Backend in Your Own Code<a class="headerlink" href="#anti-pattern-4-trying-to-support-every-gpu-backend-in-your-own-code" title="Permanent link">&para;</a></h3>
+<p>LocalAI and text-generation-webui maintain support for CUDA, ROCm, Metal, Vulkan, and CPU. This is a massive maintenance burden that only makes sense if your project IS an LLM server.</p>
+<p><strong>Better for application developers</strong>: Delegate GPU management to the LLM server (Ollama handles all of this automatically).</p>
+<h3 id="anti-pattern-5-silent-fallback-without-user-awareness">Anti-Pattern 5: Silent Fallback Without User Awareness<a class="headerlink" href="#anti-pattern-5-silent-fallback-without-user-awareness" title="Permanent link">&para;</a></h3>
+<p>Some projects silently fall back from GPU to CPU when GPU initialization fails. Users then experience 10-50x slower performance without understanding why.</p>
+<p><strong>Better</strong>: Detect and report clearly: "GPU not available (reason: CUDA 11 detected, requires CUDA 12+). Running on CPU — expect slower translation. To use GPU: [actionable steps]."</p>
+<h3 id="anti-pattern-6-monolithic-all-in-one-packaging">Anti-Pattern 6: Monolithic "All-in-One" Packaging<a class="headerlink" href="#anti-pattern-6-monolithic-all-in-one-packaging" title="Permanent link">&para;</a></h3>
+<p>Bundling the LLM engine, model files, GPU libraries, and application into a single installer creates:
+- Massive installer size (several GB)
+- Update complexity (any component change requires full reinstall)
+- Version conflicts between bundled and system libraries</p>
+<p><strong>Better</strong>: Separate concerns — application installer + instructions to install Ollama (or auto-detect existing installation).</p>
+<p><strong>Sources:</strong>
+- <a href="https://github.com/abetlen/llama-cpp-python/issues/2028">llama-cpp-python Build Issues (GitHub)</a>
+- <a href="https://github.com/abetlen/llama-cpp-python/issues/2081">llama-cpp-python GCC Issues (GitHub)</a>
+- <a href="https://www.openxcell.com/blog/llama-cpp-vs-ollama/">Ollama vs llama.cpp Comparison (Openxcell)</a>
+- <a href="https://themlarchitect.wpcomstaging.com/blog/the-architectural-elegance-of-model-context-protocol-mcp/">Sidecar Architecture Pattern (MCP)</a></p>
+<hr />
+<h2 id="recommendations-for-whisperjav">Recommendations for WhisperJAV<a class="headerlink" href="#recommendations-for-whisperjav" title="Permanent link">&para;</a></h2>
+<h3 id="recommended-architecture-detect-delegate-fallback">Recommended Architecture: "Detect + Delegate + Fallback"<a class="headerlink" href="#recommended-architecture-detect-delegate-fallback" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>User clicks &quot;Translate&quot; in GUI
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    │
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    ├── 1. Check for running Ollama (localhost:11434)
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    │       → Found: Use Ollama with user&#39;s model
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    │       → Offer to pull recommended model if none loaded
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    │
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    ├── 2. Check for running LM Studio (localhost:1234)
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    │       → Found: Use LM Studio with loaded model
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    │
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    ├── 3. Check user-configured custom server URL
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    │       → Found: Use custom OpenAI-compatible server
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    │
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>    ├── 4. No local server found
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>    │       → Show friendly message with options:
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>    │         a) &quot;Install Ollama (free, 1 click): ollama.com&quot;
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>    │         b) &quot;Use cloud translation (requires API key)&quot;
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>    │         c) &quot;Configure custom LLM server URL&quot;
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>    │
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>    └── 5. Cloud fallback (DeepSeek, OpenAI, etc.)
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>            → Use existing cloud provider code path
+</code></pre></div>
+<h3 id="why-this-architecture">Why This Architecture<a class="headerlink" href="#why-this-architecture" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Eliminates compilation entirely.</strong> No more llama-cpp-python build issues, DLL problems, CUDA Toolkit requirements.</p>
+</li>
+<li>
+<p><strong>Leverages existing ecosystem.</strong> Ollama has 162k stars, ships prebuilt GPU-accelerated binaries for every platform, auto-detects hardware. Why duplicate this?</p>
+</li>
+<li>
+<p><strong>Maintains current code structure.</strong> PySubtrans already uses OpenAI-compatible API. Changing <code>base_url</code> from <code>localhost:8000</code> (current llama-cpp-python) to <code>localhost:11434</code> (Ollama) requires minimal code changes.</p>
+</li>
+<li>
+<p><strong>Zero new dependencies.</strong> The <code>openai</code> Python package (or raw <code>requests</code>) is all that's needed. No llama-cpp-python, no CUDA, no cmake.</p>
+</li>
+<li>
+<p><strong>User choice.</strong> Power users can use their preferred LLM server. Non-technical users get clear guidance.</p>
+</li>
+</ol>
+<h3 id="implementation-phases">Implementation Phases<a class="headerlink" href="#implementation-phases" title="Permanent link">&para;</a></h3>
+<h4 id="phase-1-add-ollama-support-low-effort-high-impact">Phase 1: Add Ollama Support (Low effort, high impact)<a class="headerlink" href="#phase-1-add-ollama-support-low-effort-high-impact" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Add server detection: probe <code>localhost:11434</code>, <code>localhost:1234</code>, custom URL</li>
+<li>Add <code>--provider ollama</code> and <code>--provider lm-studio</code> options</li>
+<li>Implement health check + model listing via <code>/v1/models</code></li>
+<li>Friendly error messages when no server found</li>
+<li>Update GUI to show detected server status</li>
+<li>Keep llama-cpp-python as deprecated fallback</li>
+</ul>
+<h4 id="phase-2-deprecate-llama-cpp-python-medium-effort">Phase 2: Deprecate llama-cpp-python (Medium effort)<a class="headerlink" href="#phase-2-deprecate-llama-cpp-python-medium-effort" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Move llama-cpp-python to <code>[legacy]</code> extra</li>
+<li>Add first-run guide in GUI: "For local translation, install Ollama"</li>
+<li>Add Ollama setup instructions to documentation</li>
+<li>Remove llama_build_utils.py, llama_cuda_config.py complexity</li>
+</ul>
+<h4 id="phase-3-optional-server-bundling-future-if-needed">Phase 3: Optional Server Bundling (Future, if needed)<a class="headerlink" href="#phase-3-optional-server-bundling-future-if-needed" title="Permanent link">&para;</a></h4>
+<ul>
+<li>If user demand requires zero-external-dependency local translation:</li>
+<li>Bundle <code>llama-server</code> binary (prebuilt from llama.cpp releases, ~100-400MB)</li>
+<li>Manage as subprocess with lifecycle management</li>
+<li>This is lighter than bundling Ollama (~3-4GB)</li>
+<li>Or: create an "Ollama installer" step in WhisperJAV's installer</li>
+</ul>
+<h3 id="server-detection-implementation-sketch">Server Detection Implementation Sketch<a class="headerlink" href="#server-detection-implementation-sketch" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="sd">&quot;&quot;&quot;LLM server detection for WhisperJAV translation.&quot;&quot;&quot;</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">List</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">DetectedServer</span><span class="p">:</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>           <span class="c1"># &quot;ollama&quot;, &quot;lm-studio&quot;, &quot;custom&quot;</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    <span class="n">base_url</span><span class="p">:</span> <span class="nb">str</span>       <span class="c1"># &quot;http://localhost:11434/v1/&quot;</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="n">models</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>   <span class="c1"># Available model names</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>    <span class="n">gpu_info</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>  <span class="c1"># &quot;NVIDIA RTX 4090&quot; if detectable</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="n">PROBE_TARGETS</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="p">(</span><span class="s2">&quot;ollama&quot;</span><span class="p">,</span>    <span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">),</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>    <span class="p">(</span><span class="s2">&quot;lm-studio&quot;</span><span class="p">,</span> <span class="s2">&quot;http://localhost:1234&quot;</span><span class="p">),</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="p">]</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">detect_servers</span><span class="p">(</span><span class="n">custom_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">DetectedServer</span><span class="p">]:</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Probe known LLM server ports and return available servers.&quot;&quot;&quot;</span>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>    <span class="n">servers</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>    <span class="n">targets</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">PROBE_TARGETS</span><span class="p">)</span>
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>    <span class="k">if</span> <span class="n">custom_url</span><span class="p">:</span>
+<a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>        <span class="n">targets</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">&quot;custom&quot;</span><span class="p">,</span> <span class="n">custom_url</span><span class="p">))</span>
+<a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>
+<a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">base_url</span> <span class="ow">in</span> <span class="n">targets</span><span class="p">:</span>
+<a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a>            <span class="c1"># Check /v1/models endpoint (OpenAI standard)</span>
+<a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>            <span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_url</span><span class="si">}</span><span class="s2">/v1/models&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>            <span class="k">if</span> <span class="n">resp</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
+<a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a>                <span class="n">data</span> <span class="o">=</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+<a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a>                <span class="n">models</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="p">[])]</span>
+<a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>                <span class="n">servers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DetectedServer</span><span class="p">(</span>
+<a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>                    <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+<a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>                    <span class="n">base_url</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_url</span><span class="si">}</span><span class="s2">/v1/&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a>                    <span class="n">models</span><span class="o">=</span><span class="n">models</span><span class="p">,</span>
+<a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a>                    <span class="n">gpu_info</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># Could probe Ollama-specific API</span>
+<a id="__codelineno-13-39" name="__codelineno-13-39" href="#__codelineno-13-39"></a>                <span class="p">))</span>
+<a id="__codelineno-13-40" name="__codelineno-13-40" href="#__codelineno-13-40"></a>        <span class="k">except</span> <span class="p">(</span><span class="n">requests</span><span class="o">.</span><span class="n">ConnectionError</span><span class="p">,</span> <span class="n">requests</span><span class="o">.</span><span class="n">Timeout</span><span class="p">):</span>
+<a id="__codelineno-13-41" name="__codelineno-13-41" href="#__codelineno-13-41"></a>            <span class="k">continue</span>  <span class="c1"># Server not running, skip</span>
+<a id="__codelineno-13-42" name="__codelineno-13-42" href="#__codelineno-13-42"></a>
+<a id="__codelineno-13-43" name="__codelineno-13-43" href="#__codelineno-13-43"></a>    <span class="k">return</span> <span class="n">servers</span>
+<a id="__codelineno-13-44" name="__codelineno-13-44" href="#__codelineno-13-44"></a>
+<a id="__codelineno-13-45" name="__codelineno-13-45" href="#__codelineno-13-45"></a><span class="k">def</span><span class="w"> </span><span class="nf">select_best_server</span><span class="p">(</span>
+<a id="__codelineno-13-46" name="__codelineno-13-46" href="#__codelineno-13-46"></a>    <span class="n">servers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">DetectedServer</span><span class="p">],</span>
+<a id="__codelineno-13-47" name="__codelineno-13-47" href="#__codelineno-13-47"></a>    <span class="n">preferred_provider</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-13-48" name="__codelineno-13-48" href="#__codelineno-13-48"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DetectedServer</span><span class="p">]:</span>
+<a id="__codelineno-13-49" name="__codelineno-13-49" href="#__codelineno-13-49"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Select the best available server, respecting user preference.&quot;&quot;&quot;</span>
+<a id="__codelineno-13-50" name="__codelineno-13-50" href="#__codelineno-13-50"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">servers</span><span class="p">:</span>
+<a id="__codelineno-13-51" name="__codelineno-13-51" href="#__codelineno-13-51"></a>        <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-13-52" name="__codelineno-13-52" href="#__codelineno-13-52"></a>
+<a id="__codelineno-13-53" name="__codelineno-13-53" href="#__codelineno-13-53"></a>    <span class="c1"># If user specified a provider, prefer it</span>
+<a id="__codelineno-13-54" name="__codelineno-13-54" href="#__codelineno-13-54"></a>    <span class="k">if</span> <span class="n">preferred_provider</span><span class="p">:</span>
+<a id="__codelineno-13-55" name="__codelineno-13-55" href="#__codelineno-13-55"></a>        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">servers</span><span class="p">:</span>
+<a id="__codelineno-13-56" name="__codelineno-13-56" href="#__codelineno-13-56"></a>            <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">preferred_provider</span><span class="p">:</span>
+<a id="__codelineno-13-57" name="__codelineno-13-57" href="#__codelineno-13-57"></a>                <span class="k">return</span> <span class="n">s</span>
+<a id="__codelineno-13-58" name="__codelineno-13-58" href="#__codelineno-13-58"></a>
+<a id="__codelineno-13-59" name="__codelineno-13-59" href="#__codelineno-13-59"></a>    <span class="c1"># Default priority: ollama &gt; lm-studio &gt; custom</span>
+<a id="__codelineno-13-60" name="__codelineno-13-60" href="#__codelineno-13-60"></a>    <span class="k">return</span> <span class="n">servers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="model-recommendation-strategy">Model Recommendation Strategy<a class="headerlink" href="#model-recommendation-strategy" title="Permanent link">&para;</a></h3>
+<p>When Ollama is detected but no suitable model is loaded:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">RECOMMENDED_MODELS</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="s2">&quot;high_vram&quot;</span><span class="p">:</span>  <span class="p">{</span><span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;llama3.1:8b&quot;</span><span class="p">,</span> <span class="s2">&quot;min_vram_gb&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">,</span> <span class="s2">&quot;desc&quot;</span><span class="p">:</span> <span class="s2">&quot;Best quality&quot;</span><span class="p">},</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="s2">&quot;medium_vram&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;llama3.2:3b&quot;</span><span class="p">,</span> <span class="s2">&quot;min_vram_gb&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;desc&quot;</span><span class="p">:</span> <span class="s2">&quot;Good balance&quot;</span><span class="p">},</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="s2">&quot;low_vram&quot;</span><span class="p">:</span>   <span class="p">{</span><span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;phi3:mini&quot;</span><span class="p">,</span>    <span class="s2">&quot;min_vram_gb&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;desc&quot;</span><span class="p">:</span> <span class="s2">&quot;Lightweight&quot;</span><span class="p">},</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="p">}</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">suggest_model</span><span class="p">(</span><span class="n">available_vram_gb</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Suggest an Ollama model based on available VRAM.&quot;&quot;&quot;</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="k">if</span> <span class="n">available_vram_gb</span> <span class="o">&gt;=</span> <span class="mi">6</span><span class="p">:</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>        <span class="k">return</span> <span class="s2">&quot;llama3.1:8b&quot;</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>    <span class="k">elif</span> <span class="n">available_vram_gb</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>        <span class="k">return</span> <span class="s2">&quot;llama3.2:3b&quot;</span>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>        <span class="k">return</span> <span class="s2">&quot;phi3:mini&quot;</span>
+</code></pre></div>
+<h3 id="what-this-eliminates-from-whisperjav">What This Eliminates from WhisperJAV<a class="headerlink" href="#what-this-eliminates-from-whisperjav" title="Permanent link">&para;</a></h3>
+<p>Files/complexity that can be removed or deprecated:</p>
+<table>
+<thead>
+<tr>
+<th>Current File</th>
+<th>Purpose</th>
+<th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>translate/local_backend.py</code> (600+ lines)</td>
+<td>llama-cpp-python server management</td>
+<td>50-line Ollama client</td>
+</tr>
+<tr>
+<td><code>translate/llama_build_utils.py</code></td>
+<td>Building llama-cpp-python from source</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td><code>translate/llama_cuda_config.py</code></td>
+<td>CUDA version detection for wheels</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td><code>translate/service.py</code> (partial)</td>
+<td>FastAPI server for local LLM</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td>DLL path setup code</td>
+<td>PyTorch CUDA lib path hacking</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td>HuggingFace wheel hosting</td>
+<td>Pre-built wheel distribution</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td><code>installer/core/registry.py</code> llm entries</td>
+<td>llama-cpp-python, fastapi, uvicorn</td>
+<td>Not needed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estimated code reduction</strong>: ~1500+ lines of fragile, platform-specific code replaced by ~100 lines of HTTP client code.</p>
+<hr />
+<h2 id="key-takeaways">Key Takeaways<a class="headerlink" href="#key-takeaways" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>OpenAI-compatible API is the universal standard.</strong> WhisperJAV already uses it. The problem is the server side, not the client side.</p>
+</li>
+<li>
+<p><strong>Ollama is the right delegation target.</strong> 162k stars, prebuilt GPU binaries for all platforms, automatic hardware detection, model management, zero compilation.</p>
+</li>
+<li>
+<p><strong>Process isolation via HTTP is the proven pattern.</strong> Every successful project does this. Never embed inference in your application process.</p>
+</li>
+<li>
+<p><strong>Compilation is the enemy of user experience.</strong> Projects that require C++ compilation with GPU support generate the most support issues. Eliminate it.</p>
+</li>
+<li>
+<p><strong>The "detect external server" pattern is the lightest-weight integration.</strong> Minimal code, maximum flexibility, zero dependency on inference engine internals.</p>
+</li>
+<li>
+<p><strong>Fallback chains create resilient UX.</strong> Local GPU → local CPU → cloud API → clear error message. Never leave the user stuck.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2887 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/INSTALLATION_STATE_REVIEW/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>WhisperJAV Installation System — State Review for External Reviewers - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-installation-system-state-review-for-external-reviewers" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperJAV Installation System — State Review for External Reviewers
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-background-historical-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Background &amp; Historical Context
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Background &amp; Historical Context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is WhisperJAV?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gpu-lock-in-problem-issue-90" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The GPU Lock-in Problem (Issue #90)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-evolution-timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Evolution Timeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-installation-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two Installation Paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-v187-stable-released-installation-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. v1.8.7 Stable: Released Installation Process
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. v1.8.7 Stable: Released Installation Process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-source-installation-installpy-1741-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Source Installation (install.py — 1,741 lines)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 Source Installation (install.py — 1,741 lines)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#preflight-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight Checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-6-stage-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 6-Stage Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-install-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-Install Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-install-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-Install Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-detection-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU Detection Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-architectural-decisions-in-v187" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Architectural Decisions in v1.8.7
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-conda-constructor-installer-windows-exe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Conda-Constructor Installer (Windows .exe)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 Conda-Constructor Installer (Windows .exe)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-exe-installer-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the .exe Installer Does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-platform-wrapper-scripts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Platform Wrapper Scripts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-upgrade-system-whisperjavupgradepy-1520-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Upgrade System (whisperjav/upgrade.py — 1,520 lines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-validation-quality-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Validation &amp; Quality Gates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.5 Validation &amp; Quality Gates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#runtime-preflight-whisperjavutilspreflight_checkpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Preflight (whisperjav/utils/preflight_check.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cicd-validation-whisperjavinstallervalidation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI/CD Validation (whisperjav/installer/validation/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-package-registry-whisperjavinstallercoreregistrypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Package Registry (whisperjav/installer/core/registry.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-standalone-module-whisperjavinstallercorestandalonepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 Standalone Module (whisperjav/installer/core/standalone.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-current-dev-state-post-uv-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Current Dev State: Post-uv Migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Current Dev State: Post-uv Migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-what-changed-12-commits-since-v187" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 What Changed (12 commits since v1.8.7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-the-uv-migration-before-vs-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 The uv Migration: Before vs After
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.2 The uv Migration: Before vs After">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-v187-6-stage-pip-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before (v1.8.7): 6-stage pip pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#after-current-dev-single-uv-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After (current dev): Single uv sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-new-installpy-833-lines-uv-based" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 New: install.py (833 lines, uv-based)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.3 New: install.py (833 lines, uv-based)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-new-pyprojecttoml-uv-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 New: pyproject.toml uv Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-new-uvlock-lockfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 New: uv.lock (Lockfile)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-new-upgrade-path-for-source-installs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 New: Upgrade Path for Source Installs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-what-did-not-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 What Did NOT Change
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-known-issues-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Known Issues &amp; Open Questions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Known Issues &amp; Open Questions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-environment-targeting-problem-current-focus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Environment Targeting Problem (Current Focus)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-python-version-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 .python-version File
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-two-installation-paths-diverging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Two Installation Paths Diverging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-consumer-ux-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Consumer UX Gap
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-file-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. File Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. File Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#source-installation-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source Installation Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conda-constructor-installer-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conda-Constructor Installer Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-installer-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Installer Module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade System
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/INSTALLATION_STATE_REVIEW.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-installation-system-state-review-for-external-reviewers">WhisperJAV Installation System — State Review for External Reviewers<a class="headerlink" href="#whisperjav-installation-system-state-review-for-external-reviewers" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2026-03-12
+<strong>Current stable release:</strong> v1.8.7
+<strong>Current dev branch:</strong> main (12 commits ahead of v1.8.7, targeting v1.8.8)</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-background--historical-context">Background &amp; Historical Context</a></li>
+<li><a href="#2-v187-stable-released-installation-process">v1.8.7 Stable: Released Installation Process</a></li>
+<li><a href="#3-current-dev-state-post-uv-migration">Current Dev State: Post-uv Migration</a></li>
+<li><a href="#4-known-issues--open-questions">Known Issues &amp; Open Questions</a></li>
+<li><a href="#5-file-reference">File Reference</a></li>
+</ol>
+<hr />
+<h2 id="1-background-historical-context">1. Background &amp; Historical Context<a class="headerlink" href="#1-background-historical-context" title="Permanent link">&para;</a></h2>
+<h3 id="what-is-whisperjav">What is WhisperJAV?<a class="headerlink" href="#what-is-whisperjav" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV is a subtitle generation tool optimized for Japanese media, using OpenAI Whisper with custom enhancements for Japanese language processing, scene detection, and voice activity detection. It targets consumers (non-developers wanting subtitles) and developers/researchers alike.</p>
+<h3 id="the-gpu-lock-in-problem-issue-90">The GPU Lock-in Problem (Issue #90)<a class="headerlink" href="#the-gpu-lock-in-problem-issue-90" title="Permanent link">&para;</a></h3>
+<p>The central installation challenge for any Whisper-based tool:</p>
+<ol>
+<li>Standard <code>pip install</code> resolves all dependencies at once</li>
+<li>PyTorch on PyPI is <strong>CPU-only</strong> (~200MB)</li>
+<li>Whisper packages depend on torch</li>
+<li>Result: pip installs CPU torch even when user has an RTX 4090</li>
+<li>Inference is <strong>6-10x slower</strong> on CPU vs GPU</li>
+</ol>
+<p><strong>Solution (v1.0-v1.8.7):</strong> Install PyTorch <strong>first</strong> with <code>--index-url</code> pointing to CUDA wheels, then install everything else. This "locks in" the GPU version so subsequent packages see torch as already satisfied.</p>
+<h3 id="installation-evolution-timeline">Installation Evolution Timeline<a class="headerlink" href="#installation-evolution-timeline" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Approach</th>
+<th>Key Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>v1.0-v1.6</td>
+<td>Manual pip commands in batch scripts</td>
+<td>950+ line .bat files with duplicated logic per platform</td>
+</tr>
+<tr>
+<td>v1.7.0</td>
+<td>Unified installer module (<code>whisperjav/installer/</code>)</td>
+<td>Centralized GPU detection, registry, retry logic</td>
+</tr>
+<tr>
+<td>v1.8.0</td>
+<td>conda-constructor .exe installer</td>
+<td>Bundled Python + uv binary for end users</td>
+</tr>
+<tr>
+<td>v1.8.2</td>
+<td>Package registry as single source of truth</td>
+<td><code>registry.py</code> defines all packages; validation catches drift</td>
+</tr>
+<tr>
+<td>v1.8.7</td>
+<td>6-stage pip pipeline via <code>install.py</code></td>
+<td>Registry-driven, but still multiple sequential pip calls</td>
+</tr>
+<tr>
+<td><strong>Dev (post-v1.8.7)</strong></td>
+<td><strong>uv sync</strong> replaces pip pipeline</td>
+<td>Single command, lockfile, named GPU indexes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="two-installation-paths">Two Installation Paths<a class="headerlink" href="#two-installation-paths" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV has always maintained two distinct installation paths:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Target User</th>
+<th>Method</th>
+<th>Produced By</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Conda-constructor installer</strong></td>
+<td>End users (Windows)</td>
+<td>Download .exe → run → done</td>
+<td><code>build_release.py</code> → NSIS .exe (~150MB)</td>
+</tr>
+<tr>
+<td><strong>Source install</strong></td>
+<td>Developers, Linux/macOS users</td>
+<td><code>git clone</code> → <code>python install.py</code></td>
+<td>Direct from repo</td>
+</tr>
+</tbody>
+</table>
+<p>Both paths share the same core logic (GPU detection, package registry, preflight checks) via the <code>whisperjav/installer/</code> module.</p>
+<hr />
+<h2 id="2-v187-stable-released-installation-process">2. v1.8.7 Stable: Released Installation Process<a class="headerlink" href="#2-v187-stable-released-installation-process" title="Permanent link">&para;</a></h2>
+<h3 id="21-source-installation-installpy-1741-lines">2.1 Source Installation (<code>install.py</code> — 1,741 lines)<a class="headerlink" href="#21-source-installation-installpy-1741-lines" title="Permanent link">&para;</a></h3>
+<p>The v1.8.7 <code>install.py</code> uses a <strong>6-stage sequential pip pipeline</strong> driven by the package registry.</p>
+<h4 id="preflight-checks">Preflight Checks<a class="headerlink" href="#preflight-checks" title="Permanent link">&para;</a></h4>
+<p>Before installation begins, the script validates:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Method</th>
+<th>Failure Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python version</td>
+<td><code>sys.version_info</code></td>
+<td>Hard fail if not 3.10-3.12</td>
+</tr>
+<tr>
+<td>FFmpeg</td>
+<td><code>shutil.which("ffmpeg")</code></td>
+<td>Warning (needed for audio extraction)</td>
+</tr>
+<tr>
+<td>Git</td>
+<td><code>shutil.which("git")</code></td>
+<td>Hard fail (needed for git-based deps)</td>
+</tr>
+<tr>
+<td>Disk space</td>
+<td><code>shutil.disk_usage()</code></td>
+<td>Hard fail if &lt; 8GB free</td>
+</tr>
+<tr>
+<td>Network</td>
+<td><code>urllib.request.urlopen("https://pypi.org")</code></td>
+<td>Hard fail if PyPI unreachable</td>
+</tr>
+<tr>
+<td>WebView2</td>
+<td>Windows registry check</td>
+<td>Warning (needed for GUI)</td>
+</tr>
+<tr>
+<td>VC++ Redist</td>
+<td>Windows registry check</td>
+<td>Warning (needed for some packages)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="the-6-stage-pipeline">The 6-Stage Pipeline<a class="headerlink" href="#the-6-stage-pipeline" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Step 1/6: Upgrade pip
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    └─ pip install --upgrade pip
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>Step 2/6: Install PyTorch (GPU Lock-in)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    └─ pip install torch torchaudio torchvision --index-url &lt;cuda_url&gt;
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    └─ CUDA URL selected by GPU detection (cu128, cu118, or cpu)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    └─ Apple Silicon: installs from default PyPI (MPS support built-in)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>Step 3/6: Install Core Dependencies
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    └─ numpy, scipy, librosa, soundfile, pydub, pysrt, srt, etc.
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    └─ Packages queried from registry.py (single source of truth)
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    └─ numpy installed BEFORE numba (binary ABI compatibility)
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Step 4/6: Install Whisper Packages
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    └─ openai-whisper (git+https://github.com/openai/whisper@main)
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    └─ stable-ts (git+https://github.com/meizhong986/stable-ts-fix-setup.git)
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    └─ ffmpeg-python (git+https://github.com/kkroening/ffmpeg-python.git)
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    └─ faster-whisper (from PyPI)
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>Step 5/6: Install Optional Packages
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>    └─ HuggingFace (transformers, accelerate, huggingface-hub)
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    └─ Qwen3-ASR
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    └─ Translation (pysubtrans, openai, google-genai)
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    └─ LLM server (uvicorn, fastapi)
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    └─ llama-cpp-python (interactive prompt, platform-specific wheel logic)
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    └─ VAD (silero-vad, auditok)
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>    └─ Speech Enhancement (modelscope, clearvoice, bs-roformer) — allow_fail=True
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    └─ GUI (pywebview, pythonnet on Windows)
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>Step 6/6: Install WhisperJAV
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    └─ pip install --no-deps .          (standard)
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    └─ pip install --no-deps -e .       (with --dev flag)
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>    └─ --no-deps prevents pip from re-resolving and overwriting GPU torch
+</code></pre></div>
+<h4 id="post-install-verification">Post-Install Verification<a class="headerlink" href="#post-install-verification" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># 1. Import test</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">python</span> <span class="o">-</span><span class="n">c</span> <span class="s2">&quot;import whisperjav; print(whisperjav.__version__)&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># 2. Torch CUDA verification</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">python</span> <span class="o">-</span><span class="n">c</span> <span class="s2">&quot;import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))&quot;</span>
+</code></pre></div>
+<h4 id="post-install-summary">Post-Install Summary<a class="headerlink" href="#post-install-summary" title="Permanent link">&para;</a></h4>
+<p>Prints CLI usage instructions:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>whisperjav video.mp4 --mode balanced
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>whisperjav-gui
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>whisperjav --help
+</code></pre></div></p>
+<h4 id="gpu-detection-flow">GPU Detection Flow<a class="headerlink" href="#gpu-detection-flow" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>1. Check --cpu-only or --cuda flags (explicit override)
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>2. Try whisperjav.installer.detect_gpu() (nvidia-smi + pynvml)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>   └─ Returns GPUInfo with name, driver_version, cuda_version
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>3. Check Apple Silicon (sys.platform == &quot;darwin&quot; + arm64)
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>4. Fallback: basic nvidia-smi query
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>5. Default: &quot;cpu&quot;
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>Driver → CUDA mapping:
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  Driver 570+ → cu128 (CUDA 12.8)
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  Driver 450+ → cu118 (CUDA 11.8)
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  No GPU      → cpu
+</code></pre></div>
+<h4 id="key-architectural-decisions-in-v187">Key Architectural Decisions in v1.8.7<a class="headerlink" href="#key-architectural-decisions-in-v187" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Registry-driven:</strong> Package lists queried from <code>whisperjav/installer/core/registry.py</code> at runtime, not hardcoded</li>
+<li><strong>StepExecutor:</strong> Centralized pip execution with retry logic (3 attempts, 5s delay)</li>
+<li><strong>allow_fail=True:</strong> Speech enhancement and GUI packages can fail without aborting installation</li>
+<li><strong>Git timeout handling:</strong> Detects 21-second TCP timeout pattern (common behind GFW), auto-reconfigures git</li>
+<li><strong>Interactive prompts with timeout:</strong> LLM installation prompt defaults to "yes" after 30 seconds</li>
+</ol>
+<h3 id="22-conda-constructor-installer-windows-exe">2.2 Conda-Constructor Installer (Windows .exe)<a class="headerlink" href="#22-conda-constructor-installer-windows-exe" title="Permanent link">&para;</a></h3>
+<p>The end-user installer is built with conda-constructor and produces a ~150MB Windows executable.</p>
+<h4 id="build-pipeline">Build Pipeline<a class="headerlink" href="#build-pipeline" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>installer/VERSION              ← Version config (major.minor.patch.prerelease)
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>         │
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>installer/build_release.py     ← 5-phase orchestrator
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>         │
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>         ├─ Phase 1: Update whisperjav/__version__.py
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>         ├─ Phase 2: Generate 11 files from templates/
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>         ├─ Phase 3: Build whisperjav-{version}-py3-none-any.whl
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>         ├─ Phase 4: Copy static files (LICENSE, icon)
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>         └─ Phase 5: Run validation
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>         │
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>installer/generated/           ← Output directory
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>         ├─ construct_v{VER}.yaml          (conda-constructor config)
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>         ├─ post_install_v{VER}.bat        (batch wrapper)
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>         ├─ post_install_v{VER}.py         (2,820 lines of post-install logic)
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>         ├─ requirements_v{VER}.txt        (~65 packages)
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>         ├─ build_installer_v{VER}.bat     (runs conda-constructor)
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>         ├─ validate_installer_v{VER}.py   (pre-build checks)
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>         ├─ WhisperJAV_Launcher_v{VER}.py  (GUI launcher)
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>         ├─ custom_template_v{VER}.nsi.tmpl(NSIS UI customization)
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>         └─ ...
+</code></pre></div>
+<h4 id="what-the-exe-installer-does">What the .exe Installer Does<a class="headerlink" href="#what-the-exe-installer-does" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>User downloads WhisperJAV-1.8.7-Windows-x86_64.exe
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>         │
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    ┌────┴────┐
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    │  NSIS   │  ← GUI installer (choose install location)
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    │ Wizard  │     Default: %LOCALAPPDATA%\WhisperJAV (no admin required)
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    └────┬────┘
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>         │
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    ┌────┴─────────────────┐
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    │ conda-constructor    │  ← Extracts minimal conda environment:
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    │ (base environment)   │     Python 3.10.18, pip, git, ffmpeg, menuinst
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    └────┬─────────────────┘
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>         │
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    ┌────┴─────────────────┐
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    │ post_install.py      │  ← 2,820-line script that runs:
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    │ (heavy lifting)      │
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>    │  1. GPU detection    │     nvidia-smi or pynvml
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>    │  2. CUDA selection   │     cu128/cu118/cpu based on driver
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    │  3. Disk/network     │     8GB free, PyPI reachable
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    │  4. VC++ Redist      │     Auto-download if missing
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    │  5. WebView2 check   │     Prompt to install if missing
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>    │  6. PyTorch install  │     uv pip install torch --index-url &lt;cuda&gt;
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>    │  7. GPU constraints  │     Write pin file to protect CUDA wheels
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>    │  8. All other deps   │     uv pip install -r requirements.txt --constraint gpu_constraints.txt
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>    │  9. WhisperJAV wheel │     uv pip install whisperjav-{ver}-py3-none-any.whl
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>    │ 10. Git config       │     Timeout/proxy configuration
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>    │ 11. Verification     │     Import test + CUDA test
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    └────┬─────────────────┘
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>         │
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>    ┌────┴──────────┐
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>    │ Desktop       │  ← Created by NSIS custom template
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>    │ Shortcut      │     Points to WhisperJAV_Launcher_v{VER}.py
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>    └───────────────┘
+</code></pre></div>
+<h4 id="key-details">Key Details<a class="headerlink" href="#key-details" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Install location:</strong> <code>%LOCALAPPDATA%\WhisperJAV</code> (no admin, user-writable)</li>
+<li><strong>Install time:</strong> 10-20 minutes (internet-dependent, downloads ~2-4GB of packages)</li>
+<li><strong>First run:</strong> Additional 5-10 minutes for AI model download (~3GB)</li>
+<li><strong>uv.exe bundled:</strong> ~30MB binary included for 10-30x faster pip operations</li>
+<li><strong>GPU constraint file:</strong> After PyTorch install, pins torch/torchaudio/torchvision versions to prevent subsequent pip installs from replacing CUDA wheels with CPU versions</li>
+<li><strong>GFW support:</strong> Detects China network issues (21s TCP timeout) and auto-configures git with extended timeouts and proxy detection</li>
+</ul>
+<h3 id="23-platform-wrapper-scripts">2.3 Platform Wrapper Scripts<a class="headerlink" href="#23-platform-wrapper-scripts" title="Permanent link">&para;</a></h3>
+<p>Thin wrappers that delegate to <code>install.py</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Platform</th>
+<th>What It Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>installer/install_windows.bat</code></td>
+<td>Windows</td>
+<td>Verifies directory, forwards args to <code>python install.py</code></td>
+</tr>
+<tr>
+<td><code>installer/install_linux.sh</code></td>
+<td>Linux</td>
+<td>Same + documents system deps (python3-dev, build-essential, libsndfile1)</td>
+</tr>
+<tr>
+<td><code>installer/install_mac.sh</code></td>
+<td>macOS</td>
+<td>Same + documents Homebrew deps (portaudio)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="24-upgrade-system-whisperjavupgradepy-1520-lines">2.4 Upgrade System (<code>whisperjav/upgrade.py</code> — 1,520 lines)<a class="headerlink" href="#24-upgrade-system-whisperjavupgradepy-1520-lines" title="Permanent link">&para;</a></h3>
+<p>The v1.8.7 upgrade system handles conda-constructor installs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>whisperjav-upgrade
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    │
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    ├─ Check GitHub releases/latest for new version
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    ├─ Create snapshot (rollback point)
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    ├─ pip install git+https://github.com/meizhong986/whisperjav.git@main
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    │   └─ --upgrade --constraint gpu_constraints.txt
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    │   └─ GPU constraints protect CUDA PyTorch wheels
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    ├─ Fix known compatibility issues (numpy, librosa)
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    ├─ Update desktop shortcuts
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    ├─ Clean old version-specific files
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    └─ Preserve user data (.whisperjav_cache, configs)
+</code></pre></div>
+<h3 id="25-validation-quality-gates">2.5 Validation &amp; Quality Gates<a class="headerlink" href="#25-validation-quality-gates" title="Permanent link">&para;</a></h3>
+<h4 id="runtime-preflight-whisperjavutilspreflight_checkpy">Runtime Preflight (<code>whisperjav/utils/preflight_check.py</code>)<a class="headerlink" href="#runtime-preflight-whisperjavutilspreflight_checkpy" title="Permanent link">&para;</a></h4>
+<p>Runs before every WhisperJAV execution:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python 3.10-3.12</td>
+<td>PASS/FAIL</td>
+<td>Abort if wrong version</td>
+</tr>
+<tr>
+<td>CUDA availability</td>
+<td>PASS/WARN</td>
+<td>Continue with warning if no GPU</td>
+</tr>
+<tr>
+<td>PyTorch CUDA compat</td>
+<td>PASS/WARN</td>
+<td>Detect driver/toolkit mismatch</td>
+</tr>
+<tr>
+<td>GPU memory</td>
+<td>INFO</td>
+<td>Recommend model size</td>
+</tr>
+<tr>
+<td>FFmpeg on PATH</td>
+<td>FAIL</td>
+<td>Abort (required for audio)</td>
+</tr>
+<tr>
+<td>Disk space</td>
+<td>WARN</td>
+<td>Warn if &lt; 8GB</td>
+</tr>
+<tr>
+<td>Critical imports</td>
+<td>WARN</td>
+<td>Warn if packages missing</td>
+</tr>
+</tbody>
+</table>
+<h4 id="cicd-validation-whisperjavinstallervalidation">CI/CD Validation (<code>whisperjav/installer/validation/</code>)<a class="headerlink" href="#cicd-validation-whisperjavinstallervalidation" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Validator</th>
+<th>What It Checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sync.py</code></td>
+<td>pyproject.toml extras match registry.py definitions</td>
+</tr>
+<tr>
+<td><code>imports.py</code></td>
+<td>All imports in codebase are covered by registry (no ghost dependencies)</td>
+</tr>
+<tr>
+<td><code>__main__.py</code></td>
+<td>Runner: <code>python -m whisperjav.installer.validation</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="26-package-registry-whisperjavinstallercoreregistrypy">2.6 Package Registry (<code>whisperjav/installer/core/registry.py</code>)<a class="headerlink" href="#26-package-registry-whisperjavinstallercoreregistrypy" title="Permanent link">&para;</a></h3>
+<p><strong>The single source of truth</strong> for all ~81 packages. Each package is a dataclass:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Package</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>                    <span class="c1"># PyPI name</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">str</span>                 <span class="c1"># Version constraint</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">extra</span><span class="p">:</span> <span class="n">Extra</span>                 <span class="c1"># Which pyproject.toml extra</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">source</span><span class="p">:</span> <span class="n">InstallSource</span>        <span class="c1"># PYPI, GIT, INDEX_URL, WHEEL_URL</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span>                   <span class="c1"># Install priority (10=first, 90=last)</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">git_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>       <span class="c1"># For git-based packages</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">index_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>     <span class="c1"># For PyTorch CUDA index</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">import_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>   <span class="c1"># When import name differs (cv2 for opencv-python)</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span>                  <span class="c1"># Why this package is needed</span>
+</code></pre></div>
+<p><strong>Installation order ranges:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>10-19  PyTorch         MUST be first (GPU lock-in)
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>20-29  Scientific      numpy before numba (ABI compatibility)
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>30-39  Whisper         Depends on torch being present
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>40-49  Audio/CLI       soundfile, pydub, VAD
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>50-59  GUI             pywebview, pythonnet
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>60-69  Translation     pysubtrans, openai, google-genai
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>70-79  Enhancement     modelscope, clearvoice, bs-roformer
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>80-89  HuggingFace     transformers, accelerate
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>90-99  Compat/dev      pyvideotrans, ruff
+</code></pre></div>
+<h3 id="27-standalone-module-whisperjavinstallercorestandalonepy">2.7 Standalone Module (<code>whisperjav/installer/core/standalone.py</code>)<a class="headerlink" href="#27-standalone-module-whisperjavinstallercorestandalonepy" title="Permanent link">&para;</a></h3>
+<p>Self-contained utilities bundled with the conda-constructor installer. <strong>Critical constraint: ZERO imports from whisperjav.</strong>* — this file runs before WhisperJAV is installed.</p>
+<p>Contains:
+- GPU detection (nvidia-smi, pynvml fallback)
+- CUDA driver matrix (570+ → cu128, 450+ → cu118)
+- Git timeout pattern detection
+- Retry logic (3 attempts, 5s delay, 30min timeout)
+- Version parsing utilities</p>
+<hr />
+<h2 id="3-current-dev-state-post-uv-migration">3. Current Dev State: Post-uv Migration<a class="headerlink" href="#3-current-dev-state-post-uv-migration" title="Permanent link">&para;</a></h2>
+<h3 id="31-what-changed-12-commits-since-v187">3.1 What Changed (12 commits since v1.8.7)<a class="headerlink" href="#31-what-changed-12-commits-since-v187" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>2e28f2a feat: migrate install.py from 6-stage pip to uv sync    ← THE BIG CHANGE
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>2119d28 docs+tests: add dependency cross-match table + 65 tests
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>0ab96b1 fix: harden installation — GPU protection + graceful pip errors
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>dea0fa2 fix: remove np.int_ from metadata_manager (numpy 2.x)
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>d5b8296 fix: correct numpy 2.x migration — proper lower bounds
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>a2ab596 fix: align silero-vad&gt;=6.2 across all sources
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>2da8b22 feat: lift numpy&lt;2.0 pin — allow numpy 2.x
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>04e52fb docs: update issue tracker
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>badfc2b docs: add v1.8.8 research reports
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>9dc8f1f fix(#198): force greedy decoding on MPS
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>c052865 fix: numpy constraint in Phase 3 torch install
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>d1ee06e fix: pre-install numpy&lt;2 before Phase 3 PyTorch
+</code></pre></div>
+<h3 id="32-the-uv-migration-before-vs-after">3.2 The uv Migration: Before vs After<a class="headerlink" href="#32-the-uv-migration-before-vs-after" title="Permanent link">&para;</a></h3>
+<h4 id="before-v187-6-stage-pip-pipeline">Before (v1.8.7): 6-stage pip pipeline<a class="headerlink" href="#before-v187-6-stage-pip-pipeline" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>install.py (1,741 lines)
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    │
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    ├─ Step 1: pip install --upgrade pip
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    ├─ Step 2: pip install torch --index-url &lt;cuda&gt;
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    ├─ Step 3: pip install numpy scipy librosa ...
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    ├─ Step 4: pip install git+whisper git+stable-ts ...
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    ├─ Step 5: pip install transformers pywebview ... + llama-cpp
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    └─ Step 6: pip install --no-deps .
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    6+ separate pip invocations, each resolving dependencies independently
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    Registry queried at runtime for package lists
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    No lockfile — versions resolved fresh each time
+</code></pre></div>
+<h4 id="after-current-dev-single-uv-sync">After (current dev): Single uv sync<a class="headerlink" href="#after-current-dev-single-uv-sync" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>install.py (833 lines)
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    │
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    ├─ Preflight: uv, disk, network, Python, FFmpeg, Git
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    ├─ GPU detection → select PyTorch index
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    ├─ uv sync --extra cli --extra gui ... --index pytorch=&lt;cuda_url&gt;
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    │   └─ Single command installs ALL packages from uv.lock
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    │   └─ Named &#39;pytorch&#39; index routes torch/torchaudio to CUDA wheels
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    │   └─ All other packages resolve from PyPI (default)
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    └─ Optional: llama-cpp-python (separate uv pip install)
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>    1 primary command replaces 6 pip steps
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>    uv.lock pins all ~246 packages with exact versions + hashes
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>    pyproject.toml [tool.uv.sources] handles GPU routing declaratively
+</code></pre></div>
+<h3 id="33-new-installpy-833-lines-uv-based">3.3 New: <code>install.py</code> (833 lines, uv-based)<a class="headerlink" href="#33-new-installpy-833-lines-uv-based" title="Permanent link">&para;</a></h3>
+<h4 id="flow">Flow<a class="headerlink" href="#flow" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>main()
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a> ├─ Parse arguments
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a> ├─ Validate source directory (pyproject.toml exists)
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a> ├─ Initialize logging
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a> │
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a> ├─ Preflight Checks
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a> │   ├─ check_uv()           ← NEW: auto-installs uv via pip if missing
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a> │   ├─ check_disk_space()
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a> │   ├─ check_network()
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a> │   ├─ Python version (via installer module or fallback)
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a> │   ├─ FFmpeg
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a> │   └─ Git
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a> │
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a> ├─ GPU Detection
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a> │   └─ detect_cuda_version() → &quot;cpu&quot; | &quot;cu118&quot; | &quot;cu124&quot; | &quot;cu128&quot; | &quot;metal&quot;
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a> │
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a> ├─ Determine Extras
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a> │   ├─ --minimal: [&quot;cli&quot;]
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a> │   └─ default:   [&quot;cli&quot;, &quot;gui&quot;, &quot;translate&quot;, &quot;llm&quot;, &quot;huggingface&quot;,
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a> │                   &quot;qwen&quot;, &quot;analysis&quot;, &quot;compatibility&quot;, &quot;enhance&quot;]
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a> │
+<a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a> ├─ run_uv_sync(extras, cuda_version, dev)     ← SINGLE COMMAND
+<a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a> │   ├─ Build cmd: uv sync --extra cli --extra gui ...
+<a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a> │   ├─ Add: --python sys.executable
+<a id="__codelineno-12-25" name="__codelineno-12-25" href="#__codelineno-12-25"></a> │   ├─ Add: --index pytorch=&lt;cuda_url&gt;  (if not metal)
+<a id="__codelineno-12-26" name="__codelineno-12-26" href="#__codelineno-12-26"></a> │   ├─ Add: --verbose
+<a id="__codelineno-12-27" name="__codelineno-12-27" href="#__codelineno-12-27"></a> │   ├─ Stream output live (subprocess.Popen, line-buffered)
+<a id="__codelineno-12-28" name="__codelineno-12-28" href="#__codelineno-12-28"></a> │   └─ Tee to log file
+<a id="__codelineno-12-29" name="__codelineno-12-29" href="#__codelineno-12-29"></a> │
+<a id="__codelineno-12-30" name="__codelineno-12-30" href="#__codelineno-12-30"></a> ├─ Retry without --extra enhance (if first attempt fails)
+<a id="__codelineno-12-31" name="__codelineno-12-31" href="#__codelineno-12-31"></a> │
+<a id="__codelineno-12-32" name="__codelineno-12-32" href="#__codelineno-12-32"></a> ├─ Optional: _install_local_llm()
+<a id="__codelineno-12-33" name="__codelineno-12-33" href="#__codelineno-12-33"></a> │   └─ Uses nested _uv_pip_install() for platform-specific wheel
+<a id="__codelineno-12-34" name="__codelineno-12-34" href="#__codelineno-12-34"></a> │
+<a id="__codelineno-12-35" name="__codelineno-12-35" href="#__codelineno-12-35"></a> ├─ _verify_installation()
+<a id="__codelineno-12-36" name="__codelineno-12-36" href="#__codelineno-12-36"></a> │   └─ .venv Python: import whisperjav, check torch.cuda
+<a id="__codelineno-12-37" name="__codelineno-12-37" href="#__codelineno-12-37"></a> │
+<a id="__codelineno-12-38" name="__codelineno-12-38" href="#__codelineno-12-38"></a> └─ Summary
+<a id="__codelineno-12-39" name="__codelineno-12-39" href="#__codelineno-12-39"></a>     └─ If .venv exists: print activation instructions
+<a id="__codelineno-12-40" name="__codelineno-12-40" href="#__codelineno-12-40"></a>     └─ Print usage commands
+</code></pre></div>
+<h4 id="key-functions">Key Functions<a class="headerlink" href="#key-functions" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Lines</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_uv_cmd()</code></td>
+<td>161-170</td>
+<td>Returns <code>["uv"]</code> or <code>[sys.executable, "-m", "uv"]</code></td>
+</tr>
+<tr>
+<td><code>check_uv()</code></td>
+<td>177-227</td>
+<td>Verify uv installed; auto-bootstrap via pip if missing</td>
+</tr>
+<tr>
+<td><code>detect_cuda_version()</code></td>
+<td>320-370</td>
+<td>GPU detection with flag overrides</td>
+</tr>
+<tr>
+<td><code>run_uv_sync()</code></td>
+<td>377-456</td>
+<td><strong>Core:</strong> runs <code>uv sync</code> with extras and pytorch index</td>
+</tr>
+<tr>
+<td><code>_install_local_llm()</code></td>
+<td>463-554</td>
+<td>Platform-specific llama-cpp-python install</td>
+</tr>
+<tr>
+<td><code>_venv_python()</code></td>
+<td>587-596</td>
+<td>Find .venv Python for verification</td>
+</tr>
+<tr>
+<td><code>_verify_installation()</code></td>
+<td>599-626</td>
+<td>Import test + torch CUDA test</td>
+</tr>
+</tbody>
+</table>
+<h3 id="34-new-pyprojecttoml-uv-configuration">3.4 New: pyproject.toml uv Configuration<a class="headerlink" href="#34-new-pyprojecttoml-uv-configuration" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Named index for PyTorch GPU wheels</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">[tool.uv]</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">[[tool.uv.index]]</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;pytorch&quot;</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://download.pytorch.org/whl/cu128&quot;</span><span class="w">   </span><span class="c1"># Default: CUDA 12.8</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="n">explicit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">  </span><span class="c1"># ONLY torch/torchaudio use this index</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1"># Per-package source routing with platform markers</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="k">[tool.uv.sources]</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="n">torch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;pytorch&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">marker</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;sys_platform != &#39;darwin&#39;&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="p">]</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="n">torchaudio</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;pytorch&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">marker</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;sys_platform != &#39;darwin&#39;&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="p">]</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="c1"># macOS: torch comes from default PyPI (has built-in MPS support for Apple Silicon)</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="c1"># Linux/Windows: torch comes from named pytorch CUDA index</span>
+</code></pre></div>
+<p><strong>New <code>[torch]</code> extra:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">[project.optional-dependencies]</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">torch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;torch&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;torchaudio&quot;</span><span class="p">]</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">cli</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;whisperjav[torch]&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;soundfile&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;pydub&quot;</span><span class="p">,</span><span class="w"> </span><span class="err">...]</span>
+</code></pre></div></p>
+<p><strong>Override CUDA at install time:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--extra<span class="w"> </span>all<span class="w"> </span>--index<span class="w"> </span><span class="nv">pytorch</span><span class="o">=</span>https://download.pytorch.org/whl/cu118<span class="w">   </span><span class="c1"># CUDA 11.8</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>uv<span class="w"> </span>sync<span class="w"> </span>--extra<span class="w"> </span>all<span class="w"> </span>--index<span class="w"> </span><span class="nv">pytorch</span><span class="o">=</span>https://download.pytorch.org/whl/cpu<span class="w">     </span><span class="c1"># CPU only</span>
+</code></pre></div></p>
+<h3 id="35-new-uvlock-lockfile">3.5 New: <code>uv.lock</code> (Lockfile)<a class="headerlink" href="#35-new-uvlock-lockfile" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Pins all ~246 packages with exact versions + hashes</li>
+<li>Generated by <code>uv lock</code> (run by developer when updating dependencies)</li>
+<li>Consumed by <code>uv sync</code> (deterministic, no resolution at install time)</li>
+<li>Replaces the deleted <code>requirements.txt</code></li>
+</ul>
+<p><strong>What the lockfile provides:</strong>
+1. Exact reproducibility across all users
+2. No resolution at install time (fast, no surprises)
+3. Hash verification (tamper protection)
+4. Transitive dependency pinning
+5. Conflict prevention (caught at dev time, not user install time)</p>
+<h3 id="36-new-upgrade-path-for-source-installs">3.6 New: Upgrade Path for Source Installs<a class="headerlink" href="#36-new-upgrade-path-for-source-installs" title="Permanent link">&para;</a></h3>
+<p>Added to <code>whisperjav/upgrade.py</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_find_source_root</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Detect uv-based source install by looking for pyproject.toml + uv.lock&quot;&quot;&quot;</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">_detect_cuda_for_source</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;GPU detection for upgrade path: nvidia-smi → torch.version.cuda → cpu&quot;&quot;&quot;</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">_run_uv_sync_upgrade</span><span class="p">(</span><span class="n">source_root</span><span class="p">,</span> <span class="n">extras</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="sd">    1. git pull (fetch latest code)</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="sd">    2. Detect CUDA version</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="sd">    3. uv sync --extra &lt;extras&gt; --index pytorch=&lt;cuda_url&gt;</span>
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+<p>The existing pip-based upgrade path (for conda-constructor installs) is unchanged.</p>
+<h3 id="37-what-did-not-change">3.7 What Did NOT Change<a class="headerlink" href="#37-what-did-not-change" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Conda-constructor installer</td>
+<td>Unchanged</td>
+<td>Uses <code>uv pip install</code>, not <code>uv sync</code>. Separate path.</td>
+</tr>
+<tr>
+<td><code>post_install.py.template</code></td>
+<td>Unchanged</td>
+<td>conda-constructor post-install. No pyproject.toml in installed env.</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/core/registry.py</code></td>
+<td>Unchanged</td>
+<td>Still the single source of truth for package definitions</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/core/standalone.py</code></td>
+<td>Unchanged</td>
+<td>GPU detection, self-contained utilities</td>
+</tr>
+<tr>
+<td><code>whisperjav/utils/preflight_check.py</code></td>
+<td>Unchanged</td>
+<td>Runtime environment validation</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/validation/</code></td>
+<td>Minor update</td>
+<td>Added "torch" to known composite extras whitelist</td>
+</tr>
+<tr>
+<td>Platform scripts (.bat, .sh)</td>
+<td>Docs only</td>
+<td>Updated CLI flag documentation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-known-issues-open-questions">4. Known Issues &amp; Open Questions<a class="headerlink" href="#4-known-issues-open-questions" title="Permanent link">&para;</a></h2>
+<h3 id="41-environment-targeting-problem-current-focus">4.1 Environment Targeting Problem (Current Focus)<a class="headerlink" href="#41-environment-targeting-problem-current-focus" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> <code>uv sync</code> always creates <code>.venv</code> in the project directory, even when the user has an active conda or venv environment.</p>
+<ul>
+<li>Packages go into <code>.venv</code>, not the user's env</li>
+<li>Console scripts (<code>whisperjav</code>, <code>whisperjav-gui</code>) land in <code>.venv/Scripts/</code>, not on PATH</li>
+<li>User must double-activate (their env + <code>.venv</code>) or use <code>uv run</code></li>
+<li>Returning users who type <code>whisperjav</code> get "command not found"</li>
+</ul>
+<p><strong>Root cause:</strong> <code>uv sync</code> ignores <code>VIRTUAL_ENV</code> and <code>CONDA_PREFIX</code> by design.</p>
+<p><strong>Proposed fix:</strong> Set <code>UV_PROJECT_ENVIRONMENT</code> env var to the active environment path before calling <code>uv sync</code>. This is uv's officially supported mechanism for this use case. Additionally, <code>--inexact</code> flag may be needed when installing into conda environments (to avoid removing conda-installed packages not in the lockfile).</p>
+<h3 id="42-python-version-file">4.2 <code>.python-version</code> File<a class="headerlink" href="#42-python-version-file" title="Permanent link">&para;</a></h3>
+<p>The project has a <code>.python-version</code> file (contains <code>3.11</code>) which causes uv to download CPython 3.11 instead of using the user's Python. Current workaround: <code>--python sys.executable</code> flag. Needs a proper solution (possibly removing the file or using <code>UV_PROJECT_ENVIRONMENT</code> which overrides it).</p>
+<h3 id="43-two-installation-paths-diverging">4.3 Two Installation Paths Diverging<a class="headerlink" href="#43-two-installation-paths-diverging" title="Permanent link">&para;</a></h3>
+<p>The conda-constructor path uses <code>uv pip install</code> (no lockfile, manual GPU constraint files) while the source path now uses <code>uv sync</code> (lockfile, declarative GPU routing). These paths will continue to diverge unless unified.</p>
+<h3 id="44-consumer-ux-gap">4.4 Consumer UX Gap<a class="headerlink" href="#44-consumer-ux-gap" title="Permanent link">&para;</a></h3>
+<p>Current source install flow ends with:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Packages were installed into the project&#39;s .venv.
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Activate it before running WhisperJAV:
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    .venv\Scripts\activate
+</code></pre></div></p>
+<p>This is developer-facing, not consumer-facing. A consumer-ready installation would need:
+- Automatic environment activation or smart launcher
+- Desktop shortcut that "just works"
+- No terminal knowledge required</p>
+<hr />
+<h2 id="5-file-reference">5. File Reference<a class="headerlink" href="#5-file-reference" title="Permanent link">&para;</a></h2>
+<h3 id="source-installation-files">Source Installation Files<a class="headerlink" href="#source-installation-files" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>install.py</code></td>
+<td>833</td>
+<td>Main source installer (uv sync, current dev)</td>
+</tr>
+<tr>
+<td><code>pyproject.toml</code></td>
+<td>~460</td>
+<td>Project metadata, extras, uv config</td>
+</tr>
+<tr>
+<td><code>uv.lock</code></td>
+<td>~5,000</td>
+<td>Lockfile (all packages pinned with hashes)</td>
+</tr>
+<tr>
+<td><code>installer/install_windows.bat</code></td>
+<td>~150</td>
+<td>Windows wrapper → install.py</td>
+</tr>
+<tr>
+<td><code>installer/install_linux.sh</code></td>
+<td>~150</td>
+<td>Linux wrapper → install.py</td>
+</tr>
+<tr>
+<td><code>installer/install_mac.sh</code></td>
+<td>~120</td>
+<td>macOS wrapper → install.py</td>
+</tr>
+</tbody>
+</table>
+<h3 id="conda-constructor-installer-files">Conda-Constructor Installer Files<a class="headerlink" href="#conda-constructor-installer-files" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>installer/build_release.py</code></td>
+<td>533</td>
+<td>5-phase release build orchestrator</td>
+</tr>
+<tr>
+<td><code>installer/VERSION</code></td>
+<td>~20</td>
+<td>Version config (major.minor.patch.prerelease)</td>
+</tr>
+<tr>
+<td><code>installer/templates/construct.yaml.template</code></td>
+<td>65</td>
+<td>conda-constructor config</td>
+</tr>
+<tr>
+<td><code>installer/templates/post_install.py.template</code></td>
+<td>2,820</td>
+<td>Post-install logic (GPU, deps, checks)</td>
+</tr>
+<tr>
+<td><code>installer/templates/post_install.bat.template</code></td>
+<td>~30</td>
+<td>Batch wrapper for post_install.py</td>
+</tr>
+<tr>
+<td><code>installer/templates/requirements.txt.template</code></td>
+<td>69</td>
+<td>Pip requirements (~65 packages)</td>
+</tr>
+<tr>
+<td><code>installer/templates/WhisperJAV_Launcher.py.template</code></td>
+<td>~100</td>
+<td>GUI launcher script</td>
+</tr>
+<tr>
+<td><code>installer/templates/build_installer.bat.template</code></td>
+<td>~50</td>
+<td>Runs conda-constructor</td>
+</tr>
+<tr>
+<td><code>installer/templates/validate_installer.py.template</code></td>
+<td>~200</td>
+<td>Pre-build validation</td>
+</tr>
+<tr>
+<td><code>installer/templates/custom_template.nsi.tmpl.template</code></td>
+<td>~100</td>
+<td>NSIS UI customization</td>
+</tr>
+</tbody>
+</table>
+<h3 id="core-installer-module">Core Installer Module<a class="headerlink" href="#core-installer-module" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whisperjav/installer/__init__.py</code></td>
+<td>363</td>
+<td>Package API, architecture docs</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/core/registry.py</code></td>
+<td>~700</td>
+<td>Package registry (single source of truth)</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/core/standalone.py</code></td>
+<td>~300</td>
+<td>GPU detection, CUDA matrix (zero whisperjav imports)</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/core/executor.py</code></td>
+<td>~400</td>
+<td>StepExecutor with retry logic</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/validation/sync.py</code></td>
+<td>218</td>
+<td>Registry ↔ pyproject.toml sync validation</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/validation/imports.py</code></td>
+<td>322</td>
+<td>Ghost dependency detection (AST-based)</td>
+</tr>
+<tr>
+<td><code>whisperjav/installer/validation/__main__.py</code></td>
+<td>~50</td>
+<td>Validation runner</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upgrade-system">Upgrade System<a class="headerlink" href="#upgrade-system" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whisperjav/upgrade.py</code></td>
+<td>1,520</td>
+<td>Upgrade script (pip + uv sync paths)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="runtime-validation">Runtime Validation<a class="headerlink" href="#runtime-validation" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whisperjav/utils/preflight_check.py</code></td>
+<td>~500</td>
+<td>Pre-execution environment validation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>Document prepared for external review of WhisperJAV installation architecture.</em>
+<em>For questions, see: https://github.com/meizhong986/WhisperJAV/issues</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1813 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/COMPOSABILITY_DESIGN/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>COMPOSABILITY DESIGN - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              COMPOSABILITY DESIGN
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/COMPOSABILITY_DESIGN.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+  <h1>COMPOSABILITY DESIGN</h1>
+
+<p>My Recommendations</p>
+<ol>
+<li>Fix F-01 and F-02 now — they're small changes (~20 lines total) that prevent latent bugs from becoming real bugs when scope expands</li>
+<li>Document the WordTimestamp ↔ Dict conversion — add a comment in the orchestrator explaining the boundary</li>
+<li>Update the ADR status to reflect Phase 7 and the actual scope boundary (which modes use the orchestrator)</li>
+<li>Don't rush the deferred items — they were deferred for good architectural reasons. The step-down retry (your Issue 4) and coupled mode migration need proper design</li>
+</ol>
+<p>Both audit documents are now in docs/architecture/ for your reference. They won't be committed (docs/ is gitignored) but they're available for future sessions.</p>
+<p>---                                                                                                                                                                                            Assembly Mode Execution Flow (GUI Ensemble Tab)
+                                                                                                                                                                                                 Here's the exact flow when a user selects assembly as the input mode for Qwen in the ensemble tab:</p>
+<p>What the GUI sends</p>
+<p>The ensemble tab's default Qwen state is inputMode: 'vad_slicing' (line 1216). If the user explicitly changes the dropdown to assembly, the config sent to the API includes:</p>
+<p>pass: { pipeline: "qwen", inputMode: "assembly", speechSegmenter: "ten", ... }</p>
+<p>API → CLI args</p>
+<p>api.py:2229-2230 converts this to:</p>
+<p>--pass1-qwen-params '{"input_mode": "assembly"}'</p>
+<p>And separately (api.py:2257-2258), the speech segmenter goes as:</p>
+<p>--pass1-speech-segmenter ten</p>
+<p>pass_worker.py → QwenPipeline construction</p>
+<p>pass_worker.py:872-873 maps the speech segmenter to qwen_segmenter:
+  qwen_defaults["qwen_segmenter"] = "ten"  # from pass_config["speech_segmenter"]</p>
+<p>pass_worker.py:903 maps input_mode:
+  "qwen_input_mode": "assembly"</p>
+<p>The QwenPipeline is constructed with both (line 923-929).</p>
+<p>The 8-Phase Pipeline Execution</p>
+<p>Phase 1: Audio Extraction — Same for all modes. Extract WAV at 48kHz.</p>
+<p>Phase 2: Scene Detection — Because input_mode == ASSEMBLY and safe_chunking == True (default), scene detection uses assembly-specific limits: min_duration=30s, max_duration=120s (lines
+  495-504). Default scene detector is "semantic". Produces scenes of 30-120s.</p>
+<p>Phase 3: Speech Enhancement — Default "none", so this is a passthrough.</p>
+<p>Phase 4: Speech Segmentation (TEN VAD) — This is the key question. Because segmenter_backend == "ten" (the default), Phase 4 RUNS. It runs TEN VAD on every scene, producing
+  speech_regions_per_scene: {scene_idx: SegmentationResult}. Each SegmentationResult contains speech segments with start/end times and groups.</p>
+<p>Phase 5: ASR via DecoupledSubtitlePipeline — Because input_mode == ASSEMBLY, the code takes the assembly branch (line 641). The orchestrator (_subtitle_pipeline.process_scenes()) executes:</p>
+<ol>
+<li>Step 1 (Framing): FullSceneFramer produces 1 frame per scene = [0, duration]. The framer does NOT use the VAD data — it treats each scene as one whole block.</li>
+<li>Steps 2-4 (Generate + Clean): Load Qwen3 text-only model → transcribe_text_only() on the full scene audio → unload model → AssemblyTextCleaner.clean_batch().</li>
+<li>Steps 5-7 (Align): Load ForcedAligner → align_batch() on the full scene → unload aligner.</li>
+<li>Step 9 (Sentinel + Reconstruct + Harden): Merge words → sentinel quality check → reconstruct WhisperResult → harden timestamps.</li>
+</ol>
+<p>The Phase 4 speech regions are passed to the orchestrator (orch_speech_regions, lines 658-668) and used for:
+  - Sentinel collapse recovery (line 464 in orchestrator): If the alignment collapses, speech regions guide word redistribution.
+  - Hardening config (line 527-533 in orchestrator, after our F-02 fix): Speech regions are available to the hardening stage.</p>
+<p>But crucially: Phase 4 VAD data does NOT affect the framing or generation path in assembly mode. The FullSceneFramer ignores it. The text-only generator processes the entire scene audio.
+  The aligner processes the entire scene audio. VAD is only a safety net for sentinel recovery and hardening.</p>
+<p>Phases 6-8: Post-processing — SRT stitching, post-processing, output. Same for all modes.</p>
+<p>Summary: Default Assembly Flow</p>
+<p>Audio → Scene Detection (semantic, 30-120s scenes)
+        → Speech Enhancement (none, passthrough)
+        → TEN VAD (runs, produces speech regions, BUT...)
+        → DecoupledSubtitlePipeline:
+            FullSceneFramer (1 frame = entire scene, ignores VAD)
+            → Qwen3 text-only (full scene audio)
+            → AssemblyTextCleaner
+            → Qwen3 ForcedAligner (full scene audio)
+            → Sentinel (uses VAD regions IF collapse detected)
+            → Reconstruct → Harden
+        → SRT output</p>
+<hr />
+<p>Does Changing the Speech Segmenter Setting Change Anything?</p>
+<p>Short answer: Almost nothing for assembly mode.</p>
+<p>If the user changes the speech segmenter dropdown (e.g., from ten to silero-v3.1 or nemo):</p>
+<ol>
+<li>Phase 4 still runs with the chosen backend instead of TEN</li>
+<li>Different VAD produces different speech_regions_per_scene</li>
+<li>Those regions are passed to the orchestrator</li>
+</ol>
+<p>But in the orchestrator:
+  - FullSceneFramer still ignores them — 1 frame per scene regardless
+  - Text generation still processes full scene — no change
+  - Alignment still processes full scene — no change
+  - Sentinel recovery: Different VAD regions = different collapse redistribution IF a collapse is detected. This is a subtle difference that only manifests on quality-edge cases.
+  - Hardening: The regions are now available (F-02 fix) but _apply_vad_only_timestamps() only triggers for TimestampMode.VAD_ONLY, and assembly defaults to ALIGNER_WITH_INTERPOLATION — so
+  hardening doesn't use them either.</p>
+<p>If the user changes the segmenter to "none":
+  - Phase 4 is skipped entirely (line 581: if self.segmenter_backend != "none")
+  - speech_regions_per_scene is empty {}
+  - orch_speech_regions is None
+  - Sentinel collapse recovery falls back to proportional redistribution instead of VAD-guided
+  - This is a real behavioral difference — but only when alignment collapses</p>
+<p>Bottom line: For assembly mode, the speech segmenter setting is essentially a dormant safety net. It affects collapse recovery strategy (VAD-guided vs. proportional) and nothing else. The
+  user would not notice any difference in normal operation. The segmenter was designed for vad_slicing mode where it drives the entire temporal framing — in assembly mode, it's just along for
+   the ride.</p>
+<p>✻ Brewed for 2m 30s                                                                                                                                                                            </p>
+<blockquote>
+<p>based on all the learnings I have two specific questions: what is the best way --best practices way forward to handle the defferred gaps. and secondly how best to address the issues 4
+  that we tabled.
+                                                                                                                                                                                               ● These are deeply interrelated questions. Let me think through them architecturally before answering.                                                                                       <br />
+  Question 1: Best Practices for the Deferred Gaps                                                                                                                                           <br />
+  The deferred items fall into three distinct categories with different strategies:</p>
+</blockquote>
+<p>Category A: Mode Migrations (VAD_SLICING, CONTEXT_AWARE → orchestrator)</p>
+<p>These are the biggest gaps, and they're deferred for good reason — not because they're hard to code, but because the architectural design for step-down retry doesn't exist yet.
+  VAD_SLICING's entire value proposition is its step-down (Tier 1 → Tier 2) and per-group sentinel. Migrating it to the orchestrator without step-down would be a regression.</p>
+<p>Best practice: Don't migrate these until the orchestrator has a proven retry/step-down mechanism. Which leads directly to Issue 4 (I'll address below). The correct dependency chain is:</p>
+<p>Issue 4 (step-down design) → Assembly step-down works
+      → VAD_SLICING migration (uses same step-down mechanism)
+      → CONTEXT_AWARE migration (simpler, may not need step-down)</p>
+<p>Anti-pattern to avoid: Migrating VAD_SLICING "as-is" without step-down, thinking "we'll add step-down later." That creates a regression that users will hit immediately.</p>
+<p>Category B: New Backends (whisper-segment, TransformersGenerator, VLLMGenerator, CTCAligner, etc.)</p>
+<p>These are demand-driven. Each backend is a self-contained deliverable that can be added independently when there's a user need.</p>
+<p>Best practice: Don't build these speculatively. The protocol+factory architecture is specifically designed so backends can be added without touching the orchestrator. When a real use case
+  demands one (e.g., a user wants Whisper-Guided Qwen), build just that backend.</p>
+<p>Priority signal: The whisper-segment framer is the most interesting because it enables the ADR's most compelling workflow (cross-model composability). But it also requires solving a VRAM
+  question — loading a second ASR model alongside Qwen. This is a design question, not a coding question.</p>
+<p>Category C: CLI/GUI Exposure of Composability</p>
+<p>The orchestrator supports workflows (SRT re-transcription, aligner-free mode) that no user can reach because there are no CLI flags or GUI options for them.</p>
+<p>Best practice: This is the lowest effort, highest immediate value work. A few CLI flags (--qwen-framer, --qwen-aligner) would unlock existing functionality. But the question is: do users
+  actually want this? The answer should drive whether to expose it.</p>
+<p>Recommended Sequencing</p>
+<ol>
+<li>Design step-down mechanism for orchestrator (Issue 4)</li>
+<li>Implement &amp; validate for assembly mode</li>
+<li>Migrate VAD_SLICING using same mechanism</li>
+<li>(Optional) Expose composability via CLI if users request it</li>
+<li>(Demand-driven) Build new backends when needed</li>
+<li>(Last) Migrate CONTEXT_AWARE (works fine in coupled mode)</li>
+</ol>
+<hr />
+<p>Question 2: How to Address Issue 4 (Assembly Step-Down)</p>
+<p>This is the crux. Let me explain the problem precisely, then the design options.</p>
+<p>The Problem</p>
+<p>Today in assembly mode, each scene (30-120s) is processed as one monolithic block:</p>
+<p>120s scene → FullSceneFramer → 1 frame → generate → align → done or fail</p>
+<p>If anything goes wrong (OOM, alignment collapse, empty transcription), the entire scene is lost — (None, error_diagnostics) is returned. There is no retry.</p>
+<p>In contrast, the old coupled/VAD_SLICING mode has step-down in _transcribe_speech_regions():
+  - Tier 1: Try 30s groups
+  - If failure: Tier 2: Retry with 6s groups
+  - Per-group isolation: one group failing doesn't kill the scene</p>
+<p>The Architectural Challenge</p>
+<p>Step-down conflicts with the orchestrator's current batch-oriented VRAM lifecycle:</p>
+<p>Current flow:
+    generator.load() → generate ALL scenes → generator.unload()
+    → aligner.load() → align ALL scenes → aligner.unload()</p>
+<p>If scene 5 out of 20 fails, we've already unloaded the generator. Step-down for scene 5 means reloading it. This is the tension between batch efficiency and per-scene resilience.</p>
+<p>Three Design Options</p>
+<p>Option A: Post-Hoc Retry Pass</p>
+<p>After the full pipeline finishes, identify failed scenes, re-frame them with VadGroupedFramer, and run a second complete pipeline pass (load generator → generate → unload → load aligner →
+  align → unload) for just the failures.</p>
+<p>Pass 1: All scenes with FullSceneFramer (normal batch flow)
+    → Identify failed/collapsed scenes
+  Pass 2: Failed scenes only with VadGroupedFramer (second batch flow)
+    → Merge results</p>
+<p>Pros: Clean separation. Batch efficiency preserved for happy path. The retry is a complete, self-contained pipeline run — easy to reason about. No changes to the inner orchestrator flow.</p>
+<p>Cons: Two full VRAM load/unload cycles when failures occur (~10-15s overhead per retry pass). The generator sees different audio (frame slices vs. full scene) — text quality may differ.</p>
+<p>Option B: Integrated Per-Scene Retry Within process_scenes()</p>
+<p>The orchestrator tracks which scenes failed after step 9. Then, before returning, it does a targeted retry: re-frames just those scenes, does a second generator load/generate/unload +
+  aligner load/align/unload cycle for just the failures.</p>
+<p>process_scenes():
+    Step 1-9: Normal flow for all scenes
+    → Collect failed scene indices
+    If failures:
+      Re-frame failed scenes with fallback framer
+      generator.load() → generate failed frames → generator.unload()
+      aligner.load() → align failed frames → aligner.unload()
+      Step 9 again for failed scenes
+      Replace failed results</p>
+<p>Pros: Everything stays inside process_scenes() — the caller doesn't know about retry. The VRAM cost only occurs when failures happen.</p>
+<p>Cons: process_scenes() becomes more complex. Needs a second framer (where does it come from? Constructor parameter?).</p>
+<p>Option C: Framer-Level Step-Down (TemporalFramer grows a reframe() method)</p>
+<p>Add a protocol method: reframe(scene_audio, previous_frames, failure_info) → FramingResult. The orchestrator calls this when a scene fails, getting finer frames back, then retries just that
+   scene.</p>
+<p>protocol TemporalFramer:
+      def frame(self, audio, sr, <strong>kw) -&gt; FramingResult   # initial framing
+      def reframe(self, audio, sr, prev_result, </strong>kw) -&gt; FramingResult  # step-down</p>
+<p>Pros: Step-down strategy is encapsulated in the framer (separation of concerns). Different framers can have different step-down strategies. The orchestrator just asks "give me smaller
+  frames" without knowing how.</p>
+<p>Cons: Protocol change — affects all existing framers (they'd need at least a no-op reframe()). Adds complexity to a protocol that's currently simple. The framer doesn't have enough context
+  to decide what "step-down" means (it doesn't know WHY the failure happened).</p>
+<p>My Recommendation</p>
+<p>Option B is the sweet spot. Here's why:</p>
+<ol>
+<li>It keeps step-down invisible to callers (QwenPipeline doesn't need to change)</li>
+<li>It preserves batch efficiency for the happy path (which is 95%+ of scenes)</li>
+<li>It's the same pattern as the existing batch-fallback in generation (try batch → fall back to per-frame)</li>
+<li>The "fallback framer" can be injected at construction time — the orchestrator already takes a framer parameter; we'd add an optional fallback_framer</li>
+</ol>
+<p>The constructor change would be:</p>
+<p>def <strong>init</strong>(
+      self,
+      framer: TemporalFramer,
+      generator: TextGenerator,
+      cleaner: TextCleaner,
+      aligner: Optional[TextAligner],
+      hardening_config: HardeningConfig,
+      fallback_framer: Optional[TemporalFramer] = None,  # Step-down
+      ...
+  )</p>
+<p>And _build_subtitle_pipeline() in QwenPipeline would wire:
+  framer = TemporalFramerFactory.create("full-scene")
+  fallback_framer = TemporalFramerFactory.create("vad-grouped", max_group_duration_s=29.0)</p>
+<p>The retry logic in process_scenes() would be:</p>
+<p>Normal flow → collect results
+  If fallback_framer and any scene has result=None:
+      Re-frame failed scenes with fallback_framer
+      Second generator pass (load/generate/unload)
+      Second aligner pass (load/align/unload)
+      Step 9 for retried scenes
+      Replace None results with retry results</p>
+<p>What "Failed" Means</p>
+<p>This needs definition. I'd suggest three triggers for step-down:
+  1. Result is None (exception during processing — OOM, aligner crash)
+  2. Sentinel status is COLLAPSED and recovery produced poor quality (the sentinel already detects this)
+  3. Empty transcription (generator returned blank text for a scene with audio)</p>
+<p>Option 1 is the safe minimum. Options 2-3 require quality assessment logic.</p>
+<p>Relationship to VAD_SLICING Migration</p>
+<p>Once Option B works for assembly, migrating VAD_SLICING becomes straightforward:
+  - Primary framer: VadGroupedFramer(max_group_duration_s=30.0) (Tier 1)
+  - Fallback framer: VadGroupedFramer(max_group_duration_s=6.0) (Tier 2)
+  - Same retry mechanism, different framers</p>
+<p>This is why solving Issue 4 first unblocks the entire deferred gap cluster.</p>
+<hr />
+<p>Summary</p>
+<p>┌──────────────────────────────┬─────────────────────────────────────────────────────────────────────┐
+  │           Question           │                               Answer                                │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ Deferred gaps strategy       │ Solve step-down first → migrate modes → add backends on demand      │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ Issue 4 approach             │ Option B: integrated retry in process_scenes() with fallback_framer │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ What triggers step-down      │ Scene result is None (safe minimum)                                 │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ Why this unblocks everything │ Same mechanism serves assembly step-down AND VAD_SLICING migration  │
+  └──────────────────────────────┴─────────────────────────────────────────────────────────────────────┘</p>
+<p>Shall I plan the implementation?</p>
+<p>Expose Pipeline Composability via CLI and GUI</p>
+<p>Context</p>
+<p>WhisperJAV has a modular, protocol-based pipeline architecture (ADR-006) with clear component contracts. But users can't access most of it. The architecture's composability is invisible —
+ hardcoded behind --input-mode assembly with fixed defaults. The user wants to surface pipeline composability so power users can tune each stage, while casual users still get working
+ defaults.</p>
+<p>Triggered by: User observed 158-second wasted GPU time on a non-speech scene during assembly mode. No lever existed to skip it, tune scene sizes, or control any stage parameter beyond what
+ the modal offered.</p>
+<hr />
+<p>Part 1: User-Centric Design Proposal</p>
+<p>User Personas</p>
+<p>┌─────────────┬──────────────────────────────────────────────┬──────────────────────────────────────────────────────────┐
+ │   Persona   │                 Description                  │                          Needs                           │
+ ├─────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ Power User  │ JAV community, 8-24GB VRAM, 5-50 files/week  │ Fine control per pipeline stage, save configs as presets │
+ ├─────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ Casual User │ Occasional use, GUI-only, wants "just works" │ Working defaults, single-knob tuning, clear labels       │
+ ├─────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ CLI User    │ Batch scripts, copy-paste from forums        │ Discoverable --help, preset shortcuts, clear naming      │
+ └─────────────┴──────────────────────────────────────────────┴──────────────────────────────────────────────────────────┘</p>
+<p>Mental Model: Pipeline as Linear Stage Chain</p>
+<p>Users should see the pipeline as it actually works — a linear chain of stages:</p>
+<p>INPUT → [Scene Detection] → [Enhancement] → [Segmentation] → [Transcription] → [Cleaning] → [Alignment] → [Hardening] → OUTPUT</p>
+<p>The current GUI tab names (Model, Quality, Aligner, Post-Process, Scene, Context) mix stages and concerns. The redesign maps tabs to actual pipeline stages.</p>
+<p>Progressive Disclosure</p>
+<ul>
+<li>Level 0: Select pipeline + input mode, press Start (today's behavior, unchanged)</li>
+<li>Level 1: Ensemble grid dropdowns for component backends (already exists, well-designed)</li>
+<li>Level 2: "Customize Parameters" modal with stage-mapped tabs (the redesign)</li>
+<li>Level 3: Named profiles/presets for common scenarios (new)</li>
+</ul>
+<p>Input-Mode-Aware Adaptation</p>
+<p>The three modes have different relevant parameters:</p>
+<p>┌─────────────────┬─────────────────────┬──────────────────────┬──────────────────────┐
+ │      Stage      │      Assembly       │    Context-Aware     │     VAD Slicing      │
+ ├─────────────────┼─────────────────────┼──────────────────────┼──────────────────────┤
+ │ Scene Detection │ Critical (max 120s) │ Critical (12-90s)    │ Less important       │
+ ├─────────────────┼─────────────────────┼──────────────────────┼──────────────────────┤
+ │ Enhancement     │ Available           │ Available            │ Available            │
+ ├─────────────────┼─────────────────────┼──────────────────────┼──────────────────────┤
+ │ Segmentation    │ Sentinel-only       │ Step-down grouping   │ Primary chunking     │
+ ├─────────────────┼─────────────────────┼──────────────────────┼──────────────────────┤
+ │ Text Generation │ Batch text-only     │ batch_size=1 coupled │ batch_size=1 coupled │
+ ├─────────────────┼─────────────────────┼──────────────────────┼──────────────────────┤
+ │ Text Cleaning   │ Assembly cleaner    │ N/A                  │ N/A                  │
+ ├─────────────────┼─────────────────────┼──────────────────────┼──────────────────────┤
+ │ Alignment       │ Separate VRAM phase │ Coupled with ASR     │ Coupled with ASR     │
+ ├─────────────────┼─────────────────────┼──────────────────────┼──────────────────────┤
+ │ Step-Down       │ Available           │ Available            │ N/A (pre-sliced)     │
+ └─────────────────┴─────────────────────┴──────────────────────┴──────────────────────┘</p>
+<p>The modal adapts: shows/hides sections, adjusts defaults and descriptions per mode.</p>
+<hr />
+<p>Part 2: GUI Interface Proposal</p>
+<p>Revised Tab Structure (5 tabs, pipeline-stage-mapped)</p>
+<p>[ Pipeline ] [ Audio Prep ] [ Transcription ] [ Alignment ] [ Output ]</p>
+<p>Tab 1: Pipeline — What model, what language, what context
+ - ASR Model dropdown (1.7B / 0.6B)
+ - Device, Data Type, Attention implementation
+ - Language dropdown
+ - Context hints textarea
+ - Header: "Configure the ASR model and language. These are the most impactful choices."</p>
+<p>Tab 2: Audio Prep — Everything before ASR (3 collapsible sections)</p>
+<p>Section: Scene Detection
+ - Backend dropdown (synced with ensemble grid)
+ - Min duration slider (0.2-60s, default varies by input mode)
+ - Max duration slider (30-300s, default varies by input mode)
+ - Info banner for assembly: "Enforces max 120s (aligner limit 180s)"</p>
+<p>Section: Speech Enhancement
+ - Backend dropdown (synced with ensemble grid)
+ - Backend-specific params (dynamic)</p>
+<p>Section: Speech Segmentation
+ - Backend dropdown (synced with ensemble grid)
+ - Max group duration slider (5-60s, default 29s)
+ - NEW: "Skip scenes with no detected speech" checkbox (default OFF)
+   - Description: "Skip scenes where VAD finds zero speech. Saves processing time for music/silence sections."</p>
+<p>Header: "Audio is prepared in 3 stages: scene splitting, enhancement, and speech detection."</p>
+<p>Tab 3: Transcription — How text generation works
+ - Batch size slider (1-8)
+ - Max new tokens slider (1024-8192)
+ - Repetition penalty slider (0.8-2.0)
+ - Max tokens per audio second slider (5-40)
+ - Assembly-only section: Assembly text cleaner toggle
+ - Header: "Controls how the ASR model generates text from audio."</p>
+<p>Tab 4: Alignment — How timestamps are resolved</p>
+<p>Section: Forced Aligner
+ - Use ForcedAligner toggle
+ - Aligner model dropdown
+ - Info: "3-minute segment limit"</p>
+<p>Section: Timestamp Resolution
+ - Timestamp mode dropdown (4 options with descriptions)</p>
+<p>Section: Step-Down Retry (hidden for vad_slicing)
+ - Enable toggle
+ - Tier 1 / Tier 2 duration sliders</p>
+<p>Header: "Controls how generated text is mapped to precise timestamps."</p>
+<p>Tab 5: Output — Final formatting
+ - Post-processing preset dropdown (high_moan / default / narrative)
+ - Deprecated controls (collapsed, grayed out)</p>
+<p>Input-Mode Adaptation Behavior</p>
+<p>When input_mode changes:
+ - Assembly: Show assembly cleaner, show step-down, scene defaults 30-120s, timestamp default "aligner_interpolation"
+ - Context-Aware: Hide assembly cleaner, show step-down, scene defaults 12-90s, timestamp default "aligner_vad_fallback", batch_size locked at 1
+ - VAD Slicing: Hide assembly cleaner, hide step-down, batch_size locked at 1</p>
+<p>Profile Dropdown (at top of modal)</p>
+<p>Profile: [Default ▼] [Interview] [BGM-Heavy] [Short Scenes] [High Fidelity] [Fast] [Custom]</p>
+<p>Selecting a profile populates all controls. Manual changes switch to "Custom (based on X)".</p>
+<hr />
+<p>Part 3: CLI Interface Proposal</p>
+<p>New CLI Arguments</p>
+<p>┌───────────────────────────┬────────┬─────────────┬────────────────────────────────────────────────────────────────────┐
+ │         Argument          │  Type  │   Default   │                              Purpose                               │
+ ├───────────────────────────┼────────┼─────────────┼────────────────────────────────────────────────────────────────────┤
+ │ --qwen-skip-silent-scenes │ flag   │ False       │ Skip scenes with 0% speech coverage                                │
+ ├───────────────────────────┼────────┼─────────────┼────────────────────────────────────────────────────────────────────┤
+ │ --qwen-scene-min-dur      │ float  │ None (auto) │ Override minimum scene duration                                    │
+ ├───────────────────────────┼────────┼─────────────┼────────────────────────────────────────────────────────────────────┤
+ │ --qwen-scene-max-dur      │ float  │ None (auto) │ Override maximum scene duration                                    │
+ ├───────────────────────────┼────────┼─────────────┼────────────────────────────────────────────────────────────────────┤
+ │ --qwen-profile            │ choice │ None        │ Named preset (interview/bgm-heavy/short-scenes/high-fidelity/fast) │
+ └───────────────────────────┴────────┴─────────────┴────────────────────────────────────────────────────────────────────┘</p>
+<p>Argparse Regrouping (help text only, no functional change)</p>
+<p>Split the single qwen_group into 5 descriptive sub-groups matching the GUI tabs:
+ 1. Pipeline Strategy (model, device, dtype, attn, language, context)
+ 2. Audio Preparation (scene, enhancer, segmenter, skip-silent, min/max dur)
+ 3. Text Generation (batch_size, max_tokens, repetition_penalty, tokens/s, assembly_cleaner)
+ 4. Alignment &amp; Timestamps (aligner, timestamp_mode, safe_chunking, stepdown)
+ 5. Output (postprocess_preset)</p>
+<p>Profile Definitions</p>
+<p>Stored in whisperjav/config/qwen_profiles.py:</p>
+<ul>
+<li>interview: context_aware, semantic scenes, no enhancer, 30-90s scenes</li>
+<li>bgm-heavy: assembly, semantic scenes, enhancer on, higher repetition_penalty</li>
+<li>short-scenes: assembly, auditok scenes, 5-60s range, 15s group duration</li>
+<li>high-fidelity: assembly, all stages enabled, semantic scenes, 30-120s</li>
+<li>fast: vad_slicing, 0.6B model, auditok, no enhancer, no stepdown</li>
+</ul>
+<p>Profiles are sparse dicts. --qwen-* args override profile values.</p>
+<hr />
+<p>Part 4: Implementation Plan</p>
+<p>Phase 1: Backend Schema + New Pipeline Parameters</p>
+<p>Goal: Restructure the schema API and add new params to pipeline.</p>
+<p>Files:
+ - whisperjav/webview_gui/api.py — Restructure get_qwen_schema(): new 5-group schema keys (pipeline, audio_prep, transcription, alignment, output). Add skip_silent_scenes, scene_min_dur,
+ scene_max_dur params. Add input_mode_visibility metadata per param (tells frontend which modes show which sections).
+ - whisperjav/pipelines/qwen_pipeline.py — Add constructor params: skip_silent_scenes, scene_min_dur, scene_max_dur. Phase 2: apply scene min/max when provided. Phase 4-5 boundary: skip
+ scenes with zero speech when enabled.
+ - whisperjav/main.py — Add 3 new CLI args.
+ - whisperjav/ensemble/pass_worker.py — Add to DEFAULT_QWEN_PARAMS, prepare_qwen_params() mapping, _build_pipeline().</p>
+<p>Scope: ~200 lines. Dependencies: None.</p>
+<p>Phase 2: Frontend Tab Restructuring</p>
+<p>Goal: New 5-tab Customize modal that maps to pipeline stages.</p>
+<p>Files:
+ - whisperjav/webview_gui/assets/app.js — Rewrite generateQwenTabs() and all generateQwen*Tab() methods. New methods for 5 tabs. Update applyCustomization() and resetQwenToDefaults().
+ - whisperjav/webview_gui/assets/index.html — Update modal tab buttons (minimal: they're mostly dynamic).</p>
+<p>Scope: ~500 lines JS refactored. Dependencies: Phase 1 (schema).</p>
+<p>Phase 3: Input-Mode-Aware Adaptation</p>
+<p>Goal: Modal adapts when input mode changes.</p>
+<p>Files:
+ - whisperjav/webview_gui/assets/app.js — Add updateModalForInputMode(mode) function. Wire to ensemble grid input-mode dropdown. Show/hide conditional sections, update defaults/descriptions.</p>
+<p>Scope: ~100 lines. Dependencies: Phase 2 (tab structure).</p>
+<p>Phase 4: Profiles (CLI + GUI)</p>
+<p>Goal: Named presets for common configurations.</p>
+<p>Files:
+ - whisperjav/config/qwen_profiles.py (new) — Profile definitions.
+ - whisperjav/main.py — Add --qwen-profile arg, resolution logic.
+ - whisperjav/ensemble/pass_worker.py — Profile resolution in prepare_qwen_params().
+ - whisperjav/webview_gui/api.py — New get_qwen_profiles() method.
+ - whisperjav/webview_gui/assets/app.js — Profile dropdown at modal top.</p>
+<p>Scope: ~300 lines. Dependencies: Phase 1 (params), Phase 2 (tab structure for GUI part).</p>
+<p>Phase 5: CLI Help Regrouping</p>
+<p>Goal: Reorganize --help output into 5 named groups.</p>
+<p>Files:
+ - whisperjav/main.py — Split single qwen_group into 5 argparse groups.</p>
+<p>Scope: ~50 lines (reorganization only). Dependencies: Phase 1 (new args exist).</p>
+<p>Build Order</p>
+<p>Phase 1 (Backend) → Phase 2 (Frontend tabs) → Phase 3 (Mode adaptation)
+                  ↘ Phase 5 (CLI help)       → Phase 4 (Profiles)</p>
+<p>Phases 1+5 are independently shippable as CLI improvements.
+ Phases 2+3 ship together as the GUI redesign.
+ Phase 4 builds on top of everything.</p>
+<p>Deliverable</p>
+<p>Save the complete design document to docs/architecture/COMPOSABILITY_DESIGN.md. This is a design-only session — no code changes.
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌</p>
+<p>Claude has written up a plan and is ready to execute. Would you like to proceed?</p>
+<blockquote>
+<ol>
+<li>Yes, clear context and auto-accept edits (shift+tab)</li>
+<li>Yes, auto-accept edits</li>
+<li>Yes, manually approve edits</li>
+<li>Type here to tell Claude what to change</li>
+</ol>
+</blockquote>
+<p>ctrl-g to edit in Notepad · ~.claude\plans\modular-skipping-crayon.md</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

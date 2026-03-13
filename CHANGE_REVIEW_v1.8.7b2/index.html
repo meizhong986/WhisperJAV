@@ -1,0 +1,2338 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/CHANGE_REVIEW_v1.8.7b2/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Change Review Document — v1.8.7b2 Proposed Fixes - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#change-review-document-v187b2-proposed-fixes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Change Review Document — v1.8.7b2 Proposed Fixes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-group-b-custom-provider-api-key-typeerror-143" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Group B — Custom Provider API Key TypeError (#143)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Group B — Custom Provider API Key TypeError (#143)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i1-problem-description" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i1: Problem Description
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i2-final-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i2: Final Diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i3-final-root-cause" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i3: Final Root Cause
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i4-changes-decided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i4: Changes Decided
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i5-code-changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i5: Code Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i6-impact-of-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i6: Impact of Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-group-d-mps-beam-search-indexerror-198" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Group D — MPS Beam Search IndexError (#198)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Group D — MPS Beam Search IndexError (#198)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i1-problem-description_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i1: Problem Description
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i2-final-diagnostics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i2: Final Diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i3-final-root-cause_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i3: Final Root Cause
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i4-changes-decided_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i4: Changes Decided
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i5-code-changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i5: Code Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i6-impact-of-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i6: Impact of Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-group-c-repetition-hallucination-209" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Group C — Repetition Hallucination (#209)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Group C — Repetition Hallucination (#209)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i1-problem-description_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i1: Problem Description
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i2-final-diagnostics_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i2: Final Diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i3-final-root-cause_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i3: Final Root Cause
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i4-changes-decided_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i4: Changes Decided
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i5-code-changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i5: Code Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i6-impact-of-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        i6: Impact of Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-groups-not-yet-addressed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Groups Not Yet Addressed
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Groups Not Yet Addressed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#group-a-translation-no-matches-found-196-198-translation-132" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group A — Translation "No Matches Found" (#196, #198-translation, #132)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#group-e-gui-settings-usability-207-206" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group E — GUI Settings &amp; Usability (#207, #206)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#group-f-networkssl-china-users-204" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group F — Network/SSL China Users (#204)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-of-all-files-modified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary of All Files Modified
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/CHANGE_REVIEW_v1.8.7b2.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="change-review-document-v187b2-proposed-fixes">Change Review Document — v1.8.7b2 Proposed Fixes<a class="headerlink" href="#change-review-document-v187b2-proposed-fixes" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>Date: 2026-03-09
+Author: Senior Architect (Claude)
+Status: PENDING REVIEW — No changes should be merged without reviewer approval
+Scope: Groups B, C, D from the v1.8.7b1 Issue Analysis</p>
+</blockquote>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#group-b">Group B — Custom Provider API Key TypeError (#143)</a></li>
+<li><a href="#group-d">Group D — MPS Beam Search IndexError (#198)</a></li>
+<li><a href="#group-c">Group C — Repetition Hallucination (#209)</a></li>
+<li><a href="#not-addressed">Groups Not Yet Addressed</a></li>
+</ol>
+<hr />
+<p><a name="group-b"></a></p>
+<h2 id="1-group-b-custom-provider-api-key-typeerror-143">1. Group B — Custom Provider API Key TypeError (#143)<a class="headerlink" href="#1-group-b-custom-provider-api-key-typeerror-143" title="Permanent link">&para;</a></h2>
+<h3 id="i1-problem-description">i1: Problem Description<a class="headerlink" href="#i1-problem-description" title="Permanent link">&para;</a></h3>
+<p><strong>Issue</strong>: #143 (OdinShiva)
+<strong>Platform</strong>: Windows, Ollama running locally with <code>qwen3.5:4b</code>
+<strong>GUI Configuration</strong>: Provider = "Custom (OpenAI-compatible)", API Key field = empty, Endpoint = <code>http://localhost:11434/v1</code>, Model = <code>qwen3.5:4b</code></p>
+<p>The user clicks "Test Connection" in the GUI. Instead of testing the connection or gracefully reporting that no key is needed, the GUI shows:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Connection to custom failed: str expected, not NoneType
+</code></pre></div>
+<p>Ollama, LM Studio, and other local OpenAI-compatible servers do NOT require API keys. The user did everything correctly but cannot use the translation feature.</p>
+<h3 id="i2-final-diagnostics">i2: Final Diagnostics<a class="headerlink" href="#i2-final-diagnostics" title="Permanent link">&para;</a></h3>
+<p>The error <code>str expected, not NoneType</code> is a Python <code>TypeError</code> raised by <code>os.getenv(None)</code>. I traced the call path:</p>
+<ol>
+<li>User clicks "Test Connection" in GUI</li>
+<li>JavaScript calls <code>pywebview.api.test_provider_connection('custom', null)</code></li>
+<li>Python method <code>test_provider_connection()</code> in <code>api.py:3115</code></li>
+<li>Line 3145 (BEFORE my change): <code>key = api_key or os.getenv(config.get('env_var', ''))</code></li>
+<li><code>config.get('env_var', '')</code> → returns <code>None</code> (NOT the default <code>''</code>, because the key EXISTS in the dict with value <code>None</code>)</li>
+<li><code>os.getenv(None)</code> → raises <code>TypeError: str expected, not NoneType</code></li>
+<li>Caught by <code>except Exception as e:</code> at line 3184, returned as <code>{"success": False, "error": "str expected, not NoneType"}</code></li>
+<li>GUI formats this as <code>Connection to custom failed: str expected, not NoneType</code></li>
+</ol>
+<p><strong>Additional finding</strong>: The same bug exists in <code>cli.py:467</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">api_key</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;api_key&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">provider_config</span><span class="p">[</span><span class="s1">&#39;env_var&#39;</span><span class="p">])</span>
+</code></pre></div>
+For custom provider, <code>provider_config['env_var']</code> is <code>None</code>, so <code>os.getenv(None)</code> would crash here too if no <code>--api-key</code> is provided. This path is triggered when the GUI launches translation via subprocess (which goes through <code>cli.py</code>).</p>
+<h3 id="i3-final-root-cause">i3: Final Root Cause<a class="headerlink" href="#i3-final-root-cause" title="Permanent link">&para;</a></h3>
+<p><strong>Architectural cause</strong>: The <code>PROVIDER_CONFIGS</code> dict in <code>providers.py</code> defines <code>custom.env_var = None</code> (line 55). This is semantically correct — custom providers don't have a standard env var. But TWO code paths use <code>os.getenv(provider_config['env_var'])</code> without guarding against <code>None</code>:</p>
+<ol>
+<li><code>api.py:3145</code> (GUI connection test) — <code>config.get('env_var', '')</code> doesn't protect because the key EXISTS with value <code>None</code></li>
+<li><code>cli.py:467</code> (CLI translation) — direct dict access <code>provider_config['env_var']</code> passes <code>None</code> to <code>os.getenv()</code></li>
+</ol>
+<p>The <code>service.py</code> path (line 50-75) does NOT have this bug — its <code>_resolve_api_key()</code> function properly checks <code>if env_var:</code> before calling <code>os.getenv()</code>. And <code>service.py:290-291</code> explicitly handles <code>local</code>/<code>custom</code> with <code>resolved_api_key = api_key or ''</code>.</p>
+<p>PySubtrans's <code>CustomClient</code> (line 27-28 in its source) already handles empty API keys gracefully:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">api_key</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s1">&#39;Authorization&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">api_key</span><span class="si">}</span><span class="s2">&quot;</span>
+</code></pre></div>
+So passing <code>api_key=''</code> to PySubtrans works correctly — no Authorization header is sent, which is what Ollama expects.</p>
+<h3 id="i4-changes-decided">i4: Changes Decided<a class="headerlink" href="#i4-changes-decided" title="Permanent link">&para;</a></h3>
+<p><strong>Change 1 — <code>api.py</code> connection test</strong>: Add <code>custom</code> to the early-return group alongside <code>local</code>. Both are local server providers that don't need API key validation. The "Test Connection" button for custom providers returns success immediately, same as local.</p>
+<p><strong>Concern with this approach</strong>: The early return means "Test Connection" doesn't actually ping the Ollama/LM Studio server. The endpoint URL is available in the GUI but the <code>test_provider_connection</code> method doesn't receive it as a parameter — it only receives <code>provider</code> and <code>api_key</code>. Changing the method signature would require frontend JS changes too. The connection will be validated when the user actually starts translation.</p>
+<p><strong>Change 2 — <code>api.py</code> env_var safety</strong>: Make the <code>os.getenv()</code> call safe for any provider with <code>None</code> env_var, not just custom. This is defensive coding for future providers.</p>
+<p><strong>Previously missing change (NOW FIXED)</strong>: <code>cli.py:464-470</code> had the same <code>os.getenv(None)</code> bug for custom provider. See File 2 below.</p>
+<h3 id="i5-code-changed">i5: Code Changed<a class="headerlink" href="#i5-code-changed" title="Permanent link">&para;</a></h3>
+<p><strong>File 1: <code>whisperjav/webview_gui/api.py</code></strong> — method <code>test_provider_connection()</code> (~line 3136)</p>
+<p>BEFORE:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Local LLM provider doesn&#39;t need API key testing</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">if</span> <span class="n">provider</span> <span class="o">==</span> <span class="s1">&#39;local&#39;</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Local LLM provider - no API key required&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="s2">&quot;local&quot;</span><span class="p">:</span> <span class="kc">True</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="p">}</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># Get API key</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">key</span> <span class="o">=</span> <span class="n">api_key</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;env_var&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">key</span><span class="p">:</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;No API key. Set </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;env_var&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> or provide key.&quot;</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="p">}</span>
+</code></pre></div></p>
+<p>AFTER:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Local/Custom providers don&#39;t require API keys</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">if</span> <span class="n">provider</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;local&#39;</span><span class="p">,</span> <span class="s1">&#39;custom&#39;</span><span class="p">):</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">provider</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span><span class="si">}</span><span class="s2"> provider - no API key required&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="s2">&quot;local&quot;</span><span class="p">:</span> <span class="n">provider</span> <span class="o">==</span> <span class="s1">&#39;local&#39;</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="p">}</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1"># Get API key</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">env_var</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;env_var&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">key</span> <span class="o">=</span> <span class="n">api_key</span> <span class="ow">or</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">env_var</span><span class="p">)</span> <span class="k">if</span> <span class="n">env_var</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">key</span><span class="p">:</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;No API key. Set </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;env_var&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> or provide key.&quot;</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="p">}</span>
+</code></pre></div></p>
+<p><strong>File 2: <code>whisperjav/translate/cli.py</code></strong> (~line 464)</p>
+<p>BEFORE:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Get API key (not needed for local provider)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">if</span> <span class="n">provider_name</span> <span class="o">==</span> <span class="s1">&#39;local&#39;</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">api_key</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">api_key</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;api_key&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">provider_config</span><span class="p">[</span><span class="s1">&#39;env_var&#39;</span><span class="p">])</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">api_key</span><span class="p">:</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: API key not found. Set </span><span class="si">{</span><span class="n">provider_config</span><span class="p">[</span><span class="s1">&#39;env_var&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> or use --api-key&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div></p>
+<p>AFTER:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Get API key (not needed for local/custom providers — Ollama, LM Studio, etc.)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">if</span> <span class="n">provider_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;local&#39;</span><span class="p">,</span> <span class="s1">&#39;custom&#39;</span><span class="p">):</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">api_key</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;api_key&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">env_var</span> <span class="o">=</span> <span class="n">provider_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;env_var&#39;</span><span class="p">)</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">api_key</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;api_key&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">api_key</span> <span class="k">else</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">env_var</span><span class="p">)</span> <span class="k">if</span> <span class="n">env_var</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">api_key</span><span class="p">:</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: API key not found. Set </span><span class="si">{</span><span class="n">env_var</span><span class="si">}</span><span class="s2"> or use --api-key&quot;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div></p>
+<p>Changes:
+- <code>custom</code> added alongside <code>local</code> — both skip the API key requirement
+- For custom, if <code>--api-key</code> is provided it's used; otherwise defaults to <code>''</code> (which PySubtrans CustomClient handles correctly — no Authorization header sent)
+- The <code>else</code> branch now guards <code>os.getenv()</code> with <code>if env_var</code> to prevent <code>os.getenv(None)</code> for any future provider with <code>env_var=None</code></p>
+<h3 id="i6-impact-of-changes">i6: Impact of Changes<a class="headerlink" href="#i6-impact-of-changes" title="Permanent link">&para;</a></h3>
+<p><strong>Positive impacts</strong>:
+- Users can select "Custom" provider with empty API key and the GUI no longer shows a cryptic TypeError
+- Ollama, LM Studio, LocalAI, and other keyless servers are unblocked for translation</p>
+<p><strong>Negative impacts / concerns</strong>:
+- "Test Connection" button for custom provider now always returns success without actually testing connectivity. This may confuse users who have the wrong endpoint URL — they'll see "success" in the GUI but fail when translation starts. However, this matches the existing behavior for <code>local</code> provider.
+- The <code>"local": provider == 'local'</code> field in the return dict is a minor inconsistency — for custom provider, <code>local</code> will be <code>False</code>, but the message says "no API key required". The frontend JS may use this field. (Low risk — the field is mainly used for UI display.)</p>
+<p><strong>Reviewer questions</strong>:
+1. Should the custom provider's "Test Connection" actually attempt to reach the endpoint? This would require passing the endpoint URL to <code>test_provider_connection()</code> and updating the JS call — a larger change.
+2. For the <code>cli.py</code> change, <code>custom</code> with <code>--api-key</code> provided still passes the key through to PySubtrans. Is this correct for services like OpenRouter-compatible proxies that DO need keys but use the "custom" provider?</p>
+<hr />
+<p><a name="group-d"></a></p>
+<h2 id="2-group-d-mps-beam-search-indexerror-198">2. Group D — MPS Beam Search IndexError (#198)<a class="headerlink" href="#2-group-d-mps-beam-search-indexerror-198" title="Permanent link">&para;</a></h2>
+<h3 id="i1-problem-description_1">i1: Problem Description<a class="headerlink" href="#i1-problem-description_1" title="Permanent link">&para;</a></h3>
+<p><strong>Issue</strong>: #198 (francetoastVN)
+<strong>Platform</strong>: macOS M1 (Apple Silicon), Transformers mode
+<strong>Model</strong>: <code>kotoba-tech/kotoba-whisper-bilingual-v1.0</code>
+<strong>Settings</strong>: MPS device, float16 dtype, batch size 8, 2-hour movie</p>
+<p>The user runs transcription in Transformers mode. Audio extracts successfully (7348.9s), model loads on MPS successfully, but transcription crashes 37 seconds later with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>IndexError: index 1077827584 is out of bounds for dimension 0 with size 40
+</code></pre></div>
+<p>The traceback originates in HuggingFace Transformers library:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>transformers/models/whisper/generation_whisper.py:1172
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  in split_by_batch_index:
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    return [v[beam_idx].cpu() for (v, beam_idx) in zip(values, beam_indices[batch_idx][: len(values)])]
+</code></pre></div></p>
+<h3 id="i2-final-diagnostics_1">i2: Final Diagnostics<a class="headerlink" href="#i2-final-diagnostics_1" title="Permanent link">&para;</a></h3>
+<p>The index value <code>1077827584</code> = <code>0x40404040</code> in hexadecimal. This is a classic "fill pattern" indicating <strong>uninitialized GPU memory</strong>. The MPS (Metal Performance Shaders) backend on Apple Silicon sometimes returns garbage values in beam search index tensors.</p>
+<p>Key observations from the log:
+- Audio extracts fine → not a file/format issue
+- Model loads on MPS → not a model compatibility issue
+- Crash occurs on first chunk's beam search postprocessing → the error happens AFTER inference, during output tensor indexing
+- The garbage index (<code>0x40404040</code>) is consistent with uninitialized Metal GPU buffer reads
+- The error is in <code>transformers</code> library code, not WhisperJAV code</p>
+<p>This is a <strong>known class of MPS backend issues in PyTorch</strong>. MPS is still maturing and has various edge cases with memory management, particularly with long audio files that produce large beam search tensors.</p>
+<h3 id="i3-final-root-cause_1">i3: Final Root Cause<a class="headerlink" href="#i3-final-root-cause_1" title="Permanent link">&para;</a></h3>
+<p><strong>Upstream library bug</strong> in HuggingFace Transformers' Whisper implementation on MPS.</p>
+<p>The <code>generate_with_fallback()</code> → <code>_postprocess_outputs()</code> → <code>split_by_batch_index()</code> call chain reads <code>beam_indices</code> from MPS tensor output. On Apple Silicon, the <code>beam_indices</code> tensor sometimes contains uninitialized memory values instead of valid beam indices. When the code tries to index into a tensor of size 40 using index 1077827584, it crashes with <code>IndexError</code>.</p>
+<p>This is NOT a WhisperJAV bug. WhisperJAV correctly configures the model, device, and dtype. The failure is inside the <code>transformers</code> library's beam search postprocessing step.</p>
+<h3 id="i4-changes-decided_1">i4: Changes Decided<a class="headerlink" href="#i4-changes-decided_1" title="Permanent link">&para;</a></h3>
+<p>Add a defensive <code>except IndexError</code> handler in <code>transformers_asr.py</code> that:
+1. Detects if the error occurred on MPS device
+2. Logs a clear warning explaining this is an upstream bug
+3. Changes device to CPU and dtype to float32
+4. Unloads and reloads the model on CPU
+5. Retries the transcription
+6. If the error occurs on a non-MPS device, re-raises it (since that would be a genuine bug)</p>
+<p>This follows the <strong>existing pattern</strong> already established in the same method: the <code>except torch.cuda.OutOfMemoryError</code> handler (lines 293-309) does the same unload/reload/retry approach for CUDA OOM errors.</p>
+<h3 id="i5-code-changed_1">i5: Code Changed<a class="headerlink" href="#i5-code-changed_1" title="Permanent link">&para;</a></h3>
+<p><strong>File: <code>whisperjav/modules/transformers_asr.py</code></strong> — method <code>transcribe()</code>, after the existing CUDA OOM handler (~line 311)</p>
+<p>BEFORE (nothing after the CUDA OOM handler):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>        <span class="k">except</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">OutOfMemoryError</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>            <span class="c1"># ... existing CUDA OOM handling ...</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retry successful with batch_size=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="si">}</span><span class="s2"> (was </span><span class="si">{</span><span class="n">original_batch</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>        <span class="n">process_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+</code></pre></div></p>
+<p>AFTER (new IndexError handler added):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>        <span class="k">except</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">OutOfMemoryError</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>            <span class="c1"># ... existing CUDA OOM handling (unchanged) ...</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retry successful with batch_size=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="si">}</span><span class="s2"> (was </span><span class="si">{</span><span class="n">original_batch</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>        <span class="k">except</span> <span class="ne">IndexError</span> <span class="k">as</span> <span class="n">ie</span><span class="p">:</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>            <span class="c1"># MPS (Apple Silicon) beam search sometimes produces garbage indices</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>            <span class="c1"># from uninitialized GPU memory (e.g., index 1077827584 = 0x40404040).</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>            <span class="c1"># This is an upstream HuggingFace Transformers bug on MPS.</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>            <span class="c1"># Fallback: reload model on CPU and retry. (#198)</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">==</span> <span class="s2">&quot;mps&quot;</span><span class="p">:</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>                    <span class="s2">&quot;MPS beam search IndexError (upstream Transformers bug on Apple Silicon). &quot;</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>                    <span class="s2">&quot;Falling back to CPU. This will be slower but should complete successfully.&quot;</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>                <span class="p">)</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">unload_model</span><span class="p">()</span>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">load_model</span><span class="p">()</span>
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>                <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipe</span><span class="p">(</span>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>                    <span class="nb">str</span><span class="p">(</span><span class="n">audio_path</span><span class="p">),</span>
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a>                    <span class="n">chunk_length_s</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">chunk_length_s</span><span class="p">,</span>
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a>                    <span class="n">stride_length_s</span><span class="o">=</span><span class="n">stride</span><span class="p">,</span>
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a>                    <span class="n">return_timestamps</span><span class="o">=</span><span class="n">return_timestamps</span><span class="p">,</span>
+<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a>                    <span class="n">generate_kwargs</span><span class="o">=</span><span class="n">generate_kwargs</span><span class="p">,</span>
+<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a>                    <span class="n">ignore_warning</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a>                <span class="p">)</span>
+<a id="__codelineno-10-28" name="__codelineno-10-28" href="#__codelineno-10-28"></a>                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;CPU fallback successful after MPS IndexError&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-29" name="__codelineno-10-29" href="#__codelineno-10-29"></a>            <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-10-30" name="__codelineno-10-30" href="#__codelineno-10-30"></a>                <span class="k">raise</span>  <span class="c1"># Re-raise if not MPS — genuine bug</span>
+<a id="__codelineno-10-31" name="__codelineno-10-31" href="#__codelineno-10-31"></a>
+<a id="__codelineno-10-32" name="__codelineno-10-32" href="#__codelineno-10-32"></a>        <span class="n">process_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+</code></pre></div></p>
+<h3 id="i6-impact-of-changes_1">i6: Impact of Changes<a class="headerlink" href="#i6-impact-of-changes_1" title="Permanent link">&para;</a></h3>
+<p><strong>Positive impacts</strong>:
+- Mac users with Apple Silicon can use Transformers mode — instead of a crash, they get an automatic fallback to CPU with a clear warning message
+- The user doesn't need to know about <code>--hf-device cpu</code> flag — the system handles it transparently
+- Follows an established pattern (CUDA OOM fallback) so the code is consistent</p>
+<p><strong>Negative impacts / concerns</strong>:
+1. <strong>Performance</strong>: CPU transcription of a 2-hour movie will be significantly slower than MPS. The user will see the warning but might not understand why their transcription is suddenly much slower. No progress estimate is updated.</p>
+<ol>
+<li><strong>Overly broad catch</strong>: <code>IndexError</code> is a general Python exception. While the <code>if self._device == "mps"</code> guard limits the fallback to MPS-only, there's a theoretical risk of catching a legitimate <code>IndexError</code> from a different source in the <code>self.pipe()</code> call chain. However:</li>
+<li>The <code>else: raise</code> ensures non-MPS IndexErrors are re-raised</li>
+<li>IndexError from the Transformers pipeline is very unlikely outside the beam search bug</li>
+<li>
+<p>The alternative (letting the user crash with no recourse) is worse</p>
+</li>
+<li>
+<p><strong>Model reloaded on CPU</strong>: The <code>self._device = "cpu"</code> assignment mutates the object's state permanently for this transcription session. If the user transcribes another file in the same session, it will also use CPU. This is acceptable because:</p>
+</li>
+<li>Most users process one file at a time</li>
+<li>If MPS failed once, it's likely to fail again for similar content</li>
+<li>
+<p>The object is typically discarded after <code>process()</code> completes</p>
+</li>
+<li>
+<p><strong>Audio re-processing</strong>: The entire audio file is re-transcribed from scratch on CPU. For a 2-hour movie, this could take 30-60 minutes on CPU vs a few minutes on MPS. There's no partial progress — whatever MPS completed before crashing is discarded.</p>
+</li>
+</ol>
+<p><strong>Reviewer questions</strong>:
+1. Should the warning message suggest the user try <code>--hf-device cpu</code> directly next time to skip the MPS attempt entirely?
+2. Should we log the elapsed time before the crash so the user knows how much time was "wasted" on the MPS attempt?
+3. Should this be a configurable behavior (e.g., <code>--no-mps-fallback</code> flag) or always-on?</p>
+<hr />
+<p><a name="group-c"></a></p>
+<h2 id="3-group-c-repetition-hallucination-209">3. Group C — Repetition Hallucination (#209)<a class="headerlink" href="#3-group-c-repetition-hallucination-209" title="Permanent link">&para;</a></h2>
+<h3 id="i1-problem-description_2">i1: Problem Description<a class="headerlink" href="#i1-problem-description_2" title="Permanent link">&para;</a></h3>
+<p><strong>Issue</strong>: #209 (weifu8435, repeat user — previously #187, #185)
+<strong>Platform</strong>: Windows, Ensemble mode (Fidelity+Balanced, Large V2, "Finish each file")</p>
+<p>The user's SRT output contains extremely long subtitle entries where Whisper has "hallucinated" repetitive text. Four distinct patterns observed in screenshots:</p>
+<table>
+<thead>
+<tr>
+<th>Screenshot</th>
+<th>Pattern</th>
+<th>Example</th>
+<th>Approx Length</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Line 279</td>
+<td>Dakuten char repetition</td>
+<td><code>あ゛あ゛あ゛あ゛...</code></td>
+<td>~10s span</td>
+</tr>
+<tr>
+<td>Line 164</td>
+<td>Wave-dash + comma phrase</td>
+<td><code>あ〜、あ〜、あ〜、...</code></td>
+<td>~7s span</td>
+</tr>
+<tr>
+<td>Line 211</td>
+<td>Long phrase (10+ chars)</td>
+<td><code>お腹が空いているときは...</code> repeated 15+ times</td>
+<td>~7s span</td>
+</tr>
+<tr>
+<td>Line 9</td>
+<td>Long phrase (16 chars)</td>
+<td><code>お母さんがお腹を張ってくれているので...</code> repeated 10+ times</td>
+<td>~7s span</td>
+</tr>
+</tbody>
+</table>
+<p>These are Whisper transcription hallucinations — the model generates repetitive output for audio segments that contain moaning, ambient noise, or silence. The existing <code>RepetitionCleaner</code> should catch these but has architectural gaps.</p>
+<h3 id="i2-final-diagnostics_2">i2: Final Diagnostics<a class="headerlink" href="#i2-final-diagnostics_2" title="Permanent link">&para;</a></h3>
+<p>The <code>RepetitionCleaner</code> (in <code>repetition_cleaner.py</code>) has 6 regex patterns designed to catch repetitive text. I tested each pattern against the 4 examples from #209 and identified 4 specific gaps:</p>
+<p><strong>Gap 1 — Dakuten marks break regex backreferences</strong>:
+- Pattern <code>single_char_flood</code>: <code>([ぁ-んァ-ン])\1{3,}</code> captures a single kana character
+- <code>あ゛</code> = U+3042 (あ) + U+309B (゛ standalone dakuten) — TWO codepoints
+- Backreference <code>\1</code> captured <code>あ</code> (1 char) but the next occurrence is <code>゛</code> (different char) → NO MATCH
+- The pattern only included combining marks U+3099 and U+309A, not the standalone forms U+309B and U+309C
+- Verified: <code>ord('゛')</code> = U+309B (standalone), not U+3099 (combining)</p>
+<p><strong>Gap 2 — Max phrase length too short</strong>:
+- <code>phrase_with_comma</code> pattern: <code>{1,10}</code> char limit
+- <code>お腹が空いているときは</code> = 10+ chars → at the limit
+- <code>お母さんがお腹を張ってくれているので</code> = 16 chars → far exceeds limit
+- <code>phrase_with_separator</code> pattern: <code>{1,8}</code> char limit — even more restrictive
+- Japanese phrases in JAV dialogue routinely exceed these limits</p>
+<p><strong>Gap 3 — Separator patterns too rigid</strong>:
+- <code>vowel_extension</code> expects consecutive dashes: <code>([ぁ-んァ-ン])([〜ー])\2{3,}</code>
+- Actual pattern <code>あ〜、あ〜、あ〜、</code> has comma+space BETWEEN the wave-dash occurrences
+- No pattern exists for the <code>CHAR + 〜 + 、</code> repeating unit structure</p>
+<p><strong>Gap 4 — No general-purpose safety net</strong>:
+- <code>_is_all_repetition()</code> method exists but is DEAD CODE — defined twice (lines 171 and 225), second definition overrides first and just <code>return True</code> (always)
+- <code>_validate_modification()</code> also disabled (body wrapped in <code>'''</code> triple-quote string literal)
+- <code>_is_protected_content_enhanced()</code> also disabled (same <code>'''</code> wrapping)
+- These methods are never called from <code>clean_repetitions()</code> — the only method the sanitizer invokes
+- The CPS (characters per second) check in the sanitizer runs AFTER repetition cleaning, at 20 CPS max. A 100-char repeated text spanning 10 seconds = 10 CPS, well under the threshold
+- There is NO general "is this text mostly repeated content?" detector that would catch unknown patterns</p>
+<p><strong>Call chain verification</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>SubtitleSanitizer.process() (subtitle_sanitizer.py:483)
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  → RepetitionCleaner.clean_repetitions() (repetition_cleaner.py:87)
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    → iterates self.cleaning_patterns (6 regex patterns)
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    → returns cleaned text
+</code></pre></div>
+No other RepetitionCleaner methods are called. <code>_clean_high_density_repetitions_safe()</code>, <code>_clean_character_repetitions()</code>, <code>_pre_process_special_patterns()</code>, and <code>_clean_word_repetitions()</code> are all dead code.</p>
+<h3 id="i3-final-root-cause_2">i3: Final Root Cause<a class="headerlink" href="#i3-final-root-cause_2" title="Permanent link">&para;</a></h3>
+<p><strong>Architectural gap, not a simple code error.</strong> The RepetitionCleaner was designed for SHORT, KNOWN repetition patterns (single character floods, short phrase + comma). It lacks:</p>
+<ol>
+<li><strong>Unicode awareness</strong>: Japanese text uses multiple dakuten/handakuten forms (combining vs standalone) that break regex backreferences</li>
+<li><strong>Length accommodation</strong>: Pattern length limits (<code>{1,8}</code>, <code>{1,10}</code>) were tuned for onomatopoeia (2-5 chars), not for the full range of Japanese sentence repetitions that Whisper hallucinates</li>
+<li><strong>Separator flexibility</strong>: Only specific separator patterns are matched, missing common combinations like wave-dash + comma</li>
+<li><strong>Safety net</strong>: No fallback detector for patterns the regex list doesn't cover. The dead code methods suggest a safety net was planned but never completed or was disabled due to false positives.</li>
+</ol>
+<h3 id="i4-changes-decided_2">i4: Changes Decided<a class="headerlink" href="#i4-changes-decided_2" title="Permanent link">&para;</a></h3>
+<p>Three-layer approach:</p>
+<p><strong>Layer 1 — Fix existing regex pattern gaps</strong>:
+1. <code>single_char_flood</code>: Add standalone dakuten U+309B (゛) and handakuten U+309C (゜) to the optional character class, alongside the existing combining forms U+3099 and U+309A
+2. <code>phrase_with_separator</code>: Increase length limit from <code>{1,8}</code> to <code>{1,30}</code>, add <code>〜ー</code> to separator character class
+3. <code>phrase_with_comma</code>: Increase length limit from <code>{1,10}</code> to <code>{1,30}</code>
+4. New pattern <code>wavedash_comma_phrase</code>: Match <code>(CHAR+〜+、)\1{2,}</code> structure for wave-dash+comma repetitions</p>
+<p><strong>Layer 2 — Generic substring repetition detector (safety net)</strong>:
+New method <code>_detect_generic_repetition()</code> that runs after all Layer 1 patterns:
+- Only triggers on text &gt;40 chars (avoids processing normal subtitles)
+- Tries all substring lengths from 2 to min(50, len/2)
+- Uses the first <code>sub_len</code> characters as candidate (since repetitive text starts with the repeated unit)
+- Counts non-overlapping occurrences via linear scan
+- If any substring repeats 3+ times covering &gt;50% of text → flag as repetition
+- Replace with 1-2 occurrences (2 for short units ≤5 chars, 1 for longer)
+- Algorithm is O(n × max_sub_len), acceptable for subtitle-length text (typically &lt;500 chars)</p>
+<p><strong>Layer 3 — Absolute length limit</strong>:
+- New constant <code>MAX_SUBTITLE_TEXT_LENGTH = 200</code> in <code>sanitization_constants.py</code>
+- If text still exceeds 200 chars after Layer 1 and 2, truncate at the nearest natural boundary (comma <code>、</code> or period <code>。</code>)
+- Log a warning when truncation occurs
+- Rationale: Normal Japanese subtitles are 10-40 chars. 200 chars (5-10 full sentences) is already generous. Anything longer in a single subtitle entry is almost certainly hallucination.</p>
+<h3 id="i5-code-changed_2">i5: Code Changed<a class="headerlink" href="#i5-code-changed_2" title="Permanent link">&para;</a></h3>
+<p><strong>File 1: <code>whisperjav/config/sanitization_constants.py</code></strong> — class <code>RepetitionConstants</code></p>
+<p>Added 3 new constants after <code>HIGH_DENSITY_RATIO</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Safety net: maximum subtitle text length (chars) before flagging as hallucination.</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># Normal Japanese subtitles are 10-40 chars. Lines &gt;200 are almost certainly</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># Whisper repetition hallucinations. (#209)</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">MAX_SUBTITLE_TEXT_LENGTH</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="c1"># Generic repetition detector: minimum substring coverage ratio to flag as repetition.</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># If a repeated substring covers &gt;50% of the text, it&#39;s repetitive. (#209)</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="n">GENERIC_REPETITION_COVERAGE_THRESHOLD</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.50</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="n">GENERIC_REPETITION_MIN_OCCURRENCES</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span>
+</code></pre></div></p>
+<p><strong>File 2: <code>whisperjav/modules/repetition_cleaner.py</code></strong></p>
+<p><strong>Change A — Regex patterns</strong> (lines 49-79, <code>__init__</code>):</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Pattern Name</th>
+<th>BEFORE</th>
+<th>AFTER</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>phrase_with_separator</code></td>
+<td><code>{1,8}</code> chars, separators <code>[、,!\s!!??。。・]</code></td>
+<td><code>{1,30}</code> chars, separators <code>[、,!\s!!??。。・〜ー]</code></td>
+<td>Longer phrases, wave-dash as separator</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>phrase_with_comma</code></td>
+<td><code>{1,10}</code> chars</td>
+<td><code>{1,30}</code> chars</td>
+<td>16-char phrase repetitions</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>single_char_flood</code></td>
+<td><code>([ぁ-んァ-ン])\1{3,}</code></td>
+<td><code>([ぁ-んァ-ン][゙゚゛゜]?)\1{3,}</code></td>
+<td>Include all 4 dakuten/handakuten forms</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>wavedash_comma_phrase</code></td>
+<td>(new)</td>
+<td><code>([\p{L}]{1,10}[〜ー]+[、,]\s*)\1{2,}</code></td>
+<td>New pattern for <code>あ〜、あ〜、</code> structure</td>
+</tr>
+</tbody>
+</table>
+<p>Patterns 2, 3b, 4, 6 were NOT changed.</p>
+<p><strong>Change B — <code>clean_repetitions()</code> method</strong> (lines 87-157):</p>
+<p>BEFORE: Iterated regex patterns only, returned result.</p>
+<p>AFTER: 3 layers:
+1. Iterate regex patterns (same as before)
+2. If text still &gt;40 chars → call <code>_detect_generic_repetition()</code>
+3. If text still &gt;200 chars → truncate at natural boundary</p>
+<p><strong>Change C — New method <code>_detect_generic_repetition()</code></strong> (lines 159-208):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_detect_generic_repetition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="sd">    Generic substring repetition detector.</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="sd">    Finds any substring of length 2-50 that repeats enough times to cover</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="sd">    &gt;50% of the text. If found, reduces to 1-2 occurrences.</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">text_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">coverage_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">GENERIC_REPETITION_COVERAGE_THRESHOLD</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">min_occurrences</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">GENERIC_REPETITION_MIN_OCCURRENCES</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    <span class="n">best_sub</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="n">best_count</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>    <span class="n">best_coverage</span> <span class="o">=</span> <span class="mf">0.0</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>    <span class="n">max_sub_len</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="n">text_len</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="k">for</span> <span class="n">sub_len</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">max_sub_len</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>        <span class="n">candidate</span> <span class="o">=</span> <span class="n">text</span><span class="p">[:</span><span class="n">sub_len</span><span class="p">]</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>        <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>        <span class="n">pos</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>        <span class="k">while</span> <span class="n">pos</span> <span class="o">&lt;=</span> <span class="n">text_len</span> <span class="o">-</span> <span class="n">sub_len</span><span class="p">:</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>            <span class="k">if</span> <span class="n">text</span><span class="p">[</span><span class="n">pos</span><span class="p">:</span><span class="n">pos</span> <span class="o">+</span> <span class="n">sub_len</span><span class="p">]</span> <span class="o">==</span> <span class="n">candidate</span><span class="p">:</span>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>                <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>                <span class="n">pos</span> <span class="o">+=</span> <span class="n">sub_len</span>
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>            <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>                <span class="n">pos</span> <span class="o">+=</span> <span class="mi">1</span>
+<a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>
+<a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>        <span class="k">if</span> <span class="n">count</span> <span class="o">&gt;=</span> <span class="n">min_occurrences</span><span class="p">:</span>
+<a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>            <span class="n">coverage</span> <span class="o">=</span> <span class="p">(</span><span class="n">count</span> <span class="o">*</span> <span class="n">sub_len</span><span class="p">)</span> <span class="o">/</span> <span class="n">text_len</span>
+<a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>            <span class="k">if</span> <span class="n">coverage</span> <span class="o">&gt;</span> <span class="n">best_coverage</span><span class="p">:</span>
+<a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a>                <span class="n">best_coverage</span> <span class="o">=</span> <span class="n">coverage</span>
+<a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>                <span class="n">best_count</span> <span class="o">=</span> <span class="n">count</span>
+<a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>                <span class="n">best_sub</span> <span class="o">=</span> <span class="n">candidate</span>
+<a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a>
+<a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a>    <span class="k">if</span> <span class="n">best_sub</span> <span class="ow">and</span> <span class="n">best_coverage</span> <span class="o">&gt;=</span> <span class="n">coverage_threshold</span><span class="p">:</span>
+<a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>        <span class="n">keep</span> <span class="o">=</span> <span class="mi">2</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">best_sub</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">5</span> <span class="k">else</span> <span class="mi">1</span>
+<a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>        <span class="n">cleaned</span> <span class="o">=</span> <span class="p">(</span><span class="n">best_sub</span> <span class="o">*</span> <span class="n">keep</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+<a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>        <span class="k">return</span> <span class="n">cleaned</span><span class="p">,</span> <span class="kc">True</span>
+<a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a>
+<a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a>    <span class="k">return</span> <span class="n">text</span><span class="p">,</span> <span class="kc">False</span>
+</code></pre></div>
+<h3 id="i6-impact-of-changes_2">i6: Impact of Changes<a class="headerlink" href="#i6-impact-of-changes_2" title="Permanent link">&para;</a></h3>
+<p><strong>Positive impacts — verified by testing</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Test Case</th>
+<th>Input</th>
+<th>Result</th>
+<th>Matched By</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dakuten <code>あ゛あ゛あ゛あ゛...</code> (20 chars)</td>
+<td>10 repetitions</td>
+<td>Reduced to <code>あ゛あ゛</code> (4 chars)</td>
+<td><code>single_char_flood</code></td>
+</tr>
+<tr>
+<td>Wave-dash <code>あ〜、あ〜、あ〜、...</code> (15 chars)</td>
+<td>5 repetitions</td>
+<td>Reduced to <code>あ〜、</code> (3 chars)</td>
+<td><code>phrase_with_separator</code></td>
+</tr>
+<tr>
+<td>Long phrase <code>お腹が空いているときは、</code> × 15 (180 chars)</td>
+<td>15 repetitions</td>
+<td>Reduced to single (12 chars)</td>
+<td><code>phrase_with_separator</code></td>
+</tr>
+<tr>
+<td>No-sep phrase <code>お母さんがお腹を張ってくれているので</code> × 10 (180 chars)</td>
+<td>10 repetitions</td>
+<td>Reduced to single (18 chars)</td>
+<td><code>generic_repetition_safety_net</code></td>
+</tr>
+<tr>
+<td>Normal text <code>そうだね、今日は天気がいいね</code> (14 chars)</td>
+<td>—</td>
+<td><strong>UNCHANGED</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Legitimate <code>ドキドキするね</code> (7 chars)</td>
+<td>—</td>
+<td><strong>UNCHANGED</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Random 300-char text (no repetition)</td>
+<td>—</td>
+<td>Truncated to 200 chars</td>
+<td><code>length_limit_truncation</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Negative impacts / concerns</strong>:</p>
+<ol>
+<li><strong>Phrase length limit increase ({1,8}/{1,10} → {1,30}) — risk of false positives</strong>:</li>
+<li>The increased range means patterns 1 and 3 now capture longer substrings for backreference matching</li>
+<li>If a legitimate subtitle has a phrase that appears 3+ times (e.g., a character saying the same thing for emphasis), it would be reduced to 1 occurrence</li>
+<li>Example risk: <code>「行こう、行こう、行こう」</code> (intentional triple repetition for emphasis) would now be reduced to <code>「行こう、」</code></li>
+<li>
+<p>Mitigation: The threshold is still {3,} for pattern 1 (must repeat 4+ times) and {2,} for pattern 3 (must repeat 3+ times). Intentional emphasis rarely repeats 4+ times.</p>
+</li>
+<li>
+<p><strong>Generic substring detector — algorithmic concerns</strong>:</p>
+</li>
+<li><strong>Checks substrings starting at positions 0..sub_len-1</strong>: For each substring length, candidates are tried from each offset within one unit length of the start. This ensures that mid-text repetitions like <code>前置きお腹お腹お腹...</code> are detected (the unit <code>お腹</code> starts at an offset). The reasoning: any repeating unit must begin within its own length from position 0 (e.g., for unit length 3, it starts at offset 0, 1, or 2).</li>
+<li><strong>Greedy replacement</strong>: When a repetition is found, the ENTIRE text is replaced with 1-2 occurrences of the repeated unit. Any non-repetitive prefix/suffix is lost. For the #209 cases this is acceptable (the entire text IS repetition), but for mixed content it's destructive.</li>
+<li>
+<p><strong>Performance</strong>: For a 500-char text, the outer loop runs up to 50 iterations × sub_len candidate offsets, each with a linear scan. Worst case O(50² × 500). For subtitle text (typically &lt;500 chars) this is still sub-millisecond. Could be a concern if ever used on longer text.</p>
+</li>
+<li>
+<p><strong>Absolute length limit — truncation is lossy</strong>:</p>
+</li>
+<li>The 200-char limit truncates at a natural boundary (period or comma via <code>rsplit</code>), with a <strong>75% floor</strong> (150 chars). If the last separator is below position 150, the truncation stays at the hard 200-char limit to avoid over-cutting.</li>
+<li>Priority order: period <code>。</code> first (sentence boundary), then comma <code>、</code> (clause boundary). If neither is found or both are below the floor, hard cut at 200.</li>
+<li>This is the most aggressive change: it affects ALL subtitles &gt;200 chars, not just repetitive ones. If a legitimate subtitle somehow exceeds 200 chars (e.g., a very long dialogue with embedded context), it will be truncated.</li>
+<li>
+<p>Verified edge cases: comma at position 180 → truncates to 180. Comma at position 10 → stays at 200. No separators → stays at 200. Period at 190 → truncates to 190.</p>
+</li>
+<li>
+<p><strong>Layer ordering matters</strong>:</p>
+</li>
+<li>Layer 1 (regex) runs first. If it partially reduces text (e.g., catches some repetitions but not all), the remaining text goes to Layer 2.</li>
+<li>Layer 2 (generic detector) then sees partially-cleaned text where <code>text[:sub_len]</code> might be a fragment of the original repeating unit. This could cause false negatives.</li>
+<li>
+<p>Layer 3 (length limit) is the final backstop. If Layers 1 and 2 both miss, this catches anything &gt;200 chars.</p>
+</li>
+<li>
+<p><strong>Dead code not cleaned up</strong>: The disabled methods (<code>_is_all_repetition</code>, <code>_validate_modification</code>, <code>_is_protected_content_enhanced</code>) are still in the file. They have <code>'''</code> wrappers disabling their logic. I did not remove or re-enable them — the new Layer 2/3 approach is architecturally different from these methods. This means the file has growing dead code.</p>
+</li>
+</ol>
+<p><strong>Reviewer questions</strong>:
+1. Is the 200-char limit too aggressive? Should it be 300 or configurable?
+2. Should the dead code methods (<code>_is_all_repetition</code>, <code>_validate_modification</code>, <code>_is_protected_content_enhanced</code>) be removed, or kept for reference?
+3. For the <code>phrase_with_separator</code> pattern, is <code>{1,30}</code> too generous? Should there be a separate pattern for long phrases (10-30 chars) with a higher repetition threshold (e.g., <code>{4,}</code> instead of <code>{3,}</code>)?
+4. The generic detector's greedy replacement discards non-repetitive prefix/suffix text. Should it instead only replace the repetitive portion and preserve surrounding content?</p>
+<hr />
+<p><a name="not-addressed"></a></p>
+<h2 id="4-groups-not-yet-addressed">4. Groups Not Yet Addressed<a class="headerlink" href="#4-groups-not-yet-addressed" title="Permanent link">&para;</a></h2>
+<h3 id="group-a-translation-no-matches-found-196-198-translation-132">Group A — Translation "No Matches Found" (#196, #198-translation, #132)<a class="headerlink" href="#group-a-translation-no-matches-found-196-198-translation-132" title="Permanent link">&para;</a></h3>
+<p><strong>Status</strong>: NOT STARTED. This is the most complex fix (dynamic batch sizing, retry with half batch, garbage output detection). Requires changes to <code>translate/core.py</code> and possibly PySubtrans interaction. Deferred pending review of Groups B/C/D.</p>
+<h3 id="group-e-gui-settings-usability-207-206">Group E — GUI Settings &amp; Usability (#207, #206)<a class="headerlink" href="#group-e-gui-settings-usability-207-206" title="Permanent link">&para;</a></h3>
+<p><strong>Status</strong>: NOT STARTED. These require GitHub comment responses only (no code changes). #207 is a duplicate of #96. #206 is a feature request. Deferred pending reviewer approval of response content.</p>
+<h3 id="group-f-networkssl-china-users-204">Group F — Network/SSL China Users (#204)<a class="headerlink" href="#group-f-networkssl-china-users-204" title="Permanent link">&para;</a></h3>
+<p><strong>Status</strong>: AWAITING USER CONFIRMATION. Fix shipped in v1.8.7b1. No code action needed.</p>
+<hr />
+<h2 id="summary-of-all-files-modified">Summary of All Files Modified<a class="headerlink" href="#summary-of-all-files-modified" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Group</th>
+<th>Type of Change</th>
+<th>Lines Changed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whisperjav/webview_gui/api.py</code></td>
+<td>B</td>
+<td>Bug fix</td>
+<td>~3136-3151 (16 lines)</td>
+</tr>
+<tr>
+<td><code>whisperjav/translate/cli.py</code></td>
+<td>B</td>
+<td>Bug fix</td>
+<td>~463-471 (9 lines)</td>
+</tr>
+<tr>
+<td><code>whisperjav/modules/transformers_asr.py</code></td>
+<td>D</td>
+<td>Defensive fallback</td>
+<td>~311-336 (26 lines added)</td>
+</tr>
+<tr>
+<td><code>whisperjav/modules/repetition_cleaner.py</code></td>
+<td>C</td>
+<td>Pattern fixes + new method</td>
+<td>~49-215 (major rework)</td>
+</tr>
+<tr>
+<td><code>whisperjav/config/sanitization_constants.py</code></td>
+<td>C</td>
+<td>New constants</td>
+<td>~52-60 (9 lines added)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>This document was generated for reviewer approval before any changes are merged or committed.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

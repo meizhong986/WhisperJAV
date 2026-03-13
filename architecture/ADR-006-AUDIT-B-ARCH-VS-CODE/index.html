@@ -1,0 +1,3042 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/ADR-006-AUDIT-B-ARCH-VS-CODE/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>ADR-006 Audit B: Architecture vs. Implementation Code Gap Analysis - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-006-audit-b-architecture-vs-implementation-code-gap-analysis" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-006 Audit B: Architecture vs. Implementation Code Gap Analysis
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#methodology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-protocol-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Protocol Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Protocol Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-temporalframer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 TemporalFramer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-textgenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 TextGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-textcleaner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 TextCleaner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-textaligner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 TextAligner
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-data-type-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Data Type Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Data Type Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-wordtimestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 WordTimestamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-temporalframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 TemporalFrame
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-framingresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 FramingResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-transcriptionresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 TranscriptionResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-alignmentresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 AlignmentResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-timestampmode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 TimestampMode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-hardeningconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 HardeningConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-hardeningdiagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 HardeningDiagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-orchestrator-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Orchestrator Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Orchestrator Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-process_scenes-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 process_scenes() Signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-internal-flow-adr-section-92" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Internal Flow (ADR Section 9.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-vram-lifecycle-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 VRAM Lifecycle Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-sentinel-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Sentinel Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-sentinel-stats-accumulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Sentinel Stats Accumulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-debug-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 Debug Artifacts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#38-error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.8 Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-backend-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Backend Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Backend Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-framers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Framers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.1 Framers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#411-temporalframerfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1.1 TemporalFramerFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#412-fullsceneframer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1.2 FullSceneFramer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#413-vadgroupedframer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1.3 VadGroupedFramer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#414-srtsourceframer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1.4 SrtSourceFramer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#415-manualframer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1.5 ManualFramer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Generators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.2 Generators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#421-textgeneratorfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2.1 TextGeneratorFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#422-qwen3textgenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2.2 Qwen3TextGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-aligners" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Aligners
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.3 Aligners">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#431-textalignerfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.1 TextAlignerFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#432-qwen3forcedaligneradapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.2 Qwen3ForcedAlignerAdapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#433-nonealigner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.3 NoneAligner
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-cleaners" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Cleaners
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.4 Cleaners">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#441-textcleanerfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4.1 TextCleanerFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#442-qwen3textcleaner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4.2 Qwen3TextCleaner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#443-passthroughcleaner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4.3 PassthroughCleaner
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-integration-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Integration Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Integration Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-pipeline-construction-qwenpipelineinit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Pipeline Construction (QwenPipeline.init)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-phase-5-assembly-path-qwenpipelineprocess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Phase 5 Assembly Path (QwenPipeline.process)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-old-_phase5_assembly-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Old _phase5_assembly() Removal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-workflow-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Workflow Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Workflow Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-workflows-currently-exercisable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Workflows Currently Exercisable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-workflow-assembly-via-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Workflow: Assembly via CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-error-handling-vram-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Error Handling &amp; VRAM Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Error Handling &amp; VRAM Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-safe_cuda_cleanup-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 safe_cuda_cleanup() Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-oom-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 OOM Recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-tryfinally-for-vram-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 try/finally for VRAM Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-regression-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Regression Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Regression Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-coupled-modes-context_aware-vad_slicing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Coupled Modes (CONTEXT_AWARE, VAD_SLICING)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-dead-code-removal-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Dead Code Removal Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-m1-fix-300s-comment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 M1 Fix (300s comment)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-consolidated-findings-register" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Consolidated Findings Register
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Recommendations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Recommendations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#priority-1-address-soon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 1 (Address soon)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-2-low-urgency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 2 (Low urgency)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-3-future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 3 (Future work)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/ADR-006-AUDIT-B-ARCH-VS-CODE.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="adr-006-audit-b-architecture-vs-implementation-code-gap-analysis">ADR-006 Audit B: Architecture vs. Implementation Code Gap Analysis<a class="headerlink" href="#adr-006-audit-b-architecture-vs-implementation-code-gap-analysis" title="Permanent link">&para;</a></h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Date</strong></td>
+<td>2026-02-17</td>
+</tr>
+<tr>
+<td><strong>Scope</strong></td>
+<td>ADR-006 Phases 0-6 implementation fidelity</td>
+</tr>
+<tr>
+<td><strong>Auditor</strong></td>
+<td>Claude (code-level review)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>The ADR-006 implementation is <strong>faithful to the architectural vision</strong> across all seven phases. The protocol definitions, data types, orchestrator flow, backend implementations, and integration wiring match the ADR specification with high fidelity. The four protocol domains (TemporalFramer, TextGenerator, TextCleaner, TextAligner) are correctly defined, the orchestrator implements the 9-step flow as specified, and all audit bug fixes (C1, C2, M1) and dead code removals (L1, L2) are confirmed applied.</p>
+<p>The deviations found are predominantly <strong>additive enhancements</strong> — extra convenience properties on data types, additional constructor parameters for flexibility, and richer metadata in backend implementations — rather than contradictions or omissions. There are two findings of moderate concern: (1) the alignment step uses per-frame <code>align()</code> calls instead of <code>align_batch()</code>, which deviates from the ADR's batch-oriented description and forfeits batch efficiency for the Qwen3 aligner; (2) the hardening config's <code>speech_regions</code> field on <code>HardeningConfig</code> is never populated at the orchestrator level, meaning speech regions flow only to the sentinel, not to the hardening stage.</p>
+<p>No regressions were found in coupled mode code paths (CONTEXT_AWARE, VAD_SLICING). The old <code>_phase5_assembly()</code> method was fully removed (implementation plan said to keep it as deprecated fallback, but this is a low-risk cleanup decision). All explicitly deferred items (whisper-segment framer, VLLMGenerator, CTCAligner, HybridAligner, VADProportionalAligner, coupled mode migration) are confirmed absent as expected.</p>
+<hr />
+<h2 id="methodology">Methodology<a class="headerlink" href="#methodology" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Read the ADR (<code>ADR-006-decoupled-subtitle-pipeline.md</code>) in full — all 14 sections.</li>
+<li>Read the Implementation Plan (<code>ADR-006-IMPLEMENTATION-PLAN.md</code>) for detailed specifications.</li>
+<li>For each architectural element (protocols, types, orchestrator, backends, integration), read the corresponding implementation file(s) line-by-line.</li>
+<li>Field-by-field, method-by-method comparison between ADR specification and actual code.</li>
+<li>Traced integration wiring in <code>qwen_pipeline.py</code> from <code>__init__</code> through <code>process()</code> to <code>process_scenes()</code>.</li>
+<li>Verified bug fixes (C1, C2, M1) and dead code removal (L1, L2) in modified files.</li>
+<li>Verified coupled mode code paths are untouched.</li>
+</ol>
+<p><strong>Files audited</strong> (22 new + 2 modified):
+- <code>whisperjav/modules/subtitle_pipeline/__init__.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/types.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/protocols.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/hardening.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/reconstruction.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/orchestrator.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/framers/{__init__, factory, full_scene, vad_grouped, srt_source, manual}.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/generators/{__init__, factory, qwen3}.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/aligners/{__init__, factory, qwen3, none}.py</code>
+- <code>whisperjav/modules/subtitle_pipeline/cleaners/{__init__, factory, qwen3, passthrough}.py</code>
+- <code>whisperjav/pipelines/qwen_pipeline.py</code> (integration point, bug fixes, dead code removal)
+- <code>whisperjav/modules/qwen_asr.py</code> (C1 fix verification)</p>
+<hr />
+<h2 id="1-protocol-audit">1. Protocol Audit<a class="headerlink" href="#1-protocol-audit" title="Permanent link">&para;</a></h2>
+<h3 id="11-temporalframer">1.1 TemporalFramer<a class="headerlink" href="#11-temporalframer" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.1 specification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TemporalFramer</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FramingResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>protocols.py:28-60</code>):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TemporalFramer</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FramingResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Verdict: MATCH.</strong> The only difference is the explicit <code>Any</code> annotation on <code>**kwargs</code>, which is a refinement, not a deviation. Method signatures, return types, and <code>@runtime_checkable</code> decorator all match.</p>
+<h3 id="12-textgenerator">1.2 TextGenerator<a class="headerlink" href="#12-textgenerator" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.2 specification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TextGenerator</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                 <span class="n">context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TranscriptionResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                       <span class="n">contexts</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">TranscriptionResult</span><span class="p">]:</span> <span class="o">...</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">unload</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>protocols.py:68-107</code>):
+All five methods present with identical signatures (modulo <code>**kwargs: Any</code> annotation). Return types match.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="13-textcleaner">1.3 TextCleaner<a class="headerlink" href="#13-textcleaner" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.3 specification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TextCleaner</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">texts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>protocols.py:115-130</code>):
+Both methods present with identical signatures. No <code>load()</code>/<code>unload()</code> as ADR specifies ("lightweight text transform, no model").</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="14-textaligner">1.4 TextAligner<a class="headerlink" href="#14-textaligner" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.4 specification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TextAligner</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">align</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlignmentResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">align_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">texts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>                    <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">AlignmentResult</span><span class="p">]:</span> <span class="o">...</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">unload</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>protocols.py:138-179</code>):
+All five methods present with identical signatures.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<hr />
+<h2 id="2-data-type-audit">2. Data Type Audit<a class="headerlink" href="#2-data-type-audit" title="Permanent link">&para;</a></h2>
+<h3 id="21-wordtimestamp">2.1 WordTimestamp<a class="headerlink" href="#21-wordtimestamp" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.4 / 8.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">WordTimestamp</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">word</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">start</span><span class="p">:</span> <span class="nb">float</span>  <span class="c1"># seconds, scene-relative</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">end</span><span class="p">:</span> <span class="nb">float</span>    <span class="c1"># seconds, scene-relative</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:18-24</code>): Identical.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="22-temporalframe">2.2 TemporalFrame<a class="headerlink" href="#22-temporalframe" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TemporalFrame</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">start</span><span class="p">:</span> <span class="nb">float</span>                        <span class="c1"># seconds, scene-relative</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">end</span><span class="p">:</span> <span class="nb">float</span>                          <span class="c1"># seconds, scene-relative</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">text</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">confidence</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:33-51</code>): All five ADR fields present with correct types and defaults. <strong>Addition</strong>: A <code>duration</code> property (<code>max(0.0, self.end - self.start)</code>).</p>
+<p><strong>Verdict: MATCH with benign addition.</strong> The <code>duration</code> property is a pure convenience accessor — no state, no side effects.</p>
+<h3 id="23-framingresult">2.3 FramingResult<a class="headerlink" href="#23-framingresult" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">FramingResult</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">frames</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">TemporalFrame</span><span class="p">]</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:55-67</code>): Both fields present. Uses <code>list[TemporalFrame]</code> (Python 3.9+ lowercase) vs <code>List[TemporalFrame]</code> — functionally identical. <strong>Additions</strong>: <code>frame_count</code> and <code>total_duration</code> properties.</p>
+<p><strong>Verdict: MATCH with benign additions.</strong></p>
+<h3 id="24-transcriptionresult">2.4 TranscriptionResult<a class="headerlink" href="#24-transcriptionresult" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.2:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TranscriptionResult</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">language</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:76-81</code>): Identical.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="25-alignmentresult">2.5 AlignmentResult<a class="headerlink" href="#25-alignmentresult" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 7.4:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">AlignmentResult</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">words</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">WordTimestamp</span><span class="p">]</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:89-109</code>): Both fields present. <strong>Additions</strong>: <code>word_count</code>, <code>char_count</code>, and <code>span_sec</code> properties.</p>
+<p><strong>Verdict: MATCH with benign additions.</strong></p>
+<h3 id="26-timestampmode">2.6 TimestampMode<a class="headerlink" href="#26-timestampmode" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 9.3 / Implementation Plan 2.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">TimestampMode</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">ALIGNER_WITH_INTERPOLATION</span> <span class="o">=</span> <span class="s2">&quot;aligner_interpolation&quot;</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">ALIGNER_WITH_VAD_FALLBACK</span> <span class="o">=</span> <span class="s2">&quot;aligner_vad_fallback&quot;</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">ALIGNER_ONLY</span> <span class="o">=</span> <span class="s2">&quot;aligner_only&quot;</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">VAD_ONLY</span> <span class="o">=</span> <span class="s2">&quot;vad_only&quot;</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:117-139</code>): Identical enum values.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="27-hardeningconfig">2.7 HardeningConfig<a class="headerlink" href="#27-hardeningconfig" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan 2.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">HardeningConfig</span><span class="p">:</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">timestamp_mode</span><span class="p">:</span> <span class="n">TimestampMode</span> <span class="o">=</span> <span class="n">TimestampMode</span><span class="o">.</span><span class="n">ALIGNER_WITH_INTERPOLATION</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">scene_duration_sec</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">speech_regions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:148-153</code>): Identical.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="28-hardeningdiagnostics">2.8 HardeningDiagnostics<a class="headerlink" href="#28-hardeningdiagnostics" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan 2.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">HardeningDiagnostics</span><span class="p">:</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">segment_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">interpolated_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">fallback_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">clamped_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="nb">sorted</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>types.py:157-165</code>): All five ADR fields present. <strong>Addition</strong>: <code>timestamp_mode: str = ""</code>.</p>
+<p><strong>Verdict: MATCH with benign addition.</strong> The extra field records which mode was applied — useful for diagnostics.</p>
+<hr />
+<h2 id="3-orchestrator-audit">3. Orchestrator Audit<a class="headerlink" href="#3-orchestrator-audit" title="Permanent link">&para;</a></h2>
+<h3 id="31-constructor">3.1 Constructor<a class="headerlink" href="#31-constructor" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 9.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">DecoupledSubtitlePipeline</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>        <span class="n">framer</span><span class="p">:</span> <span class="n">TemporalFramer</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>        <span class="n">generator</span><span class="p">:</span> <span class="n">TextGenerator</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="n">cleaner</span><span class="p">:</span> <span class="n">TextCleaner</span><span class="p">,</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>        <span class="n">aligner</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextAligner</span><span class="p">],</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>        <span class="n">hardening_config</span><span class="p">:</span> <span class="n">HardeningConfig</span><span class="p">,</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>        <span class="n">artifacts_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    <span class="p">):</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>orchestrator.py:60-68</code>): All six ADR parameters present. <strong>Addition</strong>: <code>language: str = "ja"</code>.</p>
+<p><strong>Verdict: MATCH with addition.</strong> The <code>language</code> parameter avoids passing language through kwargs at every <code>generate()</code>/<code>align()</code> call. Sensible enhancement.</p>
+<h3 id="32-process_scenes-signature">3.2 process_scenes() Signature<a class="headerlink" href="#32-process_scenes-signature" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 9.1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_scenes</span><span class="p">(</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">scene_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">scene_durations</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">speech_regions_per_scene</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">WhisperResult</span><span class="p">],</span> <span class="n">Dict</span><span class="p">]]:</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>orchestrator.py:102-107</code>):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_scenes</span><span class="p">(</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="n">scene_audio_paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    <span class="n">scene_durations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="n">scene_speech_regions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]:</span>
+</code></pre></div></p>
+<p><strong>Deviations:</strong>
+- Parameter names: <code>scene_paths</code> → <code>scene_audio_paths</code>, <code>speech_regions_per_scene</code> → <code>scene_speech_regions</code>. Cosmetic naming change.
+- Return type: <code>Optional[WhisperResult]</code> → <code>Any</code>. Avoids hard type dependency on <code>stable_whisper</code> at annotation level. Functionally identical at runtime.</p>
+<p><strong>Verdict: MATCH (cosmetic naming differences).</strong></p>
+<h3 id="33-internal-flow-adr-section-92">3.3 Internal Flow (ADR Section 9.2)<a class="headerlink" href="#33-internal-flow-adr-section-92" title="Permanent link">&para;</a></h3>
+<p><strong>ADR 9-step flow:</strong>
+1. <code>framer.frame(scene_audio)</code> → temporal_frames per scene
+2. <code>generator.load()</code>
+3. <code>generator.generate_batch(frame_audios)</code> → raw_texts
+4. <code>generator.unload()</code> (VRAM swap)
+5. <code>cleaner.clean_batch(raw_texts)</code> → clean_texts
+6. IF aligner is not None: <code>aligner.load()</code>
+7. <code>aligner.align_batch(frame_audios, clean_texts)</code> → alignments
+8. <code>aligner.unload()</code> (VRAM swap)
+9. Per scene: merge + sentinel + reconstruct + harden + diagnostics</p>
+<p><strong>Actual implementation flow</strong> (<code>orchestrator.py:130-156</code>):</p>
+<table>
+<thead>
+<tr>
+<th>ADR Step</th>
+<th>Implementation Method</th>
+<th>Faithful?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>_step1_frame_and_slice()</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>_step2_4_generate_and_clean()</code> → <code>generator.load()</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>_step2_4_generate_and_clean()</code> → <code>generate_batch()</code> per scene</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>_step2_4_generate_and_clean()</code> → <code>generator.unload()</code> + <code>_safe_cuda_cleanup()</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>_step2_4_generate_and_clean()</code> → <code>cleaner.clean_batch()</code> per scene</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>6-8</td>
+<td><code>_step5_7_align()</code> → <code>aligner.load()</code> / per-frame <code>align()</code> / <code>aligner.unload()</code></td>
+<td><strong>Partial</strong> (see F-03)</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>_step9_reconstruct_and_harden()</code></td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key deviation (F-03):</strong> The ADR says Step 7 uses <code>aligner.align_batch()</code>. The actual code (<code>orchestrator.py:369-389</code>) calls <code>aligner.align()</code> per-frame in a loop, NOT <code>aligner.align_batch()</code>. This is functionally correct but forfeits any batch optimization the aligner backend might offer.</p>
+<h3 id="34-vram-lifecycle-management">3.4 VRAM Lifecycle Management<a class="headerlink" href="#34-vram-lifecycle-management" title="Permanent link">&para;</a></h3>
+<p><strong>ADR specifies:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>generator.load() → generate → generator.unload() → safe_cuda_cleanup()
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>→ aligner.load() → align → aligner.unload() → safe_cuda_cleanup()
+</code></pre></div></p>
+<p><strong>Actual code:</strong>
+- <code>_step2_4_generate_and_clean()</code>: <code>generator.load()</code> at line 255, <code>generator.unload()</code> + <code>_safe_cuda_cleanup()</code> at lines 317-318, wrapped in <code>try/finally</code>.
+- <code>_step5_7_align()</code>: <code>aligner.load()</code> at line 359, <code>aligner.unload()</code> + <code>_safe_cuda_cleanup()</code> at lines 412-413, wrapped in <code>try/finally</code>.</p>
+<p><strong>Verdict: MATCH.</strong> Both load/unload cycles wrapped in <code>try/finally</code> as the implementation plan specified.</p>
+<h3 id="35-sentinel-integration">3.5 Sentinel Integration<a class="headerlink" href="#35-sentinel-integration" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 9.4:</strong> Sentinel operates in Step 9 only, called once with word dicts from alignment.</p>
+<p><strong>Actual code</strong> (<code>orchestrator.py:436-439, 454-474</code>):
+- Imports <code>assess_alignment_quality</code> and <code>redistribute_collapsed_words</code> from <code>alignment_sentinel</code>
+- Calls <code>assess_alignment_quality(all_words, duration)</code> on merged word dicts
+- On COLLAPSED: gets speech regions, calls <code>redistribute_collapsed_words(all_words, duration, regions)</code>
+- Reconstructs with <code>suppress_silence=False</code> for recovered words (H3 fix)
+- Reconstructs with <code>suppress_silence=True</code> for normal words</p>
+<p><strong>Verdict: MATCH.</strong> Sentinel integration is exactly as specified in ADR Section 9.4 and Appendix A.</p>
+<h3 id="36-sentinel-stats-accumulation">3.6 Sentinel Stats Accumulation<a class="headerlink" href="#36-sentinel-stats-accumulation" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan Section 5.4:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="bp">self</span><span class="o">.</span><span class="n">sentinel_stats</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="s2">&quot;total_scenes&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="s2">&quot;collapsed_scenes&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="s2">&quot;recovered_scenes&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="s2">&quot;recovery_strategies&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;vad_guided&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;proportional&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>orchestrator.py:92-97</code>): Identical structure and key names.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="37-debug-artifacts">3.7 Debug Artifacts<a class="headerlink" href="#37-debug-artifacts" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan Section 5.5:</strong>
+- <code>{basename}_scene{idx}_raw.txt</code>
+- <code>{basename}_scene{idx}_clean.txt</code>
+- <code>{basename}_scene{idx}_merged.json</code>
+- <code>{basename}_scene{idx}_diag.json</code></p>
+<p><strong>Actual code</strong> (<code>orchestrator.py:644-656</code>):
+- <code>scene{idx:03d}_raw.txt</code> (at line 313)
+- <code>scene{idx:03d}_clean.txt</code> (at line 328)
+- <code>scene{idx:03d}_aligned.json</code> (at line 405) — named "aligned" not "merged"
+- <code>scene{idx:03d}_diag.json</code> (at line 511)</p>
+<p><strong>Deviation:</strong> Naming convention uses <code>scene{idx:03d}_</code> prefix instead of <code>{basename}_scene{idx}_</code>. Also "merged" → "aligned". These are cosmetic differences.</p>
+<p><strong>Verdict: MATCH (cosmetic naming differences).</strong></p>
+<h3 id="38-error-handling">3.8 Error Handling<a class="headerlink" href="#38-error-handling" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan Section 5.2:</strong>
+- Per-scene <code>try/except</code> in Step 9
+- Batch generation failure falls back to per-frame
+- Failed frame → empty string
+- Failed scene → <code>(None, error_diagnostics)</code></p>
+<p><strong>Actual code:</strong>
+- Per-scene <code>try/except</code> at <code>orchestrator.py:451,518-525</code>
+- Batch fallback to per-frame at <code>orchestrator.py:284-305</code>
+- Failed frame → <code>""</code> at <code>orchestrator.py:305</code>
+- Failed scene → <code>(None, {"scene_idx": idx, "error": str(e)})</code> at <code>orchestrator.py:525</code></p>
+<p><strong>Verdict: MATCH.</strong></p>
+<hr />
+<h2 id="4-backend-audit">4. Backend Audit<a class="headerlink" href="#4-backend-audit" title="Permanent link">&para;</a></h2>
+<h3 id="41-framers">4.1 Framers<a class="headerlink" href="#41-framers" title="Permanent link">&para;</a></h3>
+<h4 id="411-temporalframerfactory">4.1.1 TemporalFramerFactory<a class="headerlink" href="#411-temporalframerfactory" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 4.1.2:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">_registry</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="s2">&quot;full-scene&quot;</span><span class="p">:</span> <span class="s2">&quot;...FullSceneFramer&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="s2">&quot;vad-grouped&quot;</span><span class="p">:</span> <span class="s2">&quot;...VadGroupedFramer&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="s2">&quot;srt-source&quot;</span><span class="p">:</span> <span class="s2">&quot;...SrtSourceFramer&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="s2">&quot;manual&quot;</span><span class="p">:</span> <span class="s2">&quot;...ManualFramer&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>framers/factory.py:14-19</code>): Identical four entries.</p>
+<p><strong>Not implemented (as documented):</strong> <code>whisper-segment</code> — explicitly deferred in Implementation Plan Section 4.1 Note.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h4 id="412-fullsceneframer">4.1.2 FullSceneFramer<a class="headerlink" href="#412-fullsceneframer" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 4.2:</strong>
+- Returns one frame <code>[0, duration]</code> with <code>source="full-scene"</code>
+- Metadata includes <code>strategy: "full-scene"</code> and <code>frame_count: 1</code>
+- <code>cleanup()</code> is no-op</p>
+<p><strong>Actual code</strong> (<code>framers/full_scene.py:19-62</code>):
+- Returns one frame <code>[0, duration]</code> with <code>source="full-scene"</code> (line 48-50)
+- Metadata: <code>strategy: "full-scene"</code>, <code>frame_count: 1</code>, <strong>plus</strong> <code>audio_duration_sec</code> (line 54-58)
+- <code>cleanup()</code> is no-op (line 61-62)</p>
+<p><strong>Verdict: MATCH with benign metadata addition.</strong></p>
+<h4 id="413-vadgroupedframer">4.1.3 VadGroupedFramer<a class="headerlink" href="#413-vadgroupedframer" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 4.3:</strong>
+- Constructor: <code>segmenter_backend</code>, <code>max_group_duration_s</code>, <code>chunk_threshold_s</code>, <code>min_frame_duration_s</code>, <code>segmenter_config</code>
+- <code>frame()</code>: creates segmenter, detects speech regions, groups, filters, converts to TemporalFrames
+- <code>speech_regions</code> stored in metadata
+- <code>cleanup()</code> releases segmenter</p>
+<p><strong>Actual code</strong> (<code>framers/vad_grouped.py:25-170</code>):
+- Constructor parameters: all five match (lines 36-43)
+- Lazy segmenter creation via <code>_ensure_segmenter()</code> (lines 61-75)
+- Groups from <code>seg_result.groups</code>, filtered by min duration (lines 107-118)
+- Speech regions in <code>metadata["speech_regions"]</code> (line 161)
+- <code>cleanup()</code> releases segmenter (lines 166-170)
+- Rich metadata including <code>speech_coverage_ratio</code>, <code>segmenter_params</code>, etc.</p>
+<p><strong>Verdict: MATCH.</strong> Implementation is more detailed than spec (richer metadata, logging) but structurally identical.</p>
+<h4 id="414-srtsourceframer">4.1.4 SrtSourceFramer<a class="headerlink" href="#414-srtsourceframer" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 4.4:</strong>
+- Constructor: <code>srt_path</code>, <code>keep_text</code>, <code>min_frame_duration_s</code>
+- Uses <code>pysrt</code> to parse SRT
+- Each entry → TemporalFrame with optional text
+- Filters by min duration</p>
+<p><strong>Actual code</strong> (<code>framers/srt_source.py:21-133</code>):
+- Constructor: all three parameters match (lines 30-35)
+- Uses <code>pysrt</code> with lazy import (line 72)
+- Clamps to audio duration (lines 94-95)
+- Filters by min duration (line 98)
+- <code>source="srt-source"</code> (line 109)</p>
+<p><strong>Verdict: MATCH.</strong> The code adds audio boundary clamping not mentioned in the ADR — a defensive improvement.</p>
+<h4 id="415-manualframer">4.1.5 ManualFramer<a class="headerlink" href="#415-manualframer" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 4.5:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ManualFramer</span><span class="p">:</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestamps</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]):</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>framers/manual.py:18-92</code>):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ManualFramer</span><span class="p">:</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestamps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span> <span class="n">texts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span> <span class="o">...</span>
+</code></pre></div></p>
+<p><strong>Deviation:</strong> Constructor has additional <code>texts</code> parameter for pre-populating frame text. Validation ensures <code>len(texts) == len(timestamps)</code> if provided.</p>
+<p><strong>Verdict: MATCH with addition.</strong> The <code>texts</code> parameter is an optional enhancement enabling "inject known timestamps + text" testing workflows.</p>
+<h3 id="42-generators">4.2 Generators<a class="headerlink" href="#42-generators" title="Permanent link">&para;</a></h3>
+<h4 id="421-textgeneratorfactory">4.2.1 TextGeneratorFactory<a class="headerlink" href="#421-textgeneratorfactory" title="Permanent link">&para;</a></h4>
+<p><strong>Actual code</strong> (<code>generators/factory.py:14-16</code>): Registry has <code>"qwen3"</code> only. Matches plan.</p>
+<p><strong>Not implemented (as documented):</strong> TransformersGenerator, VLLMGenerator, WhisperTextGenerator — explicitly deferred.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h4 id="422-qwen3textgenerator">4.2.2 Qwen3TextGenerator<a class="headerlink" href="#422-qwen3textgenerator" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 3.1.3:</strong>
+- Constructor: <code>model_id</code>, <code>device</code>, <code>dtype</code>, <code>batch_size</code>, <code>max_new_tokens</code>, <code>language</code>, <code>repetition_penalty</code>, <code>max_tokens_per_audio_second</code>, <code>attn_implementation</code>
+- <code>load()</code>: Creates QwenASR, calls <code>load_model_text_only()</code>
+- <code>unload()</code>: Calls <code>unload_model()</code>, <code>safe_cuda_cleanup()</code>, sets <code>asr = None</code>
+- <code>generate()</code>: Delegates to <code>generate_batch()</code>
+- <code>generate_batch()</code>: Calls <code>asr.transcribe_text_only()</code>, wraps in <code>TranscriptionResult</code>
+- <code>cleanup()</code>: Calls <code>unload()</code></p>
+<p><strong>Actual code</strong> (<code>generators/qwen3.py:24-199</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>ADR Spec</th>
+<th>Code</th>
+<th>Match?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__</code> params</td>
+<td>9 params</td>
+<td>9 identical params (line 33-43)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>load()</code></td>
+<td>Create QwenASR, <code>load_model_text_only()</code></td>
+<td>Lines 78-106, includes <code>use_aligner=False</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>unload()</code></td>
+<td><code>unload_model()</code> + <code>safe_cuda_cleanup()</code></td>
+<td>Lines 108-125</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>generate()</code></td>
+<td>Delegates to <code>generate_batch()</code></td>
+<td>Lines 127-151</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>generate_batch()</code></td>
+<td><code>asr.transcribe_text_only()</code> → <code>TranscriptionResult</code></td>
+<td>Lines 153-195</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>cleanup()</code></td>
+<td>Calls <code>unload()</code></td>
+<td>Lines 197-199</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Addition:</strong> <code>is_loaded</code> property (line 73-76). Benign.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="43-aligners">4.3 Aligners<a class="headerlink" href="#43-aligners" title="Permanent link">&para;</a></h3>
+<h4 id="431-textalignerfactory">4.3.1 TextAlignerFactory<a class="headerlink" href="#431-textalignerfactory" title="Permanent link">&para;</a></h4>
+<p><strong>Actual code</strong> (<code>aligners/factory.py:14-17</code>): Registry has <code>"qwen3"</code> and <code>"none"</code>. Matches plan.</p>
+<p><strong>Not implemented (as documented):</strong> CTCAligner, VADProportionalAligner, HybridAligner — explicitly deferred.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h4 id="432-qwen3forcedaligneradapter">4.3.2 Qwen3ForcedAlignerAdapter<a class="headerlink" href="#432-qwen3forcedaligneradapter" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 3.2.3:</strong>
+- Constructor: <code>aligner_id</code>, <code>device</code>, <code>dtype</code>, <code>language</code>
+- <code>load()</code>: Creates QwenASR, <code>load_aligner_only()</code>
+- <code>unload()</code>: <code>unload_model()</code> + <code>safe_cuda_cleanup()</code>
+- <code>align()</code>: Delegates to <code>align_batch()</code>
+- <code>align_batch()</code>: <code>asr.align_standalone()</code> → <code>merge_master_with_timestamps()</code> → <code>AlignmentResult</code></p>
+<p><strong>Actual code</strong> (<code>aligners/qwen3.py:23-215</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>ADR Spec</th>
+<th>Code</th>
+<th>Match?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__</code> params</td>
+<td>4 params</td>
+<td>4 identical params (lines 37-42)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>load()</code></td>
+<td>Create QwenASR, <code>load_aligner_only()</code></td>
+<td>Lines 66-88</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>unload()</code></td>
+<td><code>unload_model()</code> + <code>safe_cuda_cleanup()</code></td>
+<td>Lines 90-103</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>align()</code></td>
+<td>Delegates to <code>align_batch()</code></td>
+<td>Lines 105-129</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>align_batch()</code></td>
+<td><code>align_standalone()</code> → <code>merge_master_with_timestamps()</code> → <code>AlignmentResult</code></td>
+<td>Lines 131-211</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>cleanup()</code></td>
+<td>Calls <code>unload()</code></td>
+<td>Lines 213-215</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Critical detail verified:</strong> <code>merge_master_with_timestamps()</code> is called inside <code>align_batch()</code> (line 187) as specified. The reconciliation of punctuated text + aligner timestamps is encapsulated within the adapter.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h4 id="433-nonealigner">4.3.3 NoneAligner<a class="headerlink" href="#433-nonealigner" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 3.2.4:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">NoneAligner</span><span class="p">:</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">align</span><span class="p">(</span><span class="o">...</span><span class="p">):</span> <span class="k">return</span> <span class="n">AlignmentResult</span><span class="p">(</span><span class="n">words</span><span class="o">=</span><span class="p">[],</span> <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;skipped&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="o">/</span><span class="n">unload</span><span class="o">/</span><span class="n">cleanup</span><span class="p">:</span> <span class="k">pass</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>aligners/none.py:14-49</code>): Exact match.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h3 id="44-cleaners">4.4 Cleaners<a class="headerlink" href="#44-cleaners" title="Permanent link">&para;</a></h3>
+<h4 id="441-textcleanerfactory">4.4.1 TextCleanerFactory<a class="headerlink" href="#441-textcleanerfactory" title="Permanent link">&para;</a></h4>
+<p><strong>Actual code</strong> (<code>cleaners/factory.py:14-17</code>): Registry has <code>"qwen3"</code> and <code>"passthrough"</code>. Matches plan.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<h4 id="442-qwen3textcleaner">4.4.2 Qwen3TextCleaner<a class="headerlink" href="#442-qwen3textcleaner" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 3.3.3:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Qwen3TextCleaner</span><span class="p">:</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AssemblyCleanerConfig</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_cleaner</span> <span class="o">=</span> <span class="n">AssemblyTextCleaner</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleaner</span><span class="o">.</span><span class="n">clean</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">texts</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleaner</span><span class="o">.</span><span class="n">clean_batch</span><span class="p">(</span><span class="n">texts</span><span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>cleaners/qwen3.py:17-76</code>):</p>
+<p><strong>Deviations:</strong>
+1. Constructor signature: <code>config: Optional[Any] = None, language: str = "ja"</code> instead of <code>config: Optional[AssemblyCleanerConfig] = None</code>. The <code>Any</code> type avoids importing <code>AssemblyCleanerConfig</code> at class definition time (lazy import inside body). The <code>language</code> parameter is passed through to <code>AssemblyTextCleaner</code>.
+2. The <code>clean()</code> and <code>clean_batch()</code> methods handle the tuple return (<code>cleaned, stats</code>) from <code>AssemblyTextCleaner</code>, returning only the cleaned text per protocol contract. Stats are stored in <code>self._last_stats</code> for optional diagnostic access.
+3. Config validation: if <code>config</code> is not <code>AssemblyCleanerConfig</code>, falls back to defaults with a warning.</p>
+<p><strong>Verdict: MATCH with enhancements.</strong> The deviations are defensive improvements (lazy import, config validation, stats preservation) that don't violate the protocol contract.</p>
+<h4 id="443-passthroughcleaner">4.4.3 PassthroughCleaner<a class="headerlink" href="#443-passthroughcleaner" title="Permanent link">&para;</a></h4>
+<p><strong>ADR / Implementation Plan Section 3.3.4:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PassthroughCleaner</span><span class="p">:</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span> <span class="k">return</span> <span class="n">text</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">texts</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span> <span class="k">return</span> <span class="n">texts</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>cleaners/passthrough.py:11-20</code>): <code>clean_batch</code> returns <code>list(texts)</code> (defensive copy). Otherwise identical.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<hr />
+<h2 id="5-integration-audit">5. Integration Audit<a class="headerlink" href="#5-integration-audit" title="Permanent link">&para;</a></h2>
+<h3 id="51-pipeline-construction-qwenpipelineinit">5.1 Pipeline Construction (QwenPipeline.<strong>init</strong>)<a class="headerlink" href="#51-pipeline-construction-qwenpipelineinit" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan Section 6.1:</strong>
+- Orchestrator constructed in <code>__init__()</code> for ASSEMBLY mode only
+- Uses factory classes to create components from <code>_asr_config</code></p>
+<p><strong>Actual code</strong> (<code>qwen_pipeline.py:288-292, 341-413</code>):
+- <code>self._subtitle_pipeline = None</code> initialized, then built if <code>input_mode == InputMode.ASSEMBLY</code> (line 291-292)
+- <code>_build_subtitle_pipeline()</code> uses all four factories (lines 349-413)
+- Component configuration pulled from <code>self._asr_config</code> (line 362)</p>
+<p><strong>Verified wiring:</strong>
+- TemporalFramer: <code>"full-scene"</code> (line 365)
+- TextGenerator: <code>"qwen3"</code> with 9 config parameters from <code>_asr_config</code> (lines 368-379)
+- TextCleaner: <code>"qwen3"</code> with <code>AssemblyCleanerConfig</code> when enabled, <code>"passthrough"</code> when disabled (lines 382-390)
+- TextAligner: <code>"qwen3"</code> when <code>use_aligner=True</code>, else <code>None</code> (lines 393-401)
+- HardeningConfig: <code>timestamp_mode</code> mapped from old enum to new enum (lines 403-411)</p>
+<p><strong>Verdict: MATCH.</strong> Implementation follows the plan's Section 6.1.2 precisely.</p>
+<h3 id="52-phase-5-assembly-path-qwenpipelineprocess">5.2 Phase 5 Assembly Path (QwenPipeline.process)<a class="headerlink" href="#52-phase-5-assembly-path-qwenpipelineprocess" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan Section 6.1.3:</strong>
+- Replace <code>_phase5_assembly()</code> call with orchestrator
+- Unpack results to Phase 6 format</p>
+<p><strong>Actual code</strong> (<code>qwen_pipeline.py:641-697</code>):
+- Assembly mode detected (line 641)
+- <code>artifacts_dir</code> set (line 651)
+- Scene paths extracted (lines 654-655)
+- Speech regions converted from <code>{idx: SegmentationResult}</code> to <code>List[List[Tuple]]</code> (lines 658-668)
+- <code>process_scenes()</code> called (lines 671-674)
+- Results unpacked to <code>(result, scene_idx)</code> tuples (lines 678-679)
+- Sentinel stats mapped to existing format (lines 682-686)
+- Per-scene diagnostics saved (lines 689-697)</p>
+<p><strong>Verdict: MATCH.</strong> The conversion of speech regions from the dict-based Phase 4 format to the list-based orchestrator format is a necessary adapter step.</p>
+<h3 id="53-cleanup">5.3 Cleanup<a class="headerlink" href="#53-cleanup" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Implementation Plan Section 6.1.4:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_subtitle_pipeline&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subtitle_pipeline</span><span class="p">:</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_subtitle_pipeline</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_subtitle_pipeline</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div></p>
+<p><strong>Actual code</strong> (<code>qwen_pipeline.py:301-312</code>):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subtitle_pipeline</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_subtitle_pipeline</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Subtitle pipeline cleanup failed (non-fatal): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_subtitle_pipeline</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+</code></pre></div></p>
+<p><strong>Verdict: MATCH with improvement.</strong> The <code>try/except</code> is more robust than the plan specified.</p>
+<h3 id="54-old-_phase5_assembly-removal">5.4 Old _phase5_assembly() Removal<a class="headerlink" href="#54-old-_phase5_assembly-removal" title="Permanent link">&para;</a></h3>
+<p><strong>Implementation Plan Section 8.1:</strong></p>
+<blockquote>
+<p>Do NOT remove the old <code>_phase5_assembly()</code> method — keep for reference/fallback until the orchestrator is proven stable.</p>
+</blockquote>
+<p><strong>Actual code:</strong> <code>_phase5_assembly()</code> is <strong>completely removed</strong> (grep confirms no matches). This is a deviation from the plan's conservative approach, but a reasonable one if the orchestrator has been validated.</p>
+<p><strong>Verdict: DEVIATION (low risk).</strong> The fallback path no longer exists. If the orchestrator fails, there is no way to revert to the old assembly code without git revert.</p>
+<hr />
+<h2 id="6-workflow-audit">6. Workflow Audit<a class="headerlink" href="#6-workflow-audit" title="Permanent link">&para;</a></h2>
+<h3 id="61-workflows-currently-exercisable">6.1 Workflows Currently Exercisable<a class="headerlink" href="#61-workflows-currently-exercisable" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 12 promises five new workflows:</strong></p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Workflow</th>
+<th>Possible Now?</th>
+<th>How?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>12.1</td>
+<td>Whisper-Guided Qwen</td>
+<td><strong>No</strong></td>
+<td>Requires <code>whisper-segment</code> framer (deferred)</td>
+</tr>
+<tr>
+<td>12.2</td>
+<td>SRT Re-Transcription</td>
+<td><strong>Yes</strong></td>
+<td><code>SrtSourceFramer(srt_path, keep_text=False)</code> + <code>Qwen3TextGenerator</code> + <code>NoneAligner</code> or <code>None</code></td>
+</tr>
+<tr>
+<td>12.3</td>
+<td>Two-Pass Refinement</td>
+<td><strong>Yes</strong></td>
+<td>Pass 1 → SRT → Pass 2 with <code>SrtSourceFramer(pass1.srt)</code></td>
+</tr>
+<tr>
+<td>12.4</td>
+<td>Aligner-Free Fast Mode</td>
+<td><strong>Yes</strong></td>
+<td><code>VadGroupedFramer</code> + <code>Qwen3TextGenerator</code> + <code>aligner=None</code></td>
+</tr>
+<tr>
+<td>12.5</td>
+<td>Cross-Model Benchmarking</td>
+<td><strong>Partial</strong></td>
+<td>Only <code>qwen3</code> generator is implemented; needs additional generators for comparison</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Assessment:</strong> Three of five workflows are structurally possible. The missing <code>whisper-segment</code> framer was explicitly deferred. Cross-model benchmarking is structurally supported but requires additional generator backends.</p>
+<p><strong>Important caveat:</strong> Workflows 12.2-12.4 are <strong>only possible via programmatic API</strong> — there are no CLI flags or GUI options to select non-default framers, generators, or aligner configurations. The current CLI integration (<code>qwen_pipeline.py</code>) always constructs <code>full-scene</code> framer and <code>qwen3</code> aligner for assembly mode. The composability exists at the code level but is not yet exposed to users.</p>
+<h3 id="62-workflow-assembly-via-cli">6.2 Workflow: Assembly via CLI<a class="headerlink" href="#62-workflow-assembly-via-cli" title="Permanent link">&para;</a></h3>
+<p><strong>Before ADR-006:</strong> <code>whisperjav video.mp4 --mode qwen --qwen-input-mode assembly</code>
+<strong>After ADR-006:</strong> Same command, now routes through <code>DecoupledSubtitlePipeline.process_scenes()</code>.</p>
+<p><strong>Verdict:</strong> The primary workflow (assembly mode via CLI) is fully functional.</p>
+<hr />
+<h2 id="7-error-handling-vram-audit">7. Error Handling &amp; VRAM Audit<a class="headerlink" href="#7-error-handling-vram-audit" title="Permanent link">&para;</a></h2>
+<h3 id="71-safe_cuda_cleanup-usage">7.1 safe_cuda_cleanup() Usage<a class="headerlink" href="#71-safe_cuda_cleanup-usage" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Audit M5:</strong> "Orchestrator calls <code>safe_cuda_cleanup()</code> once after each <code>unload()</code>."</p>
+<p><strong>Actual code:</strong>
+- After generator unload: <code>orchestrator.py:318</code> — <code>self._safe_cuda_cleanup()</code>
+- After aligner unload: <code>orchestrator.py:413</code> — <code>self._safe_cuda_cleanup()</code>
+- In generator adapter unload: <code>generators/qwen3.py:121-123</code> — <code>safe_cuda_cleanup()</code>
+- In aligner adapter unload: <code>aligners/qwen3.py:99-101</code> — <code>safe_cuda_cleanup()</code></p>
+<p><strong>Finding (F-07):</strong> <code>safe_cuda_cleanup()</code> is called TWICE per unload — once inside the adapter's <code>unload()</code> and once by the orchestrator after calling <code>unload()</code>. This is not harmful (double cleanup is idempotent) but wastes ~2ms per call.</p>
+<h3 id="72-oom-recovery">7.2 OOM Recovery<a class="headerlink" href="#72-oom-recovery" title="Permanent link">&para;</a></h3>
+<p><strong>ADR / Audit C1:</strong> "Eliminated — orchestrator manages model lifecycle externally via <code>generator.load()</code>/<code>unload()</code>. No closures capture model references."</p>
+<p><strong>Actual code:</strong> The <code>Qwen3TextGenerator.load()</code> creates a fresh <code>QwenASR</code> instance each time (line 91-103). The <code>unload()</code> sets <code>self._asr = None</code> (line 119). No closure captures.</p>
+<p><strong>However:</strong> The QwenASR instance used inside <code>generate_batch()</code> still has its own internal OOM handling (in <code>qwen_asr.py:977-985</code>). The C1 fix (reassigning <code>qwen_model</code> after reload, line 985) is applied there as a defense-in-depth measure.</p>
+<p><strong>Verdict: MATCH.</strong> The architecture eliminates the stale closure problem at the orchestrator level, and the C1 fix provides defense-in-depth at the QwenASR level.</p>
+<h3 id="73-tryfinally-for-vram-lifecycle">7.3 try/finally for VRAM Lifecycle<a class="headerlink" href="#73-tryfinally-for-vram-lifecycle" title="Permanent link">&para;</a></h3>
+<p><strong>Actual code:</strong>
+- Generator: <code>try</code> at line 257, <code>finally</code> at line 315-318 — always unloads even on exception.
+- Aligner: <code>try</code> at line 360, <code>finally</code> at line 411-413 — always unloads even on exception.</p>
+<p><strong>Verdict: MATCH.</strong></p>
+<hr />
+<h2 id="8-regression-audit">8. Regression Audit<a class="headerlink" href="#8-regression-audit" title="Permanent link">&para;</a></h2>
+<h3 id="81-coupled-modes-context_aware-vad_slicing">8.1 Coupled Modes (CONTEXT_AWARE, VAD_SLICING)<a class="headerlink" href="#81-coupled-modes-context_aware-vad_slicing" title="Permanent link">&para;</a></h3>
+<p><strong>ADR Section 13:</strong> "What Doesn't Change" — coupled modes continue through old code paths.</p>
+<p><strong>Verification:</strong>
+- <code>qwen_pipeline.py:641</code>: <code>if self.input_mode == InputMode.ASSEMBLY:</code> — only assembly routes to orchestrator
+- <code>qwen_pipeline.py:698-934</code>: <code>else:</code> block contains full CONTEXT_AWARE and VAD_SLICING code paths
+- <code>_transcribe_speech_regions()</code> still present at line 1116
+- All <code>_transcribe_group()</code> logic preserved</p>
+<p><strong>C2 fix impact on coupled modes:</strong> <code>japanese_postprocess</code> is now hardcoded <code>False</code> in <code>_asr_config</code> (line 272). This means CONTEXT_AWARE and VAD_SLICING no longer apply <code>JapanesePostProcessor</code> — this is intentional per ADR Section 5.1 ("Coupled modes are incorrect to apply it").</p>
+<p><strong>Verdict: NO REGRESSION.</strong> Coupled modes fully preserved. C2 fix intentionally changes their behavior (removing incorrect post-processing).</p>
+<h3 id="82-dead-code-removal-verification">8.2 Dead Code Removal Verification<a class="headerlink" href="#82-dead-code-removal-verification" title="Permanent link">&para;</a></h3>
+<p><strong>L1 (<code>_apply_vad_filter</code>):</strong> Confirmed absent from <code>qwen_pipeline.py</code>. No grep matches.
+<strong>L2 (<code>cross_scene_context</code> branches):</strong> Confirmed absent. No grep matches.</p>
+<p><strong>Verdict: CLEAN.</strong> Dead code properly removed.</p>
+<h3 id="83-m1-fix-300s-comment">8.3 M1 Fix (300s comment)<a class="headerlink" href="#83-m1-fix-300s-comment" title="Permanent link">&para;</a></h3>
+<p>Three occurrences of "ForcedAligner's ... limit" in <code>qwen_pipeline.py</code> (lines 218, 474, 492) now correctly say "180s".</p>
+<p><strong>Verdict: FIXED.</strong></p>
+<hr />
+<h2 id="9-consolidated-findings-register">9. Consolidated Findings Register<a class="headerlink" href="#9-consolidated-findings-register" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Category</th>
+<th>Severity</th>
+<th>ADR Reference</th>
+<th>Code Reference</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-01</td>
+<td>Orchestrator</td>
+<td><strong>MEDIUM</strong></td>
+<td>Section 9.2, Step 7</td>
+<td><code>orchestrator.py:369-389</code></td>
+<td>Alignment uses per-frame <code>align()</code> instead of <code>align_batch()</code>. Forfeits batch efficiency. ADR flow says "aligner.align_batch(frame_audios, clean_texts)".</td>
+</tr>
+<tr>
+<td>F-02</td>
+<td>Integration</td>
+<td><strong>MEDIUM</strong></td>
+<td>Section 9.3</td>
+<td><code>orchestrator.py:491-496</code></td>
+<td><code>HardeningConfig.speech_regions</code> is never populated at the orchestrator level. The field exists on the type but the orchestrator creates <code>HardeningConfig</code> with <code>speech_regions=self.hardening_config.speech_regions</code> which is always <code>None</code> (never set by <code>_build_subtitle_pipeline()</code>). Speech regions flow only to sentinel recovery, not to hardening.</td>
+</tr>
+<tr>
+<td>F-03</td>
+<td>Integration</td>
+<td><strong>LOW</strong></td>
+<td>Implementation Plan 8.1</td>
+<td><code>qwen_pipeline.py</code> (absence)</td>
+<td>Old <code>_phase5_assembly()</code> method completely removed instead of kept as deprecated fallback. No rollback path without git revert.</td>
+</tr>
+<tr>
+<td>F-04</td>
+<td>Type</td>
+<td><strong>LOW</strong></td>
+<td>Section 8</td>
+<td><code>types.py:48-51, 62-67, 96-109, 165</code></td>
+<td>Extra convenience properties (<code>duration</code>, <code>frame_count</code>, <code>total_duration</code>, <code>word_count</code>, <code>char_count</code>, <code>span_sec</code>, <code>timestamp_mode</code>) not in ADR. All benign additions.</td>
+</tr>
+<tr>
+<td>F-05</td>
+<td>Backend</td>
+<td><strong>LOW</strong></td>
+<td>Section 5.4, Plan 4.5</td>
+<td><code>framers/manual.py:29</code></td>
+<td><code>ManualFramer</code> has <code>texts</code> parameter not in ADR. Optional enhancement for testing.</td>
+</tr>
+<tr>
+<td>F-06</td>
+<td>Backend</td>
+<td><strong>LOW</strong></td>
+<td>Plan 3.3.3</td>
+<td><code>cleaners/qwen3.py:26</code></td>
+<td><code>Qwen3TextCleaner</code> constructor takes <code>config: Optional[Any]</code> + <code>language: str</code> instead of <code>config: Optional[AssemblyCleanerConfig]</code>. Defensive type handling improvement.</td>
+</tr>
+<tr>
+<td>F-07</td>
+<td>VRAM</td>
+<td><strong>LOW</strong></td>
+<td>Section 9, M5</td>
+<td><code>orchestrator.py:318,413</code> + <code>generators/qwen3.py:123</code>, <code>aligners/qwen3.py:101</code></td>
+<td><code>safe_cuda_cleanup()</code> called twice per unload cycle — once inside adapter and once by orchestrator. Idempotent but redundant.</td>
+</tr>
+<tr>
+<td>F-08</td>
+<td>Orchestrator</td>
+<td><strong>LOW</strong></td>
+<td>Section 9.1</td>
+<td><code>orchestrator.py:68</code></td>
+<td>Extra <code>language: str = "ja"</code> parameter in <code>__init__</code> not in ADR. Avoids passing language through kwargs at every call.</td>
+</tr>
+<tr>
+<td>F-09</td>
+<td>Artifacts</td>
+<td><strong>LOW</strong></td>
+<td>Plan 5.5</td>
+<td><code>orchestrator.py:405</code></td>
+<td>Debug artifact named <code>aligned.json</code> instead of <code>merged.json</code> as in plan. Cosmetic.</td>
+</tr>
+<tr>
+<td>F-10</td>
+<td>Workflows</td>
+<td><strong>INFO</strong></td>
+<td>Section 12</td>
+<td>N/A</td>
+<td>Workflows 12.2-12.4 are only accessible via programmatic API, not CLI/GUI. No CLI flags for framer/aligner selection.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Severity counts:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MEDIUM</td>
+<td>2</td>
+</tr>
+<tr>
+<td>LOW</td>
+<td>7</td>
+</tr>
+<tr>
+<td>INFO</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>10</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-recommendations">10. Recommendations<a class="headerlink" href="#10-recommendations" title="Permanent link">&para;</a></h2>
+<h3 id="priority-1-address-soon">Priority 1 (Address soon)<a class="headerlink" href="#priority-1-address-soon" title="Permanent link">&para;</a></h3>
+<p><strong>F-01: Use <code>align_batch()</code> in orchestrator Step 5-7.</strong> The per-frame <code>align()</code> loop in <code>_step5_7_align()</code> misses an optimization opportunity. For the <code>full-scene</code> framer (one frame per scene), this is moot. But for <code>vad-grouped</code> framer (multiple frames per scene), batching alignment calls would be significantly more efficient. Recommendation: Change the per-frame loop to collect all frame audio paths + texts for a scene, call <code>align_batch()</code> once per scene, then unpack results. The adapter's <code>align_batch()</code> already exists and works.</p>
+<p><strong>F-02: Populate <code>HardeningConfig.speech_regions</code> for VAD_ONLY mode.</strong> Currently, the <code>speech_regions</code> field on <code>HardeningConfig</code> is never populated. This means the <code>_apply_vad_only_timestamps()</code> function does not have access to actual speech regions — it distributes proportionally across the entire scene duration, not across speech regions specifically. For <code>TimestampMode.VAD_ONLY</code>, the hardening stage should use speech regions if available. Recommendation: Pass <code>scene_speech_regions[scene_idx]</code> through to <code>HardeningConfig</code> in <code>_step9_reconstruct_and_harden()</code>.</p>
+<h3 id="priority-2-low-urgency">Priority 2 (Low urgency)<a class="headerlink" href="#priority-2-low-urgency" title="Permanent link">&para;</a></h3>
+<p><strong>F-07: Remove double <code>safe_cuda_cleanup()</code>.</strong> Either remove the call from the adapter's <code>unload()</code> methods (and document that the caller is responsible) or remove it from the orchestrator (and document that adapters self-clean). The current approach works but is architecturally unclear about responsibility.</p>
+<p><strong>F-03: Document the removal of <code>_phase5_assembly()</code>.</strong> If the old method is intentionally removed (not just forgotten), add a comment in the commit or CHANGELOG noting that the orchestrator is now the only assembly path with no fallback.</p>
+<h3 id="priority-3-future-work">Priority 3 (Future work)<a class="headerlink" href="#priority-3-future-work" title="Permanent link">&para;</a></h3>
+<p><strong>F-10: Expose workflow composability via CLI/GUI.</strong> The ADR's workflow promises (12.1-12.5) require either CLI flags (e.g., <code>--framer srt-source --framer-srt-path existing.srt --aligner none</code>) or a configuration file mechanism. Currently, users can only access the default assembly configuration (full-scene framer + qwen3 generator + qwen3 aligner).</p>
+<hr />
+<p><em>End of ADR-006 Audit B</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

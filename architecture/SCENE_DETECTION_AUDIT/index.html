@@ -1,0 +1,2452 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/SCENE_DETECTION_AUDIT/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Scene Detection Audit: DynamicSceneDetector - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#scene-detection-audit-dynamicscenedetector" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Scene Detection Audit: DynamicSceneDetector
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Executive Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Findings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-overall-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Overall Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-auditok-method-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Auditok Method Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Auditok Method Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-block-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Block Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-parameter-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Parameter Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-minmax-duration-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Min/Max Duration Enforcement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-silero-method-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Silero Method Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Silero Method Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-block-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Block Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-parameter-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Parameter Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-minmax-duration-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Min/Max Duration Enforcement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-semantic-method-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Semantic Method Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Semantic Method Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-block-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Block Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-parameter-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Parameter Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-minmax-duration-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Min/Max Duration Enforcement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-comparison-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Comparison Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-gaps-bugs-and-technical-debt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Gaps, Bugs, and Technical Debt
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Gaps, Bugs, and Technical Debt">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-critical-parameter-contract-broken-semantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 CRITICAL: Parameter Contract Broken (Semantic)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-high-silero-vad-duration-parameters-disconnect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 HIGH: Silero VAD Duration Parameters Disconnect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-medium-timestamp-semantics-inconsistency-semantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 MEDIUM: Timestamp Semantics Inconsistency (Semantic)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-medium-no-max_duration-enforcement-in-semantic-post-clustering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 MEDIUM: No max_duration Enforcement in Semantic Post-Clustering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-low-magic-numbers-in-semantic-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 LOW: Magic Numbers in Semantic Adapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-low-silero-per-region-resampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 LOW: Silero Per-Region Resampling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-medium-brute-force-fallback-ignores-scene-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 MEDIUM: Brute Force Fallback Ignores Scene Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#68-low-inconsistent-logging-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.8 LOW: Inconsistent Logging Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Recommendations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Recommendations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-fix-parameter-contract-priority-high" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Fix Parameter Contract (Priority: HIGH)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-align-silero-duration-parameters-priority-high" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Align Silero Duration Parameters (Priority: HIGH)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-add-max_duration-splitting-to-semantic-priority-medium" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Add max_duration Splitting to Semantic (Priority: MEDIUM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-standardize-timestamp-semantics-priority-medium" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Standardize Timestamp Semantics (Priority: MEDIUM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-improve-brute-force-fallback-priority-low" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Improve Brute Force Fallback (Priority: LOW)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-appendix-code-reference-quick-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Appendix: Code Reference Quick Links
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/SCENE_DETECTION_AUDIT.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="scene-detection-audit-dynamicscenedetector">Scene Detection Audit: DynamicSceneDetector<a class="headerlink" href="#scene-detection-audit-dynamicscenedetector" title="Permanent link">&para;</a></h1>
+<p><strong>Date</strong>: 2026-02-05
+<strong>Auditor</strong>: Claude Opus 4.5
+<strong>Files Audited</strong>:
+- <code>whisperjav/modules/scene_detection.py</code> (lines 791-1508)
+- <code>whisperjav/modules/scene_detection_backends/semantic_adapter.py</code> (lines 1-504)
+- <code>whisperjav/vendor/semantic_audio_clustering.py</code> (lines 1-769)</p>
+<hr />
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>This audit examines the <code>DynamicSceneDetector</code> class and its three scene detection methods: <strong>auditok</strong>, <strong>silero</strong>, and <strong>semantic</strong>. The audit reveals significant architectural inconsistencies between methods, particularly in how <code>min_duration</code> and <code>max_duration</code> constraints are enforced.</p>
+<h3 id="key-findings">Key Findings<a class="headerlink" href="#key-findings" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Severity</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>min_duration FILTERING vs MERGING</strong></td>
+<td>HIGH</td>
+<td>Auditok/Silero FILTER short segments; Semantic MERGES them</td>
+</tr>
+<tr>
+<td><strong>max_duration SPLITTING inconsistency</strong></td>
+<td>MEDIUM</td>
+<td>Auditok uses auditok's max_dur; Semantic uses silence-snap splitting</td>
+</tr>
+<tr>
+<td><strong>Parameter contract broken</strong></td>
+<td>HIGH</td>
+<td>Semantic adapter ignores <code>self.min_duration</code>/<code>self.max_duration</code> from DynamicSceneDetector</td>
+</tr>
+<tr>
+<td><strong>Timestamp mismatch</strong></td>
+<td>MEDIUM</td>
+<td>Semantic returns asr_processing timestamps (with padding); others return exact</td>
+</tr>
+<tr>
+<td><strong>Silero resamples per-region</strong></td>
+<td>LOW</td>
+<td>Memory-efficient but CPU-intensive for large files</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-overall-architecture">1. Overall Architecture<a class="headerlink" href="#1-overall-architecture" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                                    +------------------------+
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                                    | DynamicSceneDetector   |
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                                    | (scene_detection.py)   |
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                                    | Line 791               |
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                    +------------------------+
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                                              |
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                            method selection (line 1203-1237)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                                              |
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>          +-----------------------------------+-----------------------------------+
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>          |                                   |                                   |
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    method=&quot;auditok&quot;                   method=&quot;silero&quot;                   method=&quot;semantic&quot;
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>          |                                   |                                   |
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>          v                                   v                                   v
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  +----------------+               +------------------+               +------------------------+
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  | auditok.split  |               | auditok Pass 1   |               | SemanticClusteringAdapter |
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  | (Pass 1 + 2)   |               | + Silero Pass 2  |               | (semantic_adapter.py)     |
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  +----------------+               +------------------+               +------------------------+
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                                                                                |
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                                                                                v
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                                                                      +------------------------+
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>                                                                      | process_movie_v7()     |
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                                                                      | (semantic_audio_       |
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                                                                      |  clustering.py)        |
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                                                                      +------------------------+
+</code></pre></div>
+<hr />
+<h2 id="2-auditok-method-flow">2. Auditok Method Flow<a class="headerlink" href="#2-auditok-method-flow" title="Permanent link">&para;</a></h2>
+<h3 id="21-block-diagram">2.1 Block Diagram<a class="headerlink" href="#21-block-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>detect_scenes() [line 1183]
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>        |
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        v
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>load_audio_unified() [line 1245] --- No resampling (native SR)
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        |
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        v
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>+-----------------------------------------------+
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>|              PASS 1: Coarse Splitting         |
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>|    auditok.split() [line 1285]                |
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>|    params: pass1_min_dur, pass1_max_dur,      |
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>|            pass1_max_silence, pass1_energy    |
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>+-----------------------------------------------+
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        |
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        v
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>For each story_line region:
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        |
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        +---&gt; Duration &lt;= max_duration AND &gt;= min_duration?
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        |         |
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>        |        YES --&gt; SAVE directly [line 1357]
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>        |         |       (detection_pass=1)
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>        |         |
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        |        NO (too long)
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>        |         |
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>        |         v
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>        |    +-------------------------------------------+
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>        |    |           PASS 2: Fine Splitting         |
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>        |    | Optional: _apply_assistive_processing()  |
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>        |    |           [line 1382]                    |
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>        |    |                                          |
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>        |    | auditok.split() [line 1395]              |
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>        |    | params: pass2_min_dur, pass2_max_dur,    |
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>        |    |         pass2_max_silence, pass2_energy  |
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>        |    +-------------------------------------------+
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>        |              |
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>        |              v
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>        |         sub_regions found?
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>        |              |
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>        |      YES     |      NO
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>        |       |      |       |
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>        |       v      |       v
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>        |   FILTER by  |   BRUTE FORCE [line 1419]
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>        |   min_dur    |   chunk_len = max_duration
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a>        |   [line 1404]|   num_chunks = ceil(region_dur/chunk_len)
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>        |       |      |       |
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>        |       v      |       v
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a>        |   SAVE each  |   SAVE each chunk
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a>        |   (pass=2)   |   (pass=2)
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>        +-------+------+-------+
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>                |
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a>                v
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a>        final_scene_tuples[]
+</code></pre></div>
+<h3 id="22-parameter-flow">2.2 Parameter Flow<a class="headerlink" href="#22-parameter-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>DynamicSceneDetector.__init__() [lines 800-929]
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>        |
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        +---&gt; self.max_duration = 29.0 (default)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        +---&gt; self.min_duration = 0.3 (default)
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        +---&gt; self.pass1_max_duration = 2700.0 (default)
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        +---&gt; self.pass1_min_duration = 0.3 (default)
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        +---&gt; self.pass1_max_silence = 1.8 (default)
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        +---&gt; self.pass1_energy_threshold = 38 (default)
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        +---&gt; self.pass2_max_duration = max_duration - 1.0 = 28.0
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        +---&gt; self.pass2_min_duration = 0.3 (default)
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        +---&gt; self.pass2_max_silence = 0.94 (default)
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        +---&gt; self.pass2_energy_threshold = 50 (default)
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>detect_scenes():
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        |
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        +---&gt; Pass 1 params [line 1275-1284]:
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        |         min_dur = self.pass1_min_duration  (auditok param)
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>        |         max_dur = self.pass1_max_duration  (auditok param)
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>        |         max_silence = min(duration*0.95, self.pass1_max_silence)
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>        |         energy_threshold = self.pass1_energy_threshold
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>        |
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        +---&gt; Direct save check [line 1353]:
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>        |         duration &lt;= self.max_duration AND &gt;= self.min_duration
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>        |
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>        +---&gt; Pass 2 params [line 1385-1394]:
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>                  min_dur = self.pass2_min_duration  (auditok param)
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>                  max_dur = self.pass2_max_duration  (auditok param)
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>                  max_silence = min(region_duration*0.95, self.pass2_max_silence)
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>                  energy_threshold = self.pass2_energy_threshold
+</code></pre></div>
+<h3 id="23-minmax-duration-enforcement">2.3 Min/Max Duration Enforcement<a class="headerlink" href="#23-minmax-duration-enforcement" title="Permanent link">&para;</a></h3>
+<p><strong>min_duration</strong>:
+- Pass 1: <code>auditok.split(min_dur=pass1_min_duration)</code> - auditok drops segments &lt; min_dur
+- Pass 2: <code>auditok.split(min_dur=pass2_min_duration)</code> - auditok drops segments &lt; min_dur
+- Post-filter: <code>if sub_dur &lt; self.min_duration: continue</code> [line 1404] - FILTERING only
+- <strong>NO MERGING</strong> of short segments</p>
+<p><strong>max_duration</strong>:
+- Pass 1: <code>auditok.split(max_dur=pass1_max_duration)</code> - auditok splits at max_dur
+- Direct save: Only if <code>region_duration &lt;= self.max_duration</code> [line 1353]
+- Pass 2: <code>auditok.split(max_dur=pass2_max_duration)</code> - auditok splits at max_dur
+- Brute force: <code>chunk_len = self.brute_force_chunk_s</code> (defaults to max_duration) [line 1419]</p>
+<hr />
+<h2 id="3-silero-method-flow">3. Silero Method Flow<a class="headerlink" href="#3-silero-method-flow" title="Permanent link">&para;</a></h2>
+<h3 id="31-block-diagram">3.1 Block Diagram<a class="headerlink" href="#31-block-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>detect_scenes() [line 1183]
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>        |
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        v
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>_init_silero_vad() [line 931-968] --- Called in __init__ if method=&quot;silero&quot;
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        |
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        +---&gt; load_silero_vad() from silero_vad package
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        +---&gt; Store silero_* parameters from config
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>load_audio_unified() [line 1245] --- No resampling (native SR)
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        |
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        v
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>+-----------------------------------------------+
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>|              PASS 1: Coarse Splitting         |
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>|    auditok.split() [line 1285]                |
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>|    (SAME AS AUDITOK METHOD)                   |
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>+-----------------------------------------------+
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        |
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        v
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>For each story_line region:
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>        |
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>        +---&gt; Duration &lt;= max_duration AND &gt;= min_duration?
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>        |         |
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>        |        YES --&gt; SAVE directly [line 1357]
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>        |         |       (detection_pass=1)
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>        |         |
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>        |        NO (too long)
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>        |         |
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>        |         v
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>        |    +-------------------------------------------+
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>        |    |         PASS 2: Silero VAD               |
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>        |    | _detect_pass2_silero() [line 1015-1084]  |
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>        |    +-------------------------------------------+
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>        |              |
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>        |              v
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>        |    Resample region to 16kHz [line 1031-1034]
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>        |              |
+<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>        |              v
+<a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>        |    get_speech_timestamps() [line 1043-1055]
+<a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>        |    params: threshold, neg_threshold,
+<a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>        |            min_silence_duration_ms,
+<a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a>        |            min_speech_duration_ms,
+<a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>        |            max_speech_duration_s,
+<a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>        |            speech_pad_ms
+<a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>        |              |
+<a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a>        |              v
+<a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>        |    Convert to SileroRegion objects [line 1070-1073]
+<a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>        |              |
+<a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a>        |              v
+<a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a>        |         sub_regions found?
+<a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a>        |              |
+<a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a>        |      YES     |      NO
+<a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a>        |       |      |       |
+<a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a>        |       v      |       v
+<a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a>        |   FILTER by  |   BRUTE FORCE [line 1419]
+<a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a>        |   min_dur    |   (SAME AS AUDITOK)
+<a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a>        |   [line 1404]|
+<a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a>        |       |      |
+<a id="__codelineno-3-58" name="__codelineno-3-58" href="#__codelineno-3-58"></a>        |       v      |
+<a id="__codelineno-3-59" name="__codelineno-3-59" href="#__codelineno-3-59"></a>        |   SAVE each  |
+<a id="__codelineno-3-60" name="__codelineno-3-60" href="#__codelineno-3-60"></a>        |   (pass=2)   |
+<a id="__codelineno-3-61" name="__codelineno-3-61" href="#__codelineno-3-61"></a>        +-------+------+
+<a id="__codelineno-3-62" name="__codelineno-3-62" href="#__codelineno-3-62"></a>                |
+<a id="__codelineno-3-63" name="__codelineno-3-63" href="#__codelineno-3-63"></a>                v
+<a id="__codelineno-3-64" name="__codelineno-3-64" href="#__codelineno-3-64"></a>        final_scene_tuples[]
+</code></pre></div>
+<h3 id="32-parameter-flow">3.2 Parameter Flow<a class="headerlink" href="#32-parameter-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>DynamicSceneDetector.__init__() [lines 800-929]
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>        |
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>        +---&gt; (All auditok params same as above)
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        +---&gt; _init_silero_vad(kwargs) [line 915]
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>                  |
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>                  +---&gt; self.silero_threshold = 0.08 (default)
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>                  +---&gt; self.silero_neg_threshold = 0.15 (default)
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>                  +---&gt; self.silero_min_silence_ms = 1500 (default)
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>                  +---&gt; self.silero_min_speech_ms = 100 (default)
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>                  +---&gt; self.silero_max_speech_s = 600 (default)
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>                  +---&gt; self.silero_min_silence_at_max = 500 (default)
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>                  +---&gt; self.silero_speech_pad_ms = 200 (default)
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>_detect_pass2_silero() [line 1015]:
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        |
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        +---&gt; get_speech_timestamps() params [line 1043-1055]:
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>                  threshold = self.silero_threshold
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>                  neg_threshold = self.silero_neg_threshold
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>                  min_silence_duration_ms = self.silero_min_silence_ms
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>                  min_speech_duration_ms = self.silero_min_speech_ms
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>                  max_speech_duration_s = self.silero_max_speech_s
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>                  min_silence_at_max_speech = self.silero_min_silence_at_max
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>                  speech_pad_ms = self.silero_speech_pad_ms
+</code></pre></div>
+<h3 id="33-minmax-duration-enforcement">3.3 Min/Max Duration Enforcement<a class="headerlink" href="#33-minmax-duration-enforcement" title="Permanent link">&para;</a></h3>
+<p><strong>min_duration</strong>:
+- Pass 1: Same as Auditok (auditok.split drops short segments)
+- Pass 2: <code>min_speech_duration_ms</code> controls Silero's minimum (defaults to 100ms)
+- Post-filter: <code>if sub_dur &lt; self.min_duration: continue</code> [line 1404] - FILTERING only
+- <strong>NO MERGING</strong> of short segments
+- <strong>NOTE</strong>: <code>silero_min_speech_ms</code> (100) != <code>self.min_duration</code> (300) - DISCONNECT</p>
+<p><strong>max_duration</strong>:
+- Pass 1: Same as Auditok (auditok.split)
+- Pass 2: <code>max_speech_duration_s</code> controls Silero's maximum (defaults to 600s)
+- Brute force fallback: Same as Auditok
+- <strong>NOTE</strong>: <code>silero_max_speech_s</code> (600) != <code>self.max_duration</code> (29) - DISCONNECT</p>
+<hr />
+<h2 id="4-semantic-method-flow">4. Semantic Method Flow<a class="headerlink" href="#4-semantic-method-flow" title="Permanent link">&para;</a></h2>
+<h3 id="41-block-diagram">4.1 Block Diagram<a class="headerlink" href="#41-block-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>detect_scenes() [line 1183]
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>        |
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        v
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>method == &quot;semantic&quot; [line 1215]
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        |
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        v
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>_semantic_adapter.detect_scenes() [line 1223]
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        |
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        v
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>+-------------------------------------------+
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>| SemanticClusteringAdapter.detect_scenes() |
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>| (semantic_adapter.py line 228)            |
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>+-------------------------------------------+
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>        |
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>        v
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>_ensure_engine() [line 188] --- Lazy load vendor module
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>        |
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>        v
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>Build engine_config [line 286-292]:
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    min_duration = self.config.min_duration  (from adapter config)
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>    max_duration = self.config.max_duration  (from adapter config)
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>    snap_window = self.config.snap_window
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>    clustering_threshold = self.config.clustering_threshold
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>        |
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>        v
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>+-------------------------------------------+
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>| process_movie_v7() [vendor line 566]      |
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>+-------------------------------------------+
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>        |
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>        v
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>StreamFeatureExtractor.extract() [line 193]
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>        |
+<a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>        +---&gt; MFCC, delta, RMS, ZCR, spectral contrast, chroma
+<a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>        |
+<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>        v
+<a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>AdaptiveClassifier.calibrate() [line 461]
+<a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a>        |
+<a id="__codelineno-5-38" name="__codelineno-5-38" href="#__codelineno-5-38"></a>        v
+<a id="__codelineno-5-39" name="__codelineno-5-39" href="#__codelineno-5-39"></a>+-------------------------------------------+
+<a id="__codelineno-5-40" name="__codelineno-5-40" href="#__codelineno-5-40"></a>| SemanticSegmenter.segment() [line 277]    |
+<a id="__codelineno-5-41" name="__codelineno-5-41" href="#__codelineno-5-41"></a>+-------------------------------------------+
+<a id="__codelineno-5-42" name="__codelineno-5-42" href="#__codelineno-5-42"></a>        |
+<a id="__codelineno-5-43" name="__codelineno-5-43" href="#__codelineno-5-43"></a>        v
+<a id="__codelineno-5-44" name="__codelineno-5-44" href="#__codelineno-5-44"></a>1. Pre-clustering Smoothing [line 282]
+<a id="__codelineno-5-45" name="__codelineno-5-45" href="#__codelineno-5-45"></a>        |
+<a id="__codelineno-5-46" name="__codelineno-5-46" href="#__codelineno-5-46"></a>        v
+<a id="__codelineno-5-47" name="__codelineno-5-47" href="#__codelineno-5-47"></a>2. AgglomerativeClustering [line 291]
+<a id="__codelineno-5-48" name="__codelineno-5-48" href="#__codelineno-5-48"></a>        |
+<a id="__codelineno-5-49" name="__codelineno-5-49" href="#__codelineno-5-49"></a>        v
+<a id="__codelineno-5-50" name="__codelineno-5-50" href="#__codelineno-5-50"></a>3. Raw Boundaries from cluster labels [line 294-299]
+<a id="__codelineno-5-51" name="__codelineno-5-51" href="#__codelineno-5-51"></a>        |
+<a id="__codelineno-5-52" name="__codelineno-5-52" href="#__codelineno-5-52"></a>        v
+<a id="__codelineno-5-53" name="__codelineno-5-53" href="#__codelineno-5-53"></a>4. _snap_to_silence() [line 303, 316-341]
+<a id="__codelineno-5-54" name="__codelineno-5-54" href="#__codelineno-5-54"></a>   - Snaps boundaries to lowest energy within snap_window
+<a id="__codelineno-5-55" name="__codelineno-5-55" href="#__codelineno-5-55"></a>        |
+<a id="__codelineno-5-56" name="__codelineno-5-56" href="#__codelineno-5-56"></a>        v
+<a id="__codelineno-5-57" name="__codelineno-5-57" href="#__codelineno-5-57"></a>5. _smart_merge() [line 306, 343-393]
+<a id="__codelineno-5-58" name="__codelineno-5-58" href="#__codelineno-5-58"></a>   - MERGES segments &lt; min_dur with most similar neighbor
+<a id="__codelineno-5-59" name="__codelineno-5-59" href="#__codelineno-5-59"></a>   - Respects max_dur constraint during merge
+<a id="__codelineno-5-60" name="__codelineno-5-60" href="#__codelineno-5-60"></a>        |
+<a id="__codelineno-5-61" name="__codelineno-5-61" href="#__codelineno-5-61"></a>        v
+<a id="__codelineno-5-62" name="__codelineno-5-62" href="#__codelineno-5-62"></a>6. _forced_cleanup() [line 309, 395-413]
+<a id="__codelineno-5-63" name="__codelineno-5-63" href="#__codelineno-5-63"></a>   - Final pass to merge any remaining short segments
+<a id="__codelineno-5-64" name="__codelineno-5-64" href="#__codelineno-5-64"></a>        |
+<a id="__codelineno-5-65" name="__codelineno-5-65" href="#__codelineno-5-65"></a>        v
+<a id="__codelineno-5-66" name="__codelineno-5-66" href="#__codelineno-5-66"></a>7. _ensure_timeline_coverage() [line 312, 415-445]
+<a id="__codelineno-5-67" name="__codelineno-5-67" href="#__codelineno-5-67"></a>   - Fills gaps with filler segments
+<a id="__codelineno-5-68" name="__codelineno-5-68" href="#__codelineno-5-68"></a>   - Ensures 0.0 -&gt; duration coverage
+<a id="__codelineno-5-69" name="__codelineno-5-69" href="#__codelineno-5-69"></a>        |
+<a id="__codelineno-5-70" name="__codelineno-5-70" href="#__codelineno-5-70"></a>        v
+<a id="__codelineno-5-71" name="__codelineno-5-71" href="#__codelineno-5-71"></a>Return raw_segments (list of dicts)
+<a id="__codelineno-5-72" name="__codelineno-5-72" href="#__codelineno-5-72"></a>        |
+<a id="__codelineno-5-73" name="__codelineno-5-73" href="#__codelineno-5-73"></a>        v
+<a id="__codelineno-5-74" name="__codelineno-5-74" href="#__codelineno-5-74"></a>+-------------------------------------------+
+<a id="__codelineno-5-75" name="__codelineno-5-75" href="#__codelineno-5-75"></a>| Back to Adapter                           |
+<a id="__codelineno-5-76" name="__codelineno-5-76" href="#__codelineno-5-76"></a>+-------------------------------------------+
+<a id="__codelineno-5-77" name="__codelineno-5-77" href="#__codelineno-5-77"></a>        |
+<a id="__codelineno-5-78" name="__codelineno-5-78" href="#__codelineno-5-78"></a>        v
+<a id="__codelineno-5-79" name="__codelineno-5-79" href="#__codelineno-5-79"></a>_transform_and_split() [line 325, 358-455]
+<a id="__codelineno-5-80" name="__codelineno-5-80" href="#__codelineno-5-80"></a>        |
+<a id="__codelineno-5-81" name="__codelineno-5-81" href="#__codelineno-5-81"></a>        +---&gt; Load source audio [line 371-375]
+<a id="__codelineno-5-82" name="__codelineno-5-82" href="#__codelineno-5-82"></a>        +---&gt; For each segment in semantic_metadata:
+<a id="__codelineno-5-83" name="__codelineno-5-83" href="#__codelineno-5-83"></a>        |         Use asr_processing timestamps (WITH PADDING)
+<a id="__codelineno-5-84" name="__codelineno-5-84" href="#__codelineno-5-84"></a>        |         Extract audio slice
+<a id="__codelineno-5-85" name="__codelineno-5-85" href="#__codelineno-5-85"></a>        |         Save as WAV
+<a id="__codelineno-5-86" name="__codelineno-5-86" href="#__codelineno-5-86"></a>        |         Populate scenes_detected[]
+<a id="__codelineno-5-87" name="__codelineno-5-87" href="#__codelineno-5-87"></a>        |
+<a id="__codelineno-5-88" name="__codelineno-5-88" href="#__codelineno-5-88"></a>        v
+<a id="__codelineno-5-89" name="__codelineno-5-89" href="#__codelineno-5-89"></a>Return scene_tuples to DynamicSceneDetector
+</code></pre></div>
+<h3 id="42-parameter-flow">4.2 Parameter Flow<a class="headerlink" href="#42-parameter-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>DynamicSceneDetector.__init__() [lines 800-929]
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>        |
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        +---&gt; self.max_duration = 29.0 (default)   &lt;-- NOT PASSED TO SEMANTIC
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        +---&gt; self.min_duration = 0.3 (default)    &lt;-- NOT PASSED TO SEMANTIC
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        |
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        +---&gt; _init_semantic_adapter(kwargs) [line 920]
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>                  |
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>                  v
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>              SemanticClusteringConfig() [line 986-994]:
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>                  min_duration = config.get(&quot;min_duration&quot;, 20.0)   &lt;-- DIFFERENT DEFAULT!
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>                  max_duration = config.get(&quot;max_duration&quot;, 420.0)  &lt;-- DIFFERENT DEFAULT!
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>                  snap_window = config.get(&quot;snap_window&quot;, 5.0)
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>                  clustering_threshold = config.get(&quot;clustering_threshold&quot;, 18.0)
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>SemanticClusteringAdapter._ensure_engine() [line 188]:
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>        |
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>        v
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>process_movie_v7() receives SegmentationConfig with:
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        min_duration = 20.0 (from adapter config, NOT from DynamicSceneDetector)
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>        max_duration = 420.0 (from adapter config, NOT from DynamicSceneDetector)
+</code></pre></div>
+<h3 id="43-minmax-duration-enforcement">4.3 Min/Max Duration Enforcement<a class="headerlink" href="#43-minmax-duration-enforcement" title="Permanent link">&para;</a></h3>
+<p><strong>min_duration</strong>:
+- SemanticSegmenter._smart_merge() [line 359-362]:
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">if</span> <span class="n">seg</span><span class="p">[</span><span class="s2">&quot;dur&quot;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_dur</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">continue</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># else: MERGE with most similar neighbor</span>
+</code></pre></div>
+- SemanticSegmenter._forced_cleanup() [line 401-412]:
+  - Final pass merges remaining short segments
+- <strong>MERGING</strong> of short segments (NOT filtering)</p>
+<p><strong>max_duration</strong>:
+- _smart_merge() respects max_dur during merging [lines 371, 374, 376, 377]:
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">if</span> <span class="p">(</span><span class="n">left</span><span class="p">[</span><span class="s2">&quot;dur&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">seg</span><span class="p">[</span><span class="s2">&quot;dur&quot;</span><span class="p">])</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_dur</span><span class="p">:</span> <span class="n">merge_target</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+</code></pre></div>
+- _snap_to_silence() [line 316-341]:
+  - Snaps to lowest energy, but does NOT split long segments
+- <strong>NO EXPLICIT max_duration SPLITTING</strong> after clustering
+- Segments CAN exceed max_duration if clustering produces them</p>
+<hr />
+<h2 id="5-comparison-matrix">5. Comparison Matrix<a class="headerlink" href="#5-comparison-matrix" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Auditok</th>
+<th>Silero</th>
+<th>Semantic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pass 1</strong></td>
+<td>auditok.split</td>
+<td>auditok.split</td>
+<td>MFCC clustering</td>
+</tr>
+<tr>
+<td><strong>Pass 2</strong></td>
+<td>auditok.split</td>
+<td>Silero VAD</td>
+<td>None (single-pass)</td>
+</tr>
+<tr>
+<td><strong>min_duration default</strong></td>
+<td>0.3s</td>
+<td>0.3s</td>
+<td>20.0s</td>
+</tr>
+<tr>
+<td><strong>max_duration default</strong></td>
+<td>29.0s</td>
+<td>29.0s</td>
+<td>420.0s</td>
+</tr>
+<tr>
+<td><strong>min_duration enforcement</strong></td>
+<td>FILTER</td>
+<td>FILTER</td>
+<td>MERGE</td>
+</tr>
+<tr>
+<td><strong>max_duration enforcement</strong></td>
+<td>auditok splits</td>
+<td>Silero + brute force</td>
+<td>Merge constraint only</td>
+</tr>
+<tr>
+<td><strong>Short segment handling</strong></td>
+<td>Discard</td>
+<td>Discard</td>
+<td>Merge to neighbor</td>
+</tr>
+<tr>
+<td><strong>Timestamp type returned</strong></td>
+<td>Exact</td>
+<td>Exact</td>
+<td>asr_processing (padded)</td>
+</tr>
+<tr>
+<td><strong>Resampling</strong></td>
+<td>None</td>
+<td>Per-region to 16kHz</td>
+<td>Per-file to 16kHz</td>
+</tr>
+<tr>
+<td><strong>Parameter source</strong></td>
+<td>DynamicSceneDetector</td>
+<td>DynamicSceneDetector</td>
+<td>SemanticClusteringConfig</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-gaps-bugs-and-technical-debt">6. Gaps, Bugs, and Technical Debt<a class="headerlink" href="#6-gaps-bugs-and-technical-debt" title="Permanent link">&para;</a></h2>
+<h3 id="61-critical-parameter-contract-broken-semantic">6.1 CRITICAL: Parameter Contract Broken (Semantic)<a class="headerlink" href="#61-critical-parameter-contract-broken-semantic" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>scene_detection.py</code> lines 986-994, <code>semantic_adapter.py</code> line 52-63</p>
+<p><strong>Issue</strong>: When <code>DynamicSceneDetector</code> is instantiated with <code>min_duration=0.3, max_duration=29.0</code>, these values are <strong>NOT</strong> passed to the semantic adapter. The adapter uses its own defaults:
+- <code>min_duration=20.0</code> (vs 0.3)
+- <code>max_duration=420.0</code> (vs 29.0)</p>
+<p><strong>Impact</strong>: Users expecting 30-second max scenes get 7-minute scenes with semantic method.</p>
+<p><strong>Root Cause</strong>: <code>_init_semantic_adapter()</code> reads from <code>kwargs</code> which doesn't include <code>self.min_duration</code> or <code>self.max_duration</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># scene_detection.py line 986-994</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">adapter_config</span> <span class="o">=</span> <span class="n">SemanticClusteringConfig</span><span class="p">(</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">min_duration</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_duration&quot;</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)),</span>  <span class="c1"># kwargs, not self</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">max_duration</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_duration&quot;</span><span class="p">,</span> <span class="mf">420.0</span><span class="p">)),</span> <span class="c1"># kwargs, not self</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="o">...</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="62-high-silero-vad-duration-parameters-disconnect">6.2 HIGH: Silero VAD Duration Parameters Disconnect<a class="headerlink" href="#62-high-silero-vad-duration-parameters-disconnect" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>scene_detection.py</code> lines 940-946</p>
+<p><strong>Issue</strong>: Silero VAD has its own duration parameters that don't match the class-level ones:
+- <code>silero_min_speech_ms=100</code> vs <code>self.min_duration=300</code> (ms vs s mismatch too!)
+- <code>silero_max_speech_s=600</code> vs <code>self.max_duration=29</code></p>
+<p><strong>Impact</strong>: Silero can return segments as short as 100ms or as long as 600s, which are then only filtered (not merged) at line 1404.</p>
+<h3 id="63-medium-timestamp-semantics-inconsistency-semantic">6.3 MEDIUM: Timestamp Semantics Inconsistency (Semantic)<a class="headerlink" href="#63-medium-timestamp-semantics-inconsistency-semantic" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>semantic_adapter.py</code> lines 401-406, <code>semantic_audio_clustering.py</code> lines 122-144</p>
+<p><strong>Issue</strong>: Semantic method returns <code>asr_processing</code> timestamps which include 0.2s padding:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># semantic_audio_clustering.py line 123-127</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">pad</span> <span class="o">=</span> <span class="mf">0.2</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">safe_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">-</span> <span class="n">pad</span><span class="p">)</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">safe_end</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">+</span> <span class="n">pad</span>
+</code></pre></div>
+<p>Meanwhile, <code>_transform_and_split()</code> uses these padded timestamps [line 403-406]:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">asr_ts</span> <span class="o">=</span> <span class="n">segment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;asr_processing&quot;</span><span class="p">,</span> <span class="n">segment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timestamps&quot;</span><span class="p">,</span> <span class="p">{}))</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">start_sec</span> <span class="o">=</span> <span class="n">asr_ts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;start&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">end_sec</span> <span class="o">=</span> <span class="n">asr_ts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;end&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>: Scene files are longer than reported timestamps. Could cause subtitle timing drift if downstream expects exact timestamps.</p>
+<h3 id="64-medium-no-max_duration-enforcement-in-semantic-post-clustering">6.4 MEDIUM: No max_duration Enforcement in Semantic Post-Clustering<a class="headerlink" href="#64-medium-no-max_duration-enforcement-in-semantic-post-clustering" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>semantic_audio_clustering.py</code> lines 306-313</p>
+<p><strong>Issue</strong>: After clustering, <code>_smart_merge()</code> only prevents merges that would exceed <code>max_dur</code>. It does NOT split segments that already exceed <code>max_dur</code> from clustering.</p>
+<p><strong>Impact</strong>: If clustering produces a 500s segment, it stays 500s. The <code>max_duration</code> parameter is only a merge constraint, not a hard limit.</p>
+<h3 id="65-low-magic-numbers-in-semantic-adapter">6.5 LOW: Magic Numbers in Semantic Adapter<a class="headerlink" href="#65-low-magic-numbers-in-semantic-adapter" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>semantic_adapter.py</code> line 52-63, <code>semantic_audio_clustering.py</code> lines 70-91</p>
+<p><strong>Issue</strong>: Multiple hardcoded constants without configuration:
+- <code>pad = 0.2</code> (padding for asr_processing)
+- <code>fps = 31</code> (frames per second for feature extraction)
+- <code>smoothing_window = 15</code>
+- Various percentile thresholds in classifier</p>
+<h3 id="66-low-silero-per-region-resampling">6.6 LOW: Silero Per-Region Resampling<a class="headerlink" href="#66-low-silero-per-region-resampling" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>scene_detection.py</code> lines 1029-1034</p>
+<p><strong>Issue</strong>: Silero resamples each region to 16kHz individually. For files with many long regions, this is repeated work.</p>
+<p><strong>Code</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">if</span> <span class="n">sr</span> <span class="o">!=</span> <span class="mi">16000</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">region_duration</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">region_audio</span><span class="p">)</span> <span class="o">/</span> <span class="n">sr</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resampling </span><span class="si">{</span><span class="n">region_duration</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s region from </span><span class="si">{</span><span class="n">sr</span><span class="si">}</span><span class="s2">Hz to 16kHz for Silero&quot;</span><span class="p">)</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">audio_16k</span> <span class="o">=</span> <span class="n">librosa</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="n">region_audio</span><span class="p">,</span> <span class="n">orig_sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">target_sr</span><span class="o">=</span><span class="mi">16000</span><span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>: CPU overhead for files with native SR != 16kHz. Documented as intentional trade-off for memory.</p>
+<h3 id="67-medium-brute-force-fallback-ignores-scene-boundaries">6.7 MEDIUM: Brute Force Fallback Ignores Scene Boundaries<a class="headerlink" href="#67-medium-brute-force-fallback-ignores-scene-boundaries" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>scene_detection.py</code> lines 1419-1435</p>
+<p><strong>Issue</strong>: When Pass 2 returns no sub-regions, brute force splits at fixed <code>chunk_len</code> intervals with no regard for audio content.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">chunk_len</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">brute_force_chunk_s</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">num_chunks</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">region_duration</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="n">chunk_len</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_duration</span><span class="p">)))</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_chunks</span><span class="p">):</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">sub_start</span> <span class="o">=</span> <span class="n">region_start_sec</span> <span class="o">+</span> <span class="n">i</span> <span class="o">*</span> <span class="n">chunk_len</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">sub_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">region_start_sec</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">chunk_len</span><span class="p">,</span> <span class="n">region_end_sec</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Impact</strong>: Can cut mid-sentence. Better approaches exist (e.g., silence detection fallback).</p>
+<h3 id="68-low-inconsistent-logging-patterns">6.8 LOW: Inconsistent Logging Patterns<a class="headerlink" href="#68-low-inconsistent-logging-patterns" title="Permanent link">&para;</a></h3>
+<p><strong>Locations</strong>: Multiple files</p>
+<p><strong>Issue</strong>: Three different logging patterns:
+1. <code>scene_detection.py</code>: Uses <code>from whisperjav.utils.logger import logger</code>
+2. <code>semantic_adapter.py</code>: Same, but also accepts <code>logger_instance</code> parameter
+3. <code>semantic_audio_clustering.py</code>: Uses <code>print()</code> as default, optional <code>logger</code> param</p>
+<hr />
+<h2 id="7-recommendations">7. Recommendations<a class="headerlink" href="#7-recommendations" title="Permanent link">&para;</a></h2>
+<h3 id="71-fix-parameter-contract-priority-high">7.1 Fix Parameter Contract (Priority: HIGH)<a class="headerlink" href="#71-fix-parameter-contract-priority-high" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># In _init_semantic_adapter(), use self.min_duration and self.max_duration:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">adapter_config</span> <span class="o">=</span> <span class="n">SemanticClusteringConfig</span><span class="p">(</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">min_duration</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_duration&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_duration</span><span class="p">)),</span>  <span class="c1"># Use self</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">max_duration</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_duration&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_duration</span><span class="p">)),</span>  <span class="c1"># Use self</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="o">...</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="p">)</span>
+</code></pre></div>
+<h3 id="72-align-silero-duration-parameters-priority-high">7.2 Align Silero Duration Parameters (Priority: HIGH)<a class="headerlink" href="#72-align-silero-duration-parameters-priority-high" title="Permanent link">&para;</a></h3>
+<p>Either:
+1. Scale <code>self.min_duration</code> (seconds) to <code>silero_min_speech_ms</code> (milliseconds)
+2. Or document clearly that Silero uses different duration constraints</p>
+<h3 id="73-add-max_duration-splitting-to-semantic-priority-medium">7.3 Add max_duration Splitting to Semantic (Priority: MEDIUM)<a class="headerlink" href="#73-add-max_duration-splitting-to-semantic-priority-medium" title="Permanent link">&para;</a></h3>
+<p>Add a <code>_split_long_segments()</code> method in <code>SemanticSegmenter</code> that runs after <code>_smart_merge()</code> to split any segment exceeding <code>max_duration</code> at lowest-energy points.</p>
+<h3 id="74-standardize-timestamp-semantics-priority-medium">7.4 Standardize Timestamp Semantics (Priority: MEDIUM)<a class="headerlink" href="#74-standardize-timestamp-semantics-priority-medium" title="Permanent link">&para;</a></h3>
+<p>Document clearly which timestamp type each method returns, or add a configuration option to control padding.</p>
+<h3 id="75-improve-brute-force-fallback-priority-low">7.5 Improve Brute Force Fallback (Priority: LOW)<a class="headerlink" href="#75-improve-brute-force-fallback-priority-low" title="Permanent link">&para;</a></h3>
+<p>Use simple energy-based silence detection for brute force splits instead of fixed intervals.</p>
+<hr />
+<h2 id="8-appendix-code-reference-quick-links">8. Appendix: Code Reference Quick Links<a class="headerlink" href="#8-appendix-code-reference-quick-links" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Function/Method</th>
+<th>File</th>
+<th>Line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DynamicSceneDetector.__init__</code></td>
+<td>scene_detection.py</td>
+<td>800</td>
+</tr>
+<tr>
+<td><code>DynamicSceneDetector.detect_scenes</code></td>
+<td>scene_detection.py</td>
+<td>1183</td>
+</tr>
+<tr>
+<td><code>DynamicSceneDetector._init_silero_vad</code></td>
+<td>scene_detection.py</td>
+<td>931</td>
+</tr>
+<tr>
+<td><code>DynamicSceneDetector._init_semantic_adapter</code></td>
+<td>scene_detection.py</td>
+<td>970</td>
+</tr>
+<tr>
+<td><code>DynamicSceneDetector._detect_pass2_silero</code></td>
+<td>scene_detection.py</td>
+<td>1015</td>
+</tr>
+<tr>
+<td><code>SemanticClusteringAdapter.__init__</code></td>
+<td>semantic_adapter.py</td>
+<td>130</td>
+</tr>
+<tr>
+<td><code>SemanticClusteringAdapter.detect_scenes</code></td>
+<td>semantic_adapter.py</td>
+<td>228</td>
+</tr>
+<tr>
+<td><code>SemanticClusteringAdapter._transform_and_split</code></td>
+<td>semantic_adapter.py</td>
+<td>358</td>
+</tr>
+<tr>
+<td><code>process_movie_v7</code></td>
+<td>semantic_audio_clustering.py</td>
+<td>566</td>
+</tr>
+<tr>
+<td><code>SemanticSegmenter.segment</code></td>
+<td>semantic_audio_clustering.py</td>
+<td>277</td>
+</tr>
+<tr>
+<td><code>SemanticSegmenter._smart_merge</code></td>
+<td>semantic_audio_clustering.py</td>
+<td>343</td>
+</tr>
+<tr>
+<td><code>SemanticSegmenter._snap_to_silence</code></td>
+<td>semantic_audio_clustering.py</td>
+<td>316</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>End of Audit</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

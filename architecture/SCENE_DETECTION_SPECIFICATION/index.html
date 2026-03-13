@@ -1,0 +1,3285 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/SCENE_DETECTION_SPECIFICATION/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Scene Detection System — Specification & Developer Guide - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#scene-detection-system-specification-developer-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Scene Detection System — Specification &amp; Developer Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Overview
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#design-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-level-block-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High-Level Block Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-pass-architecture-auditok-silero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-Pass Architecture (Auditok &amp; Silero)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantic-architecture-single-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantic Architecture (Single-Pass)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-protocol-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Protocol Contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Protocol Contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#contract-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contract Guarantees
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-data-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Data Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Data Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sceneinfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SceneInfo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenedetectionresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SceneDetectionResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenedetectionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SceneDetectionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-factory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Factory
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Factory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenedetectorfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SceneDetectorFactory
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SceneDetectorFactory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-detector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a Detector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create_from_legacy_kwargskwargs-how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create_from_legacy_kwargs(**kwargs) — How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#introspection-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introspection Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Backends
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Backends">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-auditokscenedetector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 AuditokSceneDetector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-sileroscenedetector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 SileroSceneDetector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-semanticscenedetector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 SemanticSceneDetector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-nullscenedetector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 NullSceneDetector
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-parameters-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Parameters Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Parameters Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#auditoksceneconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AuditokSceneConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#silerosceneconfig-extends-auditoksceneconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SileroSceneConfig (extends AuditokSceneConfig)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semanticclusteringconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SemanticClusteringConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#legacy-kwargs-alias-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Kwargs Alias Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-developer-guide-integrating-scene-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Developer Guide: Integrating Scene Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Developer Guide: Integrating Scene Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minimal-integration-5-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal Integration (5 steps)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-overrides-eg-qwen-safe_chunking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With Overrides (e.g., Qwen safe_chunking)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accessing-rich-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accessing Rich Metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lifecycle-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-new-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a New Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-consumer-adoption-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Consumer Adoption Map
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Consumer Adoption Map">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-each-pipeline-creates-and-uses-scene-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Each Pipeline Creates and Uses Scene Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Each Pipeline Creates and Uses Scene Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#qwenpipeline-qwen_pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QwenPipeline (qwen_pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#balancedpipeline-balanced_pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BalancedPipeline (balanced_pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fidelitypipeline-fidelity_pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FidelityPipeline (fidelity_pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastpipeline-fast_pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastPipeline (fast_pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transformerspipeline-transformers_pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TransformersPipeline (transformers_pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kotobafasterwhisperpipeline-kotoba_faster_whisper_pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KotobaFasterWhisperPipeline (kotoba_faster_whisper_pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ensemblepassworker-ensemblepass_workerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EnsemblePassWorker (ensemble/pass_worker.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Error Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Error Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#detection-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detection Failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#empty-results-not-an-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Empty Results (Not an Error)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Not Available
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unknown-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unknown Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Utilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#load_audio_unified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load_audio_unified
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#save_scene_wav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        save_scene_wav
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brute_force_split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brute_force_split
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-migration-from-dynamicscenedetector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Migration from DynamicSceneDetector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Migration from DynamicSceneDetector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before (Legacy)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#after-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After (Current)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-differences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Differences
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/SCENE_DETECTION_SPECIFICATION.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="scene-detection-system-specification-developer-guide">Scene Detection System — Specification &amp; Developer Guide<a class="headerlink" href="#scene-detection-system-specification-developer-guide" title="Permanent link">&para;</a></h1>
+<p><strong>Version</strong>: 1.1 (post-audit corrections)
+<strong>Last Updated</strong>: 2026-02-15
+<strong>Package</strong>: <code>whisperjav.modules.scene_detection_backends</code></p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-architecture">Architecture</a></li>
+<li><a href="#3-protocol-contract">Protocol Contract</a></li>
+<li><a href="#4-data-types">Data Types</a></li>
+<li><a href="#5-factory">Factory</a></li>
+<li><a href="#6-backends">Backends</a></li>
+<li><a href="#7-parameters-reference">Parameters Reference</a></li>
+<li><a href="#8-developer-guide-integrating-scene-detection">Developer Guide: Integrating Scene Detection</a></li>
+<li><a href="#9-consumer-adoption-map">Consumer Adoption Map</a></li>
+<li><a href="#10-error-handling">Error Handling</a></li>
+<li><a href="#11-utilities">Utilities</a></li>
+<li><a href="#12-migration-from-dynamicscenedetector">Migration from DynamicSceneDetector</a></li>
+</ol>
+<hr />
+<h2 id="1-overview">1. Overview<a class="headerlink" href="#1-overview" title="Permanent link">&para;</a></h2>
+<p>The scene detection system splits audio files into temporal segments ("scenes") for
+downstream ASR processing. It answers the question: <strong>"Where should we split this
+audio so each chunk is digestible by the ASR model?"</strong></p>
+<h3 id="design-goals">Design Goals<a class="headerlink" href="#design-goals" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Protocol-driven</strong>: All backends implement <code>SceneDetector</code> (<code>@runtime_checkable</code>)</li>
+<li><strong>Factory-created</strong>: <code>SceneDetectorFactory</code> handles lazy loading and routing</li>
+<li><strong>Uniform output</strong>: Every backend returns <code>SceneDetectionResult</code> containing <code>SceneInfo</code> objects</li>
+<li><strong>Backward compatible</strong>: <code>to_legacy_tuples()</code> produces the same <code>List[Tuple[Path, float, float, float]]</code> that the deprecated <code>DynamicSceneDetector</code> returned</li>
+<li><strong>Resource-safe</strong>: <code>cleanup()</code> releases models and cached state</li>
+</ul>
+<h3 id="package-location">Package Location<a class="headerlink" href="#package-location" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>whisperjav/modules/scene_detection_backends/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── __init__.py            # Public API re-exports
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── base.py                # Protocol, SceneInfo, SceneDetectionResult, SceneDetectionError
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── factory.py             # SceneDetectorFactory (registry + lazy loading)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── utils.py               # load_audio_unified, save_scene_wav, brute_force_split
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── auditok_backend.py     # AuditokSceneDetector + AuditokSceneConfig
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── silero_backend.py      # SileroSceneDetector + SileroSceneConfig (extends Auditok)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├── semantic_backend.py    # SemanticSceneDetector (wraps SemanticClusteringAdapter)
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>├── semantic_adapter.py    # SemanticClusteringAdapter (external engine bridge)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>└── none_backend.py        # NullSceneDetector (passthrough)
+</code></pre></div>
+<hr />
+<h2 id="2-architecture">2. Architecture<a class="headerlink" href="#2-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="high-level-block-diagram">High-Level Block Diagram<a class="headerlink" href="#high-level-block-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>┌──────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>│                        Pipeline Consumer                         │
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>│  (qwen_pipeline, balanced_pipeline, fidelity_pipeline, etc.)     │
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│                                                                  │
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│  1. scene_opts = features.get(&quot;scene_detection&quot;, {})             │
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│  2. detector = SceneDetectorFactory                              │
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│       .create_from_legacy_kwargs(**scene_opts)                   │
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│  3. result = detector.detect_scenes(audio, out_dir, basename)    │
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│  4. scene_paths = result.to_legacy_tuples()                      │
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>│  5. metadata = result.to_metadata_dict()                         │
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>│  6. detector.cleanup()                                           │
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>└─────────────────┬────────────────────────────────────────────────┘
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>                  │
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>                  ▼
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>┌──────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>│                    SceneDetectorFactory                           │
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>│                                                                  │
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>│  Registry: { &quot;auditok&quot; → AuditokSceneDetector,                   │
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>│              &quot;silero&quot;  → SileroSceneDetector,                     │
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>│              &quot;semantic&quot;→ SemanticSceneDetector,                   │
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>│              &quot;none&quot;    → NullSceneDetector }                      │
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>│                                                                  │
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>│  create_from_legacy_kwargs(**kw):                                │
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>│    method = kw.pop(&quot;method&quot;, &quot;auditok&quot;)                          │
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>│    return create(method, **kw)                                   │
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>└─────────────────┬────────────────────────────────────────────────┘
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>                  │ Lazy import + instantiate
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>                  ▼
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>┌──────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>│              SceneDetector Protocol Implementations               │
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>│                                                                  │
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>│  ┌──────────────────┐  ┌──────────────────┐                     │
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>│  │ AuditokScene     │  │ SileroScene      │                     │
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>│  │ Detector         │←─│ Detector         │  (inherits)          │
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>│  │                  │  │                  │                      │
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>│  │ Pass1: auditok   │  │ Pass1: auditok   │                     │
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>│  │ Pass2: auditok   │  │ Pass2: Silero VAD│                     │
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>│  └──────────────────┘  └──────────────────┘                     │
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>│  ┌──────────────────┐  ┌──────────────────┐                     │
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>│  │ SemanticScene    │  │ NullScene        │                     │
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>│  │ Detector         │  │ Detector         │                     │
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>│  │                  │  │                  │                      │
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a>│  │ Single-pass MFCC │  │ Full audio as    │                     │
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>│  │ clustering       │  │ single scene     │                     │
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>│  └──────────────────┘  └──────────────────┘                     │
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a>└──────────────────────────────────────────────────────────────────┘
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a>                  │
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>                  ▼
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>┌──────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a>│                    Shared Output Contract                         │
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a>│                                                                  │
+<a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a>│  SceneDetectionResult                                            │
+<a id="__codelineno-1-53" name="__codelineno-1-53" href="#__codelineno-1-53"></a>│  ├── scenes: List[SceneInfo]                                     │
+<a id="__codelineno-1-54" name="__codelineno-1-54" href="#__codelineno-1-54"></a>│  │   ├── start_sec, end_sec, scene_path, detection_pass          │
+<a id="__codelineno-1-55" name="__codelineno-1-55" href="#__codelineno-1-55"></a>│  │   └── .to_legacy_tuple() → (Path, float, float, float)       │
+<a id="__codelineno-1-56" name="__codelineno-1-56" href="#__codelineno-1-56"></a>│  ├── method: str                                                 │
+<a id="__codelineno-1-57" name="__codelineno-1-57" href="#__codelineno-1-57"></a>│  ├── audio_duration_sec, parameters, processing_time_sec         │
+<a id="__codelineno-1-58" name="__codelineno-1-58" href="#__codelineno-1-58"></a>│  ├── coarse_boundaries: Optional[List[Dict]]                     │
+<a id="__codelineno-1-59" name="__codelineno-1-59" href="#__codelineno-1-59"></a>│  ├── vad_segments: Optional[List[Dict]]                          │
+<a id="__codelineno-1-60" name="__codelineno-1-60" href="#__codelineno-1-60"></a>│  ├── .to_legacy_tuples() → List[(Path, float, float, float)]    │
+<a id="__codelineno-1-61" name="__codelineno-1-61" href="#__codelineno-1-61"></a>│  └── .to_metadata_dict() → Dict (for pipeline metadata)         │
+<a id="__codelineno-1-62" name="__codelineno-1-62" href="#__codelineno-1-62"></a>└──────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<h3 id="two-pass-architecture-auditok-silero">Two-Pass Architecture (Auditok &amp; Silero)<a class="headerlink" href="#two-pass-architecture-auditok-silero" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Audio File
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    ▼
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>┌──────────────────────────────────────────┐
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│         Pass 1: Coarse Chapters          │
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│                                          │
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│  Strategy: Find long silences            │
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>│  Parameters: pass1_max_silence (1.8s),   │
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>│              pass1_energy_threshold (38)  │
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│  Result: ~5-20 &quot;story line&quot; regions      │
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│  Max duration: 2700s (45 min per region) │
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>└────────────────┬─────────────────────────┘
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>                 │
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    ┌────────────┼─────────────┐
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    ▼            ▼             ▼
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>┌────────┐ ┌────────┐   ┌────────┐
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>│Region 1│ │Region 2│...│Region N│
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>└───┬────┘ └───┬────┘   └───┬────┘
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    │          │             │
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    ▼          ▼             ▼
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>┌──────────────────────────────────────────┐
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>│     Per-Region Decision                  │
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>│                                          │
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>│  IF min_dur ≤ duration ≤ max_dur:        │
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>│     → Save directly (detection_pass=1)   │
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>│  ELSE IF duration &gt; max_dur:             │
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>│     → Pass 2: Fine split                 │
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>│  ELSE IF duration &lt; min_dur:             │
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>│     → Skip (too short)                   │
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>└────────────────┬─────────────────────────┘
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>                 │ (oversized regions only)
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>                 ▼
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>┌──────────────────────────────────────────┐
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>│          Pass 2: Fine Chunking           │
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>│                                          │
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>│  Auditok: shorter silence, higher energy │
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>│    pass2_max_silence=0.94s, threshold=50 │
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>│  Silero: VAD speech boundaries           │
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>│    silero_threshold=0.08, min_silence=   │
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>│    1500ms                                │
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>│                                          │
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>│  IF no sub-regions found:                │
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>│     → Brute-force split (fixed chunks)   │
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>│                                          │
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>│  Result: scenes (detection_pass=2)       │
+<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>└──────────────────────────────────────────┘
+</code></pre></div>
+<h3 id="semantic-architecture-single-pass">Semantic Architecture (Single-Pass)<a class="headerlink" href="#semantic-architecture-single-pass" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Audio File
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    │
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    ▼
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>┌──────────────────────────────────────────┐
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│    Semantic Audio Clustering Engine       │
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│                                          │
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│  1. Extract MFCC features                │
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│  2. Agglomerative clustering             │
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│  3. Boundary detection + snapping        │
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│  4. Min/max duration enforcement         │
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│                                          │
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>│  Natural range: 20s-420s scenes          │
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>│  detection_pass = 0 (single-pass)        │
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>│                                          │
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>│  Each SceneInfo.metadata includes:       │
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>│    { &quot;context&quot;: {...}, &quot;asr_prompt&quot;: &quot;&quot;} │
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>└──────────────────────────────────────────┘
+</code></pre></div>
+<hr />
+<h2 id="3-protocol-contract">3. Protocol Contract<a class="headerlink" href="#3-protocol-contract" title="Permanent link">&para;</a></h2>
+<p>Defined in <code>base.py</code>. All backends <strong>MUST</strong> implement this interface.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">SceneDetector</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="nd">@property</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Unique backend identifier (e.g., &#39;auditok&#39;, &#39;silero&#39;, &#39;semantic&#39;, &#39;none&#39;)&quot;&quot;&quot;</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="o">...</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="nd">@property</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">display_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Human-readable name for GUI display.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="o">...</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">detect_scenes</span><span class="p">(</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        <span class="n">audio_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>        <span class="n">media_basename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SceneDetectionResult</span><span class="p">:</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="sd">        Detect scenes in audio and extract WAV files.</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="sd">        Args:</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="sd">            audio_path:     Path to input audio (.wav)</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="sd">            output_dir:     Directory to write scene_NNNN.wav files</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="sd">            media_basename: Prefix for output filenames</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="sd">        Returns:</span>
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a><span class="sd">            SceneDetectionResult (never None)</span>
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a><span class="sd">        Raises:</span>
+<a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a><span class="sd">            SceneDetectionError: On fatal failure (audio load, backend crash)</span>
+<a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a><span class="sd">        &quot;&quot;&quot;</span>
+<a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>        <span class="o">...</span>
+<a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>
+<a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Release loaded models and cached state.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a>        <span class="o">...</span>
+</code></pre></div>
+<h3 id="contract-guarantees">Contract Guarantees<a class="headerlink" href="#contract-guarantees" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Return type</strong></td>
+<td>Always <code>SceneDetectionResult</code> (never <code>None</code>)</td>
+</tr>
+<tr>
+<td><strong>Empty scenes</strong></td>
+<td>Valid result — means no speech detected, not an error</td>
+</tr>
+<tr>
+<td><strong>WAV files</strong></td>
+<td>Each <code>SceneInfo.scene_path</code> points to a PCM16 WAV file in <code>output_dir</code></td>
+</tr>
+<tr>
+<td><strong>Filenames</strong></td>
+<td><code>{media_basename}_scene_{NNNN:04d}.wav</code> (0-indexed)</td>
+</tr>
+<tr>
+<td><strong>Time coords</strong></td>
+<td><code>start_sec</code> and <code>end_sec</code> are relative to the original audio</td>
+</tr>
+<tr>
+<td><strong>Immutability</strong></td>
+<td><code>detect_scenes()</code> clears prior state; each call is independent</td>
+</tr>
+<tr>
+<td><strong>Cleanup</strong></td>
+<td><code>cleanup()</code> is idempotent and safe to call multiple times</td>
+</tr>
+<tr>
+<td><strong>Errors</strong></td>
+<td><code>SceneDetectionError</code> for fatal failures only</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-data-types">4. Data Types<a class="headerlink" href="#4-data-types" title="Permanent link">&para;</a></h2>
+<h3 id="sceneinfo">SceneInfo<a class="headerlink" href="#sceneinfo" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">SceneInfo</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">start_sec</span><span class="p">:</span> <span class="nb">float</span>                            <span class="c1"># Start time (seconds, absolute)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">end_sec</span><span class="p">:</span> <span class="nb">float</span>                              <span class="c1"># End time (seconds, absolute)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">scene_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>           <span class="c1"># Path to extracted WAV</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">detection_pass</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>                     <span class="c1"># 0=single-pass, 1=coarse/direct, 2=fine/split</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>       <span class="c1"># Backend-specific</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="nd">@property</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">duration_sec</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span> <span class="o">...</span>        <span class="c1"># end_sec - start_sec</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span> <span class="o">...</span>              <span class="c1"># JSON-serializable</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_legacy_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong><code>detection_pass</code> values:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Single-pass detection (no two-pass)</td>
+<td>Semantic, None</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Pass 1 direct save (region fits within max_duration)</td>
+<td>Auditok, Silero</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>Pass 2 fine split (region was oversized)</td>
+<td>Auditok, Silero</td>
+</tr>
+</tbody>
+</table>
+<h3 id="scenedetectionresult">SceneDetectionResult<a class="headerlink" href="#scenedetectionresult" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">SceneDetectionResult</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">scenes</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">SceneInfo</span><span class="p">]</span>                     <span class="c1"># All detected scenes</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span>                                 <span class="c1"># Backend name (&quot;auditok&quot;, &quot;silero&quot;, etc.)</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">audio_duration_sec</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>             <span class="c1"># Total audio duration</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>     <span class="c1"># Detection parameters used</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">processing_time_sec</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>            <span class="c1"># Wall clock time</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">coarse_boundaries</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Pass 1 data (two-pass only)</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">vad_segments</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>       <span class="c1"># VAD data (Silero only)</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="nd">@property</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">num_scenes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="nd">@property</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">total_scene_duration_sec</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    <span class="nd">@property</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">coverage_ratio</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_legacy_tuples</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]:</span> <span class="o">...</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_metadata_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong><code>to_metadata_dict()</code> output schema:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="s2">&quot;scenes_detected&quot;</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>        <span class="p">{</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>            <span class="s2">&quot;scene_index&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>            <span class="s2">&quot;start_time_seconds&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>            <span class="s2">&quot;end_time_seconds&quot;</span><span class="p">:</span> <span class="mf">28.5</span><span class="p">,</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>            <span class="s2">&quot;duration_seconds&quot;</span><span class="p">:</span> <span class="mf">28.5</span><span class="p">,</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>            <span class="s2">&quot;detection_pass&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>            <span class="s2">&quot;filename&quot;</span><span class="p">:</span> <span class="s2">&quot;video_scene_0000.wav&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>            <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="s2">&quot;/tmp/scenes/video_scene_0000.wav&quot;</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>        <span class="p">},</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>        <span class="c1"># ...</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="p">],</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="s2">&quot;coarse_boundaries&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="o">...</span> <span class="p">]</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="s2">&quot;vad_segments&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="o">...</span> <span class="p">]</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="s2">&quot;vad_method&quot;</span><span class="p">:</span> <span class="s2">&quot;auditok&quot;</span><span class="p">,</span>       <span class="c1"># Same as result.method</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>    <span class="s2">&quot;vad_params&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="o">...</span> <span class="p">}</span> <span class="ow">or</span> <span class="kc">None</span>  <span class="c1"># Same as result.parameters</span>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="scenedetectionerror">SceneDetectionError<a class="headerlink" href="#scenedetectionerror" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SceneDetectionError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Fatal detection failure (audio load error, backend crash, etc.).&quot;&quot;&quot;</span>
+</code></pre></div>
+<p><strong>Critical distinction:</strong>
+- <code>SceneDetectionError</code> → Detection <strong>failed</strong>. Cannot continue.
+- Empty <code>result.scenes</code> → Detection <strong>succeeded</strong>. No speech found. Valid result.</p>
+<hr />
+<h2 id="5-factory">5. Factory<a class="headerlink" href="#5-factory" title="Permanent link">&para;</a></h2>
+<h3 id="scenedetectorfactory">SceneDetectorFactory<a class="headerlink" href="#scenedetectorfactory" title="Permanent link">&para;</a></h3>
+<p>Located in <code>factory.py</code>. Static methods only (no instances).</p>
+<h4 id="creating-a-detector">Creating a Detector<a class="headerlink" href="#creating-a-detector" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">whisperjav.modules.scene_detection_backends</span><span class="w"> </span><span class="kn">import</span> <span class="n">SceneDetectorFactory</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Method 1: Direct creation (typed)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;auditok&quot;</span><span class="p">,</span> <span class="n">max_duration</span><span class="o">=</span><span class="mf">29.0</span><span class="p">)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Method 2: Legacy kwargs bridge (used by all pipelines)</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;silero&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="n">max_duration_s</span><span class="o">=</span><span class="mf">29.0</span><span class="p">,</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="n">min_duration_s</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="n">silero_threshold</span><span class="o">=</span><span class="mf">0.08</span><span class="p">,</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="p">)</span>
+</code></pre></div>
+<h4 id="create_from_legacy_kwargskwargs-how-it-works"><code>create_from_legacy_kwargs(**kwargs)</code> — How It Works<a class="headerlink" href="#create_from_legacy_kwargskwargs-how-it-works" title="Permanent link">&para;</a></h4>
+<ol>
+<li>Pops <code>method</code> key (default: <code>"auditok"</code>)</li>
+<li>Passes remaining kwargs to <code>create(method, **remaining_kwargs)</code></li>
+<li>Backend constructor accepts or silently ignores unrecognized kwargs</li>
+</ol>
+<p>This is the <strong>zero-risk migration bridge</strong> — same kwargs that <code>DynamicSceneDetector</code> accepted.</p>
+<h4 id="backend-registry">Backend Registry<a class="headerlink" href="#backend-registry" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Class</th>
+<th>Dependencies</th>
+<th>Always Available</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"auditok"</code></td>
+<td><code>AuditokSceneDetector</code></td>
+<td><code>auditok</code></td>
+<td>Yes (core dep)</td>
+</tr>
+<tr>
+<td><code>"silero"</code></td>
+<td><code>SileroSceneDetector</code></td>
+<td><code>torch</code></td>
+<td>Yes (core dep)</td>
+</tr>
+<tr>
+<td><code>"semantic"</code></td>
+<td><code>SemanticSceneDetector</code></td>
+<td><code>scikit-learn</code></td>
+<td>No (optional)</td>
+</tr>
+<tr>
+<td><code>"none"</code></td>
+<td><code>NullSceneDetector</code></td>
+<td>—</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h4 id="introspection-methods">Introspection Methods<a class="headerlink" href="#introspection-methods" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># List all registered backend names</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">list_backends</span><span class="p">()</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># → [&quot;auditok&quot;, &quot;silero&quot;, &quot;semantic&quot;, &quot;none&quot;]</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Check if a backend&#39;s dependencies are installed</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">available</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">is_backend_available</span><span class="p">(</span><span class="s2">&quot;semantic&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># → (True, &quot;&quot;) or (False, &quot;pip install scikit-learn&quot;)</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="c1"># Get all backends with availability status</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">get_available_backends</span><span class="p">()</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="c1"># → [{&quot;name&quot;: &quot;auditok&quot;, &quot;display_name&quot;: &quot;Auditok (Silence-Based)&quot;,</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="c1">#      &quot;available&quot;: True, &quot;install_hint&quot;: &quot;&quot;}, ...]</span>
+</code></pre></div>
+<hr />
+<h2 id="6-backends">6. Backends<a class="headerlink" href="#6-backends" title="Permanent link">&para;</a></h2>
+<h3 id="61-auditokscenedetector">6.1 AuditokSceneDetector<a class="headerlink" href="#61-auditokscenedetector" title="Permanent link">&para;</a></h3>
+<p><strong>Strategy</strong>: Two-pass silence-based detection.
+<strong>Config</strong>: <code>AuditokSceneConfig</code> (dataclass)
+<strong>Scene range</strong>: <code>min_duration</code> to <code>max_duration</code> (default 0.3s–29.0s)</p>
+<p>Pass 1 uses auditok to find coarse chapter boundaries via long silences.
+Pass 2 uses auditok again with tighter parameters to chunk oversized chapters.
+Optional assistive processing (bandpass filter + DRC) for Pass 2 on challenging audio.</p>
+<h3 id="62-sileroscenedetector">6.2 SileroSceneDetector<a class="headerlink" href="#62-sileroscenedetector" title="Permanent link">&para;</a></h3>
+<p><strong>Strategy</strong>: Two-pass — auditok Pass 1 + Silero VAD Pass 2.
+<strong>Config</strong>: <code>SileroSceneConfig</code> (extends <code>AuditokSceneConfig</code>)
+<strong>Inherits</strong>: <code>AuditokSceneDetector</code> (overrides <code>_detect_pass2()</code> only)
+<strong>Scene range</strong>: Same as auditok config</p>
+<p>Pass 2 uses Silero VAD for speech boundary detection instead of energy-based auditok.
+Silero model is loaded once at construction and reused for all regions.
+Per-region resampling to 16kHz is done as needed.
+<strong>No assistive processing</strong> — Silero is trained on natural audio; bandpass/DRC would
+change signal distribution outside its training data.</p>
+<h3 id="63-semanticscenedetector">6.3 SemanticSceneDetector<a class="headerlink" href="#63-semanticscenedetector" title="Permanent link">&para;</a></h3>
+<p><strong>Strategy</strong>: Single-pass content-aware clustering.
+<strong>Config</strong>: <code>SemanticClusteringConfig</code> (via adapter)
+<strong>Scene range</strong>: 20.0s–420.0s (not 0.3s–29.0s like auditok/silero)
+<strong>Dependencies</strong>: scikit-learn (optional)</p>
+<p>Uses MFCC features + agglomerative clustering for texture-based segmentation.
+Wraps the existing <code>SemanticClusteringAdapter</code> for Protocol conformance.
+Each <code>SceneInfo.metadata</code> includes <code>context</code> and <code>asr_prompt</code> from the engine.</p>
+<h3 id="64-nullscenedetector">6.4 NullSceneDetector<a class="headerlink" href="#64-nullscenedetector" title="Permanent link">&para;</a></h3>
+<p><strong>Strategy</strong>: Passthrough — full audio as one scene.
+<strong>Config</strong>: None (ignores all kwargs)
+<strong>Scene range</strong>: Entire audio duration</p>
+<p>Used when scene detection should be bypassed (e.g., Qwen pipeline with <code>method="none"</code>).
+Loads the full audio, saves it as a single WAV, returns one <code>SceneInfo</code>.</p>
+<hr />
+<h2 id="7-parameters-reference">7. Parameters Reference<a class="headerlink" href="#7-parameters-reference" title="Permanent link">&para;</a></h2>
+<h3 id="auditoksceneconfig">AuditokSceneConfig<a class="headerlink" href="#auditoksceneconfig" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Core</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>max_duration</code></td>
+<td>float</td>
+<td>29.0</td>
+<td>Maximum scene duration (seconds)</td>
+</tr>
+<tr>
+<td><code>min_duration</code></td>
+<td>float</td>
+<td>0.3</td>
+<td>Minimum scene duration (seconds)</td>
+</tr>
+<tr>
+<td><strong>Pass 1 (Coarse)</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>pass1_min_duration</code></td>
+<td>float</td>
+<td>0.3</td>
+<td>Min region duration</td>
+</tr>
+<tr>
+<td><code>pass1_max_duration</code></td>
+<td>float</td>
+<td>2700.0</td>
+<td>Max region duration (45 min)</td>
+</tr>
+<tr>
+<td><code>pass1_max_silence</code></td>
+<td>float</td>
+<td>1.8</td>
+<td>Silence length to split on (seconds)</td>
+</tr>
+<tr>
+<td><code>pass1_energy_threshold</code></td>
+<td>int</td>
+<td>38</td>
+<td>Energy threshold for speech (dB)</td>
+</tr>
+<tr>
+<td><strong>Pass 2 (Fine)</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>pass2_min_duration</code></td>
+<td>float</td>
+<td>0.3</td>
+<td>Min sub-region duration</td>
+</tr>
+<tr>
+<td><code>pass2_max_duration</code></td>
+<td>float</td>
+<td><em>derived</em></td>
+<td>Max sub-region (default: <code>max(max_duration - 1.0, min_duration)</code>)</td>
+</tr>
+<tr>
+<td><code>pass2_max_silence</code></td>
+<td>float</td>
+<td>0.94</td>
+<td>Silence length to split on (seconds)</td>
+</tr>
+<tr>
+<td><code>pass2_energy_threshold</code></td>
+<td>int</td>
+<td>50</td>
+<td>Energy threshold for speech (dB)</td>
+</tr>
+<tr>
+<td><strong>Assist Processing</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>assist_processing</code></td>
+<td>bool</td>
+<td>False</td>
+<td>Enable bandpass + DRC for Pass 2</td>
+</tr>
+<tr>
+<td><code>bandpass_low_hz</code></td>
+<td>int</td>
+<td>200</td>
+<td>Bandpass filter low cutoff (Hz)</td>
+</tr>
+<tr>
+<td><code>bandpass_high_hz</code></td>
+<td>int</td>
+<td>4000</td>
+<td>Bandpass filter high cutoff (Hz)</td>
+</tr>
+<tr>
+<td><code>drc_threshold_db</code></td>
+<td>float</td>
+<td>-24.0</td>
+<td>DRC threshold (dB)</td>
+</tr>
+<tr>
+<td><code>drc_ratio</code></td>
+<td>float</td>
+<td>4.0</td>
+<td>DRC compression ratio</td>
+</tr>
+<tr>
+<td><code>drc_attack_ms</code></td>
+<td>float</td>
+<td>5.0</td>
+<td>DRC attack time (ms)</td>
+</tr>
+<tr>
+<td><code>drc_release_ms</code></td>
+<td>float</td>
+<td>100.0</td>
+<td>DRC release time (ms)</td>
+</tr>
+<tr>
+<td><code>skip_assist_on_loud_dbfs</code></td>
+<td>float</td>
+<td>-5.0</td>
+<td>Skip assist if louder than this</td>
+</tr>
+<tr>
+<td><strong>Fallback</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>brute_force_fallback</code></td>
+<td>bool</td>
+<td>True</td>
+<td>Use fixed-chunk splitting if Pass 2 fails</td>
+</tr>
+<tr>
+<td><code>brute_force_chunk_s</code></td>
+<td>float</td>
+<td><em>derived</em></td>
+<td>Chunk size (default: max_duration)</td>
+</tr>
+<tr>
+<td><strong>Edge</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>pad_edges_s</code></td>
+<td>float</td>
+<td>0.0</td>
+<td>Padding at segment edges (seconds)</td>
+</tr>
+<tr>
+<td><strong>Output</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>verbose_summary</code></td>
+<td>bool</td>
+<td>True</td>
+<td>Log detection summary</td>
+</tr>
+<tr>
+<td><code>force_mono</code></td>
+<td>bool</td>
+<td>True</td>
+<td>Convert stereo to mono</td>
+</tr>
+</tbody>
+</table>
+<h3 id="silerosceneconfig-extends-auditoksceneconfig">SileroSceneConfig (extends AuditokSceneConfig)<a class="headerlink" href="#silerosceneconfig-extends-auditoksceneconfig" title="Permanent link">&para;</a></h3>
+<p>All auditok parameters above, plus:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>silero_threshold</code></td>
+<td>float</td>
+<td>0.08</td>
+<td>Speech probability threshold</td>
+</tr>
+<tr>
+<td><code>silero_neg_threshold</code></td>
+<td>float</td>
+<td>0.15</td>
+<td>Deactivation threshold</td>
+</tr>
+<tr>
+<td><code>silero_min_silence_ms</code></td>
+<td>int</td>
+<td>1500</td>
+<td>Min silence to split (ms)</td>
+</tr>
+<tr>
+<td><code>silero_min_speech_ms</code></td>
+<td>int</td>
+<td>100</td>
+<td>Min speech duration (ms)</td>
+</tr>
+<tr>
+<td><code>silero_max_speech_s</code></td>
+<td>float</td>
+<td>600.0</td>
+<td>Max speech segment (seconds)</td>
+</tr>
+<tr>
+<td><code>silero_min_silence_at_max</code></td>
+<td>int</td>
+<td>500</td>
+<td>Min silence at max speech (ms)</td>
+</tr>
+<tr>
+<td><code>silero_speech_pad_ms</code></td>
+<td>int</td>
+<td>200</td>
+<td>Padding around speech (ms)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note</strong>: <code>assist_processing</code> is forced to <code>False</code> in <code>SileroSceneConfig.__post_init__()</code>.</p>
+<h3 id="semanticclusteringconfig">SemanticClusteringConfig<a class="headerlink" href="#semanticclusteringconfig" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>min_duration</code></td>
+<td>float</td>
+<td>20.0</td>
+<td>Minimum segment duration</td>
+</tr>
+<tr>
+<td><code>max_duration</code></td>
+<td>float</td>
+<td>420.0</td>
+<td>Maximum segment duration</td>
+</tr>
+<tr>
+<td><code>snap_window</code></td>
+<td>float</td>
+<td>5.0</td>
+<td>Boundary snapping window (seconds)</td>
+</tr>
+<tr>
+<td><code>clustering_threshold</code></td>
+<td>float</td>
+<td>18.0</td>
+<td>Agglomerative clustering distance threshold</td>
+</tr>
+<tr>
+<td><code>sample_rate</code></td>
+<td>int</td>
+<td>16000</td>
+<td>Processing sample rate</td>
+</tr>
+<tr>
+<td><code>preserve_original_sr</code></td>
+<td>bool</td>
+<td>True</td>
+<td>Save WAVs at original sample rate</td>
+</tr>
+<tr>
+<td><code>visualize</code></td>
+<td>bool</td>
+<td>False</td>
+<td>Generate visualization PNG</td>
+</tr>
+<tr>
+<td><code>preset</code></td>
+<td>str</td>
+<td>"default"</td>
+<td>Preset name</td>
+</tr>
+</tbody>
+</table>
+<h3 id="legacy-kwargs-alias-support">Legacy Kwargs Alias Support<a class="headerlink" href="#legacy-kwargs-alias-support" title="Permanent link">&para;</a></h3>
+<p>The factory bridge (<code>create_from_legacy_kwargs</code>) and <code>AuditokSceneDetector._build_config_from_kwargs</code>
+accept both <code>_s</code> suffixed and un-suffixed parameter names:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># These are equivalent:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;auditok&quot;</span><span class="p">,</span> <span class="n">max_duration_s</span><span class="o">=</span><span class="mf">29.0</span><span class="p">)</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;auditok&quot;</span><span class="p">,</span> <span class="n">max_duration</span><span class="o">=</span><span class="mf">29.0</span><span class="p">)</span>
+</code></pre></div>
+<p>The <code>_s</code> suffix takes precedence when both are present.</p>
+<p>Additionally, the bare top-level aliases <code>max_silence</code> and <code>energy_threshold</code> (without
+the <code>pass1_</code>/<code>pass2_</code> prefix) are supported as fallbacks for <code>pass1_max_silence</code> and
+<code>pass1_energy_threshold</code> respectively. This preserves backward compatibility with
+the oldest config format:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># These are equivalent:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;auditok&quot;</span><span class="p">,</span> <span class="n">max_silence</span><span class="o">=</span><span class="mf">1.8</span><span class="p">)</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;auditok&quot;</span><span class="p">,</span> <span class="n">pass1_max_silence</span><span class="o">=</span><span class="mf">1.8</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="8-developer-guide-integrating-scene-detection">8. Developer Guide: Integrating Scene Detection<a class="headerlink" href="#8-developer-guide-integrating-scene-detection" title="Permanent link">&para;</a></h2>
+<h3 id="minimal-integration-5-steps">Minimal Integration (5 steps)<a class="headerlink" href="#minimal-integration-5-steps" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">whisperjav.modules.scene_detection_backends</span><span class="w"> </span><span class="kn">import</span> <span class="n">SceneDetectorFactory</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="c1"># 1. Create detector from config</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">scene_opts</span> <span class="o">=</span> <span class="n">resolved_config</span><span class="p">[</span><span class="s2">&quot;features&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;scene_detection&quot;</span><span class="p">,</span> <span class="p">{})</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span><span class="o">**</span><span class="n">scene_opts</span><span class="p">)</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># 2. Run detection</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="n">scenes_dir</span> <span class="o">=</span> <span class="n">temp_dir</span> <span class="o">/</span> <span class="s2">&quot;scenes&quot;</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="n">scenes_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="n">result</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_scenes</span><span class="p">(</span><span class="n">audio_path</span><span class="p">,</span> <span class="n">scenes_dir</span><span class="p">,</span> <span class="n">media_basename</span><span class="p">)</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="c1"># 3. Get legacy tuples for downstream ASR</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="n">scene_paths</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">to_legacy_tuples</span><span class="p">()</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="c1"># scene_paths: [(Path, start_sec, end_sec, duration_sec), ...]</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="c1"># 4. Optionally extract metadata</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="n">metadata</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">to_metadata_dict</span><span class="p">()</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="c1"># 5. Cleanup when done</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="n">detector</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="with-overrides-eg-qwen-safe_chunking">With Overrides (e.g., Qwen safe_chunking)<a class="headerlink" href="#with-overrides-eg-qwen-safe_chunking" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">scene_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">scene_method</span><span class="p">}</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">safe_chunking</span><span class="p">:</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">scene_kwargs</span><span class="p">[</span><span class="s2">&quot;min_duration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">30</span>   <span class="c1"># wider scenes</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">scene_kwargs</span><span class="p">[</span><span class="s2">&quot;max_duration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">120</span>  <span class="c1"># ForcedAligner limit headroom</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span><span class="o">**</span><span class="n">scene_kwargs</span><span class="p">)</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="n">result</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_scenes</span><span class="p">(</span><span class="n">audio_path</span><span class="p">,</span> <span class="n">scenes_dir</span><span class="p">,</span> <span class="n">media_basename</span><span class="p">)</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="n">scene_paths</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">to_legacy_tuples</span><span class="p">()</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="n">detector</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="accessing-rich-metadata">Accessing Rich Metadata<a class="headerlink" href="#accessing-rich-metadata" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_scenes</span><span class="p">(</span><span class="n">audio_path</span><span class="p">,</span> <span class="n">scenes_dir</span><span class="p">,</span> <span class="n">basename</span><span class="p">)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># Per-scene data</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="k">for</span> <span class="n">scene</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">scenes</span><span class="p">:</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Scene: </span><span class="si">{</span><span class="n">scene</span><span class="o">.</span><span class="n">start_sec</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s - </span><span class="si">{</span><span class="n">scene</span><span class="o">.</span><span class="n">end_sec</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s &quot;</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>          <span class="sa">f</span><span class="s2">&quot;(pass=</span><span class="si">{</span><span class="n">scene</span><span class="o">.</span><span class="n">detection_pass</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    <span class="k">if</span> <span class="n">scene</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;split_method&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;brute_force&quot;</span><span class="p">:</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  ⚠ Brute-force split (no natural boundary found)&quot;</span><span class="p">)</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="c1"># Aggregate stats</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Coverage: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">coverage_ratio</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing time: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">processing_time_sec</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="c1"># Coarse boundaries (two-pass methods only)</span>
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">coarse_boundaries</span><span class="p">:</span>
+<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a>    <span class="k">for</span> <span class="n">cb</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">coarse_boundaries</span><span class="p">:</span>
+<a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Chapter: </span><span class="si">{</span><span class="n">cb</span><span class="p">[</span><span class="s1">&#39;start_time_seconds&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s - &quot;</span>
+<a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a>              <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">cb</span><span class="p">[</span><span class="s1">&#39;end_time_seconds&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+<a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>
+<a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a><span class="c1"># VAD segments (Silero only)</span>
+<a id="__codelineno-15-21" name="__codelineno-15-21" href="#__codelineno-15-21"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">vad_segments</span><span class="p">:</span>
+<a id="__codelineno-15-22" name="__codelineno-15-22" href="#__codelineno-15-22"></a>    <span class="k">for</span> <span class="n">seg</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">vad_segments</span><span class="p">:</span>
+<a id="__codelineno-15-23" name="__codelineno-15-23" href="#__codelineno-15-23"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Speech: </span><span class="si">{</span><span class="n">seg</span><span class="p">[</span><span class="s1">&#39;start_sec&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s - </span><span class="si">{</span><span class="n">seg</span><span class="p">[</span><span class="s1">&#39;end_sec&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="lifecycle-management">Lifecycle Management<a class="headerlink" href="#lifecycle-management" title="Permanent link">&para;</a></h3>
+<p>Scene detectors should be:
+1. <strong>Created once</strong> at pipeline construction time (or once per process call for Qwen)
+2. <strong>Used</strong> via <code>detect_scenes()</code> for each file
+3. <strong>Cleaned up</strong> via <code>cleanup()</code> when the pipeline is done</p>
+<p>The base pipeline (<code>base_pipeline.py</code>) includes automatic cleanup with defensive guards:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># base_pipeline.py cleanup() — called automatically</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;scene_detector&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">scene_detector</span><span class="p">:</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scene_detector</span><span class="p">,</span> <span class="s1">&#39;cleanup&#39;</span><span class="p">):</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">scene_detector</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">scene_detector</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Scene detector cleanup failed (non-fatal): </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>For one-shot usage (like Qwen), call <code>cleanup()</code> explicitly after use.</p>
+<h3 id="writing-a-new-backend">Writing a New Backend<a class="headerlink" href="#writing-a-new-backend" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Create <code>whisperjav/modules/scene_detection_backends/my_backend.py</code></li>
+<li>Implement the <code>SceneDetector</code> Protocol:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">SceneDetectionResult</span><span class="p">,</span> <span class="n">SceneInfo</span><span class="p">,</span> <span class="n">SceneDetectionError</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">MySceneDetector</span><span class="p">:</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>        <span class="c1"># Accept/ignore kwargs for factory compatibility</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>        <span class="o">...</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>    <span class="nd">@property</span>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>        <span class="k">return</span> <span class="s2">&quot;my_method&quot;</span>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>    <span class="nd">@property</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">display_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>        <span class="k">return</span> <span class="s2">&quot;My Method (Description)&quot;</span>
+<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a>
+<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">detect_scenes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_path</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">media_basename</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a>        <span class="c1"># 1. Load audio</span>
+<a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a>        <span class="c1"># 2. Detect boundaries</span>
+<a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a>        <span class="c1"># 3. Save WAV files via save_scene_wav()</span>
+<a id="__codelineno-17-21" name="__codelineno-17-21" href="#__codelineno-17-21"></a>        <span class="c1"># 4. Return SceneDetectionResult with SceneInfo list</span>
+<a id="__codelineno-17-22" name="__codelineno-17-22" href="#__codelineno-17-22"></a>        <span class="o">...</span>
+<a id="__codelineno-17-23" name="__codelineno-17-23" href="#__codelineno-17-23"></a>
+<a id="__codelineno-17-24" name="__codelineno-17-24" href="#__codelineno-17-24"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-17-25" name="__codelineno-17-25" href="#__codelineno-17-25"></a>        <span class="o">...</span>
+</code></pre></div>
+<ol>
+<li>Register in <code>factory.py</code>:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">_BACKEND_REGISTRY</span><span class="p">[</span><span class="s2">&quot;my_method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="s2">&quot;whisperjav.modules.scene_detection_backends.my_backend.MySceneDetector&quot;</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="p">)</span>
+</code></pre></div>
+<ol>
+<li>Add dependency info:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">_BACKEND_DEPENDENCIES</span><span class="p">[</span><span class="s2">&quot;my_method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="s2">&quot;packages&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;my_dep&quot;</span><span class="p">],</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="s2">&quot;install_hint&quot;</span><span class="p">:</span> <span class="s2">&quot;pip install my_dep&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    <span class="s2">&quot;always_available&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="9-consumer-adoption-map">9. Consumer Adoption Map<a class="headerlink" href="#9-consumer-adoption-map" title="Permanent link">&para;</a></h2>
+<h3 id="how-each-pipeline-creates-and-uses-scene-detection">How Each Pipeline Creates and Uses Scene Detection<a class="headerlink" href="#how-each-pipeline-creates-and-uses-scene-detection" title="Permanent link">&para;</a></h3>
+<h4 id="qwenpipeline-qwen_pipelinepy">QwenPipeline (<code>qwen_pipeline.py</code>)<a class="headerlink" href="#qwenpipeline-qwen_pipelinepy" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>Construction:  scene_method set from CLI / config
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Usage (Phase 2):
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>  kwargs = {&quot;method&quot;: self.scene_method}
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>  + safe_chunking overrides:
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    ASSEMBLY mode:    min_duration=30, max_duration=120
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>    Other modes:      min_duration=12, max_duration=90
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>  detector = SceneDetectorFactory.create_from_legacy_kwargs(**kwargs)
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>  result = detector.detect_scenes(audio, scenes_dir, basename)
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>  scene_paths = result.to_legacy_tuples()
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>  detector.cleanup()  ← explicit, one-shot
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>Metadata:  method, scenes_detected count, time_sec only
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>Cleanup:   Manual (detector created/destroyed per process call)
+</code></pre></div>
+<p><strong>Qwen Input Modes and Scene Detection:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Input Mode</th>
+<th>Scene Method</th>
+<th>max_duration</th>
+<th>min_duration</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ASSEMBLY</td>
+<td>varies</td>
+<td>120s (safe)</td>
+<td>30s (safe)</td>
+<td>ForcedAligner 180s limit</td>
+</tr>
+<tr>
+<td>CONTEXT_AWARE</td>
+<td>varies</td>
+<td>90s (safe)</td>
+<td>12s (safe)</td>
+<td>Coupled ASR+Aligner</td>
+</tr>
+<tr>
+<td>VAD_SLICING</td>
+<td>varies</td>
+<td>90s (safe)</td>
+<td>12s (safe)</td>
+<td>VAD segments up to 29s</td>
+</tr>
+<tr>
+<td>Any (no safe_chunking)</td>
+<td>varies</td>
+<td>backend default</td>
+<td>backend default</td>
+<td>Uses config as-is</td>
+</tr>
+</tbody>
+</table>
+<h4 id="balancedpipeline-balanced_pipelinepy">BalancedPipeline (<code>balanced_pipeline.py</code>)<a class="headerlink" href="#balancedpipeline-balanced_pipelinepy" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>Construction:
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>  scene_opts = features.get(&quot;scene_detection&quot;, {})
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>  self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>Usage (Step 2):
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>  result = self.scene_detector.detect_scenes(audio, scenes_dir, basename)
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>  scene_paths = result.to_legacy_tuples()
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>  meta = result.to_metadata_dict()
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>  master_metadata[&quot;scenes_detected&quot;] = meta[&quot;scenes_detected&quot;]
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>  + coarse_boundaries, vad_segments if present
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>Metadata:  Full metadata via to_metadata_dict()
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>Cleanup:   Via base_pipeline.cleanup() (automatic)
+</code></pre></div>
+<h4 id="fidelitypipeline-fidelity_pipelinepy">FidelityPipeline (<code>fidelity_pipeline.py</code>)<a class="headerlink" href="#fidelitypipeline-fidelity_pipelinepy" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>Construction:
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>  scene_opts = features.get(&quot;scene_detection&quot;, {})
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>  self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>Usage:
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>  result = self.scene_detector.detect_scenes(audio, scenes_dir, basename)
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>  scene_paths = result.to_legacy_tuples()
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>Metadata:  Manual per-scene metadata from legacy tuples (path, start, end, duration).
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>           Does NOT use to_metadata_dict().
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>Cleanup:   Via base_pipeline.cleanup() (automatic)
+</code></pre></div>
+<h4 id="fastpipeline-fast_pipelinepy">FastPipeline (<code>fast_pipeline.py</code>)<a class="headerlink" href="#fastpipeline-fast_pipelinepy" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>Construction:
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>  scene_opts = features.get(&quot;scene_detection&quot;, {})
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>  self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>Usage:
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>  result = self.scene_detector.detect_scenes(audio, scenes_dir, basename)
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>  scene_paths = result.to_legacy_tuples()
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>Metadata:  Manual per-scene metadata from legacy tuples.
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>           Uses self.scene_detector.name in tracer.
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>           Does NOT use to_metadata_dict().
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>Cleanup:   Via base_pipeline.cleanup() (automatic)
+</code></pre></div>
+<h4 id="transformerspipeline-transformers_pipelinepy">TransformersPipeline (<code>transformers_pipeline.py</code>)<a class="headerlink" href="#transformerspipeline-transformers_pipelinepy" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>Construction:
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>  IF scene_method != &quot;none&quot;:
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>        method=self.scene_method
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>    )
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>  ELSE:
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>    self.scene_detector = None  ← guards against &quot;none&quot; at code level
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>Usage:
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>  IF self.scene_detector:
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>    result = self.scene_detector.detect_scenes(audio, scenes_dir, basename)
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>    scene_paths = result.to_legacy_tuples()
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>    → per-scene enhancement + ASR
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>  ELSE:
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>    → full-audio enhancement + ASR (different code path)
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>Metadata:  Manual per-scene metadata from legacy tuples.
+<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>           Does NOT use to_metadata_dict().
+<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>Cleanup:   Via base_pipeline.cleanup() (automatic)
+</code></pre></div>
+<p><strong>Notes on consumer adoption patterns:</strong>
+- <strong>Transformers</strong> is the only consumer that keeps the <code>scene_method != "none"</code> guard.
+  This is correct because it has genuinely different code paths for scene-based vs
+  full-audio processing (different enhancement calls, different ASR flow).
+- <strong>BalancedPipeline</strong> is the only consumer that calls <code>to_metadata_dict()</code> for rich
+  structured metadata. All others manually build per-scene metadata from the legacy tuples.
+- <strong>QwenPipeline</strong> is the only consumer that calls <code>cleanup()</code> explicitly (one-shot usage).
+  All others rely on <code>base_pipeline.cleanup()</code> for automatic cleanup.</p>
+<h4 id="kotobafasterwhisperpipeline-kotoba_faster_whisper_pipelinepy">KotobaFasterWhisperPipeline (<code>kotoba_faster_whisper_pipeline.py</code>)<a class="headerlink" href="#kotobafasterwhisperpipeline-kotoba_faster_whisper_pipelinepy" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>Construction:
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>  scene_opts[&quot;method&quot;] = self.scene_method
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>  self.scene_detector = SceneDetectorFactory.create_from_legacy_kwargs(**scene_opts)
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>Usage:
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>  result = self.scene_detector.detect_scenes(audio, scenes_dir, basename)
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>  scene_paths = result.to_legacy_tuples()
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>Metadata:  Minimal
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>Cleanup:   Via base_pipeline.cleanup() (automatic)
+</code></pre></div>
+<h4 id="ensemblepassworker-ensemblepass_workerpy">EnsemblePassWorker (<code>ensemble/pass_worker.py</code>)<a class="headerlink" href="#ensemblepassworker-ensemblepass_workerpy" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>Does NOT directly create scene detectors.
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>Prepares resolved_config with scene_detection options, then
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>delegates to a child pipeline (balanced, fidelity, etc.) which
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>creates its own detector.
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>Uses SCENE_DETECTION_PARAMS set to route params to
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>resolved_config[&quot;features&quot;][&quot;scene_detection&quot;].
+</code></pre></div>
+<hr />
+<h2 id="10-error-handling">10. Error Handling<a class="headerlink" href="#10-error-handling" title="Permanent link">&para;</a></h2>
+<h3 id="detection-failures">Detection Failures<a class="headerlink" href="#detection-failures" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_scenes</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">,</span> <span class="n">basename</span><span class="p">)</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="k">except</span> <span class="n">SceneDetectionError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>    <span class="c1"># Fatal: audio load failed, backend crashed</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Scene detection failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>    <span class="k">raise</span>  <span class="c1"># or fall back to NullSceneDetector</span>
+</code></pre></div>
+<h3 id="empty-results-not-an-error">Empty Results (Not an Error)<a class="headerlink" href="#empty-results-not-an-error" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_scenes</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">,</span> <span class="n">basename</span><span class="p">)</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">scenes</span><span class="p">:</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="c1"># No speech found — valid result</span>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No scenes detected (audio may be silent)&quot;</span><span class="p">)</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>    <span class="c1"># Pipeline typically skips ASR for this file</span>
+</code></pre></div>
+<h3 id="backend-not-available">Backend Not Available<a class="headerlink" href="#backend-not-available" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>    <span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;semantic&quot;</span><span class="p">)</span>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>    <span class="c1"># scikit-learn not installed</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Semantic backend unavailable: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>    <span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;auditok&quot;</span><span class="p">)</span>  <span class="c1"># fallback</span>
+</code></pre></div>
+<h3 id="unknown-backend">Unknown Backend<a class="headerlink" href="#unknown-backend" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>    <span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;unknown_method&quot;</span><span class="p">)</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>    <span class="c1"># &quot;Unknown scene detector: &#39;unknown_method&#39;. Available: [...]&quot;</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>    <span class="o">...</span>
+</code></pre></div>
+<hr />
+<h2 id="11-utilities">11. Utilities<a class="headerlink" href="#11-utilities" title="Permanent link">&para;</a></h2>
+<p>Located in <code>utils.py</code>, shared across all backends.</p>
+<h3 id="load_audio_unified">load_audio_unified<a class="headerlink" href="#load_audio_unified" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">load_audio_unified</span><span class="p">(</span>
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>    <span class="n">audio_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>    <span class="n">target_sr</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># None = preserve original</span>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>    <span class="n">force_mono</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+</code></pre></div>
+<p>Unified audio loading. Uses <code>soundfile</code> for reading, <code>librosa</code> for resampling.
+Handles stereo→mono conversion, actionable error messages.</p>
+<h3 id="save_scene_wav">save_scene_wav<a class="headerlink" href="#save_scene_wav" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">save_scene_wav</span><span class="p">(</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>    <span class="n">audio_data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>    <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>    <span class="n">scene_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>    <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>    <span class="n">media_basename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+</code></pre></div>
+<p>Saves PCM16 WAV with standardized naming: <code>{basename}_scene_{idx:04d}.wav</code>.</p>
+<h3 id="brute_force_split">brute_force_split<a class="headerlink" href="#brute_force_split" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">brute_force_split</span><span class="p">(</span>
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>    <span class="n">start_sec</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>    <span class="n">end_sec</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>    <span class="n">chunk_duration</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>    <span class="n">min_duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span>
+<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">SceneInfo</span><span class="p">]:</span>
+</code></pre></div>
+<p>Fixed-duration fallback splitting when silence-based detection fails.
+Returns <code>SceneInfo</code> objects with <code>scene_path=None</code> (caller saves WAVs).</p>
+<hr />
+<h2 id="12-migration-from-dynamicscenedetector">12. Migration from DynamicSceneDetector<a class="headerlink" href="#12-migration-from-dynamicscenedetector" title="Permanent link">&para;</a></h2>
+<p><code>DynamicSceneDetector</code> (in <code>scene_detection.py</code>) is <strong>deprecated</strong> and emits a
+<code>FutureWarning</code> on instantiation. All pipelines have been migrated to
+<code>SceneDetectorFactory</code>.</p>
+<h3 id="before-legacy">Before (Legacy)<a class="headerlink" href="#before-legacy" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">whisperjav.modules.scene_detection</span><span class="w"> </span><span class="kn">import</span> <span class="n">DynamicSceneDetector</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">DynamicSceneDetector</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;auditok&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">scene_opts</span><span class="p">)</span>
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="n">scene_tuples</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_scenes</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">,</span> <span class="n">basename</span><span class="p">)</span>
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="c1"># scene_tuples: List[Tuple[Path, float, float, float]]</span>
+</code></pre></div>
+<h3 id="after-current">After (Current)<a class="headerlink" href="#after-current" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">whisperjav.modules.scene_detection_backends</span><span class="w"> </span><span class="kn">import</span> <span class="n">SceneDetectorFactory</span>
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">SceneDetectorFactory</span><span class="o">.</span><span class="n">create_from_legacy_kwargs</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;auditok&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">scene_opts</span><span class="p">)</span>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_scenes</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">,</span> <span class="n">basename</span><span class="p">)</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="n">scene_tuples</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">to_legacy_tuples</span><span class="p">()</span>  <span class="c1"># Same type as before</span>
+<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="n">detector</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="key-differences">Key Differences<a class="headerlink" href="#key-differences" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Return type</strong>: <code>SceneDetectionResult</code> (rich) vs <code>List[Tuple]</code> (flat)</li>
+<li><strong>Metadata</strong>: <code>result.to_metadata_dict()</code> vs <code>detector.get_detection_metadata()</code></li>
+<li><strong>Cleanup</strong>: Explicit <code>cleanup()</code> call vs implicit (no cleanup)</li>
+<li><strong>Error type</strong>: <code>SceneDetectionError</code> vs generic exceptions</li>
+<li><strong>"none" handling</strong>: <code>NullSceneDetector</code> via factory vs ad-hoc <code>if</code> guards in each pipeline</li>
+</ol>
+<hr />
+<p><em>End of specification.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

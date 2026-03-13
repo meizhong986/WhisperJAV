@@ -1,0 +1,3529 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/ADR-006-AUDIT-A-DOCS-VS-DOCS/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>ADR-006 Audit A: Vision vs. Implementation Plan Gap Analysis - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-006-audit-a-vision-vs-implementation-plan-gap-analysis" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-006 Audit A: Vision vs. Implementation Plan Gap Analysis
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#methodology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methodology
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-coverage-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Coverage Matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A. Coverage Matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a1-protocol-specifications-adr-section-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.1 Protocol Specifications (ADR Section 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a2-temporalframer-backends-adr-section-54-71" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.2 TemporalFramer Backends (ADR Section 5.4 / 7.1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a3-textgenerator-implementations-adr-section-72" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.3 TextGenerator Implementations (ADR Section 7.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a4-textaligner-implementations-adr-section-74" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.4 TextAligner Implementations (ADR Section 7.4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a5-textcleaner-implementations-adr-section-73" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.5 TextCleaner Implementations (ADR Section 7.3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a6-orchestrator-design-adr-section-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.6 Orchestrator Design (ADR Section 9)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a7-data-flow-contracts-adr-section-8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.7 Data Flow &amp; Contracts (ADR Section 8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a8-audit-finding-resolutions-adr-section-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.8 Audit Finding Resolutions (ADR Section 10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a9-mode-mapping-adr-section-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.9 Mode Mapping (ADR Section 11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a10-new-workflows-adr-section-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.10 New Workflows (ADR Section 12)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a11-appendices-constants-adr-sections-13-14-appendices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.11 Appendices &amp; Constants (ADR Sections 13, 14, Appendices)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b-deviation-register" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Deviation Register
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="B. Deviation Register">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#b1-harden_scene_result-signature-difference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.1 harden_scene_result() Signature Difference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b2-plan-adds-hardeningconfig-and-hardeningdiagnostics-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.2 Plan Adds HardeningConfig and HardeningDiagnostics Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b3-decoupledsubtitlepipeline__init__-parameter-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.3 DecoupledSubtitlePipeline.__init__() Parameter Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b4-process_scenes-parameter-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.4 process_scenes() Parameter Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b5-plan-adds-phase-7-not-in-adr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.5 Plan Adds Phase 7 (Not in ADR)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b6-plan-adds-timestampmode-as-new-enum" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.6 Plan Adds TimestampMode as New Enum
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b7-plan-adds-batch-fallback-error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.7 Plan Adds Batch Fallback Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b8-plan-changes-adr-migration-phase-numbering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.8 Plan Changes ADR Migration Phase Numbering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b9-plan-defers-whisper-segment-framer-with-explicit-justification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.9 Plan Defers whisper-segment Framer with Explicit Justification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b10-plan-defers-vadproportionalaligner-with-inline-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.10 Plan Defers VADProportionalAligner with Inline Alternative
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b11-plan-specifies-qwen3-cleaner-naming-adr-uses-assembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.11 Plan Specifies qwen3 Cleaner Naming (ADR Uses assembly)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b12-plan-adds-debug-artifact-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.12 Plan Adds Debug Artifact Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b13-plan-adds-explicit-test-file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.13 Plan Adds Explicit Test File Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#c-completeness-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Completeness Gaps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="C. Completeness Gaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#c1-adr-section-55-the-aligner-becomes-optional-no-dedicated-plan-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.1 ADR Section 5.5 "The Aligner Becomes Optional" — No Dedicated Plan Coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c2-adr-section-62-speechenhancer-placement-no-plan-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.2 ADR Section 6.2 "SpeechEnhancer Placement" — No Plan Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c3-adr-section-63-existing-protocol-factory-pattern-implicit-in-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.3 ADR Section 6.3 "Existing Protocol + Factory Pattern" — Implicit in Plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c4-adr-finding-m2-resolution-wordtimestamp-null-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.4 ADR Finding M2 Resolution — WordTimestamp Null Representation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c5-adr-appendix-c-key-constants-limits-no-plan-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.5 ADR Appendix C "Key Constants &amp; Limits" — No Plan Coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c6-adr-what-doesnt-change-section-13-no-explicit-plan-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.6 ADR "What Doesn't Change" Section (13) — No Explicit Plan Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c7-no-plan-coverage-for-adr-section-4-architectural-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.7 No Plan Coverage for ADR Section 4 (Architectural Comparison)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c8-plan-phase-4-integration-does-not-address-scene-speech-regions-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.8 Plan Phase 4 (Integration) Does Not Address Scene Speech Regions Conversion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c9-no-plan-coverage-for-orchestrator-cleanup-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C.9 No Plan Coverage for Orchestrator cleanup() Method
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d-contractinterface-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D. Contract/Interface Gaps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="D. Contract/Interface Gaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#d1-harden_scene_result-return-type-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.1 harden_scene_result() Return Type Mismatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d2-alignmentresultwords-type-wordtimestamp-vs-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.2 AlignmentResult.words Type — WordTimestamp vs Dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d3-sentinel-api-operates-on-word-dicts-not-wordtimestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.3 Sentinel API Operates on Word Dicts, Not WordTimestamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d4-temporalframerframe-audio-input-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.4 TemporalFramer.frame() — Audio Input Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#e-workflow-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E. Workflow Gaps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="E. Workflow Gaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#e1-assembly-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E.1 ASSEMBLY Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e2-vad_slicing-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E.2 VAD_SLICING Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e3-context_aware-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E.3 CONTEXT_AWARE Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e4-whisper-guided-qwen-workflow-adr-section-121" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E.4 Whisper-Guided Qwen Workflow (ADR Section 12.1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e5-srt-re-transcription-workflow-adr-section-122" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E.5 SRT Re-Transcription Workflow (ADR Section 12.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e6-error-handling-per-scene-vs-per-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E.6 Error Handling — Per-Scene vs Per-Batch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e7-vram-lifecycle-explicit-swap-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E.7 VRAM Lifecycle — Explicit Swap Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#f-severity-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F. Severity Classification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#g-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        G. Recommendations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="G. Recommendations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#priority-1-document-alignment-address-perception-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 1: Document Alignment (address perception gaps)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-2-type-contract-clarification-address-medium-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 2: Type Contract Clarification (address MEDIUM gaps)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-3-deferred-scope-tracking-acknowledge-gaps-create-future-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 3: Deferred Scope Tracking (acknowledge gaps, create future plan)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-4-minor-cleanup-low-severity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 4: Minor Cleanup (LOW severity)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/ADR-006-AUDIT-A-DOCS-VS-DOCS.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="adr-006-audit-a-vision-vs-implementation-plan-gap-analysis">ADR-006 Audit A: Vision vs. Implementation Plan Gap Analysis<a class="headerlink" href="#adr-006-audit-a-vision-vs-implementation-plan-gap-analysis" title="Permanent link">&para;</a></h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Date</strong></td>
+<td>2026-02-17</td>
+</tr>
+<tr>
+<td><strong>Scope</strong></td>
+<td>ADR-006 (Vision) vs. ADR-006-IMPLEMENTATION-PLAN</td>
+</tr>
+<tr>
+<td><strong>Auditor</strong></td>
+<td>Claude Opus 4.6 (architectural gap analysis)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>The Implementation Plan is a <strong>strong, high-fidelity translation</strong> of the ADR-006 vision into actionable phases. The plan covers the majority of the ADR's architectural elements: all four protocols, all shared data types, the orchestrator design, the hardening stage, the reconstruction function, and the VRAM lifecycle management. The phasing strategy (additive-first, existing-code-modifications-last) faithfully implements the ADR's migration strategy from Section 11.2.</p>
+<p>However, the audit identifies <strong>23 discrete gaps</strong> between the two documents. The most significant cluster of gaps relates to <strong>deferred scope that the ADR presents as core architecture but the plan explicitly defers</strong>: the <code>whisper-segment</code> framer, the <code>VADProportionalAligner</code>, and the <code>HybridAligner</code> are all described as part of the proposed architecture (Section 6.1 block diagram, Section 7.4 implementations table) but are deferred to "future" in the plan. The plan is transparent about this (Section 10.3), but the ADR does not distinguish between "core v1" and "future expansion" in its architectural diagrams, creating a perception gap.</p>
+<p>The second cluster involves <strong>minor type/contract discrepancies</strong>: the ADR's <code>harden_scene_result()</code> signature (Section 9.3) differs from the plan's implementation (Section 2.3) in parameter structure; the orchestrator's <code>process_scenes()</code> parameter naming diverges between the two documents; and the plan adds a <code>Phase 7</code> that has no corresponding ADR section. These are all individually low-severity but collectively indicate the plan evolved beyond the ADR during implementation.</p>
+<p>Overall severity assessment: <strong>No CRITICAL gaps. 3 HIGH, 8 MEDIUM, 12 LOW.</strong> The architecture is sound and the plan is a faithful-enough translation that no fundamental redesign is needed to close the gaps.</p>
+<hr />
+<h2 id="methodology">Methodology<a class="headerlink" href="#methodology" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Read both documents in their entirety, noting every architectural element (protocol, type, method, workflow, constant, design decision) in the ADR.</li>
+<li>For each element, searched the implementation plan for corresponding coverage, recording which phase/step addresses it.</li>
+<li>Read each phase of the implementation plan and cross-referenced back to the ADR to identify additions, omissions, or modifications.</li>
+<li>Checked the actual git commits (Phase 0 through Phase 7) to understand whether the implementation plan was itself faithfully executed, which informed whether deviations are "plan-only" or "plan+implementation."</li>
+<li>Classified all findings by severity (CRITICAL/HIGH/MEDIUM/LOW) based on impact on architectural integrity, correctness, and maintainability.</li>
+</ol>
+<hr />
+<h2 id="a-coverage-matrix">A. Coverage Matrix<a class="headerlink" href="#a-coverage-matrix" title="Permanent link">&para;</a></h2>
+<h3 id="a1-protocol-specifications-adr-section-7">A.1 Protocol Specifications (ADR Section 7)<a class="headerlink" href="#a1-protocol-specifications-adr-section-7" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TemporalFramer</code> protocol definition</td>
+<td>7.1</td>
+<td>Phase 0, Step 2.2</td>
+<td>COVERED</td>
+<td>Exact match on method signatures</td>
+</tr>
+<tr>
+<td><code>TemporalFrame</code> dataclass</td>
+<td>7.1</td>
+<td>Phase 0, Step 2.1</td>
+<td>COVERED</td>
+<td>All fields present</td>
+</tr>
+<tr>
+<td><code>FramingResult</code> dataclass</td>
+<td>7.1</td>
+<td>Phase 0, Step 2.1</td>
+<td>COVERED</td>
+<td>Plan adds <code>field(default_factory=dict)</code> for metadata; ADR omits this detail</td>
+</tr>
+<tr>
+<td><code>TextGenerator</code> protocol definition</td>
+<td>7.2</td>
+<td>Phase 0, Step 2.2</td>
+<td>COVERED</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td><code>TranscriptionResult</code> dataclass</td>
+<td>7.2</td>
+<td>Phase 0, Step 2.1</td>
+<td>COVERED</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td><code>TextCleaner</code> protocol definition</td>
+<td>7.3</td>
+<td>Phase 0, Step 2.2</td>
+<td>COVERED</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td><code>TextAligner</code> protocol definition</td>
+<td>7.4</td>
+<td>Phase 0, Step 2.2</td>
+<td>COVERED</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td><code>WordTimestamp</code> dataclass</td>
+<td>7.4</td>
+<td>Phase 0, Step 2.1</td>
+<td>COVERED</td>
+<td>Exact match</td>
+</tr>
+<tr>
+<td><code>AlignmentResult</code> dataclass</td>
+<td>7.4</td>
+<td>Phase 0, Step 2.1</td>
+<td>COVERED</td>
+<td>Plan adds <code>field(default_factory=dict)</code>; ADR omits</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a2-temporalframer-backends-adr-section-54-71">A.2 TemporalFramer Backends (ADR Section 5.4 / 7.1)<a class="headerlink" href="#a2-temporalframer-backends-adr-section-54-71" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vad-grouped</code> backend</td>
+<td>5.4, 7.1</td>
+<td>Phase 2, Step 4.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td><code>whisper-segment</code> backend</td>
+<td>5.4, 7.1</td>
+<td>Phase 2 factory note</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 4.1.2 explicitly defers. Plan Section 10.3 documents deferral. ADR Section 6.1 includes it in the block diagram without distinction.</td>
+</tr>
+<tr>
+<td><code>srt-source</code> backend</td>
+<td>5.4, 7.1</td>
+<td>Phase 2, Step 4.4</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td><code>full-scene</code> backend</td>
+<td>5.4, 7.1</td>
+<td>Phase 2, Step 4.2</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td><code>manual</code> backend</td>
+<td>5.4, 7.1</td>
+<td>Phase 2, Step 4.5</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="a3-textgenerator-implementations-adr-section-72">A.3 TextGenerator Implementations (ADR Section 7.2)<a class="headerlink" href="#a3-textgenerator-implementations-adr-section-72" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Qwen3TextGenerator</code></td>
+<td>7.2</td>
+<td>Phase 1, Step 3.1.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td><code>TransformersGenerator</code></td>
+<td>7.2</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3 documents. ADR lists in Section 7.2 table.</td>
+</tr>
+<tr>
+<td><code>VLLMGenerator</code></td>
+<td>7.2</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3 documents. ADR Section 14.4 references ADR-005.</td>
+</tr>
+<tr>
+<td><code>WhisperTextGenerator</code></td>
+<td>7.2</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3 documents.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a4-textaligner-implementations-adr-section-74">A.4 TextAligner Implementations (ADR Section 7.4)<a class="headerlink" href="#a4-textaligner-implementations-adr-section-74" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Qwen3ForcedAlignerAdapter</code></td>
+<td>7.4</td>
+<td>Phase 1, Step 3.2.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td><code>CTCAligner</code></td>
+<td>7.4</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3 documents.</td>
+</tr>
+<tr>
+<td><code>VADProportionalAligner</code></td>
+<td>7.4</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3 states "aligner-free path in orchestrator Step 9 covers the core logic inline." ADR lists as a distinct backend.</td>
+</tr>
+<tr>
+<td><code>NoneAligner</code></td>
+<td>7.4</td>
+<td>Phase 1, Step 3.2.4</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td><code>HybridAligner</code></td>
+<td>7.4</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3 documents. Needs 2+ working aligners first.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a5-textcleaner-implementations-adr-section-73">A.5 TextCleaner Implementations (ADR Section 7.3)<a class="headerlink" href="#a5-textcleaner-implementations-adr-section-73" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AssemblyTextCleaner</code> wrapper</td>
+<td>7.3</td>
+<td>Phase 1, Step 3.3.3</td>
+<td>COVERED</td>
+<td>Plan names it <code>Qwen3TextCleaner</code></td>
+</tr>
+<tr>
+<td><code>PassthroughCleaner</code></td>
+<td>7.3</td>
+<td>Phase 1, Step 3.3.4</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="a6-orchestrator-design-adr-section-9">A.6 Orchestrator Design (ADR Section 9)<a class="headerlink" href="#a6-orchestrator-design-adr-section-9" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DecoupledSubtitlePipeline</code> class</td>
+<td>9.1</td>
+<td>Phase 3, Step 5.1</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td><code>__init__()</code> signature</td>
+<td>9.1</td>
+<td>Phase 3, Step 5.1</td>
+<td><strong>MODIFIED</strong></td>
+<td>See Deviation B.3 — parameter naming differs</td>
+</tr>
+<tr>
+<td><code>process_scenes()</code> signature</td>
+<td>9.1</td>
+<td>Phase 3, Step 5.1</td>
+<td><strong>MODIFIED</strong></td>
+<td>See Deviation B.4 — parameter naming differs</td>
+</tr>
+<tr>
+<td>9-step internal flow</td>
+<td>9.2</td>
+<td>Phase 3, Step 5.2</td>
+<td>COVERED</td>
+<td>Plan provides detailed pseudocode for all 9 steps</td>
+</tr>
+<tr>
+<td>VRAM swap pattern</td>
+<td>9.2 (Steps 4, 8)</td>
+<td>Phase 3, Steps 2-4, 5-8</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>Hardening stage</td>
+<td>9.3</td>
+<td>Phase 0, Step 2.3 + Phase 3 Step 9</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>Sentinel integration</td>
+<td>9.4</td>
+<td>Phase 3, Step 5.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>Sentinel stats accumulation</td>
+<td>—</td>
+<td>Phase 3, Step 5.4</td>
+<td>COVERED</td>
+<td>Plan adds explicit detail not in ADR</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a7-data-flow-contracts-adr-section-8">A.7 Data Flow &amp; Contracts (ADR Section 8)<a class="headerlink" href="#a7-data-flow-contracts-adr-section-8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Inter-component data flow diagram</td>
+<td>8.1</td>
+<td>Phase 3, Step 5.2</td>
+<td>COVERED</td>
+<td>Implicit via orchestrator pseudocode</td>
+</tr>
+<tr>
+<td>Package location (<code>subtitle_pipeline/</code>)</td>
+<td>8.2</td>
+<td>Phase 0 + all phases</td>
+<td>COVERED</td>
+<td>Exact directory match</td>
+</tr>
+<tr>
+<td>Phase 5 -&gt; Phase 6 contract (WhisperResult)</td>
+<td>8.3</td>
+<td>Phase 0 (reconstruction.py) + Phase 4</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="a8-audit-finding-resolutions-adr-section-10">A.8 Audit Finding Resolutions (ADR Section 10)<a class="headerlink" href="#a8-audit-finding-resolutions-adr-section-10" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Finding</th>
+<th>ADR Section 10 Resolution</th>
+<th>Plan Coverage</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1: OOM stale closure</td>
+<td>Eliminated by lifecycle</td>
+<td>Phase 5, Step 7.1.1</td>
+<td>COVERED</td>
+<td>Plan provides targeted fix for existing code too</td>
+</tr>
+<tr>
+<td>C2: Wrong post-processor</td>
+<td>TextCleaner protocol</td>
+<td>Phase 5, Step 7.1.2</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>H1: VAD_ONLY overlapping</td>
+<td>Fixed in hardening</td>
+<td>Phase 0, Step 2.3</td>
+<td>COVERED</td>
+<td>Explicit rewrite documented</td>
+</tr>
+<tr>
+<td>H2: Assembly no timestamps</td>
+<td>Fixed in hardening</td>
+<td>Phase 0, Step 2.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>H3: suppress_silence conflict</td>
+<td>Design decision in reconstruction</td>
+<td>Phase 0, Step 2.4</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>H4: Wrong diagnostics</td>
+<td>Fixed in hardening</td>
+<td>Phase 0, Step 2.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>M1: Stale 300s comment</td>
+<td>Resolved by extraction</td>
+<td>Phase 5, Step 7.2</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>M2: end=0.0 as NULL</td>
+<td>Explicit null in AlignmentResult</td>
+<td>Phase 0 (types.py)</td>
+<td><strong>PARTIAL</strong></td>
+<td>ADR says "explicit null representation"; plan's WordTimestamp still uses float 0.0. See Gap C.4.</td>
+</tr>
+<tr>
+<td>M3: No batch_size override</td>
+<td>TextGenerator.load() config</td>
+<td>Phase 1, Step 3.1.3</td>
+<td>COVERED</td>
+<td>Constructor accepts independent batch_size</td>
+</tr>
+<tr>
+<td>M4: Private _exact_lists</td>
+<td>Encapsulated in TextCleaner</td>
+<td>Phase 1, Step 3.3.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>M5: Redundant VRAM cleanup</td>
+<td>safe_cuda_cleanup() after unload</td>
+<td>Phase 1, Step 3.1.3 + Phase 3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>M6: Redundant audio checks</td>
+<td>Duration from TemporalFrame</td>
+<td>Phase 2 (framers)</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>M7: Inconsistent timestamp modes</td>
+<td>Single hardening path</td>
+<td>Phase 0, Step 2.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>M8: suppress_silence coupled</td>
+<td>Same as H3</td>
+<td>Phase 0, Step 2.4</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>L1-L7: Dead code/cosmetic</td>
+<td>Fresh implementation</td>
+<td>Phase 6</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="a9-mode-mapping-adr-section-11">A.9 Mode Mapping (ADR Section 11)<a class="headerlink" href="#a9-mode-mapping-adr-section-11" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ASSEMBLY mapping</td>
+<td>11.1</td>
+<td>Phase 4</td>
+<td>COVERED</td>
+<td>Full-scene + qwen3 + assembly cleaner + qwen-forced-aligner</td>
+</tr>
+<tr>
+<td>VAD_SLICING mapping</td>
+<td>11.1</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3 explicitly defers migration</td>
+</tr>
+<tr>
+<td>CONTEXT_AWARE mapping</td>
+<td>11.1</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3: "needs design work"</td>
+</tr>
+<tr>
+<td>Migration strategy Phase 0-3</td>
+<td>11.2</td>
+<td>Phases 0-3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>Migration strategy Phase 4</td>
+<td>11.2</td>
+<td>Phase 4</td>
+<td>COVERED</td>
+<td>Assembly only, as specified</td>
+</tr>
+<tr>
+<td>Migration strategy Phase 5 "Future"</td>
+<td>11.2</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>ADR says "Deprecate mode-specific code as orchestrator proves equivalent"</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a10-new-workflows-adr-section-12">A.10 New Workflows (ADR Section 12)<a class="headerlink" href="#a10-new-workflows-adr-section-12" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Workflow</th>
+<th>ADR Section</th>
+<th>Plan Phase/Step</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Whisper-Guided Qwen</td>
+<td>12.1</td>
+<td>—</td>
+<td><strong>NOT COVERED</strong></td>
+<td>Depends on <code>whisper-segment</code> framer (deferred)</td>
+</tr>
+<tr>
+<td>SRT Re-Transcription</td>
+<td>12.2</td>
+<td>Phase 2 (srt-source framer)</td>
+<td><strong>PARTIAL</strong></td>
+<td>Framer exists, but no integration guidance. Workflow is "enabled" but not exercised.</td>
+</tr>
+<tr>
+<td>Two-Pass Refinement</td>
+<td>12.3</td>
+<td>—</td>
+<td><strong>NOT COVERED</strong></td>
+<td>Enabled by architecture but no plan step addresses wiring it</td>
+</tr>
+<tr>
+<td>Aligner-Free Fast Mode</td>
+<td>12.4</td>
+<td>Phase 3, Step 9 (aligner=None path)</td>
+<td>COVERED</td>
+<td>Orchestrator handles aligner-free explicitly</td>
+</tr>
+<tr>
+<td>Cross-Model Benchmarking</td>
+<td>12.5</td>
+<td>—</td>
+<td><strong>DEFERRED</strong></td>
+<td>Plan Section 10.3: "Depends on stable protocol contracts"</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a11-appendices-constants-adr-sections-13-14-appendices">A.11 Appendices &amp; Constants (ADR Sections 13, 14, Appendices)<a class="headerlink" href="#a11-appendices-constants-adr-sections-13-14-appendices" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>ADR Element</th>
+<th>ADR Section</th>
+<th>Plan Coverage</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What doesn't change (Phases 1-4, 6-8)</td>
+<td>13</td>
+<td>Plan Section 1.4</td>
+<td>COVERED</td>
+<td>Files modified list is minimal</td>
+</tr>
+<tr>
+<td>Future TextGenerator implementations</td>
+<td>14.1</td>
+<td>Plan 10.3 (deferred)</td>
+<td>DEFERRED</td>
+<td></td>
+</tr>
+<tr>
+<td>Future TextAligner implementations</td>
+<td>14.2</td>
+<td>Plan 10.3 (deferred)</td>
+<td>DEFERRED</td>
+<td></td>
+</tr>
+<tr>
+<td>Diagnostic/Benchmarking utility</td>
+<td>14.3</td>
+<td>Plan 10.3 (deferred)</td>
+<td>DEFERRED</td>
+<td></td>
+</tr>
+<tr>
+<td>vLLM integration</td>
+<td>14.4</td>
+<td>Plan 10.3 (deferred)</td>
+<td>DEFERRED</td>
+<td></td>
+</tr>
+<tr>
+<td>Alignment Sentinel reference</td>
+<td>App A</td>
+<td>Phase 3, Step 5.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>AssemblyTextCleaner reference</td>
+<td>App B</td>
+<td>Phase 1, Step 3.3.3</td>
+<td>COVERED</td>
+<td></td>
+</tr>
+<tr>
+<td>Key Constants &amp; Limits</td>
+<td>App C</td>
+<td>Not explicitly addressed</td>
+<td><strong>GAP</strong></td>
+<td>See Gap C.5</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="b-deviation-register">B. Deviation Register<a class="headerlink" href="#b-deviation-register" title="Permanent link">&para;</a></h2>
+<h3 id="b1-harden_scene_result-signature-difference">B.1 <code>harden_scene_result()</code> Signature Difference<a class="headerlink" href="#b1-harden_scene_result-signature-difference" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 0, Step 2.3</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 9.3</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>MODIFICATION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ADR specifies:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">harden_scene_result</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">WhisperResult</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">scene_duration_sec</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">timestamp_mode</span><span class="p">:</span> <span class="n">TimestampMode</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">speech_regions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">WhisperResult</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]:</span>
+</code></pre></div></p>
+<p><strong>Plan specifies:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">harden_scene_result</span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">WhisperResult</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">HardeningConfig</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HardeningDiagnostics</span><span class="p">:</span>
+</code></pre></div></p>
+<p>The plan wraps the individual parameters into a <code>HardeningConfig</code> dataclass and returns a typed <code>HardeningDiagnostics</code> instead of a generic <code>Tuple[WhisperResult, Dict]</code>. This is an <strong>improvement</strong> over the ADR's design (stronger typing, config aggregation), but it is a deviation. The ADR's signature is more explicit about what goes in; the plan's is more extensible.</p>
+<h3 id="b2-plan-adds-hardeningconfig-and-hardeningdiagnostics-types">B.2 Plan Adds <code>HardeningConfig</code> and <code>HardeningDiagnostics</code> Types<a class="headerlink" href="#b2-plan-adds-hardeningconfig-and-hardeningdiagnostics-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 0, Step 2.1</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Not present in Section 8 types</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>ADDITION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR does not define <code>HardeningConfig</code> or <code>HardeningDiagnostics</code> as data types. They appear only implicitly in the <code>harden_scene_result()</code> signature (Section 9.3). The plan formalizes them as explicit dataclasses in <code>types.py</code>. This is a beneficial addition for type safety and is consistent with the ADR's spirit.</p>
+<h3 id="b3-decoupledsubtitlepipeline__init__-parameter-naming">B.3 <code>DecoupledSubtitlePipeline.__init__()</code> Parameter Naming<a class="headerlink" href="#b3-decoupledsubtitlepipeline__init__-parameter-naming" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 3, Step 5.1</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 9.1</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>MODIFICATION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR and plan use identical parameter names in <code>__init__()</code>. No deviation on this specific point upon closer inspection.</p>
+<h3 id="b4-process_scenes-parameter-naming">B.4 <code>process_scenes()</code> Parameter Naming<a class="headerlink" href="#b4-process_scenes-parameter-naming" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 3, Step 5.1</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 9.1</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>MODIFICATION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ADR specifies:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_scenes</span><span class="p">(</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">scene_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">scene_durations</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">speech_regions_per_scene</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">WhisperResult</span><span class="p">],</span> <span class="n">Dict</span><span class="p">]]:</span>
+</code></pre></div></p>
+<p><strong>Plan specifies:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_scenes</span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">scene_audio_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">scene_durations</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">scene_speech_regions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">WhisperResult</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]:</span>
+</code></pre></div></p>
+<p>Two naming differences: <code>scene_paths</code> vs <code>scene_audio_paths</code>, and <code>speech_regions_per_scene</code> vs <code>scene_speech_regions</code>. The plan also adds <code>Dict[str, Any]</code> type annotation where the ADR uses bare <code>Dict</code>. These are cosmetic but could cause confusion when cross-referencing documents.</p>
+<h3 id="b5-plan-adds-phase-7-not-in-adr">B.5 Plan Adds Phase 7 (Not in ADR)<a class="headerlink" href="#b5-plan-adds-phase-7-not-in-adr" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 7 (git commit 18341b6)</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Not present</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>ADDITION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>MEDIUM</td>
+</tr>
+</tbody>
+</table>
+<p>The actual implementation includes a Phase 7 (<code>_phase5_assembly()</code> removal + <code>japanese_postprocess</code> deprecation across all entry points) that is not described in either the ADR or the implementation plan. The plan's Phase 6 says "Do NOT remove the old <code>_phase5_assembly()</code> method" but Phase 7 does exactly that. This represents implementation evolving beyond the plan.</p>
+<p>The ADR was updated to "IMPLEMENTED (Phases 0-6 complete)" in its status field, but the actual git log shows Phase 7 also completed. The ADR status is stale/inaccurate relative to actual commits.</p>
+<h3 id="b6-plan-adds-timestampmode-as-new-enum">B.6 Plan Adds <code>TimestampMode</code> as New Enum<a class="headerlink" href="#b6-plan-adds-timestampmode-as-new-enum" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 0, Step 2.1</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 9.3 (uses <code>TimestampMode</code> by name, no definition)</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>ADDITION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR uses <code>TimestampMode</code> in the <code>harden_scene_result()</code> signature (Section 9.3) but never defines it. The plan creates it as a new <code>str, Enum</code> in <code>types.py</code> with four values. The plan also specifies the migration strategy: the old enum stays in <code>qwen_pipeline.py</code> during Phases 0-3, then <code>qwen_pipeline.py</code> imports from the new location in Phase 4. This is a necessary gap fill by the plan.</p>
+<h3 id="b7-plan-adds-batch-fallback-error-handling">B.7 Plan Adds Batch Fallback Error Handling<a class="headerlink" href="#b7-plan-adds-batch-fallback-error-handling" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 3, Steps 2-4</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 9.2 (no error handling detail)</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>ADDITION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR's orchestrator flow (Section 9.2) does not describe error handling for generation or alignment failures. The plan adds explicit error handling: batch failure falls back to per-frame generation, per-frame failure logs error and sets text to empty string. This is a beneficial addition consistent with the ADR's general resilience goals.</p>
+<h3 id="b8-plan-changes-adr-migration-phase-numbering">B.8 Plan Changes ADR Migration Phase Numbering<a class="headerlink" href="#b8-plan-changes-adr-migration-phase-numbering" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Section 1.2 (6 phases, later 7)</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 11.2 (4 phases)</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>MODIFICATION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR describes migration in 4 phases (0-3 + "Future"). The plan expands to 7 phases (0-6, with Phase 7 added during implementation). The mapping is:</p>
+<table>
+<thead>
+<tr>
+<th>ADR Phase</th>
+<th>Plan Phases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Phase 0 (types, protocols, hardening, reconstruction)</td>
+<td>Phase 0</td>
+</tr>
+<tr>
+<td>Phase 1 (Qwen3 adapters)</td>
+<td>Phase 1</td>
+</tr>
+<tr>
+<td>Phase 2 (orchestrator, sentinel)</td>
+<td>Phases 2 + 3 (framers separated from orchestrator)</td>
+</tr>
+<tr>
+<td>Phase 3 (wire into QwenPipeline)</td>
+<td>Phase 4</td>
+</tr>
+<tr>
+<td>Future (deprecate)</td>
+<td>Phases 5, 6, 7</td>
+</tr>
+</tbody>
+</table>
+<p>This is a refinement, not a deviation. The plan correctly separates framers (Phase 2) from the orchestrator (Phase 3), which the ADR lumps into a single phase. And the plan breaks "Future" into concrete Phase 5 (bug fixes), Phase 6 (dead code), and Phase 7 (deprecation).</p>
+<h3 id="b9-plan-defers-whisper-segment-framer-with-explicit-justification">B.9 Plan Defers <code>whisper-segment</code> Framer with Explicit Justification<a class="headerlink" href="#b9-plan-defers-whisper-segment-framer-with-explicit-justification" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 2, Step 4.1.2 (note)</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 5.4, 7.1, 12.1</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>OMISSION (intentional)</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>MEDIUM</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR describes <code>whisper-segment</code> as one of the five core backends (Section 5.4), includes it in the block diagram (Section 6.1), specifies its behavior in the backend table (Section 7.1), and builds an entire workflow around it (Section 12.1 "Whisper-Guided Qwen"). The plan explicitly defers it with justification: "requires loading a Whisper model which adds complexity (VRAM management, model download)."</p>
+<p>This is the single largest functional gap between the documents. The <code>whisper-segment</code> backend is the enabler for the most novel workflow the ADR proposes. Without it, the architecture is proven for existing Assembly-equivalent flows but has not yet demonstrated its cross-model composability promise.</p>
+<h3 id="b10-plan-defers-vadproportionalaligner-with-inline-alternative">B.10 Plan Defers <code>VADProportionalAligner</code> with Inline Alternative<a class="headerlink" href="#b10-plan-defers-vadproportionalaligner-with-inline-alternative" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 3, Step 9 (inline logic)</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 7.4</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>MODIFICATION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR lists <code>VADProportionalAligner</code> as a distinct backend in the TextAligner implementations table (Section 7.4), described as "No neural model -- VAD + proportional char distribution." The plan covers this functionality inline in the orchestrator's Step 9 (aligner-free path: word timestamps derived from frame boundaries) rather than as a separate backend class. The plan explicitly notes this tradeoff in Section 10.3: "dedicated backend adds marginal value."</p>
+<p>This is a reasonable simplification. The inline logic achieves the same result. A dedicated backend could be extracted later if needed.</p>
+<h3 id="b11-plan-specifies-qwen3-cleaner-naming-adr-uses-assembly">B.11 Plan Specifies <code>qwen3</code> Cleaner Naming (ADR Uses <code>assembly</code>)<a class="headerlink" href="#b11-plan-specifies-qwen3-cleaner-naming-adr-uses-assembly" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 1, Step 3.3</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Section 11.1</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>MODIFICATION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR's mode mapping table (Section 11.1) shows the TextCleaner as <code>assembly (Qwen3)</code> for all three modes. The plan names the implementation <code>Qwen3TextCleaner</code> and the factory key is <code>"qwen3"</code>. The renaming is reasonable (it IS a Qwen3-specific cleaner that wraps AssemblyTextCleaner), but creates a minor naming inconsistency with the ADR.</p>
+<h3 id="b12-plan-adds-debug-artifact-details">B.12 Plan Adds Debug Artifact Details<a class="headerlink" href="#b12-plan-adds-debug-artifact-details" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Phase 3, Step 5.5</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Not specified in detail</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>ADDITION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR mentions debug artifacts only in the comparison table (Section 4.2, Row R) as an "Assembly advantage." The plan provides specific artifact file naming conventions and four artifact types per scene. This is a beneficial addition.</p>
+<h3 id="b13-plan-adds-explicit-test-file-structure">B.13 Plan Adds Explicit Test File Structure<a class="headerlink" href="#b13-plan-adds-explicit-test-file-structure" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plan Phase</strong></td>
+<td>Appendix C</td>
+</tr>
+<tr>
+<td><strong>ADR Reference</strong></td>
+<td>Not present</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td>ADDITION</td>
+</tr>
+<tr>
+<td><strong>Severity</strong></td>
+<td>LOW</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR contains no testing guidance. The plan adds Appendix C with a complete test directory structure and per-phase verification criteria. This is a beneficial addition.</p>
+<hr />
+<h2 id="c-completeness-gaps">C. Completeness Gaps<a class="headerlink" href="#c-completeness-gaps" title="Permanent link">&para;</a></h2>
+<h3 id="c1-adr-section-55-the-aligner-becomes-optional-no-dedicated-plan-coverage">C.1 ADR Section 5.5 "The Aligner Becomes Optional" — No Dedicated Plan Coverage<a class="headerlink" href="#c1-adr-section-55-the-aligner-becomes-optional-no-dedicated-plan-coverage" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>ADR Section 5.5 describes this as a "key architectural win" and explains why aligner-free workflows are significant. The plan implements this as the <code>aligner=None</code> path in the orchestrator (Phase 3, Step 9) and the <code>NoneAligner</code> backend (Phase 1). However, there is no dedicated plan section that explicitly maps Section 5.5's vision to implementation steps. The coverage is implicit and adequate, but a cross-reference would improve traceability.</p>
+<h3 id="c2-adr-section-62-speechenhancer-placement-no-plan-reference">C.2 ADR Section 6.2 "SpeechEnhancer Placement" — No Plan Reference<a class="headerlink" href="#c2-adr-section-62-speechenhancer-placement-no-plan-reference" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>ADR Section 6.2 explains why SpeechEnhancer runs before temporal framing. The plan does not reference this section or the SpeechEnhancer at all, because the plan correctly scopes itself to Phase 5 (ASR) only, and SpeechEnhancer is Phase 3 (pre-existing, unchanged). However, the plan's orchestrator pseudocode (Phase 3, Steps 1-9) shows <code>framer.frame(scene_audio)</code> as the entry point, implying the audio is already enhanced. This assumption is correct but undocumented in the plan.</p>
+<h3 id="c3-adr-section-63-existing-protocol-factory-pattern-implicit-in-plan">C.3 ADR Section 6.3 "Existing Protocol + Factory Pattern" — Implicit in Plan<a class="headerlink" href="#c3-adr-section-63-existing-protocol-factory-pattern-implicit-in-plan" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>ADR Section 6.3 documents the existing codebase pattern (SceneDetector, SpeechSegmenter, SpeechEnhancer factories) and states "New domains will follow the same pattern." The plan follows this pattern exactly (three new factories with lazy-import registries) but does not explicitly reference Section 6.3 or state that it is following the existing pattern. The alignment is clear from reading both documents but a cross-reference would improve traceability.</p>
+<h3 id="c4-adr-finding-m2-resolution-wordtimestamp-null-representation">C.4 ADR Finding M2 Resolution — WordTimestamp Null Representation<a class="headerlink" href="#c4-adr-finding-m2-resolution-wordtimestamp-null-representation" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: MEDIUM</strong></p>
+<p>ADR Section 10 states M2 is "Resolved -- sentinel operates on <code>AlignmentResult.words</code> which has explicit null representation, not overloaded <code>0.0</code>." However, the plan's <code>WordTimestamp</code> dataclass (Phase 0, Step 2.1) uses <code>start: float</code> and <code>end: float</code> with no explicit null representation. There is no <code>Optional[float]</code>, no sentinel value, and no documented convention for "no timestamp available."</p>
+<p>The ADR claims the design resolves M2 by having "explicit null representation" but neither document actually defines what that representation is. The plan's <code>WordTimestamp</code> uses the same <code>float</code> type as the old code, meaning <code>0.0</code> could still be misinterpreted as "no timestamp."</p>
+<h3 id="c5-adr-appendix-c-key-constants-limits-no-plan-coverage">C.5 ADR Appendix C "Key Constants &amp; Limits" — No Plan Coverage<a class="headerlink" href="#c5-adr-appendix-c-key-constants-limits-no-plan-coverage" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>ADR Appendix C documents 10 key constants (ForcedAligner hard limit 180s, assembly max scene duration 120s, TEN VAD max group 29s, sentinel thresholds, etc.). The plan does not address where these constants should live in the new architecture or whether they should be extracted/centralized. Some are referenced implicitly (e.g., the plan's <code>VadGroupedFramer</code> uses <code>max_group_duration_s: float = 29.0</code>), but there is no systematic treatment.</p>
+<h3 id="c6-adr-what-doesnt-change-section-13-no-explicit-plan-verification">C.6 ADR "What Doesn't Change" Section (13) — No Explicit Plan Verification<a class="headerlink" href="#c6-adr-what-doesnt-change-section-13-no-explicit-plan-verification" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>ADR Section 13 lists 8 components that should remain unchanged. The plan's "Files Modified" list (Section 1.4) implicitly confirms this by listing only 2 modified files. However, Phase 7 (added during implementation) modifies <code>pass_worker.py</code>, <code>main.py</code>, and <code>webview_gui/api.py</code>, which are in the "Ensemble system", "CLI interfaces", and "GUI interfaces" categories listed in Section 13 as "Untouched." These modifications are minor (changing a default parameter), but they technically violate the ADR's "What Doesn't Change" commitment.</p>
+<h3 id="c7-no-plan-coverage-for-adr-section-4-architectural-comparison">C.7 No Plan Coverage for ADR Section 4 (Architectural Comparison)<a class="headerlink" href="#c7-no-plan-coverage-for-adr-section-4-architectural-comparison" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>ADR Section 4 provides a detailed 18-row feature comparison between Assembly and VAD_SLICING. The plan uses this comparison as motivation but does not map each comparison row to specific implementation steps. For example:
+- Row A (Adaptive Step-Down): Not addressed in the plan at all. The plan defers VAD_SLICING migration.
+- Row G (Sentinel Step-Down Deferral): Not addressed.
+- Row K (Per-Group Diagnostics): Partially addressed by plan's per-frame diagnostics.
+- Row M (Min Duration Guard): Addressed in VadGroupedFramer.</p>
+<p>Since the plan is explicitly scoped to Assembly mode first, these gaps are expected and acceptable. But the ADR's comparison table creates an expectation that the plan should address all 18 rows, which it does not.</p>
+<h3 id="c8-plan-phase-4-integration-does-not-address-scene-speech-regions-conversion">C.8 Plan Phase 4 (Integration) Does Not Address Scene Speech Regions Conversion<a class="headerlink" href="#c8-plan-phase-4-integration-does-not-address-scene-speech-regions-conversion" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: MEDIUM</strong></p>
+<p>The plan's Phase 4 (Section 6.1.3) shows calling <code>self._subtitle_pipeline.process_scenes()</code> with <code>scene_speech_regions</code>. However, the plan does not detail how <code>speech_regions_per_scene</code> (available from Phase 4 speech segmentation) is converted into the format expected by the orchestrator. The ADR's <code>process_scenes()</code> expects <code>List[List[Tuple[float, float]]]</code>, but the pipeline's Phase 4 may produce speech regions in a different format (e.g., <code>SegmentationResult.groups</code>).</p>
+<p>The actual implementation commit (Phase 4, 188602c) shows 166 insertions, suggesting this conversion was handled, but the plan document does not specify the mapping.</p>
+<h3 id="c9-no-plan-coverage-for-orchestrator-cleanup-method">C.9 No Plan Coverage for Orchestrator <code>cleanup()</code> Method<a class="headerlink" href="#c9-no-plan-coverage-for-orchestrator-cleanup-method" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>The ADR's <code>TemporalFramer</code>, <code>TextGenerator</code>, and <code>TextAligner</code> protocols all include <code>cleanup()</code> methods. The plan documents individual adapter cleanup (e.g., "cleanup() calls unload() if loaded") but does not describe the orchestrator's own <code>cleanup()</code> method — specifically, in what order it calls cleanup on its four components, or how it handles cleanup errors. This is an implementation detail but important for VRAM leak prevention.</p>
+<hr />
+<h2 id="d-contractinterface-gaps">D. Contract/Interface Gaps<a class="headerlink" href="#d-contractinterface-gaps" title="Permanent link">&para;</a></h2>
+<h3 id="d1-harden_scene_result-return-type-mismatch">D.1 <code>harden_scene_result()</code> Return Type Mismatch<a class="headerlink" href="#d1-harden_scene_result-return-type-mismatch" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>ADR (Section 9.3)</th>
+<th>Plan (Section 2.3)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Return type</td>
+<td><code>Tuple[WhisperResult, Dict]</code></td>
+<td><code>HardeningDiagnostics</code></td>
+</tr>
+<tr>
+<td>Mutation</td>
+<td>Implicit (returns new result?)</td>
+<td>Explicit ("Mutates result in-place. Returns diagnostics.")</td>
+</tr>
+</tbody>
+</table>
+<p>The ADR implies the function returns a (modified result, diagnostics dict) tuple. The plan specifies mutation in-place with a typed diagnostics return. These are incompatible APIs. The plan's approach is architecturally cleaner (no ambiguity about whether the input is modified), but consumers must know to read the mutated input.</p>
+<h3 id="d2-alignmentresultwords-type-wordtimestamp-vs-dict">D.2 <code>AlignmentResult.words</code> Type — WordTimestamp vs Dict<a class="headerlink" href="#d2-alignmentresultwords-type-wordtimestamp-vs-dict" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: MEDIUM</strong></p>
+<p>The ADR's <code>AlignmentResult.words</code> (Section 7.4) contains <code>List[WordTimestamp]</code> (typed dataclass). But the ADR's orchestrator pseudocode (Section 9.2, Step 9) says "merge text + timestamps -&gt; word dicts", and the existing <code>merge_master_with_timestamps()</code> function returns <code>List[Dict[str, Any]]</code>.</p>
+<p>The plan's <code>Qwen3ForcedAlignerAdapter</code> (Phase 1, Step 3.2.3) says it "wraps in <code>AlignmentResult</code>" after calling <code>merge_master_with_timestamps()</code>. This means the adapter must convert from <code>List[Dict]</code> to <code>List[WordTimestamp]</code>. The plan does not document this conversion step explicitly.</p>
+<p>Furthermore, <code>reconstruct_from_words()</code> (Phase 0, Step 2.4) accepts <code>List[Dict[str, Any]]</code> (word dicts), not <code>List[WordTimestamp]</code>. This means there must be a conversion back from <code>WordTimestamp</code> to dict before reconstruction. Neither document addresses this bidirectional conversion.</p>
+<h3 id="d3-sentinel-api-operates-on-word-dicts-not-wordtimestamp">D.3 Sentinel API Operates on Word Dicts, Not WordTimestamp<a class="headerlink" href="#d3-sentinel-api-operates-on-word-dicts-not-wordtimestamp" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: MEDIUM</strong></p>
+<p>The existing <code>alignment_sentinel.py</code> functions (<code>assess_alignment_quality</code>, <code>redistribute_collapsed_words</code>) operate on <code>List[Dict]</code> (word dicts with 'word', 'start', 'end' keys). The ADR's types module introduces <code>WordTimestamp</code> dataclass. The plan's orchestrator Step 9 calls the sentinel with "all_words" but does not specify whether these are <code>WordTimestamp</code> instances or dicts.</p>
+<p>If <code>AlignmentResult.words</code> contains <code>WordTimestamp</code> objects, they must be converted to dicts before passing to the sentinel (and back again after recovery). Neither document addresses this.</p>
+<h3 id="d4-temporalframerframe-audio-input-format">D.4 <code>TemporalFramer.frame()</code> — Audio Input Format<a class="headerlink" href="#d4-temporalframerframe-audio-input-format" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>Both documents agree that <code>frame()</code> takes <code>np.ndarray</code> audio. However, the ADR (Section 7.1) and plan (Section 2.2) both specify <code>audio: np.ndarray</code> without specifying expected shape, dtype, or sample rate conventions. The <code>sample_rate</code> parameter is provided but the convention for mono vs stereo, float32 vs int16, etc., is not documented in either place.</p>
+<p>This is acceptable for an internal protocol but could cause issues when third-party backends are added.</p>
+<hr />
+<h2 id="e-workflow-gaps">E. Workflow Gaps<a class="headerlink" href="#e-workflow-gaps" title="Permanent link">&para;</a></h2>
+<h3 id="e1-assembly-workflow">E.1 ASSEMBLY Workflow<a class="headerlink" href="#e1-assembly-workflow" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: NONE (fully covered)</strong></p>
+<p>The ADR's ASSEMBLY mapping (Section 11.1: full-scene + qwen3 + assembly cleaner + qwen-forced-aligner) is fully covered by the plan's Phase 4 integration (Section 6.1.2-6.1.3). The wiring is explicit and the plan provides verification criteria.</p>
+<h3 id="e2-vad_slicing-workflow">E.2 VAD_SLICING Workflow<a class="headerlink" href="#e2-vad_slicing-workflow" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: HIGH (explicitly deferred)</strong></p>
+<p>The ADR maps VAD_SLICING to <code>vad-grouped</code> + <code>qwen3-text-only</code> + <code>assembly</code> + <code>qwen-forced-aligner</code> (Section 11.1). The plan explicitly defers this migration (Section 10.3: "Step-down logic doesn't fit cleanly; needs design work"). The <code>vad-grouped</code> framer is built (Phase 2), but the orchestrator is never wired to use it with the full VAD_SLICING workflow.</p>
+<p>This means the architecture's most complex workflow path (the one with adaptive step-down, per-group sentinel, two-tier retry) remains in the old monolithic code. The ADR's vision of a unified orchestrator handling all modes is not realized by the plan.</p>
+<h3 id="e3-context_aware-workflow">E.3 CONTEXT_AWARE Workflow<a class="headerlink" href="#e3-context_aware-workflow" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: HIGH (explicitly deferred)</strong></p>
+<p>The ADR maps CONTEXT_AWARE to <code>full-scene</code> + <code>qwen3-coupled</code> + <code>assembly</code> + built-in (Section 11.1, noting "May remain as legacy path initially"). The plan defers migration entirely (Section 10.3: "Coupled mode has different semantics; needs design work").</p>
+<p>The ADR is partially prepared for this by noting it may "remain as legacy path initially," but the plan's deferral means the coupled-mode architecture is untouched.</p>
+<h3 id="e4-whisper-guided-qwen-workflow-adr-section-121">E.4 Whisper-Guided Qwen Workflow (ADR Section 12.1)<a class="headerlink" href="#e4-whisper-guided-qwen-workflow-adr-section-121" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: HIGH (blocked by deferred framer)</strong></p>
+<p>This is the ADR's showcase workflow demonstrating cross-model composability. It requires the <code>whisper-segment</code> framer, which the plan defers. Without this framer, the workflow cannot be executed and the architecture's most compelling value proposition is undemonstrated.</p>
+<h3 id="e5-srt-re-transcription-workflow-adr-section-122">E.5 SRT Re-Transcription Workflow (ADR Section 12.2)<a class="headerlink" href="#e5-srt-re-transcription-workflow-adr-section-122" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: MEDIUM (partially enabled)</strong></p>
+<p>The <code>srt-source</code> framer is built (Phase 2), so the technical path exists. However, the plan provides no integration guidance for this workflow. There is no CLI flag, no GUI option, and no documented way for a user to invoke this workflow. It is "architecturally enabled" but "functionally unreachable" from the user's perspective.</p>
+<h3 id="e6-error-handling-per-scene-vs-per-batch">E.6 Error Handling — Per-Scene vs Per-Batch<a class="headerlink" href="#e6-error-handling-per-scene-vs-per-batch" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: LOW</strong></p>
+<p>The ADR (Section 9.2) does not address error handling beyond stating "Result is None if scene processing failed." The plan (Phase 3, Step 9) provides detailed per-scene error isolation with try/except. The plan also adds batch-level error handling (Step 2-4: batch failure falls back to per-frame). This is a plan addition that improves on the ADR's sparse error handling specification.</p>
+<h3 id="e7-vram-lifecycle-explicit-swap-points">E.7 VRAM Lifecycle — Explicit Swap Points<a class="headerlink" href="#e7-vram-lifecycle-explicit-swap-points" title="Permanent link">&para;</a></h3>
+<p><strong>Severity: NONE (fully covered)</strong></p>
+<p>Both documents describe the same VRAM lifecycle: generator.load() -&gt; generate -&gt; generator.unload() -&gt; safe_cuda_cleanup() -&gt; aligner.load() -&gt; align -&gt; aligner.unload() -&gt; safe_cuda_cleanup(). The plan adds try/finally guards, which is a beneficial addition.</p>
+<hr />
+<h2 id="f-severity-classification">F. Severity Classification<a class="headerlink" href="#f-severity-classification" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Finding</th>
+<th>Severity</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E.4</td>
+<td><code>whisper-segment</code> framer deferred, blocking Whisper-Guided Qwen workflow</td>
+<td><strong>HIGH</strong></td>
+<td>The ADR's most novel workflow is unimplementable. This is the primary architectural differentiator from the old monolithic approach.</td>
+</tr>
+<tr>
+<td>E.2</td>
+<td>VAD_SLICING migration deferred</td>
+<td><strong>HIGH</strong></td>
+<td>The most feature-rich mode (step-down, per-group sentinel, 4-mode timestamps) remains in monolithic code. The unified orchestrator vision is only partially realized.</td>
+</tr>
+<tr>
+<td>E.3</td>
+<td>CONTEXT_AWARE migration deferred</td>
+<td><strong>HIGH</strong></td>
+<td>Coupled-mode workflow remains untouched. Less impactful than E.2 since CONTEXT_AWARE is simpler, but still means the orchestrator handles only 1 of 3 modes.</td>
+</tr>
+<tr>
+<td>C.4</td>
+<td>WordTimestamp has no explicit null representation (ADR M2 resolution incomplete)</td>
+<td><strong>MEDIUM</strong></td>
+<td>The ADR claims M2 is resolved, but the plan's types still use <code>float</code> with no null convention. Could lead to the same 0.0 misinterpretation the ADR identified.</td>
+</tr>
+<tr>
+<td>D.2</td>
+<td>WordTimestamp vs Dict conversion undocumented</td>
+<td><strong>MEDIUM</strong></td>
+<td>Bidirectional conversion between typed dataclass and dict is required but not specified. Implementation may work but contract is ambiguous.</td>
+</tr>
+<tr>
+<td>D.3</td>
+<td>Sentinel API type mismatch with WordTimestamp</td>
+<td><strong>MEDIUM</strong></td>
+<td>Related to D.2. The sentinel functions expect dicts; the protocol types use dataclasses. Conversion path not documented.</td>
+</tr>
+<tr>
+<td>B.9</td>
+<td><code>whisper-segment</code> framer deferred (plan vs ADR block diagram)</td>
+<td><strong>MEDIUM</strong></td>
+<td>ADR presents 5 framers as core architecture; plan implements 4. The ADR's block diagram does not distinguish core from future.</td>
+</tr>
+<tr>
+<td>C.8</td>
+<td>Speech regions format conversion unspecified</td>
+<td><strong>MEDIUM</strong></td>
+<td>Phase 4 integration must convert pipeline speech regions to orchestrator format. The plan does not document this mapping.</td>
+</tr>
+<tr>
+<td>E.5</td>
+<td>SRT Re-Transcription workflow unreachable</td>
+<td><strong>MEDIUM</strong></td>
+<td>Framer exists but no user-facing path to invoke it.</td>
+</tr>
+<tr>
+<td>B.5</td>
+<td>Phase 7 not in plan or ADR</td>
+<td><strong>MEDIUM</strong></td>
+<td>Implementation evolved beyond documents. _phase5_assembly() removed despite plan saying "keep for reference." ADR status stale.</td>
+</tr>
+<tr>
+<td>C.6</td>
+<td>Phase 7 violates ADR "What Doesn't Change"</td>
+<td><strong>MEDIUM</strong></td>
+<td>pass_worker.py, main.py, api.py modified despite ADR listing them as "Untouched." Changes are minor (default parameter) but violate the stated scope.</td>
+</tr>
+<tr>
+<td>B.1</td>
+<td><code>harden_scene_result()</code> signature differs</td>
+<td>LOW</td>
+<td>Plan improves on ADR design (typed config/diagnostics). Beneficial deviation.</td>
+</tr>
+<tr>
+<td>B.2</td>
+<td>Plan adds HardeningConfig/HardeningDiagnostics types</td>
+<td>LOW</td>
+<td>Not in ADR but needed. Beneficial addition.</td>
+</tr>
+<tr>
+<td>B.4</td>
+<td><code>process_scenes()</code> parameter naming differs</td>
+<td>LOW</td>
+<td>Cosmetic. <code>scene_paths</code> vs <code>scene_audio_paths</code>.</td>
+</tr>
+<tr>
+<td>B.6</td>
+<td><code>TimestampMode</code> enum defined in plan, undefined in ADR</td>
+<td>LOW</td>
+<td>Necessary gap fill.</td>
+</tr>
+<tr>
+<td>B.7</td>
+<td>Plan adds batch fallback error handling</td>
+<td>LOW</td>
+<td>Beneficial addition not in ADR.</td>
+</tr>
+<tr>
+<td>B.8</td>
+<td>Migration phase numbering differs (ADR 4 phases, plan 7)</td>
+<td>LOW</td>
+<td>Refinement, not deviation.</td>
+</tr>
+<tr>
+<td>B.10</td>
+<td>VADProportionalAligner deferred, covered inline</td>
+<td>LOW</td>
+<td>Reasonable simplification.</td>
+</tr>
+<tr>
+<td>B.11</td>
+<td>Cleaner naming: ADR "assembly", plan "qwen3"</td>
+<td>LOW</td>
+<td>Minor naming inconsistency.</td>
+</tr>
+<tr>
+<td>B.12</td>
+<td>Plan adds debug artifact details</td>
+<td>LOW</td>
+<td>Beneficial addition.</td>
+</tr>
+<tr>
+<td>B.13</td>
+<td>Plan adds test file structure</td>
+<td>LOW</td>
+<td>Beneficial addition.</td>
+</tr>
+<tr>
+<td>C.1</td>
+<td>ADR Section 5.5 — no dedicated plan section</td>
+<td>LOW</td>
+<td>Coverage is implicit and adequate.</td>
+</tr>
+<tr>
+<td>C.5</td>
+<td>ADR Appendix C constants — no systematic plan coverage</td>
+<td>LOW</td>
+<td>Some constants referenced implicitly in framer defaults.</td>
+</tr>
+<tr>
+<td>C.9</td>
+<td>Orchestrator cleanup() method not specified</td>
+<td>LOW</td>
+<td>Implementation detail, but important for VRAM.</td>
+</tr>
+<tr>
+<td>D.1</td>
+<td>harden_scene_result() return type differs</td>
+<td>LOW</td>
+<td>Plan improves on ADR design.</td>
+</tr>
+<tr>
+<td>D.4</td>
+<td>Audio input format conventions undocumented</td>
+<td>LOW</td>
+<td>Acceptable for internal protocol.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="g-recommendations">G. Recommendations<a class="headerlink" href="#g-recommendations" title="Permanent link">&para;</a></h2>
+<h3 id="priority-1-document-alignment-address-perception-gaps">Priority 1: Document Alignment (address perception gaps)<a class="headerlink" href="#priority-1-document-alignment-address-perception-gaps" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Update ADR-006 status field</strong> to reflect Phase 7 and the actual final state. Current status says "Phases 0-6 complete" but Phase 7 exists.</p>
+</li>
+<li>
+<p><strong>Add a "Scope Boundary" section to the ADR</strong> (or annotate Section 6.1's block diagram) distinguishing "v1 core" backends from "future" backends. The block diagram currently shows <code>whisper-segment</code>, <code>ctc-aligner</code>, <code>vllm-backend</code>, and <code>TransformersGenerator</code> without distinguishing them from implemented backends. This creates false expectations.</p>
+</li>
+<li>
+<p><strong>Update ADR Section 13 ("What Doesn't Change")</strong> to acknowledge that Phase 7 made minor changes to <code>pass_worker.py</code>, <code>main.py</code>, and <code>webview_gui/api.py</code>.</p>
+</li>
+</ol>
+<h3 id="priority-2-type-contract-clarification-address-medium-gaps">Priority 2: Type Contract Clarification (address MEDIUM gaps)<a class="headerlink" href="#priority-2-type-contract-clarification-address-medium-gaps" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Resolve the WordTimestamp null representation gap</strong> (C.4). Either:</li>
+<li>(a) Make <code>WordTimestamp.start</code> and <code>.end</code> <code>Optional[float]</code> with <code>None</code> meaning "no timestamp", or</li>
+<li>(b) Document a convention (e.g., <code>start == end == -1.0</code> means null), or</li>
+<li>
+<p>(c) Acknowledge that M2 is NOT fully resolved and the sentinel's existing 0.0 heuristic persists.</p>
+</li>
+<li>
+<p><strong>Document the WordTimestamp &lt;-&gt; Dict conversion</strong> (D.2, D.3). Specify:</p>
+</li>
+<li><code>Qwen3ForcedAlignerAdapter.align()</code> converts from <code>Dict</code> to <code>WordTimestamp</code> after <code>merge_master_with_timestamps()</code>.</li>
+<li>The orchestrator converts back from <code>WordTimestamp</code> to <code>Dict</code> before calling sentinel functions and <code>reconstruct_from_words()</code>.</li>
+<li>
+<p>Or: modify <code>reconstruct_from_words()</code> and sentinel to accept <code>WordTimestamp</code> natively.</p>
+</li>
+<li>
+<p><strong>Document the speech regions format conversion</strong> (C.8) in Phase 4 integration — how pipeline Phase 4 <code>SegmentationResult</code> maps to <code>List[List[Tuple[float, float]]]</code>.</p>
+</li>
+</ol>
+<h3 id="priority-3-deferred-scope-tracking-acknowledge-gaps-create-future-plan">Priority 3: Deferred Scope Tracking (acknowledge gaps, create future plan)<a class="headerlink" href="#priority-3-deferred-scope-tracking-acknowledge-gaps-create-future-plan" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Create a tracking issue or ADR addendum</strong> for the <code>whisper-segment</code> framer (E.4, B.9). This is the gateway to the most compelling new workflows. Document:</li>
+<li>What VRAM management challenges it introduces</li>
+<li>Whether it should load a persistent Whisper model or create/destroy per scene</li>
+<li>
+<p>How it interacts with the existing faster-whisper pipeline</p>
+</li>
+<li>
+<p><strong>Create a design note</strong> for VAD_SLICING migration (E.2). The plan correctly identifies "step-down logic doesn't fit cleanly," but does not elaborate. Key questions for a future design:</p>
+</li>
+<li>Does step-down become a framer concern (re-frame on collapse) or an orchestrator concern (retry loop)?</li>
+<li>Does per-group sentinel integrate into the existing Step 9 or need a per-frame loop?</li>
+<li>
+<p>Does the two-tier retry pattern require a new protocol method (e.g., <code>framer.reframe()</code>)?</p>
+</li>
+<li>
+<p><strong>Document a CLI/GUI path for SRT Re-Transcription</strong> (E.5). The <code>srt-source</code> framer exists. To make it user-reachable, define:</p>
+</li>
+<li>A CLI flag (e.g., <code>--temporal-framer srt-source --srt-path existing.srt</code>)</li>
+<li>How it integrates with the existing <code>--qwen-input-mode</code> parameter or replaces it</li>
+</ol>
+<h3 id="priority-4-minor-cleanup-low-severity">Priority 4: Minor Cleanup (LOW severity)<a class="headerlink" href="#priority-4-minor-cleanup-low-severity" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Harmonize parameter naming</strong> between ADR and plan (<code>scene_paths</code> vs <code>scene_audio_paths</code>, <code>speech_regions_per_scene</code> vs <code>scene_speech_regions</code>). Update whichever document is considered the source of truth.</p>
+</li>
+<li>
+<p><strong>Add audio format conventions</strong> to the <code>TemporalFramer</code> protocol docstring (D.4): expected dtype (float32), channel count (mono), sample rate (parameterized).</p>
+</li>
+<li>
+<p><strong>Harmonize cleaner naming</strong> (B.11): decide whether the factory key should be <code>"qwen3"</code> or <code>"assembly"</code> and update the non-matching document.</p>
+</li>
+</ol>
+<hr />
+<p><em>End of Gap Analysis</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

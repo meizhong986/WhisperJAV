@@ -1,0 +1,2016 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/INSTALLATION_PROPOSAL/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>WhisperJAV Installation System – Unified Proposal - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-installation-system-unified-proposal" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperJAV Installation System – Unified Proposal
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-core-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Core Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-user-personas-and-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. User Personas and Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-proposed-solution-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Proposed Solution – Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Proposed Solution – Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-core-installation-script-installpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Core Installation Script (install.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-launcher" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Launcher
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-conda-constructor-installer-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Conda-Constructor Installer (Windows)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-user-data-separation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 User Data Separation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-portable-zip-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Portable ZIP Distribution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-upgrade-system-upgradepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Upgrade System (upgrade.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-phased-implementation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Phased Implementation Plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Phased Implementation Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1a-v188-core-installpy-enhancements-source-path-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1a (v1.8.8) – Core install.py Enhancements (Source Path Only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1b-v190-conda-constructor-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1b (v1.9.0) – Conda-Constructor Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-v20-launcher-and-user-data-separation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 (v2.0+) – Launcher and User Data Separation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-v21-portable-zip-and-cross-platform-expansion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 (v2.1+) – Portable ZIP and Cross-Platform Expansion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-key-design-decisions-final" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Key Design Decisions (Final)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-detailed-responses-to-developers-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Detailed Responses to Developer's Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Detailed Responses to Developer&#39;s Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#point-1-installjson-in-phase-1a-is-it-premature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point 1: install.json in Phase 1a – Is It Premature?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#point-2-approach-a-feasibility-needs-a-concrete-spike" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point 2: Approach A Feasibility – Needs a Concrete Spike
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#point-3-inexact-should-be-automatic-when-targeting-external-envs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point 3: --inexact Should Be Automatic When Targeting External Envs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#point-4-the-minimal-post-install-wrapper-phase-1b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point 4: The Minimal Post-Install Wrapper (Phase 1b)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#point-5-what-does-upgrade-actually-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point 5: What Does --upgrade Actually Do?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#point-6-uv-sync-conda-testing-what-specifically-to-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point 6: uv sync Conda Testing – What Specifically to Test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/INSTALLATION_PROPOSAL.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-installation-system-unified-proposal">WhisperJAV Installation System – Unified Proposal<a class="headerlink" href="#whisperjav-installation-system-unified-proposal" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2026-03-12
+<strong>Target Versions:</strong> v1.8.8 (Phase 1) -&gt; v2.0+ (Phases 2-4)
+<strong>Author:</strong> [Expert Consultant]
+<strong>For:</strong> Review and agreement by WhisperJAV development team.</p>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary<a class="headerlink" href="#1-executive-summary" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV currently has two installation paths (source install and conda-constructor Windows installer) that use different dependency management methods. This causes maintenance overhead and user confusion. The proposed solution unifies both paths around a single core: <strong><code>uv sync</code> with a lockfile (<code>uv.lock</code>)</strong>. It adds a smart launcher that abstracts environment details from end users, and it separates user data from the installation folder. The result is a <strong>reproducible, fast, and consumer-friendly</strong> installation experience that also serves developers seamlessly.</p>
+<hr />
+<h2 id="2-core-principles">2. Core Principles<a class="headerlink" href="#2-core-principles" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Consumer-first design:</strong> End users (Sarah, Mark, Alex) must never see or interact with Python environments, terminals, or activation commands. They only double-click an installer and then a desktop shortcut.</li>
+<li><strong>Developer convenience:</strong> Power users (Jamie) can install into their active Conda/venv with one command, and all dependencies are exactly pinned.</li>
+<li><strong>Reproducibility:</strong> Every installation, regardless of path, uses the same lockfile, guaranteeing identical package versions.</li>
+<li><strong>Self-healing:</strong> The launcher automatically recreates a missing or corrupted environment.</li>
+<li><strong>Data safety:</strong> User-generated content (models, configs) lives outside the installation folder, so upgrades never wipe personal files.</li>
+</ul>
+<hr />
+<h2 id="3-user-personas-and-requirements">3. User Personas and Requirements<a class="headerlink" href="#3-user-personas-and-requirements" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Persona</th>
+<th>Description</th>
+<th>Key Requirements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sarah</strong> - Fresh consumer (Windows)</td>
+<td>Non-technical, downloads .exe installer.</td>
+<td>One-click install to default folder. Desktop shortcut that always opens GUI. No terminal, no environment knowledge.</td>
+</tr>
+<tr>
+<td><strong>Mark</strong> - Upgrader</td>
+<td>Existing user of version 1.x.</td>
+<td>New installer detects old installation and upgrades in place. Data preserved. Shortcut continues to work.</td>
+</tr>
+<tr>
+<td><strong>Alex</strong> - Portable user</td>
+<td>Wants to run from USB, no admin rights.</td>
+<td>ZIP archive with everything needed. Double-click launcher works on any Windows PC.</td>
+</tr>
+<tr>
+<td><strong>Jamie</strong> - Developer</td>
+<td>Uses Conda/venv, may want editable install.</td>
+<td>Install into active environment with one command. Exact reproducibility via lockfile. Can run <code>whisperjav</code> command directly.</td>
+</tr>
+<tr>
+<td><strong>Returning user</strong></td>
+<td>Installed weeks ago, wants to use app again.</td>
+<td>Double-click shortcut just works. If environment broken, it auto-repairs.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-proposed-solution-components">4. Proposed Solution – Components<a class="headerlink" href="#4-proposed-solution-components" title="Permanent link">&para;</a></h2>
+<h3 id="41-core-installation-script-installpy">4.1 Core Installation Script (<code>install.py</code>)<a class="headerlink" href="#41-core-installation-script-installpy" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Inputs:</strong> optional <code>--local</code>, <code>--upgrade</code>, <code>--dev</code>, <code>--env PATH</code> flags.</li>
+<li><strong>Behavior:</strong></li>
+<li><strong>Preflight checks:</strong> Python version, disk space, network, FFmpeg, Git.</li>
+<li><strong>Environment detection (only if no override flag):</strong><ul>
+<li>Check <code>VIRTUAL_ENV</code> (virtual environment) -&gt; validate path and Python.</li>
+<li>Else check <code>CONDA_PREFIX</code> (Conda environment) -&gt; validate.</li>
+<li>Else use project-local <code>.venv</code> (fallback).</li>
+</ul>
+</li>
+<li><strong>Set <code>UV_PROJECT_ENVIRONMENT</code></strong> to the target environment path.</li>
+<li><strong>GPU detection</strong> -&gt; select PyTorch index URL (cu128, cu118, cpu, metal).</li>
+<li><strong>Run <code>uv sync</code></strong> with:<ul>
+<li>Appropriate extras (from <code>--dev</code>, etc.)</li>
+<li><code>--index pytorch=&lt;url&gt;</code> (unless metal)</li>
+<li><code>--inexact</code> if installing into an existing non-empty environment (to avoid removing unrelated packages).</li>
+</ul>
+</li>
+<li><strong>Optional:</strong> Install <code>llama-cpp-python</code> (separate <code>uv pip install</code> call, refactored into a reusable function).</li>
+<li><strong>Verification:</strong> Import test and CUDA test.</li>
+<li>
+<p><strong>Write <code>install.json</code></strong> in the user data directory (see Section 4.4) containing:</p>
+<ul>
+<li>Installation path</li>
+<li>Version installed</li>
+<li>Timestamp</li>
+</ul>
+</li>
+<li>
+<p><strong>Why this works for consumers:</strong> When no environment variables are set (the typical consumer case), it falls back to <code>.venv</code> inside the app folder - exactly what we want.</p>
+</li>
+</ul>
+<h3 id="42-launcher">4.2 Launcher<a class="headerlink" href="#42-launcher" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>A Python script (<code>launcher.py</code>)</strong> placed in the installation folder (or bundled in the <code>.exe</code>).</li>
+<li><strong>Responsibilities:</strong></li>
+<li>Read <code>install.json</code> to locate installation and user data directories.</li>
+<li>Check if the target environment (e.g., <code>runtime\venv</code> or Conda env) exists and is intact:<ul>
+<li>Verify that key packages can be imported (e.g., <code>torch</code>, <code>whisperjav</code>).</li>
+<li>Optionally compare a hash of the lockfile with a stored hash to detect changes.</li>
+</ul>
+</li>
+<li>If missing or corrupted, run <code>install.py --local</code> (for consumer installs) or <code>install.py --upgrade</code> (for upgrades) using the bundled Python.</li>
+<li>Set environment variable <code>WHISPERJAV_DATA_DIR</code> to the user data path.</li>
+<li>Launch the GUI by executing the environment's Python with <code>-m whisperjav_gui</code>.</li>
+<li><strong>Platform wrappers:</strong></li>
+<li><strong>Windows:</strong> A <code>.bat</code> file that calls <code>pythonw.exe launcher.py</code> (or a tiny C# executable that hides the console).</li>
+<li><strong>macOS:</strong> A shell script inside the <code>.app</code> bundle.</li>
+<li><strong>Linux:</strong> A shell script placed in <code>/usr/bin/whisperjav</code> or used by the desktop entry.</li>
+</ul>
+<h3 id="43-conda-constructor-installer-windows">4.3 Conda-Constructor Installer (Windows)<a class="headerlink" href="#43-conda-constructor-installer-windows" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>No change to the installer UI or build process</strong> - same <code>.exe</code> output.</li>
+<li><strong>Changes inside the installer:</strong></li>
+<li>Include <code>uv.lock</code> and the enhanced <code>install.py</code> in the package.</li>
+<li>Replace the 2,800-line <code>post_install.py</code> with a minimal script that:<ul>
+<li>Detects GPU (reuse <code>standalone.py</code>).</li>
+<li>If this is a fresh install (no previous <code>install.json</code>), runs <code>install.py --local</code>.</li>
+<li>If an existing installation is detected (via <code>install.json</code>), runs <code>install.py --upgrade</code>.</li>
+<li>Creates a desktop shortcut pointing to the launcher (not directly to Python).</li>
+</ul>
+</li>
+<li>Ensure <code>uv.exe</code> is already bundled (as currently done).</li>
+<li>Write <code>install.json</code> to <code>%APPDATA%\WhisperJAV</code> (user data location).</li>
+</ul>
+<h3 id="44-user-data-separation">4.4 User Data Separation<a class="headerlink" href="#44-user-data-separation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Location:</strong></li>
+<li>Windows: <code>%APPDATA%\WhisperJAV</code></li>
+<li>macOS: <code>~/Library/Application Support/WhisperJAV</code></li>
+<li>Linux: <code>~/.local/share/whisperjav</code></li>
+<li><strong>Contents:</strong></li>
+<li><code>models/</code> - downloaded AI models</li>
+<li><code>config.toml</code> - user preferences</li>
+<li><code>logs/</code> - application logs</li>
+<li><code>install.json</code> - installation metadata</li>
+<li>The launcher passes the data directory to the GUI via <code>WHISPERJAV_DATA_DIR</code>.</li>
+</ul>
+<h3 id="45-portable-zip-distribution">4.5 Portable ZIP Distribution<a class="headerlink" href="#45-portable-zip-distribution" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Structure:</strong> Same as an installed folder, but without the <code>venv</code> (which is created on first run).</li>
+<li><strong>Contents:</strong> Bundled Python, <code>launcher.py</code>, <code>install.py</code>, <code>uv.lock</code>, application code, and a <code>README.txt</code>.</li>
+<li><strong>First run:</strong> The launcher detects no environment, runs <code>install.py --local</code>, creates <code>venv</code>, then launches GUI.</li>
+<li><strong>No registry or system-wide changes</strong> - fully portable.</li>
+</ul>
+<h3 id="46-upgrade-system-upgradepy">4.6 Upgrade System (<code>upgrade.py</code>)<a class="headerlink" href="#46-upgrade-system-upgradepy" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Unified detection:</strong> Reads <code>install.json</code> to locate the installation.</li>
+<li><strong>Two modes:</strong></li>
+<li><strong>Source install (uv-based):</strong> Runs <code>git pull</code> then <code>install.py --upgrade</code>.</li>
+<li><strong>Conda-constructor install:</strong> Runs the new installer (which internally calls <code>install.py --upgrade</code>).</li>
+<li>Preserves user data by not touching the data directory.</li>
+</ul>
+<hr />
+<h2 id="5-phased-implementation-plan">5. Phased Implementation Plan<a class="headerlink" href="#5-phased-implementation-plan" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1a-v188-core-installpy-enhancements-source-path-only">Phase 1a (v1.8.8) – Core <code>install.py</code> Enhancements (Source Path Only)<a class="headerlink" href="#phase-1a-v188-core-installpy-enhancements-source-path-only" title="Permanent link">&para;</a></h3>
+<p><strong>Scope:</strong>
+- Enhance <code>install.py</code> with:
+  - Environment detection: <code>VIRTUAL_ENV</code> -&gt; <code>CONDA_PREFIX</code> -&gt; fallback to local <code>.venv</code>.
+  - <code>--local</code> flag to force local <code>.venv</code> creation.
+  - Use <code>UV_PROJECT_ENVIRONMENT</code> when targeting active environment.
+  - <strong>Automatic <code>--inexact</code></strong> when target is an external environment (conda/venv).
+  - Refactor <code>_install_local_llm()</code> into top-level <code>run_uv_pip_install()</code>.
+- Update <code>upgrade.py</code> for source installs to use <code>install.py --upgrade</code> (internal).
+- <strong>Remove <code>.python-version</code></strong> from repo and add to <code>.gitignore</code>.
+- <strong>Spike: Test Approach A for conda-constructor</strong> - bundle <code>pyproject.toml</code> and <code>uv.lock</code> in a minimal test installer to verify feasibility. This spike will answer:
+  - Can <code>construct.yaml</code> include extra files?
+  - Can <code>uv sync</code> run inside the conda environment with <code>UV_PROJECT_ENVIRONMENT</code> pointing to it?
+  - Does the result match the current <code>.whl</code> + <code>pip</code> pipeline?
+  - Document findings and decide Phase 1b approach.
+- <strong>Test matrix for <code>uv sync</code> in conda (to be run during spike):</strong>
+  1. Clean conda env -&gt; <code>uv sync --inexact --extra cli</code> -&gt; verify packages installed, conda packages untouched.
+  2. Conda env with unrelated packages (pandas, scikit-learn) -&gt; <code>uv sync --inexact --extra cli</code> -&gt; verify unrelated packages remain.
+  3. Conda env with conflicting numpy (1.26) -&gt; <code>uv sync --inexact --extra cli</code> -&gt; verify numpy upgraded to lockfile version or handled gracefully.
+  4. Simulated v1.8.7 pip-installed env -&gt; <code>uv sync --inexact --extra cli</code> -&gt; verify upgrade works cleanly.</p>
+<p><strong>Outcome:</strong> Source install path fixed, reproducible, and conda-compatible. A clear decision on conda-constructor integration approach.</p>
+<hr />
+<h3 id="phase-1b-v190-conda-constructor-integration">Phase 1b (v1.9.0) – Conda-Constructor Integration<a class="headerlink" href="#phase-1b-v190-conda-constructor-integration" title="Permanent link">&para;</a></h3>
+<p><strong>Scope (depends on spike outcome):</strong></p>
+<ul>
+<li><strong>If Approach A feasible:</strong></li>
+<li>Modify <code>build_release.py</code> to bundle <code>pyproject.toml</code>, <code>uv.lock</code>, and the <code>whisperjav/</code> source directory alongside the <code>.whl</code>.</li>
+<li>Update post-install script to copy these files to the installation root and run <code>install.py --local</code> (or <code>--upgrade</code> if upgrading).</li>
+<li><strong>If Approach A infeasible, fallback to Approach B:</strong></li>
+<li>
+<p>Keep existing packaging, but replace the <code>uv pip install</code> calls with a single <code>uv pip install</code> that reads pinned versions from <code>uv.lock</code> (i.e., generate a temporary <code>requirements.txt</code> from the lockfile and install with <code>--constraint</code>). This still gives lockfile reproducibility, though slower than <code>uv sync</code>.</p>
+</li>
+<li>
+<p><strong>Regardless of approach:</strong></p>
+</li>
+<li><strong>Create a minimal post-install wrapper</strong> (Python script) that handles:<ul>
+<li>VC++ Redist detection / installation.</li>
+<li>WebView2 detection and prompt.</li>
+<li>GFW proxy detection (registry scan).</li>
+<li>Git timeout reconfiguration.</li>
+<li>Then calls <code>install.py --local</code> (or <code>--upgrade</code>) with the bundled Python.</li>
+</ul>
+</li>
+<li>This wrapper replaces the current 2,800-line <code>post_install.py</code> with a ~300-line focused script.</li>
+<li><strong>Add <code>install.json</code> writing</strong> to the installation root (for now; will be migrated in Phase 2). Contains: install path, version, timestamp.</li>
+<li>
+<p><strong>Update <code>upgrade.py</code></strong> to detect conda-constructor installs via <code>install.json</code> and trigger the new installer (or an in-place upgrade using <code>install.py --upgrade</code> if environment is uv-compatible).</p>
+</li>
+<li>
+<p><strong>Testing:</strong></p>
+</li>
+<li>Full Windows installer test on clean machines, with/without VC++/WebView2.</li>
+<li>Upgrade test from v1.8.7 to v1.9.0.</li>
+<li>Test behind simulated GFW (e.g., with network delay/packet loss).</li>
+<li>Validate that <code>install.json</code> is correctly written and read by <code>upgrade.py</code>.</li>
+</ul>
+<p><strong>Outcome:</strong> Conda-constructor installer now uses the same lockfile-based logic as source installs, with full reproducibility and proper handling of Windows-specific dependencies.</p>
+<hr />
+<h3 id="phase-2-v20-launcher-and-user-data-separation">Phase 2 (v2.0+) – Launcher and User Data Separation<a class="headerlink" href="#phase-2-v20-launcher-and-user-data-separation" title="Permanent link">&para;</a></h3>
+<p><strong>Scope:</strong>
+- Develop <code>launcher.py</code> (Python script) with:
+  - Read <code>install.json</code> from data directory (new location).
+  - Check environment integrity (import test, optional lockfile hash comparison).
+  - If missing/corrupted, run <code>install.py --local</code> (or <code>--upgrade</code>) using bundled Python.
+  - Set <code>WHISPERJAV_DATA_DIR</code> environment variable.
+  - Launch GUI by executing environment's Python with <code>-m whisperjav_gui</code>.
+- <strong>Platform wrappers:</strong>
+  - Windows: <code>.bat</code> file calling <code>pythonw.exe launcher.py</code> (or compiled C# stub).
+  - macOS: shell script inside <code>.app</code> bundle.
+  - Linux: shell script in <code>/usr/bin</code> or desktop entry.
+- <strong>Move all user data</strong> to platform-specific data directory:
+  - Windows: <code>%APPDATA%\WhisperJAV</code>
+  - macOS: <code>~/Library/Application Support/WhisperJAV</code>
+  - Linux: <code>~/.local/share/whisperjav</code>
+- <strong>Update codebase</strong> to respect <code>WHISPERJAV_DATA_DIR</code> for:
+  - Model cache (currently HuggingFace cache + <code>.whisperjav_cache/</code>).
+  - Config files (currently <code>whisperjav_config.json</code>).
+  - Logs (currently <code>whisperjav.log</code>).
+- Provide migration script for existing users to move data from old locations.
+- Modify installer to create shortcut pointing to launcher, not directly to Python.
+- Update <code>install.py</code> to write <code>install.json</code> to the new data directory.</p>
+<p><strong>Testing:</strong>
+- Consumer workflow: install -&gt; shortcut -&gt; launcher starts GUI.
+- Self-healing: delete environment -&gt; launcher recreates it.
+- Upgrade preserves data in new location.
+- Migration from v1.9.0 works correctly.</p>
+<p><strong>Outcome:</strong> Full consumer-friendly experience; environment complexity completely hidden.</p>
+<hr />
+<h3 id="phase-3-v21-portable-zip-and-cross-platform-expansion">Phase 3 (v2.1+) – Portable ZIP and Cross-Platform Expansion<a class="headerlink" href="#phase-3-v21-portable-zip-and-cross-platform-expansion" title="Permanent link">&para;</a></h3>
+<p><strong>Scope:</strong>
+- <strong>Portable ZIP:</strong> Package same structure as installed version (bundled Python, <code>launcher.py</code>, <code>install.py</code>, lockfile, app code) - without pre-created <code>venv</code>. Launcher creates it on first run.
+- <strong>macOS <code>.dmg</code> installer:</strong> Use same internal layout inside <code>WhisperJAV.app/Contents/Resources</code>. Post-install script runs <code>install.py --local</code>.
+- <strong>Linux packaging:</strong>
+  - AppImage: self-contained, uses bundled Python and launcher.
+  - <code>.deb</code>/<code>.rpm</code> packages for system-wide install (optional).
+- <strong>In-app updates</strong> (optional): launcher checks for new version, downloads installer or runs <code>git pull</code> + <code>install.py --upgrade</code>.</p>
+<p><strong>Testing:</strong> Cross-platform validation on clean macOS/Linux systems.</p>
+<hr />
+<h2 id="6-key-design-decisions-final">6. Key Design Decisions (Final)<a class="headerlink" href="#6-key-design-decisions-final" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>All installations eventually use <code>uv sync</code> + lockfile</strong></td>
+<td>Reproducibility, speed, hash verification, declarative GPU routing.</td>
+</tr>
+<tr>
+<td><strong>Conda-constructor integration via Approach A (bundle <code>pyproject.toml</code> + <code>uv.lock</code>)</strong> if feasible; otherwise Approach B (lockfile-aware <code>uv pip install</code>).</td>
+<td>A spike in Phase 1a will determine feasibility.</td>
+</tr>
+<tr>
+<td><strong>Environment detection order:</strong> <code>VIRTUAL_ENV</code> first, then <code>CONDA_PREFIX</code>.</td>
+<td><code>VIRTUAL_ENV</code> is explicitly user-activated; <code>CONDA_PREFIX</code> may be base env.</td>
+</tr>
+<tr>
+<td><strong><code>--inexact</code> is automatic</strong> when targeting an external environment (conda/venv).</td>
+<td>Prevents accidental removal of unrelated packages.</td>
+</tr>
+<tr>
+<td><strong><code>--upgrade</code> flag is internal only</strong> - used by <code>upgrade.py</code>; not user-facing.</td>
+<td>Keeps responsibilities clear; <code>upgrade.py</code> handles version checks and rollback.</td>
+</tr>
+<tr>
+<td><strong><code>install.json</code> is introduced in Phase 1b</strong>, not Phase 1a.</td>
+<td>Not needed for source-only fixes; avoids temporary locations and rework.</td>
+</tr>
+<tr>
+<td><strong>Windows-specific checks</strong> remain in a minimal post-install wrapper, not in <code>install.py</code>.</td>
+<td>Keeps <code>install.py</code> cross-platform; wrapper handles platform quirks.</td>
+</tr>
+<tr>
+<td><strong>User data separation (<code>WHISPERJAV_DATA_DIR</code>) is Phase 2</strong> - requires app-wide changes.</td>
+<td>Avoids bloating installation logic; done after core is stable.</td>
+</tr>
+<tr>
+<td><strong><code>.python-version</code> file removed</strong> from repo and added to <code>.gitignore</code>.</td>
+<td>Prevents uv from downloading its own Python.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-detailed-responses-to-developers-points">7. Detailed Responses to Developer's Points<a class="headerlink" href="#7-detailed-responses-to-developers-points" title="Permanent link">&para;</a></h2>
+<h3 id="point-1-installjson-in-phase-1a-is-it-premature">Point 1: <code>install.json</code> in Phase 1a – Is It Premature?<a class="headerlink" href="#point-1-installjson-in-phase-1a-is-it-premature" title="Permanent link">&para;</a></h3>
+<p><strong>Agreed.</strong> We will <strong>skip <code>install.json</code> entirely in Phase 1a</strong>. It will be introduced in <strong>Phase 1b</strong> when it's needed for upgrade detection. This avoids temporary locations and rework.</p>
+<h3 id="point-2-approach-a-feasibility-needs-a-concrete-spike">Point 2: Approach A Feasibility – Needs a Concrete Spike<a class="headerlink" href="#point-2-approach-a-feasibility-needs-a-concrete-spike" title="Permanent link">&para;</a></h3>
+<p><strong>Absolutely.</strong> The spike is added as a <strong>blocking task in Phase 1a</strong>. It will answer:
+- Can <code>construct.yaml</code> bundle extra files (<code>pyproject.toml</code>, <code>uv.lock</code>, <code>whisperjav/</code>)?
+- Can <code>uv sync</code> run inside the conda env with <code>UV_PROJECT_ENVIRONMENT</code>?
+- Does the result match the current <code>.whl</code> + <code>pip</code> pipeline?
+- Based on the outcome, we will finalize the Phase 1b approach.</p>
+<h3 id="point-3-inexact-should-be-automatic-when-targeting-external-envs">Point 3: <code>--inexact</code> Should Be Automatic When Targeting External Envs<a class="headerlink" href="#point-3-inexact-should-be-automatic-when-targeting-external-envs" title="Permanent link">&para;</a></h3>
+<p><strong>Fully agreed.</strong> The logic in <code>install.py</code> will be:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">if</span> <span class="n">target_env</span> <span class="ow">is</span> <span class="n">external</span> <span class="p">(</span><span class="n">conda</span> <span class="ow">or</span> <span class="n">venv</span> <span class="n">detected</span><span class="p">):</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">inexact</span> <span class="o">=</span> <span class="kc">True</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">else</span><span class="p">:</span>  <span class="c1"># target is .venv we created</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">inexact</span> <span class="o">=</span> <span class="kc">False</span>
+</code></pre></div>
+No user flag needed.</p>
+<h3 id="point-4-the-minimal-post-install-wrapper-phase-1b">Point 4: The Minimal Post-Install Wrapper (Phase 1b)<a class="headerlink" href="#point-4-the-minimal-post-install-wrapper-phase-1b" title="Permanent link">&para;</a></h3>
+<p><strong>Agreed.</strong> We will keep a <strong>minimal Windows-specific wrapper</strong> (200-300 lines) that handles VC++ Redist, WebView2, GFW proxy, and Git timeout, then calls <code>install.py</code>. This keeps <code>install.py</code> platform-agnostic and simplifies maintenance.</p>
+<h3 id="point-5-what-does-upgrade-actually-do">Point 5: What Does <code>--upgrade</code> Actually Do?<a class="headerlink" href="#point-5-what-does-upgrade-actually-do" title="Permanent link">&para;</a></h3>
+<p><strong>Clarified:</strong> <code>install.py --upgrade</code> is an <strong>internal flag</strong>, not documented for end users. It will:
+- Run in non-interactive mode (skip prompts).
+- Imply <code>--inexact</code> (always, because it's upgrading an existing environment).
+- Log that it's an upgrade.
+- Update <code>install.json</code> with new version.
+- <strong>Do not</strong> perform <code>git pull</code> - that's <code>upgrade.py</code>'s job.</p>
+<p><code>upgrade.py</code> will handle version checking, backup, and then call <code>install.py --upgrade</code>.</p>
+<h3 id="point-6-uv-sync-conda-testing-what-specifically-to-test">Point 6: <code>uv sync</code> Conda Testing – What Specifically to Test<a class="headerlink" href="#point-6-uv-sync-conda-testing-what-specifically-to-test" title="Permanent link">&para;</a></h3>
+<p>The test matrix provided is excellent and will be used during the spike in Phase 1a. It covers:
+- Clean conda env.
+- Conda env with unrelated packages.
+- Conda env with conflicting numpy.
+- Previous pip-installed env (simulating v1.8.7 migration).</p>
+<p>These tests will inform whether <code>uv sync --inexact</code> behaves as expected in all scenarios, and if any adjustments are needed (e.g., always creating a dedicated <code>venv</code> inside the conda env if conflicts arise).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3802 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/ADR-006-decoupled-subtitle-pipeline/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>ADR-006: Decoupled Subtitle Pipeline Architecture - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-006-decoupled-subtitle-pipeline-architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-006: Decoupled Subtitle Pipeline Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-context-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Context &amp; Problem Statement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Context &amp; Problem Statement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-fundamental-challenge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The Fundamental Challenge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-current-experience-with-qwen3-asr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Current Experience with Qwen3-ASR
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-current-pipeline-approaches-three-input-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Current Pipeline Approaches (Three Input Modes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-vision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Vision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-current-architecture-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Current Architecture Audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Current Architecture Audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-methodology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Methodology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-findings-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Findings Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-architectural-comparison-assembly-vs-vad_slicing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Architectural Comparison: Assembly vs VAD_SLICING
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Architectural Comparison: Assembly vs VAD_SLICING">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-execution-flow-side-by-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Execution Flow Side-by-Side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-feature-by-feature-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Feature-by-Feature Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-summary-what-each-mode-contributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Summary: What Each Mode Contributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-key-design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Key Design Decisions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Key Design Decisions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-japanesepostprocessor-is-not-suitable-for-qwen3-asr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 JapanesePostProcessor Is NOT Suitable for Qwen3-ASR
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-new-shared-method-not-porting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 New Shared Method, Not Porting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-temporalframer-as-a-distinct-concern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 TemporalFramer as a Distinct Concern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-temporalframer-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 TemporalFramer Backends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-the-aligner-becomes-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 The Aligner Becomes Optional
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-proposed-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Proposed Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Proposed Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-block-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Block Diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-speechenhancer-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 SpeechEnhancer Placement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-existing-protocol-factory-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Existing Protocol + Factory Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-protocol-specifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Protocol Specifications
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Protocol Specifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-temporalframer-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 TemporalFramer Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-textgenerator-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 TextGenerator Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-textcleaner-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 TextCleaner Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-textaligner-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 TextAligner Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-data-types-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Data Types &amp; Contracts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Data Types &amp; Contracts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-inter-component-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Inter-Component Data Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-shared-types-package-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Shared Types Package Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-phase-5-phase-6-contract-preserved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Phase 5 → Phase 6 Contract Preserved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-orchestrator-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Orchestrator Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Orchestrator Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-decoupledsubtitlepipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 DecoupledSubtitlePipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-internal-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Internal Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-hardening-stage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Hardening Stage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-sentinel-integration-one-place-not-four" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Sentinel Integration (One Place, Not Four)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-audit-finding-resolutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Audit Finding Resolutions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-current-mode-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Current Mode Mapping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Current Mode Mapping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-how-existing-modes-map-to-new-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 How Existing Modes Map to New Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-migration-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Migration Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-new-workflows-enabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. New Workflows Enabled
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. New Workflows Enabled">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#121-whisper-guided-qwen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.1 Whisper-Guided Qwen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#122-srt-re-transcription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.2 SRT Re-Transcription
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#123-two-pass-refinement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.3 Two-Pass Refinement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#124-aligner-free-fast-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.4 Aligner-Free Fast Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#125-cross-model-benchmarking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.5 Cross-Model Benchmarking
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-what-doesnt-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. What Doesn't Change
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-future-expansion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Future Expansion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Future Expansion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#141-new-textgenerator-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.1 New TextGenerator Implementations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#142-new-textaligner-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.2 New TextAligner Implementations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#143-diagnosticbenchmarking-utility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.3 Diagnostic/Benchmarking Utility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#144-vllm-integration-per-adr-005" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.4 vLLM Integration (per ADR-005)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-a-alignment-sentinel-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix A: Alignment Sentinel Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-b-assemblytextcleaner-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix B: AssemblyTextCleaner Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-c-key-constants-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix C: Key Constants &amp; Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/ADR-006-decoupled-subtitle-pipeline.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="adr-006-decoupled-subtitle-pipeline-architecture">ADR-006: Decoupled Subtitle Pipeline Architecture<a class="headerlink" href="#adr-006-decoupled-subtitle-pipeline-architecture" title="Permanent link">&para;</a></h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>IMPLEMENTED (Phases 0–6 complete, 2026-02-17)</td>
+</tr>
+<tr>
+<td><strong>Date</strong></td>
+<td>2026-02-16</td>
+</tr>
+<tr>
+<td><strong>Authors</strong></td>
+<td>MK (product vision), Claude (architecture)</td>
+</tr>
+<tr>
+<td><strong>Supersedes</strong></td>
+<td>Extends ADR-004 (dedicated Qwen pipeline)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-executive-summary">Executive Summary</a></li>
+<li><a href="#2-context--problem-statement">Context &amp; Problem Statement</a></li>
+<li><a href="#3-current-architecture-audit">Current Architecture Audit</a></li>
+<li><a href="#4-architectural-comparison-assembly-vs-vad_slicing">Architectural Comparison: Assembly vs VAD_SLICING</a></li>
+<li><a href="#5-key-design-decisions">Key Design Decisions</a></li>
+<li><a href="#6-proposed-architecture">Proposed Architecture</a></li>
+<li><a href="#7-protocol-specifications">Protocol Specifications</a></li>
+<li><a href="#8-data-types--contracts">Data Types &amp; Contracts</a></li>
+<li><a href="#9-orchestrator-design">Orchestrator Design</a></li>
+<li><a href="#10-audit-finding-resolutions">Audit Finding Resolutions</a></li>
+<li><a href="#11-current-mode-mapping">Current Mode Mapping</a></li>
+<li><a href="#12-new-workflows-enabled">New Workflows Enabled</a></li>
+<li><a href="#13-what-doesnt-change">What Doesn't Change</a></li>
+<li><a href="#14-future-expansion">Future Expansion</a></li>
+</ol>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary<a class="headerlink" href="#1-executive-summary" title="Permanent link">&para;</a></h2>
+<p>This ADR proposes a <strong>model-agnostic, component-based subtitle generation pipeline</strong> that
+separates the concerns of temporal framing, text generation, text cleaning, and text alignment
+into independent, swappable protocol domains. The design is motivated by:</p>
+<ol>
+<li><strong>The timestamp problem</strong>: Many high-quality ASR models produce excellent text but no
+   timestamps. To produce SRT subtitles, timestamps must come from somewhere else.</li>
+<li><strong>Aligner unreliability</strong>: The Qwen3 ForcedAligner frequently collapses on JAV content,
+   mapping all words to a ~100ms window instead of the actual speech duration.</li>
+<li><strong>Experimentation need</strong>: Finding the optimal approach requires mixing and matching
+   different temporal framing, transcription, and alignment strategies.</li>
+<li><strong>Reusability</strong>: The solution should apply to any ASR model lacking built-in timestamps,
+   not just Qwen3-ASR, including transformers-based and vLLM-served models.</li>
+</ol>
+<p>The architecture introduces <strong>six protocol domains</strong> (four existing, two new) and a
+<strong>TemporalFramer</strong> concept that cleanly decouples "when does dialogue happen?" from "what
+was said?" — enabling aligner-free workflows where reliable timestamps come from external
+sources (Whisper segments, existing SRTs, VAD grouping).</p>
+<hr />
+<h2 id="2-context-problem-statement">2. Context &amp; Problem Statement<a class="headerlink" href="#2-context-problem-statement" title="Permanent link">&para;</a></h2>
+<h3 id="21-the-fundamental-challenge">2.1 The Fundamental Challenge<a class="headerlink" href="#21-the-fundamental-challenge" title="Permanent link">&para;</a></h3>
+<p>Many state-of-the-art ASR models excel at text transcription but lack built-in timestamp
+output. To produce SRT subtitle files, these models need auxiliary timestamp generation
+capabilities. The pipeline must therefore handle two separate concerns:</p>
+<ul>
+<li><strong>Text generation</strong>: "What was said?" (high-quality transcription)</li>
+<li><strong>Timestamp assignment</strong>: "When was each word/segment said?" (accurate timing)</li>
+</ul>
+<h3 id="22-current-experience-with-qwen3-asr">2.2 Current Experience with Qwen3-ASR<a class="headerlink" href="#22-current-experience-with-qwen3-asr" title="Permanent link">&para;</a></h3>
+<p>Qwen3-ASR is a representative example of this class of models:</p>
+<ul>
+<li><strong>Text quality</strong>: Excellent Japanese transcription, superior to Whisper for JAV content</li>
+<li><strong>Timestamp mechanism</strong>: Offers a ForcedAligner model that attempts to map text to audio
+  and output predicted word timestamps</li>
+<li><strong>Reliability</strong>: The ForcedAligner is <strong>unreliable for JAV content</strong> — it frequently
+  "collapses", mapping all words to a ~100ms window instead of spreading them across the
+  actual speech duration. This is what the Alignment Sentinel exists to detect.</li>
+</ul>
+<h3 id="23-current-pipeline-approaches-three-input-modes">2.3 Current Pipeline Approaches (Three Input Modes)<a class="headerlink" href="#23-current-pipeline-approaches-three-input-modes" title="Permanent link">&para;</a></h3>
+<p>The current Qwen pipeline (<code>qwen_pipeline.py</code>, ~2178 lines) implements three input modes:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Approach</th>
+<th>Strength</th>
+<th>Weakness</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ASSEMBLY</strong></td>
+<td>Decoupled text generation + alignment. Batch ASR text-only → sanitize → VRAM swap → batch align → reconstruct</td>
+<td>Mid-pipeline text cleaning, VRAM efficiency, batch processing, future vLLM socket</td>
+<td>No timestamp resolution, no boundary clamping, no step-down retry</td>
+</tr>
+<tr>
+<td><strong>CONTEXT_AWARE</strong></td>
+<td>Coupled ASR+Aligner on full scenes (30-90s), batch_size=1</td>
+<td>Simple, leverages full scene context</td>
+<td>Applies wrong post-processor (Whisper-era), hardcoded interpolation only</td>
+</tr>
+<tr>
+<td><strong>VAD_SLICING</strong></td>
+<td>VAD segments (up to 29s groups via TEN VAD), coupled ASR per group</td>
+<td>Adaptive step-down, 4-mode timestamp resolution, double boundary clamping, rich diagnostics</td>
+<td>No mid-pipeline text cleaning, relies on Whisper-era post-processor</td>
+</tr>
+</tbody>
+</table>
+<p>Each mode discovered important patterns, but the implementations are tangled together in
+mode-specific code paths rather than composable components. The hardening features from
+VAD_SLICING cannot be easily ported to Assembly because they operate in fundamentally
+different coordinate systems.</p>
+<h3 id="24-vision">2.4 Vision<a class="headerlink" href="#24-vision" title="Permanent link">&para;</a></h3>
+<p>Architect a <strong>reusable, expandable, modular pipeline</strong> that:</p>
+<ol>
+<li>Works with <strong>any ASR model</strong> lacking built-in timestamps</li>
+<li>Supports both <strong>transformers</strong> and <strong>vLLM</strong> backends</li>
+<li>Allows <strong>experimentation</strong> with various temporal framing, generation, and alignment
+   strategies</li>
+<li>Makes the unreliable aligner <strong>optional</strong> when better timestamp sources are available</li>
+<li>Follows the established <strong>Protocol + Factory</strong> pattern already used by three other
+   domains in the codebase</li>
+</ol>
+<hr />
+<h2 id="3-current-architecture-audit">3. Current Architecture Audit<a class="headerlink" href="#3-current-architecture-audit" title="Permanent link">&para;</a></h2>
+<h3 id="31-methodology">3.1 Methodology<a class="headerlink" href="#31-methodology" title="Permanent link">&para;</a></h3>
+<p>Code-driven analysis of four core files:
+- <code>qwen_pipeline.py</code> (~2178 lines)
+- <code>qwen_asr.py</code> (~1754 lines)
+- <code>alignment_sentinel.py</code> (~417 lines)
+- <code>assembly_text_cleaner.py</code> (~663 lines)</p>
+<p>Every finding cites specific file:line references. Comments and docstrings were NOT trusted
+— only executed code paths were analyzed.</p>
+<h3 id="32-findings-summary">3.2 Findings Summary<a class="headerlink" href="#32-findings-summary" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Sev</th>
+<th>ID</th>
+<th>Title</th>
+<th>File(s)</th>
+<th>Lines</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>CRIT</td>
+<td>C1</td>
+<td>OOM retry uses stale closure</td>
+<td>qwen_asr.py</td>
+<td>784, 977-997</td>
+<td><code>_transcribe_with_regrouping</code> OOM handler unloads+reloads model, but the <code>qwen_inference</code> closure still references the OLD model via captured <code>qwen_model</code> variable. Old model not freed (ref held), new model loaded → double VRAM. Retry uses wrong model with old batch_size.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>CRIT</td>
+<td>C2</td>
+<td>Coupled modes apply wrong post-processor</td>
+<td>qwen_pipeline.py, qwen_asr.py</td>
+<td>1780-1798, 964-973</td>
+<td><strong>Revised</strong>: CONTEXT_AWARE and VAD_SLICING incorrectly apply the Whisper-era <code>JapanesePostProcessor</code> to Qwen3-ASR output (qwen_asr.py:964-973). Assembly is <strong>correct</strong> to skip it — it has its own Qwen-specific <code>AssemblyTextCleaner</code>. The Whisper-era post-processor was designed for Whisper's output characteristics, not Qwen3's.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>HIGH</td>
+<td>H1</td>
+<td><code>_apply_vad_only_timestamps</code> produces overlapping subs</td>
+<td>qwen_pipeline.py</td>
+<td>1973-1975</td>
+<td>All segments in a group receive identical <code>[0, group_duration]</code> range. Multiple segments stack at same timestamp. Should distribute proportionally by character count.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>HIGH</td>
+<td>H2</td>
+<td>Assembly mode doesn't apply timestamp resolution</td>
+<td>qwen_pipeline.py</td>
+<td>1640-1798</td>
+<td>Assembly Step 8 skips <code>_apply_timestamp_interpolation()</code> and <code>_apply_vad_timestamp_fallback()</code>. Words with null timestamps (start=0, end=0) pass through unmodified. <code>timestamp_mode</code> setting silently ignored in assembly.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>HIGH</td>
+<td>H3</td>
+<td><code>suppress_silence</code> may alter sentinel recovery timestamps</td>
+<td>qwen_pipeline.py</td>
+<td>1872-1882</td>
+<td><code>_reconstruct_from_words()</code> passes <code>suppress_silence=True</code> to <code>transcribe_any()</code>. stable-ts modifies word timestamps based on audio silence detection — potentially undoing sentinel's carefully computed VAD-guided redistribution. Affects both assembly and coupled sentinel recovery.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>HIGH</td>
+<td>H4</td>
+<td>Assembly diagnostics report word count not segment count</td>
+<td>qwen_pipeline.py</td>
+<td>1769-1773</td>
+<td><code>timing_sources.aligner_native</code> and <code>total_segments</code> both set to <code>n_words</code> (word count from merge). Measured before <code>_reconstruct_from_words()</code> so actual segment count after regrouping never recorded.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>MED</td>
+<td>M1</td>
+<td>Stale "300s" comment — actual limit is 180s</td>
+<td>qwen_pipeline.py</td>
+<td>217</td>
+<td>Comment says "ForcedAligner's 300s architectural limit" but actual limit is 180s (<code>qwen_asr.py:217: MAX_FORCE_ALIGN_SECONDS = 180</code>). Code correctly uses 120s max.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>MED</td>
+<td>M2</td>
+<td><code>_transcribe_without_aligner</code> returns <code>end=0.0</code></td>
+<td>qwen_asr.py</td>
+<td>1063</td>
+<td>Creates segment with <code>end: 0.0</code>. Downstream logic uses <code>seg.end &lt;= 0.0</code> as "aligner returned NULL" heuristic. This segment would be incorrectly classified as collapsed.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>MED</td>
+<td>M3</td>
+<td>No <code>batch_size</code> override for assembly text generation</td>
+<td>qwen_pipeline.py</td>
+<td>1505</td>
+<td>Assembly's stated benefit is higher batch_size (ASR-only uses less VRAM). But <code>QwenASR</code> constructed with same <code>_asr_config</code> (<code>batch_size=1</code> default). No mechanism for assembly-specific batch_size.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>MED</td>
+<td>M4</td>
+<td>Hallucination list access via private <code>_exact_lists</code></td>
+<td>assembly_text_cleaner.py</td>
+<td>576</td>
+<td><code>getattr(remover, '_exact_lists', None)</code> accesses private attribute. If <code>HallucinationRemover</code> refactors, silently returns <code>None</code> → Stage 3 does nothing, no error.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>MED</td>
+<td>M5</td>
+<td>Redundant inline VRAM cleanup — not using <code>safe_cuda_cleanup()</code></td>
+<td>qwen_pipeline.py</td>
+<td>462-467, 799-804, 1542-1548, 1619-1624</td>
+<td>Same 6-line <code>gc.collect + torch.cuda.empty_cache</code> pattern repeated 4 times. <code>BasePipeline.cleanup()</code> uses <code>safe_cuda_cleanup()</code> from <code>gpu_utils</code>. Pipeline doesn't.</td>
+</tr>
+<tr>
+<td>12</td>
+<td>MED</td>
+<td>M6</td>
+<td><code>_check_audio_limits</code> runs redundantly for every VAD clip</td>
+<td>qwen_asr.py</td>
+<td>674</td>
+<td>Called at start of every <code>transcribe()</code> call. In VAD_SLICING, runs for every speech region (50+ per scene). Each call loads librosa/soundfile to detect duration already known from segmenter.</td>
+</tr>
+<tr>
+<td>13</td>
+<td>MED</td>
+<td>M7</td>
+<td>Timestamp modes only apply to VAD_SLICING</td>
+<td>qwen_pipeline.py</td>
+<td>1202-1213, 669, 1640</td>
+<td>CONTEXT_AWARE hardcodes interpolation. Assembly ignores <code>timestamp_mode</code> entirely. Only VAD_SLICING respects user's <code>--timestamp-mode</code> setting.</td>
+</tr>
+<tr>
+<td>14</td>
+<td>MED</td>
+<td>M8</td>
+<td><code>suppress_silence</code> in coupled mode transcription</td>
+<td>qwen_asr.py</td>
+<td>937-938</td>
+<td>Same as H3 but for primary coupled-mode path. All coupled-mode transcriptions have aligner timestamps potentially modified by stable-ts silence suppression.</td>
+</tr>
+<tr>
+<td>15</td>
+<td>LOW</td>
+<td>L1</td>
+<td>Deprecated <code>_apply_vad_filter</code> never called</td>
+<td>qwen_pipeline.py</td>
+<td>2116-2177</td>
+<td>Dead code. 62 lines.</td>
+</tr>
+<tr>
+<td>16</td>
+<td>LOW</td>
+<td>L2</td>
+<td>Dead <code>cross_scene_context</code> branches</td>
+<td>qwen_pipeline.py</td>
+<td>249, 593-599, 782-784, 1489-1491</td>
+<td><code>self.cross_scene_context = False</code> hardcoded. All branches are dead code.</td>
+</tr>
+<tr>
+<td>17</td>
+<td>LOW</td>
+<td>L3</td>
+<td><code>_normalize_language_for_qwen</code> redundant second-pass</td>
+<td>qwen_asr.py</td>
+<td>1655-1659</td>
+<td>Loop over <code>QWEN_SUPPORTED_LANGUAGES</code> is redundant — all names already in <code>LANGUAGE_TO_QWEN_MAP</code>.</td>
+</tr>
+<tr>
+<td>18</td>
+<td>LOW</td>
+<td>L4</td>
+<td><code>_map_language_code</code> fallback produces invalid ISO</td>
+<td>qwen_asr.py</td>
+<td>1692</td>
+<td>"Unknown" → "un" (invalid ISO code). Cosmetic.</td>
+</tr>
+<tr>
+<td>19</td>
+<td>LOW</td>
+<td>L5</td>
+<td><code>_estimate_tokens</code> only used for warnings</td>
+<td>qwen_asr.py</td>
+<td>481-505</td>
+<td>Not used for any functional logic.</td>
+</tr>
+<tr>
+<td>20</td>
+<td>LOW</td>
+<td>L6</td>
+<td>Assembly context propagation differs from coupled</td>
+<td>qwen_pipeline.py</td>
+<td>1489-1492, 593-601</td>
+<td>Moot — <code>cross_scene_context</code> flag is hardcoded <code>False</code>.</td>
+</tr>
+<tr>
+<td>21</td>
+<td>LOW</td>
+<td>L7</td>
+<td>Diagnostics JSON only preserved in debug mode</td>
+<td>qwen_pipeline.py</td>
+<td>975-976, 1802-1810</td>
+<td>Master metadata needs <code>--debug</code>. Assembly diagnostics cleaned up unless <code>--keep-temp</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Counts by severity:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CRITICAL</td>
+<td>2</td>
+</tr>
+<tr>
+<td>HIGH</td>
+<td>4</td>
+</tr>
+<tr>
+<td>MEDIUM</td>
+<td>8</td>
+</tr>
+<tr>
+<td>LOW</td>
+<td>7</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>21</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-architectural-comparison-assembly-vs-vad_slicing">4. Architectural Comparison: Assembly vs VAD_SLICING<a class="headerlink" href="#4-architectural-comparison-assembly-vs-vad_slicing" title="Permanent link">&para;</a></h2>
+<h3 id="41-execution-flow-side-by-side">4.1 Execution Flow Side-by-Side<a class="headerlink" href="#41-execution-flow-side-by-side" title="Permanent link">&para;</a></h3>
+<p><strong>VAD_SLICING</strong> (<code>_transcribe_speech_regions</code>, lines 987-1425):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Per scene:
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  Read scene audio once (memory) → Per VAD group:
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    ├─ Slice audio in-memory
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    ├─ Write temp WAV per group
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    ├─ asr.transcribe() [coupled: ASR+Aligner in VRAM together]
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    ├─ Alignment Sentinel (assess on WhisperResult words)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    ├─ Recovery if COLLAPSED (VAD-guided or proportional)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    ├─ Timestamp resolution (4 modes)
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    ├─ Clamp to group bounds [0, group_duration]
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    ├─ Offset to scene-relative
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    └─ Clamp to scene bounds [0, scene_duration]
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  Merge all group results
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  Defensive chronological sort
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  Build per-scene diagnostics (with group_details)
+</code></pre></div></p>
+<p><strong>ASSEMBLY</strong> (<code>_phase5_assembly</code>, lines 1431-1818):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Across ALL scenes:
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  Step 1-2: Load ASR text-only → Batch transcribe_text_only()
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  Step 3:   Unload ASR (VRAM swap)
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  Step 4:   AssemblyTextCleaner.clean_batch()
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  Step 5-6: Load aligner → Batch align_standalone()
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  Step 7:   Unload aligner (VRAM cleanup)
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  Step 8:   Per scene:
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    ├─ merge_master_with_timestamps()
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    ├─ Alignment Sentinel (assess on raw word dicts)
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    ├─ Recovery if COLLAPSED (VAD-guided or proportional)
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    ├─ (no timestamp resolution)
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    ├─ (no boundary clamping)
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    ├─ (no offset — timestamps already scene-relative)
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    ├─ _reconstruct_from_words() [stable-ts regrouping]
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    └─ (no Japanese post-processing — correct, see Section 5.1)
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>  Build per-scene diagnostics
+</code></pre></div></p>
+<h3 id="42-feature-by-feature-comparison">4.2 Feature-by-Feature Comparison<a class="headerlink" href="#42-feature-by-feature-comparison" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Feature</th>
+<th>VAD_SLICING</th>
+<th>ASSEMBLY</th>
+<th>Gap?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td><strong>Adaptive Step-Down</strong> (Tier 1→Tier 2)</td>
+<td>Yes. Tier 1: 30s groups → detect collapse → defer. Tier 2: re-group collapsed segments at 6s → transcribe + recover. Lines 1257-1343.</td>
+<td>No. Operates at scene level (30-120s). No mechanism to re-group at finer granularity.</td>
+<td><strong>YES — Major</strong></td>
+</tr>
+<tr>
+<td>B</td>
+<td><strong>Timestamp Resolution</strong></td>
+<td>Full 4-mode dispatch: <code>ALIGNER_WITH_INTERPOLATION</code>, <code>ALIGNER_WITH_VAD_FALLBACK</code>, <code>ALIGNER_ONLY</code>, <code>VAD_ONLY</code>. Lines 1202-1213. Respects <code>--timestamp-mode</code> CLI flag.</td>
+<td>None. Null timestamps pass through unmodified. <code>timestamp_mode</code> silently ignored.</td>
+<td><strong>YES — Major</strong></td>
+</tr>
+<tr>
+<td>C</td>
+<td><strong>Boundary Clamping</strong> (double)</td>
+<td>Two-layer clamp: (1) Group-relative <code>[0, group_duration]</code> (lines 1220-1227). (2) Scene-relative <code>[0, scene_duration]</code> after offset (lines 1234-1242).</td>
+<td>None. Timestamps from the aligner go directly to <code>_reconstruct_from_words()</code>. Aligner timestamps &gt; scene_duration persist into final SRT.</td>
+<td><strong>YES — Major</strong></td>
+</tr>
+<tr>
+<td>D</td>
+<td><strong>Text Cleaning for Qwen</strong></td>
+<td>None mid-pipeline. Relies on Whisper-era <code>SubtitleSanitizer</code> post-pipeline. Also <strong>incorrectly</strong> applies Whisper-era <code>JapanesePostProcessor</code> via coupled <code>transcribe()</code>.</td>
+<td><strong>Correct</strong>: <code>AssemblyTextCleaner</code> operates between text generation and alignment (4 stages: phrase repetition, char flood, hallucination filter, whitespace). Prevents aligner NULL failures from hallucinated text.</td>
+<td><strong>Assembly is AHEAD</strong></td>
+</tr>
+<tr>
+<td>E</td>
+<td><strong>Timestamp Offset</strong></td>
+<td><code>_offset_result_timestamps(result, group_start_sec)</code> at line 1230. Shifts group-relative to scene-relative.</td>
+<td>Not needed — aligner timestamps are already scene-relative (aligner operates on full scene audio).</td>
+<td>N/A (different architecture)</td>
+</tr>
+<tr>
+<td>F</td>
+<td><strong>Sentinel Granularity</strong></td>
+<td>Per-group (5-30s audio). Smaller audio = more precise collapse detection. VAD groups provide natural speech boundaries for Strategy C recovery.</td>
+<td>Per-scene (30-120s audio). Coarser detection. VAD regions available but at scene level.</td>
+<td>Partial gap</td>
+</tr>
+<tr>
+<td>G</td>
+<td><strong>Sentinel Step-Down Deferral</strong></td>
+<td><code>skip_recovery_on_collapse=True</code> on Tier 1: defers recovery, queues segments for Tier 2 re-grouping at tighter boundaries. Only recovers at Tier 2 (last resort). Lines 1157-1161.</td>
+<td>No deferral. Immediately recovers collapsed scenes. No retry at finer granularity.</td>
+<td><strong>YES — Major</strong> (ties to A)</td>
+</tr>
+<tr>
+<td>H</td>
+<td><strong>Mid-Pipeline Text Cleaning</strong></td>
+<td>None. Raw ASR text (with potential hallucinations/repetitions) goes directly to aligner via coupled <code>transcribe()</code>.</td>
+<td>Yes — <code>AssemblyTextCleaner</code> between text generation and alignment. 4 stages: phrase repetition, char flood, hallucination filter, whitespace.</td>
+<td><strong>Assembly is AHEAD</strong></td>
+</tr>
+<tr>
+<td>I</td>
+<td><strong>Dynamic Token Budget</strong></td>
+<td>Applied per-group via <code>asr.transcribe()</code> → <code>_compute_dynamic_token_limit(audio_duration)</code>.</td>
+<td>Applied per-scene via <code>asr.transcribe_text_only()</code>.</td>
+<td>Parity</td>
+</tr>
+<tr>
+<td>J</td>
+<td><strong>Audio I/O Pattern</strong></td>
+<td>Reads scene audio once into memory. Slices in-memory per group. Writes temp WAV per group (required by QwenASR file-path API).</td>
+<td>Passes full scene audio paths to batch APIs. No slicing. Less I/O overhead but larger audio per call.</td>
+<td>N/A (different by design)</td>
+</tr>
+<tr>
+<td>K</td>
+<td><strong>Per-Group Diagnostics</strong></td>
+<td>Rich <code>group_details</code> array: tier, group_index, time_range, duration, outcome, sentinel_status, triggers, assessment_snapshot, subs_produced, recovery info. Lines 1070-1248.</td>
+<td>No per-unit diagnostics. Per-scene only: sentinel status, asr_stats, timing_sources (using wrong metric — word count not segment count, per H4).</td>
+<td><strong>YES — Major</strong></td>
+</tr>
+<tr>
+<td>L</td>
+<td><strong>Sentinel Analytics</strong></td>
+<td>Full assessment_snapshot per group: word_count, char_count, coverage_ratio, aggregate_cps, zero_position_ratio, degenerate_ratio, triggers list.</td>
+<td>Per-scene assessment dict stored but no snapshot decomposition. No triggers list in diagnostics structure.</td>
+<td><strong>YES — Moderate</strong></td>
+</tr>
+<tr>
+<td>M</td>
+<td><strong>Min Duration Guard</strong></td>
+<td>Groups &lt; 0.1s are skipped (line 1086-1092).</td>
+<td>Scenes with empty cleaned text are skipped (line 1648-1655). No minimum duration guard.</td>
+<td><strong>YES — Minor</strong></td>
+</tr>
+<tr>
+<td>N</td>
+<td><strong>Error Recovery per Unit</strong></td>
+<td>Per-group <code>try/except</code> (line 1116-1128). Failed group → <code>None</code>, other groups continue.</td>
+<td>Per-scene <code>try/except</code> (line 1794-1799). But text generation and alignment are batched (Steps 2+6), so a crash there fails all scenes.</td>
+<td>Partial gap</td>
+</tr>
+<tr>
+<td>O</td>
+<td><strong>Merge + Chronological Sort</strong></td>
+<td>Merges tier1/tier2 results. Explicit <code>sort(key=s.start)</code> at line 1336. Defensive sort at 1367-1368 as safety net.</td>
+<td>No merge needed (one result per scene). But no chronological sort within the result after <code>_reconstruct_from_words()</code>.</td>
+<td><strong>YES — Minor</strong></td>
+</tr>
+<tr>
+<td>P</td>
+<td><strong>Sentinel Stats</strong></td>
+<td><code>self._sentinel_stats</code> accumulates across all groups. Instance-level dict.</td>
+<td>Local counters. Assigned to <code>self._sentinel_stats</code> at end.</td>
+<td>Parity</td>
+</tr>
+<tr>
+<td>Q</td>
+<td><strong>Progress Reporting</strong></td>
+<td>Per-group logging with tier tag (<code>[T1]/[T2]</code>), group index, time range.</td>
+<td>Per-scene <code>[DIAG]</code> logging. Batch-level tqdm from <code>transcribe_text_only()</code> and <code>align_standalone()</code>.</td>
+<td>Different style, both adequate</td>
+</tr>
+<tr>
+<td>R</td>
+<td><strong>Debug Artifacts</strong></td>
+<td>Per-group via <code>asr.transcribe(artifacts_dir=...)</code> — saves master text, timestamps JSON, merged words JSON.</td>
+<td>Per-scene: <code>_assembly_raw.txt</code>, <code>_assembly_clean.txt</code>, <code>_assembly_merged.json</code>. Richer mid-pipeline visibility.</td>
+<td><strong>Assembly is AHEAD</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-summary-what-each-mode-contributes">4.3 Summary: What Each Mode Contributes<a class="headerlink" href="#43-summary-what-each-mode-contributes" title="Permanent link">&para;</a></h3>
+<p><strong>What VAD_SLICING has that Assembly lacks (and needs):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Feature</th>
+<th>Impact if Missing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0</td>
+<td>Timestamp Resolution (4 modes)</td>
+<td>Null timestamps persist in final SRT</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>Boundary Clamping (double)</td>
+<td>Aligner timestamps can exceed scene duration</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Adaptive Step-Down</td>
+<td>No retry mechanism for collapsed scenes</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Step-Down Deferral in Sentinel</td>
+<td>Cannot defer collapse recovery to finer granularity</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Per-Group Diagnostics</td>
+<td>No sub-scene visibility for debugging</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Min Duration Guard (0.1s)</td>
+<td>Near-empty scenes waste alignment compute</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Sentinel Assessment Snapshot</td>
+<td>Less diagnostic data for analysis</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Defensive Chronological Sort</td>
+<td>Segments may be out of order after recovery</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What Assembly has that VAD_SLICING lacks:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mid-pipeline text cleaning (AssemblyTextCleaner)</td>
+<td>Prevents aligner NULL failures from hallucinated input</td>
+</tr>
+<tr>
+<td>VRAM-exclusive phases</td>
+<td>Higher batch_size potential, future vLLM socket</td>
+</tr>
+<tr>
+<td>Raw vs clean text artifacts</td>
+<td>Better debuggability for text quality issues</td>
+</tr>
+<tr>
+<td>Batch processing</td>
+<td>Amortized overhead across scenes</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-key-design-decisions">5. Key Design Decisions<a class="headerlink" href="#5-key-design-decisions" title="Permanent link">&para;</a></h2>
+<h3 id="51-japanesepostprocessor-is-not-suitable-for-qwen3-asr">5.1 JapanesePostProcessor Is NOT Suitable for Qwen3-ASR<a class="headerlink" href="#51-japanesepostprocessor-is-not-suitable-for-qwen3-asr" title="Permanent link">&para;</a></h3>
+<p><strong>Decision</strong>: The Whisper-era <code>JapanesePostProcessor</code> was developed for Whisper's output
+characteristics (aizuchi patterns, particle anchoring, merge/split rules tuned to Whisper
+segmentation). It is <strong>not suitable</strong> for Qwen3-ASR output.</p>
+<p><strong>Implications</strong>:
+- Assembly is <strong>correct</strong> to skip <code>JapanesePostProcessor</code> — it has its own Qwen-specific
+  <code>AssemblyTextCleaner</code> (4 stages: phrase repetition, char flood, hallucination filter,
+  whitespace)
+- Coupled modes (CONTEXT_AWARE, VAD_SLICING) are <strong>incorrect</strong> to apply it via
+  <code>qwen_asr.py:964-973</code>
+- This <strong>flips audit finding C2</strong>: coupled modes have the bug, not assembly
+- Each future ASR model may need its own text cleaner tuned to that model's artifacts</p>
+<h3 id="52-new-shared-method-not-porting">5.2 New Shared Method, Not Porting<a class="headerlink" href="#52-new-shared-method-not-porting" title="Permanent link">&para;</a></h3>
+<p><strong>Decision</strong>: Create a new shared hardening method rather than porting VAD_SLICING features
+to Assembly.</p>
+<p><strong>Rationale</strong>: The two modes operate in fundamentally different coordinate systems and data
+formats:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>VAD_SLICING</th>
+<th>ASSEMBLY</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Coordinate system</td>
+<td>Group-relative → offset → scene-relative</td>
+<td>Scene-relative throughout</td>
+</tr>
+<tr>
+<td>Input data</td>
+<td>WhisperResult (from coupled transcribe)</td>
+<td>Raw word dicts (from merge)</td>
+</tr>
+<tr>
+<td>Sentinel input</td>
+<td><code>extract_words_from_result(result)</code> adapter</td>
+<td>Direct word dicts (native format)</td>
+</tr>
+<tr>
+<td>Recovery VAD regions</td>
+<td>Offset from scene-relative to group-relative</td>
+<td>Scene-relative (no transform)</td>
+</tr>
+<tr>
+<td>Reconstruction</td>
+<td>Only after sentinel recovery</td>
+<td>Always (every scene)</td>
+</tr>
+<tr>
+<td>Timestamp resolution</td>
+<td>Before reconstruction</td>
+<td>Would need to be after reconstruction</td>
+</tr>
+</tbody>
+</table>
+<p>Porting means adapting each feature for a different coordinate system — every adaptation
+risks bugs. The shared hardening method works on the common output (WhisperResult) that
+both modes produce.</p>
+<h3 id="53-temporalframer-as-a-distinct-concern">5.3 TemporalFramer as a Distinct Concern<a class="headerlink" href="#53-temporalframer-as-a-distinct-concern" title="Permanent link">&para;</a></h3>
+<p><strong>Decision</strong>: Introduce a <code>TemporalFramer</code> protocol between scene detection and text
+generation — architecturally distinct from <code>SpeechSegmenter</code> (VAD).</p>
+<p><strong>The four orthogonal questions the pipeline answers:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Concern</th>
+<th>Protocol Domain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WHERE is there speech?</td>
+<td>Physical detection (VAD)</td>
+<td>SpeechSegmenter (existing)</td>
+</tr>
+<tr>
+<td>WHAT are the dialogue segments?</td>
+<td>Semantic segmentation with time boundaries</td>
+<td><strong>TemporalFramer (new)</strong></td>
+</tr>
+<tr>
+<td>WHAT was said?</td>
+<td>Text generation</td>
+<td>TextGenerator (new)</td>
+</tr>
+<tr>
+<td>WHEN exactly was each word said?</td>
+<td>Sub-segment alignment</td>
+<td>TextAligner (new)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why TemporalFramer is distinct from SpeechSegmenter:</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>SpeechSegmenter (VAD)</th>
+<th>TemporalFramer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Level</td>
+<td>Physical (speech/silence)</td>
+<td>Semantic (dialogue units)</td>
+</tr>
+<tr>
+<td>Input</td>
+<td>Audio only</td>
+<td>Audio, SRT, Whisper output, or other</td>
+</tr>
+<tr>
+<td>Output</td>
+<td>Speech regions</td>
+<td>Dialogue segments with optional text</td>
+</tr>
+<tr>
+<td>May use ASR internally</td>
+<td>No</td>
+<td>Yes (Whisper-as-framer)</td>
+</tr>
+<tr>
+<td>May use no audio at all</td>
+<td>No</td>
+<td>Yes (SRT-as-source)</td>
+</tr>
+<tr>
+<td>Granularity</td>
+<td>Sub-second frames</td>
+<td>Utterance-level (1-30s)</td>
+</tr>
+</tbody>
+</table>
+<p>SpeechSegmenter doesn't go away — it becomes an <strong>internal dependency</strong> of the
+<code>vad-grouped</code> framer backend. But <code>whisper-segment</code> and <code>srt-source</code> framers bypass
+SpeechSegmenter entirely.</p>
+<h3 id="54-temporalframer-backends">5.4 TemporalFramer Backends<a class="headerlink" href="#54-temporalframer-backends" title="Permanent link">&para;</a></h3>
+<p>After evaluation, four backends represent genuinely different strategies (not parameter
+variations), plus one utility backend:</p>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>Input</th>
+<th>How it frames</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>vad-grouped</code></strong></td>
+<td>Audio</td>
+<td>VAD → speech regions → grouped dialogue chunks</td>
+<td>ASR with short context windows (&lt;=30s)</td>
+</tr>
+<tr>
+<td><strong><code>whisper-segment</code></strong></td>
+<td>Audio</td>
+<td>Whisper ASR → extract segment boundaries</td>
+<td>Cross-model workflows (Whisper timing + Qwen text)</td>
+</tr>
+<tr>
+<td><strong><code>srt-source</code></strong></td>
+<td>SRT file</td>
+<td>Parse timestamps → dialogue frames</td>
+<td>Re-transcription of existing subtitles</td>
+</tr>
+<tr>
+<td><strong><code>full-scene</code></strong></td>
+<td>Scene bounds</td>
+<td>Entire scene = one frame</td>
+<td>When aligner or coupled ASR handles all timing</td>
+</tr>
+<tr>
+<td><strong><code>manual</code></strong></td>
+<td>User timestamps</td>
+<td>Direct injection</td>
+<td>Testing, debugging, special workflows</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Dropped: <code>scene-proportional</code></strong> — Naive time-based subdivision (120s → 4x30s) cuts at
+arbitrary points, potentially mid-word. VAD-based framing is always superior. If a
+<code>full-scene</code> frame exceeds some hard limit, fixed-window subdivision can be a fallback
+<strong>within</strong> the <code>full-scene</code> backend, not a separate strategy.</p>
+<h3 id="55-the-aligner-becomes-optional">5.5 The Aligner Becomes Optional<a class="headerlink" href="#55-the-aligner-becomes-optional" title="Permanent link">&para;</a></h3>
+<p><strong>Key architectural win</strong>: If the TemporalFramer provides sufficiently accurate timestamps
+and the TextGenerator produces text within those boundaries, the TextAligner can be
+<strong>skipped entirely</strong>. This is significant because:</p>
+<ul>
+<li>The ForcedAligner is the <strong>most unreliable component</strong> (collapse is what the sentinel
+  exists to detect)</li>
+<li>SRT subtitles need segment-level timing, not word-level — aligner precision is often
+  unnecessary</li>
+<li>Aligner-free workflows are simpler, faster, and more robust</li>
+</ul>
+<hr />
+<h2 id="6-proposed-architecture">6. Proposed Architecture<a class="headerlink" href="#6-proposed-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="61-block-diagram">6.1 Block Diagram<a class="headerlink" href="#61-block-diagram" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>┌──────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>│                    DecoupledSubtitlePipeline                      │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│                                                                  │
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│  SceneDetector ─→ [SpeechEnhancer] ─→ TemporalFramer            │
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│  (Protocol)       (Protocol,optional)  (Protocol - NEW)          │
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│  ├─ auditok       ├─ clearvoice        ├─ vad-grouped            │
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│  ├─ silero        ├─ bs-roformer       ├─ whisper-segment        │
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>│  ├─ semantic      ├─ none              ├─ srt-source             │
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>│  └─ none          └─ future            ├─ full-scene             │
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│                                        └─ manual                 │
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│                                                                  │
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>│  ─→ TextGenerator ─→ TextCleaner ─→ [TextAligner] ─→ Hardening  │
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>│     (Protocol)       (Protocol)     (Protocol,opt)               │
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>│     ├─ qwen3         ├─ assembly    ├─ qwen-forced-aligner       │
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>│     ├─ future-model  ├─ passthrough ├─ ctc-aligner               │
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>│     └─ vllm-backend  └─ future      ├─ none (skip)              │
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>│                                     └─ future                    │
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>└──────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<p><strong>Six protocol domains:</strong>
+1. <strong>SceneDetector</strong> — existing, established (auditok, silero, semantic, none)
+2. <strong>SpeechEnhancer</strong> — existing, established (clearvoice, bs-roformer, none)
+3. <strong>TemporalFramer</strong> — NEW (vad-grouped, whisper-segment, srt-source, full-scene, manual)
+4. <strong>TextGenerator</strong> — NEW (qwen3-text-only, future transformers, vLLM)
+5. <strong>TextCleaner</strong> — formalizes existing (assembly text cleaner, passthrough)
+6. <strong>TextAligner</strong> — formalizes existing (qwen-forced-aligner, ctc-aligner, none)</p>
+<p>Plus a <strong>shared Hardening</strong> stage (not a protocol — a deterministic post-processing step).</p>
+<h3 id="62-speechenhancer-placement">6.2 SpeechEnhancer Placement<a class="headerlink" href="#62-speechenhancer-placement" title="Permanent link">&para;</a></h3>
+<p>SpeechEnhancer operates on scene-level audio <strong>before</strong> temporal framing because:
+- Enhancement needs surrounding context for noise profile estimation
+- Framing backends that use VAD internally (<code>vad-grouped</code>) get better accuracy on clean
+  audio
+- Framing backends that run ASR internally (<code>whisper-segment</code>) benefit from enhanced audio</p>
+<h3 id="63-existing-protocol-factory-pattern">6.3 Existing Protocol + Factory Pattern<a class="headerlink" href="#63-existing-protocol-factory-pattern" title="Permanent link">&para;</a></h3>
+<p>The codebase already uses a consistent pattern for three domains:</p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>Protocol</th>
+<th>Factory</th>
+<th>Result type</th>
+<th>Backends dir</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Scene Detection</td>
+<td><code>SceneDetector</code></td>
+<td><code>SceneDetectorFactory</code></td>
+<td><code>SceneDetectionResult</code></td>
+<td><code>scene_detection_backends/</code></td>
+</tr>
+<tr>
+<td>Speech Segmentation</td>
+<td><code>SpeechSegmenter</code></td>
+<td><code>SpeechSegmenterFactory</code></td>
+<td><code>SegmentationResult</code></td>
+<td><code>speech_segmentation/backends/</code></td>
+</tr>
+<tr>
+<td>Speech Enhancement</td>
+<td><code>SpeechEnhancer</code></td>
+<td><code>SpeechEnhancerFactory</code></td>
+<td><code>EnhancementResult</code></td>
+<td><code>speech_enhancement/backends/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each follows:
+- Protocol defines the contract (input/output types, methods)
+- Dataclass defines the result type
+- Factory creates implementations by name
+- <code>cleanup()</code> for resource management
+- Implementations live in <code>backends/</code> subdirectory</p>
+<p>New domains will follow the same pattern.</p>
+<hr />
+<h2 id="7-protocol-specifications">7. Protocol Specifications<a class="headerlink" href="#7-protocol-specifications" title="Permanent link">&para;</a></h2>
+<h3 id="71-temporalframer-protocol">7.1 TemporalFramer Protocol<a class="headerlink" href="#71-temporalframer-protocol" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TemporalFrame</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">start</span><span class="p">:</span> <span class="nb">float</span>                      <span class="c1"># Frame start (seconds, scene-relative)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">end</span><span class="p">:</span> <span class="nb">float</span>                        <span class="c1"># Frame end (seconds, scene-relative)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">text</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>        <span class="c1"># Pre-existing text (from SRT, Whisper draft)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">confidence</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>                  <span class="c1"># Backend that produced this frame</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">FramingResult</span><span class="p">:</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">frames</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">TemporalFrame</span><span class="p">]</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>          <span class="c1"># Backend-specific metadata</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="k">class</span><span class="w"> </span><span class="nc">TemporalFramer</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        <span class="n">audio</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>        <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>        <span class="o">**</span><span class="n">kwargs</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FramingResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>Backend implementations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th><code>frame()</code> behavior</th>
+<th>Key kwargs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vad-grouped</code></td>
+<td>Runs SpeechSegmenter internally → groups speech regions into dialogue chunks</td>
+<td><code>max_group_duration_s</code>, <code>chunk_threshold_s</code>, segmenter config</td>
+</tr>
+<tr>
+<td><code>whisper-segment</code></td>
+<td>Runs faster-whisper → extracts segment boundaries</td>
+<td><code>model_size</code>, <code>language</code>, <code>compute_type</code></td>
+</tr>
+<tr>
+<td><code>srt-source</code></td>
+<td>Parses SRT file → extracts timestamps, optionally preserves text</td>
+<td><code>srt_path</code>, <code>keep_text</code></td>
+</tr>
+<tr>
+<td><code>full-scene</code></td>
+<td>Returns single frame spanning entire scene</td>
+<td>(none — trivial)</td>
+</tr>
+<tr>
+<td><code>manual</code></td>
+<td>Returns user-provided timestamps as frames</td>
+<td><code>timestamps: List[Tuple[float, float]]</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="72-textgenerator-protocol">7.2 TextGenerator Protocol<a class="headerlink" href="#72-textgenerator-protocol" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TranscriptionResult</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span>                          <span class="c1"># Transcribed text</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">language</span><span class="p">:</span> <span class="nb">str</span>                      <span class="c1"># Detected or specified language</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>           <span class="c1"># Model-specific metadata (token count, etc.)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">TextGenerator</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="n">audio_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="n">context</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="o">**</span><span class="n">kwargs</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TranscriptionResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate_batch</span><span class="p">(</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>        <span class="n">audio_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>        <span class="n">contexts</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>        <span class="o">**</span><span class="n">kwargs</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">TranscriptionResult</span><span class="p">]:</span> <span class="o">...</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">unload</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>Implementations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Implementation</th>
+<th>Wraps</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Qwen3TextGenerator</code></td>
+<td><code>QwenASR.transcribe_text_only()</code></td>
+<td>Batch support via existing batch API</td>
+</tr>
+<tr>
+<td><code>TransformersGenerator</code></td>
+<td>Any HuggingFace ASR model</td>
+<td>Generic transformers pipeline adapter</td>
+</tr>
+<tr>
+<td><code>VLLMGenerator</code></td>
+<td>OpenAI-compatible API to vLLM server</td>
+<td>HTTP client, no VRAM management</td>
+</tr>
+<tr>
+<td><code>WhisperTextGenerator</code></td>
+<td>faster-whisper/openai-whisper</td>
+<td>Text extraction (timestamps ignored)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="73-textcleaner-protocol">7.3 TextCleaner Protocol<a class="headerlink" href="#73-textcleaner-protocol" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">TextCleaner</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">texts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>Implementations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Implementation</th>
+<th>Wraps</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AssemblyTextCleaner</code> (existing)</td>
+<td>4-stage Qwen-specific cleaning</td>
+<td>Qwen3-ASR output</td>
+</tr>
+<tr>
+<td><code>PassthroughCleaner</code></td>
+<td>No-op</td>
+<td>Models whose output needs no cleaning</td>
+</tr>
+<tr>
+<td>Future model-specific cleaners</td>
+<td>TBD</td>
+<td>Per-model characteristics</td>
+</tr>
+</tbody>
+</table>
+<h3 id="74-textaligner-protocol">7.4 TextAligner Protocol<a class="headerlink" href="#74-textaligner-protocol" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">WordTimestamp</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">word</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">start</span><span class="p">:</span> <span class="nb">float</span>                       <span class="c1"># Seconds, scene-relative</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">end</span><span class="p">:</span> <span class="nb">float</span>                         <span class="c1"># Seconds, scene-relative</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">AlignmentResult</span><span class="p">:</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">words</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">WordTimestamp</span><span class="p">]</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>           <span class="c1"># Aligner-specific (coverage, CPS, etc.)</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="k">class</span><span class="w"> </span><span class="nc">TextAligner</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">align</span><span class="p">(</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>        <span class="n">audio_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>        <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        <span class="o">**</span><span class="n">kwargs</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlignmentResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">align_batch</span><span class="p">(</span>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>        <span class="n">audio_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>        <span class="n">texts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>        <span class="o">**</span><span class="n">kwargs</span>
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">AlignmentResult</span><span class="p">]:</span> <span class="o">...</span>
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>
+<a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">unload</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>Implementations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Implementation</th>
+<th>Wraps</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Qwen3ForcedAlignerAdapter</code></td>
+<td><code>QwenASR.align_standalone()</code></td>
+<td>Batch support via existing batch API</td>
+</tr>
+<tr>
+<td><code>CTCAligner</code></td>
+<td>wav2vec2-based CTC segmentation</td>
+<td>Alternative neural alignment</td>
+</tr>
+<tr>
+<td><code>VADProportionalAligner</code></td>
+<td>No neural model — VAD + proportional char distribution</td>
+<td>Fallback when no aligner available</td>
+</tr>
+<tr>
+<td><code>NoneAligner</code></td>
+<td>Skip alignment</td>
+<td>Timestamps from TemporalFramer are sufficient</td>
+</tr>
+<tr>
+<td><code>HybridAligner</code></td>
+<td>Try primary, fall back to secondary on collapse</td>
+<td>Composed from other aligners</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-data-types-contracts">8. Data Types &amp; Contracts<a class="headerlink" href="#8-data-types-contracts" title="Permanent link">&para;</a></h2>
+<h3 id="81-inter-component-data-flow">8.1 Inter-Component Data Flow<a class="headerlink" href="#81-inter-component-data-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>SceneDetector        → SceneDetectionResult (scene boundaries)
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>SpeechEnhancer       → EnhancementResult (enhanced audio paths)
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>TemporalFramer       → FramingResult (List[TemporalFrame])
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>TextGenerator        → TranscriptionResult (text per frame)
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>TextCleaner          → str (cleaned text per frame)
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>TextAligner          → AlignmentResult (word timestamps per frame)
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>Hardening            → stable_whisper.WhisperResult (Phase 5→6 contract)
+</code></pre></div>
+<h3 id="82-shared-types-package-location">8.2 Shared Types Package Location<a class="headerlink" href="#82-shared-types-package-location" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>whisperjav/modules/subtitle_pipeline/
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>├── __init__.py
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>├── types.py             # TemporalFrame, TranscriptionResult, AlignmentResult, WordTimestamp
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>├── protocols.py         # TemporalFramer, TextGenerator, TextCleaner, TextAligner protocols
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>├── orchestrator.py      # DecoupledSubtitlePipeline
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>├── hardening.py         # harden_scene_result() — shared post-reconstruction
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>├── reconstruction.py    # reconstruct_from_words() — extracted from current static method
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>├── framers/             # TemporalFramer backends
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>│   ├── __init__.py
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>│   ├── factory.py       # TemporalFramerFactory
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>│   ├── vad_grouped.py
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>│   ├── whisper_segment.py
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>│   ├── srt_source.py
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>│   ├── full_scene.py
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>│   └── manual.py
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>├── generators/          # TextGenerator backends
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>│   ├── __init__.py
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>│   ├── factory.py       # TextGeneratorFactory
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>│   └── qwen3.py
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>├── aligners/            # TextAligner backends
+<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>│   ├── __init__.py
+<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>│   ├── factory.py       # TextAlignerFactory
+<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a>│   ├── qwen3.py
+<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a>│   ├── vad_proportional.py
+<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a>│   └── none.py
+<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>└── cleaners/            # TextCleaner backends
+<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a>    ├── __init__.py
+<a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a>    ├── factory.py       # TextCleanerFactory
+<a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a>    ├── qwen3.py         # Wraps AssemblyTextCleaner
+<a id="__codelineno-8-30" name="__codelineno-8-30" href="#__codelineno-8-30"></a>    └── passthrough.py
+</code></pre></div>
+<h3 id="83-phase-5-phase-6-contract-preserved">8.3 Phase 5 → Phase 6 Contract Preserved<a class="headerlink" href="#83-phase-5-phase-6-contract-preserved" title="Permanent link">&para;</a></h3>
+<p>The pipeline output remains <code>stable_whisper.WhisperResult</code> — the existing contract between
+Phase 5 (ASR) and Phase 6 (SRT generation). The <code>reconstruction.py</code> module handles
+converting <code>AlignmentResult</code> (word timestamps) into <code>WhisperResult</code> via
+<code>stable_whisper.transcribe_any()</code>.</p>
+<hr />
+<h2 id="9-orchestrator-design">9. Orchestrator Design<a class="headerlink" href="#9-orchestrator-design" title="Permanent link">&para;</a></h2>
+<h3 id="91-decoupledsubtitlepipeline">9.1 DecoupledSubtitlePipeline<a class="headerlink" href="#91-decoupledsubtitlepipeline" title="Permanent link">&para;</a></h3>
+<p>Not a pipeline class (doesn't extend <code>BasePipeline</code>). Rather, a Phase 5 replacement that
+any pipeline class can use internally:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">DecoupledSubtitlePipeline</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>        <span class="n">framer</span><span class="p">:</span> <span class="n">TemporalFramer</span><span class="p">,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>        <span class="n">generator</span><span class="p">:</span> <span class="n">TextGenerator</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>        <span class="n">cleaner</span><span class="p">:</span> <span class="n">TextCleaner</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="n">aligner</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextAligner</span><span class="p">],</span>   <span class="c1"># None = skip alignment</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>        <span class="n">hardening_config</span><span class="p">:</span> <span class="n">HardeningConfig</span><span class="p">,</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="n">artifacts_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># debug artifact output</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">process_scenes</span><span class="p">(</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>        <span class="n">scene_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>        <span class="n">scene_durations</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>        <span class="n">speech_regions_per_scene</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">WhisperResult</span><span class="p">],</span> <span class="n">Dict</span><span class="p">]]:</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="sd">        Process all scenes through the decoupled pipeline.</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="sd">        Returns list of (result, diagnostics) tuples, one per scene.</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="sd">        Result is None if scene processing failed.</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="sd">        &quot;&quot;&quot;</span>
+</code></pre></div>
+<h3 id="92-internal-flow">9.2 Internal Flow<a class="headerlink" href="#92-internal-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>1.  framer.frame(scene_audio) → temporal_frames per scene
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    ─── if framer produces text (srt-source, whisper-segment): skip steps 2-5
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>2.  generator.load()
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>3.  generator.generate_batch(frame_audios) → raw_texts
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>4.  generator.unload()                      ← VRAM swap
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>5.  cleaner.clean_batch(raw_texts) → clean_texts
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>6.  IF aligner is not None:
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>      aligner.load()
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>7.    aligner.align_batch(frame_audios, clean_texts) → alignments
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>8.    aligner.unload()                      ← VRAM swap
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>9.  Per scene/frame:
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>      merge text + timestamps → word dicts
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>      sentinel detection → recovery if collapsed
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>      reconstruct → WhisperResult
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>      harden (timestamp resolution, boundary clamp, chronological sort)
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>      emit diagnostics
+</code></pre></div>
+<p><strong>Key flow variations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>TemporalFramer</th>
+<th>TextAligner</th>
+<th>Flow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>full-scene</code></td>
+<td><code>qwen-forced-aligner</code></td>
+<td>Current assembly flow: text → align → merge → harden</td>
+</tr>
+<tr>
+<td><code>vad-grouped</code></td>
+<td><code>none</code></td>
+<td>VAD provides timing, text generated per frame, timestamps inherited from frames</td>
+</tr>
+<tr>
+<td><code>whisper-segment</code></td>
+<td><code>none</code></td>
+<td>Whisper provides timing + optional draft text, Qwen re-transcribes per frame</td>
+</tr>
+<tr>
+<td><code>srt-source</code></td>
+<td><code>none</code></td>
+<td>SRT provides timing, Qwen transcribes per timestamp window</td>
+</tr>
+<tr>
+<td><code>vad-grouped</code></td>
+<td><code>qwen-forced-aligner</code></td>
+<td>Current VAD_SLICING flow but decoupled</td>
+</tr>
+</tbody>
+</table>
+<h3 id="93-hardening-stage">9.3 Hardening Stage<a class="headerlink" href="#93-hardening-stage" title="Permanent link">&para;</a></h3>
+<p>The shared <code>harden_scene_result()</code> function applies <strong>identically</strong> to all results
+regardless of how they were produced:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">harden_scene_result</span><span class="p">(</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">WhisperResult</span><span class="p">,</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">scene_duration_sec</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">timestamp_mode</span><span class="p">:</span> <span class="n">TimestampMode</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">speech_regions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">WhisperResult</span><span class="p">,</span> <span class="n">Dict</span><span class="p">]:</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="sd">    Post-reconstruction hardening — shared by all pipeline paths.</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="sd">    Steps:</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="sd">    1. Timestamp resolution (interpolation/fallback/VAD-only per timestamp_mode)</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="sd">    2. Boundary clamping [0, scene_duration]</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="sd">    3. Chronological sort</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="sd">    4. Diagnostic snapshot (segment count, timing source breakdown, quality metrics)</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+<p>This resolves:
+- <strong>H2</strong>: Assembly gets timestamp resolution
+- <strong>H1</strong>: VAD_ONLY distributes proportionally (not blanket assignment)
+- <strong>H4</strong>: Diagnostics measured after reconstruction, with correct segment count
+- <strong>M7</strong>: All modes respect <code>timestamp_mode</code> setting
+- <strong>Comparison B/C/O</strong>: All modes get boundary clamping and chronological sort</p>
+<h3 id="94-sentinel-integration-one-place-not-four">9.4 Sentinel Integration (One Place, Not Four)<a class="headerlink" href="#94-sentinel-integration-one-place-not-four" title="Permanent link">&para;</a></h3>
+<p>Currently, sentinel detection + recovery is implemented in:
+1. Assembly Step 8 (lines 1693-1763) — operates on raw word dicts
+2. VAD_SLICING <code>_transcribe_group</code> (lines 1129-1197) — operates on WhisperResult via adapter
+3. Coupled-mode sentinel recovery (via shared code paths)</p>
+<p>In the new architecture, sentinel integration lives <strong>once</strong> in the orchestrator's Step 9,
+operating on word dicts from either:
+- <code>AlignmentResult.words</code> (when aligner ran)
+- Direct extraction from <code>TemporalFrame.text</code> timestamps (when framer provided timing)</p>
+<hr />
+<h2 id="10-audit-finding-resolutions">10. Audit Finding Resolutions<a class="headerlink" href="#10-audit-finding-resolutions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Resolution in New Architecture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>C1</strong>: OOM retry stale closure</td>
+<td><strong>Eliminated</strong> — orchestrator manages model lifecycle externally via <code>generator.load()</code>/<code>unload()</code>. No closures capture model references.</td>
+</tr>
+<tr>
+<td><strong>C2</strong> (revised): Coupled modes apply wrong post-processor</td>
+<td><strong>Resolved</strong> — <code>TextCleaner</code> protocol makes cleaning strategy explicit per model. Qwen3 uses <code>AssemblyTextCleaner</code>. Whisper-era <code>JapanesePostProcessor</code> removed from Qwen path.</td>
+</tr>
+<tr>
+<td><strong>H1</strong>: VAD_ONLY overlapping subs</td>
+<td><strong>Fixed</strong> in shared <code>harden_scene_result()</code> — proportional distribution by character count.</td>
+</tr>
+<tr>
+<td><strong>H2</strong>: Assembly no timestamp resolution</td>
+<td><strong>Fixed</strong> — <code>harden_scene_result()</code> applies to all paths.</td>
+</tr>
+<tr>
+<td><strong>H3</strong>: <code>suppress_silence</code> conflicts with sentinel</td>
+<td><strong>Design decision</strong> made once in <code>reconstruction.py</code> — set <code>suppress_silence=False</code> for sentinel-recovered results, <code>True</code> for normal results.</td>
+</tr>
+<tr>
+<td><strong>H4</strong>: Wrong diagnostic metrics</td>
+<td><strong>Fixed</strong> — diagnostics measured after reconstruction in hardening stage, with correct segment count.</td>
+</tr>
+<tr>
+<td><strong>M1</strong>: Stale 300s comment</td>
+<td><strong>Resolved</strong> by code extraction — hard limit lives in aligner backend, not in pipeline comments.</td>
+</tr>
+<tr>
+<td><strong>M2</strong>: <code>end=0.0</code> treated as NULL</td>
+<td><strong>Resolved</strong> — sentinel operates on <code>AlignmentResult.words</code> which has explicit null representation, not overloaded <code>0.0</code>.</td>
+</tr>
+<tr>
+<td><strong>M3</strong>: No batch_size override for assembly</td>
+<td><strong>Resolved</strong> — <code>TextGenerator.load()</code> can accept model config including batch_size.</td>
+</tr>
+<tr>
+<td><strong>M4</strong>: Private <code>_exact_lists</code> access</td>
+<td><strong>Resolved</strong> — <code>TextCleaner</code> protocol encapsulates cleaning. If a cleaner needs hallucination lists, it manages that internally.</td>
+</tr>
+<tr>
+<td><strong>M5</strong>: Redundant VRAM cleanup</td>
+<td><strong>Resolved</strong> — orchestrator calls <code>safe_cuda_cleanup()</code> once after each <code>unload()</code>.</td>
+</tr>
+<tr>
+<td><strong>M6</strong>: Redundant <code>_check_audio_limits</code></td>
+<td><strong>Resolved</strong> — duration known from <code>TemporalFrame.end - TemporalFrame.start</code>. No redundant file reads.</td>
+</tr>
+<tr>
+<td><strong>M7</strong>: Timestamp modes inconsistent</td>
+<td><strong>Resolved</strong> — one <code>harden_scene_result()</code>, one behavior for all modes.</td>
+</tr>
+<tr>
+<td><strong>M8</strong>: <code>suppress_silence</code> in coupled mode</td>
+<td><strong>Resolved</strong> — same design decision as H3, applied once.</td>
+</tr>
+<tr>
+<td><strong>L1-L7</strong></td>
+<td><strong>Resolved</strong> by fresh implementation — dead code, stale comments, and cosmetic issues don't carry over.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-current-mode-mapping">11. Current Mode Mapping<a class="headerlink" href="#11-current-mode-mapping" title="Permanent link">&para;</a></h2>
+<h3 id="111-how-existing-modes-map-to-new-architecture">11.1 How Existing Modes Map to New Architecture<a class="headerlink" href="#111-how-existing-modes-map-to-new-architecture" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Current Mode</th>
+<th>TemporalFramer</th>
+<th>TextGenerator</th>
+<th>TextCleaner</th>
+<th>TextAligner</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ASSEMBLY</strong></td>
+<td><code>full-scene</code></td>
+<td><code>qwen3-text-only</code></td>
+<td><code>assembly (Qwen3)</code></td>
+<td><code>qwen-forced-aligner</code></td>
+<td>Closest to current assembly flow</td>
+</tr>
+<tr>
+<td><strong>VAD_SLICING</strong></td>
+<td><code>vad-grouped</code></td>
+<td><code>qwen3-text-only</code> (or coupled)</td>
+<td><code>assembly (Qwen3)</code></td>
+<td><code>qwen-forced-aligner</code> (or <code>none</code>)</td>
+<td>Decoupled version of current flow</td>
+</tr>
+<tr>
+<td><strong>CONTEXT_AWARE</strong></td>
+<td><code>full-scene</code></td>
+<td><code>qwen3-coupled</code></td>
+<td><code>assembly (Qwen3)</code></td>
+<td>built-in (coupled)</td>
+<td>May remain as legacy path initially</td>
+</tr>
+</tbody>
+</table>
+<h3 id="112-migration-strategy">11.2 Migration Strategy<a class="headerlink" href="#112-migration-strategy" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Phase 0</strong>: Build types, protocols, hardening, reconstruction — independent of current
+   pipeline</li>
+<li><strong>Phase 1</strong>: Create Qwen3 adapters (wrap existing <code>QwenASR</code> methods behind protocols)</li>
+<li><strong>Phase 2</strong>: Build orchestrator, integrate sentinel</li>
+<li><strong>Phase 3</strong>: Wire into <code>QwenPipeline</code> for assembly mode first; coupled modes continue
+   as-is initially</li>
+<li><strong>Future</strong>: Deprecate mode-specific code as orchestrator proves equivalent</li>
+</ol>
+<hr />
+<h2 id="12-new-workflows-enabled">12. New Workflows Enabled<a class="headerlink" href="#12-new-workflows-enabled" title="Permanent link">&para;</a></h2>
+<p>The component architecture trivially enables workflows that are currently impossible:</p>
+<h3 id="121-whisper-guided-qwen">12.1 Whisper-Guided Qwen<a class="headerlink" href="#121-whisper-guided-qwen" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>TemporalFramer(&quot;whisper-segment&quot;) → Whisper produces segment timestamps
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>TextGenerator(&quot;qwen3&quot;) → Qwen transcribes within those timestamps
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>TextAligner(None) → Skip aligner — Whisper&#39;s segment timestamps are the final timing
+</code></pre></div>
+<p><strong>Value</strong>: Uses Whisper's reliable timing with Qwen's superior Japanese transcription.
+The aligner (most unreliable component) is eliminated entirely.</p>
+<h3 id="122-srt-re-transcription">12.2 SRT Re-Transcription<a class="headerlink" href="#122-srt-re-transcription" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>TemporalFramer(&quot;srt-source&quot;, srt_path=&quot;existing.srt&quot;) → Extract timestamps from SRT
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>TextGenerator(&quot;qwen3&quot;) → Qwen re-transcribes each dialogue window
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>TextAligner(None) → Timestamps inherited from source SRT
+</code></pre></div>
+<p><strong>Value</strong>: An existing SRT with good timing but poor transcription gets re-transcribed
+with a better model. No aligner needed.</p>
+<h3 id="123-two-pass-refinement">12.3 Two-Pass Refinement<a class="headerlink" href="#123-two-pass-refinement" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>Pass 1: Normal pipeline → output1.srt (may have timing issues)
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>Pass 2: TemporalFramer(&quot;srt-source&quot;, srt_path=&quot;output1.srt&quot;) → use Pass 1 timestamps
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>        TextGenerator(&quot;qwen3&quot;) → re-transcribe with context from Pass 1
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>        TextAligner(&quot;qwen-forced-aligner&quot;) → refine word-level timing
+</code></pre></div>
+<p><strong>Value</strong>: Iterative refinement where each pass improves on the previous.</p>
+<h3 id="124-aligner-free-fast-mode">12.4 Aligner-Free Fast Mode<a class="headerlink" href="#124-aligner-free-fast-mode" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>TemporalFramer(&quot;vad-grouped&quot;) → VAD provides speech boundaries
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>TextGenerator(&quot;qwen3&quot;) → Qwen transcribes per group
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>TextAligner(None) → Frame timestamps become segment timestamps
+</code></pre></div>
+<p><strong>Value</strong>: Fastest possible pipeline — no aligner load/compute. Segment-level timing from
+VAD is sufficient for many SRT use cases.</p>
+<h3 id="125-cross-model-benchmarking">12.5 Cross-Model Benchmarking<a class="headerlink" href="#125-cross-model-benchmarking" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Same audio + same TemporalFramer
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>→ TextGenerator(&quot;qwen3&quot;) → AlignmentResult A
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>→ TextGenerator(&quot;whisper-large-v3&quot;) → AlignmentResult B
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>→ Compare against ground-truth SRT → per-scene accuracy metrics
+</code></pre></div>
+<p><strong>Value</strong>: Because all generators produce the same <code>TranscriptionResult</code> type, comparison
+is trivial. The diagnostic/benchmarking utility can run multiple generators on the same
+input and compare results.</p>
+<hr />
+<h2 id="13-what-doesnt-change">13. What Doesn't Change<a class="headerlink" href="#13-what-doesnt-change" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Phases 1-4</strong> (audio extraction, scene detection, speech enhancement, speech segmentation)</td>
+<td>Untouched</td>
+</tr>
+<tr>
+<td><strong>Phases 6-8</strong> (SRT generation, stitching, sanitization, output)</td>
+<td>Untouched</td>
+</tr>
+<tr>
+<td><strong>Ensemble system</strong> (<code>pass_worker.py</code>)</td>
+<td>Continues to construct pipelines as before</td>
+</tr>
+<tr>
+<td><strong>CLI and GUI interfaces</strong></td>
+<td>Pass same parameters, wired through same paths</td>
+</tr>
+<tr>
+<td><strong><code>stable_whisper.WhisperResult</code></strong></td>
+<td>Remains the Phase 5→6 contract</td>
+</tr>
+<tr>
+<td><strong>Scene detection backends</strong></td>
+<td>Already refactored (Sprint 3), unchanged</td>
+</tr>
+<tr>
+<td><strong>Speech enhancement backends</strong></td>
+<td>Already established, unchanged</td>
+</tr>
+<tr>
+<td><strong>Speech segmentation backends</strong></td>
+<td>Become internal to <code>vad-grouped</code> framer</td>
+</tr>
+<tr>
+<td><strong>SRT stitching</strong></td>
+<td>Unchanged — operates on Phase 6 output</td>
+</tr>
+</tbody>
+</table>
+<p>The refactoring is <strong>scoped to Phase 5</strong> — replacing mode-specific tangled code with
+composable components.</p>
+<hr />
+<h2 id="14-future-expansion">14. Future Expansion<a class="headerlink" href="#14-future-expansion" title="Permanent link">&para;</a></h2>
+<h3 id="141-new-textgenerator-implementations">14.1 New TextGenerator Implementations<a class="headerlink" href="#141-new-textgenerator-implementations" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Backend Type</th>
+<th>Integration Path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Future transformers models</td>
+<td><code>TransformersGenerator</code></td>
+<td>Generic HuggingFace pipeline adapter</td>
+</tr>
+<tr>
+<td>vLLM-served models</td>
+<td><code>VLLMGenerator</code></td>
+<td>OpenAI-compatible HTTP API</td>
+</tr>
+<tr>
+<td>Whisper (text extraction)</td>
+<td><code>WhisperTextGenerator</code></td>
+<td>faster-whisper, discard timestamps</td>
+</tr>
+</tbody>
+</table>
+<h3 id="142-new-textaligner-implementations">14.2 New TextAligner Implementations<a class="headerlink" href="#142-new-textaligner-implementations" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aligner</th>
+<th>Approach</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CTC Aligner (wav2vec2)</td>
+<td>CTC-based forced alignment</td>
+<td>Alternative to Qwen3 aligner</td>
+</tr>
+<tr>
+<td>WhisperCrossAttention</td>
+<td>Use Whisper's attention maps for alignment</td>
+<td>Cross-model alignment</td>
+</tr>
+<tr>
+<td>HybridAligner</td>
+<td>Try primary → fall back on collapse</td>
+<td>Composed from other aligners</td>
+</tr>
+</tbody>
+</table>
+<h3 id="143-diagnosticbenchmarking-utility">14.3 Diagnostic/Benchmarking Utility<a class="headerlink" href="#143-diagnosticbenchmarking-utility" title="Permanent link">&para;</a></h3>
+<p>The protocol-based architecture makes benchmarking natural:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Same audio + same text → different TextAligner implementations → AlignmentResult[]
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>                       → compare against ground-truth SRT
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>                       → per-scene metrics (timing accuracy, coverage, CPS)
+</code></pre></div>
+<p>Because all aligners produce the same <code>AlignmentResult</code> type, the utility can:
+1. Run multiple aligners on the same input
+2. Compare their results against ground truth
+3. Report which aligner works best for which content type
+4. Identify per-scene problem areas
+5. Generate comparative reports</p>
+<h3 id="144-vllm-integration-per-adr-005">14.4 vLLM Integration (per ADR-005)<a class="headerlink" href="#144-vllm-integration-per-adr-005" title="Permanent link">&para;</a></h3>
+<p>Assembly mode was identified as the "vLLM socket" in ADR-005. The new architecture makes
+this explicit: <code>VLLMGenerator</code> is a drop-in <code>TextGenerator</code> implementation that talks to
+a vLLM server via HTTP. No VRAM management needed (the server handles it). The VRAM swap
+points (Steps 4 and 8 in the orchestrator) become no-ops for VLLMGenerator.</p>
+<hr />
+<h2 id="appendix-a-alignment-sentinel-reference">Appendix A: Alignment Sentinel Reference<a class="headerlink" href="#appendix-a-alignment-sentinel-reference" title="Permanent link">&para;</a></h2>
+<p>The Alignment Sentinel (<code>alignment_sentinel.py</code>) detects and recovers from ForcedAligner
+collapse. It operates as standalone functions (no class state):</p>
+<p><strong>Detection</strong> (<code>assess_alignment_quality</code>):
+- Coverage ratio: words covering &lt;5% of scene = collapsed
+- Aggregate CPS: &gt;50 chars/sec = physically impossible speech rate
+- Word span: sub-500ms with substantial text = collapsed
+- Zero position: &gt;10% words at (0.0, 0.0) = aligner returned NULL
+- Degenerate: &gt;40% words with start==end = cluster collapse</p>
+<p><strong>Recovery strategies</strong>:
+- <strong>Strategy C</strong> (VAD-guided): Distribute words proportionally across VAD speech regions,
+  skipping silence gaps. Used when VAD data available.
+- <strong>Strategy B</strong> (Proportional): Distribute words from anchor position at conversational
+  speed (~10 CPS Japanese). Fallback when no VAD data.</p>
+<p><strong>In new architecture</strong>: Sentinel moves from 3-4 integration points to one place in
+orchestrator Step 9.</p>
+<h2 id="appendix-b-assemblytextcleaner-reference">Appendix B: AssemblyTextCleaner Reference<a class="headerlink" href="#appendix-b-assemblytextcleaner-reference" title="Permanent link">&para;</a></h2>
+<p>The <code>AssemblyTextCleaner</code> (<code>assembly_text_cleaner.py</code>) is the Qwen3-ASR-specific mid-pipeline
+text cleaner. It operates between text generation and alignment with four stages:</p>
+<ol>
+<li><strong>Phrase repetition</strong> (<code>PhraseRepetitionConfig</code>): Detects and collapses repeated
+   multi-word phrases</li>
+<li><strong>Character flood</strong> (<code>CharFloodConfig</code>): Detects sequences of repeated characters
+   (e.g., "ああああああ")</li>
+<li><strong>Hallucination filter</strong> (<code>HallucinationFilterConfig</code>): Removes known hallucination
+   patterns using lists from <code>HallucinationRemover</code></li>
+<li><strong>Whitespace</strong> (<code>WhitespaceConfig</code>): Normalizes whitespace artifacts</li>
+</ol>
+<p>This cleaner is specifically tuned for Qwen3-ASR's hallucination characteristics and is
+NOT interchangeable with the Whisper-era <code>JapanesePostProcessor</code>.</p>
+<h2 id="appendix-c-key-constants-limits">Appendix C: Key Constants &amp; Limits<a class="headerlink" href="#appendix-c-key-constants-limits" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Value</th>
+<th>Location</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ForcedAligner hard limit</td>
+<td>180s</td>
+<td><code>qwen_asr.py:217</code></td>
+<td>NOT 300s as some comments claim</td>
+</tr>
+<tr>
+<td>Assembly max scene duration</td>
+<td>120s</td>
+<td><code>qwen_pipeline.py:398</code></td>
+<td>60s safety margin below aligner limit</td>
+</tr>
+<tr>
+<td>TEN VAD max group duration</td>
+<td>29s</td>
+<td>Config YAML</td>
+<td>Stay within Whisper's 30s context window</td>
+</tr>
+<tr>
+<td>Sentinel coverage threshold</td>
+<td>5%</td>
+<td><code>alignment_sentinel.py</code></td>
+<td>Words covering &lt;5% of scene = collapsed</td>
+</tr>
+<tr>
+<td>Sentinel CPS threshold</td>
+<td>50.0</td>
+<td><code>alignment_sentinel.py</code></td>
+<td>Physically impossible speech rate</td>
+</tr>
+<tr>
+<td>Sentinel degenerate threshold</td>
+<td>40%</td>
+<td><code>alignment_sentinel.py</code></td>
+<td>&gt;40% zero-duration words = collapse</td>
+</tr>
+<tr>
+<td>Target CPS for recovery</td>
+<td>10.0</td>
+<td><code>alignment_sentinel.py</code></td>
+<td>Japanese conversational speed</td>
+</tr>
+<tr>
+<td>Repetition penalty</td>
+<td>1.1</td>
+<td>Pipeline default</td>
+<td>Applied via <code>_apply_generation_config()</code></td>
+</tr>
+<tr>
+<td>Max tokens per audio second</td>
+<td>20.0</td>
+<td>Pipeline default</td>
+<td>Dynamic per-call token budget</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>End of ADR-006</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

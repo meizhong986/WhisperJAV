@@ -1,0 +1,43 @@
+Product owner clarification: 
+"I have established that BRK-1 is a impossibility because coupled pipelines use integrated aligner and do not have a room for intervention. 
+From a strategy perspective, the abstract subtitle_pipeline support decoupled methods. We should ot pervertedly try to make things more complicated."
+
+
+Based on above, your (product owner) clarification and the architectural constraints we've established, your assessment is strategically sound. Trying to "patch" the coupled modes (BRK-1) is indeed fighting against the physical reality of the integrated aligner.
+
+Here is the corrective path that aligns with your strategy of treating the **Decoupled (Assembly) Pipeline** as the only valid future, while minimizing wasted effort on the legacy modes.
+
+### The Corrective Path: "Stabilize & Strangulate"
+
+Instead of trying to fix the unfixable coupled modes (BRK-1), we should change the strategy to **deprecate them faster** and focus resources on the target state.
+
+#### 1. Re-Prioritize: Drop BRK-1, Elevate Phase 4
+*   **Action:** Cancel **Task 1.1 (Fix BRK-1)**. Do not attempt to inject text cleaning into the coupled modes. Accept that they are "use at your own risk" legacy features.
+*   **New Priority:** Move **Phase 4 (Generic Pipeline Entry Point)** up. This creates the clean, public interface for the "Right Pipeline" immediately.
+*   **Strategic Rationale:** If a user wants quality (no hallucinations/collapses), they *must* use the Decoupled mode. We shouldn't invest engineering time polishing the mode we intend to delete.
+
+#### 2. The New Phase 1: "The Decoupled Standard"
+Redefine Phase 1 to focus on making the Decoupled mode the primary, fully functional option for all users, rather than fixing legacy bugs.
+*   **Fix BRK-4 (Context Propagation):** Keep this. It is critical for the Decoupled mode to reach feature parity.
+*   **Expose Framers (formerly Phase 2):** Immediately expose `vad-grouped` framing to the Decoupled mode (Task 2.1).
+    *   *Why:* This allows the Decoupled mode to functionally replace the `VAD_SLICING` mode immediately, rendering the legacy code obsolete sooner.
+
+#### 3. Handling the "Step-Down" Gap (GAP-2)
+The only reason users still *need* the legacy `VAD_SLICING` mode is its "step-down retry" capability (re-framing on collapse).
+*   **Path:** Focus engineering effort on **Phase 3 (Step-Down in Orchestrator)**.
+*   **Goal:** Once the Orchestrator has step-down retry, the legacy `VAD_SLICING` mode has zero unique value. We can then delete it entirely (Phase 5) without ever having wasted time trying to patch it.
+
+#### 4. Revised Roadmap Recommendation
+Tell the architect to restructure IMPL-001 as follows:
+
+1.  **Phase 1 (Parity):** Fix Context Propagation (BRK-4) and expose `vad-grouped` framing in Assembly mode. **Drop BRK-1.**
+2.  **Phase 2 (Superiority):** Implement Step-Down Retry in the Orchestrator (Phase 3 in original plan).
+    *   *Milestone:* At this point, the Decoupled pipeline is functionally superior to legacy modes in every way.
+3.  **Phase 3 (Expansion):** Build the `DecoupledPipeline` entry point (Phase 4 in original plan).
+4.  **Phase 4 (Cleanup):** Delete the Coupled Modes (`CONTEXT_AWARE`, `VAD_SLICING`) entirely (Phase 5 in original plan).
+
+### Summary of the Strategic Pivot
+*   **Old Strategy:** "Fix the legacy modes (BRK-1) so they work better while we build the new one."
+*   **Corrective Path:** "Accept the legacy modes are flawed. Make the **Decoupled Pipeline** the feature-complete default immediately, and force users to migrate to it for quality results."
+
+This approach saves the effort of writing the `_clean_coupled_result()` temporary fix and accelerates the delivery of the architecture that actually meets the Product Owner's vision.

@@ -1,0 +1,3219 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/A3-ROADMAP-SUBTITLE-PIPELINE/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>A3: Roadmap & Path Forward — subtitle-pipeline as Model-Agnostic Abstract Pipeline - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#a3-roadmap-path-forward-subtitle-pipeline-as-model-agnostic-abstract-pipeline" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              A3: Roadmap &amp; Path Forward — subtitle-pipeline as Model-Agnostic Abstract Pipeline
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#revision-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revision History
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-state-of-the-art" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. State of the Art
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. State of the Art">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-works-proven-in-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Works (Proven in Production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whats-theoretical-designed-but-not-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Theoretical (Designed But Not Built)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whats-absent-not-even-designed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Absent (Not Even Designed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-model-agnostic-vision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Model-Agnostic Vision
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Model-Agnostic Vision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-core-proposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Core Proposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-categories-and-their-characteristics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Categories and Their Characteristics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model Categories and Their Characteristics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#category-a-text-only-output-primary-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Category A: Text-Only Output (Primary Target)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#category-b-text-timestamps-existing-timestamps-usable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Category B: Text + Timestamps (Existing Timestamps Usable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#category-c-apihttp-based-models-cloud-or-self-hosted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Category C: API/HTTP-Based Models (Cloud or Self-Hosted)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#category-d-ensemble-multi-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Category D: Ensemble / Multi-Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-subtitle-pipeline-vs-running-a-model-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why subtitle-pipeline vs. Running a Model Directly
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-immediate-wins-0-2-weeks-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Immediate Wins (0-2 weeks effort)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Immediate Wins (0-2 weeks effort)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#win-1-fullsceneframerreframe-enable-step-down-for-default-framer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WIN-1: FullSceneFramer.reframe() — Enable Step-Down for Default Framer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#win-2-passthroughcleaner-registration-completeness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WIN-2: PassthroughCleaner Registration Completeness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#win-3-enable-step-down-by-default-in-qwenpipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WIN-3: Enable Step-Down by Default in QwenPipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#win-4-generictextcleaner-model-agnostic-baseline-cleaner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WIN-4: GenericTextCleaner — Model-Agnostic Baseline Cleaner
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-strategic-builds-2-8-weeks-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Strategic Builds (2-8 weeks effort)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Strategic Builds (2-8 weeks effort)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build-1-whispersegmentframer-the-flagship-cross-model-workflow-deferred" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BUILD-1: WhisperSegmentFramer — The Flagship Cross-Model Workflow [DEFERRED]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-2-transformerstextgenerator-huggingface-model-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BUILD-2: TransformersTextGenerator — HuggingFace Model Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-3-ctc-forced-aligner-alternative-timestamp-alignment-deprioritized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BUILD-3: CTC Forced Aligner — Alternative Timestamp Alignment [DEPRIORITIZED]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-4-httptextgenerator-vllm-and-cloud-api-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BUILD-4: HTTPTextGenerator — vLLM and Cloud API Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-5-equivalence-validation-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BUILD-5: Equivalence Validation Framework
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-speculative-future-research-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Speculative / Future (Research-Level)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Speculative / Future (Research-Level)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spec-1-compositetextgenerator-multi-model-ensemble-at-generator-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPEC-1: CompositeTextGenerator — Multi-Model Ensemble at Generator Level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spec-2-contentadaptiveframer-dynamic-strategy-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPEC-2: ContentAdaptiveFramer — Dynamic Strategy Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spec-3-streamingincremental-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPEC-3: Streaming/Incremental Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spec-4-speaker-diarization-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPEC-4: Speaker Diarization Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spec-5-iterative-refinement-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPEC-5: Iterative Refinement Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-validation-questions-concrete-roadmap-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Validation Questions — Concrete Roadmap Items
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Validation Questions — Concrete Roadmap Items">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q1-can-i-add-a-huggingface-anime-asr-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q1: "Can I add a HuggingFace anime ASR model?"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q2-can-users-mix-and-match-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q2: "Can users mix and match components?"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q3-can-i-do-dual-vad-fusion-silero-ten" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q3: "Can I do dual-VAD fusion (Silero + TEN)?"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-risk-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Risk Assessment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Risk Assessment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#risk-1-stable_whisper-dependency-lock-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk 1: stable_whisper Dependency Lock-In
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-2-protocol-validation-with-only-one-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk 2: Protocol Validation with Only One Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-3-vram-accounting-for-multi-model-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk 3: VRAM Accounting for Multi-Model Workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-4-japanese-regrouping-quality-across-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk 4: Japanese Regrouping Quality Across Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-5-community-adoption-vs-maintenance-burden" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk 5: Community Adoption vs. Maintenance Burden
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-6-the-second-system-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk 6: The "Second System Effect"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-recommended-execution-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Recommended Execution Order
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Recommended Execution Order">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tier-0-foundation-week-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 0: Foundation (Week 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-1-composability-exposure-cli-gui-weeks-2-5-elevated-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1: Composability Exposure — CLI &amp; GUI (Weeks 2-5) [ELEVATED PRIORITY]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 1: Composability Exposure — CLI &amp; GUI (Weeks 2-5) [ELEVATED PRIORITY]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-c-composable-reconstructor-protocol-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option C: Composable Reconstructor Protocol (Future)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-2-architecture-validation-weeks-5-8-deprioritized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: Architecture Validation (Weeks 5-8) [DEPRIORITIZED]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-3-ecosystem-expansion-weeks-8-12-deprioritized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 3: Ecosystem Expansion (Weeks 8-12) [DEPRIORITIZED]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-4-cross-model-framing-no-fixed-timeline-deferred" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 4: Cross-Model Framing (No Fixed Timeline) [DEFERRED]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-5-speculative-no-timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 5: Speculative (No Timeline)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-a-current-module-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix A: Current Module Inventory
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Appendix A: Current Module Inventory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#files-in-whisperjavmodulessubtitle_pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files in whisperjav/modules/subtitle_pipeline/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration Surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-b-factory-registry-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix B: Factory Registry State
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Appendix B: Factory Registry State">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-registrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Registrations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#after-full-roadmap-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After Full Roadmap Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/A3-ROADMAP-SUBTITLE-PIPELINE.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="a3-roadmap-path-forward-subtitle-pipeline-as-model-agnostic-abstract-pipeline">A3: Roadmap &amp; Path Forward — subtitle-pipeline as Model-Agnostic Abstract Pipeline<a class="headerlink" href="#a3-roadmap-path-forward-subtitle-pipeline-as-model-agnostic-abstract-pipeline" title="Permanent link">&para;</a></h1>
+<p><strong>Date</strong>: 2026-02-19
+<strong>Status</strong>: Design Document (synthesized from A1 Vision Conformance Audit + A2 IMPL-001 Conformance Audit)
+<strong>Scope</strong>: <code>whisperjav/modules/subtitle_pipeline/</code> and its integration surface</p>
+<h3 id="revision-history">Revision History<a class="headerlink" href="#revision-history" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-02-19</td>
+<td>Initial version from A1/A2/A3 audits</td>
+</tr>
+<tr>
+<td>2026-02-19</td>
+<td><strong>Clarifications applied</strong> — see below</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Applied Clarifications:</strong>
+- <strong>C1</strong>: WhisperSegmentFramer (BUILD-1) explicitly deferred to a later phase. Not a near-term priority.
+- <strong>C2</strong>: The Qwen3 ForcedAligner is <strong>model-agnostic</strong> — it works with any model's text output, not just Qwen3. This removes the urgency for a CTC aligner (BUILD-3) as a prerequisite for model independence.
+- <strong>C5</strong>: CLI/GUI composability exposure elevated to <strong>high priority</strong> (Tier 1). The pipeline infrastructure exists but is invisible to users.
+- <strong>Execution order restructured</strong>: Tier 0 (step-down foundation) + Tier 1 (composability UX, formerly Tier 4) are the priorities. Middle tiers (new generators, aligners, framers) deprioritized.</p>
+<hr />
+<h2 id="1-state-of-the-art">1. State of the Art<a class="headerlink" href="#1-state-of-the-art" title="Permanent link">&para;</a></h2>
+<h3 id="what-works-proven-in-production">What Works (Proven in Production)<a class="headerlink" href="#what-works-proven-in-production" title="Permanent link">&para;</a></h3>
+<p>The subtitle-pipeline is a structurally complete, operationally proven system that has survived the full IMPL-001 lifecycle: design, implementation, parity validation, and strangulation of the legacy coupled code. The following components are production-hardened:</p>
+<p><strong>Architecture (all proven):</strong>
+- 4 runtime-checkable protocols: <code>TemporalFramer</code>, <code>TextGenerator</code>, <code>TextCleaner</code>, <code>TextAligner</code> (<code>protocols.py</code>)
+- 4 lazy-import factory registries with class caching (<code>generators/factory.py</code>, <code>framers/factory.py</code>, <code>cleaners/factory.py</code>, <code>aligners/factory.py</code>)
+- <code>DecoupledSubtitlePipeline</code> orchestrator with 9-step flow, explicit VRAM lifecycle, two-pass step-down retry, and per-scene diagnostics (<code>orchestrator.py</code>)
+- <code>DecoupledPipeline</code> entry point: configuration-driven, 9-phase outer pipeline with YAML config loading (<code>decoupled_pipeline.py</code>)
+- Shared hardening layer with 4 timestamp resolution modes (<code>hardening.py</code>)
+- <code>reconstruct_from_words()</code> via stable-ts <code>transcribe_any()</code> with Japanese regrouping (<code>reconstruction.py</code>)
+- Alignment sentinel with V2 detection (5 triggers: coverage, CPS, span, zero_position, degenerate) and 2 recovery strategies (VAD-guided, proportional) (<code>alignment_sentinel.py</code>)
+- <code>SceneDiagnostics</code> v2.0.0 canonical diagnostics schema (<code>types.py</code>)
+- Step-down retry with <code>StepDownConfig</code> and framer <code>reframe()</code> support (<code>orchestrator.py</code>, <code>vad_grouped.py</code>)</p>
+<p><strong>Backends (all proven):</strong>
+- Framers: <code>FullSceneFramer</code>, <code>VadGroupedFramer</code> (with <code>reframe()</code>), <code>SrtSourceFramer</code>, <code>ManualFramer</code>
+- Generators: <code>Qwen3TextGenerator</code> (text-only mode, batch support, dynamic token budgets)
+- Cleaners: <code>Qwen3TextCleaner</code> (wraps AssemblyTextCleaner), <code>PassthroughCleaner</code>
+- Aligners: <code>Qwen3ForcedAlignerAdapter</code> (model-agnostic forced aligner — works with any model's text output, not Qwen-specific), <code>NoneAligner</code></p>
+<p><strong>Integration (all proven):</strong>
+- <code>QwenPipeline</code> uses the orchestrator as its sole ASR code path (post-Phase 4 strangulation, 861 LOC)
+- <code>DecoupledPipeline</code> as the generic entry point with <code>--pipeline decoupled</code> CLI flag
+- Legacy <code>InputMode</code> enum values (<code>CONTEXT_AWARE</code>, <code>VAD_SLICING</code>) map to assembly with appropriate framer overrides
+- YAML pipeline configuration via <code>load_pipeline_config()</code></p>
+<h3 id="whats-theoretical-designed-but-not-built">What's Theoretical (Designed But Not Built)<a class="headerlink" href="#whats-theoretical-designed-but-not-built" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Non-Qwen backends</strong>: No TextGenerator or TextAligner exists beyond Qwen3. The protocol contracts are validated only by one implementation.</li>
+<li><strong>Cross-model composability</strong>: The <code>SrtSourceFramer</code> enables a "Whisper-framed, Qwen-generated" workflow in principle, but nobody has tested Whisper SRT timestamps feeding into Qwen3 text generation.</li>
+<li><strong>CLI/GUI exposure</strong> (<strong>HIGH PRIORITY GAP</strong>): The DecoupledPipeline's component selection (<code>--generator</code>, <code>--framer</code>, <code>--cleaner</code>, <code>--aligner</code>) is accessible but not prominently surfaced. Power users cannot easily discover or use the composability. This is the primary barrier to adoption and must be addressed early — see Tier 1 in Section 8.</li>
+<li><strong>Multi-model ensemble at the generator level</strong>: Running 2+ TextGenerators and selecting the best output per scene.</li>
+<li><strong>Step-down on FullSceneFramer</strong>: The <code>FullSceneFramer</code> has no <code>reframe()</code>, so step-down is only available when <code>VadGroupedFramer</code> is the primary framer.</li>
+</ul>
+<h3 id="whats-absent-not-even-designed">What's Absent (Not Even Designed)<a class="headerlink" href="#whats-absent-not-even-designed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Whisper-segment framer</strong> (GAP-1, <strong>deferred</strong>): The cross-model workflow — use Whisper's segment timestamps as temporal frames for a different model's text generation. Explicitly deferred to a later phase.</li>
+<li><strong>CTC aligner</strong>: wav2vec2 or similar CTC models that produce character-level timestamps. Note: the existing Qwen3 ForcedAligner is model-agnostic (works with any model's text), so a CTC aligner is an alternative option rather than a blocking dependency for model independence.</li>
+<li><strong>HTTP/API-based generators</strong>: Connecting to external ASR services (vLLM server, Gemini audio API, GPT-4o audio) as TextGenerator backends.</li>
+<li><strong>Benchmarking/evaluation framework</strong>: Comparing different component combinations against ground-truth SRT files.</li>
+<li><strong>Dynamic component selection</strong>: Choosing framer/generator/aligner at runtime based on content analysis (e.g., "this scene has heavy BGM, use enhanced audio + aggressive VAD").</li>
+</ul>
+<hr />
+<h2 id="2-the-model-agnostic-vision">2. The Model-Agnostic Vision<a class="headerlink" href="#2-the-model-agnostic-vision" title="Permanent link">&para;</a></h2>
+<h3 id="the-core-proposition">The Core Proposition<a class="headerlink" href="#the-core-proposition" title="Permanent link">&para;</a></h3>
+<p>The subtitle-pipeline's value is NOT that it can run an ASR model. Any script can do that. Its value is the <strong>infrastructure that wraps model output</strong>:</p>
+<ol>
+<li><strong>Temporal Framing</strong> — deciding WHEN in the audio to listen (scene detection + VAD + grouping)</li>
+<li><strong>VRAM Lifecycle</strong> — loading/unloading models across GPU memory constraints (generator unload before aligner load)</li>
+<li><strong>Alignment Sentinel</strong> — detecting when timestamps are garbage and recovering</li>
+<li><strong>Reconstruction</strong> — converting raw words into properly structured, Japanese-regrouped WhisperResult</li>
+<li><strong>Hardening</strong> — 4 timestamp resolution strategies, boundary clamping, chronological sorting</li>
+<li><strong>Step-down Retry</strong> — automatically re-framing and retrying when scenes fail</li>
+<li><strong>Diagnostics</strong> — per-scene structured telemetry for debugging and quality assessment</li>
+</ol>
+<p>A new ASR model gets ALL of this infrastructure for free by implementing a single protocol (<code>TextGenerator</code>: <code>load()</code>, <code>unload()</code>, <code>generate()</code>, <code>generate_batch()</code>, <code>cleanup()</code>). That is approximately 100-200 lines of adapter code. Zero orchestrator changes. Zero hardening changes. Zero framer changes.</p>
+<h3 id="model-categories-and-their-characteristics">Model Categories and Their Characteristics<a class="headerlink" href="#model-categories-and-their-characteristics" title="Permanent link">&para;</a></h3>
+<p>The vision targets "any model that produces text of transcription but no timestamps." In practice, the model landscape is broader and the pipeline should accommodate various output modalities:</p>
+<h4 id="category-a-text-only-output-primary-target">Category A: Text-Only Output (Primary Target)<a class="headerlink" href="#category-a-text-only-output-primary-target" title="Permanent link">&para;</a></h4>
+<p>Models that produce transcription text with no temporal information whatsoever. These are the pipeline's sweet spot — they need the full framing + generation + alignment flow.</p>
+<table>
+<thead>
+<tr>
+<th>Model Type</th>
+<th>Example</th>
+<th>VRAM</th>
+<th>Latency</th>
+<th>Quality for JAV</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen3-ASR (current)</td>
+<td><code>Qwen/Qwen3-ASR-1.7B</code></td>
+<td>~3.5GB</td>
+<td>2-4s/scene</td>
+<td>Excellent (trained on conversational Japanese)</td>
+</tr>
+<tr>
+<td>HuggingFace Transformers</td>
+<td><code>kotoba-tech/kotoba-whisper-v2.2</code></td>
+<td>1-4GB</td>
+<td>1-3s/scene</td>
+<td>Good (general Japanese ASR)</td>
+</tr>
+<tr>
+<td>Local LLM (audio input)</td>
+<td>Qwen2-Audio, SALMONN</td>
+<td>4-16GB</td>
+<td>3-10s/scene</td>
+<td>Unknown (general audio understanding)</td>
+</tr>
+<tr>
+<td>Anime/media ASR</td>
+<td>Hypothetical fine-tuned model</td>
+<td>1-4GB</td>
+<td>1-3s/scene</td>
+<td>Potentially excellent (trained on similar content)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Integration pattern</strong>: Implement <code>TextGenerator</code> protocol. Pair with <code>Qwen3ForcedAlignerAdapter</code> for timestamps — the Qwen3 ForcedAligner is model-agnostic and works with any model's text output, so no aligner swap is needed.</p>
+<h4 id="category-b-text-timestamps-existing-timestamps-usable">Category B: Text + Timestamps (Existing Timestamps Usable)<a class="headerlink" href="#category-b-text-timestamps-existing-timestamps-usable" title="Permanent link">&para;</a></h4>
+<p>Models that produce both text and timestamps. The pipeline can either use their timestamps directly (aligner-free) or discard timestamps and re-align with a dedicated aligner.</p>
+<table>
+<thead>
+<tr>
+<th>Model Type</th>
+<th>Example</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Whisper variants</td>
+<td><code>openai/whisper-large-v3-turbo</code></td>
+<td>Framing source (WhisperSegmentFramer) OR generator with <code>NoneAligner</code></td>
+</tr>
+<tr>
+<td>Faster-Whisper</td>
+<td>Community builds</td>
+<td>Fast draft for framing, Qwen for final text</td>
+</tr>
+<tr>
+<td>CTC models</td>
+<td>wav2vec2-large-xlsr-japanese</td>
+<td>Character-level timestamps, useful as aligner</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Integration patterns</strong>:
+1. As <code>TemporalFramer</code>: Use model's segment timestamps as frames (WhisperSegmentFramer — GAP-1)
+2. As <code>TextGenerator</code> + <code>NoneAligner</code>: Trust the model's own timestamps, skip alignment
+3. As <code>TextAligner</code>: CTC models produce character-level alignment suitable as a <code>TextAligner</code> backend (optional — the existing Qwen3 ForcedAligner already works with any model's text)</p>
+<h4 id="category-c-apihttp-based-models-cloud-or-self-hosted">Category C: API/HTTP-Based Models (Cloud or Self-Hosted)<a class="headerlink" href="#category-c-apihttp-based-models-cloud-or-self-hosted" title="Permanent link">&para;</a></h4>
+<p>Models accessed via HTTP API. Text output, no local VRAM management needed (or separate VRAM server).</p>
+<table>
+<thead>
+<tr>
+<th>Model Type</th>
+<th>Example</th>
+<th>VRAM Management</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>vLLM-served models</td>
+<td>Self-hosted Qwen3-ASR via vLLM</td>
+<td>Server manages VRAM; <code>load()</code>/<code>unload()</code> become no-ops</td>
+</tr>
+<tr>
+<td>Gemini audio</td>
+<td><code>gemini-2.0-flash</code> with audio input</td>
+<td>No VRAM; API key auth; rate limiting</td>
+</tr>
+<tr>
+<td>GPT-4o audio</td>
+<td><code>gpt-4o-audio-preview</code></td>
+<td>No VRAM; API key auth; high latency</td>
+</tr>
+<tr>
+<td>OpenRouter</td>
+<td>Various models via unified API</td>
+<td>No VRAM; key + model selection</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Integration pattern</strong>: Implement <code>TextGenerator</code> where <code>load()</code>/<code>unload()</code> are no-ops (or manage connection pooling). The orchestrator's VRAM swap logic gracefully handles no-op lifecycle methods.</p>
+<h4 id="category-d-ensemble-multi-model">Category D: Ensemble / Multi-Model<a class="headerlink" href="#category-d-ensemble-multi-model" title="Permanent link">&para;</a></h4>
+<p>Running multiple generators and selecting or merging the best output. Not a single model but a composition pattern.</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Best-of-N</td>
+<td>Run N generators, score outputs (by length, coherence, consistency), pick best</td>
+</tr>
+<tr>
+<td>Voting</td>
+<td>Run N generators, keep text that appears in majority</td>
+</tr>
+<tr>
+<td>Draft-and-refine</td>
+<td>Fast model generates draft, expensive model refines</td>
+</tr>
+<tr>
+<td>Parallel specialization</td>
+<td>Model A for speech, Model B for onomatopoeia, merge</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Integration pattern</strong>: Implement a <code>CompositeTextGenerator</code> that wraps multiple <code>TextGenerator</code> instances and implements selection/merging logic. The orchestrator sees a single <code>TextGenerator</code>.</p>
+<h3 id="why-subtitle-pipeline-vs-running-a-model-directly">Why subtitle-pipeline vs. Running a Model Directly<a class="headerlink" href="#why-subtitle-pipeline-vs-running-a-model-directly" title="Permanent link">&para;</a></h3>
+<p>A user can always run <code>model.transcribe(audio)</code> and get text. The subtitle-pipeline adds:</p>
+<table>
+<thead>
+<tr>
+<th>Infrastructure</th>
+<th>Value</th>
+<th>Who Benefits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Temporal framing</td>
+<td>Breaks 2-hour video into manageable chunks within model context window</td>
+<td>All users</td>
+</tr>
+<tr>
+<td>Scene detection integration</td>
+<td>Intelligent splitting at silence/semantic boundaries</td>
+<td>All users</td>
+</tr>
+<tr>
+<td>VRAM lifecycle</td>
+<td>Runs 3.5GB generator + 1.2GB aligner on 8GB GPU via sequential loading</td>
+<td>Users with limited VRAM (8-12GB)</td>
+</tr>
+<tr>
+<td>Alignment sentinel</td>
+<td>Catches broken timestamps that would produce unwatchable subtitles</td>
+<td>All users (automatic quality gate)</td>
+</tr>
+<tr>
+<td>Step-down retry</td>
+<td>Recovers from failed scenes instead of losing content</td>
+<td>Users with long/complex videos</td>
+</tr>
+<tr>
+<td>Hardening</td>
+<td>4 timestamp strategies for different quality/speed tradeoffs</td>
+<td>Power users</td>
+</tr>
+<tr>
+<td>Japanese reconstruction</td>
+<td>stable-ts regrouping with particle-based boundaries</td>
+<td>Japanese subtitle users</td>
+</tr>
+<tr>
+<td>Diagnostics</td>
+<td>Per-scene telemetry for debugging</td>
+<td>Power users, developers</td>
+</tr>
+</tbody>
+</table>
+<p>Without subtitle-pipeline, each model integration would need to independently solve all of these problems. The pipeline is a force multiplier.</p>
+<hr />
+<h2 id="3-immediate-wins-0-2-weeks-effort">3. Immediate Wins (0-2 weeks effort)<a class="headerlink" href="#3-immediate-wins-0-2-weeks-effort" title="Permanent link">&para;</a></h2>
+<h3 id="win-1-fullsceneframerreframe-enable-step-down-for-default-framer">WIN-1: FullSceneFramer.reframe() — Enable Step-Down for Default Framer<a class="headerlink" href="#win-1-fullsceneframerreframe-enable-step-down-for-default-framer" title="Permanent link">&para;</a></h3>
+<p><strong>Gap closed</strong>: GAP-6 (step-down disabled for full-scene framer)
+<strong>Effort</strong>: 2-4 hours (including tests)
+<strong>Impact</strong>: High — currently the most common framer (<code>full-scene</code> is the default for assembly mode) cannot participate in step-down retry. Users with long scenes (30-120s) that fail alignment get no recovery.</p>
+<p><strong>Implementation</strong>:
+Add a <code>reframe()</code> method to <code>FullSceneFramer</code> in <code>whisperjav/modules/subtitle_pipeline/framers/full_scene.py</code> that delegates to <code>VadGroupedFramer</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">reframe</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">audio</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">max_group_duration_s</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FramingResult</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Step-down: split the full scene into VAD-grouped frames.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">whisperjav.modules.subtitle_pipeline.framers.vad_grouped</span><span class="w"> </span><span class="kn">import</span> <span class="n">VadGroupedFramer</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">fallback</span> <span class="o">=</span> <span class="n">VadGroupedFramer</span><span class="p">(</span><span class="n">max_group_duration_s</span><span class="o">=</span><span class="n">max_group_duration_s</span><span class="p">)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="k">return</span> <span class="n">fallback</span><span class="o">.</span><span class="n">frame</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="k">finally</span><span class="p">:</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>        <span class="n">fallback</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Files</strong>: <code>whisperjav/modules/subtitle_pipeline/framers/full_scene.py</code> (~20 lines added)
+<strong>Who benefits</strong>: Every user running assembly mode with step-down enabled. Scene failures that currently produce <code>None</code> results get a second chance with finer temporal framing.</p>
+<h3 id="win-2-passthroughcleaner-registration-completeness">WIN-2: PassthroughCleaner Registration Completeness<a class="headerlink" href="#win-2-passthroughcleaner-registration-completeness" title="Permanent link">&para;</a></h3>
+<p><strong>Gap closed</strong>: Ensuring every factory has a "none/passthrough" option
+<strong>Effort</strong>: 1 hour
+<strong>Impact</strong>: Low-medium — enables aligner-free + cleaner-free workflows for testing and for models that produce clean output.</p>
+<p><strong>Status</strong>: Already done. <code>PassthroughCleaner</code> is registered as <code>"passthrough"</code> in the cleaner factory and <code>NoneAligner</code> is registered as <code>"none"</code> in the aligner factory. No action needed.</p>
+<h3 id="win-3-enable-step-down-by-default-in-qwenpipeline">WIN-3: Enable Step-Down by Default in QwenPipeline<a class="headerlink" href="#win-3-enable-step-down-by-default-in-qwenpipeline" title="Permanent link">&para;</a></h3>
+<p><strong>Gap closed</strong>: A2 deviation D2 (YAML defaults step-down to false)
+<strong>Effort</strong>: 1-2 hours (config change + validation testing)
+<strong>Impact</strong>: Medium — step-down is the pipeline's primary resilience mechanism, but it defaults to off. Once WIN-1 lands (FullSceneFramer.reframe()), enabling step-down by default becomes safe.</p>
+<p><strong>Dependency</strong>: WIN-1 must land first (otherwise step-down for the default framer is a no-op).</p>
+<p><strong>Files</strong>:
+- <code>whisperjav/pipelines/qwen_pipeline.py</code>: Change <code>stepdown_enabled</code> default to <code>True</code> (constructor, ~1 line)
+- <code>whisperjav/config/v4/ecosystems/pipelines/decoupled.yaml</code>: Change <code>stepdown.enabled: true</code>
+- <code>whisperjav/pipelines/decoupled_pipeline.py</code>: Change <code>stepdown_enabled</code> default to <code>True</code> (constructor, ~1 line)</p>
+<p><strong>Who benefits</strong>: All users. Scenes that fail on the first pass automatically get a second attempt with tighter framing, instead of silently producing empty subtitles.</p>
+<h3 id="win-4-generictextcleaner-model-agnostic-baseline-cleaner">WIN-4: GenericTextCleaner — Model-Agnostic Baseline Cleaner<a class="headerlink" href="#win-4-generictextcleaner-model-agnostic-baseline-cleaner" title="Permanent link">&para;</a></h3>
+<p><strong>Effort</strong>: 4-8 hours
+<strong>Impact</strong>: Medium — when adding a new TextGenerator (e.g., Transformers-based), users need a cleaner that handles universal ASR artifacts without being tied to Qwen3's specific patterns.</p>
+<p><strong>Implementation</strong>: Create <code>whisperjav/modules/subtitle_pipeline/cleaners/generic.py</code> with a <code>GenericTextCleaner</code> that handles:
+- Whitespace normalization
+- Repeated character sequences (e.g., "ああああああ" beyond reasonable interjection length)
+- Basic hallucination patterns common across ASR models (repeated phrases)
+- Language-specific rules loaded from config</p>
+<p>Register as <code>"generic"</code> in <code>cleaners/factory.py</code>.</p>
+<p><strong>Files</strong>:
+- <code>whisperjav/modules/subtitle_pipeline/cleaners/generic.py</code> (~80-120 lines)
+- <code>whisperjav/modules/subtitle_pipeline/cleaners/factory.py</code> (1 line addition to registry)</p>
+<p><strong>Who benefits</strong>: Anyone integrating a new ASR model. Without this, they must either use the Qwen3-specific cleaner (which may not match their model's artifacts) or the passthrough cleaner (which provides no cleaning at all).</p>
+<hr />
+<h2 id="4-strategic-builds-2-8-weeks-effort">4. Strategic Builds (2-8 weeks effort)<a class="headerlink" href="#4-strategic-builds-2-8-weeks-effort" title="Permanent link">&para;</a></h2>
+<h3 id="build-1-whispersegmentframer-the-flagship-cross-model-workflow-deferred">BUILD-1: WhisperSegmentFramer — The Flagship Cross-Model Workflow [DEFERRED]<a class="headerlink" href="#build-1-whispersegmentframer-the-flagship-cross-model-workflow-deferred" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><strong>Status</strong>: Explicitly deferred to a later phase. Will be added when the composability UX and foundation are mature.</p>
+</blockquote>
+<p><strong>Gap closed</strong>: GAP-1 (missing whisper-segment framer) + GAP-2 (non-Qwen generator pathway validation)
+<strong>Effort</strong>: 2-3 weeks
+<strong>Impact</strong>: Very high — this is the single most compelling composability workflow. Use Whisper (fast, well-understood) to identify WHERE dialogue is, then use a stronger model (Qwen3, or a future model) to transcribe WHAT was said.</p>
+<p><strong>Why it matters for JAV users</strong>: Whisper is excellent at detecting speech boundaries in noisy audio (moaning, BGM, ambient sound) but mediocre at transcribing conversational Japanese dialogue. Qwen3-ASR is excellent at Japanese text but processes full scenes without precision on where speech starts/ends. Combining them gives the best of both worlds.</p>
+<p><strong>Architecture</strong>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Audio → Scene Detection → WhisperSegmentFramer → frames[]
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    → Qwen3TextGenerator → texts[]
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    → Qwen3TextCleaner → cleaned[]
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    → Qwen3ForcedAligner → words[]
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    → Sentinel → Reconstruct → Harden → SRT
+</code></pre></div>
+<p><strong>Implementation</strong>:</p>
+<ol>
+<li><code>whisperjav/modules/subtitle_pipeline/framers/whisper_segment.py</code> (~150-200 lines):</li>
+<li>Constructor takes Whisper model size (tiny/base/small/medium/large)</li>
+<li><code>frame()</code>: Run Whisper transcription on scene audio, extract segment boundaries as <code>TemporalFrame</code> objects</li>
+<li>Optionally carry Whisper's text in <code>frame.text</code> (for comparison or as context to the generator)</li>
+<li><code>cleanup()</code>: Unload Whisper model</li>
+<li>
+<p><code>reframe()</code>: Re-run with a smaller Whisper model or with VAD-only fallback</p>
+</li>
+<li>
+<p><code>whisperjav/modules/subtitle_pipeline/framers/factory.py</code> (1 line: register <code>"whisper-segment"</code>)</p>
+</li>
+<li>
+<p>VRAM design question: Whisper needs to be loaded to produce frames, then unloaded before the generator loads. The orchestrator's current flow handles this correctly because framing happens in Step 1 (before generator.load() in Steps 2-4). The framer can load Whisper in <code>frame()</code> and unload it in <code>cleanup()</code>, OR keep it loaded and rely on the natural lifecycle. Since framing happens once per pass, load-in-frame/unload-in-cleanup is the clean pattern.</p>
+</li>
+</ol>
+<p><strong>VRAM budget</strong> (worst case with WhisperSegmentFramer + Qwen3):
+- Step 1: Whisper small (~1GB) for framing
+- Step 1 cleanup: Whisper unloaded
+- Steps 2-4: Qwen3 text-only (~3.5GB) for generation
+- Steps 2-4 cleanup: Qwen3 unloaded
+- Steps 5-7: Qwen3 ForcedAligner (~1.2GB) for alignment
+- Peak VRAM: ~3.5GB (sequential, never concurrent)</p>
+<p><strong>Validation</strong>: Process the same video with:
+1. <code>full-scene</code> framer + Qwen3 (current default)
+2. <code>whisper-segment</code> framer + Qwen3 (new)
+3. Compare SRT quality, timing accuracy, and processing time</p>
+<p><strong>Files</strong>:
+- <code>whisperjav/modules/subtitle_pipeline/framers/whisper_segment.py</code> (~200 lines)
+- <code>whisperjav/modules/subtitle_pipeline/framers/factory.py</code> (1 line)
+- Tests: <code>tests/test_whisper_segment_framer.py</code></p>
+<p><strong>Who benefits</strong>: Users with BGM-heavy content, multi-speaker scenes, or content where Whisper's speech detection is better than raw scene detection + full-scene framing.</p>
+<h3 id="build-2-transformerstextgenerator-huggingface-model-support">BUILD-2: TransformersTextGenerator — HuggingFace Model Support<a class="headerlink" href="#build-2-transformerstextgenerator-huggingface-model-support" title="Permanent link">&para;</a></h3>
+<p><strong>Gap closed</strong>: GAP-2 (no non-Qwen TextGenerator)
+<strong>Effort</strong>: 1-2 weeks
+<strong>Impact</strong>: High — validates the "model-agnostic" claim. If a second generator works without orchestrator changes, the architecture is proven.</p>
+<p><strong>Why it matters</strong>: HuggingFace hosts dozens of Japanese ASR models. Users should be able to swap in any <code>AutoModelForSpeechSeq2Seq</code> model without writing adapter code. This also enables community experimentation — users can try fine-tuned models for specific content types.</p>
+<p><strong>Implementation</strong>:</p>
+<p><code>whisperjav/modules/subtitle_pipeline/generators/transformers_asr.py</code> (~150-200 lines):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">TransformersTextGenerator</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;TextGenerator backed by any HuggingFace AutoModelForSpeechSeq2Seq.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>  <span class="c1"># e.g., &quot;openai/whisper-large-v3-turbo&quot;</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="n">task</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;transcribe&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="n">max_new_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">448</span><span class="p">,</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Load model + processor via AutoModelForSpeechSeq2Seq.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">unload</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete model + processor, clear CUDA cache.&quot;&quot;&quot;</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_path</span><span class="p">,</span> <span class="n">language</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TranscriptionResult</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_paths</span><span class="p">,</span> <span class="n">language</span><span class="p">,</span> <span class="n">contexts</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">TranscriptionResult</span><span class="p">]:</span> <span class="o">...</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p>Key implementation details:
+- Audio loading via <code>librosa</code> or <code>soundfile</code> (already in dependencies)
+- Processor handles feature extraction (log-mel spectrogram)
+- Generation kwargs passed through for model-specific tuning
+- Batch support via <code>pipeline()</code> or manual batching
+- <code>generate_batch()</code> respects <code>batch_size</code> for GPU memory management</p>
+<p><strong>Registry</strong>: Add <code>"transformers"</code> to <code>generators/factory.py</code></p>
+<p><strong>Validation question Q1 answer confirmed</strong>: ~150-200 lines. Orchestrator needs zero changes.</p>
+<p><strong>Files</strong>:
+- <code>whisperjav/modules/subtitle_pipeline/generators/transformers_asr.py</code> (~150-200 lines)
+- <code>whisperjav/modules/subtitle_pipeline/generators/factory.py</code> (1 line)
+- Tests: <code>tests/test_transformers_generator.py</code></p>
+<p><strong>Who benefits</strong>: Users who want to try different ASR models. Community contributors who have fine-tuned models for specific content. Researchers comparing model quality.</p>
+<h3 id="build-3-ctc-forced-aligner-alternative-timestamp-alignment-deprioritized">BUILD-3: CTC Forced Aligner — Alternative Timestamp Alignment [DEPRIORITIZED]<a class="headerlink" href="#build-3-ctc-forced-aligner-alternative-timestamp-alignment-deprioritized" title="Permanent link">&para;</a></h3>
+<p><strong>Effort</strong>: 2-3 weeks
+<strong>Impact</strong>: Medium — provides a TextAligner alternative. Not blocking for model independence since the Qwen3 ForcedAligner is already model-agnostic.</p>
+<p><strong>Clarification (C2)</strong>: The Qwen3 ForcedAligner, despite its name, is model-agnostic — it works with any model's text output, not just Qwen3-generated text. The <code>merge_master_with_timestamps()</code> logic reconciles punctuated text with unpunctuated aligner tokens, which is a universal text normalization problem, not a Qwen-specific one. A CTC-based aligner is therefore a nice-to-have alternative (different alignment algorithm, different failure modes) rather than a prerequisite for model independence.</p>
+<p><strong>Implementation</strong>:</p>
+<p><code>whisperjav/modules/subtitle_pipeline/aligners/ctc.py</code> (~200-250 lines):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">CTCForcedAligner</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;TextAligner using CTC-based forced alignment (wav2vec2/MMS).&quot;&quot;&quot;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;facebook/mms-1b-all&quot;</span><span class="p">,</span>  <span class="c1"># or wav2vec2-large-xlsr-japanese</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Load wav2vec2 model + processor.&quot;&quot;&quot;</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">align</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_path</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">language</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlignmentResult</span><span class="p">:</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;CTC forced alignment: text → character positions → word boundaries.&quot;&quot;&quot;</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">align_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_paths</span><span class="p">,</span> <span class="n">texts</span><span class="p">,</span> <span class="n">language</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">AlignmentResult</span><span class="p">]:</span> <span class="o">...</span>
+</code></pre></div>
+<p>The CTC alignment algorithm:
+1. Tokenize text into characters (for Japanese: each character is a token)
+2. Run audio through wav2vec2 to get frame-level CTC probabilities
+3. Viterbi alignment: find optimal path mapping characters to frames
+4. Group character timestamps into word boundaries</p>
+<p><strong>Registry</strong>: Add <code>"ctc"</code> to <code>aligners/factory.py</code></p>
+<p><strong>Files</strong>:
+- <code>whisperjav/modules/subtitle_pipeline/aligners/ctc.py</code> (~200-250 lines)
+- <code>whisperjav/modules/subtitle_pipeline/aligners/factory.py</code> (1 line)
+- Tests: <code>tests/test_ctc_aligner.py</code></p>
+<p><strong>Who benefits</strong>: Users who want an alternative alignment algorithm when the Qwen3 ForcedAligner collapses on specific content. Users who prefer a lighter-weight aligner without the Qwen3 model dependency (smaller VRAM footprint).</p>
+<h3 id="build-4-httptextgenerator-vllm-and-cloud-api-support">BUILD-4: HTTPTextGenerator — vLLM and Cloud API Support<a class="headerlink" href="#build-4-httptextgenerator-vllm-and-cloud-api-support" title="Permanent link">&para;</a></h3>
+<p><strong>Effort</strong>: 1-2 weeks
+<strong>Impact</strong>: Medium-high — unlocks cloud ASR and self-hosted vLLM inference servers.</p>
+<p><strong>Implementation</strong>:</p>
+<p><code>whisperjav/modules/subtitle_pipeline/generators/http_generator.py</code> (~150-200 lines):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">HTTPTextGenerator</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;TextGenerator that calls an HTTP ASR endpoint.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="n">endpoint_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>  <span class="c1"># e.g., &quot;http://localhost:8000/v1/audio/transcriptions&quot;</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">api_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># for multi-model servers</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">60.0</span><span class="p">,</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="n">max_concurrent</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;No-op or connection pool warmup.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">unload</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;No-op or connection pool cleanup.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_path</span><span class="p">,</span> <span class="n">language</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TranscriptionResult</span><span class="p">:</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;POST audio file to endpoint, parse response.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_paths</span><span class="p">,</span> <span class="n">language</span><span class="p">,</span> <span class="n">contexts</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">TranscriptionResult</span><span class="p">]:</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Concurrent HTTP requests (asyncio or ThreadPoolExecutor).&quot;&quot;&quot;</span>
+</code></pre></div>
+<p>Supports two API patterns:
+1. <strong>OpenAI-compatible</strong> (<code>/v1/audio/transcriptions</code>): Works with vLLM, Whisper servers, any OpenAI-API-compatible endpoint
+2. <strong>Raw endpoint</strong>: POST audio binary, receive text response (configurable via <code>response_format</code>)</p>
+<p>The VRAM lifecycle is interesting here: <code>load()</code>/<code>unload()</code> are no-ops because the server manages its own VRAM. This means the orchestrator's VRAM swap pattern (unload generator before loading aligner) still works correctly — it just does nothing on the generator side.</p>
+<p><strong>Registry</strong>: Add <code>"http"</code> to <code>generators/factory.py</code></p>
+<p><strong>Files</strong>:
+- <code>whisperjav/modules/subtitle_pipeline/generators/http_generator.py</code> (~150-200 lines)
+- <code>whisperjav/modules/subtitle_pipeline/generators/factory.py</code> (1 line)</p>
+<p><strong>Who benefits</strong>: Users with vLLM servers running Qwen3-ASR or other audio models. Users who want to use cloud ASR (Gemini, GPT-4o audio) for transcription. Users with high-VRAM servers separate from their editing workstation.</p>
+<h3 id="build-5-equivalence-validation-framework">BUILD-5: Equivalence Validation Framework<a class="headerlink" href="#build-5-equivalence-validation-framework" title="Permanent link">&para;</a></h3>
+<p><strong>Gap closed</strong>: A2 deferred item (Phase 4 equivalence validation status unclear)
+<strong>Effort</strong>: 1-2 weeks
+<strong>Impact</strong>: Medium — critical for confidence in the strangulation (did we actually match the old code's output?) and for future model comparisons.</p>
+<p><strong>Implementation</strong>:</p>
+<p>A lightweight benchmarking tool that compares SRT output against a reference:</p>
+<p><code>whisperjav/tools/subtitle_benchmark.py</code> (~200-300 lines):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SubtitleBenchmark</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Compare pipeline output against reference SRT.&quot;&quot;&quot;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">generated_srt</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">reference_srt</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BenchmarkResult</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="sd">        Metrics:</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="sd">        - Text similarity (character-level edit distance, normalized)</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="sd">        - Timing accuracy (mean absolute error of start/end timestamps)</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="sd">        - Coverage (% of reference lines that have a matching generated line)</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="sd">        - Over-generation (generated lines with no reference match)</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="sd">        &quot;&quot;&quot;</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">batch_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pairs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Path</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">BatchResult</span><span class="p">:</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Aggregate metrics across multiple files.&quot;&quot;&quot;</span>
+</code></pre></div>
+<p>CLI interface:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>whisperjav-benchmark<span class="w"> </span>--generated<span class="w"> </span>output.srt<span class="w"> </span>--reference<span class="w"> </span>ground_truth.srt
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>whisperjav-benchmark<span class="w"> </span>--generated-dir<span class="w"> </span>output/<span class="w"> </span>--reference-dir<span class="w"> </span>ground_truth/<span class="w"> </span>--report<span class="w"> </span>report.json
+</code></pre></div></p>
+<p><strong>Files</strong>:
+- <code>whisperjav/tools/subtitle_benchmark.py</code> (~200-300 lines)
+- <code>whisperjav/tools/__init__.py</code>
+- Entry point in <code>pyproject.toml</code>: <code>whisperjav-benchmark</code></p>
+<p><strong>Who benefits</strong>: Developers validating model changes. Users comparing different pipeline configurations. Quality assurance for releases.</p>
+<hr />
+<h2 id="5-speculative-future-research-level">5. Speculative / Future (Research-Level)<a class="headerlink" href="#5-speculative-future-research-level" title="Permanent link">&para;</a></h2>
+<h3 id="spec-1-compositetextgenerator-multi-model-ensemble-at-generator-level">SPEC-1: CompositeTextGenerator — Multi-Model Ensemble at Generator Level<a class="headerlink" href="#spec-1-compositetextgenerator-multi-model-ensemble-at-generator-level" title="Permanent link">&para;</a></h3>
+<p><strong>Concept</strong>: Run 2+ TextGenerators on the same frames and select the best output per scene.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">CompositeTextGenerator</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Runs multiple generators and selects the best output per scene.&quot;&quot;&quot;</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="n">generators</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TextGenerator</span><span class="p">],</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="n">selector</span><span class="p">:</span> <span class="n">OutputSelector</span><span class="p">,</span>  <span class="c1"># &quot;longest&quot;, &quot;voting&quot;, &quot;llm_judge&quot;</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="p">):</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>Challenges</strong>:
+- VRAM: Cannot load 2 generators simultaneously on consumer GPUs. Must serialize: load A → generate → unload A → load B → generate → unload B → select. This doubles VRAM swap overhead.
+- Selection heuristics: "Longest output" is a surprisingly good heuristic for Japanese ASR (models that hallucinate tend to produce shorter outputs). "LLM judge" would use a small LLM to score coherence. "Voting" requires 3+ generators.
+- Latency: 2x or more processing time. Only worthwhile for high-quality batch processing.</p>
+<p><strong>Research needed</strong>: Is the quality improvement worth the 2x latency? For which content types? Can we predict which scenes benefit from ensemble and only run multiple generators on those?</p>
+<h3 id="spec-2-contentadaptiveframer-dynamic-strategy-selection">SPEC-2: ContentAdaptiveFramer — Dynamic Strategy Selection<a class="headerlink" href="#spec-2-contentadaptiveframer-dynamic-strategy-selection" title="Permanent link">&para;</a></h3>
+<p><strong>Concept</strong>: Analyze scene audio characteristics (SNR, speech ratio, BGM presence) and select the optimal framer per scene.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ContentAdaptiveFramer</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Selects framer strategy based on audio analysis.&quot;&quot;&quot;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FramingResult</span><span class="p">:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="n">features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_analyze</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">)</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="k">if</span> <span class="n">features</span><span class="o">.</span><span class="n">speech_ratio</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">:</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_skip_frame</span><span class="p">()</span>  <span class="c1"># No speech detected</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>        <span class="k">elif</span> <span class="n">features</span><span class="o">.</span><span class="n">snr</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">:</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vad_framer</span><span class="o">.</span><span class="n">frame</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">)</span>  <span class="c1"># Noisy: use VAD</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_full_scene_framer</span><span class="o">.</span><span class="n">frame</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">)</span>  <span class="c1"># Clean: full scene</span>
+</code></pre></div>
+<p><strong>Why this matters for JAV</strong>: JAV audio varies dramatically within a single video — quiet dialogue scenes, loud BGM montages, ambient sounds, etc. A single framing strategy is a compromise. Adaptive framing could skip non-speech scenes entirely (saving 158 seconds of wasted GPU time, as observed by the user) and use tighter framing for noisy scenes.</p>
+<p><strong>Research needed</strong>: What audio features reliably predict optimal framer strategy? Can this be done cheaply (in Step 1, before GPU models load)?</p>
+<h3 id="spec-3-streamingincremental-pipeline">SPEC-3: Streaming/Incremental Pipeline<a class="headerlink" href="#spec-3-streamingincremental-pipeline" title="Permanent link">&para;</a></h3>
+<p><strong>Concept</strong>: Process scenes as they become available from scene detection, rather than waiting for all scenes to be detected first.</p>
+<p><strong>Why</strong>: For long videos (2+ hours), the current pipeline detects ALL scenes first, then processes them all. Streaming would allow the user to see early results while later scenes are still being detected.</p>
+<p><strong>Challenges</strong>: The orchestrator's batch-oriented VRAM lifecycle (load generator → generate ALL scenes → unload) conflicts with streaming. Would need per-scene or per-batch lifecycle management with configurable batch sizes.</p>
+<p><strong>Verdict</strong>: Architecturally possible but requires significant orchestrator changes. Deferred until there is user demand for it.</p>
+<h3 id="spec-4-speaker-diarization-integration">SPEC-4: Speaker Diarization Integration<a class="headerlink" href="#spec-4-speaker-diarization-integration" title="Permanent link">&para;</a></h3>
+<p><strong>Concept</strong>: Add a speaker diarization stage between VAD and ASR, then tag subtitle lines with speaker identifiers.</p>
+<p><strong>Why for JAV</strong>: Dialogue between multiple characters benefits from speaker identification. "Who is speaking?" is a common user question.</p>
+<p><strong>Integration point</strong>: This would be a new protocol (<code>SpeakerDiarizer</code>) between framing and generation, or a metadata annotation on <code>TemporalFrame</code>. The orchestrator would need to pass speaker IDs through to reconstruction.</p>
+<p><strong>Research needed</strong>: How well do diarization models work on JAV audio (overlapping speech, varying recording quality)? What's the VRAM cost?</p>
+<h3 id="spec-5-iterative-refinement-pipeline">SPEC-5: Iterative Refinement Pipeline<a class="headerlink" href="#spec-5-iterative-refinement-pipeline" title="Permanent link">&para;</a></h3>
+<p><strong>Concept</strong>: Run the full pipeline, identify low-confidence or sentinel-flagged scenes, then re-process only those scenes with different parameters (longer context window, different model, manual framing).</p>
+<p><strong>Why</strong>: The sentinel already identifies problematic scenes. Instead of just recovering with proportional redistribution, we could re-attempt with a fundamentally different strategy.</p>
+<p><strong>Architecture</strong>: This is a meta-pipeline that wraps the existing pipeline:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Pass 1: Default config → identify flagged scenes
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Pass 2: Flagged scenes only, different generator/framer → merge
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Pass 3: (Optional) Human review of remaining issues
+</code></pre></div></p>
+<p>The step-down mechanism (WIN-1/WIN-3) is a lightweight version of this concept. Full iterative refinement would support arbitrary strategy changes between passes.</p>
+<hr />
+<h2 id="6-validation-questions-concrete-roadmap-items">6. Validation Questions — Concrete Roadmap Items<a class="headerlink" href="#6-validation-questions-concrete-roadmap-items" title="Permanent link">&para;</a></h2>
+<h3 id="q1-can-i-add-a-huggingface-anime-asr-model">Q1: "Can I add a HuggingFace anime ASR model?"<a class="headerlink" href="#q1-can-i-add-a-huggingface-anime-asr-model" title="Permanent link">&para;</a></h3>
+<p><strong>A1 audit answer</strong>: ~150-200 lines for a new TextGenerator. Orchestrator needs zero changes. Effort: 4-8 hours.</p>
+<p><strong>Roadmap item</strong>: BUILD-2 (TransformersTextGenerator)</p>
+<p><strong>Concrete steps</strong>:
+1. Implement <code>TransformersTextGenerator</code> in <code>generators/transformers_asr.py</code> (~150-200 lines)
+2. Register <code>"transformers"</code> in <code>generators/factory.py</code> (1 line)
+3. User runs: <code>whisperjav video.mp4 --pipeline decoupled --generator transformers --generator-config '{"model_id": "user/anime-asr-v1"}'</code>
+4. Or via YAML config:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pipeline</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">pipeline</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">generator</span><span class="p">:</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">transformers</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">model_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;user/anime-asr-v1&quot;</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nt">framer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full-scene</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span><span class="nt">cleaner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">passthrough</span><span class="w">  </span><span class="c1"># or generic (WIN-4)</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">  </span><span class="nt">aligner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3</span><span class="w">         </span><span class="c1"># Qwen3 ForcedAligner is model-agnostic — works with any model&#39;s text</span>
+</code></pre></div></p>
+<p><strong>Effort estimate</strong>: 4-8 hours for the generator. 0 hours for orchestrator changes. 2-4 hours for integration testing. Total: 1-2 days.</p>
+<h3 id="q2-can-users-mix-and-match-components">Q2: "Can users mix and match components?"<a class="headerlink" href="#q2-can-users-mix-and-match-components" title="Permanent link">&para;</a></h3>
+<p><strong>A1 audit answer</strong>: Python API is excellent. CLI/GUI surface exists via <code>--pipeline decoupled</code>. No runtime swapping (by design).</p>
+<p><strong>Roadmap item</strong>: Three layers of composability exposure.</p>
+<p><strong>Layer 1 — Already works (CLI)</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--pipeline<span class="w"> </span>decoupled<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span>--generator<span class="w"> </span>qwen3<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span>--framer<span class="w"> </span>full-scene<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span>--cleaner<span class="w"> </span>passthrough<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span>--aligner<span class="w"> </span>none
+</code></pre></div></p>
+<p><strong>Layer 2 — YAML config (already works)</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pipeline</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nt">pipeline</span><span class="p">:</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">generator</span><span class="p">:</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="nt">backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="nt">model_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Qwen/Qwen3-ASR-1.7B&quot;</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="nt">framer</span><span class="p">:</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="nt">backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vad-grouped</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="nt">max_group_duration_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15.0</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">  </span><span class="nt">cleaner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">passthrough</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">  </span><span class="nt">aligner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">  </span><span class="nt">stepdown</span><span class="p">:</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="w">    </span><span class="nt">fallback_group_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6.0</span>
+</code></pre></div></p>
+<p><strong>Layer 3 — GUI exposure (not built, from COMPOSABILITY_DESIGN.md)</strong>:
+- The 5-tab Customize modal design exists in the COMPOSABILITY_DESIGN.md document
+- Implementation requires GUI frontend changes (~500 lines JS)
+- This is a UI project, not an architecture project</p>
+<p><strong>Effort estimate</strong>: Layer 1 and 2 already work. Layer 3 is 2-3 weeks of GUI work (Phase 2-3 of COMPOSABILITY_DESIGN.md).</p>
+<blockquote>
+<p><strong>Priority (C5)</strong>: CLI/GUI composability exposure is elevated to <strong>high priority</strong> (Tier 1). The infrastructure exists but is invisible to users. Exposing it is the highest-leverage UX investment and should proceed immediately after the Tier 0 foundation.</p>
+</blockquote>
+<h3 id="q3-can-i-do-dual-vad-fusion-silero-ten">Q3: "Can I do dual-VAD fusion (Silero + TEN)?"<a class="headerlink" href="#q3-can-i-do-dual-vad-fusion-silero-ten" title="Permanent link">&para;</a></h3>
+<p><strong>A1 audit answer</strong>: Possible as a CompositeFramer backend without touching orchestrator. ~100 lines. Factory needs parameterized composition support.</p>
+<p><strong>Roadmap item</strong>: A <code>CompositeFramer</code> that merges speech regions from multiple VAD backends.</p>
+<p><strong>Implementation</strong>:</p>
+<p><code>whisperjav/modules/subtitle_pipeline/framers/composite.py</code> (~100-150 lines):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">CompositeFramer</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Merges frames from multiple TemporalFramers.&quot;&quot;&quot;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="n">framers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TemporalFramer</span><span class="p">],</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>        <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;intersection&quot;</span><span class="p">,</span>  <span class="c1"># &quot;intersection&quot;, &quot;union&quot;, &quot;voting&quot;</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FramingResult</span><span class="p">:</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>        <span class="n">all_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">frame</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">framers</span><span class="p">]</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merge</span><span class="p">(</span><span class="n">all_results</span><span class="p">)</span>
+</code></pre></div>
+<p>Merge strategies:
+- <strong>Intersection</strong>: Keep only time regions where ALL framers agree there is speech. Conservative — reduces false positives.
+- <strong>Union</strong>: Keep time regions where ANY framer detects speech. Aggressive — reduces missed speech.
+- <strong>Voting</strong>: Keep regions where majority of framers agree. Balanced.</p>
+<p><strong>Factory challenge</strong>: The current factory pattern (<code>TemporalFramerFactory.create(name, **kwargs)</code>) creates a single backend. A composite framer needs a list of backends. Options:
+1. Special-case in factory: <code>create("composite", framers=["vad-grouped:ten", "vad-grouped:silero"])</code> with string-based nested creation
+2. Python API only: Users construct <code>CompositeFramer</code> directly and pass it to the orchestrator
+3. YAML config support: <code>framer: {backend: composite, framers: [{backend: vad-grouped, segmenter_backend: ten}, {backend: vad-grouped, segmenter_backend: silero}]}</code></p>
+<p><strong>Effort estimate</strong>: 100-150 lines for CompositeFramer. 50-100 lines for factory support. 2-3 days total.</p>
+<hr />
+<h2 id="7-risk-assessment">7. Risk Assessment<a class="headerlink" href="#7-risk-assessment" title="Permanent link">&para;</a></h2>
+<h3 id="risk-1-stable_whisper-dependency-lock-in">Risk 1: stable_whisper Dependency Lock-In<a class="headerlink" href="#risk-1-stable_whisper-dependency-lock-in" title="Permanent link">&para;</a></h3>
+<p><strong>What</strong>: <code>reconstruction.py</code> depends on <code>stable_whisper.transcribe_any()</code> to convert word dicts into <code>WhisperResult</code> with Japanese regrouping. Every downstream consumer (SRT generation, stitching, analytics) expects <code>WhisperResult</code>.</p>
+<p><strong>Impact</strong>: If we want to support output formats other than <code>WhisperResult</code> (e.g., for models that produce their own structured output), we cannot — the pipeline is locked to stable-ts's data model.</p>
+<p><strong>Mitigation</strong>: This is an acknowledged design choice (GAP-4). The <code>WhisperResult</code> is a well-understood, feature-rich data structure with SRT/VTT export, word-level access, and regrouping capabilities. Replacing it would require rewriting all downstream consumers. The correct approach is to keep <code>WhisperResult</code> as the pipeline's internal representation and provide export adapters if needed.</p>
+<p><strong>Likelihood of becoming a problem</strong>: Low. stable-ts is actively maintained (our fork), and <code>WhisperResult</code> is a good fit for subtitle data.</p>
+<h3 id="risk-2-protocol-validation-with-only-one-implementation">Risk 2: Protocol Validation with Only One Implementation<a class="headerlink" href="#risk-2-protocol-validation-with-only-one-implementation" title="Permanent link">&para;</a></h3>
+<p><strong>What</strong>: All 4 protocols (<code>TextGenerator</code>, <code>TextAligner</code>, <code>TextCleaner</code>, <code>TemporalFramer</code>) have real implementations, but only one "heavy" implementation each (Qwen3). The protocol contracts have only been validated against Qwen3's behavior.</p>
+<p><strong>Impact</strong>: A new backend might discover protocol ambiguities. For example: Does <code>generate_batch()</code> guarantee ordering? What happens if <code>generate()</code> returns empty text for a non-silent scene? What does <code>align()</code> do with text that contains characters the aligner cannot handle?</p>
+<p><strong>Mitigation</strong>: BUILD-2 (TransformersTextGenerator) is the critical validation. If a second generator works without orchestrator changes, the protocols are proven. If it requires changes, we learn where the contracts need tightening.</p>
+<p><strong>Recommendation</strong>: BUILD-2 remains important for protocol validation, but is lower urgency than composability UX (Tier 1). Note that the aligner protocol is already validated as model-agnostic (C2) — only the generator protocol needs a second implementation to be stress-tested.</p>
+<h3 id="risk-3-vram-accounting-for-multi-model-workflows">Risk 3: VRAM Accounting for Multi-Model Workflows<a class="headerlink" href="#risk-3-vram-accounting-for-multi-model-workflows" title="Permanent link">&para;</a></h3>
+<p><strong>What</strong>: The orchestrator's VRAM lifecycle assumes a simple pattern: generator load/unload, then aligner load/unload. Multi-model workflows (WhisperSegmentFramer + Qwen3Generator + CTC Aligner) add a third VRAM occupant (the framer's Whisper model).</p>
+<p><strong>Impact</strong>: On 8GB GPUs, Whisper small (1GB) + Qwen3 text-only (3.5GB) + Qwen3 ForcedAligner (1.2GB) = 5.7GB if all loaded simultaneously. If framing doesn't unload before generation loads, OOM.</p>
+<p><strong>Mitigation</strong>: The current architecture handles this correctly because framing (Step 1) completes before generation (Steps 2-4) begins. As long as framers unload their models in <code>cleanup()</code> (called between pipeline passes) or immediately after <code>frame()</code> returns, VRAM is safe. The WhisperSegmentFramer implementation (BUILD-1) must follow this pattern.</p>
+<p><strong>Recommendation</strong>: Add a VRAM budget assertion in the orchestrator's debug mode that logs peak VRAM at each step transition.</p>
+<h3 id="risk-4-japanese-regrouping-quality-across-models">Risk 4: Japanese Regrouping Quality Across Models<a class="headerlink" href="#risk-4-japanese-regrouping-quality-across-models" title="Permanent link">&para;</a></h3>
+<p><strong>What</strong>: <code>reconstruct_from_words()</code> uses stable-ts's regrouping with Japanese-aware rules (particle boundaries, etc.). This works well with Qwen3's output because Qwen3 produces natural Japanese text. Other models may produce text that trips up regrouping — e.g., missing particles, incorrect character types, or mixed-language output.</p>
+<p><strong>Impact</strong>: Bad regrouping = subtitles that break in the middle of sentences, or subtitles that are too long (no breaks at all).</p>
+<p><strong>Mitigation</strong>: The <code>TextCleaner</code> stage exists specifically to normalize model-specific artifacts before reconstruction. A good cleaner for a new model should produce text that regrouping handles well. Additionally, regrouping is configurable via stable-ts parameters — the pipeline could expose regrouping config as an option.</p>
+<h3 id="risk-5-community-adoption-vs-maintenance-burden">Risk 5: Community Adoption vs. Maintenance Burden<a class="headerlink" href="#risk-5-community-adoption-vs-maintenance-burden" title="Permanent link">&para;</a></h3>
+<p><strong>What</strong>: Each new backend (generator, framer, cleaner, aligner) is a maintenance obligation. If we build 5 generators for 5 model families, we have 5 things to keep working as upstream libraries update.</p>
+<p><strong>Impact</strong>: Backends break silently when upstream dependencies change (e.g., transformers API changes, wav2vec2 model format changes).</p>
+<p><strong>Mitigation</strong>:
+1. Keep backends thin — adapters, not implementations. The less logic in a backend, the less can break.
+2. Lazy imports — backends that aren't used don't need their dependencies installed.
+3. Community ownership — backends contributed by users can be maintained by users.
+4. Validation tests — <code>python -m whisperjav.installer.validation</code> already catches configuration drift; extend to backend smoke tests.</p>
+<h3 id="risk-6-the-second-system-effect">Risk 6: The "Second System Effect"<a class="headerlink" href="#risk-6-the-second-system-effect" title="Permanent link">&para;</a></h3>
+<p><strong>What</strong>: The temptation to over-engineer the pipeline for hypothetical future needs, adding complexity that serves no current user.</p>
+<p><strong>Impact</strong>: Increased maintenance burden, harder onboarding for contributors, slower iteration.</p>
+<p><strong>Mitigation</strong>: Every roadmap item in this document includes a "Who benefits" section. If the answer is "nobody currently," it should not be built. The speculative items (Section 5) are explicitly labeled as research-level and should only be pursued when there is concrete demand.</p>
+<hr />
+<h2 id="8-recommended-execution-order">8. Recommended Execution Order<a class="headerlink" href="#8-recommended-execution-order" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Priority Decision</strong>: Tier 0 (step-down foundation) and composability exposure (formerly Tier 4) are the immediate priorities. The Qwen3 ForcedAligner's model-agnosticism (C2) removes the urgency for alternative aligners, and the WhisperSegmentFramer (C1) is explicitly deferred. The middle tiers (new generators, new aligners, new framers) are valuable but not blocking — the existing pipeline with a single generator + model-agnostic aligner already serves users well. What's missing is <strong>discoverability</strong>: users can't find or use what already exists.</p>
+</blockquote>
+<h3 id="tier-0-foundation-week-1">Tier 0: Foundation (Week 1)<a class="headerlink" href="#tier-0-foundation-week-1" title="Permanent link">&para;</a></h3>
+<p>These items are prerequisites that unblock everything else and should be done first.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Effort</th>
+<th>Unblocks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WIN-1</strong>: FullSceneFramer.reframe()</td>
+<td>2-4 hours</td>
+<td>WIN-3 (step-down by default)</td>
+</tr>
+<tr>
+<td><strong>WIN-3</strong>: Enable step-down by default</td>
+<td>1-2 hours</td>
+<td>General pipeline resilience</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rationale</strong>: Step-down is the pipeline's primary resilience mechanism. With <code>FullSceneFramer.reframe()</code> and step-down enabled by default, every user gets automatic failure recovery. This is the highest impact-to-effort ratio item on the entire roadmap.</p>
+<h3 id="tier-1-composability-exposure-cli-gui-weeks-2-5-elevated-priority">Tier 1: Composability Exposure — CLI &amp; GUI (Weeks 2-5) [ELEVATED PRIORITY]<a class="headerlink" href="#tier-1-composability-exposure-cli-gui-weeks-2-5-elevated-priority" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><strong>Elevated from Tier 4</strong> per clarification C5. The pipeline infrastructure already works — framers, generators, cleaners, aligners, YAML config, CLI flags. But users cannot discover or use it. This is the primary adoption barrier and the highest-leverage UX investment.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Effort</th>
+<th>Depends On</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>COMPOSABILITY_DESIGN.md Phase 1 (Backend Schema + New Pipeline Parameters)</td>
+<td>~200 lines</td>
+<td>Tier 0</td>
+</tr>
+<tr>
+<td>COMPOSABILITY_DESIGN.md Phase 5 (CLI Help Regrouping)</td>
+<td>~50 lines</td>
+<td>Phase 1</td>
+</tr>
+<tr>
+<td>COMPOSABILITY_DESIGN.md Phases 2-3 (GUI Tab Restructuring + Mode Adaptation)</td>
+<td>~600 lines JS</td>
+<td>Phase 1</td>
+</tr>
+<tr>
+<td>COMPOSABILITY_DESIGN.md Phase 4 (Profiles)</td>
+<td>~300 lines</td>
+<td>Phases 1-3</td>
+</tr>
+<tr>
+<td>Q3: CompositeFramer (dual-VAD fusion)</td>
+<td>2-3 days</td>
+<td>None (standalone framer)</td>
+</tr>
+<tr>
+<td><strong>Option C: Composable Reconstructor</strong></td>
+<td>1-2 days</td>
+<td>Phase 1 (backend schema)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rationale</strong>: Even with a single generator (Qwen3), there are 4 framers, 2 cleaners, 2 aligners, YAML pipeline configs, step-down tuning, hardening modes, and sentinel parameters. All of these exist today but are invisible. Surfacing them through good CLI help, GUI component pickers, and profile presets turns the pipeline from a developer tool into a user-facing product. This does NOT require waiting for BUILD-2 or BUILD-1 — the existing components already offer meaningful user choices.</p>
+<h4 id="option-c-composable-reconstructor-protocol-future">Option C: Composable Reconstructor Protocol (Future)<a class="headerlink" href="#option-c-composable-reconstructor-protocol-future" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p><strong>Status</strong>: Deferred. Currently handled by inline branching in the orchestrator
+(Branch A → <code>REGROUP_JAV</code>, Branch B/vad_only → <code>REGROUP_VAD_ONLY</code>).
+Elevate to implementation when a 3rd regrouping strategy is needed.</p>
+</blockquote>
+<p><strong>Problem</strong>: Reconstruction (word dicts → WhisperResult with subtitle-level segments)
+is currently a hardcoded function (<code>reconstruct_from_words()</code>) called directly by the
+orchestrator. The orchestrator selects a regroup string based on <code>TimestampMode</code>, but
+this is an if/else chain, not a composable component.  As more regrouping strategies
+emerge (e.g., pre-segmented inference for aligner-free modes, or LLM-guided subtitle
+boundaries), the orchestrator's Branch B will accumulate mode-specific logic.</p>
+<p><strong>Design</strong>: Add <code>Reconstructor</code> as the 5th protocol alongside Framer, Generator,
+Cleaner, and Aligner.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nd">@runtime_checkable</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Reconstructor</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts word-level dicts into a WhisperResult with subtitle segments.&quot;&quot;&quot;</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">reconstruct</span><span class="p">(</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>        <span class="n">words</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>        <span class="n">audio_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;stable_whisper.WhisperResult&quot;</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>Backends</strong> (factory-registered):</p>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>Regroup</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RegroupJavReconstructor</code></td>
+<td><code>REGROUP_JAV</code> (gap + merge + caps)</td>
+<td>Branch A (aligned, real timestamps)</td>
+</tr>
+<tr>
+<td><code>RegroupVadOnlyReconstructor</code></td>
+<td><code>REGROUP_VAD_ONLY</code> (punct + caps only)</td>
+<td>Branch B/vad_only (synthetic timestamps)</td>
+</tr>
+<tr>
+<td><code>PreSegmentedReconstructor</code></td>
+<td><code>regroup=False</code>, pre-segmented inference</td>
+<td>Future: one segment per pseudo-word</td>
+</tr>
+<tr>
+<td><code>PassthroughReconstructor</code></td>
+<td><code>regroup=False</code></td>
+<td>Debugging / raw output</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Orchestrator change</strong>: Replace the current regroup branching with:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reconstructor</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="n">words</span><span class="p">,</span> <span class="n">audio_path</span><span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Config wiring</strong>: Factory selects backend based on <code>timestamp_mode</code> default,
+overridable via CLI <code>--reconstructor</code> and GUI dropdown.</p>
+<p><strong>Why deferred</strong>: The current 2-way branch (<code>REGROUP_JAV</code> vs <code>REGROUP_VAD_ONLY</code>)
+is manageable with inline logic.  Protocol extraction is warranted when:
+- A 3rd strategy is needed (pre-segmented, LLM-guided, etc.)
+- Users want to select reconstruction strategy independently of timestamp mode
+- The orchestrator's Branch B grows beyond ~20 lines of mode-specific logic</p>
+<p><strong>What users gain immediately</strong>:
+- Framer selection (full-scene vs vad-grouped vs srt-source vs manual) visible in GUI
+- Cleaner bypass (passthrough) for models that produce clean output
+- Aligner bypass (none) for text-only workflows
+- Step-down tuning (fallback_group_s, max retries) exposed as sliders
+- YAML profile presets: "quality", "speed", "noisy-audio"</p>
+<h3 id="tier-2-architecture-validation-weeks-5-8-deprioritized">Tier 2: Architecture Validation (Weeks 5-8) [DEPRIORITIZED]<a class="headerlink" href="#tier-2-architecture-validation-weeks-5-8-deprioritized" title="Permanent link">&para;</a></h3>
+<p>Prove the architecture with a second generator. Important but not blocking for current users.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Effort</th>
+<th>Unblocks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WIN-4</strong>: GenericTextCleaner</td>
+<td>4-8 hours</td>
+<td>BUILD-2 (new generators need a cleaner)</td>
+</tr>
+<tr>
+<td><strong>BUILD-2</strong>: TransformersTextGenerator</td>
+<td>1-2 weeks</td>
+<td>Validates "model-agnostic" claim</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rationale</strong>: If BUILD-2 works without orchestrator changes, the architecture is proven and the model-agnostic vision is real. If it requires orchestrator changes, we learn early and cheaply what needs fixing. This validates the protocol contracts with a second implementation. Deprioritized because (a) the aligner is already model-agnostic (C2), so only the generator protocol needs validation, and (b) composability UX (Tier 1) has a higher immediate impact.</p>
+<h3 id="tier-3-ecosystem-expansion-weeks-8-12-deprioritized">Tier 3: Ecosystem Expansion (Weeks 8-12) [DEPRIORITIZED]<a class="headerlink" href="#tier-3-ecosystem-expansion-weeks-8-12-deprioritized" title="Permanent link">&para;</a></h3>
+<p>Broaden model support and add evaluation tooling. These are independent items that can be pursued based on demand.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Effort</th>
+<th>Depends On</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>BUILD-5</strong>: Equivalence Validation Framework</td>
+<td>1-2 weeks</td>
+<td>None (standalone tool)</td>
+<td>Useful for any config comparison</td>
+</tr>
+<tr>
+<td><strong>BUILD-4</strong>: HTTPTextGenerator</td>
+<td>1-2 weeks</td>
+<td>BUILD-2 (validates generator pattern)</td>
+<td>Unlocks vLLM + cloud ASR</td>
+</tr>
+<tr>
+<td><strong>BUILD-3</strong>: CTC Forced Aligner</td>
+<td>2-3 weeks</td>
+<td>BUILD-2</td>
+<td>Nice-to-have alternative; Qwen3 aligner already model-agnostic (C2)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rationale</strong>: BUILD-5 is the most immediately useful (standalone, no deps). BUILD-4 unlocks cloud/server workflows. BUILD-3 provides an alternative alignment algorithm but is NOT required for model independence since the existing Qwen3 ForcedAligner works with any model's text (C2).</p>
+<h3 id="tier-4-cross-model-framing-no-fixed-timeline-deferred">Tier 4: Cross-Model Framing (No Fixed Timeline) [DEFERRED]<a class="headerlink" href="#tier-4-cross-model-framing-no-fixed-timeline-deferred" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><strong>Deferred</strong> per clarification C1. Will be revisited when the composability UX is mature and there is concrete demand for cross-model workflows.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Effort</th>
+<th>Depends On</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>BUILD-1</strong>: WhisperSegmentFramer</td>
+<td>2-3 weeks</td>
+<td>Tier 1 (composability UX to expose it)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rationale</strong>: This is the "killer feature" of the pipeline architecture — combining Whisper's speech detection with Qwen3's Japanese transcription. However, it requires significant effort (2-3 weeks) and benefits most when the composability UX (Tier 1) is already in place so users can actually select it. Explicitly deferred to focus on foundation + UX first.</p>
+<h3 id="tier-5-speculative-no-timeline">Tier 5: Speculative (No Timeline)<a class="headerlink" href="#tier-5-speculative-no-timeline" title="Permanent link">&para;</a></h3>
+<p>Only pursue when there is concrete user demand:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SPEC-1: CompositeTextGenerator</td>
+<td>User reports wanting to compare model outputs</td>
+</tr>
+<tr>
+<td>SPEC-2: ContentAdaptiveFramer</td>
+<td>Sufficient data on which framers work best for which content</td>
+</tr>
+<tr>
+<td>SPEC-3: Streaming Pipeline</td>
+<td>User demand for live preview of long video processing</td>
+</tr>
+<tr>
+<td>SPEC-4: Speaker Diarization</td>
+<td>User request for speaker tagging</td>
+</tr>
+<tr>
+<td>SPEC-5: Iterative Refinement</td>
+<td>Step-down proves insufficient for quality recovery</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="appendix-a-current-module-inventory">Appendix A: Current Module Inventory<a class="headerlink" href="#appendix-a-current-module-inventory" title="Permanent link">&para;</a></h2>
+<h3 id="files-in-whisperjavmodulessubtitle_pipeline">Files in <code>whisperjav/modules/subtitle_pipeline/</code><a class="headerlink" href="#files-in-whisperjavmodulessubtitle_pipeline" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__.py</code></td>
+<td>61</td>
+<td>Public API re-exports</td>
+</tr>
+<tr>
+<td><code>protocols.py</code></td>
+<td>180</td>
+<td>4 protocol definitions (runtime-checkable)</td>
+</tr>
+<tr>
+<td><code>types.py</code></td>
+<td>211</td>
+<td>Data types: TemporalFrame, TranscriptionResult, AlignmentResult, configs, diagnostics</td>
+</tr>
+<tr>
+<td><code>orchestrator.py</code></td>
+<td>1007</td>
+<td>DecoupledSubtitlePipeline: 9-step flow, VRAM lifecycle, step-down, diagnostics</td>
+</tr>
+<tr>
+<td><code>hardening.py</code></td>
+<td>426</td>
+<td>4 timestamp resolution modes, boundary clamping, chronological sort</td>
+</tr>
+<tr>
+<td><code>reconstruction.py</code></td>
+<td>94</td>
+<td>Word dicts → WhisperResult via stable-ts transcribe_any()</td>
+</tr>
+<tr>
+<td><code>framers/factory.py</code></td>
+<td>72</td>
+<td>TemporalFramerFactory (4 backends registered)</td>
+</tr>
+<tr>
+<td><code>framers/full_scene.py</code></td>
+<td>63</td>
+<td>FullSceneFramer (1 frame = entire scene)</td>
+</tr>
+<tr>
+<td><code>framers/vad_grouped.py</code></td>
+<td>206</td>
+<td>VadGroupedFramer (VAD + grouping, has reframe())</td>
+</tr>
+<tr>
+<td><code>framers/srt_source.py</code></td>
+<td>134</td>
+<td>SrtSourceFramer (SRT timestamps as frames)</td>
+</tr>
+<tr>
+<td><code>framers/manual.py</code></td>
+<td>93</td>
+<td>ManualFramer (user-provided timestamps)</td>
+</tr>
+<tr>
+<td><code>generators/factory.py</code></td>
+<td>69</td>
+<td>TextGeneratorFactory (1 backend: qwen3)</td>
+</tr>
+<tr>
+<td><code>generators/qwen3.py</code></td>
+<td>200</td>
+<td>Qwen3TextGenerator (text-only mode adapter)</td>
+</tr>
+<tr>
+<td><code>cleaners/factory.py</code></td>
+<td>70</td>
+<td>TextCleanerFactory (2 backends: qwen3, passthrough)</td>
+</tr>
+<tr>
+<td><code>cleaners/qwen3.py</code></td>
+<td>94</td>
+<td>Qwen3TextCleaner (wraps AssemblyTextCleaner)</td>
+</tr>
+<tr>
+<td><code>cleaners/passthrough.py</code></td>
+<td>18</td>
+<td>PassthroughCleaner (no-op)</td>
+</tr>
+<tr>
+<td><code>aligners/factory.py</code></td>
+<td>70</td>
+<td>TextAlignerFactory (2 backends: qwen3, none)</td>
+</tr>
+<tr>
+<td><code>aligners/qwen3.py</code></td>
+<td>222</td>
+<td>Qwen3ForcedAlignerAdapter (with merge_master_with_timestamps)</td>
+</tr>
+<tr>
+<td><code>aligners/none.py</code></td>
+<td>50</td>
+<td>NoneAligner (no-op for aligner-free workflows)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total</strong>: ~3,339 lines across 19 files (excluding <code>__init__.py</code> files)</p>
+<h3 id="integration-surface">Integration Surface<a class="headerlink" href="#integration-surface" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whisperjav/pipelines/decoupled_pipeline.py</code> (793 lines)</td>
+<td>Generic entry point: 9-phase outer pipeline with YAML config</td>
+</tr>
+<tr>
+<td><code>whisperjav/pipelines/qwen_pipeline.py</code> (861 lines)</td>
+<td>Qwen-specific entry point: uses orchestrator for assembly mode</td>
+</tr>
+<tr>
+<td><code>whisperjav/modules/alignment_sentinel.py</code> (417 lines)</td>
+<td>Standalone sentinel: collapse detection + 2 recovery strategies</td>
+</tr>
+</tbody>
+</table>
+<h2 id="appendix-b-factory-registry-state">Appendix B: Factory Registry State<a class="headerlink" href="#appendix-b-factory-registry-state" title="Permanent link">&para;</a></h2>
+<h3 id="current-registrations">Current Registrations<a class="headerlink" href="#current-registrations" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>TextGeneratorFactory:
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  &quot;qwen3&quot; → Qwen3TextGenerator
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>TemporalFramerFactory:
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>  &quot;full-scene&quot; → FullSceneFramer
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>  &quot;vad-grouped&quot; → VadGroupedFramer
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>  &quot;srt-source&quot; → SrtSourceFramer
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>  &quot;manual&quot; → ManualFramer
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>TextCleanerFactory:
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>  &quot;qwen3&quot; → Qwen3TextCleaner
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>  &quot;passthrough&quot; → PassthroughCleaner
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>
+<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>TextAlignerFactory:
+<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>  &quot;qwen3&quot; → Qwen3ForcedAlignerAdapter
+<a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>  &quot;none&quot; → NoneAligner
+</code></pre></div>
+<h3 id="after-full-roadmap-execution">After Full Roadmap Execution<a class="headerlink" href="#after-full-roadmap-execution" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>TextGeneratorFactory:
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>  &quot;qwen3&quot; → Qwen3TextGenerator
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  &quot;transformers&quot; → TransformersTextGenerator        (BUILD-2)
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>  &quot;http&quot; → HTTPTextGenerator                        (BUILD-4)
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>TemporalFramerFactory:
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  &quot;full-scene&quot; → FullSceneFramer                    (+ reframe(), WIN-1)
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>  &quot;vad-grouped&quot; → VadGroupedFramer
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>  &quot;srt-source&quot; → SrtSourceFramer
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>  &quot;manual&quot; → ManualFramer
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>  &quot;whisper-segment&quot; → WhisperSegmentFramer          (BUILD-1)
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>  &quot;composite&quot; → CompositeFramer                     (Q3)
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>TextCleanerFactory:
+<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>  &quot;qwen3&quot; → Qwen3TextCleaner
+<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a>  &quot;passthrough&quot; → PassthroughCleaner
+<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>  &quot;generic&quot; → GenericTextCleaner                    (WIN-4)
+<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a>
+<a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a>TextAlignerFactory:
+<a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a>  &quot;qwen3&quot; → Qwen3ForcedAlignerAdapter              (model-agnostic — works with any model&#39;s text)
+<a id="__codelineno-17-21" name="__codelineno-17-21" href="#__codelineno-17-21"></a>  &quot;none&quot; → NoneAligner
+<a id="__codelineno-17-22" name="__codelineno-17-22" href="#__codelineno-17-22"></a>  &quot;ctc&quot; → CTCForcedAligner                         (BUILD-3, optional alternative)
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2769 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/whisperjav/architecture/ADR-005-vllm-readiness/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>ADR-005: vLLM Readiness — Qwen3-ASR Backend Strategy - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-005-vllm-readiness-qwen3-asr-backend-strategy" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-005: vLLM Readiness — Qwen3-ASR Backend Strategy
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Background
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-qwen3-asr-dual-backend-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Qwen3-ASR Dual Backend Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-transformers-backend-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Transformers Backend (Current)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Transformers Backend (Current)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#characteristics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Characteristics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whisperjav-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WhisperJAV Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-vllm-backend-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. vLLM Backend (Future)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. vLLM Backend (Future)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#construction_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Registration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vllm-native-model-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vLLM-Native Model Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inference_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#characteristics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Characteristics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Claims
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-api-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. API Comparison
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. API Comparison">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#construction_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inference-after-construction-identical-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inference (after construction, identical API)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generation-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generation Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-streaming-inference-vllm-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Streaming Inference (vLLM Only)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Streaming Inference (vLLM Only)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#state-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-vllm-serving-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. vLLM Serving Mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. vLLM Serving Mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#starting-the-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting the Server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-api-openai-compatible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client API (OpenAI-compatible)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relevance-to-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relevance to WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-audio-limits-and-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Audio Limits and Constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-whisperjav-architectural-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. WhisperJAV Architectural Preparation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. WhisperJAV Architectural Preparation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assembly-mode-vram-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assembly Mode VRAM Phases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#existing-code-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing Code References
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-already-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Already Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-integration-pathway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Integration Pathway
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Integration Pathway">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-backend-selection-minimal-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Backend Selection (Minimal Change)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-generation-config-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Generation Config Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-cli-and-gui-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: CLI and GUI Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-coupled-modes-optional-lower-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Coupled Modes (Optional, Lower Priority)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-dependency-and-installation-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Dependency and Installation Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Dependency and Installation Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current State
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proposed-addition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed Addition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vllm-version-pinning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vLLM Version Pinning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Sizes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platform-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-risk-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Risk Assessment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Decision
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-decision-defer-implementation-document-readiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Decision: DEFER implementation, DOCUMENT readiness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-revisit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Revisit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whats-ready-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Ready Today
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/architecture/ADR-005-vllm-readiness.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="adr-005-vllm-readiness-qwen3-asr-backend-strategy">ADR-005: vLLM Readiness — Qwen3-ASR Backend Strategy<a class="headerlink" href="#adr-005-vllm-readiness-qwen3-asr-backend-strategy" title="Permanent link">&para;</a></h1>
+<p><strong>Created</strong>: 2026-02-09
+<strong>Status</strong>: INFORMATIONAL — Research &amp; Planning
+<strong>Author</strong>: Senior Architect
+<strong>Depends On</strong>: ADR-004 (Dedicated QwenPipeline Architecture)</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-executive-summary">Executive Summary</a></li>
+<li><a href="#2-background">Background</a></li>
+<li><a href="#3-qwen3-asr-dual-backend-architecture">Qwen3-ASR Dual Backend Architecture</a></li>
+<li><a href="#4-transformers-backend-current">Transformers Backend (Current)</a></li>
+<li><a href="#5-vllm-backend-future">vLLM Backend (Future)</a></li>
+<li><a href="#6-api-comparison">API Comparison</a></li>
+<li><a href="#7-streaming-inference-vllm-only">Streaming Inference (vLLM Only)</a></li>
+<li><a href="#8-vllm-serving-mode">vLLM Serving Mode</a></li>
+<li><a href="#9-audio-limits-and-constraints">Audio Limits and Constraints</a></li>
+<li><a href="#10-whisperjav-architectural-preparation">WhisperJAV Architectural Preparation</a></li>
+<li><a href="#11-integration-pathway">Integration Pathway</a></li>
+<li><a href="#12-dependency-and-installation-strategy">Dependency and Installation Strategy</a></li>
+<li><a href="#13-risk-assessment">Risk Assessment</a></li>
+<li><a href="#14-decision">Decision</a></li>
+</ol>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary<a class="headerlink" href="#1-executive-summary" title="Permanent link">&para;</a></h2>
+<p>The official Qwen3-ASR Toolkit (<code>qwen-asr</code>) provides two inference backends: <strong>HuggingFace Transformers</strong> (current WhisperJAV default) and <strong>vLLM</strong> (high-throughput alternative). Both share a unified API through the <code>Qwen3ASRModel</code> class.</p>
+<p>WhisperJAV's Qwen pipeline already has the architectural socket for vLLM integration: the <strong>Assembly (decoupled) mode</strong> separates text generation from forced alignment into VRAM-exclusive phases. Since the ForcedAligner is PyTorch-only, vLLM can only power the text generation phase — which is exactly what Assembly mode isolates.</p>
+<p>This document records the technical findings from researching the Qwen3-ASR Toolkit's vLLM support and outlines the integration pathway when the time comes.</p>
+<hr />
+<h2 id="2-background">2. Background<a class="headerlink" href="#2-background" title="Permanent link">&para;</a></h2>
+<p>Qwen3-ASR is a Large Audio Language Model (LALM) that performs ASR by encoding audio into the language model's embedding space. Unlike Whisper (encoder-decoder), Qwen3-ASR is a decoder-only transformer that benefits from LLM-optimized inference engines like vLLM.</p>
+<p>The Qwen3-ASR Toolkit (<code>qwen-asr</code> package, version 0.0.6+) is maintained by the Qwen team and provides:
+- <code>Qwen3ASRModel</code> — unified inference class with dual backend support
+- <code>Qwen3ForcedAligner</code> — separate model for word-level timestamp alignment
+- CLI tools for batch processing and serving</p>
+<p><strong>Toolkit source</strong>: <code>qwen_asr/</code> package
+<strong>Repository</strong>: <a href="https://github.com/QwenLM/Qwen3-ASR">Qwen/Qwen3-ASR</a></p>
+<hr />
+<h2 id="3-qwen3-asr-dual-backend-architecture">3. Qwen3-ASR Dual Backend Architecture<a class="headerlink" href="#3-qwen3-asr-dual-backend-architecture" title="Permanent link">&para;</a></h2>
+<p>The toolkit's <code>Qwen3ASRModel</code> class provides a unified interface with two construction paths:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Qwen3ASRModel
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a> ├── .from_pretrained(model_path, ...)   → Transformers backend
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a> └── .LLM(model_path, ...)              → vLLM backend
+</code></pre></div>
+<p>After construction, the same <code>.transcribe()</code> and <code>.align()</code> methods work identically regardless of backend. The dispatch happens internally:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Source: qwen_asr/inference/qwen3_asr.py
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>def _infer_asr(self, contexts, wavs, languages) -&gt; List[str]:
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    if self.backend == &quot;transformers&quot;:
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        return self._infer_asr_transformers(contexts, wavs, languages)
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    if self.backend == &quot;vllm&quot;:
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        return self._infer_asr_vllm(contexts, wavs, languages)
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    raise RuntimeError(f&quot;Unknown backend: {self.backend}&quot;)
+</code></pre></div>
+<p>This design means WhisperJAV can switch backends with minimal code changes — the same <code>transcribe()</code> call signature works for both.</p>
+<hr />
+<h2 id="4-transformers-backend-current">4. Transformers Backend (Current)<a class="headerlink" href="#4-transformers-backend-current" title="Permanent link">&para;</a></h2>
+<h3 id="construction">Construction<a class="headerlink" href="#construction" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">qwen_asr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Qwen3ASRModel</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">model</span> <span class="o">=</span> <span class="n">Qwen3ASRModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">&quot;Qwen/Qwen3-ASR-1.7B&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">forced_aligner</span><span class="o">=</span><span class="s2">&quot;Qwen/Qwen3-ForcedAligner-0.6B&quot;</span><span class="p">,</span>  <span class="c1"># Optional</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">max_inference_batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">max_new_tokens</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Source</strong>: <code>qwen_asr/inference/qwen3_asr.py</code> lines 175-224</p>
+<h3 id="inference">Inference<a class="headerlink" href="#inference" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Internally calls model.generate(**inputs, max_new_tokens=...)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># Standard HuggingFace generate() with AutoProcessor for tokenization</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">text_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="o">**</span><span class="n">inputs</span><span class="p">,</span> <span class="n">max_new_tokens</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_new_tokens</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">decoded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">processor</span><span class="o">.</span><span class="n">batch_decode</span><span class="p">(</span><span class="n">text_ids</span><span class="p">[:,</span> <span class="n">inputs</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]:])</span>
+</code></pre></div>
+<h3 id="characteristics">Characteristics<a class="headerlink" href="#characteristics" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VRAM usage</td>
+<td>Full model + KV cache + audio encoder</td>
+</tr>
+<tr>
+<td>Batch processing</td>
+<td>Manual splitting at <code>max_inference_batch_size</code></td>
+</tr>
+<tr>
+<td>Timestamps</td>
+<td>Via ForcedAligner (separate model)</td>
+</tr>
+<tr>
+<td>Streaming</td>
+<td>Not supported</td>
+</tr>
+<tr>
+<td>Tensor parallelism</td>
+<td>Via HuggingFace <code>device_map</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="whisperjav-usage">WhisperJAV Usage<a class="headerlink" href="#whisperjav-usage" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV's <code>QwenASR</code> wrapper (<code>whisperjav/modules/qwen_asr.py</code>) uses this backend exclusively today. The wrapper adds:
+- Decoupled loading (<code>load_model_text_only()</code> / <code>load_aligner_only()</code>)
+- Generation safety controls (<code>repetition_penalty</code>, <code>max_tokens_per_audio_second</code>)
+- VRAM lifecycle management (explicit load/unload for Assembly mode)</p>
+<hr />
+<h2 id="5-vllm-backend-future">5. vLLM Backend (Future)<a class="headerlink" href="#5-vllm-backend-future" title="Permanent link">&para;</a></h2>
+<h3 id="construction_1">Construction<a class="headerlink" href="#construction_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">qwen_asr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Qwen3ASRModel</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">model</span> <span class="o">=</span> <span class="n">Qwen3ASRModel</span><span class="o">.</span><span class="n">LLM</span><span class="p">(</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;Qwen/Qwen3-ASR-1.7B&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">forced_aligner</span><span class="o">=</span><span class="s2">&quot;Qwen/Qwen3-ForcedAligner-0.6B&quot;</span><span class="p">,</span>  <span class="c1"># Optional</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">forced_aligner_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">),</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">gpu_memory_utilization</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">max_inference_batch_size</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>   <span class="c1"># Unlimited for vLLM</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">max_new_tokens</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Source</strong>: <code>qwen_asr/inference/qwen3_asr.py</code> lines 226-288</p>
+<h3 id="model-registration">Model Registration<a class="headerlink" href="#model-registration" title="Permanent link">&para;</a></h3>
+<p>vLLM requires custom model architectures to be registered before use. The toolkit handles this automatically on import:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Source: qwen_asr/inference/qwen3_asr.py lines 49-54</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">qwen_asr.core.vllm_backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">Qwen3ASRForConditionalGeneration</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">vllm</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelRegistry</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">ModelRegistry</span><span class="o">.</span><span class="n">register_model</span><span class="p">(</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="s2">&quot;Qwen3ASRForConditionalGeneration&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="n">Qwen3ASRForConditionalGeneration</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="p">)</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="k">except</span><span class="p">:</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">pass</span>
+</code></pre></div>
+<h3 id="vllm-native-model-implementation">vLLM-Native Model Implementation<a class="headerlink" href="#vllm-native-model-implementation" title="Permanent link">&para;</a></h3>
+<p>The toolkit includes a full vLLM-native model implementation:</p>
+<p><strong>Source</strong>: <code>qwen_asr/core/vllm_backend/qwen3_asr.py</code></p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Class</th>
+<th>Lines</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Audio encoder</td>
+<td><code>Qwen3ASRAudioEncoder</code></td>
+<td>298-531</td>
+<td>Mel-spectrogram → embeddings</td>
+</tr>
+<tr>
+<td>Attention</td>
+<td><code>Qwen3ASRAudioAttention</code></td>
+<td>157-227</td>
+<td>vLLM's <code>MMEncoderAttention</code> with TP</td>
+</tr>
+<tr>
+<td>Main model</td>
+<td><code>Qwen3ASRForConditionalGeneration</code></td>
+<td>692-875</td>
+<td>Full ASR model for vLLM</td>
+</tr>
+<tr>
+<td>Processor</td>
+<td><code>Qwen3ASRMultiModalProcessor</code></td>
+<td>622-684</td>
+<td>Audio input parsing</td>
+</tr>
+</tbody>
+</table>
+<p>This is not a simple wrapper around HuggingFace — it's a purpose-built implementation using vLLM's multimodal infrastructure (<code>SupportsMultiModal</code>, <code>SupportsPP</code>, <code>SupportsMRoPE</code>, <code>SupportsTranscription</code>).</p>
+<h3 id="inference_1">Inference<a class="headerlink" href="#inference_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Internally constructs prompt dicts with multimodal data</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="n">prompt_str</span><span class="p">,</span> <span class="s2">&quot;multi_modal_data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;audio&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">wav_tensor</span><span class="p">]}}</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="p">[</span><span class="n">inputs</span><span class="p">],</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">sampling_params</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sampling_params</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">use_tqdm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">text</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">text</span>
+</code></pre></div>
+<p><strong>SamplingParams</strong> (created at construction):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">sampling_params</span> <span class="o">=</span> <span class="n">SamplingParams</span><span class="p">(</span><span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_tokens</span><span class="o">=</span><span class="n">max_new_tokens</span><span class="p">)</span>
+</code></pre></div></p>
+<ul>
+<li><code>temperature=0.0</code>: Deterministic greedy decoding (matches Whisper behavior)</li>
+<li><code>max_tokens</code>: Dynamic per-call token budget</li>
+</ul>
+<h3 id="characteristics_1">Characteristics<a class="headerlink" href="#characteristics_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VRAM usage</td>
+<td>Managed by vLLM's PagedAttention</td>
+</tr>
+<tr>
+<td>Batch processing</td>
+<td>Handled by vLLM's scheduler (unlimited batch)</td>
+</tr>
+<tr>
+<td>Timestamps</td>
+<td>Via ForcedAligner (separate model, PyTorch-only)</td>
+</tr>
+<tr>
+<td>Streaming</td>
+<td>Supported (incremental decoding)</td>
+</tr>
+<tr>
+<td>Tensor parallelism</td>
+<td>Native vLLM TP support</td>
+</tr>
+<tr>
+<td>GPU memory utilization</td>
+<td>Configurable via <code>gpu_memory_utilization</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="performance-claims">Performance Claims<a class="headerlink" href="#performance-claims" title="Permanent link">&para;</a></h3>
+<p>From the Qwen3-ASR README:
+- Up to <strong>2000x throughput</strong> at concurrency 128 (0.6B model benchmark)
+- Better batch scheduling than HuggingFace's manual splitting
+- Specialized memory management via PagedAttention</p>
+<hr />
+<h2 id="6-api-comparison">6. API Comparison<a class="headerlink" href="#6-api-comparison" title="Permanent link">&para;</a></h2>
+<h3 id="construction_2">Construction<a class="headerlink" href="#construction_2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Transformers</th>
+<th>vLLM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Factory method</td>
+<td><code>Qwen3ASRModel.from_pretrained()</code></td>
+<td><code>Qwen3ASRModel.LLM()</code></td>
+</tr>
+<tr>
+<td>Model loading</td>
+<td><code>AutoModel.from_pretrained()</code></td>
+<td><code>vllm.LLM()</code></td>
+</tr>
+<tr>
+<td>Processor</td>
+<td><code>AutoProcessor.from_pretrained()</code></td>
+<td>Built into vLLM model</td>
+</tr>
+<tr>
+<td><code>backend</code> field</td>
+<td><code>"transformers"</code></td>
+<td><code>"vllm"</code></td>
+</tr>
+<tr>
+<td>Default <code>max_new_tokens</code></td>
+<td>512</td>
+<td>4096</td>
+</tr>
+<tr>
+<td>Default <code>max_inference_batch_size</code></td>
+<td>32</td>
+<td>-1 (unlimited)</td>
+</tr>
+<tr>
+<td>Extra kwargs</td>
+<td>HuggingFace kwargs</td>
+<td>vLLM kwargs (<code>gpu_memory_utilization</code>, etc.)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="inference-after-construction-identical-api">Inference (after construction, identical API)<a class="headerlink" href="#inference-after-construction-identical-api" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Both backends use the same call:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">results</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">transcribe</span><span class="p">(</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">audio</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;path/to/audio.wav&quot;</span><span class="p">],</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">context</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;optional context&quot;</span><span class="p">],</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">language</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Japanese&quot;</span><span class="p">],</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">return_time_stamps</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">)</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="c1"># Returns List[Qwen3ASRResult] with:</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1">#   .text       — transcribed text</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="c1">#   .language   — detected language</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="c1">#   .words      — word-level timestamps (if return_time_stamps=True)</span>
+</code></pre></div>
+<h3 id="output-handling">Output Handling<a class="headerlink" href="#output-handling" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Transformers</th>
+<th>vLLM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Text extraction</td>
+<td><code>processor.batch_decode()</code> on token IDs</td>
+<td><code>output.outputs[0].text</code></td>
+</tr>
+<tr>
+<td>Batch control</td>
+<td>Manual split at <code>max_inference_batch_size</code></td>
+<td>vLLM scheduler handles batching</td>
+</tr>
+<tr>
+<td>ForcedAligner</td>
+<td>Same (PyTorch, separate model)</td>
+<td>Same (PyTorch, separate model)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="generation-config">Generation Config<a class="headerlink" href="#generation-config" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Transformers</th>
+<th>vLLM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Max tokens</td>
+<td><code>max_new_tokens</code> in <code>generate()</code></td>
+<td><code>SamplingParams.max_tokens</code></td>
+</tr>
+<tr>
+<td>Temperature</td>
+<td>Via <code>GenerationConfig</code></td>
+<td><code>SamplingParams.temperature</code></td>
+</tr>
+<tr>
+<td>Repetition penalty</td>
+<td>Via <code>GenerationConfig</code></td>
+<td><code>SamplingParams.repetition_penalty</code></td>
+</tr>
+<tr>
+<td>Top-k / Top-p</td>
+<td>Via <code>GenerationConfig</code></td>
+<td><code>SamplingParams.top_k</code> / <code>.top_p</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-streaming-inference-vllm-only">7. Streaming Inference (vLLM Only)<a class="headerlink" href="#7-streaming-inference-vllm-only" title="Permanent link">&para;</a></h2>
+<p>Streaming is <strong>exclusively available with the vLLM backend</strong> and enables real-time incremental transcription. This is not currently needed by WhisperJAV (which processes pre-recorded files), but could enable future live captioning.</p>
+<p><strong>Source</strong>: <code>qwen_asr/inference/qwen3_asr.py</code> lines 584-830</p>
+<h3 id="state-management">State Management<a class="headerlink" href="#state-management" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ASRStreamingState</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">unfixed_chunk_num</span><span class="p">:</span> <span class="nb">int</span>        <span class="c1"># Chunks before prefix prompt kicks in</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">unfixed_token_num</span><span class="p">:</span> <span class="nb">int</span>        <span class="c1"># Tokens to rollback for prefix</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">chunk_size_sec</span><span class="p">:</span> <span class="nb">float</span>         <span class="c1"># Chunk duration (e.g. 2.0s)</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">chunk_size_samples</span><span class="p">:</span> <span class="nb">int</span>       <span class="c1"># Samples at 16kHz</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">chunk_id</span><span class="p">:</span> <span class="nb">int</span>                 <span class="c1"># Current chunk counter</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">buffer</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>            <span class="c1"># Audio sample buffer</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="n">audio_accum</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>       <span class="c1"># All audio seen so far</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="n">prompt_raw</span><span class="p">:</span> <span class="nb">str</span>               <span class="c1"># Base chat template prompt</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="n">context</span><span class="p">:</span> <span class="nb">str</span>                  <span class="c1"># User-provided context string</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="n">force_language</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="c1"># Forced language</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="n">language</span><span class="p">:</span> <span class="nb">str</span>                 <span class="c1"># Latest detected language</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span>                     <span class="c1"># Latest cumulative text</span>
+</code></pre></div>
+<h3 id="usage-pattern">Usage Pattern<a class="headerlink" href="#usage-pattern" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">state</span> <span class="o">=</span> <span class="n">asr</span><span class="o">.</span><span class="n">init_streaming_state</span><span class="p">(</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">unfixed_chunk_num</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>    <span class="c1"># 2 chunks before stabilizing</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">unfixed_token_num</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>    <span class="c1"># 5-token rollback window</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">chunk_size_sec</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>     <span class="c1"># 2-second chunks</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="p">)</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="k">while</span> <span class="n">has_audio</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">chunk</span> <span class="o">=</span> <span class="n">get_next_audio_chunk</span><span class="p">()</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="n">asr</span><span class="o">.</span><span class="n">streaming_transcribe</span><span class="p">(</span><span class="n">chunk</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">language</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">text</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="n">asr</span><span class="o">.</span><span class="n">finish_streaming_transcribe</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final: </span><span class="si">{</span><span class="n">state</span><span class="o">.</span><span class="n">text</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="constraints">Constraints<a class="headerlink" href="#constraints" title="Permanent link">&para;</a></h3>
+<ul>
+<li>No ForcedAligner support (no word-level timestamps during streaming)</li>
+<li>Single stream only (no parallel streams in one model instance)</li>
+<li>Requires vLLM backend — Transformers backend raises <code>NotImplementedError</code></li>
+</ul>
+<hr />
+<h2 id="8-vllm-serving-mode">8. vLLM Serving Mode<a class="headerlink" href="#8-vllm-serving-mode" title="Permanent link">&para;</a></h2>
+<p>The toolkit includes an OpenAI-compatible serving endpoint.</p>
+<p><strong>Source</strong>: <code>qwen_asr/cli/serve.py</code></p>
+<h3 id="starting-the-server">Starting the Server<a class="headerlink" href="#starting-the-server" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>qwen-asr-serve<span class="w"> </span>Qwen/Qwen3-ASR-1.7B<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>--gpu-memory-utilization<span class="w"> </span><span class="m">0</span>.8<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span>--port<span class="w"> </span><span class="m">8000</span>
+</code></pre></div>
+<p>This wraps <code>vllm serve</code> with the model registration step.</p>
+<h3 id="client-api-openai-compatible">Client API (OpenAI-compatible)<a class="headerlink" href="#client-api-openai-compatible" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/v1/chat/completions<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="s1">    &quot;model&quot;: &quot;Qwen/Qwen3-ASR-1.7B&quot;,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="s1">    &quot;messages&quot;: [{</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="s1">      &quot;role&quot;: &quot;user&quot;,</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="s1">      &quot;content&quot;: [</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="s1">        {&quot;type&quot;: &quot;audio_url&quot;, &quot;audio_url&quot;: {&quot;url&quot;: &quot;https://example.com/audio.wav&quot;}}</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="s1">      ]</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="s1">    }]</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="s1">  }&#39;</span>
+</code></pre></div>
+<h3 id="relevance-to-whisperjav">Relevance to WhisperJAV<a class="headerlink" href="#relevance-to-whisperjav" title="Permanent link">&para;</a></h3>
+<p>Serving mode could enable a future <strong>client-server architecture</strong> where:
+- The vLLM server runs persistently (no model load/unload per file)
+- WhisperJAV sends audio clips via HTTP (OpenAI-compatible API)
+- Multiple WhisperJAV instances share one GPU server</p>
+<p>This is lower priority than direct vLLM integration but worth noting for multi-user or production deployments.</p>
+<hr />
+<h2 id="9-audio-limits-and-constraints">9. Audio Limits and Constraints<a class="headerlink" href="#9-audio-limits-and-constraints" title="Permanent link">&para;</a></h2>
+<p><strong>Source</strong>: <code>qwen_asr/inference/utils.py</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">SAMPLE_RATE</span> <span class="o">=</span> <span class="mi">16000</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">MAX_ASR_INPUT_SECONDS</span> <span class="o">=</span> <span class="mi">1200</span>              <span class="c1"># 20 minutes (text-only mode)</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">MAX_FORCE_ALIGN_INPUT_SECONDS</span> <span class="o">=</span> <span class="mi">180</span>       <span class="c1"># 3 minutes (with timestamps)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Value</th>
+<th>Applies To</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Max ASR input</td>
+<td>1200s (20 min)</td>
+<td>Text-only generation</td>
+<td>Both backends</td>
+</tr>
+<tr>
+<td>Max aligner input</td>
+<td><strong>180s</strong> (3 min)</td>
+<td>ForcedAligner timestamps</td>
+<td>Hard limit; NOT 300s as some docs claim</td>
+</tr>
+<tr>
+<td>Sample rate</td>
+<td>16000 Hz</td>
+<td>All audio input</td>
+<td>Resampled internally if different</td>
+</tr>
+<tr>
+<td>Internal chunking</td>
+<td>180s</td>
+<td><code>split_audio_into_chunks()</code></td>
+<td>Applied before aligner call</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Critical for WhisperJAV</strong>: The ForcedAligner's <strong>180-second hard limit</strong> is the primary constraint driving the pipeline's scene detection and Assembly mode's 120-second max scene duration (60-second safety margin).</p>
+<p>Both backends share the same ForcedAligner (PyTorch-only <code>Qwen3ForcedAligner</code>). Switching to vLLM for text generation does not change the aligner limits.</p>
+<hr />
+<h2 id="10-whisperjav-architectural-preparation">10. WhisperJAV Architectural Preparation<a class="headerlink" href="#10-whisperjav-architectural-preparation" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV's Qwen pipeline already has the structural foundation for vLLM integration through the <strong>Assembly (decoupled) mode</strong>.</p>
+<h3 id="assembly-mode-vram-phases">Assembly Mode VRAM Phases<a class="headerlink" href="#assembly-mode-vram-phases" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>Phase 5 Assembly Flow:
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  Step 1: load_model_text_only()          ← vLLM replaces THIS
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  Step 2: transcribe_text_only(batch)     ← vLLM replaces THIS
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  Step 3: unload_model()                  ← VRAM freed
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>  Step 4: TextSanitizer.clean_batch()     ← CPU, no VRAM
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>  Step 5: load_aligner_only()             ← PyTorch ForcedAligner (stays)
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>  Step 6: align_standalone(batch)          ← PyTorch ForcedAligner (stays)
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>  Step 7: unload_model()                  ← VRAM freed
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>  Step 8: Reconstruct WhisperResult       ← CPU, no VRAM
+</code></pre></div>
+<p>Steps 1-3 are the <strong>text generation phase</strong> — this is where vLLM plugs in.
+Steps 5-7 are the <strong>alignment phase</strong> — this stays on PyTorch/Transformers because the ForcedAligner has no vLLM implementation.</p>
+<h3 id="existing-code-references">Existing Code References<a class="headerlink" href="#existing-code-references" title="Permanent link">&para;</a></h3>
+<p><strong>QwenPipeline constructor</strong> (<code>qwen_pipeline.py</code> line 60-69):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ASSEMBLY mode ... creates the architectural socket for future vLLM integration.
+</code></pre></div></p>
+<p><strong>QwenASR decoupled API</strong> (<code>qwen_asr.py</code> lines 1080-1093):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>The decoupled VRAM-exclusive phases allow ASR and forced alignment to run
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>as separate VRAM-exclusive phases. This allows:
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>  - Higher batch_size for text-only ASR (no aligner loaded)
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>  - Mid-pipeline sanitization between generation and alignment
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>  - Future vLLM integration (ASR supports vLLM, aligner does not)
+</code></pre></div></p>
+<h3 id="what-already-works">What Already Works<a class="headerlink" href="#what-already-works" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>vLLM Ready?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Assembly mode pipeline</td>
+<td>Yes</td>
+<td>VRAM phases already decoupled</td>
+</tr>
+<tr>
+<td><code>transcribe_text_only()</code></td>
+<td>Needs adapter</td>
+<td>Currently calls HuggingFace <code>.generate()</code></td>
+</tr>
+<tr>
+<td><code>align_standalone()</code></td>
+<td>N/A</td>
+<td>ForcedAligner is PyTorch-only, no change needed</td>
+</tr>
+<tr>
+<td>TextSanitizer</td>
+<td>Yes</td>
+<td>CPU-only, backend-agnostic</td>
+</tr>
+<tr>
+<td>Scene detection</td>
+<td>Yes</td>
+<td>Audio-only, backend-agnostic</td>
+</tr>
+<tr>
+<td>VAD / Speech segmentation</td>
+<td>Yes</td>
+<td>Audio-only, backend-agnostic</td>
+</tr>
+<tr>
+<td>Generation safety controls</td>
+<td>Needs mapping</td>
+<td><code>repetition_penalty</code> → <code>SamplingParams</code></td>
+</tr>
+<tr>
+<td>Sentinel (collapse detection)</td>
+<td>Yes</td>
+<td>Operates on word dicts, backend-agnostic</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-integration-pathway">11. Integration Pathway<a class="headerlink" href="#11-integration-pathway" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-backend-selection-minimal-change">Phase 1: Backend Selection (Minimal Change)<a class="headerlink" href="#phase-1-backend-selection-minimal-change" title="Permanent link">&para;</a></h3>
+<p>Add a <code>qwen_backend</code> parameter to <code>QwenPipeline</code> and <code>QwenASR</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># QwenASR.__init__()</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">backend</span>  <span class="c1"># &quot;transformers&quot; (default) or &quot;vllm&quot;</span>
+</code></pre></div>
+<p>In <code>load_model_text_only()</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">==</span> <span class="s2">&quot;vllm&quot;</span><span class="p">:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">Qwen3ASRModel</span><span class="o">.</span><span class="n">LLM</span><span class="p">(</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>        <span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model_id</span><span class="p">,</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>        <span class="n">gpu_memory_utilization</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">gpu_memory_utilization</span><span class="p">,</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>        <span class="n">max_new_tokens</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_new_tokens</span><span class="p">,</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="p">)</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">Qwen3ASRModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">model_id</span><span class="p">,</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>        <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>        <span class="n">device_map</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>        <span class="n">max_new_tokens</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_new_tokens</span><span class="p">,</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="p">)</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>: Minimal. Only <code>load_model_text_only()</code> and <code>transcribe_text_only()</code> change. Alignment stays on Transformers.</p>
+<h3 id="phase-2-generation-config-mapping">Phase 2: Generation Config Mapping<a class="headerlink" href="#phase-2-generation-config-mapping" title="Permanent link">&para;</a></h3>
+<p>Map WhisperJAV's generation safety parameters to vLLM's <code>SamplingParams</code>:</p>
+<table>
+<thead>
+<tr>
+<th>WhisperJAV Parameter</th>
+<th>Transformers</th>
+<th>vLLM SamplingParams</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>repetition_penalty</code></td>
+<td><code>GenerationConfig.repetition_penalty</code></td>
+<td><code>SamplingParams.repetition_penalty</code></td>
+</tr>
+<tr>
+<td><code>max_tokens_per_audio_second</code></td>
+<td>Dynamic <code>max_new_tokens</code></td>
+<td>Dynamic <code>SamplingParams.max_tokens</code></td>
+</tr>
+<tr>
+<td>Temperature</td>
+<td><code>GenerationConfig.temperature</code></td>
+<td><code>SamplingParams.temperature</code></td>
+</tr>
+</tbody>
+</table>
+<p>The toolkit's <code>Qwen3ASRModel.LLM()</code> already creates <code>SamplingParams</code> at construction:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">sampling_params</span> <span class="o">=</span> <span class="n">SamplingParams</span><span class="p">(</span><span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_tokens</span><span class="o">=</span><span class="n">max_new_tokens</span><span class="p">)</span>
+</code></pre></div></p>
+<p>WhisperJAV would need to either:
+- Pass generation params through the constructor's <code>**kwargs</code>, or
+- Override <code>self.model.sampling_params</code> before each call (for dynamic <code>max_tokens</code>)</p>
+<h3 id="phase-3-cli-and-gui-integration">Phase 3: CLI and GUI Integration<a class="headerlink" href="#phase-3-cli-and-gui-integration" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># CLI</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--qwen-backend&quot;</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;transformers&quot;</span><span class="p">,</span> <span class="s2">&quot;vllm&quot;</span><span class="p">],</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>                    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;transformers&quot;</span><span class="p">)</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--qwen-gpu-memory-utilization&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="c1"># GUI schema addition</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;select&quot;</span><span class="p">,</span>
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;Inference Backend&quot;</span><span class="p">,</span>
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>    <span class="s2">&quot;options&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;transformers&quot;</span><span class="p">,</span> <span class="s2">&quot;vllm&quot;</span><span class="p">],</span>
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>    <span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="s2">&quot;transformers&quot;</span><span class="p">,</span>
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="phase-4-coupled-modes-optional-lower-priority">Phase 4: Coupled Modes (Optional, Lower Priority)<a class="headerlink" href="#phase-4-coupled-modes-optional-lower-priority" title="Permanent link">&para;</a></h3>
+<p>CONTEXT_AWARE and VAD_SLICING modes currently use coupled ASR+Aligner calls. For vLLM:
+- Option A: Force Assembly mode when backend=vllm (simplest)
+- Option B: Support coupled vLLM calls with separate aligner loading (complex, questionable value)</p>
+<p><strong>Recommendation</strong>: Phase 4 is Option A — when <code>backend="vllm"</code>, automatically use Assembly mode regardless of <code>input_mode</code> setting.</p>
+<hr />
+<h2 id="12-dependency-and-installation-strategy">12. Dependency and Installation Strategy<a class="headerlink" href="#12-dependency-and-installation-strategy" title="Permanent link">&para;</a></h2>
+<h3 id="current-state">Current State<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># WhisperJAV pyproject.toml</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">qwen</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">    </span><span class="s2">&quot;qwen-asr&gt;=0.0.6&quot;</span><span class="p">,</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">    </span><span class="s2">&quot;whisperjav[huggingface]&quot;</span><span class="p">,</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="p">]</span>
+</code></pre></div>
+<p>This installs <code>qwen-asr</code> without the vLLM extra. The Transformers backend works.</p>
+<h3 id="proposed-addition">Proposed Addition<a class="headerlink" href="#proposed-addition" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># New extra for vLLM support</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">qwen-vllm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">    </span><span class="s2">&quot;qwen-asr[vllm]&gt;=0.0.6&quot;</span><span class="p">,</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">    </span><span class="s2">&quot;whisperjav[huggingface]&quot;</span><span class="p">,</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="p">]</span>
+</code></pre></div>
+<h3 id="vllm-version-pinning">vLLM Version Pinning<a class="headerlink" href="#vllm-version-pinning" title="Permanent link">&para;</a></h3>
+<p>The Qwen3-ASR toolkit pins vLLM strictly:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># qwen-asr pyproject.toml</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="n">vllm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;vllm==0.14.0&quot;</span><span class="p">]</span>
+</code></pre></div></p>
+<p>This version pin means:
+- WhisperJAV doesn't need to manage vLLM versions directly
+- The <code>qwen-asr[vllm]</code> extra handles the correct version
+- vLLM updates require a corresponding <code>qwen-asr</code> update</p>
+<h3 id="installation-sizes">Installation Sizes<a class="headerlink" href="#installation-sizes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Extra</th>
+<th>Additional Size</th>
+<th>GPU Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>qwen</code> (current)</td>
+<td>~200MB (qwen-asr + transformers deps)</td>
+<td>Yes (CUDA)</td>
+</tr>
+<tr>
+<td><code>qwen-vllm</code> (proposed)</td>
+<td>~800MB+ (vllm + CUDA kernels)</td>
+<td>Yes (CUDA, Linux preferred)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="platform-considerations">Platform Considerations<a class="headerlink" href="#platform-considerations" title="Permanent link">&para;</a></h3>
+<ul>
+<li>vLLM has strongest support on <strong>Linux with CUDA</strong></li>
+<li>Windows support is experimental (WSL2 recommended)</li>
+<li>macOS is not supported by vLLM</li>
+<li>WhisperJAV's Windows installer would need to handle this gracefully</li>
+</ul>
+<hr />
+<h2 id="13-risk-assessment">13. Risk Assessment<a class="headerlink" href="#13-risk-assessment" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Severity</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>vLLM version conflicts with other WhisperJAV deps</td>
+<td>MEDIUM</td>
+<td>Separate <code>qwen-vllm</code> extra, version managed by <code>qwen-asr</code></td>
+</tr>
+<tr>
+<td>vLLM Windows compatibility</td>
+<td>HIGH</td>
+<td>Document Linux/WSL2 requirement; Transformers backend as fallback</td>
+</tr>
+<tr>
+<td>ForcedAligner stays PyTorch-only</td>
+<td>LOW</td>
+<td>Assembly mode already decouples; no architectural change needed</td>
+</tr>
+<tr>
+<td>Generation safety params may behave differently</td>
+<td>MEDIUM</td>
+<td>Test repetition_penalty and token budgets under vLLM; validate output quality</td>
+</tr>
+<tr>
+<td>vLLM VRAM management conflicts with manual unload</td>
+<td>MEDIUM</td>
+<td>vLLM manages its own memory; may need to skip manual <code>torch.cuda.empty_cache()</code></td>
+</tr>
+<tr>
+<td>Streaming not needed yet</td>
+<td>LOW</td>
+<td>Don't implement until there's a use case (live captioning)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="14-decision">14. Decision<a class="headerlink" href="#14-decision" title="Permanent link">&para;</a></h2>
+<h3 id="current-decision-defer-implementation-document-readiness">Current Decision: DEFER implementation, DOCUMENT readiness<a class="headerlink" href="#current-decision-defer-implementation-document-readiness" title="Permanent link">&para;</a></h3>
+<p>The vLLM integration pathway is well-understood and architecturally prepared. Implementation is deferred because:</p>
+<ol>
+<li><strong>No immediate throughput bottleneck</strong> — WhisperJAV processes single files sequentially; vLLM's batch scheduling advantage is minimal for this workload.</li>
+<li><strong>Platform risk</strong> — vLLM's Windows support is experimental, and most WhisperJAV users are on Windows.</li>
+<li><strong>Assembly mode maturity</strong> — Assembly mode (the vLLM socket) is new (v1.8.8+) and needs production stabilization before adding another variable.</li>
+<li><strong>Transformers backend works</strong> — Current quality and speed are acceptable for the target use case.</li>
+</ol>
+<h3 id="when-to-revisit">When to Revisit<a class="headerlink" href="#when-to-revisit" title="Permanent link">&para;</a></h3>
+<p>Implement vLLM integration when any of these triggers occur:
+- WhisperJAV adds <strong>batch/queue processing</strong> (multiple files) — vLLM's scheduler becomes valuable
+- Users request <strong>live captioning</strong> — streaming is vLLM-only
+- <strong>Server deployment</strong> is needed — vLLM serving mode enables multi-client architectures
+- vLLM achieves <strong>stable Windows support</strong> — removes the platform risk
+- Assembly mode is <strong>proven stable</strong> in production — safe to add vLLM as a variable</p>
+<h3 id="whats-ready-today">What's Ready Today<a class="headerlink" href="#whats-ready-today" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Architectural socket: Assembly mode's decoupled VRAM phases</li>
+<li>API knowledge: <code>Qwen3ASRModel.LLM()</code> construction and <code>SamplingParams</code> mapping</li>
+<li>Dependency strategy: Separate <code>qwen-vllm</code> extra with pinned version via <code>qwen-asr</code></li>
+<li>Code locations: <code>load_model_text_only()</code> and <code>transcribe_text_only()</code> are the only methods that change</li>
+</ul>
+<hr />
+<p><em>This document is maintained as a living reference. Update when the Qwen3-ASR toolkit changes its vLLM interface or when WhisperJAV begins implementation.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
