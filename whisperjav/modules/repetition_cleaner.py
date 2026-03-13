@@ -76,6 +76,13 @@ class RepetitionCleaner:
 
             # 7. Targets wave-dash + comma phrase repetitions (e.g., "あ〜、あ〜、あ〜、") (#209)
             ('wavedash_comma_phrase', regex.compile(r'([\p{L}]{1,10}[〜ー]+[、,]\s*)\1{2,}'), r'\1'),
+
+            # 8. Targets sentence-ending phrase repetitions with ellipsis/period markers (#209)
+            # e.g., "はい、はい、はい・・・。はい、はい、はい・・・。" (FC2-PPV-4025269 line 52)
+            # Catches phrases ending in 。or ・・・。that repeat 3+ times
+            ('sentence_phrase_repetition', regex.compile(
+                r'((?:[\p{L}\p{N}][、,]?\s*){1,10}[・…。!！]{1,5}\s*)\1{2,}'
+            ), r'\1'),
         ]
 
 

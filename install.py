@@ -405,6 +405,16 @@ def detect_cuda_version(args) -> str:
         log(f"  [WARN] Unknown CUDA version '{args.cuda}', defaulting to cu128")
         return "cu128"
 
+    # --force-cuda: manual override when GPU detection fails (#200 Optimus laptops)
+    if hasattr(args, 'force_cuda') and args.force_cuda:
+        cuda = args.force_cuda.lower().replace("cuda", "").replace("cu", "").replace(".", "")
+        key = f"cu{cuda}"
+        if key in PYTORCH_INDEXES:
+            log(f"  --force-cuda: using {key} (bypassing GPU detection)")
+            return key
+        log(f"  [WARN] --force-cuda '{args.force_cuda}' not recognized, using cu128")
+        return "cu128"
+
     # Auto-detect
     if _INSTALLER_AVAILABLE:
         gpu_info = detect_gpu()
@@ -786,6 +796,9 @@ def main():
                         help="Skip preflight checks")
     parser.add_argument("--local", action="store_true",
                         help="Force local .venv even if conda/venv is active")
+    parser.add_argument("--force-cuda", type=str, default=None, metavar="VERSION",
+                        help="Force CUDA version even if GPU detection fails (e.g. cu118, cu128). "
+                             "Useful for Optimus laptops where NVML/nvidia-smi may not detect the GPU.")
     parser.add_argument("--log-file", type=str, default=None, metavar="PATH",
                         help="Custom log file path")
     # Internal flags (used by upgrade.py)

@@ -423,10 +423,13 @@ def detect_gpu() -> GPUInfo:
     if result:
         return result
 
-    # No GPU detected
+    # No GPU detected — provide Optimus-specific guidance (#200)
     return GPUInfo(
         source="none",
-        message="No NVIDIA GPU detected. Will use CPU-only installation.",
+        message="No NVIDIA GPU detected. Will use CPU-only installation.\n"
+                "  If you have an NVIDIA GPU (e.g., Optimus laptop with dual GPUs),\n"
+                "  try: python install.py --force-cuda cu128\n"
+                "  or:  python install.py --cuda cu128",
     )
 
 
@@ -575,9 +578,13 @@ def run_pip_command(
     if env:
         run_env.update(env)
 
-    # Set uv timeout if using uv
+    # Set uv-specific environment variables
     if uv_path:
         run_env["UV_HTTP_TIMEOUT"] = "300"
+        # Fix #218: uv rejects HuggingFace wheels where internal version
+        # (e.g., "0.2.26+cu118") doesn't match filename ("0.2.26").
+        # This is common for CUDA-specific llama-cpp-python builds.
+        run_env["UV_SKIP_WHEEL_FILENAME_CHECK"] = "1"
 
     git_timeouts_configured = False
     last_stdout = ""

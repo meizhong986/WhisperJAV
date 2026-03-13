@@ -241,7 +241,7 @@ def detect_gpu() -> GPUInfo:
         if result.detected:
             return result
 
-    # No GPU detected
+    # No GPU detected — provide guidance for Optimus laptops (#200)
     return GPUInfo(
         detected=False,
         name=None,
@@ -249,7 +249,9 @@ def detect_gpu() -> GPUInfo:
         cuda_version=None,
         torch_index=CPU_TORCH_INDEX,
         detection_method="none",
-        message="No NVIDIA GPU detected - using CPU",
+        message="No NVIDIA GPU detected - using CPU.\n"
+                "  If you have an NVIDIA GPU (e.g., Optimus laptop with dual GPUs),\n"
+                "  try: python install.py --force-cuda cu128",
     )
 
 

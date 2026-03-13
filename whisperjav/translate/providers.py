@@ -44,6 +44,16 @@ PROVIDER_CONFIGS = {
         'server_address': 'https://api.groq.com',
         'endpoint': '/openai/v1/chat/completions',
     },
+    'ollama': {
+        'pysubtrans_name': 'Custom Server',  # Uses OpenAI-compatible /v1/chat/completions
+        'model': 'gemma3:12b',         # Default: good quality for JAV translation
+        'env_var': None,               # No API key needed
+        'server_address': 'http://localhost:11434',
+        'endpoint': '/v1/chat/completions',
+        'supports_conversation': True,
+        'supports_system_messages': True,
+        'supports_streaming': True,
+    },
     'local': {
         'pysubtrans_name': 'Local',  # Marker for local LLM bypass
         'model': 'llama-8b',          # Default: good quality, 6GB VRAM

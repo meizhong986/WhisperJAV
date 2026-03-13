@@ -2,6 +2,7 @@
 Core translation logic - PySubtrans wrapper.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -75,13 +76,15 @@ def compute_max_output_tokens(batch_size: int, n_ctx: int) -> int:
     - Budget: 500 tokens fixed overhead
 
     Strategy: clamp to the smaller of (available context after worst-case input)
-    and (2× expected output). This prevents finish_reason='length' while
-    still allowing the model to be verbose when content is shorter.
+    and expected output. Previous versions used 2× expected, but this gave models
+    too much room to produce verbose/garbled output (e.g., 2392 tokens of garbage
+    instead of ~1200 tokens of translation). Tightening to 1× forces concise output
+    and reduces "No matches found" failures caused by off-format model verbosity.
 
     Results:
-    - 8K  (batch=11): ~2392 tokens max output (~2× the ~1320 tokens expected)
-    - 16K (batch=27): ~5784 tokens max output (~1.5× the ~3740 tokens expected)
-    - 32K (batch=30): ~8200 tokens max output (capped by 2× expected)
+    - 8K  (batch=11): ~1820 tokens max output (matches expected)
+    - 16K (batch=27): ~3740 tokens max output (matches expected)
+    - 32K (batch=30): ~4100 tokens max output (matches expected)
 
     Args:
         batch_size: Number of subtitle lines in the batch
@@ -97,7 +100,7 @@ def compute_max_output_tokens(batch_size: int, n_ctx: int) -> int:
 
     available = n_ctx - overhead - (batch_size * input_per_line_cjk)
     expected = (batch_size * output_per_line_en) + output_fixed_tags
-    return max(512, min(available, expected * 2))
+    return max(512, min(available, expected))
 
 
 def _normalize_api_base(url: str) -> str:
@@ -289,6 +292,44 @@ def translate_subtitle(
                     print(f"[TRANSLATE]   Client server_address: {getattr(settings, 'server_address', 'unknown')}", file=sys.stderr)
                     print(f"[TRANSLATE]   Client endpoint: {getattr(settings, 'endpoint', 'unknown')}", file=sys.stderr)
 
+        # =========================================================================
+        # A2 FIX: Delete stale .subtrans files from previous failed attempts
+        # =========================================================================
+        # .subtrans files store project state including batch_size and other
+        # settings from previous runs. When settings change (e.g., user adjusts
+        # batch_size via CLI), the stale .subtrans file overrides the new CLI
+        # settings via options.update(project_settings). This is a known bug
+        # where "batch size not taking effect" (#212, zhstark's report).
+        #
+        # Fix: Delete .subtrans if WhisperJAV version changed (indicates user
+        # upgraded and old settings are likely stale/incompatible).
+        _subtrans_path = Path(str(input_path) + '.subtrans')
+        if _subtrans_path.exists():
+            _delete_stale = False
+            try:
+                import json as _json
+                with open(_subtrans_path, 'r', encoding='utf-8') as _sf:
+                    _subtrans_data = _json.load(_sf)
+                _old_version = _subtrans_data.get('whisperjav_version', '')
+                try:
+                    from whisperjav.__version__ import __version__ as _current_version
+                except ImportError:
+                    _current_version = ''
+                if _old_version and _current_version and _old_version != _current_version:
+                    _delete_stale = True
+                    print(f"[TRANSLATE]   Deleting stale .subtrans file (version changed: "
+                          f"{_old_version} -> {_current_version})", file=sys.stderr)
+            except (ValueError, KeyError, OSError):
+                # If we can't read the .subtrans file, it may be corrupt — delete it
+                _delete_stale = True
+                print(f"[TRANSLATE]   Deleting unreadable .subtrans file", file=sys.stderr)
+
+            if _delete_stale:
+                try:
+                    _subtrans_path.unlink()
+                except OSError as _e:
+                    print(f"[TRANSLATE]   Warning: Could not delete .subtrans: {_e}", file=sys.stderr)
+
         # Initialize project (PySubtrans 1.5.x expects subtitle path in 'filepath' kwarg)
         print(f"[TRANSLATE] Loading subtitle project...", file=sys.stderr)
         project = init_project(options, filepath=str(input_path), persistent=True)
@@ -365,6 +406,62 @@ def translate_subtitle(
             translator.events.connect_default_loggers()
 
         # =========================================================================
+        # A1: Diagnostic token logging — track batch results and failures
+        # =========================================================================
+        _batch_stats = {'total': 0, 'success': 0, 'no_matches': 0, 'errors': 0}
+
+        def _diagnostic_batch_handler(sender, **kwargs):
+            """Track batch translation results for diagnostic summary."""
+            _batch_stats['total'] += 1
+            _batch_stats['success'] += 1
+
+        def _diagnostic_warning_handler(sender, message=None, **kwargs):
+            """Capture 'No matches found' warnings with context."""
+            msg = message or kwargs.get('message', '')
+            if msg is None:
+                return
+            msg_str = str(msg)
+            if 'No matches' in msg_str or 'no matches' in msg_str:
+                _batch_stats['no_matches'] += 1
+                # Log the raw output that failed parsing — this is the #1 diagnostic gap
+                print(f"\n[TRANSLATE] *** NO MATCHES DETECTED (batch #{_batch_stats['total'] + 1}) ***",
+                      file=sys.stderr)
+                print(f"[TRANSLATE]   This means the model's response didn't match PySubtrans's",
+                      file=sys.stderr)
+                print(f"[TRANSLATE]   expected format (#N / Original> / Translation>).",
+                      file=sys.stderr)
+                print(f"[TRANSLATE]   Raw warning: {msg_str[:500]}", file=sys.stderr)
+                if provider_config.get('max_tokens'):
+                    print(f"[TRANSLATE]   max_tokens was set to: {provider_config['max_tokens']}",
+                          file=sys.stderr)
+                print(f"[TRANSLATE]   Consider: smaller --max-batch-size, different model, or cloud provider",
+                      file=sys.stderr)
+
+        def _diagnostic_error_handler(sender, message=None, **kwargs):
+            """Track translation errors."""
+            _batch_stats['errors'] += 1
+            msg = message or kwargs.get('message', '')
+            if msg:
+                msg_str = str(msg)
+                # Log server errors (502, 500, etc.) with context
+                if any(code in msg_str for code in ('502', '500', '503', 'Server Error', 'timed out')):
+                    print(f"\n[TRANSLATE] *** SERVER ERROR (batch #{_batch_stats['total'] + 1}) ***",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]   Error: {msg_str[:300]}", file=sys.stderr)
+                    print(f"[TRANSLATE]   This may indicate context overflow crashing the LLM server.",
+                          file=sys.stderr)
+
+        # Connect diagnostic handlers to translator events
+        if hasattr(translator, 'events'):
+            if hasattr(translator.events, 'batch_translated'):
+                translator.events.batch_translated.connect(_diagnostic_batch_handler)
+            # Also hook warning/error signals for "No matches" detection
+            if hasattr(translator.events, 'warning'):
+                translator.events.warning.connect(_diagnostic_warning_handler)
+            if hasattr(translator.events, 'error'):
+                translator.events.error.connect(_diagnostic_error_handler)
+
+        # =========================================================================
         # DIAGNOSTIC: Translation Start
         # =========================================================================
         import time as _time
@@ -386,12 +483,41 @@ def translate_subtitle(
             else:
                 print(f"\n[TRANSLATE] Translation FAILED after {_translation_elapsed:.1f}s", file=sys.stderr)
 
+            # =====================================================================
+            # A1: Diagnostic summary — always print batch stats
+            # =====================================================================
+            print(f"[TRANSLATE] Batch statistics:", file=sys.stderr)
+            print(f"[TRANSLATE]   Batches processed: {_batch_stats['total']}", file=sys.stderr)
+            print(f"[TRANSLATE]   Successful: {_batch_stats['success']}", file=sys.stderr)
+            if _batch_stats['no_matches'] > 0:
+                print(f"[TRANSLATE]   *** 'No matches' failures: {_batch_stats['no_matches']} ***", file=sys.stderr)
+                print(f"[TRANSLATE]   These failures mean the LLM produced output that PySubtrans", file=sys.stderr)
+                print(f"[TRANSLATE]   couldn't parse. Common causes:", file=sys.stderr)
+                print(f"[TRANSLATE]     - Model too small for the task (try gemma-9b or cloud)", file=sys.stderr)
+                print(f"[TRANSLATE]     - Context overflow (try smaller --max-batch-size)", file=sys.stderr)
+                print(f"[TRANSLATE]     - Missing format example in instructions", file=sys.stderr)
+            if _batch_stats['errors'] > 0:
+                print(f"[TRANSLATE]   Errors: {_batch_stats['errors']}", file=sys.stderr)
+
         # Save final project state after successful translation
         print(f"[TRANSLATE] Saving project state...", file=sys.stderr)
         if hasattr(project, 'SaveProject'):
             try:
                 project.SaveProject()
                 print(f"[TRANSLATE]   Project state saved (.subtrans file)", file=sys.stderr)
+                # Stamp WhisperJAV version into .subtrans for A2 stale detection
+                _subtrans_save_path = Path(str(input_path) + '.subtrans')
+                if _subtrans_save_path.exists():
+                    try:
+                        import json as _json
+                        from whisperjav.__version__ import __version__ as _ver
+                        with open(_subtrans_save_path, 'r', encoding='utf-8') as _sf:
+                            _data = _json.load(_sf)
+                        _data['whisperjav_version'] = _ver
+                        with open(_subtrans_save_path, 'w', encoding='utf-8') as _sf:
+                            _json.dump(_data, _sf, indent=2, ensure_ascii=False)
+                    except Exception:
+                        pass  # Best-effort version stamping
             except Exception as e:
                 print(f"[TRANSLATE]   Warning: Could not save project state: {e}", file=sys.stderr)
 

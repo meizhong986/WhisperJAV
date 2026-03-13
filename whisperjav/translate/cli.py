@@ -460,8 +460,8 @@ def main():
             provider_config['endpoint'] = endpoint_path
             provider_config.pop('api_base', None)
 
-    # Get API key (not needed for local/custom providers — Ollama, LM Studio, etc.)
-    if provider_name in ('local', 'custom'):
+    # Get API key (not needed for local/custom/ollama providers)
+    if provider_name in ('local', 'custom', 'ollama'):
         api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else ''
     else:
         env_var = provider_config.get('env_var')
@@ -507,7 +507,66 @@ def main():
         n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)
         print(f"  NOTE: Local LLM provider - server will be started", file=sys.stderr)
         print(f"  GPU layers: {n_gpu_layers} (-1=all, 0=CPU only)", file=sys.stderr)
+    if provider_name == 'ollama':
+        print(f"  NOTE: Ollama provider — requires Ollama running locally", file=sys.stderr)
+        print(f"  Download: https://ollama.com/download", file=sys.stderr)
     print(f"{'='*60}\n", file=sys.stderr)
+
+    # =========================================================================
+    # Ollama provider: auto-detect running server, set num_ctx
+    # =========================================================================
+    if provider_name == 'ollama':
+        import urllib.request
+        import urllib.error
+
+        ollama_base = provider_config.get('server_address', 'http://localhost:11434')
+
+        # Override server address if --endpoint provided
+        if hasattr(args, 'endpoint') and args.endpoint:
+            ollama_base = _normalize_api_base(args.endpoint)
+            provider_config = dict(provider_config)
+            server_addr, endpoint_path = _api_base_to_custom_server(args.endpoint)
+            provider_config['server_address'] = server_addr
+            provider_config['endpoint'] = endpoint_path
+
+        # Check if Ollama server is running
+        try:
+            req = urllib.request.Request(f"{ollama_base}/api/tags", method='GET')
+            resp = urllib.request.urlopen(req, timeout=5)
+            resp.read()
+            print(f"[OLLAMA] Server detected at {ollama_base}", file=sys.stderr)
+        except (urllib.error.URLError, OSError) as e:
+            print(f"\nERROR: Cannot connect to Ollama at {ollama_base}", file=sys.stderr)
+            print(f"", file=sys.stderr)
+            print(f"  Ollama is not running or not installed.", file=sys.stderr)
+            print(f"  1. Install Ollama: https://ollama.com/download", file=sys.stderr)
+            print(f"  2. Start Ollama:   ollama serve", file=sys.stderr)
+            print(f"  3. Pull a model:   ollama pull {model}", file=sys.stderr)
+            print(f"  4. Re-run translation", file=sys.stderr)
+            print(f"", file=sys.stderr)
+            print(f"  Connection error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        # Set num_ctx to 8192 (Ollama defaults to 2048 which is too small for
+        # translation batches). This is passed via provider_options which
+        # PySubtrans forwards as extra body parameters in the API call.
+        ollama_n_ctx = 8192
+        if 'num_ctx' not in provider_options:
+            provider_options['num_ctx'] = ollama_n_ctx
+
+        # Auto-cap batch size for Ollama's context window
+        _user_batch = merged.get('max_batch_size', 30)
+        ollama_batch_size = cap_batch_size_for_context(_user_batch, ollama_n_ctx)
+        if ollama_batch_size < _user_batch:
+            print(f"[OLLAMA] Batch size auto-reduced from {_user_batch} to "
+                  f"{ollama_batch_size} to fit {ollama_n_ctx}-token context", file=sys.stderr)
+
+        # Compute max_tokens for Ollama
+        ollama_max_tokens = compute_max_output_tokens(ollama_batch_size, ollama_n_ctx)
+        provider_config = dict(provider_config)  # Copy to avoid modifying original
+        provider_config['max_tokens'] = ollama_max_tokens
+        print(f"[OLLAMA] num_ctx={ollama_n_ctx}, batch_size={ollama_batch_size}, "
+              f"max_tokens={ollama_max_tokens}", file=sys.stderr)
 
     # Batch translation loop
     success_count = 0
@@ -626,6 +685,24 @@ def main():
                         print(f"\n[CLI] Stopping local LLM server...", file=sys.stderr)
                         stop_local_server()
                         print(f"[CLI]   Server stopped, GPU memory released", file=sys.stderr)
+            elif provider_name == 'ollama':
+                result_path = translate_subtitle(
+                    input_path=str(input_path),
+                    output_path=output_path,
+                    provider_config=provider_config,
+                    model=model,
+                    api_key='',
+                    source_lang=source_lang,
+                    target_lang=target_lang,
+                    instruction_file=instruction_file,
+                    scene_threshold=merged.get('scene_threshold', 60.0),
+                    max_batch_size=ollama_batch_size,
+                    stream=True,  # Always stream for local models (prevents timeout)
+                    debug=args.debug,
+                    provider_options=provider_options,
+                    extra_context=extra_context if extra_context else None,
+                    emit_raw_output=not getattr(args, 'no_progress', False)
+                )
             else:
                 result_path = translate_subtitle(
                     input_path=str(input_path),
