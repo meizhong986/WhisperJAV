@@ -1417,7 +1417,7 @@ def verify_import(module_name: str, display_name: str) -> Tuple[bool, Optional[s
              f"import {module_name}; v = getattr({module_name}, '__version__', 'OK'); print(v)"],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=120  # First import of torch/whisper can take 60s+ on fresh install
         )
         if result.returncode == 0:
             version = result.stdout.strip() or "OK"
@@ -1465,7 +1465,7 @@ def run_post_install_verification() -> Tuple[int, int, list]:
     try:
         result = subprocess.run(
             [python_exe, "-c", "from whisperjav.main import main; print('OK')"],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=120  # First import loads torch, whisper — slow on cold cache
         )
         if result.returncode == 0:
             log("  ✓ from whisperjav.main import main: OK")
@@ -1509,7 +1509,7 @@ def run_post_install_verification() -> Tuple[int, int, list]:
         try:
             result = subprocess.run(
                 [wj_exe, "--version"],
-                capture_output=True, text=True, timeout=15
+                capture_output=True, text=True, timeout=120  # First invocation imports torch
             )
             if result.returncode == 0:
                 version_str = result.stdout.strip()
