@@ -79,6 +79,36 @@ Plus: auto-detection of running Ollama server, friendly error message if not fou
 
 ---
 
+### v1.8.9 — Ollama Smart Integration (Near-term)
+
+**Theme**: Upgrade the v1.8.8 `--provider ollama` preview into a production-ready "Smart BYOO" experience. Additive — nothing breaks, llama-cpp-python untouched.
+
+**What's new**:
+
+1. **`OllamaManager`** (`whisperjav/translate/ollama_manager.py`) — Central class for all Ollama interaction:
+   - Server detection (running? installed?) and auto-start via `ollama serve` subprocess
+   - Model management: list, check, pull with progress, hardware-aware recommendation
+   - Dynamic context sizing from `/api/show` metadata (replaces hardcoded 8192)
+   - Curated model configs: qwen2.5:3b/7b/14b, gemma3:12b with VRAM-based selection
+
+2. **New CLI flags**:
+   - `--ollama-url URL` — Custom Ollama server URL
+   - `--list-ollama-models` — List locally available models and exit
+   - `--yes` / `-y` — Auto-confirm prompts (model downloads, server starts)
+
+3. **Smart orchestration flow** (`ensure_ready()`):
+   - Detect server → auto-start if installed → select model → auto-pull with consent → configure context
+   - Non-TTY mode: auto-start (safe) but refuse to auto-pull (prevents surprise GB downloads in CI)
+   - Platform-specific install guidance (Windows, macOS, Linux)
+
+4. **Service layer integration** — `translate_with_config()` gains `ollama_url` and `auto_confirm` params, enabling the main pipeline (`whisperjav video.mp4 --translate --translate-provider ollama`) to use full OllamaManager orchestration.
+
+**How v1.8.9 feeds v1.9.0**: OllamaManager becomes the foundation for the `LLMBackend` protocol in v1.9.0. The v1.9.0 migration wraps OllamaManager in a `backends/ollama.py` adapter, adds the backend abstraction layer, and deprecates llama-cpp-python. No v1.8.9 code needs rewriting — it's purely additive.
+
+**Files**: `ollama_manager.py` (new, ~350 lines), `cli.py`, `service.py`, `main.py`, `__init__.py`, `providers.py`
+
+---
+
 ### v1.9.0 — LLM Backend Migration (Medium-term)
 
 **Theme**: Replace llama-cpp-python with Ollama as the primary local LLM backend.

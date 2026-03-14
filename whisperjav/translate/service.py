@@ -32,7 +32,7 @@ from typing import Callable, Optional
 from .providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
 from .settings import load_settings, DEFAULT_SETTINGS
 from .instructions import get_instruction_content
-from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context
+from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +203,9 @@ def translate_with_config(
     extra_context: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
     n_gpu_layers: int = -1,
-    endpoint: Optional[str] = None
+    endpoint: Optional[str] = None,
+    ollama_url: Optional[str] = None,
+    auto_confirm: bool = False,
 ) -> Optional[Path]:
     """
     Translate subtitle file with full configuration resolution.
@@ -286,8 +288,8 @@ def translate_with_config(
     # Load user settings
     settings = load_settings()
 
-    # Resolve API key (not needed for local/custom providers)
-    if provider in ('local', 'custom'):
+    # Resolve API key (not needed for local/custom/ollama providers)
+    if provider in ('local', 'custom', 'ollama'):
         resolved_api_key = api_key or ''
     else:
         resolved_api_key = _resolve_api_key(provider_config, api_key)
@@ -357,9 +359,63 @@ def translate_with_config(
 
     # Execute translation
     try:
+        # For Ollama provider: use OllamaManager for server detection + model readiness
+        if provider == 'ollama':
+            from .ollama_manager import OllamaManager
+
+            print(f"\n[SERVICE] Ollama Provider Mode", file=sys.stderr)
+            mgr = OllamaManager(base_url=ollama_url or endpoint)
+
+            readiness = mgr.ensure_ready(
+                model=resolved_model,
+                auto_start=True,
+                auto_pull=auto_confirm,
+                interactive=False,  # Non-interactive from service layer
+            )
+
+            resolved_model = readiness['model']
+            n_ctx = readiness['num_ctx']
+            resolved_max_batch_size = cap_batch_size_for_context(resolved_max_batch_size, n_ctx)
+            max_tokens = compute_max_output_tokens(resolved_max_batch_size, n_ctx)
+
+            if temperature is None and readiness.get('temperature'):
+                provider_options['temperature'] = readiness['temperature']
+            provider_options['num_ctx'] = n_ctx
+
+            provider_config = dict(provider_config)
+            provider_config['max_tokens'] = max_tokens
+            resolved_api_key = ''
+            stream = True  # Always stream for local models
+
+            if readiness.get('base_url'):
+                server_addr, endpoint_path = _api_base_to_custom_server(readiness['base_url'])
+                provider_config['server_address'] = server_addr
+                provider_config['endpoint'] = endpoint_path + '/v1/chat/completions'
+
+            print(f"[SERVICE]   Model: {resolved_model}", file=sys.stderr)
+            print(f"[SERVICE]   num_ctx={n_ctx}, batch_size={resolved_max_batch_size}, max_tokens={max_tokens}", file=sys.stderr)
+
+            result_path = translate_subtitle(
+                input_path=str(input_file),
+                output_path=resolved_output_path,
+                provider_config=provider_config,
+                model=resolved_model,
+                api_key='',
+                source_lang=source_lang,
+                target_lang=target_lang,
+                instruction_file=resolved_instruction_file,
+                scene_threshold=resolved_scene_threshold,
+                max_batch_size=resolved_max_batch_size,
+                stream=stream,
+                debug=debug,
+                provider_options=provider_options,
+                extra_context=extra_context,
+                emit_raw_output=True,
+            )
+
         # For local provider WITHOUT custom endpoint: start llama.cpp server
         # If local + endpoint: skip server launch, use the endpoint directly (cloud path)
-        if provider == 'local' and not endpoint:
+        elif provider == 'local' and not endpoint:
             from .local_backend import start_local_server, stop_local_server
 
             # =========================================================================

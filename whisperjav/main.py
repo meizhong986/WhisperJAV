@@ -449,6 +449,15 @@ def parse_arguments():
         "--translate-endpoint",
         help="Custom API endpoint URL for translation (for OpenAI-compatible APIs)"
     )
+    translation_group.add_argument(
+        "--ollama-url",
+        help="Custom Ollama server URL (default: http://localhost:11434)"
+    )
+    translation_group.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Auto-confirm prompts (model downloads, server starts)"
+    )
 
     # HuggingFace Transformers mode arguments
     hf_group = parser.add_argument_group("HuggingFace Transformers Mode Options (--mode transformers)")
@@ -1269,7 +1278,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             debug=getattr(args, 'debug', False),
                             extra_context=build_translation_context(args),
                             n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
-                            endpoint=getattr(args, 'translate_endpoint', None)
+                            endpoint=getattr(args, 'translate_endpoint', None),
+                            ollama_url=getattr(args, 'ollama_url', None),
+                            auto_confirm=getattr(args, 'yes', False),
                         )
 
                         if translated_path:
