@@ -223,8 +223,8 @@ def parse_arguments():
                                help="Speech padding in ms for pass 1")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
-                               help="Pipeline for pass 2 (enables pass 2)")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl"],
+                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP Faster Whisper XXL (requires --xxl-exe)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: balanced)")
@@ -257,6 +257,14 @@ def parse_arguments():
     twopass_group.add_argument("--ensemble-serial", action="store_true",
                                help="Complete each file (Pass1+Pass2+Merge) before starting the next. "
                                     "Slower (reloads models per file) but delivers results incrementally.")
+
+    # BYOP (Bring Your Own Provider) — external ASR tool integration
+    byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
+    byop_group.add_argument("--xxl-exe", default=None,
+                            help="Path to faster-whisper-xxl executable (required for --pass2-pipeline xxl)")
+    byop_group.add_argument("--xxl-args", default="",
+                            help="Extra arguments passed directly to XXL "
+                                 "(e.g., '--standard_asia --ff_vocal_extract mdx_kim2')")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -1656,6 +1664,24 @@ def main():
         # Check if two-pass ensemble mode
         if args.ensemble:
             logger.info("Two-pass ensemble mode enabled")
+
+            # BYOP XXL validation: --xxl-exe is required when pass2-pipeline=xxl
+            if getattr(args, 'pass2_pipeline', None) == 'xxl':
+                xxl_exe = getattr(args, 'xxl_exe', None)
+                if not xxl_exe:
+                    logger.error(
+                        "--xxl-exe is required when using --pass2-pipeline xxl. "
+                        "Provide the path to your faster-whisper-xxl executable."
+                    )
+                    sys.exit(1)
+                xxl_path = Path(xxl_exe)
+                if not xxl_path.is_file():
+                    logger.error(
+                        "--xxl-exe path does not exist or is not a file: %s", xxl_exe
+                    )
+                    sys.exit(1)
+                logger.info("BYOP XXL: exe=%s", xxl_exe)
+
             # Config will be handled by EnsembleOrchestrator
             resolved_config = None  # Not used in ensemble mode
         # Check if component-based ensemble mode (--asr provided)
@@ -2004,6 +2030,9 @@ def main():
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)
+                    # BYOP XXL fields (only used when pipeline='xxl')
+                    'xxl_exe': getattr(args, 'xxl_exe', None),
+                    'xxl_args': getattr(args, 'xxl_args', '') or '',
                 }
 
             # Create orchestrator

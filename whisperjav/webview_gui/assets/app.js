@@ -1242,9 +1242,12 @@ const EnsembleManager = {
             isTransformers: false,
             isQwen: true,  // Default pipeline is Qwen3-ASR
             isAnimeWhisper: false,
+            isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
-            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
+            enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
+            xxlExePath: '',  // Persisted path to XXL executable
+            xxlExtraArgs: ''  // Extra CLI args for XXL
         },
         mergeStrategy: 'pass1_primary',
         serialMode: false,
@@ -1307,6 +1310,26 @@ const EnsembleManager = {
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper');
         this.state.pass2.isAnimeWhisper = this.state.pass2.pipeline === 'anime-whisper';
+        this.state.pass2.isXxl = this.state.pass2.pipeline === 'xxl';
+
+        // Load persisted BYOP preferences (XXL exe path, extra args)
+        try {
+            const byopPrefs = await pywebview.api.get_byop_preferences();
+            if (byopPrefs) {
+                if (byopPrefs.xxl_exe_path) {
+                    this.state.pass2.xxlExePath = byopPrefs.xxl_exe_path;
+                    const pathInput = document.getElementById('xxl-exe-path');
+                    if (pathInput) pathInput.value = byopPrefs.xxl_exe_path;
+                }
+                if (byopPrefs.xxl_extra_args) {
+                    this.state.pass2.xxlExtraArgs = byopPrefs.xxl_extra_args;
+                    const argsInput = document.getElementById('xxl-extra-args');
+                    if (argsInput) argsInput.value = byopPrefs.xxl_extra_args;
+                }
+            }
+        } catch (e) {
+            // BYOP preferences not available — first run or backend not ready
+        }
 
         // Swap model options for non-legacy passes
         if (this.state.pass1.isAnimeWhisper) {
@@ -1380,6 +1403,28 @@ const EnsembleManager = {
             this.state.pass2.speechSegmenter = e.target.value;
         });
 
+        // BYOP: Browse for XXL executable
+        document.getElementById('xxl-browse-btn')?.addEventListener('click', async () => {
+            try {
+                const result = await pywebview.api.select_xxl_exe();
+                if (result.success && result.path) {
+                    document.getElementById('xxl-exe-path').value = result.path;
+                    this.state.pass2.xxlExePath = result.path;
+                    // Persist for future sessions
+                    pywebview.api.save_byop_preferences({ xxl_exe_path: result.path });
+                }
+            } catch (e) {
+                ConsoleManager.log(`Failed to browse for XXL: ${e.message}`, 'error');
+            }
+        });
+
+        // BYOP: Extra args input
+        document.getElementById('xxl-extra-args')?.addEventListener('change', (e) => {
+            this.state.pass2.xxlExtraArgs = e.target.value.trim();
+            // Persist for future sessions
+            pywebview.api.save_byop_preferences({ xxl_extra_args: this.state.pass2.xxlExtraArgs });
+        });
+
         // DSP effects checkbox handlers
         this.initDspCheckboxes();
         document.getElementById('pass2-model').addEventListener('change', (e) => {
@@ -1444,6 +1489,7 @@ const EnsembleManager = {
         const isTransformers = newValue === 'transformers';
         const isQwen = (newValue === 'qwen' || newValue === 'anime-whisper');
         const isAnimeWhisper = newValue === 'anime-whisper';
+        const isXxl = newValue === 'xxl';
         const wasTransformers = passState.isTransformers;
         const wasQwen = passState.isQwen;
         const wasAnimeWhisper = passState.isAnimeWhisper;
@@ -1464,8 +1510,10 @@ const EnsembleManager = {
                 passState.isTransformers = isTransformers;
                 passState.isQwen = isQwen;
                 passState.isAnimeWhisper = isAnimeWhisper;
+                passState.isXxl = isXxl;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
+                this.updateByopPanel();
                 if (oldType !== newType) {
                     this.swapModelOptions(passKey, newType);
                     this.applyPipelinePresets(passKey, newType);
@@ -1480,7 +1528,9 @@ const EnsembleManager = {
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
             passState.isAnimeWhisper = isAnimeWhisper;
+            passState.isXxl = isXxl;
             this.updateRowGreyingState(passKey);
+            this.updateByopPanel();
             if (oldType !== newType) {
                 this.swapModelOptions(passKey, newType);
                 this.applyPipelinePresets(passKey, newType);
@@ -1559,6 +1609,7 @@ const EnsembleManager = {
     },
 
     // Update row greying based on pipeline type
+    // - XXL (BYOP): Disable ALL controls (external tool, no WhisperJAV config applies)
     // - Transformers: Disable sensitivity AND segmenter (uses HF internal chunking)
     // - Qwen: Disable sensitivity only, KEEP segmenter (uses post-ASR VAD filter)
     // - Legacy: Enable both
@@ -1569,6 +1620,40 @@ const EnsembleManager = {
 
         // Check if pass2 is disabled (controls should be disabled regardless of pipeline)
         const isPass2Disabled = passKey === 'pass2' && !this.state.pass2.enabled;
+
+        // XXL (BYOP): Disable all pipeline controls — external tool handles everything
+        if (passState.isXxl) {
+            const xxlTitle = 'Not applicable — Faster Whisper XXL uses its own settings';
+            sensitivitySelect.disabled = true;
+            sensitivitySelect.title = xxlTitle;
+            segmenterSelect.disabled = true;
+            segmenterSelect.title = xxlTitle;
+
+            const sceneSelect = document.getElementById(`${passKey}-scene`);
+            const enhancerSelect = document.getElementById(`${passKey}-enhancer`);
+            const modelSelect = document.getElementById(`${passKey}-model`);
+            const customizeBtn = document.getElementById(`customize-${passKey}`);
+            if (sceneSelect) { sceneSelect.disabled = true; sceneSelect.title = xxlTitle; }
+            if (enhancerSelect) { enhancerSelect.disabled = true; enhancerSelect.title = xxlTitle; }
+            if (modelSelect) { modelSelect.disabled = true; modelSelect.title = xxlTitle; }
+            if (customizeBtn) { customizeBtn.disabled = true; customizeBtn.title = xxlTitle; }
+
+            // Hide guide button and DSP panel
+            const guideBtn = document.getElementById(`guide-${passKey}`);
+            if (guideBtn) guideBtn.style.display = 'none';
+            this.updateDspPanel(passKey);
+            return;
+        }
+
+        // Re-enable controls that XXL may have disabled (scene, enhancer, model, customize)
+        const sceneSelect = document.getElementById(`${passKey}-scene`);
+        const enhancerSelect = document.getElementById(`${passKey}-enhancer`);
+        const modelSelect = document.getElementById(`${passKey}-model`);
+        const customizeBtn = document.getElementById(`customize-${passKey}`);
+        if (sceneSelect) { sceneSelect.disabled = isPass2Disabled; sceneSelect.title = ''; }
+        if (enhancerSelect) { enhancerSelect.disabled = isPass2Disabled; enhancerSelect.title = ''; }
+        if (modelSelect) { modelSelect.disabled = isPass2Disabled; modelSelect.title = ''; }
+        if (customizeBtn) { customizeBtn.disabled = isPass2Disabled; customizeBtn.title = ''; }
 
         // Sensitivity: Disabled only for Transformers (Qwen now uses sensitivity presets)
         const disableSensitivity = passState.isTransformers;
@@ -1666,8 +1751,9 @@ const EnsembleManager = {
             mergeRow.classList.add('disabled');
         }
 
-        // Update DSP panel visibility for Pass 2
+        // Update DSP and BYOP panel visibility for Pass 2
         this.updateDspPanel('pass2');
+        this.updateByopPanel();
     },
 
     // DSP Effects Panel Management
@@ -1678,10 +1764,33 @@ const EnsembleManager = {
 
         if (panel) {
             // Show panel only when FFmpeg DSP is selected and pass is enabled
-            if (enhancer === 'ffmpeg-dsp' && isEnabled) {
+            // Also hide when XXL is selected (external tool, no DSP)
+            const isXxl = passId === 'pass2' && this.state.pass2.isXxl;
+            if (enhancer === 'ffmpeg-dsp' && isEnabled && !isXxl) {
                 panel.style.display = 'block';
             } else {
                 panel.style.display = 'none';
+            }
+        }
+    },
+
+    // BYOP Settings Panel Management
+    updateByopPanel() {
+        const panel = document.getElementById('byop-settings-panel');
+        if (!panel) return;
+
+        const showByop = this.state.pass2.enabled && this.state.pass2.isXxl;
+        panel.style.display = showByop ? 'block' : 'none';
+
+        // Sync input fields from state
+        if (showByop) {
+            const pathInput = document.getElementById('xxl-exe-path');
+            const argsInput = document.getElementById('xxl-extra-args');
+            if (pathInput && !pathInput.value && this.state.pass2.xxlExePath) {
+                pathInput.value = this.state.pass2.xxlExePath;
+            }
+            if (argsInput && !argsInput.value && this.state.pass2.xxlExtraArgs) {
+                argsInput.value = this.state.pass2.xxlExtraArgs;
             }
         }
     },
@@ -4801,8 +4910,12 @@ const EnsembleManager = {
                 isTransformers: this.state.pass2.isTransformers,
                 isQwen: this.state.pass2.isQwen,
                 isAnimeWhisper: this.state.pass2.isAnimeWhisper,
+                isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
-                enhanceForVad: this.state.pass2.isQwen ? (this.state.pass2.enhanceForVad || false) : false
+                enhanceForVad: this.state.pass2.isQwen ? (this.state.pass2.enhanceForVad || false) : false,
+                // BYOP fields (only meaningful when pipeline is 'xxl')
+                xxlExe: this.state.pass2.isXxl ? this.state.pass2.xxlExePath : null,
+                xxlArgs: this.state.pass2.isXxl ? this.state.pass2.xxlExtraArgs : null
             },
             merge_strategy: this.state.mergeStrategy,
             serial_mode: this.state.serialMode,
