@@ -18,20 +18,13 @@ class BasePipeline(ABC):
                  temp_dir: str = "./temp",
                  keep_temp_files: bool = False,
                  save_metadata_json: bool = False,
-                 adaptive_classification: bool = False,
-                 adaptive_audio_enhancement: bool = False,
-                 smart_postprocessing: bool = False,
-                 **kwargs  # --- FIX: Accept and ignore extra keyword arguments ---
+                 **kwargs  # Accept and ignore extra keyword arguments
                 ):
         self.output_dir = Path(output_dir)
         self.temp_dir = Path(temp_dir)
         self.keep_temp_files = keep_temp_files
         self.save_metadata_json = save_metadata_json  # Preserve metadata JSON files (enabled by --debug)
         self.metadata_manager = MetadataManager(self.temp_dir, self.output_dir)
-
-        self.adaptive_classification = adaptive_classification
-        self.adaptive_audio_enhancement = adaptive_audio_enhancement
-        self.smart_postprocessing = smart_postprocessing
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)

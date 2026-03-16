@@ -1,4 +1,10 @@
 # whisperjav/config/sanitization_constants.py
+#
+# NOTE: These constants are NOT sensitivity-aware. They use fixed values
+# regardless of --sensitivity setting. The sensitivity system only controls
+# ASR/VAD/scene-detection parameters via Pydantic presets.
+# TODO(v1.9.0): Consider making CPS thresholds and timing constants
+# configurable per sensitivity profile.
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Set

@@ -72,14 +72,17 @@ class FasterWhisperProASR:
         provider_params = params["provider"]
 
         # VAD parameters (passed to Speech Segmenter)
-        self.vad_threshold = vad_params.get("threshold", 0.4)
-        self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 150)
-        self.vad_chunk_threshold = vad_params.get("chunk_threshold", 4.0)
+        # Fallback values match the "balanced" Pydantic preset (SileroVADOptions)
+        self.vad_threshold = vad_params.get("threshold", 0.18)
+        self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 100)
 
         # Speech Segmenter (MANDATORY - single owner of speech segmentation)
         # All speech segmentation goes through this contract
+        # NOTE: The resolver does not set speech_segmenter.backend — it's only set
+        # when the user passes --speech-segmenter or --no-vad from CLI.
+        # TODO(v1.9.0): Move default backend selection into Pydantic VAD component.
         speech_segmenter_config = params.get("speech_segmenter", {})
-        segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")  # Default to silero-v4.0
+        segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")
 
         # CRITICAL: Merge VAD params into speech segmenter config for sensitivity tuning
         # Without this, sensitivity settings (threshold, min_speech_duration_ms) are lost

@@ -32,18 +32,12 @@ class ConfigManager:
     # Configuration schema for v4.3 validation
     CONFIG_SCHEMA = {
         "type": "object",
-        "required": ["version", "pipeline_parameter_map", "models", "pipelines", "common_transcriber_options", "common_decoder_options"],
+        "required": ["version"],
         "properties": {
             "version": {"type": "string", "pattern": "^4\\.\\d+$"},
-            "pipeline_parameter_map": {"type": "object"},
-            "models": {"type": "object"},
-            "pipelines": {"type": "object"},
-            "common_transcriber_options": {"type": "object"},
-            "common_decoder_options": {"type": "object"},
-            "feature_configs": {"type": "object"},
-            "defaults": {"type": "object"},
             "ui_preferences": {"type": "object"}
-        }
+        },
+        "additionalProperties": True
     }
     
     def __init__(self, config_path: Optional[Union[str, Path]] = None):

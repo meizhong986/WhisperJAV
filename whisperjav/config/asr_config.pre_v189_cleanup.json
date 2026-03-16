@@ -1,0 +1,596 @@
+{
+  "version": "4.4",
+  "_deprecation_note": "CAUTION: Most sections in this file are NOT read at runtime for the balanced/fidelity pipeline CLI/GUI path. Runtime parameters come from Pydantic presets in config/components/asr/faster_whisper.py. The scene_detection section IS still active. See docs/research/CONFIG_RESOLUTION_CHAIN_ANALYSIS.md for details.",
+  "pipeline_parameter_map": {
+    "faster": {
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options"
+      ],
+      "engine": [
+        "faster_whisper_engine_options",
+        "stable_ts_engine_options"
+      ],
+      "vad": "stable_ts_vad_options",
+      "vad_handling": "packed"
+    },
+    "fast": {
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options"
+      ],
+      "engine": [
+        "faster_whisper_engine_options",
+        "fast_pipeline_overrides",
+        "stable_ts_engine_options"
+      ],
+      "vad": "stable_ts_vad_options",
+      "vad_handling": "packed"
+    },
+    "fidelity": {
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options",
+        "exclusive_whisper_plus_faster_whisper"
+      ],
+      "engine": "openai_whisper_engine_options",
+      "vad": "silero_vad_options",
+      "vad_handling": "separate"
+    },
+    "balanced": {
+      "common": [
+        "common_transcriber_options",
+        "common_decoder_options",
+        "exclusive_whisper_plus_faster_whisper"
+      ],
+      "engine": "faster_whisper_engine_options",
+      "vad": "silero_vad_options",
+      "vad_handling": "separate"
+    }
+  },
+  "fast_pipeline_overrides": {
+    "balanced": {
+      "batch_size": 1,
+      "chunk_length": null
+    },
+    "conservative": {
+      "batch_size": 1,
+      "chunk_length": null
+    },
+    "aggressive": {
+      "batch_size": 1,
+      "chunk_length": null
+    }
+  },
+  "models": {
+    "whisper-turbo": {
+      "provider": "openai_whisper",
+      "model_name": "turbo",
+      "compute_type": "float16",
+      "supported_tasks": [
+        "transcribe"
+      ],
+      "_comment": "device auto-detected: CUDA → MPS → CPU"
+    },
+    "whisper-large-v2": {
+      "provider": "openai_whisper",
+      "model_name": "large-v2",
+      "compute_type": "float16",
+      "supported_tasks": [
+        "transcribe",
+        "translate"
+      ],
+      "_comment": "device auto-detected: CUDA → MPS → CPU"
+    },
+    "faster-whisper-large-v2-int8": {
+      "provider": "faster_whisper",
+      "model_name": "large-v2",
+      "compute_type": "int8_float16",
+      "supported_tasks": [
+        "transcribe",
+        "translate"
+      ],
+      "_comment": "requires ctranslate2 build with int8 quantization support"
+    },
+    "faster-whisper-large-v3": {
+      "provider": "faster_whisper",
+      "model_name": "large-v3",
+      "compute_type": "float16",
+      "supported_tasks": [
+        "transcribe",
+        "translate"
+      ],
+      "_comment": "Systran/faster-whisper-large-v3 for fast/faster pipelines"
+    }
+  },
+  "vad_engines": {
+    "silero-v4": {
+      "provider": "silero",
+      "repo": "snakers4/silero-vad:v4.0"
+    },
+    "silero-v3.1": {
+      "provider": "silero",
+      "repo": "snakers4/silero-vad:v3.1"
+    },
+    "silero-latest": {
+      "provider": "silero",
+      "repo": "snakers4/silero-vad"
+    }
+  },
+  "feature_configs": {
+    "scene_detection": {
+      "default_method": "auditok",
+      "auditok": {
+        "max_duration_s": 29.0,
+        "min_duration_s": 0.2,
+        "target_sr": 16000,
+        "force_mono": true,
+        "preserve_original_sr": true,
+        "assist_processing": false,
+        "verbose_summary": true,
+        "pass1_min_duration_s": 2.0,
+        "pass1_max_duration_s": 2700.0,
+        "pass1_max_silence_s": 2.5,
+        "pass1_energy_threshold": 20,
+        "pass2_min_duration_s": 0.1,
+        "pass2_max_duration_s": 28.0,
+        "pass2_max_silence_s": 1.8,
+        "pass2_energy_threshold": 25,
+        "bandpass_low_hz": 200,
+        "bandpass_high_hz": 4000,
+        "drc_threshold_db": -24.0,
+        "drc_ratio": 4.0,
+        "drc_attack_ms": 5.0,
+        "drc_release_ms": 100.0,
+        "skip_assist_on_loud_dbfs": -5.0,
+        "brute_force_fallback": true,
+        "brute_force_chunk_s": 29.0,
+        "pad_edges_s": 0.0,
+        "fade_ms": 0
+      },
+      "silero": {
+        "method": "silero",
+        "max_duration_s": 29.0,
+        "min_duration_s": 0.2,
+        "target_sr": 16000,
+        "force_mono": true,
+        "preserve_original_sr": true,
+        "assist_processing": false,
+        "verbose_summary": true,
+        "pass1_min_duration_s": 2.0,
+        "pass1_max_duration_s": 2700.0,
+        "pass1_max_silence_s": 2.5,
+        "pass1_energy_threshold": 32,
+        "pass2_min_duration_s": 0.1,
+        "pass2_max_duration_s": 960.0,
+        "silero_threshold": 0.08,
+        "silero_neg_threshold": 0.1,
+        "silero_min_silence_ms": 7800,
+        "silero_min_speech_ms": 100,
+        "silero_max_speech_s": 960,
+        "silero_min_silence_at_max": 750,
+        "silero_speech_pad_ms": 500,
+        "bandpass_low_hz": 200,
+        "bandpass_high_hz": 4000,
+        "drc_threshold_db": -24.0,
+        "drc_ratio": 4.0,
+        "drc_attack_ms": 5.0,
+        "drc_release_ms": 100.0,
+        "skip_assist_on_loud_dbfs": -5.0,
+        "brute_force_fallback": true,
+        "brute_force_chunk_s": 29.0,
+        "pad_edges_s": 0.0,
+        "fade_ms": 0
+      }
+    },
+    "post_processing": {
+      "standard": {
+        "remove_hallucinations": true,
+        "max_merge_gap_sec": 0.4
+      }
+    }
+  },
+  "pipelines": {
+    "faster": {
+      "workflow": {
+        "model": "faster-whisper-large-v3",
+        "vad": "none",
+        "backend": "stable-ts",
+        "features": {
+          "post_processing": "standard"
+        }
+      },
+      "model_overrides": {
+        "translate": "whisper-large-v2"
+      }
+    },
+    "fast": {
+      "workflow": {
+        "model": "faster-whisper-large-v2-int8",
+        "vad": "none",
+        "backend": "stable-ts",
+        "features": {
+          "scene_detection": "default",
+          "post_processing": "standard"
+        }
+      }
+    },
+    "fidelity": {
+      "workflow": {
+        "model": "whisper-large-v2",
+        "vad": "silero-v3.1",
+        "backend": "whisper",
+        "features": {
+          "scene_detection": "default",
+          "post_processing": "standard"
+        }
+      }
+    },
+    "balanced": {
+      "workflow": {
+        "model": "faster-whisper-large-v3",
+        "vad": "silero-v3.1",
+        "backend": "faster-whisper",
+        "features": {
+          "scene_detection": "default",
+          "post_processing": "standard"
+        }
+      },
+      "model_overrides": {
+        "translate": "faster-whisper-large-v2-int8"
+      }
+    }
+  },
+  "defaults": {
+    "language": "ja",
+    "output_format": "srt"
+  },
+  "ui_preferences": {
+    "console_verbosity": "summary",
+    "progress_batch_size": 10,
+    "show_scene_details": false,
+    "max_console_lines": 1000,
+    "auto_scroll": true,
+    "show_timestamps": false,
+    "theme": "default",
+    "last_mode": "fidelity",
+    "last_sensitivity": "conservative",
+    "last_language": "japanese",
+    "show_console": true,
+    "adaptive_classification": true,
+    "adaptive_audio_enhancement": true,
+    "smart_postprocessing": true
+  },
+  "common_transcriber_options": {
+    "balanced": {
+      "temperature": [
+        0.0,
+        0.1
+      ],
+      "compression_ratio_threshold": 2.4,
+      "logprob_threshold": -1.2,
+      "logprob_margin": 0.2,
+      "drop_nonverbal_vocals": false,
+      "no_speech_threshold": 0.5,
+      "condition_on_previous_text": false,
+      "initial_prompt": null,
+      "word_timestamps": true,
+      "prepend_punctuations": null,
+      "append_punctuations": null,
+      "clip_timestamps": null
+    },
+    "conservative": {
+      "temperature": [
+        0.0
+      ],
+      "compression_ratio_threshold": 2.4,
+      "logprob_threshold": -1.0,
+      "logprob_margin": 0.1,
+      "drop_nonverbal_vocals": false,
+      "no_speech_threshold": 0.74,
+      "condition_on_previous_text": false,
+      "initial_prompt": null,
+      "word_timestamps": true,
+      "prepend_punctuations": null,
+      "append_punctuations": null,
+      "clip_timestamps": null
+    },
+    "aggressive": {
+      "temperature": [
+        0.0,
+        0.3
+      ],
+      "no_speech_threshold": 0.22,
+      "logprob_threshold": -2.5,
+      "logprob_margin": 0.0,
+      "drop_nonverbal_vocals": false,
+      "compression_ratio_threshold": 3.0,
+      "condition_on_previous_text": false,
+      "initial_prompt": null,
+      "word_timestamps": true,
+      "prepend_punctuations": null,
+      "append_punctuations": null,
+      "clip_timestamps": null
+    }
+  },
+  "common_decoder_options": {
+    "balanced": {
+      "task": "transcribe",
+      "language": "ja",
+      "best_of": 1,
+      "beam_size": 2,
+      "patience": 2.0,
+      "length_penalty": null,
+      "prefix": null,
+      "suppress_tokens": null,
+      "suppress_blank": true,
+      "without_timestamps": false,
+      "max_initial_timestamp": null
+    },
+    "conservative": {
+      "task": "transcribe",
+      "language": "ja",
+      "best_of": 1,
+      "beam_size": 1,
+      "patience": 1.5,
+      "length_penalty": null,
+      "prefix": null,
+      "suppress_tokens": null,
+      "suppress_blank": true,
+      "without_timestamps": false,
+      "max_initial_timestamp": null
+    },
+    "aggressive": {
+      "task": "transcribe",
+      "language": "ja",
+      "best_of": 1,
+      "beam_size": 2,
+      "patience": 2.9,
+      "length_penalty": null,
+      "prefix": null,
+      "suppress_blank": false,
+      "suppress_tokens": [],
+      "without_timestamps": false,
+      "max_initial_timestamp": null
+    }
+  },
+  "openai_whisper_engine_options": {
+    "balanced": {
+      "carry_initial_prompt": null,
+      "prompt": null,
+      "fp16": true
+    },
+    "conservative": {
+      "carry_initial_prompt": null,
+      "prompt": null,
+      "fp16": true
+    },
+    "aggressive": {
+      "verbose": false,
+      "carry_initial_prompt": null,
+      "prompt": null,
+      "fp16": true
+    }
+  },
+  "faster_whisper_engine_options": {
+    "balanced": {
+      "chunk_length": null,
+      "repetition_penalty": 1.5,
+      "no_repeat_ngram_size": 2.0,
+      "prompt_reset_on_temperature": null,
+      "hotwords": null,
+      "multilingual": false,
+      "max_new_tokens": null,
+      "language_detection_threshold": null,
+      "language_detection_segments": null,
+      "log_progress": false
+    },
+    "conservative": {
+      "chunk_length": null,
+      "repetition_penalty": 1.8,
+      "no_repeat_ngram_size": 2.0,
+      "prompt_reset_on_temperature": null,
+      "hotwords": null,
+      "multilingual": false,
+      "max_new_tokens": null,
+      "language_detection_threshold": null,
+      "language_detection_segments": null,
+      "log_progress": false
+    },
+    "aggressive": {
+      "chunk_length": 30,
+      "repetition_penalty": 1.1,
+      "no_repeat_ngram_size": 2.0,
+      "prompt_reset_on_temperature": null,
+      "hotwords": null,
+      "multilingual": false,
+      "max_new_tokens": null,
+      "language_detection_threshold": null,
+      "language_detection_segments": null,
+      "log_progress": false
+    }
+  },
+  "silero_vad_options": {
+    "balanced": {
+      "threshold": 0.18,
+      "min_speech_duration_ms": 100,
+      "max_speech_duration_s": 11,
+      "min_silence_duration_ms": 300,
+      "neg_threshold": 0.15,
+      "speech_pad_ms": 400,
+      "chunk_threshold_s": 4.0
+    },
+    "conservative": {
+      "threshold": 0.35,
+      "min_speech_duration_ms": 150,
+      "max_speech_duration_s": 9,
+      "min_silence_duration_ms": 300,
+      "neg_threshold": 0.3,
+      "speech_pad_ms": 400,
+      "chunk_threshold_s": 4.0
+    },
+    "aggressive": {
+      "threshold": 0.05,
+      "min_speech_duration_ms": 30,
+      "max_speech_duration_s": 14,
+      "min_silence_duration_ms": 300,
+      "neg_threshold": 0.1,
+      "speech_pad_ms": 600,
+      "chunk_threshold_s": 4.0
+    }
+  },
+  "faster_whisper_vad_options": {
+    "balanced": {
+      "vad": false,
+      "threshold": 0.1,
+      "max_speech_duration_s": 8
+    },
+    "conservative": {
+      "vad": false,
+      "threshold": 0.1,
+      "max_speech_duration_s": 6
+    },
+    "aggressive": {
+      "vad": false,
+      "threshold": 0.1,
+      "max_speech_duration_s": 9
+    }
+  },
+  "stable_ts_vad_options": {
+    "balanced": {
+      "vad": true,
+      "vad_threshold": 0.25
+    },
+    "conservative": {
+      "vad": true,
+      "vad_threshold": 0.35
+    },
+    "aggressive": {
+      "vad": true,
+      "vad_threshold": 0.1
+    }
+  },
+  "stable_ts_engine_options": {
+    "balanced": {
+      "stream": null,
+      "mel_first": null,
+      "split_callback": null,
+      "suppress_ts_tokens": false,
+      "gap_padding": " ...",
+      "only_ffmpeg": false,
+      "max_instant_words": 0.5,
+      "avg_prob_threshold": null,
+      "nonspeech_skip": null,
+      "progress_callback": null,
+      "ignore_compatibility": true,
+      "extra_models": null,
+      "dynamic_heads": null,
+      "nonspeech_error": 0.1,
+      "only_voice_freq": false,
+      "min_word_dur": null,
+      "min_silence_dur": null,
+      "regroup": true,
+      "ts_num": 0,
+      "ts_noise": null,
+      "suppress_silence": true,
+      "suppress_word_ts": true,
+      "suppress_attention": false,
+      "use_word_position": true,
+      "q_levels": 20,
+      "k_size": 5,
+      "time_scale": null,
+      "denoiser": null,
+      "denoiser_options": null,
+      "demucs": false,
+      "demucs_options": null
+    },
+    "conservative": {
+      "stream": null,
+      "mel_first": null,
+      "split_callback": null,
+      "suppress_ts_tokens": false,
+      "gap_padding": " ...",
+      "only_ffmpeg": false,
+      "max_instant_words": 0.5,
+      "avg_prob_threshold": null,
+      "nonspeech_skip": null,
+      "progress_callback": null,
+      "ignore_compatibility": true,
+      "extra_models": null,
+      "dynamic_heads": null,
+      "nonspeech_error": 0.1,
+      "only_voice_freq": false,
+      "min_word_dur": null,
+      "min_silence_dur": null,
+      "regroup": true,
+      "ts_num": 0,
+      "ts_noise": null,
+      "suppress_silence": true,
+      "suppress_word_ts": true,
+      "suppress_attention": false,
+      "use_word_position": true,
+      "q_levels": 20,
+      "k_size": 5,
+      "time_scale": null,
+      "denoiser": null,
+      "denoiser_options": null,
+      "demucs": false,
+      "demucs_options": null
+    },
+    "aggressive": {
+      "stream": null,
+      "mel_first": null,
+      "split_callback": null,
+      "suppress_ts_tokens": false,
+      "gap_padding": " ...",
+      "only_ffmpeg": false,
+      "max_instant_words": 0.5,
+      "avg_prob_threshold": null,
+      "nonspeech_skip": null,
+      "progress_callback": null,
+      "ignore_compatibility": true,
+      "extra_models": null,
+      "dynamic_heads": null,
+      "nonspeech_error": 0.1,
+      "only_voice_freq": false,
+      "min_word_dur": null,
+      "min_silence_dur": null,
+      "regroup": true,
+      "ts_num": 0,
+      "ts_noise": null,
+      "suppress_silence": true,
+      "suppress_word_ts": true,
+      "suppress_attention": false,
+      "use_word_position": true,
+      "q_levels": 20,
+      "k_size": 5,
+      "time_scale": null,
+      "denoiser": null,
+      "denoiser_options": null,
+      "demucs": false,
+      "demucs_options": null
+    }
+  },
+  "exclusive_whisper_plus_faster_whisper": {
+    "balanced": {
+      "hallucination_silence_threshold": 2.0
+    },
+    "conservative": {
+      "hallucination_silence_threshold": 1.5
+    },
+    "aggressive": {
+      "hallucination_silence_threshold": 2.5
+    }
+  },
+  "HF_transformers_engine_options": {
+    "balanced": {
+      "placeholder for future": "placeholder for future"
+    },
+    "conservative": {
+      "placeholder for future": "placeholder for future"
+    },
+    "aggressive": {
+      "placeholder for future": "placeholder for future"
+    }
+  }
+}

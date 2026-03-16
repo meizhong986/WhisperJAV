@@ -101,10 +101,6 @@ class FasterPipeline(BasePipeline):
             self.lang_code = params["decoder"].get("language", "ja")
         self.postprocessor = SRTPostProcessor(language=self.lang_code, **post_proc_opts)
 
-        # Log if smart post-processing is enabled
-        if kwargs.get('smart_postprocessing', False):
-            logger.debug("Smart Post-Processing enabled.")
-
     def get_mode_name(self) -> str:
         return "faster"
         

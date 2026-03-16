@@ -3,7 +3,9 @@ Faster-Whisper ASR Component.
 
 High-performance Whisper implementation using CTranslate2.
 
-Parameter values match v1 asr_config.json exactly for backward compatibility.
+These Pydantic presets are the SINGLE SOURCE OF TRUTH for all Faster-Whisper
+pipeline parameters (balanced, fast, faster, fidelity modes). As of v1.8.9,
+asr_config.json is no longer read for pipeline parameters.
 """
 
 from typing import List, Optional, Union
@@ -14,13 +16,14 @@ from whisperjav.config.components.base import ASRComponent, register_asr
 
 class FasterWhisperOptions(BaseModel):
     """
-    Complete Faster-Whisper options matching v1 asr_config.json structure.
+    Complete Faster-Whisper options — the single source of truth for all
+    decoder, transcriber, and engine parameters.
 
-    Combines parameters from:
-    - common_decoder_options
-    - common_transcriber_options
-    - faster_whisper_engine_options
-    - exclusive_whisper_plus_faster_whisper
+    Parameter categories:
+    - Decoder: beam_size, best_of, patience, suppress_blank, etc.
+    - Transcriber: temperature, compression_ratio_threshold, logprob_threshold, etc.
+    - Engine: repetition_penalty, no_repeat_ngram_size, chunk_length, etc.
+    - Exclusive: hallucination_silence_threshold
     """
 
     # === Decoder Options (common_decoder_options) ===

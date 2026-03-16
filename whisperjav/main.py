@@ -310,12 +310,6 @@ def parse_arguments():
     progress_group.add_argument("--crash-trace", action="store_true",
                                help="Enable crash tracing (writes to crash_traces/ for debugging ctranslate2 crashes)")
 
-    # Enhancement features
-    enhancement_group = parser.add_argument_group("Optional Enhancement Features")
-    enhancement_group.add_argument("--adaptive-classification", action="store_true")
-    enhancement_group.add_argument("--adaptive-audio-enhancement", action="store_true")
-    enhancement_group.add_argument("--smart-postprocessing", action="store_true")
-    
     # Transcription tuning
     tuning_group = parser.add_argument_group("Transcription Tuning")
     tuning_group.add_argument("--sensitivity",
@@ -914,12 +908,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         verbosity_str = ui_prefs.get('console_verbosity', 'summary')
         verbosity = verbosity_mapping.get(verbosity_str, UnifiedVerbosityLevel.STANDARD)
     
-    enhancement_kwargs = {
-        "adaptive_classification": args.adaptive_classification,
-        "adaptive_audio_enhancement": args.adaptive_audio_enhancement,
-        "smart_postprocessing": args.smart_postprocessing
-    }
-
     # Create parameter tracer for real-time observability (if requested)
     tracer = create_tracer(args.trace_params)
     if args.trace_params:
@@ -960,7 +948,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "resolved_config": resolved_config,
         "progress_display": progress,
         "parameter_tracer": tracer,
-        **enhancement_kwargs
     }
 
     # Select pipeline
@@ -1409,10 +1396,6 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
     resolved_config['language'] = language_code  # Whisper language code
-    
-    # Enhancement options
-    for opt in ['adaptive_classification', 'adaptive_audio_enhancement', 'smart_postprocessing']:
-        resolved_config[opt] = getattr(args, opt)
     
     # Add scene detection method for kotoba pipeline
     resolved_config['scene_method'] = getattr(args, 'scene_detection_method', None) or 'auditok'

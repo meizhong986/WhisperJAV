@@ -3,7 +3,9 @@ Scene Detection Feature Component.
 
 Audio-based scene splitting using silence detection.
 
-Parameter values match v1 asr_config.json exactly for backward compatibility.
+These Pydantic presets are the SINGLE SOURCE OF TRUTH for scene detection
+parameters across all pipeline modes. As of v1.8.9, asr_config.json is
+no longer read for scene detection parameters.
 """
 
 from typing import Optional
