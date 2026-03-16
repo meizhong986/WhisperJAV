@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-15 (rev8.1 — responded to #223, #225, #227) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **37 open** on GitHub
+> Updated: 2026-03-16 (rev9 — 5 new issues, BYOP XXL shipped, #217 install log received) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **42 open** on GitHub
 
 ---
 
@@ -20,15 +20,42 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **37** | 3 new since rev7 (#224, #225, #227) |
-| New issues since rev7 | 3 | #224 (vocal separation analysis), #225 (GUI white screen), #227 (MPS hang on Transformers) |
-| **NEEDS RESPONSE (no reply yet)** | 4 | #224, #225, #227, #223 |
-| **KEY USER FEEDBACK RECEIVED** | 4 | #198 (MPS benchmark results), #132 (Kaggle Ollama confirmed), #128 (Gemma 3 proposal), #201 (self-resolved) |
-| **AWAITING LOG (asked for install log)** | 3 | #217, #220, #221 |
-| **Awaiting user response** | 9 | #200, #204, #207, #209, #210, #212, #214, #215, #218 |
-| **Closable now** | 2 | #201 (self-resolved), #222 (responded, can close if no follow-up) |
-| Feature requests (open) | 18 | See Cluster J |
+| Total open on GitHub | **42** | +5 since rev8.1 (#228, #229, #230, #231, #232) |
+| New issues since rev8.1 | 5 | #228 (cublas64_12.dll), #229 (install SSL fail), #230 (merge module request), #231 (Kaggle error), #232 (whisper-ja-anime model) |
+| Closed since rev8.1 | 2 | #198 (MPS, closed by user), #201 (SSL, self-resolved) |
+| **NEEDS RESPONSE (no reply yet)** | 6 | #224, #228, #229, #230, #231, #232 |
+| **AWAITING LOG (asked for install log)** | 3 | #220, #221, #225 |
+| **AWAITING CONFIRMATION** | 9 | #200, #204, #207, #209, #210, #212, #214, #218 |
+| **KEY NEW DATA** | 2 | #217 (install log received from vimbackground), #227 (MPS benchmark from dadlaugh) |
+| Feature requests (open) | 20 | See Cluster J |
 | Deferred to v1.9+ | 11 | See v1.9+ Backlog |
+
+---
+
+## v1.8.9 Development — IN PROGRESS
+
+### Branch: `dev_v1.8.9.beta` (5 commits ahead of main)
+
+| Commit | Description | Status |
+|--------|-------------|--------|
+| `aed1af2` | **BYOP Faster Whisper XXL** — full GUI + CLI + worker integration | DONE |
+| `6f27629` | Config/settings cleanup (WS1-WS5 workstreams) | DONE |
+| `3d4c4da` | Quality/accuracy tuning work (parameter audit findings) | DONE |
+| `a94f862` | Planning for v1.8.9 and beyond | DONE |
+| `dd56aa4` | OllamaManager smart integration | DONE |
+
+### v1.8.9 Planned Items — Progress
+
+| Priority | Item | Issues | Status | Notes |
+|----------|------|--------|--------|-------|
+| **P0** | Quality parameter fixes (large-v3, float16, beam_size=5) | #223, #224 | **DONE** | All Q1-Q6 verified in Pydantic presets + resolver_v3.py. See `V189_QUALITY_IMPROVEMENT_PLAN.md`. |
+| **P0** | BYOP Faster Whisper XXL ensemble integration | #223 | **DONE** | Committed `aed1af2`. Full GUI + CLI + worker chain. |
+| **P0** | MPS → CPU default for Whisper on Apple Silicon | #198, #227 | **NOT STARTED** | #227 benchmark shows kotoba MPS works but whisper-large-v3-turbo produces garbage on MPS |
+| **P1** | OllamaManager smart integration | #132, #212, #214 | **CODED** | Needs testing. `ollama_manager.py` committed. |
+| **P1** | Gemma 3 model upgrade (hyiip contribution) | #128, #132 | **DECISION NEEDED** | hyiip offers to implement. TinyRick1489 asks about num_ctx tuning (#132). |
+| **P2** | Config/settings cleanup (WS1-WS5) | — | **DONE** | Committed `6f27629`. |
+| **P2** | Installer investigation (#217 GUI exe) | #217 | **ANALYZED** | Root cause: PyTorch cu118 2.6GB download fails (TLS drops). Not installer bug. Responded on GitHub. |
+| **P3** | VAD failover + scene detection fixes (Q4, Q5) | #223 | **DONE** | Q4: `should_force_full_transcribe` in faster_whisper_pro_asr.py. Q5: Pydantic default auto-derives 28.0. |
 
 ---
 
@@ -47,7 +74,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | B1 | **#200** | NVML Optimus laptop fallback (`--force-cuda` flag, guidance text) | `SHIPPED` | Needs Ywocp to confirm |
 | C1 | **#209** | Repetition cleaner pattern #8 (`sentence_phrase_repetition`) | `SHIPPED` | Needs weifu8435 to confirm |
 | C2 | **#219** | MossFormer2_SS_16K 3D tensor crash | `SHIPPED` | Issue closed 2026-03-13 |
-| — | #198 | Force greedy decoding (`num_beams=1`) on MPS | `SHIPPED` | MPS working but NOT accelerating Whisper (see Cluster B) |
+| — | #198 | Force greedy decoding (`num_beams=1`) on MPS | `SHIPPED` | Issue closed. MPS confirmed not accelerating Whisper. |
 | — | — | numpy 2.x migration | `SHIPPED` | |
 | — | #211 | urllib3/chardet warning suppressed | `SHIPPED` | |
 | — | — | Post-install verification timeout 30s→120s | `SHIPPED` | `63936e1` |
@@ -61,61 +88,57 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 **Issues**: #196 (closed), #212, #214, #132, #128 (contributor PR)
 **Severity**: CRITICAL — affects ALL local LLM translation users across all platforms
-**Status**: v1.8.8 tactical fixes shipped. #132 partially verified. **#128 has new Gemma 3 proposal from hyiip.**
+**Status**: v1.8.8 tactical fixes shipped. #132 partially verified. **#128 has Gemma 3 proposal from hyiip.** **#132 new comment: TinyRick1489 asks about Ollama num_ctx tuning.**
 
 | # | Title | Reporter | Platform | State | Detail |
 |---|-------|----------|----------|-------|--------|
 | **#214** | 1.8.7 localLLM fail | KenZP12 | Windows, cu128 | **OPEN** | gemma-9b, 502 error. `AWAITING CONFIRMATION` |
 | **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090 | **OPEN** | llama-8b AND gemma-9b both fail. `AWAITING CONFIRMATION` |
 | **#196** | Local Translation Errors | zhstark | Ubuntu, 5090 32GB | CLOSED | Related to #212. |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | **UPDATE 2026-03-15**: `--provider local` NOW WORKS on Kaggle v1.8.8. `--provider ollama` also works after manual ollama install (`curl -fsSL https://ollama.com/install.sh \| sh` + `ollama pull gemma3:12b`). Ollama not auto-installed — user had to do it manually. |
-| **#128** | LLM context/batch sizing | hyiip | (contributor) | **OPEN** | **UPDATE 2026-03-14**: hyiip proposes replacing gemma-9b (8K context cap) with **Gemma 3 models** (128K context). Offers gemma-3-4b (~2.5GB Q4_K_M, beats Gemma 2 27B on benchmarks) and gemma-3-12b (~8.1GB Q4_K_M). Also proposes model-specific n_ctx in MODEL_REGISTRY and dynamic batch sizing. **Offers to implement.** |
-
-**Key new developments:**
-1. **#132 PARTIAL FIX VERIFIED**: `--provider local` works on Kaggle v1.8.8 (was broken before). `--provider ollama` works but requires manual ollama installation.
-2. **#128 GEMMA 3 PROPOSAL**: hyiip (original LLM contributor) offers to upgrade from Gemma 2 9B (8K context, the root cause of most LLM failures) to Gemma 3 4B/12B (128K context). This would fix the context overflow issue at the source. **Decision needed: accept hyiip's contribution or do it ourselves.**
-
-**Strategic direction update**: The Gemma 3 upgrade (#128) + Ollama migration together would solve the LLM translation cluster comprehensively. hyiip's proposal aligns perfectly with our v1.9.0 plans.
+| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | **UPDATE 2026-03-15**: `--provider local` works. `--provider ollama` works after manual install. **NEW**: TinyRick1489 asks if there's an arg to change Ollama num_ctx (currently 8192, caps batch_size to 11). `NEEDS RESPONSE` |
+| **#128** | LLM context/batch sizing | hyiip | (contributor) | **OPEN** | hyiip proposes Gemma 3 4B/12B (128K context). **Offers to implement.** `DECISION NEEDED` |
 
 ---
 
-### Cluster B: MPS / Apple Silicon — CONFIRMED NOT ACCELERATING (3 issues)
+### Cluster B: MPS / Apple Silicon — CONFIRMED PROBLEMATIC (2 issues)
 
-**Issues**: #198 (closed), #227 (NEW)
-**Severity**: HIGH — MPS detection works but provides NEGATIVE acceleration for Whisper
-**Status**: Benchmark results confirm the problem. New issue #227 reports Transformers mode hangs on M1 MAX.
+**Issues**: #198 (closed), #227
+**Status**: #198 closed. #227 has new benchmark data from dadlaugh showing model-dependent MPS behavior.
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#198** | Transformers MPS crash | francetoastVN | **CLOSED** | MPS fix shipped v1.8.8. **BENCHMARK RESULTS (2026-03-15)**: MPS matmul 2.5x faster than CPU, but **Whisper transcription 0.2x** (MPS: 17.1s vs CPU: 2.8s for 15s audio). PyTorch 2.10.0. **VERDICT: MPS is NOT providing meaningful acceleration for Whisper.** MPS backend limitations for this workload type. |
-| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN (NEW)** | `--mode transformers` hangs silently on Apple Silicon after model loads. Model: kotoba-whisper-bilingual. No output, no error, must force-kill. **NEEDS RESPONSE** |
+| **#198** | Transformers MPS crash | francetoastVN | **CLOSED** | MPS fix shipped v1.8.8. MPS confirmed 6x SLOWER for Whisper. |
+| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN** | **UPDATE 2026-03-16**: dadlaugh ran MPS test script. Results: kotoba-bilingual **works on MPS** (28s MPS vs 35s CPU = 1.25x speedup), but whisper-large-v3-turbo produces **garbage output on MPS** (42s, wrong language). CPU workaround works but takes 2-3 hours for 120-min video. `AWAITING CONFIRMATION` |
 
-**MPS analysis update (2026-03-15):**
-- MPS **works** for basic tensor operations (2.5x matmul speedup)
-- MPS **fails to accelerate** Whisper inference — 6x SLOWER than CPU
-- Root cause: PyTorch MPS backend not optimized for attention-heavy transformer workloads (known limitation)
-- #227 may be a different issue — model hangs entirely (not just slow), could be MPS-specific deadlock
-- **Recommendation**: Default Transformers mode to CPU on Apple Silicon until PyTorch MPS matures. MPS for Whisper is a net negative.
+**MPS analysis update (2026-03-16):**
+- MPS is **model-dependent**: kotoba-bilingual works, whisper-large-v3-turbo fails
+- dadlaugh's benchmark shows MPS CAN provide speedup (1.25x) for some HuggingFace models
+- But standard Whisper models produce garbage on MPS — language detection fails
+- francetoastVN (M1 Pro) confirms wanting to upgrade to M5 Max, watches progress
+- **Recommendation updated**: Don't blanket-disable MPS. Instead: force CPU for `openai/whisper-*` models, allow MPS for `kotoba-*` models
 
 ---
 
-### Cluster C: Network / Installation (8 issues)
+### Cluster C: Network / Installation (9 issues — 2 new)
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#225** | 白屏 (GUI white screen) | github3C | **OPEN (NEW)** | Program launches but shows white screen. Screenshots attached. | `RESPONDED` (2026-03-15) — asked for install log in Chinese. `AWAITING LOG` |
-| **#222** | 字幕是日语... (how to get Chinese?) | libinghui20001231-debug | **OPEN** | User doesn't know about translation feature. Pointed to docs (2026-03-14). `AWAITING CONFIRMATION` |
-| **#221** | 安装完后报错 (cublas64_12.dll missing) | libinghui20001231-debug | **OPEN** | GTX 1650, old driver 462. Community helped (yangming2027). | `AWAITING LOG` |
-| **#220** | 安装卡着不动 (install stalls) | libinghui20001231-debug | **OPEN** | Install stalls during PyTorch download. Slow network. | `AWAITING LOG` |
+| **#229** | INSTALLATION FAILED (SSL) | WillChengCN | **OPEN (NEW)** | SSL cert verification failure during preflight. Same user as #218. VPN/proxy. | `NEEDS RESPONSE` |
+| **#228** | cublas64_12.dll not found / first run hang | yhxkry | **OPEN (NEW)** | First run hung all day. Second attempt: missing CUDA library. yangming2027 helped (CUDA toolkit not installed). | `NEEDS RESPONSE` — community partially resolved |
+| **#225** | 白屏 (GUI white screen) | github3C | **OPEN** | Program launches but shows white screen. | `AWAITING LOG` |
+| **#222** | 字幕是日语... (how to get Chinese?) | libinghui20001231-debug | **OPEN** | User doesn't know about translation feature. Pointed to docs. | `AWAITING CONFIRMATION` |
+| **#221** | 安装完后报错 (cublas64_12.dll missing) | libinghui20001231-debug | **OPEN** | GTX 1650, old driver 462. Community helped. | `AWAITING LOG` |
+| **#220** | 安装卡着不动 (install stalls) | libinghui20001231-debug | **OPEN** | Install stalls during PyTorch download. | `AWAITING LOG` |
 | **#218** | 安装错误 (uv cu118 wheel) | WillChengCN | **OPEN** | uv rejects cu118 llama-cpp wheel | `SHIPPED` (A3). `AWAITING CONFIRMATION` |
-| **#217** | 找不到WhisperJAV-GUI.exe | loveGEM + vimbackground | **OPEN** | 2 reporters, persists on v1.8.8. loveGEM installed to non-C drive. vimbackground tried admin. Both can't find GUI exe. | `AWAITING LOG` — **ESCALATED** |
+| **#217** | 找不到WhisperJAV-GUI.exe | loveGEM + vimbackground | **OPEN** | **ROOT CAUSE FOUND (2026-03-16)**: Install log shows PyTorch download (2.6GB cu118) fails 3/3 with TLS connection drop. Installation never completed — no installer code bug. Network reliability issue for large downloads. Responded with explanation. | `RESPONDED` — `AWAITING CONFIRMATION` |
 | **#210** | 安装失败 DNS error | iop335577 | **OPEN** | DNS through proxy | `AWAITING CONFIRMATION` |
 | **#204** | VPN/v2rayN SSL failures | yangming2027 | **OPEN** | HF hub SSL errors | `AWAITING CONFIRMATION` |
-| **#201** | Install SSL cert error | jl6564 | **OPEN** | **SELF-RESOLVED (2026-03-15)**: `pip install pip-system-certs` fixed it. **CLOSABLE.** |
 
-**#217 update**: loveGEM confirms: installed to non-C drive, `%localappdata%\temp\uv` has 5GB+ PyTorch files, installer CMD exits normally, but no GUI exe in install dir. Non-default drive install may be the trigger.
+**#217 update (2026-03-16)**: **ROOT CAUSE FOUND.** vimbackground's install log shows PyTorch cu118 download (2.6GB) failing 3/3 attempts with TLS connection drop (`peer closed connection without sending TLS close_notify`). Installation never completed — Phase 3 failure prevents all subsequent phases including WhisperJAV package install and GUI creation. NOT an installer code bug. Network reliability issue for large downloads in China. Responded 2026-03-16.
 
-**#225 is NEW**: Different from #217. The program launches (window appears) but renders a white screen. Could be WebView2 issue or a slow first-load problem.
+**#229**: Same user as #218 (WillChengCN). SSL cert verification failure. Likely VPN/corporate proxy intercepting SSL. User asks if turning off VPN helps.
+
+**#228**: yhxkry's first run hung for a full day (likely model download). Second run: cublas64_12.dll missing — CUDA toolkit not installed or not on PATH. yangming2027 (community) diagnosed it in comments.
 
 ---
 
@@ -137,38 +160,24 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 ---
 
-### Cluster F: Whisper Output Quality — EXPANDED (5 issues)
+### Cluster F: Whisper Output Quality — EXPANDED (6 issues — 1 new)
 
-**Issues**: #223, #224 (NEW), #209, #215, #227 (NEW)
-**Severity**: HIGH — competitive quality gap confirmed by multiple users + detailed technical analysis
-**Status**: Quality improvement plan drafted (`docs/plans/V189_QUALITY_IMPROVEMENT_PLAN.md`). Not yet implemented.
+**Issues**: #223, #224, #230 (NEW), #209, #215, #227
+**Severity**: HIGH — quality is now the #1 user concern, multiple power users reporting
+**Status**: Quality improvement plan drafted. BYOP XXL integration done. New #230 requests standalone merge module.
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#224** | 人声分离分析 (vocal separation analysis) | yangming2027 | **OPEN (NEW)** | Detailed technical breakdown of why XXL beats WhisperJAV. Argues vocal separation is #1 gap. User's analysis is partially incorrect. | `DEFERRED RESPONSE` — will respond later with corrected analysis |
-| **#223** | Faster Whisper XXL comparison | weifu8435 | **OPEN** | Claims XXL more accurate. 10 comments with screenshots. | `RESPONDED` (2026-03-15) — acknowledged quality issue (int8→fp16 fix coming), XXL ensemble integration planned, asked for usage tips |
+| **#230** | Subtitle merging module request | weifu8435 | **OPEN (NEW)** | Wants standalone merge tool for multi-pass merging (pass3, pass4...). 5 comments, active discussion with justantopair-ai. | `NEEDS RESPONSE` |
+| **#224** | 人声分离分析 (vocal separation analysis) | yangming2027 | **OPEN** | Detailed technical breakdown of XXL's vocal separation advantage. cbl19961214-sudo commented agreeing but noting WhisperJAV has basic audio processing. | `NEEDS RESPONSE` |
+| **#223** | Faster Whisper XXL comparison | weifu8435 | **OPEN** | **UPDATE 2026-03-16**: weifu8435 continues arguing balanced mode is worse than PotPlayer live captions. 16 comments total. We asked for test files to benchmark. BYOP XXL integration now shipped as response. | `RESPONDED` |
 | **#209** | Single subtitle very long (repetition) | weifu8435 | **OPEN** | `SHIPPED` (C1: pattern #8). `AWAITING CONFIRMATION` |
 | **#215** | Qwen3-ASR subtitle quality | yangming2027 | **OPEN** | Responded — expected behavior. `AWAITING CONFIRMATION` |
-| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN (NEW)** | Transformers mode hangs on Apple Silicon. | `RESPONDED` (2026-03-15) — CPU workaround (`--hf-device cpu`), MPS test script referenced (needs manual attachment to issue). `AWAITING CONFIRMATION` |
+| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN** | See Cluster B. MPS model-dependent behavior confirmed. | `AWAITING CONFIRMATION` |
 
-**Quality gap analysis — synthesized from #223, #224, and our AP1/AP2 audits:**
+**#230 analysis**: weifu8435 wants a standalone `whisperjav-merge` command that takes multiple SRT files and merges them iteratively. The existing ensemble merge is internal to 2-pass mode. This is a feature request for a CLI tool. weifu8435 is WhisperJAV's most active quality-focused user (filed #223, #209, #230).
 
-The quality gap vs Faster Whisper XXL has **two layers**:
-
-**Layer 1 — Parameter defaults (fixable now, ~70% of gap):**
-- Q1: Model `large-v2` → XXL uses `large-v3` (10-20% better Japanese)
-- Q2: `compute_type="auto"` (int8_float16) → XXL uses `float16` (lossless)
-- Q3: `beam_size=2, best_of=1` → XXL uses `beam_size=5, best_of=5`
-- Q4-Q6: VAD failover, scene detection, CPS filter issues
-- **Fix plan**: `docs/plans/V189_QUALITY_IMPROVEMENT_PLAN.md` — ~45 lines of changes
-
-**Layer 2 — Vocal separation (architectural, longer-term):**
-- yangming2027 (#224) argues this is the #1 factor
-- XXL integrates UVR MDX-Net (Kim_vocal_v2) for vocal/BGM separation before ASR
-- WhisperJAV has speech enhancement backends (ClearVoice, BS-RoFormer, ZipEnhancer) but none are vocal separation models
-- WhisperJAV's `--speech-enhancer` is denoising/enhancement, not source separation
-- **Gap**: No equivalent to UVR MDX-Net in current architecture
-- **However**: WhisperJAV already has `bs-roformer` backend which IS a vocal isolation model. Need to verify if it's being used effectively.
+**#223 update**: 16 comments now. weifu8435 continues to push on quality gap. Our response: (1) parameter fixes coming in v1.8.9, (2) BYOP XXL integration shipped so users can use XXL as Pass 2. Asked for test files for benchmarking.
 
 ---
 
@@ -180,19 +189,24 @@ The quality gap vs Faster Whisper XXL has **two layers**:
 
 ---
 
-### Cluster H: Startup Warning — COSMETIC
+### Cluster H: Kaggle / Colab (2 issues — 1 new)
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#211** | 启动报错 (urllib3 warning) | WillChengCN | **OPEN** | `SHIPPED` in v1.8.8. Can close. |
+| **#231** | Kaggle notebook run error | fzfile | **OPEN (NEW)** | Error: `ffmpeg-dsp not available in single-pass mode` + stable_whisper import error (`whisper.tokenizer`). Running on Kaggle. | `NEEDS RESPONSE` |
+| **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | Partially working. New question about num_ctx. | `NEEDS RESPONSE` |
+
+**#231 analysis**: Two errors visible: (1) ffmpeg-dsp enhancer not available in single-pass mode (correct — speech enhancement requires scene detection pipeline), (2) stable_whisper fails to import `whisper.tokenizer` — likely openai-whisper not installed or version mismatch. This may be a Kaggle environment issue.
 
 ---
 
-### Cluster I: Ensemble Mode — RESOLVED
+### Cluster I: Model Support Requests (1 new)
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#203** | Serial mode request | yangming2027 | **OPEN** | Already exists. Can close. |
+| **#232** | whisper-ja-anime-v0.1 model support | mustssr | **OPEN (NEW)** | Requests `efwkjn/whisper-ja-anime-v0.1` HuggingFace model. Notes it and Anime-Whisper each have strengths. | `NEEDS RESPONSE` |
+
+**#232 analysis**: whisper-ja-anime-v0.1 is a fine-tuned Whisper model for Japanese anime. WhisperJAV already has anime-whisper integration. Adding another anime model would be a Transformers pipeline addition. Low effort if it follows standard HuggingFace format.
 
 ---
 
@@ -200,8 +214,10 @@ The quality gap vs Faster Whisper XXL has **two layers**:
 
 | # | Title | Reporter | State | Summary | Target |
 |---|-------|----------|-------|---------|--------|
-| **#224** | Vocal separation (UVR MDX-Net) | yangming2027 | OPEN (NEW) | Detailed analysis of XXL's vocal separation advantage | **Investigate** |
-| **#223** | Faster Whisper XXL comparison | weifu8435 | OPEN | Quality gap with XXL | **v1.8.9 (params) + future (vocal sep)** |
+| **#232** | whisper-ja-anime-v0.1 model | mustssr | OPEN (NEW) | HuggingFace anime ASR model | **Investigate** |
+| **#230** | Standalone merge module | weifu8435 | OPEN (NEW) | CLI tool for multi-SRT merging | **Investigate** |
+| **#224** | Vocal separation (UVR MDX-Net) | yangming2027 | OPEN | Detailed analysis of XXL's vocal separation advantage | **Investigate** |
+| **#223** | Faster Whisper XXL comparison | weifu8435 | OPEN | Quality gap with XXL | **v1.8.9 (params + BYOP XXL)** |
 | **#213** | Intel GPU (XPU) support | DDXDB | OPEN | torch.xpu via PyTorch XPU wheels | v1.9+ |
 | **#206** | Grey out incompatible options | techguru0 | OPEN | Block incompatible GUI choices | v1.9+ |
 | **#205** | VibeVoice ASR | kylesskim-sys | OPEN | Microsoft VibeVoice. VRAM too high. | v1.9+ |
@@ -221,7 +237,6 @@ The quality gap vs Faster Whisper XXL has **two layers**:
 | **#44** | GUI drag-drop | lingyunlxh | OPEN | Filename vs path | Backlog |
 | **#43** | DeepL provider | teijiIshida | OPEN | Non-LLM adapter | v1.9+ |
 | **#33** | Linux pyaudio docs | org0ne | OPEN | Documentation | Backlog |
-| **#198-FR** | English in Ensemble/Translate dropdown | francetoastVN | (comment) | Feature request | Backlog |
 
 ---
 
@@ -231,62 +246,66 @@ The quality gap vs Faster Whisper XXL has **two layers**:
 
 | Status | Count | Issues |
 |--------|------:|--------|
-| **NEEDS RESPONSE (new/unresponded)** | 1 | #224 (deferred — response planned later) |
-| **AWAITING LOG (install log requested)** | 4 | #217, #220, #221, #225 |
-| **AWAITING CONFIRMATION** | 11 | #200, #204, #207, #209, #210, #212, #214, #215, #218, #223, #227 |
-| **CLOSABLE NOW** | 2 | #201 (self-resolved), #222 (responded) |
-| **KEY FEEDBACK RECEIVED (action needed)** | 3 | #198 (MPS benchmark), #132 (Kaggle works), #128 (Gemma 3 proposal) |
-| **Feature requests (open)** | 21 | See Cluster J |
+| **NEEDS RESPONSE (new/unresponded)** | 6 | #224, #228, #229, #230, #231, #232 |
+| **AWAITING LOG (install log requested)** | 3 | #220, #221, #225 |
+| **AWAITING CONFIRMATION** | 9 | #200, #204, #207, #209, #210, #212, #214, #218 |
+| **KEY DATA RECEIVED (action needed)** | 4 | #217 (install log), #227 (MPS benchmark), #132 (num_ctx question), #223 (continued feedback) |
+| **Feature requests (open)** | 22 | See Cluster J |
 | **DEFERRED to v1.9+** | 11 | #96, #205, #206, #213, #180, #175, #181, #142, #114, #126, #43 |
 
 ### By Priority (Active Work)
 
 | Priority | # | Issue | Status | Why |
 |----------|---|-------|--------|-----|
-| **CRITICAL** | #217 | GUI exe missing after install | `ESCALATED` | 2 reporters, persists on v1.8.8, non-C drive install. Potential installer bug. |
-| **CRITICAL** | #223/#224 | Quality gap vs Faster Whisper XXL | `RESPONDED + PLAN DRAFTED` | #223 responded (2026-03-15). Plan at `docs/plans/V189_QUALITY_IMPROVEMENT_PLAN.md`. |
-| **HIGH** | #128 | Gemma 3 model upgrade proposal | `CONTRIBUTOR READY` | hyiip (original LLM author) offers to implement. Fixes root cause of LLM context overflow. |
-| **HIGH** | #227 | MPS Transformers hang on M1 MAX | `RESPONDED` | CPU workaround given. MPS test script needs attachment. `AWAITING CONFIRMATION` |
-| **HIGH** | #225 | GUI white screen after install | `RESPONDED` | Asked for install log. `AWAITING LOG` |
-| **HIGH** | #198 | MPS NOT accelerating Whisper | `CONFIRMED` | Benchmark: 0.2x CPU speed. Need to decide: disable MPS for Whisper or document limitation. |
-| **MEDIUM** | #132 | Kaggle LLM — works but ollama not auto-installed | `PARTIAL FIX` | `--provider local` works. `--provider ollama` needs manual install. |
-| **MEDIUM** | #201 | SSL cert — self-resolved | `CLOSABLE` | User fixed with `pip install pip-system-certs`. |
-| **LOW** | #211/#203 | Already resolved | `CLOSABLE` | Can close. |
+| **RESOLVED** | #217 | GUI exe missing after install | `RESPONDED` | Root cause: PyTorch download fails (network). Not an installer bug. |
+| **CRITICAL** | #223/#224 | Quality gap vs Faster Whisper XXL | `BYOP SHIPPED + PLAN DRAFTED` | BYOP XXL done. Parameter fixes not yet implemented. |
+| **HIGH** | #230 | Standalone merge module request | `NEEDS RESPONSE` | Power user (weifu8435) wants multi-pass merge CLI. |
+| **HIGH** | #128 | Gemma 3 model upgrade proposal | `DECISION NEEDED` | hyiip offers to implement. Fixes LLM context root cause. |
+| **HIGH** | #227 | MPS model-dependent behavior | `DATA RECEIVED` | kotoba works on MPS, whisper-large fails. Need selective MPS policy. |
+| **HIGH** | #132 | Kaggle Ollama num_ctx tuning | `NEEDS RESPONSE` | TinyRick1489 asks about num_ctx arg for Ollama. |
+| **MEDIUM** | #231 | Kaggle notebook error | `NEEDS RESPONSE` | ffmpeg-dsp single-pass + whisper.tokenizer import error. |
+| **MEDIUM** | #232 | whisper-ja-anime-v0.1 model | `NEEDS RESPONSE` | Easy to add if standard HF format. |
+| **MEDIUM** | #229 | Install SSL failure (WillChengCN) | `NEEDS RESPONSE` | Repeat user. VPN/proxy SSL interception. |
+| **MEDIUM** | #228 | cublas64_12.dll + first run hang | `NEEDS RESPONSE` | Community partially helped. May self-resolve. |
+| **LOW** | #222 | How to get Chinese subs | `AWAITING CONFIRMATION` | Responded with docs. |
 
 ---
 
 ## Pending GitHub Actions
 
-### Issues Needing Response
+### Issues Needing Response (6)
 
 | # | Action Needed | Priority |
 |---|--------------|----------|
-| **#224** | Deferred. User's analysis is partially incorrect (scientifically). Will respond later with corrected analysis. | MEDIUM |
+| **#232** | Respond: whisper-ja-anime-v0.1 is HF model, can potentially add to Transformers pipeline. Ask user for benchmark results vs anime-whisper. | MEDIUM |
+| **#231** | Respond: ffmpeg-dsp not available in single-pass. Suggest removing `--speech-enhancer` or using ensemble mode. The whisper.tokenizer error is a Kaggle environment issue — openai-whisper may not be installed. | HIGH |
+| **#230** | Respond: Acknowledge value. Note ensemble merge exists internally. A standalone `whisperjav-merge` CLI tool is a reasonable feature request. BYOP XXL integration already allows external pass2. | HIGH |
+| **#229** | Respond: SSL cert failure = VPN/corporate proxy intercepting HTTPS. Try without VPN, or set `SSL_CERT_FILE` env var. Same root cause as #204. | MEDIUM |
+| **#228** | Respond: cublas64_12.dll = CUDA toolkit not installed. yangming2027 already helped. First-run hang = model download (expected, needs better progress indication). | LOW |
+| **#224** | Deferred response. User's analysis partially incorrect. Will respond with corrected analysis + mention BS-RoFormer. | MEDIUM |
 
-### Issues Responded (2026-03-15)
+### Issues Needing Action (not just response)
 
-| # | Action Taken |
-|---|-------------|
-| **#227** | CPU workaround (`--hf-device cpu`), MPS test script referenced. **NOTE**: test script not pushed to repo — needs manual file attachment. |
-| **#225** | Asked for install log in Chinese. |
-| **#223** | Acknowledged quality issue (int8→fp16 fix coming in next release), XXL ensemble integration planned, asked for usage tips. |
+| # | Action Needed | Priority |
+|---|--------------|----------|
+| **#217** | **ANALYZE INSTALL LOG** from vimbackground. Determine why GUI exe missing after v1.8.8 install. | CRITICAL |
+| **#132** | Respond to TinyRick1489's num_ctx question. OllamaManager already supports `--ollama-num-ctx` via CLI. | HIGH |
+| **#223** | Continue quality conversation. BYOP XXL shipped. Await test files from weifu8435 for benchmarking. | MEDIUM |
 
 ### Candidates for Closing
 
 | # | Condition | Notes |
 |---|-----------|-------|
-| **#201** | Self-resolved — `pip install pip-system-certs` | Can close with acknowledgment |
-| **#222** | Responded with docs + translation instructions | Can close if no further questions |
-| **#211** | Already closed | Done |
-| **#203** | Already closed | Done |
+| **#222** | Responded with docs + translation instructions | Can close if no further questions (last activity 2026-03-14) |
+| **#211** | urllib3 warning fixed in v1.8.8 | Can close |
 
 ### Decisions Needed
 
 | # | Decision | Options |
 |---|----------|---------|
 | **#128** | Accept hyiip's Gemma 3 contribution? | (a) Accept PR for v1.8.9, (b) Coordinate for v1.9.0, (c) Do it ourselves |
-| **#198/#227** | MPS strategy for Whisper? | (a) Disable MPS for Whisper, default to CPU, (b) Keep MPS but warn about performance, (c) Investigate further |
-| **#224** | Vocal separation integration? | (a) Document BS-RoFormer as existing alternative, (b) Add UVR MDX-Net, (c) Defer |
+| **#227** | MPS strategy — selective by model? | (a) Allow MPS for kotoba-*, force CPU for whisper-*, (b) Disable MPS entirely, (c) Let user choose |
+| **#230** | Standalone merge CLI tool? | (a) Build for v1.8.9, (b) Defer to v1.9.0, (c) Document existing ensemble merge as workaround |
 
 ---
 
@@ -295,16 +314,16 @@ The quality gap vs Faster Whisper XXL has **two layers**:
 | Cluster | Issues | Primary | Status |
 |---------|--------|---------|--------|
 | **Local LLM translation** | #196 (closed), **#212**, **#214**, **#132**, **#128** | **#128** | #132 partial fix verified. #128 Gemma 3 proposal pending. |
-| **MPS/Apple Silicon** | #198 (closed), **#227** (NEW) | **#227** | MPS confirmed not accelerating Whisper. #227 is new hang issue. |
-| **Network/SSL/Install** | **#225** (NEW), **#222**, **#221**, **#220**, **#218**, **#217**, #204, #210, #201 | **#217** | #217 ESCALATED. #225 NEW (white screen). #201 self-resolved. |
+| **MPS/Apple Silicon** | #198 (closed), **#227** | **#227** | Model-dependent MPS behavior confirmed. |
+| **Network/SSL/Install** | **#229** (NEW), **#228** (NEW), **#225**, **#222**, **#221**, **#220**, **#218**, **#217**, #204, #210 | **#217** | #217 ESCALATED — install log received. #229 same user as #218. |
 | **GPU detection** | **#200**, **#213** | **#200** | `SHIPPED` v1.8.8; #213 deferred |
 | **GUI settings** | #96, **#207** | **#96** | `DEFERRED` (v1.9); #207 responded |
-| **Whisper quality** | **#224** (NEW), **#223**, **#209**, **#215** | **#223** | Quality plan drafted. #224 adds vocal separation analysis. |
-| **Speech enhancement** | #219 (closed) | — | Resolved |
-| **AMD/Intel GPU** | #142, #114, **#213** | Deferred | v1.9+ — FishYu-OWO AMD workaround on #142 |
+| **Whisper quality** | **#230** (NEW), **#224**, **#223**, **#209**, **#215** | **#223** | BYOP XXL shipped. Quality plan drafted. #230 is new merge request. |
+| **Kaggle/Colab** | **#231** (NEW), **#132** | **#132** | #231 is new Kaggle error. |
+| **Model support** | **#232** (NEW) | **#232** | whisper-ja-anime-v0.1 request. |
+| **AMD/Intel GPU** | #142, #114, **#213** | Deferred | v1.9+ |
 | **Translation providers** | #71, #43 | Deferred | v1.9+ |
 | **i18n** | **#222**, #180, #175 | **#180** | v1.9+ |
-| **Onboarding** | **#220**, **#221**, **#222** | — | Same user, 3 issues across install→run→use journey |
 
 ---
 
@@ -312,9 +331,10 @@ The quality gap vs Faster Whisper XXL has **two layers**:
 
 | # | Title | Closed | Resolution |
 |---|-------|--------|------------|
+| **#201** | Install SSL cert error | 2026-03-15 | Self-resolved: `pip install pip-system-certs` |
+| **#198** | MPS beam search + detection | 2026-03-15 | Fixed v1.8.8. MPS working but not accelerating Whisper (benchmark confirmed). |
 | **#219** | MossFormer2_SS_16K 3D tensor crash | 2026-03-13 | Fixed v1.8.8 |
 | #208 | LLM server AssertionError | 2026-03-09 | Self-resolved |
-| #198 | MPS beam search + detection | 2026-03-07 | Fixed v1.8.8. MPS working but not accelerating Whisper (confirmed 2026-03-15). |
 | #197 | Installation problem v1.8.6 | 2026-03-08 | Closed by user |
 | #196 | Local Translation Errors | 2026-03-07 | Partial fix. See #212/#214. |
 | #195 | UnicodeDecodeError audio extraction | 2026-03-08 | Fixed |
@@ -322,88 +342,38 @@ The quality gap vs Faster Whisper XXL has **two layers**:
 
 ---
 
-## Analysis & Recommendations (rev8 — 2026-03-15)
-
-### Current Situation
-
-Since rev7 (2026-03-14), four significant pieces of user feedback arrived:
-
-1. **#198 MPS benchmark**: francetoastVN ran the standalone test. **MPS is 6x SLOWER than CPU for Whisper** (17.1s vs 2.8s). MPS matmul works (2.5x speedup) but the Whisper attention workload is a net negative on MPS. This is a PyTorch MPS backend limitation, not a WhisperJAV bug.
-
-2. **#132 Kaggle confirmation**: TinyRick1489 confirms `--provider local` works on v1.8.8 Kaggle. `--provider ollama` also works after manual ollama installation. The auto-detection says "not installed" because ollama isn't bundled — user must install it themselves.
-
-3. **#128 Gemma 3 proposal**: hyiip (the original LLM contributor) proposes upgrading from Gemma 2 9B (8K context, the root cause of most "No matches" failures) to Gemma 3 4B (128K context, 2.5GB, beats Gemma 2 27B). Also proposes model-specific n_ctx and dynamic batch sizing. **Offers to do the work.**
-
-4. **#224 vocal separation analysis**: yangming2027 posted a detailed technical breakdown arguing WhisperJAV's #1 quality gap vs XXL is the lack of built-in vocal separation (UVR MDX-Net). Partially correct — but overstates it, as WhisperJAV has BS-RoFormer vocal isolation and the parameter fixes address most of the gap.
-
-Three new issues opened: #225 (GUI white screen), #227 (MPS hang on M1 MAX), #224 (vocal separation analysis/feature request).
-
-### Key Themes Emerging
-
-**Theme 1: Quality is the #1 user concern.** Three issues (#223, #224, #209) from two power users (weifu8435, yangming2027) all point to transcription quality. This is no longer a single complaint — it's a pattern. The quality improvement plan addresses the parameter layer; the vocal separation gap is a bigger architectural question.
-
-**Theme 2: Apple Silicon is problematic.** Two issues (#198, #227) confirm MPS is not working well for Whisper. The MPS backend is a net negative for inference speed. Need a strategy: either disable MPS for Whisper or clearly document the limitation.
-
-**Theme 3: LLM translation has a path forward.** Between the Gemma 3 upgrade (#128), Ollama migration, and the `--provider local` fix in v1.8.8, the LLM cluster is close to resolution. hyiip's contribution could accelerate this significantly.
-
-**Theme 4: Installation issues continue.** #217 (GUI exe missing), #225 (white screen), #220/#221 (new user struggles) — the installer remains the biggest source of friction for new users.
-
-### Immediate Action Items (rev8)
-
-| ID | Issue | Action | Priority | Status |
-|----|-------|--------|----------|--------|
-| **R8** | #227 | Respond: suggest `--hf-device cpu` workaround, ask for full log. Likely MPS deadlock. | **HIGH** | NEW |
-| **R9** | #225 | Respond in Chinese: ask for Windows version, WebView2 status, install log. White screen = WebView2 issue. | **HIGH** | NEW |
-| **R10** | #224/#223 | Respond: acknowledge quality analysis, mention v1.8.9 parameter fix plan, note BS-RoFormer exists for vocal isolation. | **MEDIUM** | NEW |
-| **R11** | #128 | **Decision**: accept hyiip's Gemma 3 contribution? This would fix the LLM context overflow root cause. | **HIGH** | DECISION NEEDED |
-| **R12** | #201 | Close with thank-you. Self-resolved. | **LOW** | CLOSABLE |
-| **R13** | #198 | **Decision**: MPS strategy — disable for Whisper, or document limitation? | **MEDIUM** | DECISION NEEDED |
-| R1 | #217 | Investigate installer bug. Still awaiting logs from users. | **CRITICAL** | AWAITING LOG |
-| R7 | Various | Shipped fixes awaiting confirmation. | **LOW** | AWAITING |
-
-### Strategic Recommendations (updated)
-
-| ID | Recommendation | Rationale | Target | Status |
-|----|---------------|-----------|--------|--------|
-| **S5** | **Accept hyiip's Gemma 3 contribution (#128)** — Coordinate with hyiip on Gemma 3 4B/12B model integration. Fix the 8K context overflow at the source. Reduces LLM failure rate dramatically. | Root cause fix for #212/#214/#132. Contributor-driven = low effort. | **v1.8.9** | DECISION NEEDED |
-| **S6** | **Implement v1.8.9 quality parameter fixes** — Execute `V189_QUALITY_IMPROVEMENT_PLAN.md` (model→large-v3, compute_type→float16, beam_size→5, etc.). ~45 lines of changes. | #223/#224 quality gap. Addresses ~70% of the gap vs XXL. | **v1.8.9** | PLAN DRAFTED |
-| **S7** | **Disable MPS for Whisper, default to CPU on Apple Silicon** — MPS is 6x slower for Whisper. Enabling it hurts users. Keep MPS for future PyTorch improvements but don't use it now. | #198 benchmark, #227 hang. Net negative for users. | **v1.8.9** | NEW |
-| **S8** | **Investigate BS-RoFormer as vocal separation answer to #224** — WhisperJAV already has BS-RoFormer backend. If it performs vocal isolation effectively, the #224 criticism about "no vocal separation" is already addressed — just needs documentation and promotion. | #224 vocal separation analysis. May already be solved. | **v1.8.9** | NEW |
-| S1 | **Prioritize i18n (Chinese UI)** | Largest user segment. Reduces support burden. | v1.9.0 | NOT STARTED |
-| S2 | **Audit compute_type defaults** | Subsumed by S6 (quality plan). | v1.8.9 | SUBSUMED |
-| S3 | **Document AMD ROCm workaround** | FishYu-OWO workaround. | v1.9.0 | NOT STARTED |
-| S4 | **First-run guided setup** | Onboarding pain. | v1.9.0+ | NOT STARTED |
-
-### Issue Velocity Trend
+## Issue Velocity Trend
 
 | Period | New Issues | Closed | Net | Notes |
 |--------|-----------|--------|-----|-------|
 | 2026-03-08 to 2026-03-10 | 6 (#204-#210) | 5 | +1 | v1.8.7 release cycle |
 | 2026-03-11 to 2026-03-13 | 8 (#211-#220) | 3 | +5 | v1.8.8 beta + stable |
 | 2026-03-14 | 3 (#221-#223) | 1 | +2 | Post-release influx |
-| 2026-03-15 | 3 (#224-#227) | 0 | +3 | Quality + MPS + install issues |
+| 2026-03-15 | 3 (#224-#227) | 2 | +1 | Quality + MPS + install |
+| **2026-03-16** | **5 (#228-#232)** | **0** | **+5** | Install, quality, Kaggle, model request |
 
-**Trend**: 3-4 new issues/day continues. Quality concerns are now the dominant theme, overtaking installation issues.
+**Trend**: Issue rate accelerating (5 new today). Quality concerns (#223, #224, #230) and installation friction (#228, #229) dominate. Growing user base = growing issue volume.
 
 ---
 
-## Release & Roadmap Analysis (rev8 — 2026-03-15)
+## Release & Roadmap Analysis (rev9 — 2026-03-16)
 
-### v1.8.9 — Proposed Scope
+### v1.8.9 — Proposed Scope (Updated)
 
-**Theme: Quality + LLM reliability**
+**Theme: Quality + BYOP + LLM reliability**
 
-| Priority | Item | Issues | Effort | Impact |
+| Priority | Item | Issues | Effort | Status |
 |----------|------|--------|--------|--------|
-| **P0** | Quality parameter fixes (large-v3, float16, beam_size=5) | #223, #224 | ~45 LOC | HIGH — closes ~70% of quality gap |
-| **P0** | MPS → CPU default for Whisper on Apple Silicon | #198, #227 | ~10 LOC | HIGH — stops hurting Mac users |
-| **P1** | Gemma 3 model upgrade (if hyiip contributes) | #128, #132, #212, #214 | External PR | HIGH — fixes LLM context root cause |
-| **P1** | OllamaManager smart integration (already coded) | #132, #212, #214 | Testing only | HIGH — escape hatch from llama-cpp |
-| **P2** | Installer investigation (#217 GUI exe) | #217, #225 | Investigation | HIGH for new users |
-| **P2** | VAD failover + scene detection fixes (Q4, Q5) | #223 | ~15 LOC | MEDIUM — quality improvement |
-| **P3** | CPS threshold fix (Q6) | #223 | 1 LOC | LOW — edge case |
+| **P0** | ~~BYOP Faster Whisper XXL~~ | #223 | — | **DONE** (committed `aed1af2`) |
+| **P0** | Quality parameter fixes (large-v3, float16, beam_size=5) | #223, #224 | ~45 LOC | **PLAN DRAFTED** |
+| **P0** | MPS selective policy (CPU for whisper-*, MPS for kotoba-*) | #198, #227 | ~20 LOC | **NOT STARTED** |
+| **P1** | OllamaManager testing + num_ctx CLI arg | #132, #212, #214 | Testing | **CODED** |
+| **P1** | Gemma 3 model upgrade (if hyiip contributes) | #128 | External PR | **DECISION NEEDED** |
+| **P2** | Installer investigation (#217 GUI exe missing) | #217 | Investigation | **LOG RECEIVED** |
+| **P2** | VAD failover + scene detection fixes (Q4, Q5) | #223 | ~15 LOC | **NOT STARTED** |
+| **P3** | CPS threshold fix (Q6) | #223 | 1 LOC | **NOT STARTED** |
 
-**Estimated scope**: Small release focused on parameter tuning + MPS fix + LLM improvements. No new architecture.
+**v1.8.9 status**: ~40% complete. BYOP XXL and config cleanup done. Quality parameter fixes, MPS policy, and OllamaManager testing remain.
 
 ### v1.9.0 — Proposed Scope
 
@@ -413,37 +383,12 @@ Three new issues opened: #225 (GUI white screen), #227 (MPS hang on M1 MAX), #22
 |----------|------|--------|-------|
 | **P0** | Ollama full migration (deprecate llama-cpp-python) | #128, #132, #212, #214 | Remove ~1500 LOC fragile code |
 | **P0** | Chinese UI (i18n, at least partial) | #175, #180, #222 | Biggest support burden reducer |
-| **P1** | AMD ROCm support (document + partial integration) | #142, #114, #213 | FishYu-OWO proved it works |
+| **P1** | Standalone merge CLI tool | #230 | `whisperjav-merge` command |
+| **P1** | AMD ROCm support (document + partial) | #142, #114, #213 | FishYu-OWO proved it works |
 | **P1** | First-run setup wizard | #217, #220, #221, #225 | Onboarding quality |
 | **P2** | GUI settings persistence (pipeline tab) | #96, #207 | Long-standing request |
-| **P2** | Vocal separation investigation (BS-RoFormer or UVR) | #224 | Quality gap Layer 2 |
-| **P3** | DirectML for Intel GPUs | #213 | Niche |
-
-### v2.0+ — Backlog
-
-| Item | Issues |
-|------|--------|
-| UVR MDX-Net native integration | #224 |
-| Google Translate (no key) | #71 |
-| DeepL provider | #43 |
-| VibeVoice ASR | #205 |
-| Frameless window | #181 |
-| MPEG-TS + Google Drive | #164 |
-| Batch translate wildcard | #51 |
-| Recursive directory | #126 |
-
-### Decision Matrix — What to Do Next
-
-| Option | Description | Blocked? | Impact | Effort |
-|--------|------------|----------|--------|--------|
-| **A: Respond to new issues (#227, #225, #224, #223)** | Send responses to 4 unresponded issues | No | Immediate user goodwill | 30 min |
-| **B: Close #201, respond to #128** | Housekeeping + coordinate with hyiip on Gemma 3 | No | Unblocks contributor | 15 min |
-| **C: Implement v1.8.9 quality parameter fixes** | Execute V189 plan (large-v3, float16, beam_size, etc.) | No | Highest quality impact | 2-3 hrs |
-| **D: Fix MPS → CPU default for Whisper** | Based on #198 benchmark results | No | Stops hurting Mac users | 30 min |
-| **E: Investigate #217 installer bug** | Audit post-install script for non-C drive path issues | Partially (awaiting logs) | New user experience | 1-2 hrs |
-| **F: Investigate #225 GUI white screen** | WebView2 detection, screenshots analysis | Need screenshots | New user experience | 1 hr |
-
-**Recommended sequence**: A → B → C → D → E (respond first, then build)
+| **P2** | Vocal separation investigation | #224 | BS-RoFormer or UVR |
+| **P3** | whisper-ja-anime-v0.1 model | #232 | If standard HF format |
 
 ---
 
@@ -461,7 +406,6 @@ Three new issues opened: #225 (GUI white screen), #227 (MPS hang on M1 MAX), #22
 | #181 | Frameless window | Cosmetic |
 | #43 | DeepL translation provider | Feature |
 | #71 | Google Translate (no API key) | Feature |
-| #198-FR | English in Ensemble/Translate dropdown | Feature |
 
 ---
 
@@ -469,10 +413,11 @@ Three new issues opened: #225 (GUI white screen), #227 (MPS hang on M1 MAX), #22
 
 | Date | Changes |
 |------|---------|
-| 2026-03-15 | **rev8.1** Responded to #223 (quality fix int8→fp16 coming, XXL ensemble planned), #225 (asked install log), #227 (CPU workaround, MPS test script — needs manual attachment since not pushed to repo). #224 response deferred. NOTE: `tests/standalone/test_mps_whisper.py` exists locally but is NOT committed/pushed — curl link in #227 won't work until pushed. |
-| 2026-03-15 | **rev8.** 3 new issues (#224 vocal separation analysis, #225 GUI white screen, #227 MPS hang on M1 MAX). Key feedback: #198 MPS benchmark confirms Whisper 6x SLOWER on MPS than CPU. #132 `--provider local` works on Kaggle v1.8.8, `--provider ollama` works after manual install. #128 hyiip proposes Gemma 3 4B/12B upgrade (128K context). #201 self-resolved (`pip-system-certs`). Added Release & Roadmap Analysis section. |
-| 2026-03-14 | **rev7.** v1.8.8 RELEASED. 3 new issues (#221-#223). #217 ESCALATED. #142 AMD ROCm workaround. Follow-ups sent on all stale issues. |
-| 2026-03-13 | rev6. All Track A/B/C code complete (9 items). 3 new issues (#218-#220). |
+| **2026-03-16** | **rev9.** 5 new issues (#228-#232). BYOP XXL committed (`aed1af2`). #217 received install log from vimbackground (needs analysis). #227 received MPS benchmark from dadlaugh (model-dependent: kotoba works, whisper-large fails). #223 continued feedback (16 comments). #198 and #201 closed. #230 new feature request for standalone merge tool. #231 Kaggle environment error. #232 whisper-ja-anime model request. Total open: 42. |
+| 2026-03-15 | **rev8.1** Responded to #223, #225, #227. |
+| 2026-03-15 | **rev8.** 3 new issues (#224-#227). MPS benchmark confirms Whisper 6x SLOWER on MPS than CPU. #132 `--provider local` works on Kaggle. #128 Gemma 3 proposal. |
+| 2026-03-14 | **rev7.** v1.8.8 RELEASED. 3 new issues (#221-#223). #217 ESCALATED. |
+| 2026-03-13 | rev6. All Track A/B/C code complete. 3 new issues (#218-#220). |
 | 2026-03-12 | rev5. v1.8.8b1 pre-release. 5 new issues (#213-#217). |
 | 2026-03-11 | rev4. v1.8.7 RELEASED. 3 new issues (#210-#212). |
 | 2026-03-09 | Groups B, C, D committed. Fixes shipped. |
