@@ -53,7 +53,7 @@
 | **P0** | BYOP Faster Whisper XXL ensemble integration | #223 | **DONE** | Committed `aed1af2`. Full GUI + CLI + worker chain. |
 | **P0** | MPS → CPU default for Whisper on Apple Silicon | #198, #227 | **NOT STARTED** | #227 benchmark shows kotoba MPS works but whisper-large-v3-turbo produces garbage on MPS |
 | **P1** | OllamaManager smart integration | #132, #212, #214 | **CODED** | Needs testing. `ollama_manager.py` committed. |
-| **P1** | Gemma 3 model upgrade (hyiip contribution) | #128, #132 | **DECISION NEEDED** | hyiip offers to implement. TinyRick1489 asks about num_ctx tuning (#132). |
+| **P1** | Gemma 3 model upgrade (hyiip contribution) | #128, #132 | **DECIDED** | Redirected hyiip to contribute Gemma 3 configs to OllamaManager instead of llama-cpp registry. |
 | **P2** | Config/settings cleanup (WS1-WS5) | — | **DONE** | Committed `6f27629`. |
 | **P2** | Installer investigation (#217 GUI exe) | #217 | **ANALYZED** | Root cause: PyTorch cu118 2.6GB download fails (TLS drops). Not installer bug. Responded on GitHub. |
 | **P3** | VAD failover + scene detection fixes (Q4, Q5) | #223 | **DONE** | Q4: `should_force_full_transcribe` in faster_whisper_pro_asr.py. Q5: Pydantic default auto-derives 28.0. |
@@ -97,7 +97,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090 | **OPEN** | llama-8b AND gemma-9b both fail. `AWAITING CONFIRMATION` |
 | **#196** | Local Translation Errors | zhstark | Ubuntu, 5090 32GB | CLOSED | Related to #212. |
 | **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | **UPDATE 2026-03-15**: `--provider local` works. `--provider ollama` works after manual install. **NEW**: TinyRick1489 asks if there's an arg to change Ollama num_ctx (currently 8192, caps batch_size to 11). `RESPONDED` — settings file override via model_params.num_ctx |
-| **#128** | LLM context/batch sizing | hyiip | (contributor) | **OPEN** | hyiip proposes Gemma 3 4B/12B (128K context). **Offers to implement.** `DECISION NEEDED` |
+| **#128** | LLM context/batch sizing | hyiip | (contributor) | **OPEN** | hyiip proposes Gemma 3 4B/12B (128K context). Redirected to OllamaManager configs. `AWAITING CONFIRMATION` |
 
 ---
 
@@ -261,7 +261,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **RESOLVED** | #217 | GUI exe missing after install | `RESPONDED` | Root cause: PyTorch download fails (network). Not an installer bug. |
 | **CRITICAL** | #223/#224 | Quality gap vs Faster Whisper XXL | `BYOP SHIPPED + PARAMS DONE` | BYOP XXL done. All Q1-Q6 parameter fixes verified complete. |
 | **HIGH** | #230 | Standalone merge module request | `RESPONDED` | Acknowledged, noted for roadmap. |
-| **HIGH** | #128 | Gemma 3 model upgrade proposal | `DECISION NEEDED` | hyiip offers to implement. Fixes LLM context root cause. |
+| **HIGH** | #128 | Gemma 3 model upgrade proposal | `DECIDED` | Redirected to OllamaManager. Awaiting hyiip response. |
 | **HIGH** | #227 | MPS model-dependent behavior | `DATA RECEIVED` | kotoba works on MPS, whisper-large fails. Need selective MPS policy. |
 | **HIGH** | #132 | Kaggle Ollama num_ctx tuning | `RESPONDED` | Answered: settings file model_params.num_ctx override. |
 | **MEDIUM** | #231 | Kaggle notebook error | `AWAITING INFO` | Asked for full traceback, version. |
