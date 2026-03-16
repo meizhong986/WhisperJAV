@@ -23,7 +23,8 @@
 | Total open on GitHub | **42** | +5 since rev8.1 (#228, #229, #230, #231, #232) |
 | New issues since rev8.1 | 5 | #228 (cublas64_12.dll), #229 (install SSL fail), #230 (merge module request), #231 (Kaggle error), #232 (whisper-ja-anime model) |
 | Closed since rev8.1 | 2 | #198 (MPS, closed by user), #201 (SSL, self-resolved) |
-| **NEEDS RESPONSE (no reply yet)** | 6 | #224, #228, #229, #230, #231, #232 |
+| **NEEDS RESPONSE (no reply yet)** | 0 | All responded 2026-03-16 |
+| **AWAITING INFO (asked user for details)** | 3 | #228 (nvidia-smi, install method), #231 (full traceback, version), #232 (comparison results) |
 | **AWAITING LOG (asked for install log)** | 3 | #220, #221, #225 |
 | **AWAITING CONFIRMATION** | 9 | #200, #204, #207, #209, #210, #212, #214, #218 |
 | **KEY NEW DATA** | 2 | #217 (install log received from vimbackground), #227 (MPS benchmark from dadlaugh) |
@@ -123,8 +124,8 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#229** | INSTALLATION FAILED (SSL) | WillChengCN | **OPEN (NEW)** | SSL cert verification failure during preflight. Same user as #218. VPN/proxy. | `NEEDS RESPONSE` |
-| **#228** | cublas64_12.dll not found / first run hang | yhxkry | **OPEN (NEW)** | First run hung all day. Second attempt: missing CUDA library. yangming2027 helped (CUDA toolkit not installed). | `NEEDS RESPONSE` — community partially resolved |
+| **#229** | INSTALLATION FAILED (SSL) | WillChengCN | **OPEN (NEW)** | SSL cert verification failure during preflight. Same user as #218. VPN/proxy. | `AWAITING CONFIRMATION` — suggested antivirus/proxy check |
+| **#228** | cublas64_12.dll not found / first run hang | yhxkry | **OPEN (NEW)** | First run hung all day. Second attempt: missing CUDA library. yangming2027 helped (CUDA toolkit not installed). | `AWAITING INFO` — asked for nvidia-smi, install method |
 | **#225** | 白屏 (GUI white screen) | github3C | **OPEN** | Program launches but shows white screen. | `AWAITING LOG` |
 | **#222** | 字幕是日语... (how to get Chinese?) | libinghui20001231-debug | **OPEN** | User doesn't know about translation feature. Pointed to docs. | `AWAITING CONFIRMATION` |
 | **#221** | 安装完后报错 (cublas64_12.dll missing) | libinghui20001231-debug | **OPEN** | GTX 1650, old driver 462. Community helped. | `AWAITING LOG` |
@@ -168,8 +169,8 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#230** | Subtitle merging module request | weifu8435 | **OPEN (NEW)** | Wants standalone merge tool for multi-pass merging (pass3, pass4...). 5 comments, active discussion with justantopair-ai. | `NEEDS RESPONSE` |
-| **#224** | 人声分离分析 (vocal separation analysis) | yangming2027 | **OPEN** | Detailed technical breakdown of XXL's vocal separation advantage. cbl19961214-sudo commented agreeing but noting WhisperJAV has basic audio processing. | `NEEDS RESPONSE` |
+| **#230** | Subtitle merging module request | weifu8435 | **OPEN (NEW)** | Wants standalone merge tool for multi-pass merging (pass3, pass4...). 5 comments, active discussion with justantopair-ai. | `AWAITING CONFIRMATION` — acknowledged, noted for roadmap |
+| **#224** | 人声分离分析 (vocal separation analysis) | yangming2027 | **OPEN** | Detailed technical breakdown of XXL's vocal separation advantage. cbl19961214-sudo commented agreeing but noting WhisperJAV has basic audio processing. | `AWAITING CONFIRMATION` — corrected: BS-RoFormer exists |
 | **#223** | Faster Whisper XXL comparison | weifu8435 | **OPEN** | **UPDATE 2026-03-16**: weifu8435 continues arguing balanced mode is worse than PotPlayer live captions. 16 comments total. We asked for test files to benchmark. BYOP XXL integration now shipped as response. | `RESPONDED` |
 | **#209** | Single subtitle very long (repetition) | weifu8435 | **OPEN** | `SHIPPED` (C1: pattern #8). `AWAITING CONFIRMATION` |
 | **#215** | Qwen3-ASR subtitle quality | yangming2027 | **OPEN** | Responded — expected behavior. `AWAITING CONFIRMATION` |
@@ -193,7 +194,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#231** | Kaggle notebook run error | fzfile | **OPEN (NEW)** | Error: `ffmpeg-dsp not available in single-pass mode` + stable_whisper import error (`whisper.tokenizer`). Running on Kaggle. | `NEEDS RESPONSE` |
+| **#231** | Kaggle notebook run error | fzfile | **OPEN (NEW)** | Error: `ffmpeg-dsp not available in single-pass mode` + stable_whisper import error (`whisper.tokenizer`). Running on Kaggle. | `AWAITING INFO` — asked for full traceback, version, install method |
 | **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | Partially working. New question about num_ctx. | `NEEDS RESPONSE` |
 
 **#231 analysis**: Two errors visible: (1) ffmpeg-dsp enhancer not available in single-pass mode (correct — speech enhancement requires scene detection pipeline), (2) stable_whisper fails to import `whisper.tokenizer` — likely openai-whisper not installed or version mismatch. This may be a Kaggle environment issue.
@@ -204,7 +205,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#232** | whisper-ja-anime-v0.1 model support | mustssr | **OPEN (NEW)** | Requests `efwkjn/whisper-ja-anime-v0.1` HuggingFace model. Notes it and Anime-Whisper each have strengths. | `NEEDS RESPONSE` |
+| **#232** | whisper-ja-anime-v0.1 model support | mustssr | **OPEN (NEW)** | Requests `efwkjn/whisper-ja-anime-v0.1` HuggingFace model. Notes it and Anime-Whisper each have strengths. | `AWAITING INFO` — asked for comparison results vs large-v3 |
 
 **#232 analysis**: whisper-ja-anime-v0.1 is a fine-tuned Whisper model for Japanese anime. WhisperJAV already has anime-whisper integration. Adding another anime model would be a Transformers pipeline addition. Low effort if it follows standard HuggingFace format.
 
@@ -246,7 +247,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | Status | Count | Issues |
 |--------|------:|--------|
-| **NEEDS RESPONSE (new/unresponded)** | 6 | #224, #228, #229, #230, #231, #232 |
+| **NEEDS RESPONSE (new/unresponded)** | 0 | All 6 responded 2026-03-16. #132 still needs num_ctx response. |
 | **AWAITING LOG (install log requested)** | 3 | #220, #221, #225 |
 | **AWAITING CONFIRMATION** | 9 | #200, #204, #207, #209, #210, #212, #214, #218 |
 | **KEY DATA RECEIVED (action needed)** | 4 | #217 (install log), #227 (MPS benchmark), #132 (num_ctx question), #223 (continued feedback) |
@@ -258,15 +259,15 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | Priority | # | Issue | Status | Why |
 |----------|---|-------|--------|-----|
 | **RESOLVED** | #217 | GUI exe missing after install | `RESPONDED` | Root cause: PyTorch download fails (network). Not an installer bug. |
-| **CRITICAL** | #223/#224 | Quality gap vs Faster Whisper XXL | `BYOP SHIPPED + PLAN DRAFTED` | BYOP XXL done. Parameter fixes not yet implemented. |
-| **HIGH** | #230 | Standalone merge module request | `NEEDS RESPONSE` | Power user (weifu8435) wants multi-pass merge CLI. |
+| **CRITICAL** | #223/#224 | Quality gap vs Faster Whisper XXL | `BYOP SHIPPED + PARAMS DONE` | BYOP XXL done. All Q1-Q6 parameter fixes verified complete. |
+| **HIGH** | #230 | Standalone merge module request | `RESPONDED` | Acknowledged, noted for roadmap. |
 | **HIGH** | #128 | Gemma 3 model upgrade proposal | `DECISION NEEDED` | hyiip offers to implement. Fixes LLM context root cause. |
 | **HIGH** | #227 | MPS model-dependent behavior | `DATA RECEIVED` | kotoba works on MPS, whisper-large fails. Need selective MPS policy. |
 | **HIGH** | #132 | Kaggle Ollama num_ctx tuning | `NEEDS RESPONSE` | TinyRick1489 asks about num_ctx arg for Ollama. |
-| **MEDIUM** | #231 | Kaggle notebook error | `NEEDS RESPONSE` | ffmpeg-dsp single-pass + whisper.tokenizer import error. |
-| **MEDIUM** | #232 | whisper-ja-anime-v0.1 model | `NEEDS RESPONSE` | Easy to add if standard HF format. |
-| **MEDIUM** | #229 | Install SSL failure (WillChengCN) | `NEEDS RESPONSE` | Repeat user. VPN/proxy SSL interception. |
-| **MEDIUM** | #228 | cublas64_12.dll + first run hang | `NEEDS RESPONSE` | Community partially helped. May self-resolve. |
+| **MEDIUM** | #231 | Kaggle notebook error | `AWAITING INFO` | Asked for full traceback, version. |
+| **MEDIUM** | #232 | whisper-ja-anime-v0.1 model | `AWAITING INFO` | Asked for comparison results. |
+| **MEDIUM** | #229 | Install SSL failure (WillChengCN) | `RESPONDED` | Suggested antivirus/proxy check. |
+| **MEDIUM** | #228 | cublas64_12.dll + first run hang | `AWAITING INFO` | Asked for nvidia-smi, install method. |
 | **LOW** | #222 | How to get Chinese subs | `AWAITING CONFIRMATION` | Responded with docs. |
 
 ---
@@ -365,7 +366,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | Priority | Item | Issues | Effort | Status |
 |----------|------|--------|--------|--------|
 | **P0** | ~~BYOP Faster Whisper XXL~~ | #223 | — | **DONE** (committed `aed1af2`) |
-| **P0** | Quality parameter fixes (large-v3, float16, beam_size=5) | #223, #224 | ~45 LOC | **PLAN DRAFTED** |
+| **P0** | Quality parameter fixes (large-v3, float16, beam_size=5) | #223, #224 | ~45 LOC | **DONE** |
 | **P0** | MPS selective policy (CPU for whisper-*, MPS for kotoba-*) | #198, #227 | ~20 LOC | **NOT STARTED** |
 | **P1** | OllamaManager testing + num_ctx CLI arg | #132, #212, #214 | Testing | **CODED** |
 | **P1** | Gemma 3 model upgrade (if hyiip contributes) | #128 | External PR | **DECISION NEEDED** |
