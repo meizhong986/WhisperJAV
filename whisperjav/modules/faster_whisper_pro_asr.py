@@ -25,6 +25,7 @@ from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.utils.crash_tracer import get_tracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
+from whisperjav.modules.vad_failover import should_force_full_transcribe
 
 
 class FasterWhisperProASR:
@@ -440,6 +441,8 @@ class FasterWhisperProASR:
         # Run speech segmentation through the Speech Segmenter contract
         vad_segments = self._run_speech_segmentation(audio_data, sample_rate)
 
+        audio_duration = len(audio_data) / sample_rate if sample_rate else 0.0
+
         # Store segments for visualization data contract
         # Flatten grouped segments into simple list with start_sec/end_sec
         self._last_vad_segments = []
@@ -470,9 +473,25 @@ class FasterWhisperProASR:
             if self._external_segmenter.name == "none":
                 logger.info("Speech segmentation: disabled (none backend) - transcribing full audio directly")
                 all_segments = self._transcribe_full_audio(audio_data, sample_rate)
+            elif should_force_full_transcribe(vad_segments, audio_duration):
+                logger.warning(
+                    "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
+                    "Falling back to full-clip transcription.",
+                    0,
+                    audio_duration,
+                )
+                all_segments = self._transcribe_full_audio(audio_data, sample_rate)
             else:
                 logger.debug(f"No speech detected in {audio_path.name}")
                 return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
+        elif should_force_full_transcribe(vad_segments, audio_duration):
+            logger.warning(
+                "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
+                "Falling back to full-clip transcription.",
+                sum(len(group or []) for group in (vad_segments or [])),
+                audio_duration,
+            )
+            all_segments = self._transcribe_full_audio(audio_data, sample_rate)
         else:
             all_segments = []
             for i, vad_group in enumerate(vad_segments, 1):

@@ -1,5 +1,6 @@
 {
   "version": "4.4",
+  "_deprecation_note": "CAUTION: Most sections in this file are NOT read at runtime for the balanced/fidelity pipeline CLI/GUI path. Runtime parameters come from Pydantic presets in config/components/asr/faster_whisper.py. The scene_detection section IS still active. See docs/research/CONFIG_RESOLUTION_CHAIN_ANALYSIS.md for details.",
   "pipeline_parameter_map": {
     "faster": {
       "common": [
@@ -132,7 +133,7 @@
         "pass1_max_silence_s": 2.5,
         "pass1_energy_threshold": 20,
         "pass2_min_duration_s": 0.1,
-        "pass2_max_duration_s": 1900.0,
+        "pass2_max_duration_s": 28.0,
         "pass2_max_silence_s": 1.8,
         "pass2_energy_threshold": 25,
         "bandpass_low_hz": 200,
@@ -227,7 +228,7 @@
     },
     "balanced": {
       "workflow": {
-        "model": "faster-whisper-large-v2-int8",
+        "model": "faster-whisper-large-v3",
         "vad": "silero-v3.1",
         "backend": "faster-whisper",
         "features": {

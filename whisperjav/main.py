@@ -1748,7 +1748,7 @@ def main():
         # Determine device and compute_type for model override
         # Priority: CLI args > auto-detection
         override_device = args.device if args.device and args.device != "auto" else get_best_device()
-        override_compute_type = args.compute_type if args.compute_type and args.compute_type != "auto" else "int8"
+        override_compute_type = args.compute_type if args.compute_type and args.compute_type != "auto" else "auto"
         # Create a model configuration for the CLI-specified model
         override_model_config = {
             "provider": "openai_whisper",  # Default provider

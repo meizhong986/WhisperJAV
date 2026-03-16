@@ -94,7 +94,7 @@ class TimingConstants:
 
     # The maximum reading speed in Characters Per Second.
     # Subtitles above this will be completely removed as artifacts.
-    MAX_SAFE_CPS: float = 20.0
+    MAX_SAFE_CPS: float = 30.0
 
     # The minimum number of characters a subtitle needs to have to be checked.
     MIN_TEXT_LENGTH_FOR_CPS_CHECK: int = 3

@@ -198,7 +198,7 @@ class FasterWhisperASR(ASRComponent):
 
     # === ASR-specific ===
     provider = "faster_whisper"
-    model_id = "large-v2"
+    model_id = "large-v3"
     supported_tasks = ["transcribe", "translate"]
     compatible_vad = ["silero", "faster_whisper_vad", "none"]
 
@@ -215,8 +215,8 @@ class FasterWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=1,
-            best_of=1,
+            beam_size=3,
+            best_of=3,
             patience=1.5,  # v1.7.1 value
             length_penalty=None,
             prefix=None,
@@ -225,7 +225,7 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0],
+            temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
             compression_ratio_threshold=2.4,
             logprob_threshold=-1.0,
             logprob_margin=0.1,
@@ -255,8 +255,8 @@ class FasterWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=2,
-            best_of=1,
+            beam_size=5,
+            best_of=3,
             patience=2.0,  # v1.7.1 value
             length_penalty=None,
             prefix=None,
@@ -265,7 +265,7 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.1],  # v1.7.1 default - fallback for quality issues
+            temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],  # faster-whisper default — rescues failed segments
             compression_ratio_threshold=2.4,
             logprob_threshold=-1.2,
             logprob_margin=0.2,
@@ -295,8 +295,8 @@ class FasterWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=2,  # v1.7.1 value
-            best_of=1,
+            beam_size=5,
+            best_of=5,
             patience=2.9,  # v1.7.1 value
             length_penalty=None,
             prefix=None,
@@ -305,7 +305,7 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.3],  # v1.7.1 default - fallback for quality issues
+            temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],  # faster-whisper default — rescues failed segments
             compression_ratio_threshold=3.0,
             logprob_threshold=-2.5,
             logprob_margin=0.0,
