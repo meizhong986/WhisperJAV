@@ -96,7 +96,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **#214** | 1.8.7 localLLM fail | KenZP12 | Windows, cu128 | **OPEN** | gemma-9b, 502 error. `AWAITING CONFIRMATION` |
 | **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090 | **OPEN** | llama-8b AND gemma-9b both fail. `AWAITING CONFIRMATION` |
 | **#196** | Local Translation Errors | zhstark | Ubuntu, 5090 32GB | CLOSED | Related to #212. |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | **UPDATE 2026-03-15**: `--provider local` works. `--provider ollama` works after manual install. **NEW**: TinyRick1489 asks if there's an arg to change Ollama num_ctx (currently 8192, caps batch_size to 11). `NEEDS RESPONSE` |
+| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | **UPDATE 2026-03-15**: `--provider local` works. `--provider ollama` works after manual install. **NEW**: TinyRick1489 asks if there's an arg to change Ollama num_ctx (currently 8192, caps batch_size to 11). `RESPONDED` — settings file override via model_params.num_ctx |
 | **#128** | LLM context/batch sizing | hyiip | (contributor) | **OPEN** | hyiip proposes Gemma 3 4B/12B (128K context). **Offers to implement.** `DECISION NEEDED` |
 
 ---
@@ -195,7 +195,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
 | **#231** | Kaggle notebook run error | fzfile | **OPEN (NEW)** | Error: `ffmpeg-dsp not available in single-pass mode` + stable_whisper import error (`whisper.tokenizer`). Running on Kaggle. | `AWAITING INFO` — asked for full traceback, version, install method |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | Partially working. New question about num_ctx. | `NEEDS RESPONSE` |
+| **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | Partially working. num_ctx override answered. | `AWAITING CONFIRMATION` |
 
 **#231 analysis**: Two errors visible: (1) ffmpeg-dsp enhancer not available in single-pass mode (correct — speech enhancement requires scene detection pipeline), (2) stable_whisper fails to import `whisper.tokenizer` — likely openai-whisper not installed or version mismatch. This may be a Kaggle environment issue.
 
@@ -247,7 +247,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | Status | Count | Issues |
 |--------|------:|--------|
-| **NEEDS RESPONSE (new/unresponded)** | 0 | All 6 responded 2026-03-16. #132 still needs num_ctx response. |
+| **NEEDS RESPONSE (new/unresponded)** | 0 | All responded 2026-03-16 (incl. #132 num_ctx). |
 | **AWAITING LOG (install log requested)** | 3 | #220, #221, #225 |
 | **AWAITING CONFIRMATION** | 9 | #200, #204, #207, #209, #210, #212, #214, #218 |
 | **KEY DATA RECEIVED (action needed)** | 4 | #217 (install log), #227 (MPS benchmark), #132 (num_ctx question), #223 (continued feedback) |
@@ -263,7 +263,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **HIGH** | #230 | Standalone merge module request | `RESPONDED` | Acknowledged, noted for roadmap. |
 | **HIGH** | #128 | Gemma 3 model upgrade proposal | `DECISION NEEDED` | hyiip offers to implement. Fixes LLM context root cause. |
 | **HIGH** | #227 | MPS model-dependent behavior | `DATA RECEIVED` | kotoba works on MPS, whisper-large fails. Need selective MPS policy. |
-| **HIGH** | #132 | Kaggle Ollama num_ctx tuning | `NEEDS RESPONSE` | TinyRick1489 asks about num_ctx arg for Ollama. |
+| **HIGH** | #132 | Kaggle Ollama num_ctx tuning | `RESPONDED` | Answered: settings file model_params.num_ctx override. |
 | **MEDIUM** | #231 | Kaggle notebook error | `AWAITING INFO` | Asked for full traceback, version. |
 | **MEDIUM** | #232 | whisper-ja-anime-v0.1 model | `AWAITING INFO` | Asked for comparison results. |
 | **MEDIUM** | #229 | Install SSL failure (WillChengCN) | `RESPONDED` | Suggested antivirus/proxy check. |
