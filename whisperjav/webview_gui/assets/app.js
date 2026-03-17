@@ -1562,12 +1562,12 @@ const EnsembleManager = {
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else {
-            // Legacy / Transformers defaults
-            sceneSelect.value = 'auditok';
-            segmenterSelect.value = 'silero';
+            // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
+            sceneSelect.value = 'semantic';
+            segmenterSelect.value = 'silero-v6.2';
             sensitivitySelect.value = 'aggressive';
-            this.state[passKey].sceneDetector = 'auditok';
-            this.state[passKey].speechSegmenter = 'silero';
+            this.state[passKey].sceneDetector = 'semantic';
+            this.state[passKey].speechSegmenter = 'silero-v6.2';
             this.state[passKey].sensitivity = 'aggressive';
         }
     },
@@ -1941,7 +1941,7 @@ const EnsembleManager = {
         balanced: ['large-v2', 'large-v3'],
         faster: ['large-v2', 'large-v3'],
         fast: ['large-v2', 'large-v3'],
-        fidelity: ['turbo', 'large-v2', 'large-v3'],
+        fidelity: ['large-v2', 'large-v3', 'turbo'],
         'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster', 'RoachLin/kotoba-whisper-v2.2-faster']
     },
 

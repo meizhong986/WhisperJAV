@@ -1037,6 +1037,7 @@ class WhisperJAVAPI:
             "whisper-vad-medium": "whisper-vad-speech-segmentation.yaml",
             "nemo": "nemo-speech-segmentation.yaml",
             "nemo-lite": "nemo-speech-segmentation.yaml",
+            "silero-v6.2": "silero-v6-speech-segmentation.yaml",
         }
 
         # Handle "none" backend
