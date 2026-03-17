@@ -2062,14 +2062,21 @@ def main():
 
             # Report individual results
             failed_files = []
+            degraded_files = []
             successful_count = 0
             total_processing_time = 0.0
 
             for result in results:
                 basename = result.get('input', {}).get('basename', 'unknown')
-                if result.get('error') or result.get('status') == 'failed':
+                status = result.get('status', 'unknown')
+                if result.get('error') or status == 'failed':
                     logger.error(f"Failed: {basename} - {result.get('error', 'Unknown error')}")
                     failed_files.append(basename)
+                elif status == 'degraded':
+                    output_path = result.get('summary', {}).get('final_output', 'unknown')
+                    logger.warning(f"Degraded (fallback): {basename} -> {output_path}")
+                    degraded_files.append(basename)
+                    total_processing_time += result.get('summary', {}).get('total_processing_time_seconds', 0.0)
                 else:
                     output_path = result.get('summary', {}).get('final_output', 'unknown')
                     logger.info(f"Completed: {output_path}")
@@ -2081,12 +2088,19 @@ def main():
             print("ENSEMBLE PROCESSING SUMMARY")
             print("="*50)
             print(f"Total files: {len(media_files)}")
-            print(f"Successful: {successful_count}")
+            print(f"Completed: {successful_count}")
+            if degraded_files:
+                print(f"Partial (fallback): {len(degraded_files)}")
             print(f"Failed: {len(failed_files)}")
             if total_processing_time > 0:
                 print(f"Total processing time: {total_processing_time:.2f}s")
-                if successful_count > 0:
-                    print(f"Average per file: {total_processing_time / successful_count:.2f}s")
+                completed_total = successful_count + len(degraded_files)
+                if completed_total > 0:
+                    print(f"Average per file: {total_processing_time / completed_total:.2f}s")
+            if degraded_files:
+                print("\nPartial (pass 2 failed, output is pass 1 fallback):")
+                for f in degraded_files:
+                    print(f"  - {f}")
             if failed_files:
                 print("\nFailed files:")
                 for f in failed_files:
@@ -2096,7 +2110,8 @@ def main():
             # ============================================================
             # TRANSLATION: Translate successful ensemble outputs if requested
             # ============================================================
-            if args.translate and successful_count > 0:
+            translatable_count = successful_count + len(degraded_files)
+            if args.translate and translatable_count > 0:
                 print("\n" + "="*50)
                 print("STARTING TRANSLATION")
                 print("="*50)
@@ -2179,7 +2194,7 @@ def main():
             # VTT CONVERSION: Convert SRT outputs if requested
             # ============================================================
             output_format = getattr(args, 'output_format', 'srt')
-            if output_format != 'srt' and successful_count > 0:
+            if output_format != 'srt' and translatable_count > 0:
                 for result in results:
                     if result.get('error') or result.get('status') == 'failed':
                         continue
@@ -2199,15 +2214,18 @@ def main():
             # ENSEMBLE EXIT STATUS: Reflect actual success/failure
             # ============================================================
             has_failures = len(failed_files) > 0
+            has_degraded = len(degraded_files) > 0
             has_translation_failures = (
-                args.translate and successful_count > 0
+                args.translate and (successful_count + len(degraded_files)) > 0
                 and translation_failed > 0
             )
 
-            if has_failures or has_translation_failures:
+            if has_failures or has_degraded or has_translation_failures:
                 parts = []
                 if has_failures:
                     parts.append(f"{len(failed_files)} transcription(s) failed")
+                if has_degraded:
+                    parts.append(f"{len(degraded_files)} file(s) degraded (pass 2 failed, fell back to pass 1)")
                 if has_translation_failures:
                     parts.append(f"{translation_failed} translation(s) failed")
                 logger.warning("Ensemble completed with errors: %s", "; ".join(parts))

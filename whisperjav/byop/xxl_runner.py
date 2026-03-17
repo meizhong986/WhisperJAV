@@ -56,6 +56,9 @@ def run_xxl(
         output_dir = str(exe.parent / "_whisperjav_xxl_output")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+    # Minimal integration args only — model, language, output location, format.
+    # Everything else (--verbose, --beep_off, --standard_asia, etc.) is the
+    # user's choice via extra_args.  We don't assume what XXL wants.
     cmd = [
         str(exe),
         str(input_file),
@@ -63,8 +66,6 @@ def run_xxl(
         "--language", language,
         "--output_dir", str(output_dir),
         "--output_format", "srt",
-        "--beep_off",
-        "--verbose",
     ]
 
     if task == "translate":

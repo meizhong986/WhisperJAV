@@ -259,10 +259,13 @@ class EnsembleOrchestrator:
         # Trace batch completion
         batch_duration = time.time() - batch_start
         completed_count = sum(1 for m in all_metadata if m.get('status') == 'completed')
+        degraded_count = sum(1 for m in all_metadata if m.get('status') == 'degraded')
+        failed_count = sum(1 for m in all_metadata if m.get('status') == 'failed')
         self.tracer.emit("ensemble_batch_complete", {
             "files_processed": len(all_metadata),
             "completed": completed_count,
-            "failed": len(all_metadata) - completed_count,
+            "degraded": degraded_count,
+            "failed": failed_count,
             "total_duration_seconds": round(batch_duration, 2),
             "summary_path": str(summary_path) if summary_path else None,
         })
@@ -355,6 +358,7 @@ class EnsembleOrchestrator:
                     merge_info = {'status': 'skipped', 'reason': 'pass2_file_missing'}
                     row_display['merge'] = 'NOK'
                     row_display['pass2'] = 'NOK'
+                    ensemble_metadata['status'] = 'degraded'
                     if pass1_srt:
                         final_output_path = pass1_srt
                         row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
@@ -409,6 +413,7 @@ class EnsembleOrchestrator:
                             logger.error("Merge failed for %s: %s", basename, merge_error)
                             merge_info = {'status': 'failed', 'error': str(merge_error)}
                             row_display['merge'] = 'NOK'
+                            ensemble_metadata['status'] = 'degraded'
                             if pass1_srt:
                                 final_output_path = pass1_srt
                                 row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
@@ -421,6 +426,7 @@ class EnsembleOrchestrator:
                 merge_info = {'status': 'skipped', 'reason': 'pass2_failed'}
                 row_display['merge'] = 'NOK'
                 row_display['pass2'] = self._format_status(ensemble_metadata['pass2'])
+                ensemble_metadata['status'] = 'degraded'
                 if pass1_srt:
                     final_output_path = pass1_srt
                     row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
@@ -542,19 +548,28 @@ class EnsembleOrchestrator:
 
             # --- Per-file completion banner ---
             file_elapsed = time.time() - file_start
+            file_status = metadata.get('status', 'unknown')
             final_output = metadata.get('summary', {}).get('final_output')
-            if final_output and metadata.get('status') != 'failed':
+            if file_status == 'failed' or not final_output:
+                logger.warning(
+                    "[%d/%d] FAILED: %s (%.0fs)",
+                    file_idx, total_files, basename, file_elapsed,
+                )
+            elif file_status == 'degraded':
+                final_name = Path(final_output).name
+                subs_count = metadata.get('pass1', {}).get('subtitles', '?')
+                logger.warning(
+                    "[%d/%d] PARTIAL: %s -> %s (%s subs, %.0fs) — pass 2 failed, fell back to pass 1",
+                    file_idx, total_files, basename, final_name,
+                    subs_count, file_elapsed,
+                )
+            else:
                 final_name = Path(final_output).name
                 subs_count = metadata.get('pass1', {}).get('subtitles', '?')
                 logger.info(
                     "[%d/%d] DONE: %s -> %s (%s subs, %.0fs)",
                     file_idx, total_files, basename, final_name,
                     subs_count, file_elapsed,
-                )
-            else:
-                logger.warning(
-                    "[%d/%d] FAILED: %s (%.0fs)",
-                    file_idx, total_files, basename, file_elapsed,
                 )
 
         # --- Batch summary (same as batch mode) ---
@@ -565,10 +580,13 @@ class EnsembleOrchestrator:
 
         batch_duration = time.time() - batch_start
         completed_count = sum(1 for m in all_metadata if m.get('status') == 'completed')
+        degraded_count = sum(1 for m in all_metadata if m.get('status') == 'degraded')
+        failed_count = sum(1 for m in all_metadata if m.get('status') == 'failed')
         self.tracer.emit("ensemble_batch_complete", {
             "files_processed": len(all_metadata),
             "completed": completed_count,
-            "failed": len(all_metadata) - completed_count,
+            "degraded": degraded_count,
+            "failed": failed_count,
             "total_duration_seconds": round(batch_duration, 2),
             "summary_path": str(summary_path) if summary_path else None,
             "serial_mode": True,
