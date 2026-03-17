@@ -94,10 +94,9 @@ installer/install_linux.sh           # Linux
 ## What Changed (Technical Details)
 
 ### New Features
-- `--pass2-pipeline xxl`: BYOP ensemble mode with Faster Whisper XXL as external Pass 2
+- `--pass2-pipeline xxl`: BYOP ensemble mode with XXL Faster Whisper as external Pass 2
 - `--xxl-exe PATH`: Path to faster-whisper-xxl executable
-- `--xxl-args ARGS`: Extra arguments passed directly to XXL
-- GUI: BYOP panel with Browse button, extra args field, and pipeline dropdown including XXL option
+- GUI: BYOP panel with Browse button, extra args field (persisted), and pipeline dropdown including XXL option
 - `OllamaManager`: Smart Ollama lifecycle management with model metadata queries, VRAM detection, auto-start/stop, curated model configs
 
 ### Quality Improvements

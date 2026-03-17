@@ -229,7 +229,7 @@ In ensemble mode, XXL would be one of the "passes":
 |---------|-------|---------|
 | XXL exe path | GUI file picker / `--xxl-exe` CLI | `C:\Tools\faster-whisper-xxl.exe` |
 | Model | GUI dropdown / `--xxl-model` CLI | `large-v3` |
-| Extra args | GUI text field / `--xxl-args` CLI | `--standard_asia --ff_vocal_extract mdx_kim2 --compute_type float16` |
+| Extra args | GUI text field (persisted to asr_config.json) | `--standard_asia --ff_vocal_extract mdx_kim2 --compute_type float16` |
 
 ### Estimated Effort
 

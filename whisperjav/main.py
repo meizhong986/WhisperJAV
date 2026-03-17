@@ -261,9 +261,6 @@ def parse_arguments():
     byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
     byop_group.add_argument("--xxl-exe", default=None,
                             help="Path to faster-whisper-xxl executable (required for --pass2-pipeline xxl)")
-    byop_group.add_argument("--xxl-args", default="",
-                            help="Extra arguments passed directly to XXL "
-                                 "(e.g., '--standard_asia --ff_vocal_extract mdx_kim2')")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -756,6 +753,22 @@ def add_signatures_to_srt(srt_path: str, producer_credit: str = None,
     except Exception as e:
         logger.warning(f"Could not add signatures to {srt_path}: {e}")
         # Don't fail the whole process if signatures can't be added
+
+
+def _get_xxl_extra_args_from_config() -> str:
+    """Read XXL extra args from persisted BYOP preferences in asr_config.json.
+
+    The GUI saves user-supplied extra args (e.g. '--standard_asia') to
+    asr_config.json under ui_preferences.byop.xxl_extra_args. This is the
+    single source for extra args — there is no CLI flag for this.
+    """
+    try:
+        from whisperjav.config.manager import ConfigManager
+        mgr = ConfigManager()
+        ui_prefs = mgr.get_ui_preferences()
+        return ui_prefs.get('byop', {}).get('xxl_extra_args', '')
+    except Exception:
+        return ''
 
 
 def apply_vtt_conversion(srt_path: str, output_format: str) -> None:
@@ -2033,8 +2046,10 @@ def main():
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)
                     # BYOP XXL fields (only used when pipeline='xxl')
+                    # xxl_exe from CLI flag; extra args from persisted BYOP
+                    # preferences in asr_config.json (set via GUI extra args field)
                     'xxl_exe': getattr(args, 'xxl_exe', None),
-                    'xxl_args': getattr(args, 'xxl_args', '') or '',
+                    'xxl_args': _get_xxl_extra_args_from_config(),
                 }
 
             # Create orchestrator

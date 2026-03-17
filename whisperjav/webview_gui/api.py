@@ -2449,14 +2449,13 @@ class WhisperJAVAPI:
                 p2_pipeline = 'qwen'
             args += ["--pass2-pipeline", p2_pipeline]
 
-            # BYOP XXL: external tool — only needs exe path and optional extra args
+            # BYOP XXL: external tool — only needs exe path.
+            # Extra args are read from persisted BYOP preferences in asr_config.json
+            # (set via the GUI extra args text field), not passed as a CLI flag.
             if pass2.get('isXxl') or p2_pipeline == 'xxl':
                 xxl_exe = pass2.get('xxlExe', '')
                 if xxl_exe:
                     args += ["--xxl-exe", xxl_exe]
-                xxl_args = pass2.get('xxlArgs', '')
-                if xxl_args:
-                    args += ["--xxl-args", xxl_args]
                 # Skip all pipeline-specific args — XXL handles everything internally
             elif pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
