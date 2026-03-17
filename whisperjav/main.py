@@ -223,7 +223,7 @@ def parse_arguments():
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl"],
-                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP Faster Whisper XXL (requires --xxl-exe)")
+                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: balanced)")

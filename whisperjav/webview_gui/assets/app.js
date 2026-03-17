@@ -1623,7 +1623,7 @@ const EnsembleManager = {
 
         // XXL (BYOP): Disable all pipeline controls — external tool handles everything
         if (passState.isXxl) {
-            const xxlTitle = 'Not applicable — Faster Whisper XXL uses its own settings';
+            const xxlTitle = 'Not applicable — XXL Faster Whisper uses its own settings';
             sensitivitySelect.disabled = true;
             sensitivitySelect.title = xxlTitle;
             segmenterSelect.disabled = true;
@@ -4956,6 +4956,14 @@ const EnsembleManager = {
 
         try {
             const config = this.collectConfig();
+
+            // Persist BYOP preferences so the XXL path is remembered across sessions
+            if (this.state.pass2.isXxl && this.state.pass2.xxlExePath) {
+                pywebview.api.save_byop_preferences({
+                    xxl_exe_path: this.state.pass2.xxlExePath,
+                    xxl_extra_args: this.state.pass2.xxlExtraArgs || ''
+                });
+            }
 
             // Capture translation settings before starting (in case user switches tabs)
             TranslateIntegrationManager.captureSettingsOnStart();
