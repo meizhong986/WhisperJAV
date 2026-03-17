@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-16 (rev9 — 5 new issues, BYOP XXL shipped, #217 install log received) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **42 open** on GitHub
+> Updated: 2026-03-17 (rev10 — #229 self-resolved, #225 install log analyzed, #231/#227 responded) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **42 open** on GitHub
 
 ---
 
@@ -25,7 +25,7 @@
 | Closed since rev8.1 | 2 | #198 (MPS, closed by user), #201 (SSL, self-resolved) |
 | **NEEDS RESPONSE (no reply yet)** | 0 | All responded 2026-03-16 |
 | **AWAITING INFO (asked user for details)** | 3 | #228 (nvidia-smi, install method), #231 (full traceback, version), #232 (comparison results) |
-| **AWAITING LOG (asked for install log)** | 3 | #220, #221, #225 |
+| **AWAITING LOG (asked for install log)** | 2 | #220, #221 |
 | **AWAITING CONFIRMATION** | 9 | #200, #204, #207, #209, #210, #212, #214, #218 |
 | **KEY NEW DATA** | 2 | #217 (install log received from vimbackground), #227 (MPS benchmark from dadlaugh) |
 | Feature requests (open) | 20 | See Cluster J |
@@ -124,9 +124,9 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#229** | INSTALLATION FAILED (SSL) | WillChengCN | **OPEN (NEW)** | SSL cert verification failure during preflight. Same user as #218. VPN/proxy. | `AWAITING CONFIRMATION` — suggested antivirus/proxy check |
+| **#229** | INSTALLATION FAILED (SSL) | WillChengCN | **OPEN** | SSL cert verification failure. **SELF-RESOLVED** by user 2026-03-17: "the cause is python environment." Safe to close. | `FIX VERIFIED` |
 | **#228** | cublas64_12.dll not found / first run hang | yhxkry | **OPEN (NEW)** | First run hung all day. Second attempt: missing CUDA library. yangming2027 helped (CUDA toolkit not installed). | `AWAITING INFO` — asked for nvidia-smi, install method |
-| **#225** | 白屏 (GUI white screen) | github3C | **OPEN** | Program launches but shows white screen. | `AWAITING LOG` |
+| **#225** | 白屏 (GUI white screen) | github3C | **OPEN** | Install log clean (RTX 3070, 19/19 checks pass). White screen is runtime issue — likely WebView2 missing/outdated. Responded with diagnostic steps. | `AWAITING CONFIRMATION` |
 | **#222** | 字幕是日语... (how to get Chinese?) | libinghui20001231-debug | **OPEN** | User doesn't know about translation feature. Pointed to docs. | `AWAITING CONFIRMATION` |
 | **#221** | 安装完后报错 (cublas64_12.dll missing) | libinghui20001231-debug | **OPEN** | GTX 1650, old driver 462. Community helped. | `AWAITING LOG` |
 | **#220** | 安装卡着不动 (install stalls) | libinghui20001231-debug | **OPEN** | Install stalls during PyTorch download. | `AWAITING LOG` |
@@ -174,7 +174,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **#223** | Faster Whisper XXL comparison | weifu8435 | **OPEN** | **UPDATE 2026-03-16**: weifu8435 continues arguing balanced mode is worse than PotPlayer live captions. 16 comments total. We asked for test files to benchmark. BYOP XXL integration now shipped as response. | `RESPONDED` |
 | **#209** | Single subtitle very long (repetition) | weifu8435 | **OPEN** | `SHIPPED` (C1: pattern #8). `AWAITING CONFIRMATION` |
 | **#215** | Qwen3-ASR subtitle quality | yangming2027 | **OPEN** | Responded — expected behavior. `AWAITING CONFIRMATION` |
-| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN** | See Cluster B. MPS model-dependent behavior confirmed. | `AWAITING CONFIRMATION` |
+| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN** | MPS model-dependent behavior confirmed. batch_size/JSON quoting question answered. Asked for M3/M4 test data. | `AWAITING CONFIRMATION` |
 
 **#230 analysis**: weifu8435 wants a standalone `whisperjav-merge` command that takes multiple SRT files and merges them iteratively. The existing ensemble merge is internal to 2-pass mode. This is a feature request for a CLI tool. weifu8435 is WhisperJAV's most active quality-focused user (filed #223, #209, #230).
 
@@ -194,7 +194,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#231** | Kaggle notebook run error | fzfile | **OPEN (NEW)** | Error: `ffmpeg-dsp not available in single-pass mode` + stable_whisper import error (`whisper.tokenizer`). Running on Kaggle. | `AWAITING INFO` — asked for full traceback, version, install method |
+| **#231** | Kaggle notebook run error | fzfile | **OPEN** | GPU T4x2, used GitHub-linked notebook. Logs don't show full traceback. stable_whisper/whisper import fails. Sent diagnostic code to isolate the import error. | `AWAITING INFO` — diagnostic code sent |
 | **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | Partially working. num_ctx override answered. | `AWAITING CONFIRMATION` |
 
 **#231 analysis**: Two errors visible: (1) ffmpeg-dsp enhancer not available in single-pass mode (correct — speech enhancement requires scene detection pipeline), (2) stable_whisper fails to import `whisper.tokenizer` — likely openai-whisper not installed or version mismatch. This may be a Kaggle environment issue.
@@ -248,7 +248,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | Status | Count | Issues |
 |--------|------:|--------|
 | **NEEDS RESPONSE (new/unresponded)** | 0 | All responded 2026-03-16 (incl. #132 num_ctx). |
-| **AWAITING LOG (install log requested)** | 3 | #220, #221, #225 |
+| **AWAITING LOG (install log requested)** | 2 | #220, #221 |
 | **AWAITING CONFIRMATION** | 9 | #200, #204, #207, #209, #210, #212, #214, #218 |
 | **KEY DATA RECEIVED (action needed)** | 4 | #217 (install log), #227 (MPS benchmark), #132 (num_ctx question), #223 (continued feedback) |
 | **Feature requests (open)** | 22 | See Cluster J |
@@ -266,7 +266,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **HIGH** | #132 | Kaggle Ollama num_ctx tuning | `RESPONDED` | Answered: settings file model_params.num_ctx override. |
 | **MEDIUM** | #231 | Kaggle notebook error | `AWAITING INFO` | Asked for full traceback, version. |
 | **MEDIUM** | #232 | whisper-ja-anime-v0.1 model | `AWAITING INFO` | Asked for comparison results. |
-| **MEDIUM** | #229 | Install SSL failure (WillChengCN) | `RESPONDED` | Suggested antivirus/proxy check. |
+| **MEDIUM** | #229 | Install SSL failure (WillChengCN) | `SELF-RESOLVED` | User fixed it: "the cause is python environment." Safe to close. |
 | **MEDIUM** | #228 | cublas64_12.dll + first run hang | `AWAITING INFO` | Asked for nvidia-smi, install method. |
 | **LOW** | #222 | How to get Chinese subs | `AWAITING CONFIRMATION` | Responded with docs. |
 
@@ -414,6 +414,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | Date | Changes |
 |------|---------|
+| **2026-03-17** | **rev10.** #229 self-resolved (python env). #225 install log analyzed — clean install, white screen is WebView2 runtime issue. #231 fzfile replied (T4x2, GitHub notebook), sent diagnostic code. #227 answered dadlaugh's batch_size question, asked for M3/M4 testers. All issues responded — 0 NEEDS RESPONSE. V189 quality plan verified complete. #128 Gemma 3 redirected to OllamaManager. |
 | **2026-03-16** | **rev9.** 5 new issues (#228-#232). BYOP XXL committed (`aed1af2`). #217 received install log from vimbackground (needs analysis). #227 received MPS benchmark from dadlaugh (model-dependent: kotoba works, whisper-large fails). #223 continued feedback (16 comments). #198 and #201 closed. #230 new feature request for standalone merge tool. #231 Kaggle environment error. #232 whisper-ja-anime model request. Total open: 42. |
 | 2026-03-15 | **rev8.1** Responded to #223, #225, #227. |
 | 2026-03-15 | **rev8.** 3 new issues (#224-#227). MPS benchmark confirms Whisper 6x SLOWER on MPS than CPU. #132 `--provider local` works on Kaggle. #128 Gemma 3 proposal. |
