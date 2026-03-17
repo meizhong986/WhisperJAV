@@ -1613,6 +1613,83 @@ button:focus-visible,
     font-size: 11px;
 }
 
+/* BYOP (Bring Your Own Provider) Settings Panel */
+.byop-settings-panel {
+    background: linear-gradient(135deg, var(--background-tertiary) 0%, var(--background-secondary) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin: 4px 0 8px 0;
+    padding: 10px 12px;
+    animation: dspSlideIn 0.2s ease-out;
+}
+
+.byop-settings-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.byop-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.byop-hint {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+    font-style: italic;
+}
+
+.byop-settings-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.byop-settings-row:last-child {
+    margin-bottom: 0;
+}
+
+.byop-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 70px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.byop-path-input {
+    flex: 1;
+    font-size: 11px;
+    padding: 4px 8px;
+    cursor: pointer;
+    background: var(--input-bg);
+}
+
+.byop-path-input::placeholder {
+    font-style: italic;
+    color: var(--text-tertiary);
+}
+
+.byop-args-input {
+    flex: 1;
+    font-size: 11px;
+    padding: 4px 8px;
+    font-family: monospace;
+}
+
+.byop-args-input::placeholder {
+    font-style: italic;
+    color: var(--text-tertiary);
+}
+
 /* Info footer - minimal */
 .ensemble-info {
     padding: 6px 8px;

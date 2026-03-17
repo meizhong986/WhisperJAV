@@ -1,4 +1,10 @@
 # whisperjav/config/sanitization_constants.py
+#
+# NOTE: These constants are NOT sensitivity-aware. They use fixed values
+# regardless of --sensitivity setting. The sensitivity system only controls
+# ASR/VAD/scene-detection parameters via Pydantic presets.
+# TODO(v1.9.0): Consider making CPS thresholds and timing constants
+# configurable per sensitivity profile.
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
@@ -94,7 +100,7 @@ class TimingConstants:
 
     # The maximum reading speed in Characters Per Second.
     # Subtitles above this will be completely removed as artifacts.
-    MAX_SAFE_CPS: float = 20.0
+    MAX_SAFE_CPS: float = 30.0
 
     # The minimum number of characters a subtitle needs to have to be checked.
     MIN_TEXT_LENGTH_FOR_CPS_CHECK: int = 3

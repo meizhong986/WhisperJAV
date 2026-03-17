@@ -3,7 +3,9 @@ Faster-Whisper ASR Component.
 
 High-performance Whisper implementation using CTranslate2.
 
-Parameter values match v1 asr_config.json exactly for backward compatibility.
+These Pydantic presets are the SINGLE SOURCE OF TRUTH for all Faster-Whisper
+pipeline parameters (balanced, fast, faster, fidelity modes). As of v1.8.9,
+asr_config.json is no longer read for pipeline parameters.
 """
 
 from typing import List, Optional, Union
@@ -14,13 +16,14 @@ from whisperjav.config.components.base import ASRComponent, register_asr
 
 class FasterWhisperOptions(BaseModel):
     """
-    Complete Faster-Whisper options matching v1 asr_config.json structure.
+    Complete Faster-Whisper options — the single source of truth for all
+    decoder, transcriber, and engine parameters.
 
-    Combines parameters from:
-    - common_decoder_options
-    - common_transcriber_options
-    - faster_whisper_engine_options
-    - exclusive_whisper_plus_faster_whisper
+    Parameter categories:
+    - Decoder: beam_size, best_of, patience, suppress_blank, etc.
+    - Transcriber: temperature, compression_ratio_threshold, logprob_threshold, etc.
+    - Engine: repetition_penalty, no_repeat_ngram_size, chunk_length, etc.
+    - Exclusive: hallucination_silence_threshold
     """
 
     # === Decoder Options (common_decoder_options) ===
@@ -198,7 +201,7 @@ class FasterWhisperASR(ASRComponent):
 
     # === ASR-specific ===
     provider = "faster_whisper"
-    model_id = "large-v2"
+    model_id = "large-v3"
     supported_tasks = ["transcribe", "translate"]
     compatible_vad = ["silero", "faster_whisper_vad", "none"]
 
@@ -209,7 +212,7 @@ class FasterWhisperASR(ASRComponent):
     # === Schema ===
     Options = FasterWhisperOptions
 
-    # === Presets - Exact v1 values ===
+    # === Presets - tuned for v1.8.9 ===
     presets = {
         "conservative": FasterWhisperOptions(
             # Decoder options
@@ -217,7 +220,7 @@ class FasterWhisperASR(ASRComponent):
             language="ja",
             beam_size=1,
             best_of=1,
-            patience=1.5,  # v1.7.1 value
+            patience=1.2,
             length_penalty=None,
             prefix=None,
             suppress_tokens=None,
@@ -225,11 +228,11 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0],
-            compression_ratio_threshold=2.4,
+            temperature=0.0,  # Deterministic — accuracy over coverage
+            compression_ratio_threshold=2.2,
             logprob_threshold=-1.0,
             logprob_margin=0.1,
-            no_speech_threshold=0.74,
+            no_speech_threshold=0.7,
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -256,8 +259,8 @@ class FasterWhisperASR(ASRComponent):
             task="transcribe",
             language="ja",
             beam_size=2,
-            best_of=1,
-            patience=2.0,  # v1.7.1 value
+            best_of=2,
+            patience=2.0,
             length_penalty=None,
             prefix=None,
             suppress_tokens=None,
@@ -265,11 +268,11 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.1],  # v1.7.1 default - fallback for quality issues
+            temperature=[0.0, 0.2],
             compression_ratio_threshold=2.4,
             logprob_threshold=-1.2,
             logprob_margin=0.2,
-            no_speech_threshold=0.5,
+            no_speech_threshold=0.4,
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -289,25 +292,25 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=2.0,  # v1.7.1 value
+            hallucination_silence_threshold=2.0,
         ),
         "aggressive": FasterWhisperOptions(
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=2,  # v1.7.1 value
-            best_of=1,
-            patience=2.9,  # v1.7.1 value
+            beam_size=3,
+            best_of=3,
+            patience=2.5,
             length_penalty=None,
             prefix=None,
-            suppress_blank=False,  # Different!
-            suppress_tokens=[],     # Empty list, not None!
+            suppress_blank=False,
+            suppress_tokens=[],
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.3],  # v1.7.1 default - fallback for quality issues
+            temperature=[0.0, 0.2, 0.4],
             compression_ratio_threshold=3.0,
-            logprob_threshold=-2.5,
+            logprob_threshold=-2.0,
             logprob_margin=0.0,
             no_speech_threshold=0.22,
             drop_nonverbal_vocals=False,
@@ -318,8 +321,8 @@ class FasterWhisperASR(ASRComponent):
             append_punctuations=None,
             clip_timestamps=None,
             # Engine options
-            chunk_length=30,  # Increased from 14 to avoid ctranslate2 divide-by-zero crash
-            repetition_penalty=1.1,
+            chunk_length=30,
+            repetition_penalty=1.3,
             no_repeat_ngram_size=2,
             prompt_reset_on_temperature=None,
             hotwords=None,
@@ -329,6 +332,6 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=2.5,  # v1.7.1 value
+            hallucination_silence_threshold=2.5,
         ),
     }

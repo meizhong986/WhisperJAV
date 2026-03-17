@@ -29,7 +29,6 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 warnings.filterwarnings("ignore", message=".*pkg_resources.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resources")
-warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
 warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
 warnings.filterwarnings("ignore", message=".*sparse_softmax_cross_entropy.*deprecated.*")
 # requests warns about urllib3/chardet versions — cosmetic, not a real problem
@@ -223,8 +222,8 @@ def parse_arguments():
                                help="Speech padding in ms for pass 1")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
-                               help="Pipeline for pass 2 (enables pass 2)")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl"],
+                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: balanced)")
@@ -257,6 +256,11 @@ def parse_arguments():
     twopass_group.add_argument("--ensemble-serial", action="store_true",
                                help="Complete each file (Pass1+Pass2+Merge) before starting the next. "
                                     "Slower (reloads models per file) but delivers results incrementally.")
+
+    # BYOP (Bring Your Own Provider) — external ASR tool integration
+    byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
+    byop_group.add_argument("--xxl-exe", default=None,
+                            help="Path to faster-whisper-xxl executable (required for --pass2-pipeline xxl)")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -310,12 +314,6 @@ def parse_arguments():
     progress_group.add_argument("--crash-trace", action="store_true",
                                help="Enable crash tracing (writes to crash_traces/ for debugging ctranslate2 crashes)")
 
-    # Enhancement features
-    enhancement_group = parser.add_argument_group("Optional Enhancement Features")
-    enhancement_group.add_argument("--adaptive-classification", action="store_true")
-    enhancement_group.add_argument("--adaptive-audio-enhancement", action="store_true")
-    enhancement_group.add_argument("--smart-postprocessing", action="store_true")
-    
     # Transcription tuning
     tuning_group = parser.add_argument_group("Transcription Tuning")
     tuning_group.add_argument("--sensitivity",
@@ -448,6 +446,15 @@ def parse_arguments():
     translation_group.add_argument(
         "--translate-endpoint",
         help="Custom API endpoint URL for translation (for OpenAI-compatible APIs)"
+    )
+    translation_group.add_argument(
+        "--ollama-url",
+        help="Custom Ollama server URL (default: http://localhost:11434)"
+    )
+    translation_group.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Auto-confirm prompts (model downloads, server starts)"
     )
 
     # HuggingFace Transformers mode arguments
@@ -748,6 +755,22 @@ def add_signatures_to_srt(srt_path: str, producer_credit: str = None,
         # Don't fail the whole process if signatures can't be added
 
 
+def _get_xxl_extra_args_from_config() -> str:
+    """Read XXL extra args from persisted BYOP preferences in asr_config.json.
+
+    The GUI saves user-supplied extra args (e.g. '--standard_asia') to
+    asr_config.json under ui_preferences.byop.xxl_extra_args. This is the
+    single source for extra args — there is no CLI flag for this.
+    """
+    try:
+        from whisperjav.config.manager import ConfigManager
+        mgr = ConfigManager()
+        ui_prefs = mgr.get_ui_preferences()
+        return ui_prefs.get('byop', {}).get('xxl_extra_args', '')
+    except Exception:
+        return ''
+
+
 def apply_vtt_conversion(srt_path: str, output_format: str) -> None:
     """Convert SRT to VTT if requested by --output-format, and optionally remove the SRT.
 
@@ -905,12 +928,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         verbosity_str = ui_prefs.get('console_verbosity', 'summary')
         verbosity = verbosity_mapping.get(verbosity_str, UnifiedVerbosityLevel.STANDARD)
     
-    enhancement_kwargs = {
-        "adaptive_classification": args.adaptive_classification,
-        "adaptive_audio_enhancement": args.adaptive_audio_enhancement,
-        "smart_postprocessing": args.smart_postprocessing
-    }
-
     # Create parameter tracer for real-time observability (if requested)
     tracer = create_tracer(args.trace_params)
     if args.trace_params:
@@ -951,7 +968,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         "resolved_config": resolved_config,
         "progress_display": progress,
         "parameter_tracer": tracer,
-        **enhancement_kwargs
     }
 
     # Select pipeline
@@ -1269,7 +1285,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             debug=getattr(args, 'debug', False),
                             extra_context=build_translation_context(args),
                             n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
-                            endpoint=getattr(args, 'translate_endpoint', None)
+                            endpoint=getattr(args, 'translate_endpoint', None),
+                            ollama_url=getattr(args, 'ollama_url', None),
+                            auto_confirm=getattr(args, 'yes', False),
                         )
 
                         if translated_path:
@@ -1398,10 +1416,6 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
     resolved_config['language'] = language_code  # Whisper language code
-    
-    # Enhancement options
-    for opt in ['adaptive_classification', 'adaptive_audio_enhancement', 'smart_postprocessing']:
-        resolved_config[opt] = getattr(args, opt)
     
     # Add scene detection method for kotoba pipeline
     resolved_config['scene_method'] = getattr(args, 'scene_detection_method', None) or 'auditok'
@@ -1662,6 +1676,24 @@ def main():
         # Check if two-pass ensemble mode
         if args.ensemble:
             logger.info("Two-pass ensemble mode enabled")
+
+            # BYOP XXL validation: --xxl-exe is required when pass2-pipeline=xxl
+            if getattr(args, 'pass2_pipeline', None) == 'xxl':
+                xxl_exe = getattr(args, 'xxl_exe', None)
+                if not xxl_exe:
+                    logger.error(
+                        "--xxl-exe is required when using --pass2-pipeline xxl. "
+                        "Provide the path to your faster-whisper-xxl executable."
+                    )
+                    sys.exit(1)
+                xxl_path = Path(xxl_exe)
+                if not xxl_path.is_file():
+                    logger.error(
+                        "--xxl-exe path does not exist or is not a file: %s", xxl_exe
+                    )
+                    sys.exit(1)
+                logger.info("BYOP XXL: exe=%s", xxl_exe)
+
             # Config will be handled by EnsembleOrchestrator
             resolved_config = None  # Not used in ensemble mode
         # Check if component-based ensemble mode (--asr provided)
@@ -1729,7 +1761,10 @@ def main():
         logger.error(f"Failed to resolve configuration: {e}")
         sys.exit(1)
 
-    logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
+    if args.ensemble:
+        logger.debug(f"Resolved configuration for ensemble mode, task='{task}'")
+    else:
+        logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
     
     # Apply model override if specified via CLI (not for ensemble mode)
     if args.model and resolved_config is not None:
@@ -1737,7 +1772,7 @@ def main():
         # Determine device and compute_type for model override
         # Priority: CLI args > auto-detection
         override_device = args.device if args.device and args.device != "auto" else get_best_device()
-        override_compute_type = args.compute_type if args.compute_type and args.compute_type != "auto" else "int8"
+        override_compute_type = args.compute_type if args.compute_type and args.compute_type != "auto" else "auto"
         # Create a model configuration for the CLI-specified model
         override_model_config = {
             "provider": "openai_whisper",  # Default provider
@@ -2010,6 +2045,11 @@ def main():
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)
+                    # BYOP XXL fields (only used when pipeline='xxl')
+                    # xxl_exe from CLI flag; extra args from persisted BYOP
+                    # preferences in asr_config.json (set via GUI extra args field)
+                    'xxl_exe': getattr(args, 'xxl_exe', None),
+                    'xxl_args': _get_xxl_extra_args_from_config(),
                 }
 
             # Create orchestrator
@@ -2037,14 +2077,21 @@ def main():
 
             # Report individual results
             failed_files = []
+            degraded_files = []
             successful_count = 0
             total_processing_time = 0.0
 
             for result in results:
                 basename = result.get('input', {}).get('basename', 'unknown')
-                if result.get('error') or result.get('status') == 'failed':
+                status = result.get('status', 'unknown')
+                if result.get('error') or status == 'failed':
                     logger.error(f"Failed: {basename} - {result.get('error', 'Unknown error')}")
                     failed_files.append(basename)
+                elif status == 'degraded':
+                    output_path = result.get('summary', {}).get('final_output', 'unknown')
+                    logger.warning(f"Degraded (fallback): {basename} -> {output_path}")
+                    degraded_files.append(basename)
+                    total_processing_time += result.get('summary', {}).get('total_processing_time_seconds', 0.0)
                 else:
                     output_path = result.get('summary', {}).get('final_output', 'unknown')
                     logger.info(f"Completed: {output_path}")
@@ -2056,12 +2103,19 @@ def main():
             print("ENSEMBLE PROCESSING SUMMARY")
             print("="*50)
             print(f"Total files: {len(media_files)}")
-            print(f"Successful: {successful_count}")
+            print(f"Completed: {successful_count}")
+            if degraded_files:
+                print(f"Partial (fallback): {len(degraded_files)}")
             print(f"Failed: {len(failed_files)}")
             if total_processing_time > 0:
                 print(f"Total processing time: {total_processing_time:.2f}s")
-                if successful_count > 0:
-                    print(f"Average per file: {total_processing_time / successful_count:.2f}s")
+                completed_total = successful_count + len(degraded_files)
+                if completed_total > 0:
+                    print(f"Average per file: {total_processing_time / completed_total:.2f}s")
+            if degraded_files:
+                print("\nPartial (pass 2 failed, output is pass 1 fallback):")
+                for f in degraded_files:
+                    print(f"  - {f}")
             if failed_files:
                 print("\nFailed files:")
                 for f in failed_files:
@@ -2069,7 +2123,10 @@ def main():
             print("="*50)
 
             # ============================================================
-            # TRANSLATION: Translate successful ensemble outputs if requested
+            # TRANSLATION: Translate only fully successful ensemble outputs.
+            # Degraded files (pass 2 failed, fell back to pass 1) are NOT
+            # translated — the user configured two-pass for a reason and
+            # translating inferior fallback output wastes time and API cost.
             # ============================================================
             if args.translate and successful_count > 0:
                 print("\n" + "="*50)
@@ -2081,14 +2138,33 @@ def main():
                 extra_context = build_translation_context(args)
 
                 for result in results:
-                    if result.get('error') or result.get('status') == 'failed':
-                        continue  # Skip failed transcriptions
+                    status = result.get('status', 'unknown')
+                    if result.get('error') or status in ('failed', 'degraded'):
+                        continue  # Skip failed and degraded (fallback) files
 
                     output_path = result.get('summary', {}).get('final_output')
                     if not output_path:
                         continue
 
                     basename = result.get('input', {}).get('basename', 'unknown')
+
+                    # Pre-validate SRT has enough content for translation
+                    try:
+                        srt_text = Path(output_path).read_text(encoding="utf-8", errors="replace").strip()
+                        # Count subtitle blocks (separated by blank lines, must contain ' --> ')
+                        srt_blocks = [b for b in srt_text.split("\n\n") if " --> " in b]
+                        if len(srt_blocks) < 2:
+                            logger.warning(
+                                f"Skipping translation for {basename}: "
+                                f"only {len(srt_blocks)} subtitle(s) found (minimum: 2)"
+                            )
+                            print(f"  Skipping {basename}: too few subtitles ({len(srt_blocks)})")
+                            translation_failed += 1
+                            continue
+                    except OSError as e:
+                        logger.warning(f"Skipping translation for {basename}: cannot read SRT: {e}")
+                        translation_failed += 1
+                        continue
 
                     try:
                         logger.info(f"Translating: {basename}")
@@ -2136,7 +2212,8 @@ def main():
             # VTT CONVERSION: Convert SRT outputs if requested
             # ============================================================
             output_format = getattr(args, 'output_format', 'srt')
-            if output_format != 'srt' and successful_count > 0:
+            files_with_output = successful_count + len(degraded_files)
+            if output_format != 'srt' and files_with_output > 0:
                 for result in results:
                     if result.get('error') or result.get('status') == 'failed':
                         continue
@@ -2151,6 +2228,27 @@ def main():
             # Close parameter tracer for ensemble mode
             if tracer:
                 tracer.close()
+
+            # ============================================================
+            # ENSEMBLE EXIT STATUS: Reflect actual success/failure
+            # ============================================================
+            has_failures = len(failed_files) > 0
+            has_degraded = len(degraded_files) > 0
+            has_translation_failures = (
+                args.translate and successful_count > 0
+                and translation_failed > 0
+            )
+
+            if has_failures or has_degraded or has_translation_failures:
+                parts = []
+                if has_failures:
+                    parts.append(f"{len(failed_files)} transcription(s) failed")
+                if has_degraded:
+                    parts.append(f"{len(degraded_files)} file(s) degraded (pass 2 failed, fell back to pass 1)")
+                if has_translation_failures:
+                    parts.append(f"{translation_failed} translation(s) failed")
+                logger.warning("Ensemble completed with errors: %s", "; ".join(parts))
+                sys.exit(1)
 
         # Choose sync or async processing for normal mode
         elif args.async_processing:

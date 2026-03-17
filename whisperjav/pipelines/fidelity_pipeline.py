@@ -17,9 +17,6 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 
-from whisperjav.modules.segment_classification import SegmentClassifier
-from whisperjav.modules.audio_preprocessing import AudioPreprocessor
-from whisperjav.modules.srt_postproduction import SRTPostProduction
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
@@ -134,16 +131,6 @@ class FidelityPipeline(BasePipeline):
             # Get language from decoder params (set by CLI --language)
             self.lang_code = params["decoder"].get("language", "ja")
         self.standard_postprocessor = StandardPostProcessor(language=self.lang_code, **post_proc_opts)
-
-        # Optional modules (if enhancement features are enabled)
-        if kwargs.get('smart_postprocessing', False):
-            self.smart_postprocessor = SRTPostProduction()
-        if kwargs.get('adaptive_classification', False):
-            self.classifier = SegmentClassifier()
-        if kwargs.get('adaptive_audio_enhancement', False):
-            self.preprocessor = AudioPreprocessor()
-
-
 
     def process(self, media_info: Dict) -> Dict:
         """Process media file through fidelity pipeline with scene detection and VAD-enhanced ASR."""

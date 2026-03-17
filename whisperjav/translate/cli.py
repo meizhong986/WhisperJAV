@@ -334,6 +334,23 @@ def main():
         help="Disable all progress output"
     )
 
+    # Ollama options
+    ollama_group = parser.add_argument_group("Ollama Options")
+    ollama_group.add_argument(
+        '--ollama-url',
+        help="Custom Ollama server URL (default: http://localhost:11434)"
+    )
+    ollama_group.add_argument(
+        '--list-ollama-models',
+        action='store_true',
+        help="List locally available Ollama models and exit"
+    )
+    ollama_group.add_argument(
+        '--yes', '-y',
+        action='store_true',
+        help="Auto-confirm prompts (model downloads, server starts)"
+    )
+
     # Utility commands
     util_group = parser.add_argument_group("Utility Commands")
     util_group.add_argument(
@@ -375,6 +392,23 @@ def main():
     if args.create_default_settings:
         if create_default_settings():
             print(f"Default settings created at: {get_settings_path()}")
+        return
+
+    if args.list_ollama_models:
+        from .ollama_manager import OllamaManager
+        mgr = OllamaManager(base_url=getattr(args, 'ollama_url', None))
+        if not mgr.detect_server():
+            print("Ollama server not running.", file=sys.stderr)
+            sys.exit(1)
+        models = mgr.list_models()
+        if not models:
+            print("No models found. Pull one with: ollama pull gemma3:12b", file=sys.stderr)
+        else:
+            print(f"{'Model':<30s}  {'Size':>10s}")
+            print(f"{'-'*30}  {'-'*10}")
+            for m in models:
+                size = m.get('details', {}).get('parameter_size', '?')
+                print(f"  {m['name']:<30s}  {size:>8s}")
         return
 
     # Validate and collect input files (supports files, directories, and glob patterns)
@@ -508,64 +542,63 @@ def main():
         print(f"  NOTE: Local LLM provider - server will be started", file=sys.stderr)
         print(f"  GPU layers: {n_gpu_layers} (-1=all, 0=CPU only)", file=sys.stderr)
     if provider_name == 'ollama':
-        print(f"  NOTE: Ollama provider — requires Ollama running locally", file=sys.stderr)
-        print(f"  Download: https://ollama.com/download", file=sys.stderr)
+        print(f"  NOTE: Ollama provider — smart detection + auto-start", file=sys.stderr)
     print(f"{'='*60}\n", file=sys.stderr)
 
     # =========================================================================
-    # Ollama provider: auto-detect running server, set num_ctx
+    # Ollama provider: OllamaManager orchestration
     # =========================================================================
     if provider_name == 'ollama':
-        import urllib.request
-        import urllib.error
+        from .ollama_manager import (
+            OllamaManager, OllamaNotInstalledError,
+            OllamaNotRunningError, ModelNotAvailableError,
+        )
 
-        ollama_base = provider_config.get('server_address', 'http://localhost:11434')
+        mgr = OllamaManager(base_url=getattr(args, 'ollama_url', None))
+        interactive = sys.stdin.isatty() and not getattr(args, 'yes', False)
+        auto_pull = getattr(args, 'yes', False)
 
-        # Override server address if --endpoint provided
-        if hasattr(args, 'endpoint') and args.endpoint:
-            ollama_base = _normalize_api_base(args.endpoint)
-            provider_config = dict(provider_config)
-            server_addr, endpoint_path = _api_base_to_custom_server(args.endpoint)
-            provider_config['server_address'] = server_addr
-            provider_config['endpoint'] = endpoint_path
-
-        # Check if Ollama server is running
         try:
-            req = urllib.request.Request(f"{ollama_base}/api/tags", method='GET')
-            resp = urllib.request.urlopen(req, timeout=5)
-            resp.read()
-            print(f"[OLLAMA] Server detected at {ollama_base}", file=sys.stderr)
-        except (urllib.error.URLError, OSError) as e:
-            print(f"\nERROR: Cannot connect to Ollama at {ollama_base}", file=sys.stderr)
-            print(f"", file=sys.stderr)
-            print(f"  Ollama is not running or not installed.", file=sys.stderr)
-            print(f"  1. Install Ollama: https://ollama.com/download", file=sys.stderr)
-            print(f"  2. Start Ollama:   ollama serve", file=sys.stderr)
-            print(f"  3. Pull a model:   ollama pull {model}", file=sys.stderr)
-            print(f"  4. Re-run translation", file=sys.stderr)
-            print(f"", file=sys.stderr)
-            print(f"  Connection error: {e}", file=sys.stderr)
+            readiness = mgr.ensure_ready(
+                model=model,
+                auto_start=True,
+                auto_pull=auto_pull,
+                interactive=interactive,
+            )
+        except OllamaNotInstalledError as e:
+            print(f"\n{e}", file=sys.stderr)
+            sys.exit(1)
+        except OllamaNotRunningError as e:
+            print(f"\nERROR: {e}", file=sys.stderr)
+            sys.exit(1)
+        except ModelNotAvailableError as e:
+            print(f"\nERROR: {e}", file=sys.stderr)
             sys.exit(1)
 
-        # Set num_ctx to 8192 (Ollama defaults to 2048 which is too small for
-        # translation batches). This is passed via provider_options which
-        # PySubtrans forwards as extra body parameters in the API call.
-        ollama_n_ctx = 8192
+        # Dynamic config from model metadata
+        model = readiness['model']
+        ollama_n_ctx = readiness['num_ctx']
+        _user_batch = merged.get('max_batch_size', readiness['batch_size'])
+        ollama_batch_size = cap_batch_size_for_context(_user_batch, ollama_n_ctx)
+        ollama_max_tokens = compute_max_output_tokens(ollama_batch_size, ollama_n_ctx)
+
         if 'num_ctx' not in provider_options:
             provider_options['num_ctx'] = ollama_n_ctx
+        if not (hasattr(args, 'temperature') and args.temperature is not None):
+            if readiness.get('temperature'):
+                provider_options['temperature'] = readiness['temperature']
 
-        # Auto-cap batch size for Ollama's context window
-        _user_batch = merged.get('max_batch_size', 30)
-        ollama_batch_size = cap_batch_size_for_context(_user_batch, ollama_n_ctx)
+        provider_config = dict(provider_config)
+        provider_config['max_tokens'] = ollama_max_tokens
+        if readiness.get('base_url'):
+            server_addr, endpoint_path = _api_base_to_custom_server(readiness['base_url'])
+            provider_config['server_address'] = server_addr
+            provider_config['endpoint'] = endpoint_path + '/v1/chat/completions'
+
         if ollama_batch_size < _user_batch:
             print(f"[OLLAMA] Batch size auto-reduced from {_user_batch} to "
                   f"{ollama_batch_size} to fit {ollama_n_ctx}-token context", file=sys.stderr)
-
-        # Compute max_tokens for Ollama
-        ollama_max_tokens = compute_max_output_tokens(ollama_batch_size, ollama_n_ctx)
-        provider_config = dict(provider_config)  # Copy to avoid modifying original
-        provider_config['max_tokens'] = ollama_max_tokens
-        print(f"[OLLAMA] num_ctx={ollama_n_ctx}, batch_size={ollama_batch_size}, "
+        print(f"[OLLAMA] model={model}, num_ctx={ollama_n_ctx}, batch_size={ollama_batch_size}, "
               f"max_tokens={ollama_max_tokens}", file=sys.stderr)
 
     # Batch translation loop

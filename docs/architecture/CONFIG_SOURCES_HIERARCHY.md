@@ -1,193 +1,146 @@
 # WhisperJAV Configuration Sources Hierarchy
 
-## Overview
+## Overview (v1.8.9+)
 
-WhisperJAV has multiple configuration sources that can override each other. Understanding this hierarchy is critical for debugging parameter issues.
+**As of v1.8.9, Pydantic presets are the SINGLE SOURCE OF TRUTH for all pipeline parameters.**
 
-**Lesson Learned (v1.7.3 regression):** A `chunk_threshold_s` parameter was set to 4.0 in two config files, but the actual runtime value was 0.18 because a third config source (component presets) had higher priority.
+`asr_config.json` has been stripped to contain only `version` and `ui_preferences` (console verbosity). All ASR, VAD, scene detection, decoder, transcriber, and engine parameters come exclusively from Pydantic component presets. The old multi-source hierarchy has been eliminated.
 
 ---
 
-## Configuration Sources (Highest to Lowest Priority)
+## Architecture (v1.8.9+)
 
-### 1. Component Presets (HIGHEST PRIORITY)
-**Location:** `whisperjav/config/components/vad/silero.py`
-
-```python
-class SileroVAD:
-    presets = {
-        "conservative": SileroVADOptions(chunk_threshold_s=4.0, ...),
-        "balanced": SileroVADOptions(chunk_threshold_s=4.0, ...),
-        "aggressive": SileroVADOptions(chunk_threshold_s=4.0, ...),
-    }
+```
+CLI args (--mode balanced --sensitivity aggressive --vad-threshold 0.1)
+    |
+    v
+main.py
+    |
+    +--[legacy modes: balanced/faster/fast/fidelity/kotoba]
+    |       |
+    |       v
+    |   resolve_legacy_pipeline(mode, sensitivity)
+    |       |
+    |       v
+    |   resolve_config_v3(asr=..., vad=..., features=...)
+    |       |
+    |       v
+    |   Pydantic Component Registries
+    |       config/components/asr/faster_whisper.py   (ASR presets)
+    |       config/components/vad/silero.py            (VAD presets)
+    |       config/components/features/scene_detection.py (Scene presets)
+    |       |
+    |       v
+    |   component.get_preset(sensitivity).model_dump()
+    |       |
+    |       v
+    |   CLI overrides applied (--vad-threshold, --speech-pad-ms, etc.)
+    |   Only non-None CLI args override Pydantic values.
+    |       |
+    |       v
+    |   resolved_config dict → Pipeline.__init__()
+    |
+    +--[modern modes: transformers/qwen/decoupled]
+            |
+            v
+        Direct CLI args → Pipeline.__init__()
+        (no config resolution, no Pydantic)
 ```
 
-**When used:** Pipeline initialization via `TranscriptionTuner` when sensitivity preset is selected.
-
-**Key insight:** These Pydantic models define the ACTUAL values used at runtime. They override everything else.
-
----
-
-### 2. JSON Config File (asr_config.json)
-**Location:** `whisperjav/config/asr_config.json`
+### What asr_config.json Contains (v1.8.9+)
 
 ```json
 {
-  "silero_vad_options": {
-    "balanced": {
-      "chunk_threshold_s": 4.0,
-      "threshold": 0.225,
-      ...
-    },
-    "aggressive": { ... },
-    "conservative": { ... }
-  }
+  "version": "4.4",
+  "ui_preferences": { "console_verbosity": "summary", ... }
 }
 ```
 
-**When used:** Legacy pipelines, fallback values, and some code paths that read directly from JSON.
-
-**Key insight:** May be ignored if component presets take precedence in the code path.
+Only read by `ConfigManager.get_ui_preferences()` in `main.py` for console verbosity.
 
 ---
 
-### 3. YAML Ecosystem Configs
-**Location:** `whisperjav/config/v4/ecosystems/tools/*.yaml`
+## Pydantic Preset Files (Source of Truth)
 
-Example: `silero-speech-segmentation.yaml`
-```yaml
-defaults:
-  chunk_threshold_s: 2.5
-  threshold: 0.5
-```
-
-**When used:** V4 config architecture, accessed via `ConfigManager`.
-
-**Key insight:** Intended for future extensibility. Not always active in current pipelines.
+| File | What It Controls | Sensitivity Presets |
+|------|-----------------|-------------------|
+| `config/components/asr/faster_whisper.py` | Decoder (beam_size, patience, temperature), Transcriber (logprob_threshold, no_speech_threshold), Engine (repetition_penalty, chunk_length) | conservative, balanced, aggressive |
+| `config/components/asr/stable_ts.py` | Stable-ts ASR params (fast/faster modes) | conservative, balanced, aggressive |
+| `config/components/asr/openai_whisper.py` | OpenAI Whisper params (fidelity mode) | conservative, balanced, aggressive |
+| `config/components/vad/silero.py` | VAD threshold, speech_pad_ms, max_group_duration_s, chunk_threshold_s | conservative, balanced, aggressive |
+| `config/components/features/scene_detection.py` | Auditok/Silero scene detection params (energy thresholds, max_duration_s, pass1/pass2) | conservative, balanced, aggressive |
 
 ---
 
-### 4. Backend Module Defaults (LOWEST PRIORITY)
-**Location:** `whisperjav/modules/speech_segmentation/backends/silero.py`
+## Parameters NOT Controlled by Sensitivity
 
-```python
-class SileroSpeechSegmenter:
-    def __init__(self, ..., chunk_threshold_s=None, ...):
-        if chunk_threshold_s is not None:
-            self.chunk_threshold_s = chunk_threshold_s
-        else:
-            self.chunk_threshold_s = 4.0  # Default fallback
-```
+These use fixed values regardless of `--sensitivity`:
 
-**When used:** Only when no config provides a value (rare).
-
-**Key insight:** This is the last resort. Usually overridden by higher-priority sources.
+| Parameter | Location | Value | Notes |
+|-----------|----------|-------|-------|
+| `MAX_SAFE_CPS` | `config/sanitization_constants.py` | 30.0 | Post-processing subtitle filter |
+| `MIN_SUBTITLE_DURATION` | `config/sanitization_constants.py` | 0.3 | Post-processing timing |
+| `start_pad_samples` | `modules/speech_segmentation/factory.py` | 11200 (700ms) | Silero backend only |
+| `end_pad_samples` | `modules/speech_segmentation/factory.py` | 20800 (1300ms) | Silero backend only |
+| Speech segmenter backend | `modules/faster_whisper_pro_asr.py` | "silero-v4.0" | Hardcoded fallback |
 
 ---
 
-## Config Flow Diagram
+## CLI Override Behavior
 
-```
-User selects: mode=balanced, sensitivity=aggressive
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│  TranscriptionTuner.resolve_config()                    │
-│  - Looks up sensitivity preset from component presets   │
-│  - Returns SileroVADOptions with chunk_threshold_s=4.0  │
-└─────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│  FasterWhisperProASR.__init__()                         │
-│  - Receives merged config from TranscriptionTuner       │
-│  - Passes to SpeechSegmenterFactory.create()            │
-└─────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│  SileroSpeechSegmenter.__init__()                       │
-│  - Uses chunk_threshold_s from config (4.0)             │
-│  - Falls back to module default only if not provided    │
-└─────────────────────────────────────────────────────────┘
-```
+CLI arguments act as **overrides only**. If the user doesn't pass a flag, the Pydantic preset value is used unchanged.
 
----
-
-## Key Files Reference
-
-| File | Purpose | Parameters Defined |
-|------|---------|-------------------|
-| `config/components/vad/silero.py` | Pydantic presets for Silero VAD | threshold, min_speech_duration_ms, chunk_threshold_s, speech_pad_ms, etc. |
-| `config/asr_config.json` | Legacy JSON config | silero_vad_options, common_transcriber_options, temperature, etc. |
-| `config/v4/ecosystems/tools/silero-speech-segmentation.yaml` | V4 YAML config | defaults, sensitivity overrides |
-| `modules/speech_segmentation/backends/silero.py` | Backend implementation | VERSION_DEFAULTS, fallback values |
-| `config/transcription_tuner.py` | Config resolver | Merges all sources, applies sensitivity |
+| CLI Flag | Pydantic Source | Override Behavior |
+|----------|----------------|-------------------|
+| `--sensitivity` | Selects which preset to load | Always has value ("aggressive" default) |
+| `--vad-threshold` | `SileroVADOptions.threshold` | Overrides if non-None |
+| `--speech-pad-ms` | `SileroVADOptions.speech_pad_ms` | Overrides if non-None |
+| `--model` | `FasterWhisperASR.model_id` | Overrides if non-None |
+| `--device` | `FasterWhisperASR.default_device` | Overrides if non-None |
+| `--compute-type` | `FasterWhisperASR.default_compute_type` | Overrides if non-None |
 
 ---
 
 ## Debugging Config Issues
 
-### Step 1: Check Debug Output
-Look for the actual runtime values:
-```
-Creating speech segmenter: silero-v3.1 with params: {
-    'chunk_threshold_s': 4.0,  <-- THIS is what's actually used
-    ...
-}
-```
+### Quick Check: What Values Are Actually Used?
 
-### Step 2: Trace the Source
-If the value is wrong, check in order:
-1. `config/components/vad/silero.py` - presets dict
-2. `config/asr_config.json` - silero_vad_options section
-3. `modules/speech_segmentation/backends/silero.py` - __init__ defaults
-
-### Step 3: Verify All Sources Match
-When fixing a parameter, update ALL sources to avoid confusion:
 ```bash
-grep -rn "chunk_threshold" whisperjav/config/ whisperjav/modules/
+# Dump resolved parameters for any mode/sensitivity
+python -m whisperjav.main --dump-params /dev/null --mode balanced --sensitivity aggressive
+```
+
+### Trace the Source
+
+1. **Check Pydantic preset** — `config/components/asr/faster_whisper.py` presets dict
+2. **Check CLI override** — was a flag explicitly passed?
+3. **Check module fallback** — `modules/faster_whisper_pro_asr.py` `.get()` defaults (should match balanced preset)
+
+### Verify Runtime Values
+
+```python
+from whisperjav.config.legacy import resolve_legacy_pipeline
+config = resolve_legacy_pipeline('balanced', 'aggressive')
+print(config['params']['decoder']['beam_size'])  # Should be 5
+print(config['params']['vad']['threshold'])       # Should be 0.05
 ```
 
 ---
 
-## Common Pitfalls
+## Historical Context
 
-### Pitfall 1: Fixing the Wrong Config
-**Symptom:** You change a value in `asr_config.json` but runtime still uses old value.
-**Cause:** Component presets in `config/components/vad/silero.py` have higher priority.
-**Solution:** Always check and update component presets first.
+| Version | Config Architecture |
+|---------|-------------------|
+| v1.0–v1.6 | `asr_config.json` was the source of truth |
+| v1.7.0 | Pydantic components introduced, but JSON still read by TranscriptionTuner |
+| v1.7.3 | Multi-source conflicts caused 20% subtitle regression |
+| v1.8.9 | **JSON stripped to ui_preferences only.** Pydantic is sole source of truth. |
 
-### Pitfall 2: Multiple Config Systems
-**Symptom:** V4 YAML configs don't seem to take effect.
-**Cause:** Current pipelines may use component presets instead of V4 system.
-**Solution:** Check which resolver is active in the pipeline code.
+## Audit Trail
 
-### Pitfall 3: Merged Configs
-**Symptom:** Some parameters work, others don't.
-**Cause:** `merged_segmenter_config = {**vad_params, **speech_segmenter_config}` - later dict wins.
-**Solution:** Understand the merge order in `FasterWhisperProASR.__init__()`.
-
----
-
-## Version History
-
-| Version | chunk_threshold_s | Notes |
-|---------|------------------|-------|
-| v1.7.1 | 4.0 | Inline in FasterWhisperProASR, worked well |
-| v1.7.3 (broken) | 0.18-0.2 | Multiple sources, component presets had wrong value |
-| v1.7.3 (fixed) | 4.0 | All sources aligned |
-
----
-
-## Related Documentation
-
-- `docs/adr/ADR-001-yaml-config-architecture.md` - V4 config architecture decisions
-- `whisperjav/config/v4/README.md` - V4 config system guide
-- `CLAUDE.md` - General codebase guide
+Full per-pipeline config resolution audit: `docs/audit/config_resolution_per_pipeline.md`
 
 ---
 
 *Document created: 2025-12-21*
-*Last updated: 2025-12-21*
-*Context: Issue investigation - v1.7.3 produced 20% fewer subtitles than v1.7.1*
+*Last updated: 2026-03-16 (v1.8.9 — simplified to single source of truth)*

@@ -3,8 +3,12 @@ Scene Detection Feature Component.
 
 Audio-based scene splitting using silence detection.
 
-Parameter values match v1 asr_config.json exactly for backward compatibility.
+These Pydantic presets are the SINGLE SOURCE OF TRUTH for scene detection
+parameters across all pipeline modes. As of v1.8.9, asr_config.json is
+no longer read for scene detection parameters.
 """
+
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -79,10 +83,10 @@ class AuditokSceneDetectionOptions(BaseModel):
         ge=0.01, le=10.0,
         description="Pass 2: Minimum segment duration in seconds."
     )
-    pass2_max_duration_s: float = Field(
-        1800.0,
-        ge=30.0, le=3600.0,
-        description="Pass 2: Maximum segment duration in seconds."
+    pass2_max_duration_s: Optional[float] = Field(
+        None,
+        ge=1.0, le=3600.0,
+        description="Pass 2: Maximum segment duration in seconds. None = auto-derive from max_duration - 1.0."
     )
     pass2_max_silence_s: float = Field(
         1.8,

@@ -46,7 +46,7 @@ PROVIDER_CONFIGS = {
     },
     'ollama': {
         'pysubtrans_name': 'Custom Server',  # Uses OpenAI-compatible /v1/chat/completions
-        'model': 'gemma3:12b',         # Default: good quality for JAV translation
+        'model': 'gemma3:12b',         # Default; OllamaManager.recommend_model() overrides at runtime
         'env_var': None,               # No API key needed
         'server_address': 'http://localhost:11434',
         'endpoint': '/v1/chat/completions',

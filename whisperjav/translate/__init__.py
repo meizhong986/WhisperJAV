@@ -22,11 +22,14 @@ For CLI usage:
 # Users who need cli can still do: from whisperjav.translate import cli
 from . import core, providers, service
 
+# Export Ollama manager for programmatic usage
+from .ollama_manager import OllamaError, OllamaManager
+
 # Export high-level service API for direct usage
 from .service import (
-    translate_with_config,
-    TranslationError,
     ConfigurationError,
+    TranslationError,
+    translate_with_config,
 )
 
 __all__ = [
@@ -38,4 +41,7 @@ __all__ = [
     'translate_with_config',
     'TranslationError',
     'ConfigurationError',
+    # Ollama manager
+    'OllamaManager',
+    'OllamaError',
 ]

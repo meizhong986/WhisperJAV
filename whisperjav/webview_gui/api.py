@@ -676,6 +676,55 @@ class WhisperJAVAPI:
         """
         return self.select_folder()
 
+    # ── BYOP (Bring Your Own Provider) ──────────────────────────
+
+    def select_xxl_exe(self) -> Dict[str, Any]:
+        """Open file dialog to select Faster Whisper XXL executable."""
+        windows = webview.windows
+        if not windows:
+            return {"success": False, "message": "No active window"}
+
+        window = windows[0]
+        file_types = [
+            'Executable Files (*.exe)',
+            'All Files (*.*)'
+        ]
+
+        result = window.create_file_dialog(
+            FileDialog.OPEN,
+            allow_multiple=False,
+            file_types=file_types
+        )
+
+        if result and len(result) > 0:
+            return {"success": True, "path": result[0]}
+        return {"success": False, "message": "No file selected"}
+
+    def get_byop_preferences(self) -> Dict[str, Any]:
+        """Return persisted BYOP preferences from asr_config.json."""
+        try:
+            from whisperjav.config.manager import ConfigManager
+            mgr = ConfigManager()
+            prefs = mgr.get_ui_preferences()
+            return prefs.get('byop', {})
+        except Exception:
+            return {}
+
+    def save_byop_preferences(self, prefs: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist BYOP preferences (xxl_exe_path, xxl_extra_args) to asr_config.json."""
+        try:
+            from whisperjav.config.manager import ConfigManager
+            mgr = ConfigManager()
+            ui_prefs = mgr.get_ui_preferences()
+            byop = ui_prefs.get('byop', {})
+            byop.update(prefs)
+            ui_prefs['byop'] = byop
+            mgr.update_ui_preferences(ui_prefs)
+            mgr.save_config()
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
     def open_output_folder(self, path: str) -> Dict[str, Any]:
         """
         Open output folder in file explorer.
@@ -988,6 +1037,7 @@ class WhisperJAVAPI:
             "whisper-vad-medium": "whisper-vad-speech-segmentation.yaml",
             "nemo": "nemo-speech-segmentation.yaml",
             "nemo-lite": "nemo-speech-segmentation.yaml",
+            "silero-v6.2": "silero-v6-speech-segmentation.yaml",
         }
 
         # Handle "none" backend
@@ -2399,7 +2449,15 @@ class WhisperJAVAPI:
                 p2_pipeline = 'qwen'
             args += ["--pass2-pipeline", p2_pipeline]
 
-            if pass2.get('isTransformers'):
+            # BYOP XXL: external tool — only needs exe path.
+            # Extra args are read from persisted BYOP preferences in asr_config.json
+            # (set via the GUI extra args text field), not passed as a CLI flag.
+            if pass2.get('isXxl') or p2_pipeline == 'xxl':
+                xxl_exe = pass2.get('xxlExe', '')
+                if xxl_exe:
+                    args += ["--xxl-exe", xxl_exe]
+                # Skip all pipeline-specific args — XXL handles everything internally
+            elif pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
                 if pass2.get('customized') and pass2.get('params'):
                     args += ["--pass2-hf-params", json.dumps(pass2['params'])]
@@ -2425,50 +2483,52 @@ class WhisperJAVAPI:
                 if pass2.get('customized') and pass2.get('params'):
                     args += ["--pass2-params", json.dumps(pass2['params'])]
 
-            # Pass 2: Scene Detector
-            # Note: All pipelines use --pass2-scene-detector. For Qwen, pass_worker.py
-            # translates this to qwen_scene parameter.
-            scene2 = pass2.get('sceneDetector')
-            if scene2 and scene2 != 'none':
-                args += ["--pass2-scene-detector", scene2]
+            # Pass 2: Scene/Segmenter/Enhancer/Model — skip for BYOP XXL (external tool)
+            if not (pass2.get('isXxl') or p2_pipeline == 'xxl'):
+                # Pass 2: Scene Detector
+                # Note: All pipelines use --pass2-scene-detector. For Qwen, pass_worker.py
+                # translates this to qwen_scene parameter.
+                scene2 = pass2.get('sceneDetector')
+                if scene2 and scene2 != 'none':
+                    args += ["--pass2-scene-detector", scene2]
 
-            # Pass 2: Speech Segmenter
-            # - Transformers: Skip (uses HF internal chunking)
-            # - Qwen/Legacy: Use --pass2-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
-            segmenter2 = pass2.get('speechSegmenter')
-            if pass2.get('isTransformers'):
-                # Transformers: Skip segmenter entirely (HF internal chunking)
-                pass
-            else:
-                # Both Qwen and Legacy use --pass2-speech-segmenter
-                # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
-                # For Legacy: used as pre-ASR speech segmentation
-                if segmenter2:  # Pass any value including "none" to disable
-                    args += ["--pass2-speech-segmenter", segmenter2]
-
-            # Pass 2: Speech Enhancer
-            # Note: All pipelines use --pass2-speech-enhancer. For Qwen, pass_worker.py
-            # translates this to qwen_enhancer parameter.
-            enhancer2 = pass2.get('speechEnhancer')
-            if enhancer2 and enhancer2 != 'none':
-                # Handle FFmpeg DSP with selected effects
-                if enhancer2 == 'ffmpeg-dsp':
-                    dsp_effects = pass2.get('dspEffects', ['loudnorm'])
-                    effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
-                    args += ["--pass2-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+                # Pass 2: Speech Segmenter
+                # - Transformers: Skip (uses HF internal chunking)
+                # - Qwen/Legacy: Use --pass2-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
+                segmenter2 = pass2.get('speechSegmenter')
+                if pass2.get('isTransformers'):
+                    # Transformers: Skip segmenter entirely (HF internal chunking)
+                    pass
                 else:
-                    args += ["--pass2-speech-enhancer", enhancer2]
+                    # Both Qwen and Legacy use --pass2-speech-segmenter
+                    # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
+                    # For Legacy: used as pre-ASR speech segmentation
+                    if segmenter2:  # Pass any value including "none" to disable
+                        args += ["--pass2-speech-segmenter", segmenter2]
 
-            # Pass 2: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
-            if pass2.get('enhanceForVad') and enhancer2 and enhancer2 not in ('none', ''):
-                args += ["--pass2-enhance-for-vad"]
+                # Pass 2: Speech Enhancer
+                # Note: All pipelines use --pass2-speech-enhancer. For Qwen, pass_worker.py
+                # translates this to qwen_enhancer parameter.
+                enhancer2 = pass2.get('speechEnhancer')
+                if enhancer2 and enhancer2 != 'none':
+                    # Handle FFmpeg DSP with selected effects
+                    if enhancer2 == 'ffmpeg-dsp':
+                        dsp_effects = pass2.get('dspEffects', ['loudnorm'])
+                        effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
+                        args += ["--pass2-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+                    else:
+                        args += ["--pass2-speech-enhancer", enhancer2]
 
-            # Pass 2: Model
-            # Note: All pipelines use --pass2-model. For Qwen, pass_worker.py
-            # translates this to qwen_model_id parameter.
-            model2 = pass2.get('model')
-            if model2:
-                args += ["--pass2-model", model2]
+                # Pass 2: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
+                if pass2.get('enhanceForVad') and enhancer2 and enhancer2 not in ('none', ''):
+                    args += ["--pass2-enhance-for-vad"]
+
+                # Pass 2: Model
+                # Note: All pipelines use --pass2-model. For Qwen, pass_worker.py
+                # translates this to qwen_model_id parameter.
+                model2 = pass2.get('model')
+                if model2:
+                    args += ["--pass2-model", model2]
 
         # Merge strategy (default: pass1_primary - Pass 1 as base, fill gaps from Pass 2)
         merge_strategy = config.get('merge_strategy', 'pass1_primary')

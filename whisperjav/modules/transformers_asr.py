@@ -25,7 +25,6 @@ import torch
 from whisperjav.utils.logger import logger
 
 # Suppress specific transformers warnings that are informational only
-warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
 warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
 
 
@@ -196,7 +195,7 @@ class TransformersASR:
             self.pipe = pipeline(
                 "automatic-speech-recognition",
                 model=self.model_id,
-                torch_dtype=self._dtype,
+                dtype=self._dtype,
                 device=self._device,
                 model_kwargs=model_kwargs if model_kwargs else None,
                 batch_size=self.batch_size

@@ -539,6 +539,9 @@
                                                 <option value="qwen" selected>Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
                                             </optgroup>
+                                            <optgroup label="External (BYOP)">
+                                                <option value="xxl">XXL Faster Whisper</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -657,6 +660,29 @@
                                             <span class="dsp-effect-name">Amplify</span>
                                             <span class="dsp-effect-desc">+3dB boost</span>
                                         </label>
+                                    </div>
+                                </div>
+
+                                <!-- BYOP Settings Row (shown when XXL Faster Whisper selected as Pass 2) -->
+                                <div class="byop-settings-panel" id="byop-settings-panel" style="display: none;">
+                                    <div class="byop-settings-header">
+                                        <span class="byop-title">XXL Faster Whisper</span>
+                                        <span class="byop-hint">Provide the path to your locally installed executable</span>
+                                    </div>
+                                    <div class="byop-settings-row">
+                                        <label class="byop-label" for="xxl-exe-path">Executable</label>
+                                        <input type="text" id="xxl-exe-path" class="form-input byop-path-input"
+                                               placeholder="Path to faster-whisper-xxl.exe" readonly
+                                               title="Click Browse to select the faster-whisper-xxl executable">
+                                        <button type="button" class="btn btn-secondary btn-compact" id="xxl-browse-btn"
+                                                title="Browse for faster-whisper-xxl executable">Browse</button>
+                                    </div>
+                                    <div class="byop-settings-row">
+                                        <label class="byop-label" for="xxl-extra-args">Extra Args</label>
+                                        <input type="text" id="xxl-extra-args" class="form-input byop-args-input"
+                                               value="--verbose True --standard_asia"
+                                               placeholder="e.g. --verbose --standard_asia --ff_vocal_extract mdx_kim2"
+                                               title="Additional command-line arguments passed directly to XXL">
                                     </div>
                                 </div>
 

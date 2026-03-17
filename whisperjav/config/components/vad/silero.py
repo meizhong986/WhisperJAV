@@ -90,36 +90,36 @@ class SileroVAD(VADComponent):
     # === Schema ===
     Options = SileroVADOptions
 
-    # === Presets - v1.7.1 exact values ===
+    # === Presets - tuned for v1.8.9 ===
     presets = {
         "conservative": SileroVADOptions(
-            threshold=0.35,  # v1.7.1 value
-            min_speech_duration_ms=150,
-            max_speech_duration_s=9.0,  # v1.7.1 value
-            min_silence_duration_ms=300,
-            neg_threshold=0.3,
-            speech_pad_ms=400,  # v1.7.1 value
+            threshold=0.28,
+            min_speech_duration_ms=120,
+            max_speech_duration_s=9.0,
+            min_silence_duration_ms=400,
+            neg_threshold=0.4,
+            speech_pad_ms=300,
             chunk_threshold_s=4.0,
-            max_group_duration_s=29.0,  # Whisper 30s context window limit
+            max_group_duration_s=29.0,
         ),
         "balanced": SileroVADOptions(
-            threshold=0.18,  # v1.7.1 value
-            min_speech_duration_ms=100,
-            max_speech_duration_s=11.0,  # v1.7.1 value
+            threshold=0.18,
+            min_speech_duration_ms=80,
+            max_speech_duration_s=11.0,
             min_silence_duration_ms=300,
             neg_threshold=0.15,
-            speech_pad_ms=400,  # v1.7.1 value
+            speech_pad_ms=400,
             chunk_threshold_s=4.0,
-            max_group_duration_s=29.0,  # Whisper 30s context window limit
+            max_group_duration_s=29.0,
         ),
         "aggressive": SileroVADOptions(
-            threshold=0.05,  # v1.7.1 value
+            threshold=0.10,
             min_speech_duration_ms=30,
-            max_speech_duration_s=14.0,  # v1.7.1 value
-            min_silence_duration_ms=300,
-            neg_threshold=0.1,
-            speech_pad_ms=600,  # v1.7.1 value
+            max_speech_duration_s=14.0,
+            min_silence_duration_ms=200,
+            neg_threshold=0.08,
+            speech_pad_ms=500,
             chunk_threshold_s=4.0,
-            max_group_duration_s=29.0,  # Whisper 30s context window limit
+            max_group_duration_s=29.0,
         ),
     }

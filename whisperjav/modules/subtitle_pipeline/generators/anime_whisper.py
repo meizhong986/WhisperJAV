@@ -144,7 +144,7 @@ class AnimeWhisperGenerator:
         self._processor = WhisperProcessor.from_pretrained(cfg["model_id"])
         self._model = WhisperForConditionalGeneration.from_pretrained(
             cfg["model_id"],
-            torch_dtype=dtype,
+            dtype=dtype,
         ).to(device)
 
         self._device = device

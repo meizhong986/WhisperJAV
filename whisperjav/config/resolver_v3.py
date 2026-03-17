@@ -176,11 +176,11 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
             )
             return "float16"
 
-        # Delegate to CTranslate2's internal "auto" selection logic
-        # This automatically handles:
-        # - GPU capability detection (int8_float16 for RTX 20/30/40)
-        # - CPU instruction sets (AVX2, AVX512)
-        return "auto"
+        # Default to float16 for CTranslate2 on CUDA for best accuracy.
+        # "auto" resolves to int8_float16 which introduces quantization artifacts.
+        # float16 uses ~1-2GB more VRAM but preserves full precision.
+        # Users with limited VRAM can override with --compute-type int8_float16.
+        return "float16"
     else:
         # PyTorch-based providers can use float16 on GPU/MPS, float32 on CPU
         return "float16" if device in ("cuda", "mps") else "float32"

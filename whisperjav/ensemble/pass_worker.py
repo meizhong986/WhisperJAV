@@ -7,7 +7,6 @@ import warnings
 # Suppress transformers warnings BEFORE any imports that might trigger them
 # These must be set early in subprocess workers (spawn context = fresh process)
 warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
-warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
 
 import shutil
 import traceback
@@ -655,6 +654,26 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
 
     pass_temp_dir = Path(payload.temp_dir) / f"pass{pass_number}_worker"
 
+    # =========================================================================
+    # BYOP XXL: External subprocess — bypasses _build_pipeline() entirely.
+    # Produces FileResult objects in the same format as normal pipelines,
+    # then writes to Drop-Box and exits.
+    # =========================================================================
+    if pass_config.get("pipeline") == "xxl":
+        _run_xxl_pass(
+            payload=payload,
+            pass_number=pass_number,
+            media_files=media_files,
+            language_code=language_code,
+            pass_temp_dir=pass_temp_dir,
+            results=results,
+            result_file=result_file,
+            tracer=tracer,
+        )
+        # _run_xxl_pass calls _write_dropbox_and_exit → os._exit() → never returns
+        # This line should never be reached, but guard against it
+        return  # pragma: no cover
+
     try:
         pipeline = _build_pipeline(
             pass_config=pass_config,
@@ -844,6 +863,151 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
     logger.info("[Worker %s] Worker exiting via Nuclear Exit", os.getpid())
 
     # Write result to Drop-Box and Nuclear Exit
+    final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
+    _write_dropbox_and_exit(result_file, final_result, tracer, 0)
+
+
+def _run_xxl_pass(
+    payload: WorkerPayload,
+    pass_number: int,
+    media_files: List[Dict[str, Any]],
+    language_code: str,
+    pass_temp_dir: Path,
+    results: List[FileResult],
+    result_file: str,
+    tracer,
+) -> None:
+    """
+    BYOP XXL pass: call faster-whisper-xxl as subprocess for each file.
+
+    This function handles the complete lifecycle for an XXL pass:
+    process all files, collect FileResult objects, write Drop-Box, and
+    Nuclear Exit.  It never returns (os._exit is called).
+
+    The orchestrator sees identical FileResult dicts regardless of whether
+    a pass used a WhisperJAV pipeline or XXL — the merge step just needs
+    SRT file paths keyed by basename.
+    """
+    import time as _time
+
+    from whisperjav.byop.xxl_runner import run_xxl
+
+    pass_config = payload.pass_config
+    xxl_exe = pass_config.get("xxl_exe") if pass_config else None
+    if not xxl_exe:
+        error_msg = (
+            "BYOP XXL requires --xxl-exe path. "
+            "Pass 'xxl_exe' in pass_config or use --xxl-exe on the CLI."
+        )
+        logger.error("[Worker %s] %s", os.getpid(), error_msg)
+        error_result = {
+            "results": [
+                FileResult(
+                    basename=info["basename"],
+                    status="failed",
+                    error=error_msg,
+                ).__dict__
+                for info in media_files
+            ],
+            "worker_error": error_msg,
+        }
+        _write_dropbox_and_exit(result_file, error_result, tracer, 1)
+
+    pass_temp_dir.mkdir(parents=True, exist_ok=True)
+    xxl_extra_args = pass_config.get("xxl_args", "")
+    xxl_model = pass_config.get("model") or "large-v3"
+    asr_task = "translate" if payload.subs_language == "direct-to-english" else "transcribe"
+
+    logger.info(
+        "[Worker %s] Pass %s: BYOP XXL (exe=%s, model=%s)",
+        os.getpid(), pass_number, xxl_exe, xxl_model,
+    )
+
+    for media_info in media_files:
+        basename = media_info["basename"]
+        logger.info(
+            "[Worker %s] Pass %s [XXL] processing %s",
+            os.getpid(), pass_number, basename,
+            extra={'color': 'blue'},
+        )
+        file_start = _time.monotonic()
+        try:
+            srt_path = run_xxl(
+                input_file=str(media_info["path"]),
+                exe_path=xxl_exe,
+                model=xxl_model,
+                language=language_code,
+                output_dir=str(pass_temp_dir),
+                extra_args=xxl_extra_args,
+                task=asr_task,
+            )
+
+            # Move SRT to standard pass output location (same convention as
+            # normal pipelines: {basename}.{lang}.pass{N}.srt)
+            file_output_dir = Path(media_info.get('output_dir', payload.output_dir))
+            file_output_dir.mkdir(parents=True, exist_ok=True)
+            pass_output = file_output_dir / f"{basename}.{language_code}.pass{pass_number}.srt"
+
+            if pass_output.exists():
+                pass_output.unlink()
+            shutil.move(str(srt_path), str(pass_output))
+
+            if not pass_output.exists():
+                raise FileNotFoundError(
+                    f"File move succeeded but output not found: {pass_output}"
+                )
+
+            # Count subtitles (index lines are standalone integers)
+            subtitle_count = 0
+            for line in pass_output.read_text(encoding="utf-8").splitlines():
+                if line.strip().isdigit():
+                    subtitle_count += 1
+
+            elapsed = _time.monotonic() - file_start
+            results.append(
+                FileResult(
+                    basename=basename,
+                    status="completed",
+                    srt_path=str(pass_output),
+                    subtitles=subtitle_count,
+                    processing_time=elapsed,
+                )
+            )
+            logger.info(
+                "[Worker %s] Pass %s [XXL] %s -> %d subtitles in %.1fs",
+                os.getpid(), pass_number, basename, subtitle_count, elapsed,
+            )
+        except Exception:
+            elapsed = _time.monotonic() - file_start
+            logger.exception(
+                "[Worker %s] Pass %s [XXL] failed for %s (%.1fs)",
+                os.getpid(), pass_number, basename, elapsed,
+            )
+            results.append(
+                FileResult(
+                    basename=basename,
+                    status="failed",
+                    error=traceback.format_exc(),
+                )
+            )
+
+    # Cleanup temp dir (no pipeline to clean up — just the temp directory)
+    if not payload.keep_temp_files and pass_temp_dir.exists():
+        try:
+            shutil.rmtree(pass_temp_dir, ignore_errors=True)
+        except BaseException:
+            pass
+
+    # Summary
+    completed_count = sum(1 for r in results if r.status == 'completed')
+    failed_count = sum(1 for r in results if r.status == 'failed')
+    total_subs = sum(r.subtitles for r in results if r.status == 'completed')
+    logger.info(
+        "[Worker %s] Pass %s [XXL] done: %d completed, %d failed, %d subtitles",
+        os.getpid(), pass_number, completed_count, failed_count, total_subs,
+    )
+
+    # Write Drop-Box and Nuclear Exit (same pattern as normal passes)
     final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
     _write_dropbox_and_exit(result_file, final_result, tracer, 0)
 
