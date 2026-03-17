@@ -29,7 +29,6 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 warnings.filterwarnings("ignore", message=".*pkg_resources.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pkg_resources")
-warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
 warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
 warnings.filterwarnings("ignore", message=".*sparse_softmax_cross_entropy.*deprecated.*")
 # requests warns about urllib3/chardet versions — cosmetic, not a real problem
@@ -1749,7 +1748,10 @@ def main():
         logger.error(f"Failed to resolve configuration: {e}")
         sys.exit(1)
 
-    logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
+    if args.ensemble:
+        logger.debug(f"Resolved configuration for ensemble mode, task='{task}'")
+    else:
+        logger.debug(f"Resolved configuration for pipeline='{args.mode}', sensitivity='{args.sensitivity}', task='{task}'")
     
     # Apply model override if specified via CLI (not for ensemble mode)
     if args.model and resolved_config is not None:
@@ -2113,6 +2115,24 @@ def main():
 
                     basename = result.get('input', {}).get('basename', 'unknown')
 
+                    # Pre-validate SRT has enough content for translation
+                    try:
+                        srt_text = Path(output_path).read_text(encoding="utf-8", errors="replace").strip()
+                        # Count subtitle blocks (separated by blank lines, must contain ' --> ')
+                        srt_blocks = [b for b in srt_text.split("\n\n") if " --> " in b]
+                        if len(srt_blocks) < 2:
+                            logger.warning(
+                                f"Skipping translation for {basename}: "
+                                f"only {len(srt_blocks)} subtitle(s) found (minimum: 2)"
+                            )
+                            print(f"  Skipping {basename}: too few subtitles ({len(srt_blocks)})")
+                            translation_failed += 1
+                            continue
+                    except OSError as e:
+                        logger.warning(f"Skipping translation for {basename}: cannot read SRT: {e}")
+                        translation_failed += 1
+                        continue
+
                     try:
                         logger.info(f"Translating: {basename}")
                         print(f"Translating: {basename}")
@@ -2174,6 +2194,24 @@ def main():
             # Close parameter tracer for ensemble mode
             if tracer:
                 tracer.close()
+
+            # ============================================================
+            # ENSEMBLE EXIT STATUS: Reflect actual success/failure
+            # ============================================================
+            has_failures = len(failed_files) > 0
+            has_translation_failures = (
+                args.translate and successful_count > 0
+                and translation_failed > 0
+            )
+
+            if has_failures or has_translation_failures:
+                parts = []
+                if has_failures:
+                    parts.append(f"{len(failed_files)} transcription(s) failed")
+                if has_translation_failures:
+                    parts.append(f"{translation_failed} translation(s) failed")
+                logger.warning("Ensemble completed with errors: %s", "; ".join(parts))
+                sys.exit(1)
 
         # Choose sync or async processing for normal mode
         elif args.async_processing:

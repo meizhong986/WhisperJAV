@@ -28,8 +28,6 @@ import stable_whisper
 from whisperjav.utils.logger import logger
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 
-# Suppress common transformers warnings
-warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
 
 
 def merge_master_with_timestamps(

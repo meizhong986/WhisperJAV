@@ -10,6 +10,7 @@ See: docs/research/XXL_BYOP_INTEGRATION_PATTERNS.md
 """
 
 import os
+import shlex
 import subprocess
 import time
 from pathlib import Path
@@ -63,21 +64,22 @@ def run_xxl(
         "--output_dir", str(output_dir),
         "--output_format", "srt",
         "--beep_off",
+        "--verbose",
     ]
 
     if task == "translate":
         cmd.extend(["--task", "translate"])
 
-    # Passthrough user-supplied extra args (split on whitespace)
+    # Passthrough user-supplied extra args (shell-aware splitting)
     if extra_args and extra_args.strip():
-        cmd.extend(extra_args.strip().split())
+        cmd.extend(shlex.split(extra_args.strip()))
 
     # pyvideotrans-style: load extra args from text file next to exe
     txt_file = exe.parent / "whisperjav_xxl.txt"
     if txt_file.is_file():
         file_args = txt_file.read_text(encoding="utf-8").strip()
         if file_args:
-            cmd.extend(file_args.split())
+            cmd.extend(shlex.split(file_args))
 
     import sys
 

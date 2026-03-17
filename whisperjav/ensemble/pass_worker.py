@@ -7,7 +7,6 @@ import warnings
 # Suppress transformers warnings BEFORE any imports that might trigger them
 # These must be set early in subprocess workers (spawn context = fresh process)
 warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
-warnings.filterwarnings("ignore", message=".*torch_dtype.*is deprecated.*")
 
 import shutil
 import traceback

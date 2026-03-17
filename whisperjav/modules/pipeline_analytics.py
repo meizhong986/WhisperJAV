@@ -166,7 +166,7 @@ def _compute_scene_metrics(scenes: List[Dict]) -> Dict:
     # VAD speech duration: sum of all VAD region durations across scenes
     total_vad = 0.0
     for s in scenes:
-        for region in s.get("vad_regions", []):
+        for region in (s.get("vad_regions") or []):
             r_start = region.get("start", 0.0)
             r_end = region.get("end", 0.0)
             if r_end > r_start:
@@ -229,12 +229,12 @@ def _compute_alignment_metrics(scenes: List[Dict]) -> Dict:
     group_count = 0
 
     for s in scenes:
-        for gd in s.get("group_details", []):
+        for gd in (s.get("group_details") or []):
             group_count += 1
             outcome = gd.get("outcome", "unknown")
             outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
 
-            for trigger in gd.get("sentinel_triggers", []):
+            for trigger in (gd.get("sentinel_triggers") or []):
                 trigger_counts[trigger] = trigger_counts.get(trigger, 0) + 1
 
     return {
@@ -468,7 +468,7 @@ def print_summary(analytics: Dict, title: str = "") -> None:
     alignment = analytics.get("alignment", {})
     subtitle = analytics.get("subtitle", {})
     timing = analytics.get("timing", {})
-    health = analytics.get("health", [])
+    health = analytics.get("health") or []
 
     header = " PIPELINE ANALYTICS"
     if title:

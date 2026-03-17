@@ -208,7 +208,6 @@ def suppress_dependency_warnings() -> None:
     _warning_patterns = [
         (".*pkg_resources is deprecated.*", DeprecationWarning),
         (".*pkg_resources.*", DeprecationWarning),
-        (".*torch_dtype.*is deprecated.*", None),
         (".*chunk_length_s.*is very experimental.*", None),
         (".*sparse_softmax_cross_entropy.*deprecated.*", None),
         (".*Pydantic V1.*deprecated.*", DeprecationWarning),
