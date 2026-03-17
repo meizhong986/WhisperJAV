@@ -2123,10 +2123,12 @@ def main():
             print("="*50)
 
             # ============================================================
-            # TRANSLATION: Translate successful ensemble outputs if requested
+            # TRANSLATION: Translate only fully successful ensemble outputs.
+            # Degraded files (pass 2 failed, fell back to pass 1) are NOT
+            # translated — the user configured two-pass for a reason and
+            # translating inferior fallback output wastes time and API cost.
             # ============================================================
-            translatable_count = successful_count + len(degraded_files)
-            if args.translate and translatable_count > 0:
+            if args.translate and successful_count > 0:
                 print("\n" + "="*50)
                 print("STARTING TRANSLATION")
                 print("="*50)
@@ -2136,8 +2138,9 @@ def main():
                 extra_context = build_translation_context(args)
 
                 for result in results:
-                    if result.get('error') or result.get('status') == 'failed':
-                        continue  # Skip failed transcriptions
+                    status = result.get('status', 'unknown')
+                    if result.get('error') or status in ('failed', 'degraded'):
+                        continue  # Skip failed and degraded (fallback) files
 
                     output_path = result.get('summary', {}).get('final_output')
                     if not output_path:
@@ -2209,7 +2212,8 @@ def main():
             # VTT CONVERSION: Convert SRT outputs if requested
             # ============================================================
             output_format = getattr(args, 'output_format', 'srt')
-            if output_format != 'srt' and translatable_count > 0:
+            files_with_output = successful_count + len(degraded_files)
+            if output_format != 'srt' and files_with_output > 0:
                 for result in results:
                     if result.get('error') or result.get('status') == 'failed':
                         continue
@@ -2231,7 +2235,7 @@ def main():
             has_failures = len(failed_files) > 0
             has_degraded = len(degraded_files) > 0
             has_translation_failures = (
-                args.translate and (successful_count + len(degraded_files)) > 0
+                args.translate and successful_count > 0
                 and translation_failed > 0
             )
 

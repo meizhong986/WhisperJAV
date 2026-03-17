@@ -12,6 +12,7 @@ See: docs/research/XXL_BYOP_INTEGRATION_PATTERNS.md
 import os
 import shlex
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -82,8 +83,6 @@ def run_xxl(
         if file_args:
             cmd.extend(shlex.split(file_args))
 
-    import sys
-
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
 
     start_time = time.monotonic()
@@ -102,23 +101,49 @@ def run_xxl(
 
     elapsed = time.monotonic() - start_time
 
+    # Check for SRT output BEFORE checking exit code.
+    # XXL uses ctranslate2 which crashes during C++ destructor shutdown
+    # (STATUS_STACK_BUFFER_OVERRUN / 0xC0000409 on Windows) — the same
+    # problem our own Nuclear Exit pattern solves.  The transcription
+    # completes and the SRT is written, then the process crashes on exit.
+    srt_path = _find_srt(output_dir, input_file)
+
+    if srt_path is not None:
+        if result.returncode != 0:
+            print(
+                f"[XXL] Warning: process crashed on exit (code {result.returncode}) "
+                f"but SRT was produced successfully ({elapsed:.1f}s)",
+                file=sys.stderr,
+            )
+        return srt_path
+
+    # No SRT found — this is a real failure
     if result.returncode != 0:
         stderr_tail = result.stderr[-2000:] if result.stderr else "(no stderr)"
         raise RuntimeError(
             f"XXL failed (exit {result.returncode}, {elapsed:.1f}s):\n{stderr_tail}"
         )
 
+    raise RuntimeError(
+        f"XXL completed ({elapsed:.1f}s) but no SRT found in {output_dir}"
+    )
+
+
+def _find_srt(output_dir: str, input_file: str) -> Optional[Path]:
+    """Locate the SRT file produced by XXL in output_dir.
+
+    Returns the Path if found and non-empty, None otherwise.
+    """
     # XXL writes {input_stem}.srt in output_dir
     expected_srt = Path(output_dir) / f"{Path(input_file).stem}.srt"
-    if expected_srt.is_file():
+    if expected_srt.is_file() and expected_srt.stat().st_size > 0:
         return expected_srt
 
     # Fallback: look for any .srt file in output_dir (XXL may use
     # a slightly different naming convention depending on version)
     srts = sorted(Path(output_dir).glob("*.srt"), key=os.path.getmtime, reverse=True)
-    if srts:
-        return srts[0]
+    for srt in srts:
+        if srt.stat().st_size > 0:
+            return srt
 
-    raise RuntimeError(
-        f"XXL completed ({elapsed:.1f}s) but no SRT found in {output_dir}"
-    )
+    return None

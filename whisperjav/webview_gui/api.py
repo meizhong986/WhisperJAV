@@ -720,7 +720,7 @@ class WhisperJAVAPI:
             byop.update(prefs)
             ui_prefs['byop'] = byop
             mgr.update_ui_preferences(ui_prefs)
-            mgr.save()
+            mgr.save_config()
             return {"success": True}
         except Exception as e:
             return {"success": False, "message": str(e)}
