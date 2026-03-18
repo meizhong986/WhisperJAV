@@ -593,7 +593,7 @@ def main():
         if readiness.get('base_url'):
             server_addr, endpoint_path = _api_base_to_custom_server(readiness['base_url'])
             provider_config['server_address'] = server_addr
-            provider_config['endpoint'] = endpoint_path + '/v1/chat/completions'
+            provider_config['endpoint'] = endpoint_path
 
         if ollama_batch_size < _user_batch:
             print(f"[OLLAMA] Batch size auto-reduced from {_user_batch} to "

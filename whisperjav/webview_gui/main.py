@@ -364,6 +364,53 @@ def create_window():
     return window, icon_path, icon_used
 
 
+def _clear_webview_cache_on_upgrade(storage_path: str) -> None:
+    """Clear WebView2 HTTP/JS cache when the app version changes.
+
+    WebView2 caches HTML/JS/CSS to disk.  After a WhisperJAV upgrade the old
+    cached assets are served, hiding new UI features (#236).  This function
+    detects a version change and deletes only the cache directories, preserving
+    Local Storage (translation settings, UI state) and other profile data.
+    """
+    import shutil
+    from whisperjav.__version__ import __version__
+
+    storage = Path(storage_path)
+    version_file = storage / '.whisperjav_version'
+
+    try:
+        previous_version = version_file.read_text(encoding='utf-8').strip() if version_file.is_file() else None
+    except Exception:
+        previous_version = None
+
+    if previous_version == __version__:
+        return  # Same version — nothing to clear
+
+    # WebView2 stores caches under EBWebView/Default/
+    cache_dirs = [
+        storage / 'EBWebView' / 'Default' / 'Cache',
+        storage / 'EBWebView' / 'Default' / 'Code Cache',
+    ]
+    cleared = False
+    for cache_dir in cache_dirs:
+        if cache_dir.is_dir():
+            try:
+                shutil.rmtree(cache_dir)
+                cleared = True
+            except Exception as e:
+                print(f"Warning: could not clear cache {cache_dir}: {e}")
+
+    if cleared:
+        print(f"Cleared WebView2 cache (upgrade {previous_version} -> {__version__})")
+
+    # Write current version so we don't clear again next launch
+    try:
+        storage.mkdir(parents=True, exist_ok=True)
+        version_file.write_text(__version__, encoding='utf-8')
+    except Exception:
+        pass
+
+
 def _set_windows_icon(window_title: str, ico_path: Path, timeout: float = 5.0) -> bool:
     """Best-effort set taskbar/titlebar icon on Windows when pywebview lacks 'icon'.
 
@@ -380,14 +427,34 @@ def _set_windows_icon(window_title: str, ico_path: Path, timeout: float = 5.0) -
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
 
-        EnumWindows = user32.EnumWindows
         EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+        EnumWindows = user32.EnumWindows
+        EnumWindows.argtypes = [EnumWindowsProc, wintypes.LPARAM]
+        EnumWindows.restype = wintypes.BOOL
+
         GetWindowTextW = user32.GetWindowTextW
+        GetWindowTextW.argtypes = [wintypes.HWND, ctypes.c_wchar_p, ctypes.c_int]
+
         GetWindowTextLengthW = user32.GetWindowTextLengthW
+        GetWindowTextLengthW.argtypes = [wintypes.HWND]
+        GetWindowTextLengthW.restype = ctypes.c_int
+
         IsWindowVisible = user32.IsWindowVisible
+        IsWindowVisible.argtypes = [wintypes.HWND]
+        IsWindowVisible.restype = wintypes.BOOL
+
         GetWindowThreadProcessId = user32.GetWindowThreadProcessId
+        GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        GetWindowThreadProcessId.restype = wintypes.DWORD
+
         SendMessageW = user32.SendMessageW
+        SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        SendMessageW.restype = ctypes.c_long
+
         LoadImageW = user32.LoadImageW
+        LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        LoadImageW.restype = wintypes.HANDLE
 
         WM_SETICON = 0x0080
         ICON_SMALL = 0
@@ -511,6 +578,11 @@ def main():
             storage_path = str(Path(os.environ.get('APPDATA', Path.home())) / 'WhisperJAV' / 'webview_storage')
         else:
             storage_path = str(Path.home() / '.whisperjav' / 'webview_storage')
+
+        # Clear WebView2 cache on version upgrade so users see updated HTML/JS/CSS.
+        # localStorage (translation settings, UI state) is preserved — only the
+        # HTTP cache and compiled JS cache are cleared.
+        _clear_webview_cache_on_upgrade(storage_path)
 
         # If icon kwarg couldn't be used (older pywebview), set icon after start on Windows
         if platform.system() == 'Windows' and icon_path and not icon_used:

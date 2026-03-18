@@ -390,7 +390,7 @@ def translate_with_config(
             if readiness.get('base_url'):
                 server_addr, endpoint_path = _api_base_to_custom_server(readiness['base_url'])
                 provider_config['server_address'] = server_addr
-                provider_config['endpoint'] = endpoint_path + '/v1/chat/completions'
+                provider_config['endpoint'] = endpoint_path
 
             print(f"[SERVICE]   Model: {resolved_model}", file=sys.stderr)
             print(f"[SERVICE]   num_ctx={n_ctx}, batch_size={resolved_max_batch_size}, max_tokens={max_tokens}", file=sys.stderr)
