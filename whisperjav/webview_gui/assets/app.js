@@ -5501,42 +5501,48 @@ const UpdateManager = {
     },
 
     showBanner(info) {
-        const banner = document.getElementById('updateBanner');
-        const title = document.getElementById('updateTitle');
-        const version = document.getElementById('updateVersion');
-
-        if (!banner || !title || !version) return;
-
-        // Set content based on notification level
         const level = info.notification_level || 'minor';
-        let titleText = 'Update Available';
-
-        if (level === 'critical') {
-            titleText = 'Critical Update Available';
-        } else if (level === 'major') {
-            titleText = 'Major Update Available';
-        } else if (level === 'minor') {
-            titleText = 'New Version Available';
-        } else if (level === 'patch') {
-            titleText = 'Patch Available';
-        }
-
-        title.textContent = titleText;
-        version.textContent = `v${info.latest_version} is now available (you have v${info.current_version})`;
 
         // Store release URL
         this.releaseUrl = info.release_url;
 
-        // Set banner style based on level
-        banner.className = 'update-banner visible ' + level;
+        // Critical updates: show the full banner (rare, important)
+        if (level === 'critical') {
+            const banner = document.getElementById('updateBanner');
+            const title = document.getElementById('updateTitle');
+            const version = document.getElementById('updateVersion');
+            if (banner && title && version) {
+                title.textContent = 'Critical Update Available';
+                version.textContent = `v${info.latest_version} is now available (you have v${info.current_version})`;
+                banner.className = 'update-banner visible critical';
+            }
+            console.log(`Showing critical update banner: ${info.current_version} -> ${info.latest_version}`);
+            return;
+        }
 
-        console.log(`Showing update banner: ${info.current_version} -> ${info.latest_version} (${level})`);
+        // Non-critical: subtle inline indicator in header
+        const indicator = document.getElementById('updateIndicator');
+        const indicatorText = document.getElementById('updateIndicatorText');
+        if (indicator && indicatorText) {
+            indicatorText.textContent = `v${info.latest_version} available`;
+            indicator.style.display = 'inline-flex';
+            indicator.onclick = (e) => {
+                e.preventDefault();
+                ChangelogManager.show();
+            };
+        }
+
+        console.log(`Showing update indicator: ${info.current_version} -> ${info.latest_version} (${level})`);
     },
 
     hideBanner() {
         const banner = document.getElementById('updateBanner');
         if (banner) {
             banner.classList.remove('visible');
+        }
+        const indicator = document.getElementById('updateIndicator');
+        if (indicator) {
+            indicator.style.display = 'none';
         }
     },
 

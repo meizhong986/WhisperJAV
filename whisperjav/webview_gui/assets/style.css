@@ -2774,7 +2774,39 @@ details.translation-advanced-section[open] .collapse-icon {
 }
 
 /* ============================================================
-   Update Notification Banner
+   Update Indicator (subtle, inline in header)
+   ============================================================ */
+
+.update-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.12);
+    transition: background 0.2s ease;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.update-indicator:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+}
+
+.update-indicator-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #5dde5d;
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   Update Notification Banner (critical updates only)
    ============================================================ */
 
 .update-banner {

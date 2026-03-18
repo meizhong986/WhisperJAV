@@ -142,9 +142,29 @@ def parse_version(version_str: str) -> Tuple[int, int, int, str]:
     return (0, 0, 0, "")
 
 
+def _suffix_rank(suffix: str):
+    """Classify a version suffix for PEP 440 ordering.
+
+    PEP 440 order: pre-release < release < post-release
+      e.g. 1.8.9b0 < 1.8.9 < 1.8.9.post1
+
+    Returns:
+        (rank, suffix) tuple for comparison.
+        rank 0 = pre-release, 1 = release, 2 = post-release.
+    """
+    if not suffix:
+        return (1, "")
+    if suffix.startswith('.post'):
+        return (2, suffix)
+    return (0, suffix)
+
+
 def compare_versions(v1: str, v2: str) -> int:
     """
     Compare two version strings.
+
+    Handles PEP 440 pre-releases (a0, b0, rc0) and post-releases (.post1).
+    Order: 1.8.9a1 < 1.8.9b1 < 1.8.9rc1 < 1.8.9 < 1.8.9.post1 < 1.8.9.post2
 
     Returns:
         -1 if v1 < v2
@@ -161,16 +181,19 @@ def compare_versions(v1: str, v2: str) -> int:
         if p1[i] > p2[i]:
             return 1
 
-    # Compare suffix (empty suffix > any suffix for release versions)
+    # Compare suffix using PEP 440 ordering
     s1, s2 = p1[3], p2[3]
     if s1 == s2:
         return 0
-    if not s1:  # v1 is release, v2 has suffix
-        return 1
-    if not s2:  # v2 is release, v1 has suffix
-        return -1
-    # Both have suffixes - alphabetical comparison
-    return -1 if s1 < s2 else 1
+
+    r1 = _suffix_rank(s1)
+    r2 = _suffix_rank(s2)
+
+    if r1[0] != r2[0]:
+        return -1 if r1[0] < r2[0] else 1
+
+    # Same category — compare alphabetically
+    return -1 if r1[1] < r2[1] else 1
 
 
 def _load_cache() -> Optional[Dict]:
