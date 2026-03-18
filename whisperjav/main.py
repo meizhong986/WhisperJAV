@@ -397,7 +397,7 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-target",
-        choices=["english", "indonesian", "spanish", "chinese"],
+        choices=["english", "indonesian", "portuguese", "spanish", "chinese"],
         default="english",
         help="Target language for translation (default: english)"
     )

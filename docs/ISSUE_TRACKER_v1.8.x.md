@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-18 (rev11 — v1.8.9 RELEASED, 5 new issues #233-#237, #214 closed, #228 self-resolved) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **46 open** on GitHub
+> Updated: 2026-03-18 (rev12 — #238 Portuguese language added, all 4 hotfix items coded) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **47 open** on GitHub
 
 ---
 
@@ -20,8 +20,8 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **46** | +5 since rev10 (#233, #234, #235, #236, #237). #214 closed. |
-| New issues since rev10 | 5 | #233 (translation error), #234 (CUDA version claim), #235 (ctypes icon bug), #236 (WebUI cache), #237 (XXL model question) |
+| Total open on GitHub | **47** | +6 since rev10 (#233-#238). #214 closed. |
+| New issues since rev10 | 6 | #233 (translation error), #234 (CUDA version claim), #235 (ctypes icon bug), #236 (WebUI cache), #237 (XXL model question), #238 (Portuguese language) |
 | Closed since rev10 | 1 | #214 (localLLM fail, closed 2026-03-18) |
 | **NEEDS RESPONSE (no reply yet)** | 4 | #233, #234, #235, #237 |
 | **AWAITING INFO (asked user for details)** | 1 | #232 (comparison results) |
@@ -61,13 +61,14 @@ Merge commit: `eea08a0` (19 commits from `dev_v1.8.9.beta` into main)
 
 ### Post-release issues (same day)
 
-| # | Title | Severity | Analysis |
-|---|-------|----------|----------|
-| **#235** | ctypes icon OverflowError on first launch | **MEDIUM — BUG** | `hwnd` overflows C int in `_set_windows_icon` callback. Non-blocking (exceptions ignored), works on second launch. Fix: cast hwnd properly. |
-| **#236** | WebUI cache prevents seeing v1.8.9 changes | **HIGH — BUG** | After update, old HTML/JS cached by WebView2. FishYu-OWO suggests `private_mode=True`. Already acknowledged. |
-| **#237** | XXL can't select model / compute type question | **LOW** | yangming2027 confusion about XXL model selection and compute type. Needs explanation. |
-| **#132** | Ollama 404 error on Kaggle with v1.8.9 | **HIGH — BUG** | TinyRick1489 gets `404 page not found` with `translategemma:27b`. OllamaManager may have endpoint issue with custom model names. Debug log attached. |
-| **#233** | Local LLM translation AssertionError | **LOW** | WillChengCN, same llama-cpp-python `n_vocab()` failure as #208. Not a v1.8.9 regression — pre-existing. |
+| # | Title | Severity | Root Cause | Status |
+|---|-------|----------|------------|--------|
+| **#236** | WebUI cache prevents seeing v1.8.9 changes | **HIGH — BUG** | WebView2 caches old HTML/JS/CSS to disk (`private_mode=False`). After upgrade, stale assets served. | **ROOT CAUSE VALIDATED. FIX CODED.** Version-stamped cache clearing on startup — deletes `Cache/` and `Code Cache/` but preserves `Local Storage/`. |
+| **#132** | Ollama 404 error on Kaggle with v1.8.9 | **HIGH — BUG** | **CONFIRMED from user's debug log**: `_api_base_to_custom_server()` returns endpoint `/v1/chat/completions`, then `service.py:393` and `cli.py:596` append `/v1/chat/completions` again → doubled path `/v1/chat/completions/v1/chat/completions` → HTTP 404. User log shows: `POST http://localhost:11434/v1/chat/completions/v1/chat/completions "HTTP/1.1 404 Not Found"`. NOT a custom model name issue. | **ROOT CAUSE VALIDATED. FIX CODED.** Removed redundant append in both files. |
+| **#235** | ctypes icon OverflowError on first launch | **MEDIUM — BUG** | Win32 API functions called without `argtypes` declarations. 64-bit `hwnd` values overflow when passed to `IsWindowVisible()`. Non-blocking (exceptions ignored), works on second launch. | **ROOT CAUSE VALIDATED. FIX CODED.** Added proper `argtypes`/`restype` for all 7 Win32 functions. |
+| **#237** | XXL can't select model / compute type question | **LOW** | yangming2027 confusion about XXL model selection and compute type. Not a bug. | `NEEDS RESPONSE` |
+| **#238** | Add Portuguese/Brazilian translation target | **LOW — FEATURE** | Simple: add to SUPPORTED_TARGETS, argparse, GUI dropdowns. | **FIX CODED** — 4 files updated |
+| **#233** | Local LLM translation AssertionError | **LOW** | Same llama-cpp-python `n_vocab()` failure as #208. Pre-existing, not a v1.8.9 regression. | `NEEDS RESPONSE` |
 
 ---
 
@@ -108,10 +109,10 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **#214** | 1.8.7 localLLM fail | KenZP12 | Windows, cu128 | **CLOSED** (2026-03-18) | |
 | **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090 | **OPEN** | v1.8.9 comment posted. `AWAITING CONFIRMATION` |
 | **#196** | Local Translation Errors | zhstark | Ubuntu, 5090 32GB | CLOSED | Related to #212. |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | **NEW 2026-03-18**: Tried v1.8.9 `--provider ollama` with `translategemma:27b`. Gets `404 page not found` error. Debug log attached. Also batch_size auto-reduced to fit 8192 context. | `NEEDS INVESTIGATION` |
+| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | **2026-03-18**: Tried v1.8.9 `--provider ollama` with `translategemma:27b`. Gets `404 page not found`. **ROOT CAUSE FOUND**: doubled endpoint path bug in service.py + cli.py. Fix coded. | `FIX CODED` |
 | **#128** | LLM context/batch sizing | hyiip | (contributor) | **OPEN** | Gemma 3 proposal. Redirected to OllamaManager configs. v1.8.9 comment posted. `AWAITING CONFIRMATION` |
 
-**#132 analysis (2026-03-18)**: TinyRick1489 installed Ollama manually on Kaggle, pulled `translategemma:27b` (a custom/community model). Gets HTTP 404 from Ollama API. Possible causes: (1) OllamaManager uses wrong API endpoint for chat vs generate, (2) `translategemma` may need `/api/generate` not `/api/chat`, (3) Ollama server not running when translation starts. Debug log attached — needs investigation.
+**#132 root cause (2026-03-18)**: **VALIDATED from user's debug log.** The 404 is NOT a custom model name issue. It's a doubled endpoint path: `_api_base_to_custom_server('http://localhost:11434')` returns `('/v1/chat/completions')` as the endpoint, then `service.py:393` and `cli.py:596` append `'/v1/chat/completions'` again, producing `POST http://localhost:11434/v1/chat/completions/v1/chat/completions` → 404. Fix: remove the redundant append. This bug affects ALL `--provider ollama` users via both CLI and service paths — not just custom models.
 
 **#233 analysis**: Same `n_vocab()` AssertionError as #208 (closed, self-resolved). llama-cpp-python model loading fails silently then crashes. This is the same fragile llama-cpp-python path that OllamaManager was designed to replace. Recommend: tell user to try `--provider ollama` instead.
 
@@ -167,8 +168,8 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#236** | WebUI cache prevents v1.8.9 changes | FishYu-OWO | **OPEN (NEW)** | After updating to v1.8.9, WebView2 serves cached old HTML/JS. `private_mode=True` fixes it. Affects both installer and source builds. Already acknowledged. | `ACKNOWLEDGED` — fix needed |
-| **#235** | ctypes icon OverflowError on startup | techguru0 | **OPEN (NEW)** | `hwnd` overflows C int in `_set_windows_icon` EnumWindows callback (line 405 of webview_gui/main.py). Non-blocking — exceptions are ignored, second launch works fine. | `NEEDS RESPONSE` |
+| **#236** | WebUI cache prevents v1.8.9 changes | FishYu-OWO | **OPEN (NEW)** | WebView2 caches old HTML/JS to disk. Version-stamped cache clear on startup. | `FIX CODED` — hotfix candidate |
+| **#235** | ctypes icon OverflowError on startup | techguru0 | **OPEN (NEW)** | Win32 API functions missing `argtypes` — 64-bit hwnd overflows. Added proper type declarations. | `FIX CODED` — hotfix candidate |
 | **#207** | 1.86不能保存设置 | q864310563 | **OPEN** | Responded (dup of #96). `AWAITING CONFIRMATION` |
 | **#96** | Full settings persistence | sky9639 | OPEN | `DEFERRED` to v1.9 |
 
@@ -231,6 +232,7 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Reporter | State | Summary | Target |
 |---|-------|----------|-------|---------|--------|
+| **#238** | Portuguese/Brazilian translation | (request) | OPEN | Add Portuguese as translation target language | **v1.8.9.1** — CODED |
 | **#232** | whisper-ja-anime-v0.1 model | mustssr | OPEN | HuggingFace anime ASR model | **Investigate** |
 | **#230** | Standalone merge module | weifu8435 | OPEN | CLI tool for multi-SRT merging | **v1.9.0** |
 | **#224** | Vocal separation (UVR MDX-Net) | yangming2027 | OPEN | Detailed analysis of XXL's vocal separation advantage | **Investigate** |
@@ -299,13 +301,14 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 | **#231** | Respond: Root cause is Kaggle's outdated llvmlite (0.43.0). Fix: `!pip install -U llvmlite numba` before importing WhisperJAV. Not a WhisperJAV bug. | MEDIUM |
 | **#132** | Investigate: Ollama 404 with `translategemma:27b`. Download and examine the debug log. Check if OllamaManager uses wrong endpoint. | HIGH |
 
-### Issues Needing Action (not just response)
+### Issues With Coded Fixes (awaiting hotfix release)
 
-| # | Action Needed | Priority |
-|---|--------------|----------|
-| **#236** | **CODE FIX**: Add `private_mode=True` to `webview.start()` call to prevent WebView2 caching. Consider v1.8.9.1 hotfix. | **HIGH** |
-| **#235** | **CODE FIX**: Cast `hwnd` properly in `_set_windows_icon` EnumWindows callback. Use `ctypes.c_void_p` or handle overflow. | MEDIUM |
-| **#132** | **INVESTIGATE**: Download debug log, trace OllamaManager API call for custom model names. | HIGH |
+| # | Fix | Status |
+|---|-----|--------|
+| **#236** | Version-stamped WebView2 cache clear on upgrade | **CODED** — in `webview_gui/main.py` |
+| **#235** | Proper `argtypes` for Win32 functions | **CODED** — in `webview_gui/main.py` |
+| **#132** | Remove doubled `/v1/chat/completions` endpoint | **CODED** — in `translate/service.py` + `translate/cli.py` |
+| **#238** | Add Portuguese/Brazilian translation target | **CODED** — in `providers.py`, `main.py`, `index.html` (both dropdowns) |
 
 ### Candidates for Closing
 
@@ -319,11 +322,11 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 ### Decisions Needed
 
-| # | Decision | Options |
-|---|----------|---------|
-| **#236** | Hotfix v1.8.9.1 for WebUI cache? | (a) Hotfix release, (b) Document workaround, (c) Fix in v1.9.0 |
-| **#227** | MPS strategy — selective by model? | (a) Allow MPS for kotoba-*, force CPU for whisper-*, (b) Disable MPS entirely, (c) Let user choose |
-| **#128** | Accept hyiip's Gemma 3 contribution? | (a) Coordinate for v1.9.0, (b) Do it ourselves |
+| # | Decision | Recommendation |
+|---|----------|----------------|
+| **#236/#235/#132** | Release v1.8.9.1 hotfix? | **YES** — all 3 fixes coded with validated root causes. #132 breaks ALL Ollama users, #236 affects ALL upgrading users. |
+| **#227** | MPS strategy — selective by model? | Defer to v1.9.0 (needs more M3/M4 data) |
+| **#128** | Accept hyiip's Gemma 3 contribution? | Coordinate for v1.9.0 |
 
 ---
 
@@ -384,13 +387,19 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 All planned items shipped except MPS selective policy (deferred, needs more data).
 
-### v1.8.9.1 Hotfix — RECOMMENDED
+### v1.8.9.1 Hotfix — RECOMMENDED (all 3 fixes coded, root causes validated)
 
-| Item | Issues | Why |
-|------|--------|-----|
-| WebUI cache fix (`private_mode=True`) | #236 | ALL upgrading users affected |
-| ctypes hwnd overflow fix | #235 | First-launch error spam (non-blocking) |
-| OllamaManager 404 investigation | #132 | Ollama CLI broken for custom model names |
+| Item | Issues | Root Cause | Fix | Files |
+|------|--------|------------|-----|-------|
+| WebUI cache on upgrade | #236 | WebView2 disk cache serves stale HTML/JS after upgrade | Version-stamped cache clear on startup (preserves Local Storage) | `webview_gui/main.py` |
+| Ollama doubled endpoint | #132 | `/v1/chat/completions` appended twice → 404 | Remove redundant append | `translate/service.py`, `translate/cli.py` |
+| ctypes hwnd overflow | #235 | Win32 functions missing `argtypes` — 64-bit hwnd overflows | Added proper `argtypes`/`restype` for 7 Win32 functions | `webview_gui/main.py` |
+| Portuguese translation target | #238 | Missing language option | Added to SUPPORTED_TARGETS, argparse, both GUI dropdowns | `providers.py`, `main.py`, `index.html` |
+
+**Impact assessment:**
+- **#132** — Breaks ALL `--provider ollama` users (CLI and service paths). Not just custom models. Highest urgency.
+- **#236** — Affects ALL users upgrading from any previous version. They see old UI with no indication anything changed.
+- **#235** — Non-blocking (exceptions ignored, works on retry). Lowest urgency but easy win.
 
 ### v1.9.0 — Proposed Scope
 
@@ -431,6 +440,8 @@ All planned items shipped except MPS selective policy (deferred, needs more data
 
 | Date | Changes |
 |------|---------|
+| **2026-03-18** | **rev12.** #238 Portuguese/Brazilian translation target added (4 files: providers.py, main.py, index.html ×2). v1.8.9.1 hotfix scope expanded to 4 items: #236 (WebUI cache), #132 (Ollama 404), #235 (ctypes hwnd), #238 (Portuguese). All coded. Total open: 47. |
+| **2026-03-18** | **rev11.1.** Root causes validated for all 3 hotfix candidates. #132: doubled endpoint path `/v1/chat/completions/v1/chat/completions` confirmed from user's debug log — breaks ALL Ollama users, not just custom models. #236: WebView2 disk cache — fix clears Cache/Code Cache on version change, preserves Local Storage. #235: Win32 argtypes missing — added proper type declarations. All 3 fixes coded. |
 | **2026-03-18** | **rev11.** v1.8.9 RELEASED. 5 new issues (#233-#237). #214 closed. #228 self-resolved (installed CUDA runtime DLLs). #231 root cause: Kaggle llvmlite 0.43.0 too old. #132 new: Ollama 404 with translategemma:27b on v1.8.9. **Post-release bugs**: #235 ctypes hwnd overflow, #236 WebUI cache prevents seeing v1.8.9 changes. v1.8.9 release comments posted on #223, #224, #209, #212, #214, #132, #128, #230. Cluster E renamed to GUI/WebUI, expanded with #235/#236. Total open: 46. |
 | 2026-03-17 | **rev10.** #229 self-resolved (python env). #225 install log analyzed — clean install, white screen is WebView2 runtime issue. #231 fzfile replied (T4x2, GitHub notebook), sent diagnostic code. #227 answered dadlaugh's batch_size question, asked for M3/M4 testers. All issues responded — 0 NEEDS RESPONSE. V189 quality plan verified complete. #128 Gemma 3 redirected to OllamaManager. |
 | 2026-03-16 | **rev9.** 5 new issues (#228-#232). BYOP XXL committed (`aed1af2`). #217 received install log from vimbackground (needs analysis). #227 received MPS benchmark from dadlaugh (model-dependent: kotoba works, whisper-large fails). #223 continued feedback (16 comments). #198 and #201 closed. #230 new feature request for standalone merge tool. #231 Kaggle environment error. #232 whisper-ja-anime model request. Total open: 42. |
