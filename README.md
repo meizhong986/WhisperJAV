@@ -14,7 +14,7 @@
 
 A subtitle generator for Japanese Adult Videos.
 
-For user guide please see the [online documentation](https://meizhong986.github.io/WhisperJAV/).
+**Documentation:** [English](https://meizhong986.github.io/whisperjav/) | [简体中文](https://meizhong986.github.io/whisperjav/zh/)
 
 ---
 
@@ -147,6 +147,8 @@ whisperjav video.mp4 --ensemble --ensemble-serial --pass1-pipeline balanced --pa
 
 **Serial mode** (`--ensemble-serial`): Completes each file fully (Pass 1 → Pass 2 → Merge) before starting the next. See results as they finish instead of waiting for the entire batch.
 
+**BYOP: Faster Whisper XXL** (v1.8.9+): Use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as Pass 2 in ensemble mode. Select "XXL Faster Whisper" as the Pass 2 pipeline, point to your `faster-whisper-xxl.exe`, and add any extra args. CLI: `--pass2-pipeline xxl --xxl-exe /path/to/faster-whisper-xxl.exe`
+
 ### Speech Enhancement
 
 Pre-process audio per-scene after scene detection. Use surgically — audio processing that alters the mel-spectrogram can introduce artefacts.
@@ -211,9 +213,26 @@ whisperjav video.mp4 --translate
 whisperjav-translate -i subtitles.srt --provider deepseek
 ```
 
-Supports DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, OpenRouter, GLM, Groq, and local LLMs.
+Supports Ollama (local, recommended), DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, OpenRouter, GLM, Groq, and local LLMs.
 
-#### Local LLM Translation
+#### Ollama Translation (Recommended for Local)
+
+Run translation locally using [Ollama](https://ollama.com/) — no cloud API, no API key required:
+
+```bash
+whisperjav-translate -i subtitles.srt --provider ollama
+```
+
+OllamaManager auto-starts the server, detects your GPU, and picks the best model for your VRAM:
+
+| VRAM | Recommended Model |
+|------|-------------------|
+| CPU only | qwen2.5:3b |
+| 8 GB | qwen2.5:7b |
+| 12 GB | gemma3:12b |
+| 16 GB+ | qwen2.5:14b |
+
+#### Local LLM Translation (Legacy)
 
 Run translation entirely on your GPU — no cloud API, no API key required:
 
@@ -280,7 +299,7 @@ Whisper sometimes generates repeated text or phrases that weren't spoken. Whispe
 
 ## Installation
 
-> **Upgrading?** Run `whisperjav-upgrade` (works on Windows, Linux, and macOS). For code-only updates: `whisperjav-upgrade --wheel-only`. See the [Upgrade Guide](docs/UPGRADE.md) for details.
+> **Upgrading?** Run `whisperjav-upgrade` (works on Windows, Linux, and macOS). For code-only updates: `whisperjav-upgrade --wheel-only`. See the [Upgrade Guide](docs/en/UPGRADE.md) for details.
 
 ---
 
@@ -338,7 +357,7 @@ installer\install_windows.bat --local-llm       :: Include local LLM translation
 
 The installer runs in 5 phases: PyTorch first (with GPU detection), then scientific stack, Whisper packages, audio/CLI tools, and optional extras. This order matters — PyTorch must be installed before anything that depends on it, or you end up with CPU-only wheels.
 
-For the full walkthrough, see [docs/guides/installation_windows_python.md](docs/guides/installation_windows_python.md).
+For the full walkthrough, see [docs/en/guides/installation_windows_python.md](docs/en/guides/installation_windows_python.md).
 
 ---
 
@@ -370,7 +389,7 @@ chmod +x installer/install_mac.sh
 
 **Intel Macs:** CPU-only. No GPU acceleration available.
 
-For the full walkthrough, see [docs/guides/installation_mac_apple_silicon.md](docs/guides/installation_mac_apple_silicon.md).
+For the full walkthrough, see [docs/en/guides/installation_mac_apple_silicon.md](docs/en/guides/installation_mac_apple_silicon.md).
 
 ---
 
@@ -413,7 +432,7 @@ chmod +x installer/install_linux.sh
 
 **PEP 668 note:** If your distro's Python is "externally managed" (Ubuntu 24.04+, Fedora 38+), you'll need a virtual environment. The install script detects this and tells you what to do.
 
-For the full walkthrough including Colab/Kaggle setup, headless servers, and systemd services, see [docs/guides/installation_linux.md](docs/guides/installation_linux.md).
+For the full walkthrough including Colab/Kaggle setup, headless servers, and systemd services, see [docs/en/guides/installation_linux.md](docs/en/guides/installation_linux.md).
 
 ---
 
