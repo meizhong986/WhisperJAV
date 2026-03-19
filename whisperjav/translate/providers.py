@@ -54,6 +54,8 @@ PROVIDER_CONFIGS = {
         'supports_system_messages': True,
         'supports_streaming': True,
     },
+    # DEPRECATED in v1.8.10. Will be removed in v1.9.0.
+    # Users should migrate to 'ollama' provider.
     'local': {
         'pysubtrans_name': 'Local',  # Marker for local LLM bypass
         'model': 'llama-8b',          # Default: good quality, 6GB VRAM

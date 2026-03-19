@@ -72,6 +72,14 @@ OLLAMA_MODEL_CONFIGS = {
         "quality": "basic",
         "min_vram_gb": 0,
     },
+    "gemma3:4b": {
+        "num_ctx": 8192,
+        "batch_size": 11,
+        "temperature": 0.3,
+        "download_size": "2.5 GB",
+        "quality": "good",
+        "min_vram_gb": 4,
+    },
     "qwen2.5:7b": {
         "num_ctx": 8192,
         "batch_size": 11,
@@ -350,11 +358,13 @@ class OllamaManager:
             pick = "gemma3:12b"
         elif vram_gb >= 8:
             pick = "qwen2.5:7b"
+        elif vram_gb >= 4:
+            pick = "gemma3:4b"
         else:
             pick = "qwen2.5:3b"
 
         cfg = OLLAMA_MODEL_CONFIGS[pick]
-        note = f"Recommended for {'CPU/low VRAM' if vram_gb < 8 else f'{vram_gb:.0f} GB VRAM'}"
+        note = f"Recommended for {'CPU/low VRAM' if vram_gb < 4 else f'{vram_gb:.0f} GB VRAM'}"
 
         return ModelRecommendation(
             name=pick,

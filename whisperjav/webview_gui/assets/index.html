@@ -720,7 +720,8 @@
                                     </div>
                                     <div class="translate-inline-settings" id="ensembleTranslateSettings">
                                         <select id="ensembleTranslateProvider" class="form-select compact" title="Translation provider">
-                                            <option value="local">Local LLM</option>
+                                            <option value="ollama">Ollama (Local)</option>
+                                            <option value="local">Local LLM (deprecated)</option>
                                             <option value="deepseek">DeepSeek</option>
                                             <option value="gemini">Gemini</option>
                                             <option value="claude">Claude</option>
@@ -762,7 +763,8 @@
                                         <div class="form-group">
                                             <label for="translatorProvider" class="form-label">Provider:</label>
                                             <select id="translatorProvider" class="form-select">
-                                                <option value="local">Local LLM</option>
+                                                <option value="ollama">Ollama (Local)</option>
+                                                <option value="local">Local LLM (deprecated)</option>
                                                 <option value="deepseek">DeepSeek</option>
                                                 <option value="gemini">Gemini</option>
                                                 <option value="claude">Claude</option>
@@ -773,11 +775,21 @@
                                                 <option value="custom">Custom (OpenAI-compatible)</option>
                                             </select>
                                         </div>
+                                        <div id="ollamaStatusPanel" class="ollama-status-panel" style="display:none">
+                                            <span id="ollamaStatusIcon" class="ollama-status-icon">●</span>
+                                            <span id="ollamaStatusText">Checking...</span>
+                                            <button type="button" id="ollamaStartBtn" class="btn btn-secondary btn-compact" style="display:none">Start Server</button>
+                                            <button type="button" id="ollamaCheckAgain" class="btn btn-secondary btn-compact" style="display:none">Check Again</button>
+                                        </div>
                                         <div class="form-group">
                                             <label for="translatorModel" class="form-label">Model:</label>
                                             <select id="translatorModel" class="form-select">
                                                 <option value="">Default</option>
                                             </select>
+                                            <div id="ollamaModelStatus" class="ollama-model-status" style="display:none">
+                                                <span id="ollamaModelStatusText" class="ollama-model-status-text"></span>
+                                                <button type="button" id="ollamaDownloadBtn" class="btn btn-primary btn-compact" style="display:none">Download</button>
+                                            </div>
                                         </div>
                                         <div class="form-group">
                                             <label for="translatorCustomModel" class="form-label">Override/Custom Model:</label>
@@ -1291,6 +1303,12 @@
                             <div class="form-group full-width">
                                 <label for="translationCustomEndpoint" class="form-label">Custom Endpoint URL:</label>
                                 <input type="text" id="translationCustomEndpoint" class="form-input" placeholder="https://api.example.com/v1 (for OpenAI-compatible APIs)">
+                            </div>
+                        </div>
+                        <div class="form-row ollama-settings-row" style="display:none">
+                            <div class="form-group full-width">
+                                <label for="translationOllamaUrl" class="form-label">Ollama Server URL:</label>
+                                <input type="text" id="translationOllamaUrl" class="form-input" placeholder="http://localhost:11434 (leave empty for default)">
                             </div>
                         </div>
                     </div>

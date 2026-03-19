@@ -5869,6 +5869,7 @@ const TranslatorManager = {
 
     // Provider model options
     providerModels: {
+        ollama: ['gemma3:12b', 'qwen2.5:14b', 'qwen2.5:7b', 'gemma3:4b', 'qwen2.5:3b'],
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
@@ -5878,6 +5879,15 @@ const TranslatorManager = {
         glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
         groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
         custom: []
+    },
+
+    // VRAM labels for Ollama models (shown in dropdown)
+    ollamaModelLabels: {
+        'gemma3:12b': 'gemma3:12b (12GB VRAM)',
+        'qwen2.5:14b': 'qwen2.5:14b (16GB VRAM)',
+        'qwen2.5:7b': 'qwen2.5:7b (8GB VRAM)',
+        'gemma3:4b': 'gemma3:4b (4GB VRAM)',
+        'qwen2.5:3b': 'qwen2.5:3b (2GB VRAM)',
     },
 
     init() {
@@ -5894,9 +5904,17 @@ const TranslatorManager = {
         document.getElementById('translatorStartBtn')?.addEventListener('click', () => this.startTranslation());
         document.getElementById('translatorCancelBtn')?.addEventListener('click', () => this.cancelTranslation());
 
-        // Initialize model options for default provider (Local LLM)
-        this.updateModelOptions('local');
-        this.updateApiKeyStatus('local');
+        // Bind Ollama buttons
+        document.getElementById('ollamaStartBtn')?.addEventListener('click', () => this.startOllamaServer());
+        document.getElementById('ollamaCheckAgain')?.addEventListener('click', () => this.checkOllamaStatus());
+        document.getElementById('ollamaDownloadBtn')?.addEventListener('click', () => this.downloadOllamaModel());
+
+        // Bind model change to update download status (T3-2/T3-3)
+        document.getElementById('translatorModel')?.addEventListener('change', () => this.updateOllamaModelStatus());
+
+        // Initialize model options for default provider (Ollama)
+        this.updateModelOptions('ollama');
+        this.updateApiKeyStatus('ollama');
 
         console.log('TranslatorManager initialized');
     },
@@ -5930,18 +5948,202 @@ const TranslatorManager = {
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
-                const label = (provider === 'local') ? (localModelLabels[m] || m) : m;
+                let label = m;
+                if (provider === 'local') label = localModelLabels[m] || m;
+                else if (provider === 'ollama') label = this.ollamaModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
+
+        // Show/hide Ollama status panel
+        const ollamaPanel = document.getElementById('ollamaStatusPanel');
+        if (ollamaPanel) {
+            ollamaPanel.style.display = (provider === 'ollama') ? 'flex' : 'none';
+            if (provider === 'ollama') this.checkOllamaStatus();
+        }
+    },
+
+    // Cache of locally available Ollama model names (refreshed on status check)
+    localOllamaModels: [],
+
+    async checkOllamaStatus() {
+        const icon = document.getElementById('ollamaStatusIcon');
+        const text = document.getElementById('ollamaStatusText');
+        const startBtn = document.getElementById('ollamaStartBtn');
+        const checkBtn = document.getElementById('ollamaCheckAgain');
+        if (!icon || !text) return;
+
+        text.textContent = 'Checking...';
+        icon.style.color = '#999';
+
+        try {
+            const status = await pywebview.api.detect_ollama();
+            if (status.running) {
+                icon.style.color = '#4CAF50';
+                text.textContent = 'Server Running';
+                if (startBtn) startBtn.style.display = 'none';
+                if (checkBtn) checkBtn.style.display = 'none';
+                // T3-3: Fetch locally available models when server is running
+                this.refreshLocalModels();
+            } else if (status.installed) {
+                icon.style.color = '#FF9800';
+                text.textContent = 'Installed — Not Running';
+                if (startBtn) startBtn.style.display = 'inline-block';
+                if (checkBtn) checkBtn.style.display = 'inline-block';
+                this.localOllamaModels = [];
+                this.updateOllamaModelStatus();
+            } else {
+                icon.style.color = '#f44336';
+                text.textContent = 'Not Installed — visit ollama.com';
+                if (startBtn) startBtn.style.display = 'none';
+                if (checkBtn) checkBtn.style.display = 'inline-block';
+                this.localOllamaModels = [];
+                this.updateOllamaModelStatus();
+            }
+        } catch (e) {
+            icon.style.color = '#f44336';
+            text.textContent = 'Check failed';
+            if (checkBtn) checkBtn.style.display = 'inline-block';
+        }
+    },
+
+    async refreshLocalModels() {
+        try {
+            const result = await pywebview.api.list_ollama_models();
+            if (result.success && result.models) {
+                // Ollama API returns [{name: "gemma3:12b", ...}, ...]
+                this.localOllamaModels = result.models.map(m => m.name || m);
+            } else {
+                this.localOllamaModels = [];
+            }
+        } catch (e) {
+            this.localOllamaModels = [];
+        }
+        // Re-render model dropdown with installed markers
+        this.updateModelOptionsWithLocalInfo();
+        this.updateOllamaModelStatus();
+    },
+
+    updateModelOptionsWithLocalInfo() {
+        const modelSelect = document.getElementById('translatorModel');
+        if (!modelSelect) return;
+
+        const provider = document.getElementById('translatorProvider')?.value;
+        if (provider !== 'ollama') return;
+
+        const currentValue = modelSelect.value;
+        const models = this.providerModels.ollama || [];
+
+        modelSelect.innerHTML = '<option value="">Default</option>' +
+            models.map(m => {
+                const baseLabel = this.ollamaModelLabels[m] || m;
+                const isLocal = this.localOllamaModels.some(lm => lm === m || lm.startsWith(m + ':') || m.startsWith(lm));
+                const label = isLocal ? `${baseLabel} ✓` : baseLabel;
+                return `<option value="${m}">${label}</option>`;
+            }).join('');
+
+        // Restore previous selection
+        if (currentValue) modelSelect.value = currentValue;
+    },
+
+    updateOllamaModelStatus() {
+        const provider = document.getElementById('translatorProvider')?.value;
+        const statusDiv = document.getElementById('ollamaModelStatus');
+        const statusText = document.getElementById('ollamaModelStatusText');
+        const downloadBtn = document.getElementById('ollamaDownloadBtn');
+        if (!statusDiv || provider !== 'ollama') {
+            if (statusDiv) statusDiv.style.display = 'none';
+            return;
+        }
+
+        const modelSelect = document.getElementById('translatorModel');
+        const selectedModel = modelSelect?.value;
+
+        if (!selectedModel || this.localOllamaModels.length === 0) {
+            statusDiv.style.display = 'none';
+            return;
+        }
+
+        const isLocal = this.localOllamaModels.some(lm => lm === selectedModel || lm.startsWith(selectedModel + ':') || selectedModel.startsWith(lm));
+
+        statusDiv.style.display = 'flex';
+        if (isLocal) {
+            statusText.textContent = 'Installed locally';
+            statusText.style.color = '#4CAF50';
+            if (downloadBtn) downloadBtn.style.display = 'none';
+        } else {
+            const size = this.ollamaModelLabels[selectedModel] || '';
+            statusText.textContent = 'Not downloaded';
+            statusText.style.color = '#FF9800';
+            if (downloadBtn) downloadBtn.style.display = 'inline-block';
+        }
+    },
+
+    async downloadOllamaModel() {
+        const modelSelect = document.getElementById('translatorModel');
+        const selectedModel = modelSelect?.value;
+        if (!selectedModel) return;
+
+        const statusText = document.getElementById('ollamaModelStatusText');
+        const downloadBtn = document.getElementById('ollamaDownloadBtn');
+
+        if (statusText) {
+            statusText.textContent = `Downloading ${selectedModel}...`;
+            statusText.style.color = '#999';
+        }
+        if (downloadBtn) {
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Downloading...';
+        }
+
+        try {
+            const result = await pywebview.api.pull_ollama_model(selectedModel);
+            if (result.success) {
+                if (statusText) {
+                    statusText.textContent = 'Download complete ✓';
+                    statusText.style.color = '#4CAF50';
+                }
+                if (downloadBtn) downloadBtn.style.display = 'none';
+                // Refresh local models list
+                await this.refreshLocalModels();
+            } else {
+                if (statusText) {
+                    statusText.textContent = `Download failed: ${result.error || 'Unknown error'}`;
+                    statusText.style.color = '#f44336';
+                }
+            }
+        } catch (e) {
+            if (statusText) {
+                statusText.textContent = 'Download failed';
+                statusText.style.color = '#f44336';
+            }
+        } finally {
+            if (downloadBtn) {
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Download';
+            }
+        }
+    },
+
+    async startOllamaServer() {
+        const text = document.getElementById('ollamaStatusText');
+        if (text) text.textContent = 'Starting...';
+        try {
+            await pywebview.api.start_ollama_server();
+            await this.checkOllamaStatus();
+        } catch (e) {
+            if (text) text.textContent = 'Start failed';
+        }
     },
 
     async updateApiKeyStatus(provider) {
         const statusEl = document.getElementById('translatorApiStatus');
         if (!statusEl) return;
 
-        // Local/custom providers don't need API key
-        if (provider === 'local' || provider === 'custom') {
-            statusEl.textContent = provider === 'local' ? 'Local (No API)' : 'Custom (No API)';
+        // Ollama/Local/custom providers don't need API key
+        if (provider === 'ollama' || provider === 'local' || provider === 'custom') {
+            if (provider === 'ollama') statusEl.textContent = 'Ollama (No API Key)';
+            else if (provider === 'local') statusEl.textContent = 'Local (No API)';
+            else statusEl.textContent = 'Custom (No API)';
             statusEl.className = 'api-status configured';
             return;
         }
@@ -6424,6 +6626,7 @@ const TranslateIntegrationManager = {
 const TranslationSettingsModal = {
     // Provider model options (shared with inline dropdown)
     providerModels: {
+        ollama: ['gemma3:12b', 'qwen2.5:14b', 'qwen2.5:7b', 'gemma3:4b', 'qwen2.5:3b'],
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
@@ -6447,7 +6650,8 @@ const TranslationSettingsModal = {
         maxBatchSize: 30,
         temperature: 0.5,
         topP: 0.9,
-        customEndpoint: ''
+        customEndpoint: '',
+        ollamaUrl: ''
     },
 
     init() {
@@ -6473,21 +6677,14 @@ const TranslationSettingsModal = {
         // Provider change handler for inline dropdown
         document.getElementById('ensembleTranslateProvider')?.addEventListener('change', (e) => {
             this.updateModelOptions(e.target.value);
+            // Show/hide Ollama URL field in settings modal
+            document.querySelectorAll('.ollama-settings-row').forEach(el => {
+                el.style.display = (e.target.value === 'ollama') ? 'block' : 'none';
+            });
         });
 
-        // Initialize model options for default provider (Local LLM)
-        this.updateModelOptions('local');
-
-        // Set default model selection to gemma-9b (8GB VRAM)
-        const modelSelect = document.getElementById('ensembleTranslateModel');
-        if (modelSelect) {
-            // Will be populated by updateModelOptions, then set default
-            setTimeout(() => {
-                if (modelSelect.querySelector('option[value="gemma-9b"]')) {
-                    modelSelect.value = 'gemma-9b';
-                }
-            }, 0);
-        }
+        // Initialize model options for default provider (Ollama)
+        this.updateModelOptions('ollama');
 
         // Load saved settings
         this.loadSettings();
@@ -6533,6 +6730,7 @@ const TranslationSettingsModal = {
         this.settings.temperature = parseFloat(document.getElementById('translationTemperature')?.value) || 0.5;
         this.settings.topP = parseFloat(document.getElementById('translationTopP')?.value) || 0.9;
         this.settings.customEndpoint = document.getElementById('translationCustomEndpoint')?.value || '';
+        this.settings.ollamaUrl = document.getElementById('translationOllamaUrl')?.value || '';
 
         // Persist to localStorage (fast cache / fallback)
         try {
@@ -6595,6 +6793,8 @@ const TranslationSettingsModal = {
         document.getElementById('translationTemperature').value = this.settings.temperature;
         document.getElementById('translationTopP').value = this.settings.topP;
         document.getElementById('translationCustomEndpoint').value = this.settings.customEndpoint;
+        const ollamaUrlEl = document.getElementById('translationOllamaUrl');
+        if (ollamaUrlEl) ollamaUrlEl.value = this.settings.ollamaUrl || '';
     },
 
     updateMultiFileWarning() {
@@ -6617,17 +6817,30 @@ const TranslationSettingsModal = {
             'llama-3b': 'llama-3b (3GB)',
             'auto': 'auto'
         };
+        const ollamaModelLabels = {
+            'gemma3:12b': 'gemma3:12b (12GB VRAM)',
+            'qwen2.5:14b': 'qwen2.5:14b (16GB VRAM)',
+            'qwen2.5:7b': 'qwen2.5:7b (8GB VRAM)',
+            'gemma3:4b': 'gemma3:4b (4GB VRAM)',
+            'qwen2.5:3b': 'qwen2.5:3b (2GB VRAM)',
+        };
 
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
-                const label = (provider === 'local') ? (localModelLabels[m] || m) : m;
+                let label = m;
+                if (provider === 'local') label = localModelLabels[m] || m;
+                else if (provider === 'ollama') label = ollamaModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
 
         // Set default model for local provider to gemma-9b
         if (provider === 'local' && models.includes('gemma-9b')) {
             modelSelect.value = 'gemma-9b';
+        }
+        // Set default model for Ollama to gemma3:12b
+        if (provider === 'ollama' && models.includes('gemma3:12b')) {
+            modelSelect.value = 'gemma3:12b';
         }
     },
 
@@ -6637,13 +6850,16 @@ const TranslationSettingsModal = {
         const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
         const apiKey = document.getElementById('translationApiKey')?.value || '';
 
-        // Local/custom providers don't need API key testing
-        if (provider === 'local' || provider === 'custom') {
+        // Ollama/Local/custom providers don't need API key testing
+        if (provider === 'ollama' || provider === 'local' || provider === 'custom') {
             if (statusEl) {
-                statusEl.textContent = provider === 'local' ? 'Local (No API)' : 'Custom (No API)';
+                if (provider === 'ollama') statusEl.textContent = 'Ollama (No API Key)';
+                else if (provider === 'local') statusEl.textContent = 'Local (No API)';
+                else statusEl.textContent = 'Custom (No API)';
                 statusEl.className = 'api-status connected';
             }
-            ConsoleManager.log(`${provider === 'local' ? 'Local LLM' : 'Custom endpoint'} provider selected - no API key required`, 'info');
+            const label = provider === 'ollama' ? 'Ollama' : provider === 'local' ? 'Local LLM' : 'Custom endpoint';
+            ConsoleManager.log(`${label} provider selected - no API key required`, 'info');
             return;
         }
 
@@ -6699,7 +6915,8 @@ const TranslationSettingsModal = {
             maxBatchSize: this.settings.maxBatchSize,
             temperature: this.settings.temperature,
             topP: this.settings.topP,
-            customEndpoint: this.settings.customEndpoint
+            customEndpoint: this.settings.customEndpoint,
+            ollamaUrl: this.settings.ollamaUrl
         };
     }
 };

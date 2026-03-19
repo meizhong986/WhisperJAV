@@ -538,6 +538,18 @@ def main():
         print(f"  Instructions: {instruction_file}", file=sys.stderr)
     print(f"  Provider options: {provider_options}", file=sys.stderr)
     if provider_name == 'local':
+        print(
+            "\n  [DEPRECATION WARNING] --provider local is deprecated as of v1.8.10.",
+            file=sys.stderr,
+        )
+        print(
+            "  Please migrate to --provider ollama for better stability and model support.",
+            file=sys.stderr,
+        )
+        print(
+            "  The local LLM server (llama-cpp-python) will be removed in v1.9.0.\n",
+            file=sys.stderr,
+        )
         n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)
         print(f"  NOTE: Local LLM provider - server will be started", file=sys.stderr)
         print(f"  GPU layers: {n_gpu_layers} (-1=all, 0=CPU only)", file=sys.stderr)

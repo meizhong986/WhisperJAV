@@ -416,6 +416,13 @@ def translate_with_config(
         # For local provider WITHOUT custom endpoint: start llama.cpp server
         # If local + endpoint: skip server launch, use the endpoint directly (cloud path)
         elif provider == 'local' and not endpoint:
+            import warnings
+            warnings.warn(
+                "provider='local' is deprecated as of v1.8.10 and will be removed in v1.9.0. "
+                "Use provider='ollama' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             from .local_backend import start_local_server, stop_local_server
 
             # =========================================================================

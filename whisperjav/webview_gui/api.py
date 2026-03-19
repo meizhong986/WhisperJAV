@@ -2947,6 +2947,7 @@ class WhisperJAVAPI:
                 'temperature': model_params.get('temperature') or 0.5,
                 'topP': model_params.get('top_p') or 0.9,
                 'customEndpoint': backend.get('custom_endpoint', '') or '',
+                'ollamaUrl': backend.get('ollama_url', '') or '',
             }
             return {"success": True, "settings": gui_settings}
         except Exception as e:
@@ -2991,6 +2992,8 @@ class WhisperJAVAPI:
                 existing['max_batch_size'] = int(settings['maxBatchSize'])
             if 'customEndpoint' in settings:
                 existing['custom_endpoint'] = settings['customEndpoint'] or None
+            if 'ollamaUrl' in settings:
+                existing['ollama_url'] = settings['ollamaUrl'] or None
 
             # Nested model_params
             mp = existing.setdefault('model_params', {})
@@ -3193,6 +3196,20 @@ class WhisperJAVAPI:
             if not config:
                 return {"success": False, "error": f"Unknown provider: {provider}"}
 
+            # Ollama: test server connectivity instead of API key
+            if provider == 'ollama':
+                try:
+                    from whisperjav.translate.ollama_manager import OllamaManager
+                    mgr = OllamaManager(base_url=self._get_ollama_url())
+                    if mgr.detect_server():
+                        return {"success": True, "message": "Ollama server is running"}
+                    elif mgr.detect_installation():
+                        return {"success": False, "error": "Ollama installed but not running. Click 'Start Server'."}
+                    else:
+                        return {"success": False, "error": "Ollama not installed. Visit https://ollama.com to install."}
+                except Exception as e:
+                    return {"success": False, "error": f"Ollama check failed: {e}"}
+
             # Local/Custom providers don't require API keys
             if provider in ('local', 'custom'):
                 return {
@@ -3244,6 +3261,84 @@ class WhisperJAVAPI:
 
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    # ── Ollama-specific API methods ──────────────────────────────────────
+
+    def _get_ollama_url(self):
+        """Get Ollama URL from settings or default."""
+        try:
+            from whisperjav.translate.settings import load_settings
+            settings = load_settings()
+            return settings.get('ollama_url') or None
+        except Exception:
+            return None
+
+    def detect_ollama(self) -> Dict[str, Any]:
+        """Check Ollama installation and server status."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            server_running = mgr.detect_server()
+            installation = mgr.detect_installation()
+            return {
+                "success": True,
+                "installed": installation is not None,
+                "running": server_running,
+                "install_path": installation,
+                "base_url": mgr.base_url,
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def start_ollama_server(self) -> Dict[str, Any]:
+        """Start the Ollama server if installed but not running."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            started = mgr.start_server()
+            return {"success": started}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def list_ollama_models(self) -> Dict[str, Any]:
+        """List models available on the local Ollama server."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            if not mgr.detect_server():
+                return {"success": False, "error": "Ollama server is not running"}
+            models = mgr.list_models()
+            return {"success": True, "models": models}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def recommend_ollama_model(self) -> Dict[str, Any]:
+        """Get VRAM-aware model recommendation."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager()
+            rec = mgr.recommend_model()
+            return {
+                "success": True,
+                "model": rec.name,
+                "quality": rec.quality,
+                "download_size": rec.download_size,
+                "note": rec.note,
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def pull_ollama_model(self, model_name: str) -> Dict[str, Any]:
+        """Pull (download) a model from the Ollama registry."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            success = mgr.pull_model(model_name)
+            return {"success": success, "model": model_name}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # ── File selection methods ───────────────────────────────────────────
 
     def select_srt_files(self) -> Dict[str, Any]:
         """
@@ -3341,6 +3436,13 @@ class WhisperJAVAPI:
             # Provider
             provider = options.get('provider', 'deepseek')
             args.extend(["--provider", provider])
+
+            # Ollama-specific: pass URL and auto-confirm model pull
+            if provider == 'ollama':
+                ollama_url = self._get_ollama_url()
+                if ollama_url:
+                    args.extend(["--ollama-url", ollama_url])
+                args.append("--yes")  # Auto-confirm: GUI user has already chosen the model
 
             # Target language
             target = options.get('target_language', options.get('target', 'english'))

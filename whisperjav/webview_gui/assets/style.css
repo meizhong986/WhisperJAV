@@ -1939,6 +1939,104 @@ button:focus-visible,
     color: var(--error-color, #e53935);
 }
 
+/* Ollama Status Panel */
+.ollama-status-panel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--card-bg, #1e1e2e);
+    border: 1px solid var(--border-color, #333);
+    margin-bottom: 12px;
+}
+
+.ollama-status-panel .status-icon {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #888;
+    transition: background 0.3s ease;
+}
+
+.ollama-status-panel .status-icon.green {
+    background: #4caf50;
+    box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
+}
+
+.ollama-status-panel .status-icon.orange {
+    background: #ff9800;
+    box-shadow: 0 0 6px rgba(255, 152, 0, 0.5);
+}
+
+.ollama-status-panel .status-icon.red {
+    background: #e53935;
+    box-shadow: 0 0 6px rgba(229, 57, 53, 0.5);
+}
+
+.ollama-status-panel .status-text {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-secondary, #aaa);
+}
+
+.ollama-status-panel .btn-sm {
+    padding: 4px 12px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #444);
+    background: var(--card-bg, #2a2a3e);
+    color: var(--text-primary, #ddd);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s ease;
+}
+
+.ollama-status-panel .btn-sm:hover {
+    background: var(--hover-bg, #333);
+}
+
+.ollama-status-panel .btn-sm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Ollama Model Status (below model dropdown) */
+.ollama-model-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 11px;
+}
+
+.ollama-model-status-text {
+    flex: 1;
+}
+
+/* Ollama Settings Row (in settings modal) */
+.ollama-settings-row {
+    margin-top: 8px;
+}
+
+.ollama-settings-row label {
+    font-size: 12px;
+    color: var(--text-secondary, #aaa);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.ollama-settings-row input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #444);
+    background: var(--input-bg, #1a1a2e);
+    color: var(--text-primary, #ddd);
+}
+
 /* Translation Settings Grid */
 .translator-settings-grid {
     display: grid;

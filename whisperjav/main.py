@@ -393,7 +393,7 @@ def parse_arguments():
         "--translate-provider",
         choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq", "ollama", "local", "custom"],
         default="deepseek",
-        help="Translation AI provider (default: deepseek). Use 'ollama' for Ollama local LLM. Use 'local' for built-in llama-cpp server. Use 'custom' with --translate-endpoint for any OpenAI-compatible API."
+        help="Translation AI provider (default: deepseek). Use 'ollama' for Ollama local LLM. 'local' is deprecated in v1.8.10 — use 'ollama' instead. Use 'custom' with --translate-endpoint for any OpenAI-compatible API."
     )
     translation_group.add_argument(
         "--translate-target",
