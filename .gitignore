@@ -116,8 +116,9 @@ installer/generated/
 installer/*.whl
 installer/build_log_*.txt
 
-# Reference scripts (local development only)
+# Reference scripts (local development only, except translate_docs.py)
 scripts/
+!scripts/translate_docs.py
 
 # Analysis output files
 *_ANALYSIS_REPORT.md

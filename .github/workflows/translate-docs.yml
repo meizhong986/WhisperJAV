@@ -1,0 +1,110 @@
+# =============================================================================
+# Auto-translate English docs to Chinese when docs/en/ changes
+# =============================================================================
+# Triggers on push to main when English docs change.
+# Uses Claude API to translate changed files, then creates a PR for review.
+#
+# Required secrets:
+#   ANTHROPIC_API_KEY - Anthropic API key for Claude translation
+#
+# Cost: ~$0.10-0.30 per incremental update (only changed files are translated)
+# =============================================================================
+
+name: Translate Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/en/**/*.md'
+  workflow_dispatch:
+    inputs:
+      translate_all:
+        description: 'Translate all files (not just changed)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    # Only run if ANTHROPIC_API_KEY secret is configured
+    if: ${{ vars.ENABLE_AUTO_TRANSLATE == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit for diff
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install anthropic
+
+      - name: Detect changed English docs
+        id: detect
+        run: |
+          if [ "${{ github.event.inputs.translate_all }}" = "true" ]; then
+            echo "mode=--all" >> $GITHUB_OUTPUT
+            echo "Translating ALL English docs"
+          else
+            CHANGED=$(git diff --name-only HEAD~1 -- 'docs/en/**/*.md' | wc -l)
+            echo "changed_count=$CHANGED" >> $GITHUB_OUTPUT
+            echo "mode=--changed" >> $GITHUB_OUTPUT
+            echo "Found $CHANGED changed English doc(s)"
+          fi
+
+      - name: Translate changed docs
+        if: steps.detect.outputs.changed_count != '0' || github.event.inputs.translate_all == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/translate_docs.py ${{ steps.detect.outputs.mode }}
+
+      - name: Copy images to zh
+        run: |
+          if [ -d "docs/en/guides/images" ]; then
+            mkdir -p docs/zh/guides/images
+            cp -r docs/en/guides/images/* docs/zh/guides/images/ 2>/dev/null || true
+          fi
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet docs/zh/; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No translation changes detected"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Translation changes detected:"
+            git diff --stat docs/zh/
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "docs(zh): auto-translate updated English docs"
+          title: "docs(zh): auto-translate updated English docs"
+          body: |
+            ## Summary
+            - Automated Chinese translation sync triggered by English doc changes
+            - Translated using Claude API with consistent glossary terms
+            - **Please review translations before merging**
+
+            ## Checklist
+            - [ ] Glossary terms used consistently
+            - [ ] Code blocks preserved in English
+            - [ ] Product/model names kept in English
+            - [ ] Markdown formatting intact
+            - [ ] Natural Chinese prose (not machine-translation style)
+
+            🤖 Generated with [Claude API](https://docs.anthropic.com/en/docs/about-claude/models)
+          branch: docs/auto-translate
+          labels: translation, documentation
+          delete-branch: true
