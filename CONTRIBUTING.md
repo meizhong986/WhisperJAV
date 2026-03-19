@@ -19,7 +19,7 @@ The documentation is available in English and Simplified Chinese. Chinese transl
 
 ### How to Contribute
 
-1. Browse the Chinese docs at [meizhong986.github.io/whisperjav/zh/](https://meizhong986.github.io/whisperjav/zh/)
+1. Browse the Chinese docs at [meizhong986.github.io/WhisperJAV/zh/](https://meizhong986.github.io/WhisperJAV/zh/)
 2. Find a page that needs improvement
 3. Click the edit icon (pencil) on the page, or edit the file directly in `docs/zh/`
 4. Submit a Pull Request with the `translation` label

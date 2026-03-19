@@ -1,7 +1,7 @@
 # =============================================================================
 # WhisperJAV Documentation — MkDocs Material Configuration
 # =============================================================================
-# Builds to: https://meizhong986.github.io/whisperjav/
+# Builds to: https://meizhong986.github.io/WhisperJAV/
 # Local preview: mkdocs serve
 # Deploy: automatic via GitHub Actions on push to main
 #
@@ -11,7 +11,7 @@
 # =============================================================================
 
 site_name: WhisperJAV Documentation
-site_url: https://meizhong986.github.io/whisperjav/
+site_url: https://meizhong986.github.io/WhisperJAV/
 site_description: Japanese Adult Video Subtitle Generator with AI-powered transcription
 site_author: MeiZhong
 repo_url: https://github.com/meizhong986/whisperjav
@@ -193,10 +193,10 @@ extra:
       link: https://github.com/meizhong986/whisperjav
   alternate:
     - name: English
-      link: /whisperjav/
+      link: /WhisperJAV/
       lang: en
     - name: 简体中文
-      link: /whisperjav/zh/
+      link: /WhisperJAV/zh/
       lang: zh
 
 copyright: Copyright &copy; 2024-2026 MeiZhong — MIT License

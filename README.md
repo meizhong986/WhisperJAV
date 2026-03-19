@@ -14,7 +14,7 @@
 
 A subtitle generator for Japanese Adult Videos.
 
-**Documentation:** [English](https://meizhong986.github.io/whisperjav/) | [简体中文](https://meizhong986.github.io/whisperjav/zh/)
+**Documentation:** [English](https://meizhong986.github.io/WhisperJAV/) | [简体中文](https://meizhong986.github.io/WhisperJAV/zh/)
 
 ---
 
