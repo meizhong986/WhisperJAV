@@ -1,6 +1,6 @@
 # WhisperJAV GUI User Guide
 
-> Screenshots from v1.8.6 · Windows 11
+> Screenshots from v1.8.9 · Windows 11
 
 ---
 
@@ -146,7 +146,7 @@ The **Advanced** tab (Tab 2) provides additional controls for troubleshooting an
 | Option | Default | Description |
 |--------|---------|-------------|
 | **Model override** | Off | When checked, forces a specific Whisper model size instead of the pipeline default |
-| **Model** dropdown | Large V2 | Only visible when model override is checked. Options: Large V2, Large V3, Turbo |
+| **Model** dropdown | Large V3 | Only visible when model override is checked. Options: Large V2, Large V3, Turbo |
 | **Output format** | SRT | Output format: SRT, VTT, or Both |
 | **Async processing** | Off | Enables asynchronous pipeline execution |
 | **Debug logging** | Off | Writes detailed debug logs to `whisperjav.log` |
@@ -176,7 +176,7 @@ Always active. Each pass has identical controls:
 
 | Control | Options | Default |
 |---------|---------|---------|
-| **Pipeline** | Balanced, Fast, Faster, Fidelity, Transformers, Qwen3-ASR, ChronosJAV | Balanced |
+| **Pipeline** | Balanced, Fast, Faster, Fidelity, Transformers, Qwen3-ASR, ChronosJAV, XXL Faster Whisper | Balanced |
 | **Sensitivity** | Aggressive, Balanced, Conservative | Aggressive |
 | **Scene Detector** | Auditok, Silero, Semantic, None | Semantic |
 | **Speech Enhancer** | None, FFmpeg DSP, ZipEnhancer, ClearVoice, BS-RoFormer | None |
@@ -192,6 +192,7 @@ The pipeline dropdown groups options by backend:
 - **Whisper-Based**: Balanced, Fast, Faster, Fidelity
 - **HuggingFace**: Transformers
 - **ChronosJAV**: Qwen3-ASR, Anime-Whisper
+- **External (BYOP)**: XXL Faster Whisper (Pass 2 only)
 
 ### Customize Parameters
 
@@ -208,6 +209,21 @@ Use **Save Preset** to save your configuration for reuse, or **Load Preset** to 
 Check the **Pass 2** checkbox to enable the second pass. Controls are identical to Pass 1.
 
 When disabled, the row is greyed out and all controls are inactive.
+
+### BYOP: XXL Faster Whisper (v1.8.9+)
+
+Select **XXL Faster Whisper** as the Pass 2 pipeline to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external subprocess. This is a "Bring Your Own Pipeline" (BYOP) feature — you supply the executable, WhisperJAV handles integration.
+
+![Ensemble Mode with XXL Faster Whisper as Pass 2](images/gui-tab3-ensemble-xxl.png){ loading=lazy }
+
+| Field | Description |
+|-------|-------------|
+| **Executable** | Path to your `faster-whisper-xxl.exe`. Click **Browse** to select it. |
+| **Extra Args** | Any additional flags to pass to XXL (e.g., `--verbose True --standard_asia`). |
+
+WhisperJAV sends only 4 required args to XXL (input file, output dir, model, language). Everything else is controlled by your Extra Args field. XXL's real-time console output is streamed to the GUI console.
+
+If XXL crashes during shutdown (a known ctranslate2 behavior) but the SRT was already written, WhisperJAV keeps the valid output instead of discarding it.
 
 ### Speech Enhancement: FFmpeg DSP
 
@@ -258,7 +274,8 @@ The **AI SRT Translate** tab (Tab 4) is a standalone tool for translating existi
 
 | Provider | Notes |
 |----------|-------|
-| **Local** | Uses a local LLM server (llama-cpp). Free, private, no API key needed. Requires GPU with ~8GB VRAM. |
+| **Ollama** | Local LLM via Ollama. Free, private, no API key needed. Recommended over Local. |
+| **Local** | Uses a local LLM server (llama-cpp). Free, private. Legacy — consider Ollama instead. |
 | **DeepSeek** | Cloud API. Cost-effective, good quality for CJK languages. |
 | **Gemini** | Google's API. Good multilingual support. |
 | **Claude** | Anthropic's API. High quality, higher cost. |
@@ -284,7 +301,7 @@ The Local provider does not require an API key — it starts a llama-cpp server 
 | Setting | Options | Default |
 |---------|---------|---------|
 | **Source Language** | Japanese, Korean, Chinese | Japanese |
-| **Target Language** | English, Chinese, Indonesian, Spanish | English |
+| **Target Language** | English, Chinese, Indonesian, Portuguese, Spanish | English |
 | **Tone/Style** | Standard, Adult-Explicit | Standard |
 
 **Standard** tone produces clean, natural translations. **Adult-Explicit** uses specialized instructions tuned for JAV dialogue with appropriate vocabulary.
@@ -359,10 +376,11 @@ Press **F1** or access via the header. Shows version info, feature list, and key
 
 ### Update Check
 
-Click the update button in the header to check for new versions.
+WhisperJAV checks for updates automatically on startup (after a 3-second delay). When a new version is available, a subtle indicator appears in the header bar showing the version number. Click it to view the changelog.
 
-- **Stable Release** track — shows the latest published release, release notes, and an update button
-- **Development** track — shows how many commits ahead the dev branch is, with recent commit messages
+For critical updates, a full banner appears at the top of the window.
+
+You can also check manually: click the palette icon in the header, then **Check for Updates**.
 
 ### Translation Settings Modal
 

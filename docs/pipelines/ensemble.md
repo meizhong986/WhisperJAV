@@ -63,6 +63,27 @@ Click **Customize** on any pass for fine-grained parameter control.
 
 ---
 
+## BYOP: XXL Faster Whisper (v1.8.9+)
+
+Select **XXL Faster Whisper** as the Pass 2 pipeline to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external subprocess. This is "Bring Your Own Pipeline" — you supply the executable.
+
+### Setup
+
+1. Download Faster Whisper XXL from the link above
+2. In the Ensemble tab, select **XXL Faster Whisper** for Pass 2
+3. Click **Browse** to point to your `faster-whisper-xxl.exe`
+4. Add any extra args (e.g., `--verbose True --standard_asia`)
+
+WhisperJAV sends only 4 required args (input, output dir, model, language). Everything else is controlled by your Extra Args field.
+
+### CLI
+
+```bash
+whisperjav video.mp4 --pass2-pipeline xxl --xxl-exe /path/to/faster-whisper-xxl.exe
+```
+
+---
+
 ## Serial vs Parallel Batch Mode
 
 When processing multiple files in ensemble mode:

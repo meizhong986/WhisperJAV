@@ -1,7 +1,7 @@
 # WhisperJAV Linux Installation Guide
 
-**Version:** 1.8.3
-**Last Updated:** 2026-02-10
+**Version:** 1.8.9
+**Last Updated:** 2026-03-19
 **Platforms:** Ubuntu, Debian, Fedora, RHEL, Arch Linux, Google Colab, Kaggle
 
 ---

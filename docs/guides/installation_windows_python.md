@@ -1,4 +1,4 @@
-# WhisperJAV v1.8.3 -- Windows Installation Guide (Python Source)
+# WhisperJAV v1.8.9 -- Windows Installation Guide (Python Source)
 
 This guide is for experienced Python developers who want to install WhisperJAV from source on Windows. If you are looking for the standalone installer (no Python required), see the [Releases page](https://github.com/meizhong986/whisperjav/releases).
 
@@ -316,7 +316,7 @@ Install only the extras you need:
 REM HuggingFace (required for Qwen3-ASR and kotoba-whisper models)
 pip install "huggingface-hub>=0.25.0" "transformers>=4.40.0" "accelerate>=0.26.0" hf_xet
 
-REM Qwen3-ASR (new in v1.8.3, requires HuggingFace packages above)
+REM Qwen3-ASR (new in v1.8.9, requires HuggingFace packages above)
 pip install "qwen-asr>=0.0.6"
 
 REM Translation
@@ -392,7 +392,7 @@ python install.py --no-speech-enhancement
 | `llm` | uvicorn, fastapi | Local LLM server |
 | `enhance` | modelscope, clearvoice, bs-roformer | Speech enhancement |
 | `huggingface` | transformers, accelerate, hf_xet | HuggingFace model support |
-| `qwen` | qwen-asr (+ huggingface deps) | Qwen3-ASR pipeline (v1.8.3+) |
+| `qwen` | qwen-asr (+ huggingface deps) | Qwen3-ASR pipeline (v1.8.9+) |
 | `analysis` | matplotlib, Pillow | Visualization tools |
 | `compatibility` | av, imageio, httpx, websockets, soxr | pyvideotrans interop |
 | `dev` | pytest, ruff, pre-commit | Development tools |
@@ -483,7 +483,7 @@ whisperjav video.mp4 --mode balanced --sensitivity aggressive
 REM With translation
 whisperjav video.mp4 --translate
 
-REM With Qwen3-ASR pipeline (new in v1.8.3)
+REM With Qwen3-ASR pipeline (new in v1.8.9)
 whisperjav video.mp4 --mode qwen --input-mode assembly
 
 REM Process a directory
@@ -744,7 +744,7 @@ pip install "datasets>=2.14.0,<4.0"
 
 `datasets>=4.0` is incompatible with ModelScope.
 
-### Qwen3-ASR Issues (v1.8.3)
+### Qwen3-ASR Issues (v1.8.9)
 
 **Problem: `ImportError: No module named 'qwen_asr'`**
 

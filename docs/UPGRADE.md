@@ -6,36 +6,20 @@ This guide covers how to upgrade WhisperJAV to the latest version.
 
 The GUI will automatically check for updates on startup and display a notification banner when a new version is available.
 
-### Update Notification Banner
+### Update Indicator
 
-When an update is available, you'll see a colored banner at the top of the window:
+When an update is available, a small indicator appears in the header bar showing the new version number (e.g., "v1.8.10 available"). Click it to view the changelog and release notes.
 
-| Color | Update Type | Description |
-|-------|-------------|-------------|
-| Red | Critical | Security or critical bug fix - always shown |
-| Blue | Major | Major version update (e.g., 1.7 → 2.0) |
-| Green | Minor | New features (e.g., 1.7.4 → 1.8.0) |
-| Gray | Patch | Bug fixes (e.g., 1.7.4 → 1.7.5) |
+For **critical** updates only, a full colored banner appears at the top of the window to ensure you see it.
 
 ### One-Click Update
 
-1. Click **Update Now** on the notification banner
-2. Confirm the update in the dialog
-3. The GUI will close automatically
-4. The update runs in the background
-5. The GUI relaunches when complete
-
-### View Release Notes
-
-Click **Release Notes** on the banner to see what's new in the update.
-
-### Dismiss Notifications
-
-Click the **×** button to dismiss the notification. You'll be reminded:
-- Patch updates: Weekly
-- Minor updates: Monthly
-- Major updates: Every launch
-- Critical updates: Always shown (cannot dismiss)
+1. Click the update indicator in the header (or the banner for critical updates)
+2. View the changelog, then click **Update Now**
+3. Confirm the update in the dialog
+4. The GUI will close automatically
+5. The update runs in the background
+6. The GUI relaunches when complete
 
 ## CLI Users
 

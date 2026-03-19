@@ -8,7 +8,8 @@ WhisperJAV can translate Japanese subtitles to other languages using AI language
 
 | Provider | Type | API Key Required | Best For |
 |----------|------|-----------------|----------|
-| **Local LLM** | Local | No | Privacy, no cost, offline use |
+| **Ollama** | Local | No | Privacy, no cost, easy setup. Recommended for local use. |
+| **Local LLM** | Local | No | Legacy local option (llama-cpp). Consider Ollama instead. |
 | **DeepSeek** | Cloud | Yes | Cost-effective, good CJK quality |
 | **Gemini** | Cloud | Yes | Good multilingual support |
 | **Claude** | Cloud | Yes | High quality |
@@ -32,13 +33,40 @@ WhisperJAV can translate Japanese subtitles to other languages using AI language
 !!! tip
     API keys are saved locally and never sent anywhere except the provider's API endpoint.
 
-### Local LLM
+### Ollama (Recommended for Local)
+
+[Ollama](https://ollama.com/) is the easiest way to run local translation. Install Ollama, then:
+
+```bash
+# CLI: translate with Ollama (auto-detects GPU, picks best model for your VRAM)
+whisperjav-translate -i subtitles.srt --provider ollama
+
+# Use a specific model
+whisperjav-translate -i subtitles.srt --provider ollama --model gemma3:12b
+
+# List locally available Ollama models
+whisperjav --list-ollama-models
+```
+
+OllamaManager auto-starts the server, detects your GPU, and recommends a model:
+
+| VRAM | Recommended Model |
+|------|-------------------|
+| CPU only | qwen2.5:3b |
+| 8 GB | qwen2.5:7b |
+| 12 GB | gemma3:12b |
+| 16 GB+ | qwen2.5:14b |
+
+### Local LLM (Legacy)
 
 The Local provider runs a llama-cpp server on your machine. No API key needed, but requires:
 
 - A GPU with ~8GB VRAM
 - The `[llm]` extra installed (`pip install whisperjav[llm]`)
 - A GGUF model file (downloaded automatically on first use)
+
+!!! note
+    Consider switching to Ollama — it's easier to set up, more reliable, and supports more models.
 
 ---
 
@@ -120,11 +148,17 @@ whisperjav-translate --configure
 ## CLI Translation
 
 ```bash
-# Translate with DeepSeek
+# Translate with Ollama (local, recommended)
+whisperjav-translate -i subtitles.srt --provider ollama
+
+# Translate with DeepSeek (cloud)
 whisperjav-translate -i subtitles.srt --provider deepseek --api-key YOUR_KEY
 
 # Translate with adult tone
 whisperjav-translate -i subtitles.srt --provider gemini --tone adult
+
+# Translate to Portuguese
+whisperjav-translate -i subtitles.srt --target-language portuguese
 
 # Translate to Chinese
 whisperjav-translate -i subtitles.srt --target-language Chinese

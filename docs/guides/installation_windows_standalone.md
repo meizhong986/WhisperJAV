@@ -1,7 +1,7 @@
 # WhisperJAV Windows Standalone Installation Guide
 
-**Version:** 1.8.3
-**Last Updated:** 2026-02-10
+**Version:** 1.8.9
+**Last Updated:** 2026-03-19
 **Installer Type:** Standalone .exe (no admin required)
 
 ---
@@ -115,7 +115,7 @@ Some antivirus software may flag the installer or post-installation downloads. I
 
 ### Step 1: Download the Installer
 
-Download `WhisperJAV-1.8.3-Windows-x86_64.exe` from the [GitHub Releases page](https://github.com/meizhong986/whisperjav/releases).
+Download `WhisperJAV-1.8.9-Windows-x86_64.exe` from the [GitHub Releases page](https://github.com/meizhong986/whisperjav/releases).
 
 The installer file is approximately 150 MB.
 
@@ -195,7 +195,7 @@ After the base environment is extracted, a post-installation script runs automat
 - Creates `WhisperJAV-GUI.exe` launcher in the installation directory
 - Verifies icon files
 
-After all phases complete, a desktop shortcut named "WhisperJAV v1.8.3" is created.
+After all phases complete, a desktop shortcut named "WhisperJAV v1.8.9" is created.
 
 ### Step 8: Complete
 
@@ -216,7 +216,7 @@ Press Enter to close the installer window.
 
 ### Launching WhisperJAV
 
-Double-click the **"WhisperJAV v1.8.3"** shortcut on your desktop. Alternatively, double-click `WhisperJAV-GUI.exe` in the installation directory.
+Double-click the **"WhisperJAV v1.8.9"** shortcut on your desktop. Alternatively, double-click `WhisperJAV-GUI.exe` in the installation directory.
 
 ### First Transcription: AI Model Download
 
@@ -266,14 +266,14 @@ python -c "from whisperjav.__version__ import __version__; print(f'WhisperJAV {_
 
 Expected output:
 ```
-WhisperJAV 1.8.3
+WhisperJAV 1.8.9
 ```
 
 ### Check Installation Log
 
 The installation log is located at:
 ```
-[install_directory]\install_log_v1.8.3.txt
+[install_directory]\install_log_v1.8.9.txt
 ```
 
 This file contains detailed information about every step of the installation process and is useful for diagnosing issues.
@@ -284,7 +284,7 @@ This file contains detailed information about every step of the installation pro
 
 ### Automatic Upgrade Detection
 
-If you install WhisperJAV v1.8.3 to the same directory as a previous version, the installer will:
+If you install WhisperJAV v1.8.9 to the same directory as a previous version, the installer will:
 
 1. Detect the existing WhisperJAV installation
 2. Ask if you want to replace it
@@ -322,7 +322,7 @@ This file is NOT deleted during upgrades or reinstallation. If you are upgrading
 
 ### Method 2: Uninstall Script
 
-Run the `uninstall_v1.8.3.bat` file located in the installation directory. This interactive script will:
+Run the `uninstall_v1.8.9.bat` file located in the installation directory. This interactive script will:
 
 1. Remove the desktop shortcut
 2. Remove the Start Menu shortcut
@@ -340,7 +340,7 @@ Run the `uninstall_v1.8.3.bat` file located in the installation directory. This 
 
 2. **Delete the desktop shortcut:**
    ```
-   %USERPROFILE%\Desktop\WhisperJAV v1.8.3.lnk
+   %USERPROFILE%\Desktop\WhisperJAV v1.8.9.lnk
    ```
 
 3. **(Optional) Delete cached AI models** to free approximately 3 GB:
@@ -415,7 +415,7 @@ Run the `uninstall_v1.8.3.bat` file located in the installation directory. This 
 #### "Installation failed after retries"
 
 **Solution:**
-1. Check `install_log_v1.8.3.txt` in the installation directory for the specific error
+1. Check `install_log_v1.8.9.txt` in the installation directory for the specific error
 2. Common causes:
    - Antivirus blocking downloads: add an exclusion for the installation directory
    - Network timeout: try again with a better connection
@@ -427,7 +427,7 @@ Run the `uninstall_v1.8.3.bat` file located in the installation directory. This 
 **Cause:** An error occurred during the automated package installation phase.
 
 **Solution:**
-1. Check `install_log_v1.8.3.txt` for the specific phase that failed
+1. Check `install_log_v1.8.9.txt` for the specific phase that failed
 2. If it failed at PyTorch installation: check your GPU driver version
 3. If it failed at dependency installation: check network connectivity
 4. Re-run the installer; it will detect the existing partial installation and offer to replace it
@@ -478,7 +478,7 @@ Run the `uninstall_v1.8.3.bat` file located in the installation directory. This 
 The installer supports command-line options for automated deployment:
 
 ```cmd
-WhisperJAV-1.8.3-Windows-x86_64.exe /S /D=C:\WhisperJAV
+WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=C:\WhisperJAV
 ```
 
 ### Available Options
@@ -499,12 +499,12 @@ WhisperJAV-1.8.3-Windows-x86_64.exe /S /D=C:\WhisperJAV
 
 Install silently to a custom directory:
 ```cmd
-cmd /C START /WAIT WhisperJAV-1.8.3-Windows-x86_64.exe /S /D=D:\WhisperJAV
+cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=D:\WhisperJAV
 ```
 
 Install silently, skip local LLM, no PATH modification:
 ```cmd
-cmd /C START /WAIT WhisperJAV-1.8.3-Windows-x86_64.exe /S /AddToPath=0 /InstallLocalLLM=0
+cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /AddToPath=0 /InstallLocalLLM=0
 ```
 
 ---
@@ -573,8 +573,8 @@ After installation, the directory structure looks like this:
     pythonw.exe                   # Python (no console window)
     WhisperJAV-GUI.exe            # GUI launcher
     whisperjav_icon.ico           # Application icon
-    install_log_v1.8.3.txt        # Installation log
-    uninstall_v1.8.3.bat          # Uninstall script
+    install_log_v1.8.9.txt        # Installation log
+    uninstall_v1.8.9.bat          # Uninstall script
     Lib\                          # Python standard library
         site-packages\
             whisperjav\           # WhisperJAV application code
@@ -597,9 +597,9 @@ After installation, the directory structure looks like this:
 
 | Log | Path | Purpose |
 |-----|------|---------|
-| Installation log | `[install_dir]\install_log_v1.8.3.txt` | Detailed installation progress |
-| Failure marker | `[install_dir]\INSTALLATION_FAILED_v1.8.3.txt` | Created only if installation fails |
-| Uninstall log | `%TEMP%\whisperjav_uninstall_v1.8.3.txt` | Uninstallation details |
+| Installation log | `[install_dir]\install_log_v1.8.9.txt` | Detailed installation progress |
+| Failure marker | `[install_dir]\INSTALLATION_FAILED_v1.8.9.txt` | Created only if installation fails |
+| Uninstall log | `%TEMP%\whisperjav_uninstall_v1.8.9.txt` | Uninstallation details |
 
 ### Network Requirements
 
@@ -621,7 +621,7 @@ During installation, the following domains must be accessible:
 
 If you encounter issues not covered in this guide:
 
-1. Check the installation log at `install_log_v1.8.3.txt`
+1. Check the installation log at `install_log_v1.8.9.txt`
 2. Search existing issues at [GitHub Issues](https://github.com/meizhong986/whisperjav/issues)
 3. Open a new issue with:
    - Your Windows version

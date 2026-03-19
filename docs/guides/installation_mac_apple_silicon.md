@@ -1,8 +1,8 @@
 # WhisperJAV Installation Guide for Mac Apple Silicon
 
-**Version:** 1.8.3
+**Version:** 1.8.9
 **Platforms:** macOS 13 (Ventura) or later on Apple M1/M2/M3/M4/M5
-**Last Updated:** 2026-02-10
+**Last Updated:** 2026-03-19
 
 ---
 
@@ -264,7 +264,7 @@ pip install "faster-whisper>=1.1.0"
 # HuggingFace Transformers ecosystem
 pip install "huggingface-hub>=0.25.0" "transformers>=4.40.0" "accelerate>=0.26.0" hf_xet
 
-# Qwen3-ASR (v1.8.3+)
+# Qwen3-ASR (v1.8.9+)
 pip install "qwen-asr>=0.0.6"
 ```
 
@@ -448,9 +448,9 @@ See [Section 7](#7-qwen-pipeline-on-mac) for details.
 
 ## 7. Qwen Pipeline on Mac
 
-### Current Status (v1.8.3)
+### Current Status (v1.8.9)
 
-The Qwen3-ASR pipeline (`--mode qwen`) is a new feature in v1.8.3 that provides high-quality multilingual ASR. However, there is a known limitation on Mac Apple Silicon:
+The Qwen3-ASR pipeline (`--mode qwen`) is a new feature in v1.8.9 that provides high-quality multilingual ASR. However, there is a known limitation on Mac Apple Silicon:
 
 **The Qwen ASR module does not currently detect MPS.** When running on Mac, it falls back to CPU mode. This is a code limitation in `qwen_asr.py` where the device detection only checks for CUDA, skipping MPS.
 
@@ -774,7 +774,7 @@ Reference: [CTranslate2 Issue #1562](https://github.com/OpenNMT/CTranslate2/issu
 
 ### Qwen Pipeline Runs on CPU
 
-As of v1.8.3, the Qwen ASR module (`qwen_asr.py`) does not detect MPS and falls back to CPU on Apple Silicon. This is a code limitation, not a framework limitation -- the underlying `transformers` library supports MPS. A fix is expected in a future release.
+As of v1.8.9, the Qwen ASR module (`qwen_asr.py`) does not detect MPS and falls back to CPU on Apple Silicon. This is a code limitation, not a framework limitation -- the underlying `transformers` library supports MPS. A fix is expected in a future release.
 
 ### Speech Enhancement Backend Compatibility
 

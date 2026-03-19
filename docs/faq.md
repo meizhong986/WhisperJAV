@@ -69,11 +69,11 @@ Your subtitle batches are too large for the model's context window. Try:
 
 1. Reduce **Max Batch Size** in Advanced Settings (try 15 or 10)
 2. Use a model with a larger context window
-3. WhisperJAV v1.8.6+ auto-caps batch size for local LLMs
+3. WhisperJAV auto-caps batch size for local LLMs
 
 ### Translation shows "Unknown provider: Gemini" on Linux
 
-Install the missing dependency: `pip install google-api-core`. This is fixed in v1.8.6+.
+Install the missing dependency: `pip install google-api-core`. Fixed since v1.8.6.
 
 ---
 
