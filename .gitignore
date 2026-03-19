@@ -47,6 +47,9 @@ test_*
 .DS_Store
 Thumbs.db
 
+# MkDocs build output
+site/
+
 # Project specific
 test_*/
 test_media/
