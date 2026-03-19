@@ -67,6 +67,17 @@ class FasterWhisperProASR:
         # See: https://github.com/OpenNMT/CTranslate2/issues/1865
         self.compute_type = model_config.get("compute_type", "auto")
 
+        # Safety net: if device was downgraded (e.g., MPS → CPU) but compute_type
+        # was resolved for the original device, it may be incompatible.
+        # float16 is not supported on CPU by CTranslate2.
+        # See: https://github.com/meizhong986/WhisperJAV/issues/241
+        if self.device == "cpu" and self.compute_type == "float16":
+            logger.warning(
+                "Compute type 'float16' is not supported on CPU. "
+                "Falling back to 'auto' (CTranslate2 will select optimal CPU type)."
+            )
+            self.compute_type = "auto"
+
         decoder_params = params["decoder"]
         vad_params = params["vad"]
         provider_params = params["provider"]

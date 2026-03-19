@@ -136,9 +136,10 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
     Select optimal compute_type based on device and provider.
 
     CTranslate2 providers (faster_whisper, kotoba_faster_whisper):
-    - Pascal GPUs (sm_6x): Force "float32" (float16 not efficiently supported)
-    - RTX 50 Blackwell (sm_120): Force "float16" (int8_float16 buggy in CTranslate2)
-    - Other GPUs: Returns "auto" to delegate selection to CTranslate2
+    - CUDA (non-Pascal): "float16" for best accuracy
+    - CUDA + Pascal (sm_6x): "float32" (see Pascal note below)
+    - CUDA + Blackwell (sm_120): "float16" (int8_float16 buggy in CTranslate2)
+    - Non-CUDA (CPU, MPS, etc.): "auto" — delegate to CTranslate2
     - See: https://github.com/OpenNMT/CTranslate2/issues/1865
 
     PyTorch providers (openai_whisper, stable_ts):
@@ -153,32 +154,47 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
         Optimal compute_type for the device/provider combination
     """
     if provider in CTRANSLATE2_PROVIDERS:
-        # Pascal workaround: Pascal GPUs (GTX 10xx, Quadro Pxxx) don't support
-        # efficient float16 computation. CTranslate2's "auto" may select float16
-        # which fails with "target device or backend do not support efficient float16"
-        # Force float32 for Pascal GPUs as the safe fallback.
+        # --- Non-CUDA devices: let CTranslate2 decide ---
+        # CPU, MPS, and any future device (XPU, ROCm) use "auto" so CTranslate2
+        # selects the best type for the hardware (e.g., int8 with AVX on CPU).
+        # float16 is NOT supported on CPU and crashes with:
+        #   "target device or backend do not support efficient float16 computation"
+        # See: https://github.com/meizhong986/WhisperJAV/issues/241
+        if device != "cuda":
+            logger.debug(
+                f"Non-CUDA device '{device}': using 'auto' compute_type "
+                f"(CTranslate2 will select optimal type for this device)"
+            )
+            return "auto"
+
+        # --- CUDA devices below ---
+
+        # Pascal workaround (sm_6x): Pascal GPUs (GTX 10xx, Quadro Pxxx) are
+        # reported to not support efficient float16 in CTranslate2.
+        # NOTE: It is unverified whether CTranslate2 actually *rejects* float16
+        # on Pascal or merely runs it less efficiently (no tensor cores).
+        # Keeping float32 as a conservative safe default until verified.
         # See: https://github.com/meizhong986/WhisperJAV/issues/123
-        if device == "cuda" and _is_pascal_gpu():
+        if _is_pascal_gpu():
             logger.info(
-                "Pascal GPU detected (GTX 10xx/Quadro Pxxx). Using float32 compute_type "
-                "because Pascal GPUs don't support efficient float16 computation."
+                "Pascal GPU detected (GTX 10xx/Quadro Pxxx). Using float32 compute_type. "
+                "Pascal lacks dedicated FP16 tensor cores — float32 is the safe default."
             )
             return "float32"
 
-        # Blackwell workaround: CTranslate2's "auto" incorrectly selects int8_float16
-        # which fails with "target device or backend do not support efficient int8_float16"
-        # Force float16 for Blackwell until CTranslate2 properly supports sm_120
+        # Blackwell workaround (sm_120+): CTranslate2's "auto" incorrectly selects
+        # int8_float16 which fails on Blackwell. Force float16.
         # See: https://github.com/meizhong986/WhisperJAV/issues/113
-        if device == "cuda" and _is_blackwell_gpu():
+        if _is_blackwell_gpu():
             logger.info(
                 "Blackwell GPU detected (RTX 50 series). Using float16 compute_type "
                 "due to CTranslate2 int8_float16 compatibility issue."
             )
             return "float16"
 
-        # Default to float16 for CTranslate2 on CUDA for best accuracy.
-        # "auto" resolves to int8_float16 which introduces quantization artifacts.
-        # float16 uses ~1-2GB more VRAM but preserves full precision.
+        # All other CUDA GPUs (Turing, Ampere, Ada Lovelace): float16 for best
+        # accuracy. "auto" would pick int8_float16 which introduces quantization
+        # artifacts. float16 uses ~1-2GB more VRAM but preserves full precision.
         # Users with limited VRAM can override with --compute-type int8_float16.
         return "float16"
     else:

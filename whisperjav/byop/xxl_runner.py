@@ -89,12 +89,17 @@ def run_xxl(
 
     # Stream stdout to parent (visible in GUI console) while capturing
     # stderr separately for error diagnostics on failure.
+    # errors="replace" prevents UnicodeDecodeError when the external process
+    # emits non-UTF-8 bytes (e.g., Windows system codepage cp936/GBK for
+    # Chinese filenames).  stderr is diagnostic-only, so lossy decoding is fine.
+    # See: https://github.com/meizhong986/WhisperJAV/issues/244
     result = subprocess.run(
         cmd,
         stdout=sys.stdout,
         stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
+        errors="replace",
         cwd=str(exe.parent),
         env=env,
     )
