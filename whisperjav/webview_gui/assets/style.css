@@ -1939,80 +1939,119 @@ button:focus-visible,
     color: var(--error-color, #e53935);
 }
 
-/* Ollama Status Panel */
-.ollama-status-panel {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+/* Ollama Onboarding Panel */
+.ollama-onboarding-panel {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.ollama-state {
     padding: 10px 14px;
-    border-radius: 8px;
-    background: var(--card-bg, #1e1e2e);
-    border: 1px solid var(--border-color, #333);
-    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--section-bg);
 }
 
-.ollama-status-panel .status-icon {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: #888;
-    transition: background 0.3s ease;
-}
-
-.ollama-status-panel .status-icon.green {
-    background: #4caf50;
-    box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
-}
-
-.ollama-status-panel .status-icon.orange {
-    background: #ff9800;
-    box-shadow: 0 0 6px rgba(255, 152, 0, 0.5);
-}
-
-.ollama-status-panel .status-icon.red {
-    background: #e53935;
-    box-shadow: 0 0 6px rgba(229, 57, 53, 0.5);
-}
-
-.ollama-status-panel .status-text {
-    flex: 1;
-    font-size: 12px;
-    color: var(--text-secondary, #aaa);
-}
-
-.ollama-status-panel .btn-sm {
-    padding: 4px 12px;
-    font-size: 11px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color, #444);
-    background: var(--card-bg, #2a2a3e);
-    color: var(--text-primary, #ddd);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.2s ease;
-}
-
-.ollama-status-panel .btn-sm:hover {
-    background: var(--hover-bg, #333);
-}
-
-.ollama-status-panel .btn-sm:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Ollama Model Status (below model dropdown) */
-.ollama-model-status {
+.ollama-state-content {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ollama-state-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.ollama-state-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.ollama-state-actions {
+    display: flex;
     gap: 8px;
     margin-top: 4px;
-    font-size: 11px;
 }
 
-.ollama-model-status-text {
-    flex: 1;
+.ollama-recommended-model {
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.ollama-copy-command {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.ollama-copy-command code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    user-select: all;
+}
+
+.btn-copy {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.btn-copy:hover {
+    opacity: 1;
+}
+
+.ollama-state-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.ollama-state-ready {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(40, 167, 69, 0.08);
+    border: 1px solid rgba(40, 167, 69, 0.25);
+    border-radius: var(--border-radius);
+}
+
+.ollama-ready-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-color);
+    box-shadow: 0 0 4px rgba(40, 167, 69, 0.4);
+    flex-shrink: 0;
+}
+
+.ollama-ready-text {
+    font-size: 11px;
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.provider-deprecation-hint {
+    font-size: 11px;
+    color: #856404;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.25);
+    border-radius: var(--border-radius);
+    padding: 6px 12px;
+    margin-top: 8px;
 }
 
 /* Ollama Settings Row (in settings modal) */
@@ -2022,7 +2061,7 @@ button:focus-visible,
 
 .ollama-settings-row label {
     font-size: 12px;
-    color: var(--text-secondary, #aaa);
+    color: var(--text-secondary);
     margin-bottom: 4px;
     display: block;
 }
@@ -2032,9 +2071,9 @@ button:focus-visible,
     padding: 6px 10px;
     font-size: 12px;
     border-radius: 4px;
-    border: 1px solid var(--border-color, #444);
-    background: var(--input-bg, #1a1a2e);
-    color: var(--text-primary, #ddd);
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-primary);
 }
 
 /* Translation Settings Grid */

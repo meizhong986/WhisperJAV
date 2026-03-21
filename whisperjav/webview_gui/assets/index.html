@@ -720,16 +720,21 @@
                                     </div>
                                     <div class="translate-inline-settings" id="ensembleTranslateSettings">
                                         <select id="ensembleTranslateProvider" class="form-select compact" title="Translation provider">
-                                            <option value="ollama">Ollama (Local)</option>
-                                            <option value="local">Local LLM (deprecated)</option>
-                                            <option value="deepseek">DeepSeek</option>
-                                            <option value="gemini">Gemini</option>
-                                            <option value="claude">Claude</option>
-                                            <option value="gpt">GPT</option>
-                                            <option value="openrouter">OpenRouter</option>
-                                            <option value="glm">GLM (Zhipu AI)</option>
-                                            <option value="groq">Groq</option>
-                                            <option value="custom">Custom (OpenAI-compatible)</option>
+                                            <option value="" disabled selected>— Select a Provider —</option>
+                                            <optgroup label="Local LLM">
+                                                <option value="ollama">Ollama</option>
+                                                <option value="local">Local LLM (deprecated)</option>
+                                            </optgroup>
+                                            <optgroup label="Cloud AI">
+                                                <option value="deepseek">DeepSeek</option>
+                                                <option value="gemini">Gemini</option>
+                                                <option value="claude">Claude</option>
+                                                <option value="gpt">GPT</option>
+                                                <option value="openrouter">OpenRouter</option>
+                                                <option value="glm">GLM (Zhipu AI)</option>
+                                                <option value="groq">Groq</option>
+                                                <option value="custom">Custom (OpenAI-compatible)</option>
+                                            </optgroup>
                                         </select>
                                         <select id="ensembleTranslateModel" class="form-select compact" title="Model">
                                             <option value="">Default</option>
@@ -740,6 +745,42 @@
                                         <button type="button" class="btn btn-secondary btn-compact" id="ensembleTranslateSettingsBtn" title="Translation Settings">
                                             Translation Settings
                                         </button>
+                                    </div>
+                                    <div id="ensembleOllamaPanel" class="ollama-onboarding-panel" style="display:none">
+                                        <div id="ensembleOllamaNotInstalled" class="ollama-state" style="display:none">
+                                            <div class="ollama-state-content">
+                                                <div class="ollama-state-title">Ollama not found</div>
+                                                <div class="ollama-state-text">
+                                                    Ollama is a free AI tool that runs translations on your computer. No account or API key needed.
+                                                </div>
+                                                <div class="ollama-state-actions">
+                                                    <a href="https://ollama.com" target="_blank" class="btn btn-primary btn-compact">Download Ollama</a>
+                                                    <button type="button" class="btn btn-secondary btn-compact ollama-check-btn">Check Again</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div id="ensembleOllamaNoModel" class="ollama-state" style="display:none">
+                                            <div class="ollama-state-content">
+                                                <div class="ollama-state-title">Almost ready — download a translation model</div>
+                                                <div class="ollama-recommended-model">
+                                                    Recommended: <strong id="ensembleRecModel">gemma3:4b</strong>
+                                                    <span id="ensembleRecSize">(2.5 GB)</span>
+                                                </div>
+                                                <div class="ollama-copy-command">
+                                                    <code id="ensembleOllamaCmd">ollama pull gemma3:4b</code>
+                                                    <button type="button" class="btn-copy" title="Copy command">&#x1F4CB;</button>
+                                                </div>
+                                                <div class="ollama-state-hint">Run this in a terminal, then click Check Again.</div>
+                                                <button type="button" class="btn btn-secondary btn-compact ollama-check-btn">Check Again</button>
+                                            </div>
+                                        </div>
+                                        <div id="ensembleOllamaReady" class="ollama-state ollama-state-ready" style="display:none">
+                                            <span class="ollama-ready-dot"></span>
+                                            <span class="ollama-ready-text">Ollama ready</span>
+                                        </div>
+                                    </div>
+                                    <div id="ensembleDeprecationHint" class="provider-deprecation-hint" style="display:none">
+                                        This backend is being retired in v1.9.0. Consider switching to Ollama.
                                     </div>
                                 </div>
                             </div>
@@ -763,33 +804,64 @@
                                         <div class="form-group">
                                             <label for="translatorProvider" class="form-label">Provider:</label>
                                             <select id="translatorProvider" class="form-select">
-                                                <option value="ollama">Ollama (Local)</option>
-                                                <option value="local">Local LLM (deprecated)</option>
-                                                <option value="deepseek">DeepSeek</option>
-                                                <option value="gemini">Gemini</option>
-                                                <option value="claude">Claude</option>
-                                                <option value="gpt">GPT</option>
-                                                <option value="openrouter">OpenRouter</option>
-                                                <option value="glm">GLM (Zhipu AI)</option>
-                                                <option value="groq">Groq</option>
-                                                <option value="custom">Custom (OpenAI-compatible)</option>
+                                                <option value="" disabled selected>— Select a Provider —</option>
+                                                <optgroup label="Local LLM">
+                                                    <option value="ollama">Ollama</option>
+                                                    <option value="local">Local LLM (deprecated)</option>
+                                                </optgroup>
+                                                <optgroup label="Cloud AI">
+                                                    <option value="deepseek">DeepSeek</option>
+                                                    <option value="gemini">Gemini</option>
+                                                    <option value="claude">Claude</option>
+                                                    <option value="gpt">GPT</option>
+                                                    <option value="openrouter">OpenRouter</option>
+                                                    <option value="glm">GLM (Zhipu AI)</option>
+                                                    <option value="groq">Groq</option>
+                                                    <option value="custom">Custom (OpenAI-compatible)</option>
+                                                </optgroup>
                                             </select>
                                         </div>
-                                        <div id="ollamaStatusPanel" class="ollama-status-panel" style="display:none">
-                                            <span id="ollamaStatusIcon" class="ollama-status-icon">●</span>
-                                            <span id="ollamaStatusText">Checking...</span>
-                                            <button type="button" id="ollamaStartBtn" class="btn btn-secondary btn-compact" style="display:none">Start Server</button>
-                                            <button type="button" id="ollamaCheckAgain" class="btn btn-secondary btn-compact" style="display:none">Check Again</button>
+                                        <div id="srtOllamaPanel" class="ollama-onboarding-panel" style="display:none">
+                                            <div id="srtOllamaNotInstalled" class="ollama-state" style="display:none">
+                                                <div class="ollama-state-content">
+                                                    <div class="ollama-state-title">Ollama not found</div>
+                                                    <div class="ollama-state-text">
+                                                        Ollama is a free AI tool that runs translations on your computer. No account or API key needed.
+                                                    </div>
+                                                    <div class="ollama-state-actions">
+                                                        <a href="https://ollama.com" target="_blank" class="btn btn-primary btn-compact">Download Ollama</a>
+                                                        <button type="button" class="btn btn-secondary btn-compact ollama-check-btn">Check Again</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div id="srtOllamaNoModel" class="ollama-state" style="display:none">
+                                                <div class="ollama-state-content">
+                                                    <div class="ollama-state-title">Almost ready — download a translation model</div>
+                                                    <div class="ollama-recommended-model">
+                                                        Recommended: <strong id="srtRecModel">gemma3:4b</strong>
+                                                        <span id="srtRecSize">(2.5 GB)</span>
+                                                    </div>
+                                                    <div class="ollama-copy-command">
+                                                        <code id="srtOllamaCmd">ollama pull gemma3:4b</code>
+                                                        <button type="button" class="btn-copy" title="Copy command">&#x1F4CB;</button>
+                                                    </div>
+                                                    <div class="ollama-state-hint">Run this in a terminal, then click Check Again.</div>
+                                                    <button type="button" class="btn btn-secondary btn-compact ollama-check-btn">Check Again</button>
+                                                </div>
+                                            </div>
+                                            <div id="srtOllamaReady" class="ollama-state ollama-state-ready" style="display:none">
+                                                <span class="ollama-ready-dot"></span>
+                                                <span class="ollama-ready-text">Ollama ready</span>
+                                            </div>
+                                        </div>
+                                        <div id="srtDeprecationHint" class="provider-deprecation-hint" style="display:none">
+                                            This backend is being retired in v1.9.0. Consider switching to Ollama.
                                         </div>
                                         <div class="form-group">
                                             <label for="translatorModel" class="form-label">Model:</label>
                                             <select id="translatorModel" class="form-select">
                                                 <option value="">Default</option>
                                             </select>
-                                            <div id="ollamaModelStatus" class="ollama-model-status" style="display:none">
-                                                <span id="ollamaModelStatusText" class="ollama-model-status-text"></span>
-                                                <button type="button" id="ollamaDownloadBtn" class="btn btn-primary btn-compact" style="display:none">Download</button>
-                                            </div>
                                         </div>
                                         <div class="form-group">
                                             <label for="translatorCustomModel" class="form-label">Override/Custom Model:</label>
@@ -799,7 +871,7 @@
                                 </div>
 
                                 <!-- Row 2: API Key + Test Connection -->
-                                <div class="translator-section translator-compact-section">
+                                <div id="translatorApiKeyRow" class="translator-section translator-compact-section">
                                     <div class="translator-apikey-row">
                                         <div class="form-group translator-api-key-group">
                                             <label for="translatorApiKey" class="form-label">API Key:</label>

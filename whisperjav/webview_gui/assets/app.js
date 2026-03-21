@@ -5857,6 +5857,294 @@ const UpdateCheckManager = {
 };
 
 // ============================================================
+// Ollama State Manager — centralized Ollama readiness state
+// ============================================================
+const OllamaStateManager = {
+    // States: CHECKING, NOT_INSTALLED, NO_MODEL, READY
+    currentState: null,
+    localModels: [],
+    recommendation: { model: 'gemma3:4b', size: '2.5 GB', quality: 'Good' },
+
+    // DOM element mapping per tab
+    elements: {
+        ensemble: {
+            panel: 'ensembleOllamaPanel',
+            notInstalled: 'ensembleOllamaNotInstalled',
+            noModel: 'ensembleOllamaNoModel',
+            ready: 'ensembleOllamaReady',
+            recModel: 'ensembleRecModel',
+            recSize: 'ensembleRecSize',
+            cmd: 'ensembleOllamaCmd'
+        },
+        srt: {
+            panel: 'srtOllamaPanel',
+            notInstalled: 'srtOllamaNotInstalled',
+            noModel: 'srtOllamaNoModel',
+            ready: 'srtOllamaReady',
+            recModel: 'srtRecModel',
+            recSize: 'srtRecSize',
+            cmd: 'srtOllamaCmd'
+        }
+    },
+
+    // Curated models that count as "has a translation model"
+    curatedModels: ['gemma3:12b', 'gemma3:4b', 'qwen2.5:14b', 'qwen2.5:7b', 'qwen2.5:3b'],
+
+    async checkStatus() {
+        this.currentState = 'CHECKING';
+        try {
+            const status = await pywebview.api.detect_ollama();
+            if (!status.installed) {
+                this.currentState = 'NOT_INSTALLED';
+                this.localModels = [];
+                return;
+            }
+            if (!status.running) {
+                // Try auto-start (Marco's expectation)
+                try {
+                    await pywebview.api.start_ollama_server();
+                    // Re-check after start attempt
+                    const recheck = await pywebview.api.detect_ollama();
+                    if (!recheck.running) {
+                        this.currentState = 'NOT_INSTALLED';
+                        this.localModels = [];
+                        return;
+                    }
+                } catch (e) {
+                    this.currentState = 'NOT_INSTALLED';
+                    this.localModels = [];
+                    return;
+                }
+            }
+            // Server is running — check for models
+            try {
+                const result = await pywebview.api.list_ollama_models();
+                if (result.success && result.models) {
+                    this.localModels = result.models.map(m => m.name || m);
+                } else {
+                    this.localModels = [];
+                }
+            } catch (e) {
+                this.localModels = [];
+            }
+            // Check if any curated translation model is available locally
+            const hasCurated = this.localModels.some(lm =>
+                this.curatedModels.some(cm => lm === cm || lm.startsWith(cm + ':') || cm.startsWith(lm))
+            );
+            if (hasCurated || this.localModels.length > 0) {
+                this.currentState = 'READY';
+            } else {
+                this.currentState = 'NO_MODEL';
+                // Try to get recommendation
+                try {
+                    const rec = await pywebview.api.recommend_ollama_model();
+                    if (rec.success && rec.model) {
+                        this.recommendation = {
+                            model: rec.model,
+                            size: rec.size || '2.5 GB',
+                            quality: rec.quality || 'Good'
+                        };
+                    }
+                } catch (e) {
+                    // Keep default recommendation
+                }
+            }
+        } catch (e) {
+            this.currentState = 'NOT_INSTALLED';
+            this.localModels = [];
+        }
+    },
+
+    updateUI(tabPrefix) {
+        const els = this.elements[tabPrefix];
+        if (!els) return;
+
+        const panel = document.getElementById(els.panel);
+        if (!panel) return;
+
+        panel.style.display = 'block';
+
+        // Hide all state divs
+        const notInstalled = document.getElementById(els.notInstalled);
+        const noModel = document.getElementById(els.noModel);
+        const ready = document.getElementById(els.ready);
+
+        if (notInstalled) notInstalled.style.display = 'none';
+        if (noModel) noModel.style.display = 'none';
+        if (ready) ready.style.display = 'none';
+
+        switch (this.currentState) {
+            case 'NOT_INSTALLED':
+                if (notInstalled) notInstalled.style.display = 'block';
+                break;
+            case 'NO_MODEL':
+                if (noModel) noModel.style.display = 'block';
+                // Populate recommendation
+                const recModel = document.getElementById(els.recModel);
+                const recSize = document.getElementById(els.recSize);
+                const cmd = document.getElementById(els.cmd);
+                if (recModel) recModel.textContent = this.recommendation.model;
+                if (recSize) recSize.textContent = `(${this.recommendation.size})`;
+                if (cmd) cmd.textContent = `ollama pull ${this.recommendation.model}`;
+                break;
+            case 'READY':
+                if (ready) ready.style.display = 'flex';
+                break;
+            case 'CHECKING':
+                // Panel visible but no state shown — brief flash
+                break;
+        }
+    },
+
+    updateAllPanels() {
+        this.updateUI('ensemble');
+        this.updateUI('srt');
+    },
+
+    copyCommand(text) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                ConsoleManager.log('Command copied to clipboard', 'info');
+            }).catch(() => {});
+        }
+    },
+
+    isReady() {
+        return this.currentState === 'READY';
+    }
+};
+
+// ============================================================
+// Provider UI Manager — centralized provider-change handler
+// ============================================================
+const ProviderUIManager = {
+    // Tab context element mapping
+    tabElements: {
+        ensemble: {
+            provider: 'ensembleTranslateProvider',
+            model: 'ensembleTranslateModel',
+            modelOverride: 'ensembleTranslateModelOverride',
+            apiKeyRow: null,
+            ollamaPanel: 'ensembleOllamaPanel',
+            deprecation: 'ensembleDeprecationHint'
+        },
+        srt: {
+            provider: 'translatorProvider',
+            model: 'translatorModel',
+            modelOverride: 'translatorCustomModel',
+            apiKeyRow: 'translatorApiKeyRow',
+            ollamaPanel: 'srtOllamaPanel',
+            deprecation: 'srtDeprecationHint'
+        }
+    },
+
+    async onProviderChange(provider, tabContext) {
+        const els = this.tabElements[tabContext];
+        if (!els) return;
+
+        const ollamaPanel = document.getElementById(els.ollamaPanel);
+        const deprecation = document.getElementById(els.deprecation);
+        const apiKeyRow = els.apiKeyRow ? document.getElementById(els.apiKeyRow) : null;
+        const modelEl = document.getElementById(els.model);
+        const modelOverrideEl = document.getElementById(els.modelOverride);
+
+        // Persist provider selection
+        try {
+            localStorage.setItem(`whisperjav_${tabContext}_provider`, provider);
+        } catch (e) {}
+
+        if (!provider || provider === '') {
+            // Blank placeholder — hide everything
+            if (ollamaPanel) ollamaPanel.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'none';
+            if (apiKeyRow) apiKeyRow.style.display = 'none';
+            return;
+        }
+
+        if (provider === 'ollama') {
+            if (apiKeyRow) apiKeyRow.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'none';
+            if (ollamaPanel) ollamaPanel.style.display = 'block';
+
+            await OllamaStateManager.checkStatus();
+            OllamaStateManager.updateUI(tabContext);
+
+            if (OllamaStateManager.isReady()) {
+                if (modelEl) modelEl.style.display = '';
+                if (modelOverrideEl) modelOverrideEl.style.display = '';
+                this.updateModelDropdown('ollama', tabContext);
+            } else {
+                if (modelEl) modelEl.style.display = 'none';
+                if (modelOverrideEl) modelOverrideEl.style.display = 'none';
+            }
+        } else if (provider === 'local') {
+            if (apiKeyRow) apiKeyRow.style.display = 'none';
+            if (ollamaPanel) ollamaPanel.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'block';
+            if (modelEl) modelEl.style.display = '';
+            if (modelOverrideEl) modelOverrideEl.style.display = '';
+            this.updateModelDropdown('local', tabContext);
+        } else {
+            // Cloud / custom provider
+            if (apiKeyRow) apiKeyRow.style.display = '';
+            if (ollamaPanel) ollamaPanel.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'none';
+            if (modelEl) modelEl.style.display = '';
+            if (modelOverrideEl) modelOverrideEl.style.display = '';
+            this.updateModelDropdown(provider, tabContext);
+        }
+    },
+
+    updateModelDropdown(provider, tabContext) {
+        const els = this.tabElements[tabContext];
+        if (!els) return;
+
+        const modelSelect = document.getElementById(els.model);
+        if (!modelSelect) return;
+
+        // Use TranslatorManager's providerModels as the canonical list
+        const providerModels = TranslatorManager.providerModels;
+        const models = providerModels[provider] || [];
+
+        const localModelLabels = {
+            'gemma-9b': 'gemma-9b (8GB)',
+            'llama-8b': 'llama-8b (6GB)',
+            'llama-3b': 'llama-3b (3GB)',
+            'auto': 'auto'
+        };
+        const ollamaModelLabels = TranslatorManager.ollamaModelLabels;
+
+        const currentValue = modelSelect.value;
+
+        modelSelect.innerHTML = '<option value="">Default</option>' +
+            models.map(m => {
+                let label = m;
+                if (provider === 'local') label = localModelLabels[m] || m;
+                else if (provider === 'ollama') {
+                    label = ollamaModelLabels[m] || m;
+                    // Add installed marker
+                    const isLocal = OllamaStateManager.localModels.some(
+                        lm => lm === m || lm.startsWith(m + ':') || m.startsWith(lm)
+                    );
+                    if (isLocal) label += ' \u2713';
+                }
+                return `<option value="${m}">${label}</option>`;
+            }).join('');
+
+        // Restore previous selection
+        if (currentValue) modelSelect.value = currentValue;
+
+        // Set defaults
+        if (provider === 'local' && models.includes('gemma-9b')) {
+            if (!currentValue) modelSelect.value = 'gemma-9b';
+        }
+        if (provider === 'ollama' && models.includes('gemma3:12b')) {
+            if (!currentValue) modelSelect.value = 'gemma3:12b';
+        }
+    }
+};
+
+// ============================================================
 // Translator Manager (Tab 4 - Standalone Translation)
 // ============================================================
 const TranslatorManager = {
@@ -5891,9 +6179,9 @@ const TranslatorManager = {
     },
 
     init() {
-        // Bind provider change
+        // Bind provider change — route through ProviderUIManager
         document.getElementById('translatorProvider')?.addEventListener('change', (e) => {
-            this.updateModelOptions(e.target.value);
+            ProviderUIManager.onProviderChange(e.target.value, 'srt');
             this.updateApiKeyStatus(e.target.value);
         });
 
@@ -5904,17 +6192,7 @@ const TranslatorManager = {
         document.getElementById('translatorStartBtn')?.addEventListener('click', () => this.startTranslation());
         document.getElementById('translatorCancelBtn')?.addEventListener('click', () => this.cancelTranslation());
 
-        // Bind Ollama buttons
-        document.getElementById('ollamaStartBtn')?.addEventListener('click', () => this.startOllamaServer());
-        document.getElementById('ollamaCheckAgain')?.addEventListener('click', () => this.checkOllamaStatus());
-        document.getElementById('ollamaDownloadBtn')?.addEventListener('click', () => this.downloadOllamaModel());
-
-        // Bind model change to update download status (T3-2/T3-3)
-        document.getElementById('translatorModel')?.addEventListener('change', () => this.updateOllamaModelStatus());
-
-        // Initialize model options for default provider (Ollama)
-        this.updateModelOptions('ollama');
-        this.updateApiKeyStatus('ollama');
+        // No default provider initialization — dropdown starts blank
 
         console.log('TranslatorManager initialized');
     },
@@ -5953,186 +6231,6 @@ const TranslatorManager = {
                 else if (provider === 'ollama') label = this.ollamaModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
-
-        // Show/hide Ollama status panel
-        const ollamaPanel = document.getElementById('ollamaStatusPanel');
-        if (ollamaPanel) {
-            ollamaPanel.style.display = (provider === 'ollama') ? 'flex' : 'none';
-            if (provider === 'ollama') this.checkOllamaStatus();
-        }
-    },
-
-    // Cache of locally available Ollama model names (refreshed on status check)
-    localOllamaModels: [],
-
-    async checkOllamaStatus() {
-        const icon = document.getElementById('ollamaStatusIcon');
-        const text = document.getElementById('ollamaStatusText');
-        const startBtn = document.getElementById('ollamaStartBtn');
-        const checkBtn = document.getElementById('ollamaCheckAgain');
-        if (!icon || !text) return;
-
-        text.textContent = 'Checking...';
-        icon.style.color = '#999';
-
-        try {
-            const status = await pywebview.api.detect_ollama();
-            if (status.running) {
-                icon.style.color = '#4CAF50';
-                text.textContent = 'Server Running';
-                if (startBtn) startBtn.style.display = 'none';
-                if (checkBtn) checkBtn.style.display = 'none';
-                // T3-3: Fetch locally available models when server is running
-                this.refreshLocalModels();
-            } else if (status.installed) {
-                icon.style.color = '#FF9800';
-                text.textContent = 'Installed — Not Running';
-                if (startBtn) startBtn.style.display = 'inline-block';
-                if (checkBtn) checkBtn.style.display = 'inline-block';
-                this.localOllamaModels = [];
-                this.updateOllamaModelStatus();
-            } else {
-                icon.style.color = '#f44336';
-                text.textContent = 'Not Installed — visit ollama.com';
-                if (startBtn) startBtn.style.display = 'none';
-                if (checkBtn) checkBtn.style.display = 'inline-block';
-                this.localOllamaModels = [];
-                this.updateOllamaModelStatus();
-            }
-        } catch (e) {
-            icon.style.color = '#f44336';
-            text.textContent = 'Check failed';
-            if (checkBtn) checkBtn.style.display = 'inline-block';
-        }
-    },
-
-    async refreshLocalModels() {
-        try {
-            const result = await pywebview.api.list_ollama_models();
-            if (result.success && result.models) {
-                // Ollama API returns [{name: "gemma3:12b", ...}, ...]
-                this.localOllamaModels = result.models.map(m => m.name || m);
-            } else {
-                this.localOllamaModels = [];
-            }
-        } catch (e) {
-            this.localOllamaModels = [];
-        }
-        // Re-render model dropdown with installed markers
-        this.updateModelOptionsWithLocalInfo();
-        this.updateOllamaModelStatus();
-    },
-
-    updateModelOptionsWithLocalInfo() {
-        const modelSelect = document.getElementById('translatorModel');
-        if (!modelSelect) return;
-
-        const provider = document.getElementById('translatorProvider')?.value;
-        if (provider !== 'ollama') return;
-
-        const currentValue = modelSelect.value;
-        const models = this.providerModels.ollama || [];
-
-        modelSelect.innerHTML = '<option value="">Default</option>' +
-            models.map(m => {
-                const baseLabel = this.ollamaModelLabels[m] || m;
-                const isLocal = this.localOllamaModels.some(lm => lm === m || lm.startsWith(m + ':') || m.startsWith(lm));
-                const label = isLocal ? `${baseLabel} ✓` : baseLabel;
-                return `<option value="${m}">${label}</option>`;
-            }).join('');
-
-        // Restore previous selection
-        if (currentValue) modelSelect.value = currentValue;
-    },
-
-    updateOllamaModelStatus() {
-        const provider = document.getElementById('translatorProvider')?.value;
-        const statusDiv = document.getElementById('ollamaModelStatus');
-        const statusText = document.getElementById('ollamaModelStatusText');
-        const downloadBtn = document.getElementById('ollamaDownloadBtn');
-        if (!statusDiv || provider !== 'ollama') {
-            if (statusDiv) statusDiv.style.display = 'none';
-            return;
-        }
-
-        const modelSelect = document.getElementById('translatorModel');
-        const selectedModel = modelSelect?.value;
-
-        if (!selectedModel || this.localOllamaModels.length === 0) {
-            statusDiv.style.display = 'none';
-            return;
-        }
-
-        const isLocal = this.localOllamaModels.some(lm => lm === selectedModel || lm.startsWith(selectedModel + ':') || selectedModel.startsWith(lm));
-
-        statusDiv.style.display = 'flex';
-        if (isLocal) {
-            statusText.textContent = 'Installed locally';
-            statusText.style.color = '#4CAF50';
-            if (downloadBtn) downloadBtn.style.display = 'none';
-        } else {
-            const size = this.ollamaModelLabels[selectedModel] || '';
-            statusText.textContent = 'Not downloaded';
-            statusText.style.color = '#FF9800';
-            if (downloadBtn) downloadBtn.style.display = 'inline-block';
-        }
-    },
-
-    async downloadOllamaModel() {
-        const modelSelect = document.getElementById('translatorModel');
-        const selectedModel = modelSelect?.value;
-        if (!selectedModel) return;
-
-        const statusText = document.getElementById('ollamaModelStatusText');
-        const downloadBtn = document.getElementById('ollamaDownloadBtn');
-
-        if (statusText) {
-            statusText.textContent = `Downloading ${selectedModel}...`;
-            statusText.style.color = '#999';
-        }
-        if (downloadBtn) {
-            downloadBtn.disabled = true;
-            downloadBtn.textContent = 'Downloading...';
-        }
-
-        try {
-            const result = await pywebview.api.pull_ollama_model(selectedModel);
-            if (result.success) {
-                if (statusText) {
-                    statusText.textContent = 'Download complete ✓';
-                    statusText.style.color = '#4CAF50';
-                }
-                if (downloadBtn) downloadBtn.style.display = 'none';
-                // Refresh local models list
-                await this.refreshLocalModels();
-            } else {
-                if (statusText) {
-                    statusText.textContent = `Download failed: ${result.error || 'Unknown error'}`;
-                    statusText.style.color = '#f44336';
-                }
-            }
-        } catch (e) {
-            if (statusText) {
-                statusText.textContent = 'Download failed';
-                statusText.style.color = '#f44336';
-            }
-        } finally {
-            if (downloadBtn) {
-                downloadBtn.disabled = false;
-                downloadBtn.textContent = 'Download';
-            }
-        }
-    },
-
-    async startOllamaServer() {
-        const text = document.getElementById('ollamaStatusText');
-        if (text) text.textContent = 'Starting...';
-        try {
-            await pywebview.api.start_ollama_server();
-            await this.checkOllamaStatus();
-        } catch (e) {
-            if (text) text.textContent = 'Start failed';
-        }
     },
 
     async updateApiKeyStatus(provider) {
@@ -6674,8 +6772,9 @@ const TranslationSettingsModal = {
         // Test connection button
         document.getElementById('translationTestConnection')?.addEventListener('click', () => this.testConnection());
 
-        // Provider change handler for inline dropdown
+        // Provider change handler for inline dropdown — route through ProviderUIManager
         document.getElementById('ensembleTranslateProvider')?.addEventListener('change', (e) => {
+            ProviderUIManager.onProviderChange(e.target.value, 'ensemble');
             this.updateModelOptions(e.target.value);
             // Show/hide Ollama URL field in settings modal
             document.querySelectorAll('.ollama-settings-row').forEach(el => {
@@ -6683,8 +6782,7 @@ const TranslationSettingsModal = {
             });
         });
 
-        // Initialize model options for default provider (Ollama)
-        this.updateModelOptions('ollama');
+        // No default provider initialization — dropdown starts blank
 
         // Load saved settings
         this.loadSettings();
@@ -6897,7 +6995,7 @@ const TranslationSettingsModal = {
      * Get all translation settings for processing
      */
     getFullSettings() {
-        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
+        const provider = document.getElementById('ensembleTranslateProvider')?.value || '';
         const model = document.getElementById('ensembleTranslateModel')?.value || '';
         const modelOverride = document.getElementById('ensembleTranslateModelOverride')?.value?.trim() || '';
 
@@ -6967,6 +7065,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initial validation
     FormManager.validateForm();
 
+    // Event delegation for onboarding buttons
+    document.addEventListener('click', (e) => {
+        // "Check Again" buttons in Ollama onboarding panels
+        if (e.target.classList.contains('ollama-check-btn')) {
+            OllamaStateManager.checkStatus().then(() => OllamaStateManager.updateAllPanels());
+        }
+        // "Copy" buttons in Ollama onboarding panels
+        if (e.target.classList.contains('btn-copy')) {
+            const code = e.target.closest('.ollama-copy-command')?.querySelector('code');
+            if (code) OllamaStateManager.copyCommand(code.textContent);
+        }
+    });
+
     ConsoleManager.log('WhisperJAV GUI initialized', 'success');
     ConsoleManager.log('Ready to process video files', 'info');
     ConsoleManager.log('Press F1 for keyboard shortcuts', 'info');
@@ -6983,4 +7094,28 @@ window.addEventListener('pywebviewready', async () => {
 
     // Tab 4 translation settings (unaffected by persistence removal)
     await TranslationSettingsModal.loadSettingsFromBackend();
+
+    // Restore saved provider selections from localStorage
+    const savedEnsemble = localStorage.getItem('whisperjav_ensemble_provider');
+    if (savedEnsemble) {
+        const dd = document.getElementById('ensembleTranslateProvider');
+        if (dd) {
+            dd.value = savedEnsemble;
+            ProviderUIManager.onProviderChange(savedEnsemble, 'ensemble');
+            TranslationSettingsModal.updateModelOptions(savedEnsemble);
+            // Show/hide Ollama URL field in settings modal
+            document.querySelectorAll('.ollama-settings-row').forEach(el => {
+                el.style.display = (savedEnsemble === 'ollama') ? 'block' : 'none';
+            });
+        }
+    }
+    const savedSrt = localStorage.getItem('whisperjav_srt_provider');
+    if (savedSrt) {
+        const dd = document.getElementById('translatorProvider');
+        if (dd) {
+            dd.value = savedSrt;
+            ProviderUIManager.onProviderChange(savedSrt, 'srt');
+            TranslatorManager.updateApiKeyStatus(savedSrt);
+        }
+    }
 });

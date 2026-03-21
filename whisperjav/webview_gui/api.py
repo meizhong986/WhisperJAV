@@ -2948,6 +2948,7 @@ class WhisperJAVAPI:
                 'topP': model_params.get('top_p') or 0.9,
                 'customEndpoint': backend.get('custom_endpoint', '') or '',
                 'ollamaUrl': backend.get('ollama_url', '') or '',
+                'provider': backend.get('provider', ''),
             }
             return {"success": True, "settings": gui_settings}
         except Exception as e:
@@ -2994,6 +2995,8 @@ class WhisperJAVAPI:
                 existing['custom_endpoint'] = settings['customEndpoint'] or None
             if 'ollamaUrl' in settings:
                 existing['ollama_url'] = settings['ollamaUrl'] or None
+            if 'provider' in settings:
+                existing['provider'] = settings['provider']
 
             # Nested model_params
             mp = existing.setdefault('model_params', {})
