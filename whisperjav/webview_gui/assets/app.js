@@ -5865,6 +5865,10 @@ const OllamaStateManager = {
     localModels: [],
     recommendation: { model: 'gemma3:4b', size: '2.5 GB', quality: 'Good' },
 
+    // Curated models config loaded from backend JSON
+    // Each entry: { model: 'gemma3:4b', size: '2.5 GB' }
+    curatedModelsConfig: [],
+
     // DOM element mapping per tab
     elements: {
         ensemble: {
@@ -5887,11 +5891,51 @@ const OllamaStateManager = {
         }
     },
 
-    // Curated models that count as "has a translation model"
-    curatedModels: ['gemma3:12b', 'gemma3:4b', 'qwen2.5:14b', 'qwen2.5:7b', 'qwen2.5:3b'],
+    // Derived curated model names (for READY detection)
+    get curatedModels() {
+        return this.curatedModelsConfig.map(c => c.model);
+    },
+
+    // Build a size lookup from curatedModelsConfig
+    getSizeLabel(modelName) {
+        const entry = this.curatedModelsConfig.find(c => c.model === modelName);
+        return entry ? entry.size : null;
+    },
+
+    // Check if a local model matches a given model name (prefix matching for tags)
+    modelMatches(localModel, targetModel) {
+        return localModel === targetModel ||
+               localModel.startsWith(targetModel + ':') ||
+               targetModel.startsWith(localModel);
+    },
+
+    // Check if a model is installed locally
+    isInstalled(modelName) {
+        return this.localModels.some(lm => this.modelMatches(lm, modelName));
+    },
+
+    async loadCuratedModels() {
+        if (this.curatedModelsConfig.length > 0) return; // already loaded
+        try {
+            const result = await pywebview.api.get_ollama_curated_models();
+            if (result.success && result.models) {
+                this.curatedModelsConfig = result.models;
+            }
+        } catch (e) {
+            // Fallback — hardcoded so GUI doesn't break
+            this.curatedModelsConfig = [
+                { model: 'gemma3:4b', size: '2.5 GB' },
+                { model: 'qwen2.5:7b', size: '4.7 GB' },
+                { model: 'gemma3:12b', size: '8.1 GB' },
+                { model: 'qwen2.5:14b', size: '9.0 GB' },
+                { model: 'qwen2.5:3b', size: '1.9 GB' },
+            ];
+        }
+    },
 
     async checkStatus() {
         this.currentState = 'CHECKING';
+        await this.loadCuratedModels();
         try {
             const status = await pywebview.api.detect_ollama();
             if (!status.installed) {
@@ -6015,6 +6059,133 @@ const OllamaStateManager = {
 };
 
 // ============================================================
+// Ollama Pull Modal — download confirmation + progress
+// ============================================================
+const OllamaPullModal = {
+    _modelName: null,
+    _modelSize: null,
+    _tabContext: null,
+    _selectEl: null,
+
+    open(modelName, modelSize, tabContext, selectEl) {
+        this._modelName = modelName;
+        this._modelSize = modelSize;
+        this._tabContext = tabContext;
+        this._selectEl = selectEl;
+
+        // Populate confirm state
+        document.getElementById('ollamaPullModelName').textContent = modelName;
+        document.getElementById('ollamaPullModelSize').textContent = modelSize;
+
+        // Show confirm, hide others
+        document.getElementById('ollamaPullConfirm').style.display = '';
+        document.getElementById('ollamaPullProgress').style.display = 'none';
+        document.getElementById('ollamaPullSuccess').style.display = 'none';
+        document.getElementById('ollamaPullError').style.display = 'none';
+
+        // Show buttons
+        const footer = document.getElementById('ollamaPullModalFooter');
+        footer.style.display = '';
+        document.getElementById('ollamaPullCancelBtn').style.display = '';
+        document.getElementById('ollamaPullDownloadBtn').style.display = '';
+
+        // Show modal
+        const modal = document.getElementById('ollamaPullModal');
+        modal.style.display = 'flex';
+
+        // Bind buttons
+        document.getElementById('ollamaPullCancelBtn').onclick = () => this.cancel();
+        document.getElementById('ollamaPullDownloadBtn').onclick = () => this.startDownload();
+        document.getElementById('ollamaPullCloseBtn').onclick = () => this.cancel();
+    },
+
+    cancel() {
+        // Revert dropdown to previous value
+        if (this._selectEl) {
+            this._selectEl.value = ProviderUIManager._previousOllamaValue[this._tabContext] || '';
+        }
+        this.close();
+    },
+
+    close() {
+        document.getElementById('ollamaPullModal').style.display = 'none';
+    },
+
+    async startDownload() {
+        const modelName = this._modelName;
+
+        // Switch to progress state
+        document.getElementById('ollamaPullConfirm').style.display = 'none';
+        document.getElementById('ollamaPullProgress').style.display = '';
+        document.getElementById('ollamaPullProgressModel').textContent = modelName;
+        document.getElementById('ollamaPullDownloadBtn').style.display = 'none';
+
+        // Show indeterminate progress (API doesn't support streaming progress)
+        const progressBar = document.getElementById('ollamaPullProgressBar');
+        progressBar.style.width = '0%';
+        progressBar.classList.add('indeterminate');
+        document.getElementById('ollamaPullProgressText').textContent = 'Downloading... this may take a few minutes.';
+
+        // Disable cancel during download (pull_ollama_model is blocking)
+        document.getElementById('ollamaPullCancelBtn').textContent = 'Please wait...';
+        document.getElementById('ollamaPullCancelBtn').disabled = true;
+
+        try {
+            const result = await pywebview.api.pull_ollama_model(modelName);
+
+            progressBar.classList.remove('indeterminate');
+
+            if (result.success) {
+                // Success state
+                document.getElementById('ollamaPullProgress').style.display = 'none';
+                document.getElementById('ollamaPullSuccess').style.display = '';
+                document.getElementById('ollamaPullModalFooter').style.display = 'none';
+
+                // Refresh local models and rebuild dropdown
+                await OllamaStateManager.checkStatus();
+                OllamaStateManager.updateAllPanels();
+
+                // Auto-close after 1.5s and select the model
+                setTimeout(() => {
+                    this.close();
+                    // Rebuild dropdown in both tabs if needed
+                    ProviderUIManager.updateModelDropdown('ollama', this._tabContext);
+
+                    // Auto-select the newly installed model
+                    const els = ProviderUIManager.tabElements[this._tabContext];
+                    const modelSelect = document.getElementById(els.model);
+                    if (modelSelect) {
+                        modelSelect.value = modelName;
+                        ProviderUIManager._previousOllamaValue[this._tabContext] = modelName;
+                    }
+
+                    ConsoleManager.log(`Model ${modelName} downloaded successfully`, 'success');
+                }, 1500);
+            } else {
+                // Error state
+                this._showError(result.error || 'Download failed. Please try again.');
+            }
+        } catch (e) {
+            progressBar.classList.remove('indeterminate');
+            this._showError(e.message || 'Download failed. Please check your connection.');
+        }
+    },
+
+    _showError(message) {
+        document.getElementById('ollamaPullProgress').style.display = 'none';
+        document.getElementById('ollamaPullError').style.display = '';
+        document.getElementById('ollamaPullErrorText').textContent = message;
+
+        // Re-enable cancel
+        const cancelBtn = document.getElementById('ollamaPullCancelBtn');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.disabled = false;
+        cancelBtn.style.display = '';
+        document.getElementById('ollamaPullDownloadBtn').style.display = 'none';
+    }
+};
+
+// ============================================================
 // Provider UI Manager — centralized provider-change handler
 // ============================================================
 const ProviderUIManager = {
@@ -6069,13 +6240,15 @@ const ProviderUIManager = {
             await OllamaStateManager.checkStatus();
             OllamaStateManager.updateUI(tabContext);
 
-            if (OllamaStateManager.isReady()) {
+            if (OllamaStateManager.currentState === 'NOT_INSTALLED') {
+                // No server — hide model dropdown entirely
+                if (modelEl) modelEl.style.display = 'none';
+                if (modelOverrideEl) modelOverrideEl.style.display = 'none';
+            } else {
+                // READY or NO_MODEL — show dropdown (pull flow handles uninstalled)
                 if (modelEl) modelEl.style.display = '';
                 if (modelOverrideEl) modelOverrideEl.style.display = '';
                 this.updateModelDropdown('ollama', tabContext);
-            } else {
-                if (modelEl) modelEl.style.display = 'none';
-                if (modelOverrideEl) modelOverrideEl.style.display = 'none';
             }
         } else if (provider === 'local') {
             if (apiKeyRow) apiKeyRow.style.display = 'none';
@@ -6095,6 +6268,9 @@ const ProviderUIManager = {
         }
     },
 
+    // Track previous dropdown value for revert on cancel
+    _previousOllamaValue: { ensemble: '', srt: '' },
+
     updateModelDropdown(provider, tabContext) {
         const els = this.tabElements[tabContext];
         if (!els) return;
@@ -6102,45 +6278,114 @@ const ProviderUIManager = {
         const modelSelect = document.getElementById(els.model);
         if (!modelSelect) return;
 
-        // Use TranslatorManager's providerModels as the canonical list
-        const providerModels = TranslatorManager.providerModels;
-        const models = providerModels[provider] || [];
-
         const localModelLabels = {
             'gemma-9b': 'gemma-9b (8GB)',
             'llama-8b': 'llama-8b (6GB)',
             'llama-3b': 'llama-3b (3GB)',
             'auto': 'auto'
         };
-        const ollamaModelLabels = TranslatorManager.ollamaModelLabels;
 
         const currentValue = modelSelect.value;
+
+        if (provider === 'ollama') {
+            // Build optgroup-based dropdown
+            this._buildOllamaDropdown(modelSelect, currentValue, tabContext);
+            return;
+        }
+
+        // Non-Ollama providers — flat list
+        const providerModels = TranslatorManager.providerModels;
+        const models = providerModels[provider] || [];
 
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
                 let label = m;
                 if (provider === 'local') label = localModelLabels[m] || m;
-                else if (provider === 'ollama') {
-                    label = ollamaModelLabels[m] || m;
-                    // Add installed marker
-                    const isLocal = OllamaStateManager.localModels.some(
-                        lm => lm === m || lm.startsWith(m + ':') || m.startsWith(lm)
-                    );
-                    if (isLocal) label += ' \u2713';
-                }
                 return `<option value="${m}">${label}</option>`;
             }).join('');
 
-        // Restore previous selection
         if (currentValue) modelSelect.value = currentValue;
 
-        // Set defaults
         if (provider === 'local' && models.includes('gemma-9b')) {
             if (!currentValue) modelSelect.value = 'gemma-9b';
         }
-        if (provider === 'ollama' && models.includes('gemma3:12b')) {
-            if (!currentValue) modelSelect.value = 'gemma3:12b';
+    },
+
+    _buildOllamaDropdown(modelSelect, currentValue, tabContext) {
+        const installed = OllamaStateManager.localModels;
+        const curated = OllamaStateManager.curatedModelsConfig;
+
+        // Build size lookup for all known models
+        const sizeMap = {};
+        curated.forEach(c => { sizeMap[c.model] = c.size; });
+
+        // "Installed Models" group
+        const installedOptions = installed.map(m => {
+            const size = sizeMap[m] ? ` (${sizeMap[m]})` : '';
+            return `<option value="${m}">${m}${size}</option>`;
+        });
+
+        // "Top Recommendations" group — curated models NOT already installed
+        const uninstalled = curated.filter(c =>
+            !installed.some(lm => OllamaStateManager.modelMatches(lm, c.model))
+        );
+        const recOptions = uninstalled.map(c =>
+            `<option value="${c.model}">${c.model} (${c.size})</option>`
+        );
+
+        let html = '<option value="" disabled selected>\u2014 Select a model \u2014</option>';
+
+        // Installed group
+        html += '<optgroup label="Installed Models">';
+        if (installedOptions.length > 0) {
+            html += installedOptions.join('');
+        } else {
+            html += '<option value="" disabled>(none installed)</option>';
         }
+        html += '</optgroup>';
+
+        // Recommendations group
+        html += '<optgroup label="Top Recommendations">';
+        if (recOptions.length > 0) {
+            html += recOptions.join('');
+        } else {
+            html += '<option value="" disabled>(all installed)</option>';
+        }
+        html += '</optgroup>';
+
+        modelSelect.innerHTML = html;
+
+        // Restore previous selection if it exists
+        if (currentValue && installed.some(lm => OllamaStateManager.modelMatches(lm, currentValue))) {
+            modelSelect.value = currentValue;
+        }
+
+        // Store current value for revert on cancel
+        this._previousOllamaValue[tabContext] = modelSelect.value;
+
+        // Bind change handler for uninstalled model detection
+        // Remove old handler, add new one
+        const newSelect = modelSelect.cloneNode(true);
+        modelSelect.parentNode.replaceChild(newSelect, modelSelect);
+        newSelect.addEventListener('change', (e) => {
+            this._onOllamaModelChange(e.target, tabContext);
+        });
+    },
+
+    _onOllamaModelChange(selectEl, tabContext) {
+        const selectedModel = selectEl.value;
+        if (!selectedModel) return;
+
+        // Check if model is installed
+        if (OllamaStateManager.isInstalled(selectedModel)) {
+            // Installed — normal selection
+            this._previousOllamaValue[tabContext] = selectedModel;
+            return;
+        }
+
+        // Uninstalled — open pull confirmation
+        const size = OllamaStateManager.getSizeLabel(selectedModel) || 'unknown size';
+        OllamaPullModal.open(selectedModel, size, tabContext, selectEl);
     }
 };
 
@@ -6155,9 +6400,8 @@ const TranslatorManager = {
         currentFile: null
     },
 
-    // Provider model options
+    // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
-        ollama: ['gemma3:12b', 'qwen2.5:14b', 'qwen2.5:7b', 'gemma3:4b', 'qwen2.5:3b'],
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
@@ -6167,15 +6411,6 @@ const TranslatorManager = {
         glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
         groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
         custom: []
-    },
-
-    // VRAM labels for Ollama models (shown in dropdown)
-    ollamaModelLabels: {
-        'gemma3:12b': 'gemma3:12b (12GB VRAM)',
-        'qwen2.5:14b': 'qwen2.5:14b (16GB VRAM)',
-        'qwen2.5:7b': 'qwen2.5:7b (8GB VRAM)',
-        'gemma3:4b': 'gemma3:4b (4GB VRAM)',
-        'qwen2.5:3b': 'qwen2.5:3b (2GB VRAM)',
     },
 
     init() {
@@ -6213,6 +6448,12 @@ const TranslatorManager = {
     // ---- Provider & model ----
 
     updateModelOptions(provider) {
+        // Ollama models are handled by ProviderUIManager with optgroups
+        if (provider === 'ollama') {
+            ProviderUIManager.updateModelDropdown('ollama', 'srt');
+            return;
+        }
+
         const modelSelect = document.getElementById('translatorModel');
         if (!modelSelect) return;
 
@@ -6228,7 +6469,6 @@ const TranslatorManager = {
             models.map(m => {
                 let label = m;
                 if (provider === 'local') label = localModelLabels[m] || m;
-                else if (provider === 'ollama') label = this.ollamaModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
     },
@@ -6722,9 +6962,8 @@ const TranslateIntegrationManager = {
 // Translation Settings Modal Manager
 // ============================================================
 const TranslationSettingsModal = {
-    // Provider model options (shared with inline dropdown)
+    // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
-        ollama: ['gemma3:12b', 'qwen2.5:14b', 'qwen2.5:7b', 'gemma3:4b', 'qwen2.5:3b'],
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
@@ -6905,22 +7144,20 @@ const TranslationSettingsModal = {
     },
 
     updateModelOptions(provider) {
+        // Ollama models are handled by ProviderUIManager with optgroups
+        if (provider === 'ollama') {
+            ProviderUIManager.updateModelDropdown('ollama', 'ensemble');
+            return;
+        }
+
         const modelSelect = document.getElementById('ensembleTranslateModel');
         if (!modelSelect) return;
 
-        // Display labels for local models (show VRAM requirements)
         const localModelLabels = {
             'gemma-9b': 'gemma-9b (8GB)',
             'llama-8b': 'llama-8b (6GB)',
             'llama-3b': 'llama-3b (3GB)',
             'auto': 'auto'
-        };
-        const ollamaModelLabels = {
-            'gemma3:12b': 'gemma3:12b (12GB VRAM)',
-            'qwen2.5:14b': 'qwen2.5:14b (16GB VRAM)',
-            'qwen2.5:7b': 'qwen2.5:7b (8GB VRAM)',
-            'gemma3:4b': 'gemma3:4b (4GB VRAM)',
-            'qwen2.5:3b': 'qwen2.5:3b (2GB VRAM)',
         };
 
         const models = this.providerModels[provider] || [];
@@ -6928,17 +7165,12 @@ const TranslationSettingsModal = {
             models.map(m => {
                 let label = m;
                 if (provider === 'local') label = localModelLabels[m] || m;
-                else if (provider === 'ollama') label = ollamaModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
 
         // Set default model for local provider to gemma-9b
         if (provider === 'local' && models.includes('gemma-9b')) {
             modelSelect.value = 'gemma-9b';
-        }
-        // Set default model for Ollama to gemma3:12b
-        if (provider === 'ollama' && models.includes('gemma3:12b')) {
-            modelSelect.value = 'gemma3:12b';
         }
     },
 

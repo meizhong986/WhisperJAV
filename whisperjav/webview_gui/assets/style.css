@@ -2054,6 +2054,48 @@ button:focus-visible,
     margin-top: 8px;
 }
 
+/* Ollama Pull Modal — smaller variant */
+.modal-sm {
+    max-width: 400px;
+}
+
+.pull-progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: var(--disabled-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0 6px;
+}
+
+.pull-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--success-color);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.pull-progress-bar.indeterminate {
+    width: 30%;
+    animation: pull-progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pull-progress-pulse {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+}
+
+.pull-progress-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.text-error {
+    color: var(--danger-color);
+}
+
 /* Ollama Settings Row (in settings modal) */
 .ollama-settings-row {
     margin-top: 8px;

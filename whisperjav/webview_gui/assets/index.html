@@ -723,7 +723,7 @@
                                             <option value="" disabled selected>— Select a Provider —</option>
                                             <optgroup label="Local LLM">
                                                 <option value="ollama">Ollama</option>
-                                                <option value="local">Local LLM (deprecated)</option>
+                                                <option value="local">llama-cpp (deprecated)</option>
                                             </optgroup>
                                             <optgroup label="Cloud AI">
                                                 <option value="deepseek">DeepSeek</option>
@@ -776,7 +776,7 @@
                                         </div>
                                         <div id="ensembleOllamaReady" class="ollama-state ollama-state-ready" style="display:none">
                                             <span class="ollama-ready-dot"></span>
-                                            <span class="ollama-ready-text">Ollama ready</span>
+                                            <span class="ollama-ready-text">Ollama server connected</span>
                                         </div>
                                     </div>
                                     <div id="ensembleDeprecationHint" class="provider-deprecation-hint" style="display:none">
@@ -807,7 +807,7 @@
                                                 <option value="" disabled selected>— Select a Provider —</option>
                                                 <optgroup label="Local LLM">
                                                     <option value="ollama">Ollama</option>
-                                                    <option value="local">Local LLM (deprecated)</option>
+                                                    <option value="local">llama-cpp (deprecated)</option>
                                                 </optgroup>
                                                 <optgroup label="Cloud AI">
                                                     <option value="deepseek">DeepSeek</option>
@@ -851,7 +851,7 @@
                                             </div>
                                             <div id="srtOllamaReady" class="ollama-state ollama-state-ready" style="display:none">
                                                 <span class="ollama-ready-dot"></span>
-                                                <span class="ollama-ready-text">Ollama ready</span>
+                                                <span class="ollama-ready-text">Ollama server connected</span>
                                             </div>
                                         </div>
                                         <div id="srtDeprecationHint" class="provider-deprecation-hint" style="display:none">
@@ -1389,6 +1389,43 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="translationSettingsCancel">Cancel</button>
                 <button class="btn btn-primary" id="translationSettingsSave">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ollama Pull Confirmation Modal -->
+    <div id="ollamaPullModal" class="modal-overlay" style="display:none">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-header">
+                <h2>Download Model</h2>
+                <button class="modal-close" id="ollamaPullCloseBtn" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" id="ollamaPullModalBody">
+                <!-- Confirm state -->
+                <div id="ollamaPullConfirm">
+                    <p><strong id="ollamaPullModelName"></strong> is not downloaded yet.</p>
+                    <p>This will download <strong id="ollamaPullModelSize"></strong>.</p>
+                </div>
+                <!-- Progress state -->
+                <div id="ollamaPullProgress" style="display:none">
+                    <p>Downloading <strong id="ollamaPullProgressModel"></strong>...</p>
+                    <div class="pull-progress-bar-container">
+                        <div id="ollamaPullProgressBar" class="pull-progress-bar"></div>
+                    </div>
+                    <p id="ollamaPullProgressText" class="pull-progress-text">Starting...</p>
+                </div>
+                <!-- Success state -->
+                <div id="ollamaPullSuccess" style="display:none">
+                    <p>Download complete.</p>
+                </div>
+                <!-- Error state -->
+                <div id="ollamaPullError" style="display:none">
+                    <p id="ollamaPullErrorText" class="text-error"></p>
+                </div>
+            </div>
+            <div class="modal-footer" id="ollamaPullModalFooter">
+                <button class="btn btn-secondary" id="ollamaPullCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="ollamaPullDownloadBtn">Download</button>
             </div>
         </div>
     </div>

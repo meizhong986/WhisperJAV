@@ -1,0 +1,7 @@
+[
+  { "model": "gemma3:4b",   "size": "2.5 GB" },
+  { "model": "qwen2.5:7b",  "size": "4.7 GB" },
+  { "model": "gemma3:12b",  "size": "8.1 GB" },
+  { "model": "qwen2.5:14b", "size": "9.0 GB" },
+  { "model": "qwen2.5:3b",  "size": "1.9 GB" }
+]

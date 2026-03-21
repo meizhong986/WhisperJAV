@@ -6,6 +6,7 @@ Maintains thin wrapper pattern - delegates to CLI subprocess.
 Completely decoupled from UI - can be tested standalone.
 """
 
+import json
 import os
 import sys
 import time
@@ -3266,6 +3267,25 @@ class WhisperJAVAPI:
             return {"success": False, "error": str(e)}
 
     # ── Ollama-specific API methods ──────────────────────────────────────
+
+    _CURATED_MODELS_FALLBACK = [
+        {"model": "gemma3:4b", "size": "2.5 GB"},
+        {"model": "qwen2.5:7b", "size": "4.7 GB"},
+        {"model": "gemma3:12b", "size": "8.1 GB"},
+        {"model": "qwen2.5:14b", "size": "9.0 GB"},
+        {"model": "qwen2.5:3b", "size": "1.9 GB"},
+    ]
+
+    def get_ollama_curated_models(self) -> Dict[str, Any]:
+        """Return the curated Ollama model list from config."""
+        config_path = Path(__file__).parent.parent / 'config' / 'ollama_models.json'
+        try:
+            with open(config_path, 'r') as f:
+                models = json.load(f)
+            return {"success": True, "models": models}
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            # Fallback so the GUI doesn't break if the config is missing
+            return {"success": True, "models": self._CURATED_MODELS_FALLBACK}
 
     def _get_ollama_url(self):
         """Get Ollama URL from settings or default."""
