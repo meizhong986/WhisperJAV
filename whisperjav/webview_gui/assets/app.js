@@ -6124,7 +6124,7 @@ const OllamaPullModal = {
         const progressBar = document.getElementById('ollamaPullProgressBar');
         progressBar.style.width = '0%';
         progressBar.classList.add('indeterminate');
-        document.getElementById('ollamaPullProgressText').textContent = 'Downloading... this may take a few minutes.';
+        document.getElementById('ollamaPullProgressText').textContent = 'Downloading... check the terminal for progress. This may take a few minutes.';
 
         // Disable cancel during download (pull_ollama_model is blocking)
         document.getElementById('ollamaPullCancelBtn').textContent = 'Please wait...';

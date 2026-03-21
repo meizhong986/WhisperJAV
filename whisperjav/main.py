@@ -2208,6 +2208,17 @@ def main():
                 print(f"Failed: {translation_failed}")
                 print("="*50)
 
+                # Unload Ollama model from VRAM after all files are translated
+                if args.translate_provider == 'ollama':
+                    try:
+                        from whisperjav.translate.ollama_manager import OllamaManager
+                        _mgr = OllamaManager()
+                        _model = args.translate_model or 'gemma3:12b'
+                        if _mgr.unload_model(_model):
+                            print(f"[OLLAMA] Model {_model} unloaded from VRAM")
+                    except Exception:
+                        pass  # Best-effort — don't fail the run
+
             # ============================================================
             # VTT CONVERSION: Convert SRT outputs if requested
             # ============================================================

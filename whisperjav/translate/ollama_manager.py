@@ -340,6 +340,28 @@ class OllamaManager:
             print(file=sys.stderr)  # Newline after progress
         return True
 
+    def unload_model(self, name: str) -> bool:
+        """Unload a model from VRAM/RAM immediately.
+
+        Sends a generate request with keep_alive=0 which tells Ollama to
+        evict the model from memory right away instead of waiting for the
+        default idle timeout (typically 5 minutes).
+
+        Args:
+            name: Model name (e.g., "gemma3:4b")
+
+        Returns True if the request succeeded, False otherwise.
+        """
+        try:
+            self._http_post('/api/generate', {
+                'model': name,
+                'keep_alive': 0,
+            }, timeout=10)
+            return True
+        except Exception as e:
+            print(f"[OLLAMA] Failed to unload model: {e}", file=sys.stderr)
+            return False
+
     # ── Hardware-Aware Recommendation ─────────────────────────────────
 
     def recommend_model(self, vram_gb: float = None) -> ModelRecommendation:
