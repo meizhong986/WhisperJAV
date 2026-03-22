@@ -178,7 +178,7 @@ def translate_subtitle(
         print(f"[TRANSLATE]   Source lang: {source_lang} -> Target lang: {target_lang}", file=sys.stderr)
         print(f"[TRANSLATE]   Max batch size: {max_batch_size}", file=sys.stderr)
         print(f"[TRANSLATE]   Scene threshold: {scene_threshold}s", file=sys.stderr)
-        print(f"[TRANSLATE]   Streaming: {stream}", file=sys.stderr)
+        print(f"[TRANSLATE]   Stream requested: {stream} (actual depends on provider)", file=sys.stderr)
 
         # Log provider-specific settings
         if 'server_address' in provider_config:
@@ -396,13 +396,9 @@ def translate_subtitle(
 
         # Log subtitle count
         if hasattr(project, 'subtitles') and project.subtitles:
-            try:
-                subtitle_count = len(project.subtitles)
-            except TypeError:
-                try:
-                    subtitle_count = len(list(project.subtitles))
-                except Exception:
-                    subtitle_count = 'unknown'
+            subtitle_count = getattr(project.subtitles, 'linecount', None)
+            if subtitle_count is None:
+                subtitle_count = 'unknown'
             print(f"[TRANSLATE]   Subtitle lines: {subtitle_count}", file=sys.stderr)
 
         # Instructions are verified in the post-init_options() block above.
@@ -515,7 +511,8 @@ def translate_subtitle(
             msg_str = str(msg)
             if 'No matches' in msg_str or 'no matches' in msg_str:
                 _batch_stats['no_matches'] += 1
-                print(f"\n[TRANSLATE] *** NO MATCHES DETECTED (batch #{_batch_stats['total']}) ***",
+                # Warning fires before batch_translated increments total, so +1
+                print(f"\n[TRANSLATE] *** NO MATCHES DETECTED (batch #{_batch_stats['total'] + 1}) ***",
                       file=sys.stderr)
                 print(f"[TRANSLATE]   The model's response didn't match PySubtrans's expected format.",
                       file=sys.stderr)
@@ -612,6 +609,9 @@ def translate_subtitle(
                 print(f"[TRANSLATE]   The LLM produced output PySubtrans couldn't parse.", file=sys.stderr)
                 print(f"[TRANSLATE]   Try: smaller --max-batch-size, different model, or cloud provider",
                       file=sys.stderr)
+            _successful = _batch_stats['total'] - _batch_stats['errors'] - _batch_stats['no_matches']
+            if _successful > 0 and _batch_stats['total'] > 0:
+                print(f"[TRANSLATE]   Successful batches: {_successful}/{_batch_stats['total']}", file=sys.stderr)
 
             # Ground-truth: what PySubtrans actually stored in the project
             print(f"[TRANSLATE] Translation result (ground truth):", file=sys.stderr)
@@ -666,6 +666,27 @@ def translate_subtitle(
         # Convert to Path if needed
         if isinstance(saved_path, (str, Path)):
             output_path = Path(saved_path)
+
+        # =====================================================================
+        # Issue 2: Clean up PySubtrans' default .translated.srt artifact
+        # =====================================================================
+        # PySubtrans creates a .translated.srt file next to the input during
+        # SaveProject() (line 303-304 of SubtitleProject.py) using the default
+        # self.outputpath. When we then call SaveTranslation(output_path) with
+        # a different path (e.g., .english.srt or a user-specified directory),
+        # we end up with TWO output files. Clean up the redundant artifact.
+        if hasattr(project, 'subtitles') and project.subtitles:
+            _default_outpath = getattr(project.subtitles, 'outputpath', None)
+            if _default_outpath:
+                _default_outpath = Path(_default_outpath)
+                if _default_outpath.exists() and _default_outpath.resolve() != output_path.resolve():
+                    try:
+                        _default_outpath.unlink()
+                        print(f"[TRANSLATE]   Cleaned up intermediate artifact: {_default_outpath.name}",
+                              file=sys.stderr)
+                    except OSError as _e:
+                        print(f"[TRANSLATE]   Warning: Could not remove artifact {_default_outpath.name}: {_e}",
+                              file=sys.stderr)
 
         # =========================================================================
         # DIAGNOSTIC: Final Summary — truthful status

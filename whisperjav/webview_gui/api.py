@@ -3497,8 +3497,11 @@ class WhisperJAVAPI:
                 args.extend(["--max-batch-size", str(options['max_batch_size'])])
             if options.get('max_retries'):
                 args.extend(["--max-retries", str(options['max_retries'])])
-            if options.get('output_dir'):
-                args.extend(["-o", options['output_dir']])
+            # Output directory — honor the shared Destination section.
+            # 'source' is a sentinel meaning "save next to input file" (default).
+            _out_dir = options.get('output_dir', '')
+            if _out_dir and _out_dir.lower().strip() != 'source':
+                args.extend(["-o", _out_dir])
 
             # Streaming — default True: prevents read timeout on slow MPS/CPU inference.
             # Non-streaming blocks the HTTP connection until the last token arrives; on

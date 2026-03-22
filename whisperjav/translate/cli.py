@@ -537,6 +537,7 @@ def main():
     if instruction_file:
         print(f"  Instructions: {instruction_file}", file=sys.stderr)
     print(f"  Provider options: {provider_options}", file=sys.stderr)
+    print(f"  Debug: {getattr(args, 'debug', False)}", file=sys.stderr)
     if provider_name == 'local':
         print(
             "\n  [DEPRECATION WARNING] --provider local is deprecated as of v1.8.10.",

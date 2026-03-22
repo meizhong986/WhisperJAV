@@ -6558,6 +6558,8 @@ const TranslatorManager = {
         return {
             // Uses shared file list from SOURCE section (AppState.selectedFiles)
             inputs: AppState.selectedFiles,
+            // Shared Destination section — same as transcription/ensemble tabs
+            output_dir: document.getElementById('outputDir')?.value || '',
             provider: document.getElementById('translatorProvider')?.value || 'deepseek',
             model: document.getElementById('translatorCustomModel')?.value ||
                    document.getElementById('translatorModel')?.value || null,
