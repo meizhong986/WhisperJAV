@@ -596,9 +596,15 @@ def main():
 
         if 'num_ctx' not in provider_options:
             provider_options['num_ctx'] = ollama_n_ctx
-        if not (hasattr(args, 'temperature') and args.temperature is not None):
-            if readiness.get('temperature'):
-                provider_options['temperature'] = readiness['temperature']
+        # Only apply Ollama's default temperature if neither the CLI flag nor
+        # build_provider_options() (tone/settings) already set a value.
+        # Previously this checked only the CLI flag, letting readiness['temperature']
+        # (0.5) clobber the tone-aware value (e.g., 1.2 for pornify or 0.85 from
+        # user settings). See issue analysis: "Temperature 0.85→0.5".
+        if 'temperature' not in provider_options:
+            if not (hasattr(args, 'temperature') and args.temperature is not None):
+                if readiness.get('temperature'):
+                    provider_options['temperature'] = readiness['temperature']
 
         provider_config = dict(provider_config)
         provider_config['max_tokens'] = ollama_max_tokens
@@ -618,6 +624,8 @@ def main():
                   f"{ollama_batch_size} to fit {ollama_n_ctx}-token context", file=sys.stderr)
         print(f"[OLLAMA] model={model}, num_ctx={ollama_n_ctx}, batch_size={ollama_batch_size}, "
               f"max_tokens={ollama_max_tokens}", file=sys.stderr)
+        print(f"[OLLAMA] Final provider_options: temperature={provider_options.get('temperature')}, "
+              f"top_p={provider_options.get('top_p')}", file=sys.stderr)
 
     # Batch translation loop
     success_count = 0

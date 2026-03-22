@@ -6574,7 +6574,9 @@ const TranslatorManager = {
                        parseInt(document.getElementById('translatorRateLimit').value) : null,
             max_retries: parseInt(document.getElementById('translatorMaxRetries')?.value) || 3,
             endpoint: document.getElementById('translatorCustomEndpoint')?.value || null,
-            api_key: document.getElementById('translatorApiKey')?.value || null
+            api_key: document.getElementById('translatorApiKey')?.value || null,
+            // Debug checkbox lives in Transcription Adv. Options but is global
+            debug: document.getElementById('debugLogging')?.checked || false
         };
     },
 

@@ -192,6 +192,7 @@ def translate_subtitle(
         prompt = f"Translate these subtitles from {source_lang} into {target_lang}."
         if extra_context:
             prompt += "\n" + extra_context
+            print(f"[TRANSLATE]   Extra context: {extra_context[:200]}", file=sys.stderr)
 
         # Build provider options
         opt_kwargs = {
@@ -241,7 +242,8 @@ def translate_subtitle(
         # Merge provider-specific options
         if provider_options:
             opt_kwargs.update(provider_options)
-            print(f"[TRANSLATE]   Provider options: temperature={provider_options.get('temperature')}, top_p={provider_options.get('top_p')}", file=sys.stderr)
+            _po_display = {k: v for k, v in provider_options.items() if k != 'api_key'}
+            print(f"[TRANSLATE]   Provider options: {_po_display}", file=sys.stderr)
 
         # =========================================================================
         # DIAGNOSTIC: Final opt_kwargs (what PySubtrans actually receives)
@@ -386,7 +388,13 @@ def translate_subtitle(
 
         # Log subtitle count
         if hasattr(project, 'subtitles') and project.subtitles:
-            subtitle_count = len(project.subtitles) if hasattr(project.subtitles, '__len__') else 'unknown'
+            try:
+                subtitle_count = len(project.subtitles)
+            except TypeError:
+                try:
+                    subtitle_count = len(list(project.subtitles))
+                except Exception:
+                    subtitle_count = 'unknown'
             print(f"[TRANSLATE]   Subtitle lines: {subtitle_count}", file=sys.stderr)
 
         # Instructions are verified in the post-init_options() block above.
@@ -448,24 +456,25 @@ def translate_subtitle(
         _batch_stats = {'total': 0, 'success': 0, 'no_matches': 0, 'errors': 0}
 
         def _diagnostic_batch_handler(sender, **kwargs):
-            """Track batch translation results for diagnostic summary."""
+            """Track batch translation results for diagnostic summary.
+
+            batch_translated fires for every batch attempt, regardless of whether
+            translations were extracted. We count it as 'total' only — success is
+            determined by subtracting known failures.
+            """
             _batch_stats['total'] += 1
-            _batch_stats['success'] += 1
 
         def _diagnostic_warning_handler(sender, message=None, **kwargs):
-            """Capture 'No matches found' warnings with context."""
+            """Capture translation warnings with context."""
             msg = message or kwargs.get('message', '')
             if msg is None:
                 return
             msg_str = str(msg)
             if 'No matches' in msg_str or 'no matches' in msg_str:
                 _batch_stats['no_matches'] += 1
-                # Log the raw output that failed parsing — this is the #1 diagnostic gap
-                print(f"\n[TRANSLATE] *** NO MATCHES DETECTED (batch #{_batch_stats['total'] + 1}) ***",
+                print(f"\n[TRANSLATE] *** NO MATCHES DETECTED (batch #{_batch_stats['total']}) ***",
                       file=sys.stderr)
-                print(f"[TRANSLATE]   This means the model's response didn't match PySubtrans's",
-                      file=sys.stderr)
-                print(f"[TRANSLATE]   expected format (#N / Original> / Translation>).",
+                print(f"[TRANSLATE]   The model's response didn't match PySubtrans's expected format.",
                       file=sys.stderr)
                 print(f"[TRANSLATE]   Raw warning: {msg_str[:500]}", file=sys.stderr)
                 if provider_config.get('max_tokens'):
@@ -475,17 +484,33 @@ def translate_subtitle(
                       file=sys.stderr)
 
         def _diagnostic_error_handler(sender, message=None, **kwargs):
-            """Track translation errors."""
+            """Track all translation errors — not just HTTP errors."""
             _batch_stats['errors'] += 1
             msg = message or kwargs.get('message', '')
             if msg:
                 msg_str = str(msg)
-                # Log server errors (502, 500, etc.) with context
+                # Categorize known failure modes
                 if any(code in msg_str for code in ('502', '500', '503', 'Server Error', 'timed out')):
-                    print(f"\n[TRANSLATE] *** SERVER ERROR (batch #{_batch_stats['total'] + 1}) ***",
+                    print(f"\n[TRANSLATE] *** SERVER ERROR (batch #{_batch_stats['total']}) ***",
                           file=sys.stderr)
                     print(f"[TRANSLATE]   Error: {msg_str[:300]}", file=sys.stderr)
                     print(f"[TRANSLATE]   This may indicate context overflow crashing the LLM server.",
+                          file=sys.stderr)
+                elif 'No text returned' in msg_str or 'no text' in msg_str.lower():
+                    print(f"\n[TRANSLATE] *** EMPTY RESPONSE (batch #{_batch_stats['total']}) ***",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]   The model returned no text. Possible causes:",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]     - Model failed to generate (out of memory, crashed)",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]     - Streaming response contained no content chunks",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]     - Model is too large for available VRAM",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]   Try: smaller model, reduce --max-batch-size, or check Ollama logs",
+                          file=sys.stderr)
+                else:
+                    print(f"\n[TRANSLATE] *** ERROR (batch #{_batch_stats['total']}): {msg_str[:300]} ***",
                           file=sys.stderr)
 
         # Connect diagnostic handlers to translator events
@@ -515,28 +540,37 @@ def translate_subtitle(
             _translation_success = True
         finally:
             _translation_elapsed = _time.time() - _translation_start
+
+            # =====================================================================
+            # Diagnostic summary — batch stats with correct success computation
+            # =====================================================================
+            # success = total - errors - no_matches (not unconditionally incremented)
+            _failed = _batch_stats['errors'] + _batch_stats['no_matches']
+            _batch_stats['success'] = max(0, _batch_stats['total'] - _failed)
+
             if _translation_success:
                 print(f"\n[TRANSLATE] Translation completed in {_translation_elapsed:.1f}s", file=sys.stderr)
             else:
                 print(f"\n[TRANSLATE] Translation FAILED after {_translation_elapsed:.1f}s", file=sys.stderr)
 
-            # =====================================================================
-            # A1: Diagnostic summary — always print batch stats
-            # =====================================================================
             print(f"[TRANSLATE] Batch statistics:", file=sys.stderr)
             print(f"[TRANSLATE]   Batches processed: {_batch_stats['total']}", file=sys.stderr)
             print(f"[TRANSLATE]   Successful: {_batch_stats['success']}", file=sys.stderr)
+            if _batch_stats['errors'] > 0:
+                print(f"[TRANSLATE]   *** Errors: {_batch_stats['errors']} ***", file=sys.stderr)
             if _batch_stats['no_matches'] > 0:
                 print(f"[TRANSLATE]   *** 'No matches' failures: {_batch_stats['no_matches']} ***", file=sys.stderr)
-                print(f"[TRANSLATE]   These failures mean the LLM produced output that PySubtrans", file=sys.stderr)
-                print(f"[TRANSLATE]   couldn't parse. Common causes:", file=sys.stderr)
-                print(f"[TRANSLATE]     - Model too small for the task (try gemma-9b or cloud)", file=sys.stderr)
-                print(f"[TRANSLATE]     - Context overflow (try smaller --max-batch-size)", file=sys.stderr)
-                print(f"[TRANSLATE]     - Missing format example in instructions", file=sys.stderr)
-            if _batch_stats['errors'] > 0:
-                print(f"[TRANSLATE]   Errors: {_batch_stats['errors']}", file=sys.stderr)
+                print(f"[TRANSLATE]   The LLM produced output PySubtrans couldn't parse.", file=sys.stderr)
+                print(f"[TRANSLATE]   Try: smaller --max-batch-size, different model, or cloud provider",
+                      file=sys.stderr)
 
-        # Save final project state after successful translation
+            # Detect total failure: no exception but zero useful output
+            if _translation_success and _batch_stats['total'] > 0 and _batch_stats['success'] == 0:
+                _translation_success = False
+                print(f"[TRANSLATE] *** ALL {_batch_stats['total']} BATCHES FAILED — "
+                      f"no subtitles were translated ***", file=sys.stderr)
+
+        # Save final project state
         print(f"[TRANSLATE] Saving project state...", file=sys.stderr)
         if hasattr(project, 'SaveProject'):
             try:
@@ -574,16 +608,22 @@ def translate_subtitle(
             output_path = Path(saved_path)
 
         # =========================================================================
-        # DIAGNOSTIC: Final Summary
+        # DIAGNOSTIC: Final Summary — truthful status
         # =========================================================================
         print(f"", file=sys.stderr)
         print(f"[TRANSLATE] " + "=" * 50, file=sys.stderr)
-        print(f"[TRANSLATE]   TRANSLATION COMPLETE", file=sys.stderr)
-        print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
+        if _translation_success:
+            print(f"[TRANSLATE]   TRANSLATION COMPLETE", file=sys.stderr)
+            print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
+        else:
+            print(f"[TRANSLATE]   TRANSLATION FAILED", file=sys.stderr)
+            print(f"[TRANSLATE]   All batches returned errors — no subtitles translated.", file=sys.stderr)
+            print(f"[TRANSLATE]   Output file may be empty or contain only originals.", file=sys.stderr)
         print(f"[TRANSLATE] " + "=" * 50, file=sys.stderr)
         print(f"", file=sys.stderr)
 
-        return output_path
+        # Return None on total failure so cli.py reports it as failed
+        return output_path if _translation_success else None
 
     except Exception as e:
         # Save project state before propagating error
