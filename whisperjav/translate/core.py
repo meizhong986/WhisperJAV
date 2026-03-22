@@ -206,6 +206,14 @@ def translate_subtitle(
             'postprocess_translation': True
         }
 
+        # Pass instruction file to PySubtrans so it can parse the
+        # ### prompt / ### instructions / ### retry_instructions sections.
+        # Previously this was handled via project.SetInstructions() which
+        # does not exist in current PySubtrans — instructions were silently
+        # dropped for ALL providers.
+        if instruction_file:
+            opt_kwargs['instruction_file'] = str(instruction_file)
+
         if 'api_base' in provider_config:
             opt_kwargs['api_base'] = _normalize_api_base(provider_config['api_base'])
         if stream:
@@ -348,13 +356,12 @@ def translate_subtitle(
             subtitle_count = len(project.subtitles) if hasattr(project.subtitles, '__len__') else 'unknown'
             print(f"[TRANSLATE]   Subtitle lines: {subtitle_count}", file=sys.stderr)
 
-        # Set instructions if provided
-        if instruction_file is not None and hasattr(project, 'SetInstructions'):
-            try:
-                project.SetInstructions(str(instruction_file))
-                print(f"[TRANSLATE]   Instructions loaded from: {instruction_file}", file=sys.stderr)
-            except Exception as e:
-                print(f"[TRANSLATE]   Warning: Could not load instructions: {e}", file=sys.stderr)
+        # Instructions are now loaded via init_options(instruction_file=...)
+        # which delegates to PySubtrans's InstructionsHelpers.LoadInstructions().
+        # The old project.SetInstructions() path was dead code — that method
+        # does not exist in current PySubtrans versions.
+        if instruction_file:
+            print(f"[TRANSLATE]   Instructions: {instruction_file}", file=sys.stderr)
 
         # Register auto-save handler to save project after each batch
         if hasattr(project, 'events') and hasattr(project.events, 'batch_translated'):

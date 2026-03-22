@@ -607,6 +607,12 @@ def main():
             provider_config['server_address'] = server_addr
             provider_config['endpoint'] = endpoint_path
 
+        # Override supports_system_messages based on actual model template.
+        # Models with bare templates (e.g. {{ .Prompt }}) silently drop
+        # system messages — instructions must go in the user message instead.
+        if not readiness.get('supports_system_messages', True):
+            provider_config['supports_system_messages'] = False
+
         if ollama_batch_size < _user_batch:
             print(f"[OLLAMA] Batch size auto-reduced from {_user_batch} to "
                   f"{ollama_batch_size} to fit {ollama_n_ctx}-token context", file=sys.stderr)

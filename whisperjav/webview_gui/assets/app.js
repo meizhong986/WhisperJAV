@@ -5873,6 +5873,7 @@ const OllamaStateManager = {
     elements: {
         ensemble: {
             panel: 'ensembleOllamaPanel',
+            checking: 'ensembleOllamaChecking',
             notInstalled: 'ensembleOllamaNotInstalled',
             noModel: 'ensembleOllamaNoModel',
             ready: 'ensembleOllamaReady',
@@ -5882,6 +5883,7 @@ const OllamaStateManager = {
         },
         srt: {
             panel: 'srtOllamaPanel',
+            checking: 'srtOllamaChecking',
             notInstalled: 'srtOllamaNotInstalled',
             noModel: 'srtOllamaNoModel',
             ready: 'srtOllamaReady',
@@ -5900,6 +5902,12 @@ const OllamaStateManager = {
     getSizeLabel(modelName) {
         const entry = this.curatedModelsConfig.find(c => c.model === modelName);
         return entry ? entry.size : null;
+    },
+
+    // Get display label for a model (short label if available, else model name)
+    getDisplayLabel(modelName) {
+        const entry = this.curatedModelsConfig.find(c => c.model === modelName);
+        return entry && entry.label ? entry.label : modelName;
     },
 
     // Check if a local model matches a given model name (prefix matching for tags)
@@ -5922,13 +5930,11 @@ const OllamaStateManager = {
                 this.curatedModelsConfig = result.models;
             }
         } catch (e) {
-            // Fallback — hardcoded so GUI doesn't break
+            // Fallback — top 3 from curated list so GUI doesn't break
             this.curatedModelsConfig = [
-                { model: 'gemma3:4b', size: '2.5 GB' },
-                { model: 'qwen2.5:7b', size: '4.7 GB' },
-                { model: 'gemma3:12b', size: '8.1 GB' },
-                { model: 'qwen2.5:14b', size: '9.0 GB' },
-                { model: 'qwen2.5:3b', size: '1.9 GB' },
+                { model: 'hf.co/mradermacher/Huihui-Qwen3.5-9B-Claude-4.6-Opus-abliterated-i1-GGUF:Q6_K', size: '6.5 GB', label: 'Huihui-Qwen3.5-9B-Opus Q6' },
+                { model: 'hf.co/mmnga/lightblue-DeepSeek-R1-Distill-Qwen-7B-Japanese-gguf:Q8_0', size: '8.2 GB', label: 'DeepSeek-R1-Qwen-7B-Japanese Q8' },
+                { model: 'hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0', size: '8.7 GB', label: 'Shisa-v2.1-Qwen3-8B Q8' },
             ];
         }
     },
@@ -6009,15 +6015,20 @@ const OllamaStateManager = {
         panel.style.display = 'block';
 
         // Hide all state divs
+        const checking = document.getElementById(els.checking);
         const notInstalled = document.getElementById(els.notInstalled);
         const noModel = document.getElementById(els.noModel);
         const ready = document.getElementById(els.ready);
 
+        if (checking) checking.style.display = 'none';
         if (notInstalled) notInstalled.style.display = 'none';
         if (noModel) noModel.style.display = 'none';
         if (ready) ready.style.display = 'none';
 
         switch (this.currentState) {
+            case 'CHECKING':
+                if (checking) checking.style.display = 'inline-flex';
+                break;
             case 'NOT_INSTALLED':
                 if (notInstalled) notInstalled.style.display = 'block';
                 break;
@@ -6033,9 +6044,6 @@ const OllamaStateManager = {
                 break;
             case 'READY':
                 if (ready) ready.style.display = 'flex';
-                break;
-            case 'CHECKING':
-                // Panel visible but no state shown — brief flash
                 break;
         }
     },
@@ -6237,6 +6245,10 @@ const ProviderUIManager = {
             if (deprecation) deprecation.style.display = 'none';
             if (ollamaPanel) ollamaPanel.style.display = 'block';
 
+            // Show "Looking for Ollama server..." immediately
+            OllamaStateManager.currentState = 'CHECKING';
+            OllamaStateManager.updateUI(tabContext);
+
             await OllamaStateManager.checkStatus();
             OllamaStateManager.updateUI(tabContext);
 
@@ -6315,23 +6327,22 @@ const ProviderUIManager = {
         const installed = OllamaStateManager.localModels;
         const curated = OllamaStateManager.curatedModelsConfig;
 
-        // Build size lookup for all known models
-        const sizeMap = {};
-        curated.forEach(c => { sizeMap[c.model] = c.size; });
-
-        // "Installed Models" group
+        // "Installed Models" group — use short label if curated, else raw model name
         const installedOptions = installed.map(m => {
-            const size = sizeMap[m] ? ` (${sizeMap[m]})` : '';
-            return `<option value="${m}">${m}${size}</option>`;
+            const label = OllamaStateManager.getDisplayLabel(m);
+            const size = OllamaStateManager.getSizeLabel(m);
+            const sizeStr = size ? ` (${size})` : '';
+            return `<option value="${m}">${label}${sizeStr}</option>`;
         });
 
         // "Top Recommendations" group — curated models NOT already installed
         const uninstalled = curated.filter(c =>
             !installed.some(lm => OllamaStateManager.modelMatches(lm, c.model))
         );
-        const recOptions = uninstalled.map(c =>
-            `<option value="${c.model}">${c.model} (${c.size})</option>`
-        );
+        const recOptions = uninstalled.map(c => {
+            const label = c.label || c.model;
+            return `<option value="${c.model}">${label} (${c.size})</option>`;
+        });
 
         let html = '<option value="" disabled selected>\u2014 Select a model \u2014</option>';
 

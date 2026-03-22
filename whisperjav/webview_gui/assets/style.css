@@ -2019,6 +2019,36 @@ button:focus-visible,
     color: var(--text-secondary);
 }
 
+.ollama-state-checking {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(23, 162, 184, 0.08);
+    border: 1px solid rgba(23, 162, 184, 0.25);
+    border-radius: var(--border-radius);
+}
+
+.ollama-checking-spinner {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 2px solid rgba(23, 162, 184, 0.25);
+    border-top-color: var(--info-color);
+    animation: ollama-spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes ollama-spin {
+    to { transform: rotate(360deg); }
+}
+
+.ollama-checking-text {
+    font-size: 11px;
+    color: var(--info-color);
+    font-weight: 500;
+}
+
 .ollama-state-ready {
     display: inline-flex;
     align-items: center;

@@ -286,6 +286,29 @@ class OllamaManager:
 
         return 8192  # Safe fallback
 
+    def supports_system_messages(self, name: str) -> bool:
+        """Check if a model's chat template handles system messages.
+
+        Models pulled from hf.co/ as raw GGUFs often have a bare
+        ``{{ .Prompt }}`` template that drops the system role entirely.
+        When that happens, instructions sent as a system message are
+        silently discarded and the LLM never sees them.
+
+        Returns True if the template contains a reference to .System
+        (meaning system messages are rendered), False otherwise.
+        """
+        info = self.get_model_info(name)
+        if not info:
+            return True  # Optimistic fallback if we can't check
+
+        template = info.get('template', '')
+        if not template:
+            return False  # No template at all — cannot handle chat roles
+
+        # Ollama Go templates use {{ .System }} to render system messages.
+        # If the template doesn't reference it, system messages are dropped.
+        return '.System' in template
+
     def pull_model(self, name: str, progress_callback: Callable = None) -> bool:
         """Pull (download) a model. Resumable via Ollama's built-in support.
 
@@ -506,7 +529,13 @@ class OllamaManager:
         batch_size = cfg.get('batch_size', 11)
         temperature = cfg.get('temperature', 0.5)
 
-        # Step 6: Return readiness info
+        # Step 6: Check if model template handles system messages
+        has_system = self.supports_system_messages(model)
+        if not has_system:
+            print(f"[OLLAMA] Model template does not handle system messages — "
+                  f"instructions will be embedded in user message", file=sys.stderr)
+
+        # Step 7: Return readiness info
         return {
             'model': model,
             'num_ctx': num_ctx,
@@ -514,6 +543,7 @@ class OllamaManager:
             'temperature': temperature,
             'server_started': server_started,
             'base_url': self.base_url,
+            'supports_system_messages': has_system,
         }
 
     # ── Internal Helpers ──────────────────────────────────────────────
