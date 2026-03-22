@@ -228,6 +228,9 @@ def translate_subtitle(
             opt_kwargs['supports_conversation'] = provider_config['supports_conversation']
         if 'supports_system_messages' in provider_config:
             opt_kwargs['supports_system_messages'] = provider_config['supports_system_messages']
+            _sys_msg = provider_config['supports_system_messages']
+            print(f"[TRANSLATE]   System messages: {'enabled' if _sys_msg else 'DISABLED (embedded in user msg)'}",
+                  file=sys.stderr)
         if 'max_tokens' in provider_config:
             opt_kwargs['max_tokens'] = provider_config['max_tokens']
         if 'max_completion_tokens' in provider_config:
@@ -257,6 +260,36 @@ def translate_subtitle(
         # Initialize options and provider
         print(f"[TRANSLATE] Initializing PySubtrans options...", file=sys.stderr)
         options = init_options(**opt_kwargs)
+
+        # =========================================================================
+        # DIAGNOSTIC: Instruction Loading Verification (always-on)
+        # =========================================================================
+        # Verify that PySubtrans actually loaded and parsed the instructions.
+        # The instruction_file dead-path bug (commit 56315f2) went undetected
+        # for months because nothing inspected what init_options() produced.
+        _loaded_inst_file = options.get('instruction_file')
+        _has_instructions = bool(options.get('instructions'))
+        _has_retry = bool(options.get('retry_instructions'))
+        if instruction_file:
+            # We asked for a specific instruction file — verify it was loaded
+            if _loaded_inst_file:
+                print(f"[TRANSLATE]   Instructions loaded: {_loaded_inst_file}", file=sys.stderr)
+                print(f"[TRANSLATE]   Sections: instructions={'YES' if _has_instructions else 'MISSING'}, "
+                      f"retry={'YES' if _has_retry else 'MISSING'}", file=sys.stderr)
+            else:
+                print(f"[TRANSLATE]   WARNING: instruction_file='{instruction_file}' was passed "
+                      f"but PySubtrans did not load it!", file=sys.stderr)
+        else:
+            print(f"[TRANSLATE]   Instructions: (default — no instruction file specified)", file=sys.stderr)
+
+        # Debug-only: instruction content preview
+        if debug:
+            _inst_text = options.get('instructions', '')
+            if _inst_text:
+                print(f"[TRANSLATE]   Instructions preview: {_inst_text[:150]}...", file=sys.stderr)
+            _prompt_text = options.get('prompt', '')
+            if _prompt_text:
+                print(f"[TRANSLATE]   Prompt: {_prompt_text[:150]}", file=sys.stderr)
 
         # Initialize provider
         print(f"[TRANSLATE] Initializing provider: {provider_config['pysubtrans_name']}...", file=sys.stderr)
@@ -356,12 +389,9 @@ def translate_subtitle(
             subtitle_count = len(project.subtitles) if hasattr(project.subtitles, '__len__') else 'unknown'
             print(f"[TRANSLATE]   Subtitle lines: {subtitle_count}", file=sys.stderr)
 
-        # Instructions are now loaded via init_options(instruction_file=...)
-        # which delegates to PySubtrans's InstructionsHelpers.LoadInstructions().
+        # Instructions are verified in the post-init_options() block above.
         # The old project.SetInstructions() path was dead code — that method
         # does not exist in current PySubtrans versions.
-        if instruction_file:
-            print(f"[TRANSLATE]   Instructions: {instruction_file}", file=sys.stderr)
 
         # Register auto-save handler to save project after each batch
         if hasattr(project, 'events') and hasattr(project.events, 'batch_translated'):

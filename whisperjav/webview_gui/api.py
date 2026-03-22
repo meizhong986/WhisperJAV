@@ -3507,6 +3507,12 @@ class WhisperJAVAPI:
             if options.get('stream', True):
                 args.append("--stream")
 
+            # Debug logging — enables PySubtrans logging.debug() output.
+            # Shows: messages sent to API, raw model responses, batch flow,
+            # instruction loading. The checkbox is in GUI Advanced Options.
+            if options.get('debug'):
+                args.append("--debug")
+
             # Start process with unbuffered output for real-time streaming
             # PYTHONUNBUFFERED=1 ensures child process doesn't buffer stdout/stderr
             # UTF-8 encoding required: without explicit encoding, Popen uses the
