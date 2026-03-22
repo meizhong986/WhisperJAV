@@ -194,6 +194,14 @@ def translate_subtitle(
             prompt += "\n" + extra_context
             print(f"[TRANSLATE]   Extra context: {extra_context[:200]}", file=sys.stderr)
 
+        # Qwen3-family thinking model flag: consumed later by the response
+        # parsing patch (after provider init). Remove from provider_options
+        # so it doesn't get passed to PySubtrans as an unknown option.
+        _is_thinking_model = provider_options.pop('_thinking_model', False) if provider_options else False
+        if _is_thinking_model:
+            print(f"[TRANSLATE]   Thinking model: YES (will patch response parsing)",
+                  file=sys.stderr)
+
         # Build provider options
         opt_kwargs = {
             'provider': provider_config['pysubtrans_name'],
@@ -417,6 +425,41 @@ def translate_subtitle(
         print(f"[TRANSLATE] Initializing translator...", file=sys.stderr)
         translator = init_translator(options, translation_provider=provider)
 
+        # =====================================================================
+        # Qwen3 thinking model workaround: patch response parsing
+        # =====================================================================
+        # Ollama returns thinking output in 'reasoning' field with empty
+        # 'content'. PySubtrans checks for 'reasoning_content' (OpenAI
+        # convention) — field name mismatch means translations are silently
+        # lost. This patch intercepts the response parsing to move
+        # 'reasoning' → 'content' when content is empty.
+        # Upstream fix: PySubtrans should also check 'reasoning' field.
+        if _is_thinking_model:
+            _client = getattr(translator, 'client', None)
+            if _client and hasattr(_client, '_process_api_response'):
+                _original_process = _client._process_api_response
+
+                def _patched_process_api_response(content, result, _orig=_original_process):
+                    """Patched to extract thinking model output from 'reasoning' field."""
+                    import copy
+                    patched_content = copy.deepcopy(content)
+                    choices = patched_content.get('choices', [])
+                    for choice in choices:
+                        msg = choice.get('message', {})
+                        if not msg.get('content') and msg.get('reasoning'):
+                            msg['content'] = msg['reasoning']
+                            if debug:
+                                print(f"[TRANSLATE]   [thinking-patch] Moved 'reasoning' → 'content' "
+                                      f"({len(msg['content'])} chars)", file=sys.stderr)
+                    return _orig(patched_content, result)
+
+                _client._process_api_response = _patched_process_api_response
+                print(f"[TRANSLATE]   Thinking model patch: ACTIVE (reasoning→content fallback)",
+                      file=sys.stderr)
+            else:
+                print(f"[TRANSLATE]   WARNING: Could not patch thinking model — "
+                      f"translator.client not found", file=sys.stderr)
+
         # Enable resume mode to skip already-translated batches when resuming
         # This is critical for interrupted translations - without it, the translator
         # will re-translate everything from the beginning even if a .subtrans file exists
@@ -542,33 +585,50 @@ def translate_subtitle(
             _translation_elapsed = _time.time() - _translation_start
 
             # =====================================================================
-            # Diagnostic summary — batch stats with correct success computation
+            # P1/P2: Ground-truth success detection via PySubtrans project state
             # =====================================================================
-            # success = total - errors - no_matches (not unconditionally incremented)
-            _failed = _batch_stats['errors'] + _batch_stats['no_matches']
-            _batch_stats['success'] = max(0, _batch_stats['total'] - _failed)
+            # The event-signal approach (counting batch_translated / error signals)
+            # is unreliable: PySubtrans catches TranslationResponseError internally
+            # and fires batch_translated anyway — errors counter stays at 0 even
+            # when ALL batches fail. Instead, check what PySubtrans actually stored.
+            _any_translated = False
+            _all_translated = False
+            if hasattr(project, 'subtitles') and project.subtitles:
+                _any_translated = getattr(project.subtitles, 'any_translated', False)
+                _all_translated = getattr(project.subtitles, 'all_translated', False)
 
             if _translation_success:
                 print(f"\n[TRANSLATE] Translation completed in {_translation_elapsed:.1f}s", file=sys.stderr)
             else:
                 print(f"\n[TRANSLATE] Translation FAILED after {_translation_elapsed:.1f}s", file=sys.stderr)
 
+            # Batch event stats (advisory — may undercount failures)
             print(f"[TRANSLATE] Batch statistics:", file=sys.stderr)
             print(f"[TRANSLATE]   Batches processed: {_batch_stats['total']}", file=sys.stderr)
-            print(f"[TRANSLATE]   Successful: {_batch_stats['success']}", file=sys.stderr)
             if _batch_stats['errors'] > 0:
-                print(f"[TRANSLATE]   *** Errors: {_batch_stats['errors']} ***", file=sys.stderr)
+                print(f"[TRANSLATE]   Errors (signal-based): {_batch_stats['errors']}", file=sys.stderr)
             if _batch_stats['no_matches'] > 0:
-                print(f"[TRANSLATE]   *** 'No matches' failures: {_batch_stats['no_matches']} ***", file=sys.stderr)
+                print(f"[TRANSLATE]   'No matches' failures: {_batch_stats['no_matches']}", file=sys.stderr)
                 print(f"[TRANSLATE]   The LLM produced output PySubtrans couldn't parse.", file=sys.stderr)
                 print(f"[TRANSLATE]   Try: smaller --max-batch-size, different model, or cloud provider",
                       file=sys.stderr)
 
-            # Detect total failure: no exception but zero useful output
-            if _translation_success and _batch_stats['total'] > 0 and _batch_stats['success'] == 0:
+            # Ground-truth: what PySubtrans actually stored in the project
+            print(f"[TRANSLATE] Translation result (ground truth):", file=sys.stderr)
+            print(f"[TRANSLATE]   Any subtitles translated: {'YES' if _any_translated else 'NO'}",
+                  file=sys.stderr)
+            print(f"[TRANSLATE]   All subtitles translated: {'YES' if _all_translated else 'NO'}",
+                  file=sys.stderr)
+
+            # Override success based on ground truth — if TranslateSubtitles()
+            # didn't raise but nothing was actually translated, it's a failure.
+            if _translation_success and not _any_translated and _batch_stats['total'] > 0:
                 _translation_success = False
                 print(f"[TRANSLATE] *** ALL {_batch_stats['total']} BATCHES FAILED — "
                       f"no subtitles were translated ***", file=sys.stderr)
+                print(f"[TRANSLATE]   Common causes: model returned empty content (thinking mode),",
+                      file=sys.stderr)
+                print(f"[TRANSLATE]   output format not parseable, or server errors.", file=sys.stderr)
 
         # Save final project state
         print(f"[TRANSLATE] Saving project state...", file=sys.stderr)

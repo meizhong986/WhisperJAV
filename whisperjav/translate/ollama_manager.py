@@ -286,6 +286,24 @@ class OllamaManager:
 
         return 8192  # Safe fallback
 
+    def is_thinking_model(self, name: str) -> bool:
+        """Check if a model uses thinking/reasoning mode by default.
+
+        Qwen3-family models (and derivatives like shisa-v2.1-qwen3-*) put
+        their output in a ``reasoning`` JSON field with empty ``content``.
+        PySubtrans reads ``content`` only, so all translations silently fail.
+
+        Appending ``/no_think`` to the user message disables thinking mode,
+        forcing output into the ``content`` field where PySubtrans expects it.
+
+        Returns True if the model name indicates a Qwen3-family model.
+        """
+        # Normalize: "hf.co/bartowski/shisa-v2.1-qwen3-8b-GGUF:Q4_K_M" → lowercase
+        lower = name.lower()
+        # Match qwen3 anywhere in the model name (covers qwen3:8b,
+        # shisa-v2.1-qwen3-8b, hf.co/.../qwen3-..., etc.)
+        return 'qwen3' in lower
+
     def supports_system_messages(self, name: str) -> bool:
         """Check if a model's chat template handles system messages.
 
@@ -535,6 +553,13 @@ class OllamaManager:
             print(f"[OLLAMA] Model template does not handle system messages — "
                   f"instructions will be embedded in user message", file=sys.stderr)
 
+        # Step 6b: Check if model uses thinking/reasoning mode
+        is_thinking = self.is_thinking_model(model)
+        if is_thinking:
+            print(f"[OLLAMA] Qwen3-family thinking model detected — will patch "
+                  f"response parsing to extract translations from reasoning field",
+                  file=sys.stderr)
+
         # Step 7: Return readiness info
         return {
             'model': model,
@@ -544,6 +569,7 @@ class OllamaManager:
             'server_started': server_started,
             'base_url': self.base_url,
             'supports_system_messages': has_system,
+            'thinking_model': is_thinking,
         }
 
     # ── Internal Helpers ──────────────────────────────────────────────

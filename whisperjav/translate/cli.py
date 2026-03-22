@@ -619,6 +619,13 @@ def main():
         if not readiness.get('supports_system_messages', True):
             provider_config['supports_system_messages'] = False
 
+        # Qwen3-family thinking models: their output goes to the 'reasoning'
+        # field with empty 'content'. PySubtrans only reads 'content', so all
+        # translations are silently lost. The '_thinking_model' flag activates
+        # a response-parsing patch in core.py that moves reasoning → content.
+        if readiness.get('thinking_model'):
+            provider_options['_thinking_model'] = True
+
         if ollama_batch_size < _user_batch:
             print(f"[OLLAMA] Batch size auto-reduced from {_user_batch} to "
                   f"{ollama_batch_size} to fit {ollama_n_ctx}-token context", file=sys.stderr)
