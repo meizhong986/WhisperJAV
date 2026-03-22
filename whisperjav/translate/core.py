@@ -667,6 +667,15 @@ def translate_subtitle(
         if isinstance(saved_path, (str, Path)):
             output_path = Path(saved_path)
 
+        # Verify the save actually produced a file.
+        # PySubtrans' SubtitleProject.SaveTranslation() catches exceptions
+        # internally (logging.error) and returns None — we never see the error.
+        # Check the filesystem to know if the save actually worked.
+        _save_succeeded = output_path.is_file()
+        if not _save_succeeded:
+            print(f"[TRANSLATE]   WARNING: SaveTranslation did not produce output at: {output_path}",
+                  file=sys.stderr)
+
         # =====================================================================
         # Issue 2: Clean up PySubtrans' default .translated.srt artifact
         # =====================================================================
@@ -675,17 +684,26 @@ def translate_subtitle(
         # self.outputpath. When we then call SaveTranslation(output_path) with
         # a different path (e.g., .english.srt or a user-specified directory),
         # we end up with TWO output files. Clean up the redundant artifact.
+        # IMPORTANT: Only clean up if the intended save succeeded — otherwise
+        # the artifact is the ONLY copy of the translation.
         if hasattr(project, 'subtitles') and project.subtitles:
             _default_outpath = getattr(project.subtitles, 'outputpath', None)
             if _default_outpath:
                 _default_outpath = Path(_default_outpath)
                 if _default_outpath.exists() and _default_outpath.resolve() != output_path.resolve():
-                    try:
-                        _default_outpath.unlink()
-                        print(f"[TRANSLATE]   Cleaned up intermediate artifact: {_default_outpath.name}",
-                              file=sys.stderr)
-                    except OSError as _e:
-                        print(f"[TRANSLATE]   Warning: Could not remove artifact {_default_outpath.name}: {_e}",
+                    if _save_succeeded:
+                        try:
+                            _default_outpath.unlink()
+                            print(f"[TRANSLATE]   Cleaned up intermediate artifact: {_default_outpath.name}",
+                                  file=sys.stderr)
+                        except OSError as _e:
+                            print(f"[TRANSLATE]   Warning: Could not remove artifact {_default_outpath.name}: {_e}",
+                                  file=sys.stderr)
+                    else:
+                        # The intended save failed but the artifact exists —
+                        # this IS the translation. Report it as the output.
+                        output_path = _default_outpath
+                        print(f"[TRANSLATE]   Using fallback output: {_default_outpath.name}",
                               file=sys.stderr)
 
         # =========================================================================

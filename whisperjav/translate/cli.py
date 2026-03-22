@@ -643,17 +643,17 @@ def main():
         # Determine output path for this file
         if hasattr(args, 'output') and args.output:
             # If explicit output provided:
-            # - If processing multiple files, treat args.output as directory
-            # - If processing single file, treat args.output as file (legacy behavior)
+            # - If it's a directory (or looks like one): generate filename inside it
+            # - If it's a file path: use exactly what user gave (legacy single-file)
             out_arg = Path(args.output)
-            if len(files_to_process) > 1:
+            if out_arg.is_dir() or len(files_to_process) > 1:
                 if not out_arg.exists():
                     out_arg.mkdir(parents=True, exist_ok=True)
                 # Output filename is same as generated one but in the specified dir
                 default_name = Path(generate_output_path(str(input_path), target_lang)).name
                 output_path = out_arg / default_name
             else:
-                # Single file mode - use exactly what user gave
+                # Single file mode with explicit file path
                 output_path = out_arg
         else:
             # Auto-generate
