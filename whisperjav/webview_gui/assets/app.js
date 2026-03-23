@@ -5933,7 +5933,6 @@ const OllamaStateManager = {
             // Fallback — top 3 from curated list so GUI doesn't break
             this.curatedModelsConfig = [
                 { model: 'hf.co/mradermacher/Huihui-Qwen3.5-9B-Claude-4.6-Opus-abliterated-i1-GGUF:Q6_K', size: '6.5 GB', label: 'Huihui-Qwen3.5-9B-Opus Q6' },
-                { model: 'hf.co/mmnga/lightblue-DeepSeek-R1-Distill-Qwen-7B-Japanese-gguf:Q8_0', size: '8.2 GB', label: 'DeepSeek-R1-Qwen-7B-Japanese Q8' },
                 { model: 'hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0', size: '8.7 GB', label: 'Shisa-v2.1-Qwen3-8B Q8' },
             ];
         }

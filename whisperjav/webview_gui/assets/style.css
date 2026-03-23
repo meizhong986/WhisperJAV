@@ -2197,7 +2197,7 @@ details[open] .collapse-icon {
     font-size: 11px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    background: var(--background-primary);
+    background: var(--input-bg);
     color: var(--text-primary);
     resize: vertical;
     min-height: 40px;
