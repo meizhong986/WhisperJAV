@@ -556,6 +556,18 @@ def translate_subtitle(
                     else:
                         print(f"[TRANSLATE]   Check Ollama server logs for details: ollama logs",
                               file=sys.stderr)
+                    # Ollama's internal debug logs (GGUF parsing, tensor loading,
+                    # VRAM allocation) are only available server-side — they don't
+                    # flow through the HTTP API. Guide the user when debug is on.
+                    if debug and _err_num == 1:
+                        print(f"[TRANSLATE]   NOTE: WhisperJAV debug shows client-side HTTP traffic only.",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]   For Ollama's own server-side logs (model loading, GGUF errors):",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     Windows: check the Ollama app log or run 'ollama logs'",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     Linux/macOS: journalctl -u ollama or OLLAMA_DEBUG=1 ollama serve",
+                              file=sys.stderr)
                 elif 'No text returned' in msg_str or 'no text' in msg_str.lower():
                     print(f"\n[TRANSLATE] *** EMPTY RESPONSE (attempt #{_err_num}) ***",
                           file=sys.stderr)
