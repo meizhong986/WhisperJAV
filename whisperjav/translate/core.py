@@ -529,15 +529,35 @@ def translate_subtitle(
             msg = message or kwargs.get('message', '')
             if msg:
                 msg_str = str(msg)
-                # Categorize known failure modes
+                # Error count serves as attempt number (includes retries on same batch)
+                _err_num = _batch_stats['errors']
+                # Categorize known failure modes and give relevant advice
                 if any(code in msg_str for code in ('502', '500', '503', 'Server Error', 'timed out')):
-                    print(f"\n[TRANSLATE] *** SERVER ERROR (batch #{_batch_stats['total']}) ***",
+                    print(f"\n[TRANSLATE] *** SERVER ERROR (attempt #{_err_num}) ***",
                           file=sys.stderr)
-                    print(f"[TRANSLATE]   Error: {msg_str[:300]}", file=sys.stderr)
-                    print(f"[TRANSLATE]   This may indicate context overflow crashing the LLM server.",
-                          file=sys.stderr)
+                    print(f"[TRANSLATE]   {msg_str[:500]}", file=sys.stderr)
+                    # Parse the error to give relevant advice
+                    msg_lower = msg_str.lower()
+                    if 'unable to load model' in msg_lower:
+                        print(f"[TRANSLATE]   The model blob failed to load. Possible causes:",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     - Corrupt download — try: ollama rm <model> then re-pull",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     - Ollama version too old for this GGUF format — try: ollama update",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     - Insufficient VRAM — try a smaller quantization (Q4 instead of Q6/Q8)",
+                              file=sys.stderr)
+                    elif 'context length' in msg_lower or 'too long' in msg_lower:
+                        print(f"[TRANSLATE]   Context overflow — reduce --max-batch-size or use a model with larger context.",
+                              file=sys.stderr)
+                    elif 'timed out' in msg_lower or 'timeout' in msg_lower:
+                        print(f"[TRANSLATE]   Request timed out — the model may be too slow. Try a smaller model or smaller batch size.",
+                              file=sys.stderr)
+                    else:
+                        print(f"[TRANSLATE]   Check Ollama server logs for details: ollama logs",
+                              file=sys.stderr)
                 elif 'No text returned' in msg_str or 'no text' in msg_str.lower():
-                    print(f"\n[TRANSLATE] *** EMPTY RESPONSE (batch #{_batch_stats['total']}) ***",
+                    print(f"\n[TRANSLATE] *** EMPTY RESPONSE (attempt #{_err_num}) ***",
                           file=sys.stderr)
                     print(f"[TRANSLATE]   The model returned no text. Possible causes:",
                           file=sys.stderr)
@@ -550,7 +570,7 @@ def translate_subtitle(
                     print(f"[TRANSLATE]   Try: smaller model, reduce --max-batch-size, or check Ollama logs",
                           file=sys.stderr)
                 else:
-                    print(f"\n[TRANSLATE] *** ERROR (batch #{_batch_stats['total']}): {msg_str[:300]} ***",
+                    print(f"\n[TRANSLATE] *** ERROR (attempt #{_err_num}): {msg_str[:300]} ***",
                           file=sys.stderr)
 
         # Connect diagnostic handlers to translator events
@@ -609,9 +629,19 @@ def translate_subtitle(
                 print(f"[TRANSLATE]   The LLM produced output PySubtrans couldn't parse.", file=sys.stderr)
                 print(f"[TRANSLATE]   Try: smaller --max-batch-size, different model, or cloud provider",
                       file=sys.stderr)
+            # Successful batch count — cross-check signal-based counter with
+            # ground truth. Signal counters undercount failures (PySubtrans
+            # fires batch_translated even on server errors), so if ground
+            # truth says nothing was translated, don't claim any succeeded.
             _successful = _batch_stats['total'] - _batch_stats['errors'] - _batch_stats['no_matches']
             if _successful > 0 and _batch_stats['total'] > 0:
-                print(f"[TRANSLATE]   Successful batches: {_successful}/{_batch_stats['total']}", file=sys.stderr)
+                if _any_translated:
+                    print(f"[TRANSLATE]   Successful batches: {_successful}/{_batch_stats['total']}", file=sys.stderr)
+                else:
+                    # Signal counters say N succeeded but ground truth disagrees
+                    print(f"[TRANSLATE]   Successful batches: 0/{_batch_stats['total']} "
+                          f"(signal counters reported {_successful}, but no subtitles were translated)",
+                          file=sys.stderr)
 
             # Ground-truth: what PySubtrans actually stored in the project
             print(f"[TRANSLATE] Translation result (ground truth):", file=sys.stderr)

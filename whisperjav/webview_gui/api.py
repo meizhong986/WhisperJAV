@@ -2890,6 +2890,7 @@ class WhisperJAVAPI:
         if not hasattr(self, '_translate_process'):
             self._translate_process: Optional[subprocess.Popen] = None
             self._translate_status = "idle"
+            self._translate_error: Optional[str] = None
             self._translate_log_queue: queue.Queue = queue.Queue()
             self._translate_thread: Optional[threading.Thread] = None
             self._translate_files_total = 0
@@ -3538,6 +3539,7 @@ class WhisperJAVAPI:
             )
 
             self._translate_status = "running"
+            self._translate_error = None
 
             # Start output streaming thread
             self._translate_thread = threading.Thread(
@@ -3571,6 +3573,13 @@ class WhisperJAVAPI:
                     # Parse completion: "Complete: file_a.english.srt"
                     if 'Complete:' in line:
                         self._translate_files_completed += 1
+                    # Capture error messages for GUI display
+                    if 'TRANSLATION FAILED' in line:
+                        self._translate_error = 'Translation failed — no subtitles were translated'
+                    elif line.startswith('Failed:') and not self._translate_error:
+                        self._translate_error = line.strip()
+                    elif 'Batch processing finished with' in line and 'error' in line:
+                        self._translate_error = line.strip()
         except Exception as e:
             self._translate_log_queue.put(f"\n[ERROR] {e}\n")
         finally:
@@ -3632,6 +3641,8 @@ class WhisperJAVAPI:
                         self._translate_log_queue.put("\n[SUCCESS] Translation completed.\n")
                     else:
                         self._translate_status = "error"
+                        if not self._translate_error:
+                            self._translate_error = f"Translation process exited with code {exit_code}"
                         self._translate_log_queue.put(f"\n[ERROR] Exit code: {exit_code}\n")
 
         files_total = getattr(self, '_translate_files_total', 0)
@@ -3644,7 +3655,8 @@ class WhisperJAVAPI:
             "current_file": getattr(self, '_translate_current_file', None),
             "files_completed": files_completed,
             "files_total": files_total,
-            "has_logs": not self._translate_log_queue.empty()
+            "has_logs": not self._translate_log_queue.empty(),
+            "error": self._translate_error,
         }
 
     def get_translation_logs(self) -> List[str]:

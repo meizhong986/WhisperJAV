@@ -300,9 +300,12 @@ class OllamaManager:
         """
         # Normalize: "hf.co/bartowski/shisa-v2.1-qwen3-8b-GGUF:Q4_K_M" → lowercase
         lower = name.lower()
-        # Match qwen3 anywhere in the model name (covers qwen3:8b,
-        # shisa-v2.1-qwen3-8b, hf.co/.../qwen3-..., etc.)
-        return 'qwen3' in lower
+        # Match qwen3 but NOT qwen3.5 — only Qwen3 has thinking mode,
+        # Qwen3.5 is a standard generation model without reasoning tokens.
+        # 'qwen3' in 'qwen3.5-9b' would false-positive, so we check that
+        # the character after 'qwen3' is not '.' (which starts '3.5').
+        import re
+        return bool(re.search(r'qwen3(?!\.)', lower))
 
     def supports_system_messages(self, name: str) -> bool:
         """Check if a model's chat template handles system messages.
