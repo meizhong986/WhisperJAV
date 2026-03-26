@@ -548,7 +548,11 @@ class OllamaManager:
         cfg = OLLAMA_MODEL_CONFIGS.get(model, {})
         num_ctx = cfg.get('num_ctx', min(actual_ctx, 8192))
         batch_size = cfg.get('batch_size', 11)
-        temperature = cfg.get('temperature', 0.5)
+        # Default 0.3: best-fit compromise across 10 tested local models for
+        # JAV subtitle translation (range 0.2–0.4, median 0.3). Keeps strong
+        # models faithful while giving weaker models enough flexibility for
+        # fragmented ASR input. Previous default (0.5) was too high.
+        temperature = cfg.get('temperature', 0.3)
 
         # Step 6: Check if model template handles system messages
         has_system = self.supports_system_messages(model)

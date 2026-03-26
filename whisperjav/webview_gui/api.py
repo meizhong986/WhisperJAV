@@ -3271,8 +3271,8 @@ class WhisperJAVAPI:
 
     _CURATED_MODELS_FALLBACK = [
         {"model": "huihui_ai/hy-mt1.5-abliterated:latest", "size": "4.6 GB", "label": "Hy-MT1.5-Abliterated"},
-        {"model": "hf.co/mradermacher/Huihui-Qwen3.5-9B-Claude-4.6-Opus-abliterated-i1-GGUF:Q4_K_M", "size": "5.63 GB", "label": "Huihui-Qwen3.5-9B-Opus Q4"},
-        {"model": "hf.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive:Q4_K_M", "size": "6.5 GB", "label": "Qwen3.5-9B-Uncensored Q4"},
+        {"model": "hf.co/sugoitoolkit/Sugoi-14B-Ultra-GGUF:Q4_K_M", "size": "8.9 GB", "label": "Sugoi-14B-Ultra Q4"},
+        {"model": "hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0", "size": "8.7 GB", "label": "Shisa-v2.1-Qwen3-8B Q8"},
     ]
 
     def get_ollama_curated_models(self) -> Dict[str, Any]:
