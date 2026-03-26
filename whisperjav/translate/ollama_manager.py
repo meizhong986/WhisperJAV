@@ -63,6 +63,25 @@ class ModelRecommendation:
     temperature: float  # Recommended temperature
 
 
+# Optimized sampling defaults for JAV subtitle translation.
+# Based on per-model analysis of 10 local LLMs (range across models):
+#   top_k: 40–70, median 50    — constrains hallucination without starving
+#   top_p: 0.90–0.95, median 0.92 — tight enough to limit noise
+#   min_p: 0.05 (unanimous)    — floor for token probability
+#   repeat_penalty: 1.05–1.15, median 1.1 — prevents ASR fragment duplication
+#
+# These are set server-side via Ollama Modelfile PARAMETER directives because
+# PySubtrans CustomClient._generate_request_body() only passes temperature
+# to the API. By baking them into a lightweight model variant, the parameters
+# take effect without any PySubtrans modification.
+OLLAMA_SAMPLING_DEFAULTS = {
+    'top_k': 50,
+    'top_p': 0.92,
+    'min_p': 0.05,
+    'repeat_penalty': 1.1,
+}
+
+
 OLLAMA_MODEL_CONFIGS = {
     "qwen2.5:3b": {
         "num_ctx": 4096,
@@ -406,6 +425,66 @@ class OllamaManager:
             print(f"[OLLAMA] Failed to unload model: {e}", file=sys.stderr)
             return False
 
+    # ── Optimized Model Variants ─────────────────────────────────────
+
+    def _ensure_optimized_variant(self, model: str) -> str:
+        """Create or reuse an optimized model variant with tuned sampling params.
+
+        PySubtrans CustomClient only passes ``temperature`` to the Ollama API.
+        Other sampling parameters (top_k, top_p, min_p, repeat_penalty) are
+        silently ignored. This method works around that limitation by creating
+        a lightweight Ollama model variant with our recommended defaults baked
+        into the Modelfile as PARAMETER directives.
+
+        The variant is a thin metadata layer — no model weight duplication.
+        Ollama reuses the same GGUF blobs.
+
+        Args:
+            model: Original model name (e.g., "huihui_ai/hy-mt1.5-abliterated:latest")
+
+        Returns:
+            Variant model name on success, original model name on failure.
+        """
+        import hashlib
+
+        if not OLLAMA_SAMPLING_DEFAULTS:
+            return model  # No defaults to apply
+
+        # Deterministic variant name: hash of (model + params) ensures:
+        #   - Same model + same params → same variant (reuse)
+        #   - Params change in code update → new variant created
+        _key = f"{model}:{json.dumps(OLLAMA_SAMPLING_DEFAULTS, sort_keys=True)}"
+        _hash = hashlib.sha256(_key.encode()).hexdigest()[:10]
+        variant = f"whisperjav-{_hash}"
+
+        # Check if variant already exists
+        if self.check_model(variant):
+            print(f"[OLLAMA] Using optimized variant: {variant}", file=sys.stderr)
+            return variant
+
+        # Build Modelfile with optimized sampling parameters
+        lines = [f'FROM {model}']
+        for param, value in OLLAMA_SAMPLING_DEFAULTS.items():
+            lines.append(f'PARAMETER {param} {value}')
+        modelfile = '\n'.join(lines)
+
+        # Create variant via /api/create (stream=false → single JSON response)
+        try:
+            self._http_post('/api/create', {
+                'model': variant,
+                'modelfile': modelfile,
+                'stream': False,
+            }, timeout=30)
+            print(f"[OLLAMA] Created optimized variant: {variant}", file=sys.stderr)
+            _params_str = ', '.join(f'{k}={v}' for k, v in OLLAMA_SAMPLING_DEFAULTS.items())
+            print(f"[OLLAMA]   Sampling defaults: {_params_str}", file=sys.stderr)
+            return variant
+        except Exception as e:
+            print(f"[OLLAMA] Could not create optimized variant: {e}", file=sys.stderr)
+            print(f"[OLLAMA]   Continuing with original model (only temperature will be tuned)",
+                  file=sys.stderr)
+            return model
+
     # ── Hardware-Aware Recommendation ─────────────────────────────────
 
     def recommend_model(self, vram_gb: float = None) -> ModelRecommendation:
@@ -542,6 +621,8 @@ class OllamaManager:
                 )
 
         # Step 5: Get context length and build config
+        # Use the ORIGINAL model for metadata queries — the variant inherits
+        # the same GGUF blobs, context length, and template.
         actual_ctx = self.get_context_length(model)
 
         # Use curated config if available, otherwise use dynamic values
@@ -567,9 +648,15 @@ class OllamaManager:
                   f"response parsing to extract translations from reasoning field",
                   file=sys.stderr)
 
+        # Step 6c: Create optimized variant with tuned sampling parameters.
+        # PySubtrans only passes temperature to the API — top_k, top_p, min_p,
+        # repeat_penalty are silently dropped. By baking them into a Modelfile
+        # variant, Ollama applies them server-side as defaults.
+        effective_model = self._ensure_optimized_variant(model)
+
         # Step 7: Return readiness info
         return {
-            'model': model,
+            'model': effective_model,
             'num_ctx': num_ctx,
             'batch_size': batch_size,
             'temperature': temperature,
