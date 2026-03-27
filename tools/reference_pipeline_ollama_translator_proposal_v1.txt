@@ -1,0 +1,362 @@
+I'll design a **two‑pass translation pipeline** that uses your selected Ollama models, fully configurable via a JSON file. The pipeline interfaces with a local Ollama server via its REST API, allowing you to easily switch between models for each pass without changing code.
+
+---
+
+## 📦 Pipeline Overview
+
+1. **Input**: Subtitle file (SRT or plain text) – one subtitle block per line or structured.
+2. **Pass 1 – Literal Translation**: Uses a high‑accuracy, often uncensored model to produce a faithful, line‑by‑line translation.  
+3. **Pass 2 – Naturalisation / NSFW Tuning**: Refines the literal translation into natural dialogue, preserving NSFW tone where needed.  
+4. **Output**: Translated subtitle file (SRT with preserved timings or plain text).
+
+The pipeline is **config‑driven** – all model details, prompts, and parameters live in a JSON file. Users can select which model to use for each pass by editing the config or via command‑line arguments.
+
+---
+
+## 🗂️ Configuration File (`pipeline_config.json`)
+
+Below is a complete example based on our final model list. It includes the top recommendations for each pass, plus alternatives.
+
+```json
+{
+  "ollama_api": "http://localhost:11434",
+  "defaults": {
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "top_k": 20,
+    "min_p": 0.1,
+    "presence_penalty": 1.5,
+    "repeat_penalty": 1.05,
+    "max_tokens": 4096
+  },
+  "passes": {
+    "literal": {
+      "description": "First pass: faithful, literal translation from Japanese to English",
+      "models": [
+        {
+          "name": "DeepSeek R1 Distill Qwen 7B Japanese",
+          "ollama_model": "lightblue/DeepSeek-R1-Distill-Qwen-7B-Japanese",
+          "gguf_url": "https://huggingface.co/lightblue/DeepSeek-R1-Distill-Qwen-7B-Japanese-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Japanese-Q4_K_M.gguf",
+          "size_gb": 4.5,
+          "context_length": 32768,
+          "notes": "Top pick for literal translation – Japanese‑optimised, minimal censorship."
+        },
+        {
+          "name": "Qwen3.5-9B-Uncensored-Aggressive",
+          "ollama_model": "qwen3.5:9b-uncensored-aggressive",
+          "gguf_url": "https://huggingface.co/Qwen/Qwen3.5-9B-GGUF/resolve/main/qwen3.5-9b-q8_0.gguf",
+          "size_gb": 9.5,
+          "context_length": 262144,
+          "notes": "SOTA hybrid, very long context, truly uncensored."
+        },
+        {
+          "name": "Shisa-v2.1-Qwen3-8B",
+          "ollama_model": "shisa-v2.1-qwen3-8b",
+          "gguf_url": "https://huggingface.co/shisa-ai/shisa-v2.1-qwen3-8b-GGUF/resolve/main/shisa-v2.1-qwen3-8b-q8_0.gguf",
+          "size_gb": 8.7,
+          "context_length": 262144,
+          "notes": "Bilingual optimised, excellent conversational nuance."
+        },
+        {
+          "name": "TranslateGemma-12B",
+          "ollama_model": "translategemma3:12b",
+          "gguf_url": "https://huggingface.co/rinex20/TranslateGemma3-12B-GGUF/resolve/main/translategemma3-12b-q5_k_m.gguf",
+          "size_gb": 8.0,
+          "context_length": 8192,
+          "notes": "Dedicated translation model, deterministic output."
+        },
+        {
+          "name": "Hunyuan-MT 7B",
+          "ollama_model": "hunyuan-mt:7b",
+          "gguf_url": "https://huggingface.co/Tencent/Hunyuan-MT-7B-GGUF/resolve/main/hunyuan-mt-7b-q4_k_m.gguf",
+          "size_gb": 4.5,
+          "context_length": 8192,
+          "notes": "State‑of‑the‑art pure MT model."
+        }
+      ]
+    },
+    "naturalization": {
+      "description": "Second pass: refine literal translation into natural, idiomatic English with NSFW tone if required",
+      "models": [
+        {
+          "name": "Mistral-Small-3.2-24B-Abliterated",
+          "ollama_model": "mistral-small:24b-abliterated",
+          "gguf_url": "https://huggingface.co/mistral/Mistral-Small-3.2-24B-Abliterated-GGUF/resolve/main/mistral-small-24b-abliterated-q3_k_m.gguf",
+          "size_gb": 11.5,
+          "context_length": 32768,
+          "notes": "High parameter density, reduces repetition, uncensored."
+        },
+        {
+          "name": "Shisa-v2.1-Qwen3-8B",
+          "ollama_model": "shisa-v2.1-qwen3-8b",
+          "gguf_url": "same as above",
+          "size_gb": 8.7,
+          "context_length": 262144,
+          "notes": "Can also be used for naturalisation due to bilingual optimisation."
+        },
+        {
+          "name": "Floppa-12B-Gemma3",
+          "ollama_model": "Ryex/Floppa-12B-Gemma3-Uncensored",
+          "gguf_url": "https://huggingface.co/Ryex/Floppa-12B-Gemma3-Uncensored-GGUF/resolve/main/floppa-12b-gemma3-q4_k_m.gguf",
+          "size_gb": 8.0,
+          "context_length": 8192,
+          "notes": "Specialised for uncensored JA↔EN, multimodal."
+        },
+        {
+          "name": "GLM-4.7-Flash-Derestricted",
+          "ollama_model": "glm-4.7-flash-derestricted",
+          "gguf_url": "https://huggingface.co/THUDM/glm-4-7b-flash-GGUF/resolve/main/glm-4-7b-flash-derestricted-q2_k.gguf",
+          "size_gb": 11.1,
+          "context_length": 128000,
+          "notes": "Efficient MoE, good for long context naturalisation."
+        }
+      ]
+    }
+  }
+}
+```
+
+**Explanation of fields**:
+
+- `ollama_api`: endpoint for the running Ollama server.
+- `defaults`: global generation parameters (can be overridden per model).
+- `passes`: two sections (`literal` and `naturalization`), each containing a list of models with metadata:
+  - `name`: human‑readable.
+  - `ollama_model`: the identifier used when calling `ollama run` or the API (can be a local name after import).
+  - `gguf_url`: optional link to download the GGUF file (for models not in the Ollama library).
+  - `size_gb`: approximate size for user reference.
+  - `context_length`: maximum context tokens for that model.
+  - `notes`: brief description.
+
+---
+
+## 🐍 Python Pipeline Implementation
+
+This script uses the config file, reads an input SRT, processes each subtitle chunk through two passes, and outputs a translated SRT. It relies on the `requests` library to talk to Ollama.
+
+```python
+#!/usr/bin/env python3
+"""
+Two-pass subtitle translation pipeline using Ollama.
+"""
+
+import json
+import argparse
+import requests
+import sys
+import re
+from typing import List, Dict, Any
+
+def load_config(config_path: str) -> Dict[str, Any]:
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def parse_srt(srt_text: str) -> List[Dict[str, Any]]:
+    """Parse SRT into list of blocks: index, start, end, text."""
+    blocks = []
+    pattern = re.compile(r'(\d+)\n(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\n(.*?)(?=\n\n|\Z)', re.DOTALL)
+    for match in pattern.finditer(srt_text):
+        blocks.append({
+            'index': int(match.group(1)),
+            'start': match.group(2),
+            'end': match.group(3),
+            'text': match.group(4).strip()
+        })
+    return blocks
+
+def build_srt(blocks: List[Dict[str, Any]]) -> str:
+    """Rebuild SRT string from blocks."""
+    output = []
+    for b in blocks:
+        output.append(f"{b['index']}\n{b['start']} --> {b['end']}\n{b['text']}\n")
+    return "\n".join(output)
+
+def call_ollama(model: str, prompt: str, api_url: str, params: Dict[str, Any]) -> str:
+    """Send a prompt to Ollama and return the generated text."""
+    url = f"{api_url}/api/generate"
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        **params
+    }
+    response = requests.post(url, json=payload)
+    response.raise_for_status()
+    data = response.json()
+    return data['response'].strip()
+
+def translate_chunk_literal(japanese_text: str, model_info: Dict, api_url: str, defaults: Dict) -> str:
+    """Pass 1: literal translation."""
+    prompt = f"""Translate the following Japanese text to English. Provide a literal, accurate translation without adding or omitting details. Keep the tone neutral.
+
+Japanese: {japanese_text}
+English translation:"""
+    params = {**defaults, **model_info.get('params', {})}
+    return call_ollama(model_info['ollama_model'], prompt, api_url, params)
+
+def naturalize_chunk(literal_text: str, model_info: Dict, api_url: str, defaults: Dict, nsfw_flag: bool = False) -> str:
+    """Pass 2: naturalize the literal translation. Optionally enhance NSFW tone."""
+    if nsfw_flag:
+        prompt = f"""Refine the following English translation into natural, idiomatic English suitable for subtitles. The dialogue contains explicit adult content; maintain the NSFW tone without censorship. Do not add or remove meaning; just make it sound natural.
+
+Literal translation: {literal_text}
+Natural English subtitles:"""
+    else:
+        prompt = f"""Refine the following English translation into natural, idiomatic English suitable for subtitles. Make it sound conversational while preserving all meaning.
+
+Literal translation: {literal_text}
+Natural English subtitles:"""
+    params = {**defaults, **model_info.get('params', {})}
+    return call_ollama(model_info['ollama_model'], prompt, api_url, params)
+
+def main():
+    parser = argparse.ArgumentParser(description="Two-pass subtitle translation with Ollama")
+    parser.add_argument("input", help="Input SRT file")
+    parser.add_argument("output", help="Output SRT file")
+    parser.add_argument("--config", default="pipeline_config.json", help="Path to config JSON")
+    parser.add_argument("--literal-model", help="Override literal model name (as in config)")
+    parser.add_argument("--natural-model", help="Override naturalization model name (as in config)")
+    parser.add_argument("--nsfw", action="store_true", help="Enable NSFW tone in second pass")
+    args = parser.parse_args()
+
+    # Load config
+    config = load_config(args.config)
+    api_url = config['ollama_api']
+    defaults = config['defaults']
+
+    # Select models from config
+    literal_models = config['passes']['literal']['models']
+    natural_models = config['passes']['naturalization']['models']
+
+    def find_model(models, name_or_index):
+        if name_or_index.isdigit():
+            idx = int(name_or_index)
+            if 1 <= idx <= len(models):
+                return models[idx-1]
+            else:
+                raise ValueError(f"Model index {idx} out of range (1-{len(models)})")
+        else:
+            for m in models:
+                if m['name'] == name_or_index or m['ollama_model'] == name_or_index:
+                    return m
+            raise ValueError(f"Model '{name_or_index}' not found")
+
+    # If overrides not given, ask user to choose
+    if not args.literal_model:
+        print("Available literal models:")
+        for i, m in enumerate(literal_models, 1):
+            print(f"{i}. {m['name']} ({m['size_gb']} GB) - {m['notes']}")
+        choice = input("Select literal model (number or name): ")
+        args.literal_model = choice
+
+    if not args.natural_model:
+        print("\nAvailable naturalization models:")
+        for i, m in enumerate(natural_models, 1):
+            print(f"{i}. {m['name']} ({m['size_gb']} GB) - {m['notes']}")
+        choice = input("Select naturalization model (number or name): ")
+        args.natural_model = choice
+
+    lit_model = find_model(literal_models, args.literal_model)
+    nat_model = find_model(natural_models, args.natural_model)
+
+    print(f"\nUsing literal model: {lit_model['name']}")
+    print(f"Using naturalization model: {nat_model['name']}")
+    print(f"NSFW tone: {args.nsfw}")
+
+    # Read input SRT
+    with open(args.input, 'r', encoding='utf-8') as f:
+        srt_text = f.read()
+
+    blocks = parse_srt(srt_text)
+
+    print(f"\nProcessing {len(blocks)} subtitle blocks...")
+
+    # Process each block
+    for i, block in enumerate(blocks, 1):
+        jp_text = block['text']
+        print(f"Block {i}/{len(blocks)}: {jp_text[:50]}...")
+        # Pass 1
+        literal = translate_chunk_literal(jp_text, lit_model, api_url, defaults)
+        print(f"  Literal: {literal[:80]}...")
+        # Pass 2
+        natural = naturalize_chunk(literal, nat_model, api_url, defaults, args.nsfw)
+        print(f"  Natural: {natural[:80]}...")
+        block['text'] = natural
+
+    # Write output SRT
+    output_srt = build_srt(blocks)
+    with open(args.output, 'w', encoding='utf-8') as f:
+        f.write(output_srt)
+
+    print(f"\nDone. Translated SRT saved to {args.output}")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## 📥 Model Setup Instructions
+
+### 1. Ensure Ollama is running
+```bash
+ollama serve
+```
+
+### 2. Add models to Ollama
+Models can be added in two ways:
+
+- **From Ollama library** (if available):  
+  `ollama pull <model_name>` (e.g., `ollama pull qwen2.5:7b-instruct`)
+
+- **From GGUF files** (for custom/uncensored variants):  
+  Download the GGUF file from the provided URL (or Hugging Face). Then create a Modelfile:
+
+  ```bash
+  ollama create <custom_model_name> -f Modelfile
+  ```
+
+  Where `Modelfile` contains:
+  ```
+  FROM /path/to/downloaded.gguf
+  TEMPLATE """{{ .Prompt }}"""
+  PARAMETER temperature 0.7
+  ```
+
+  After creation, the model will be listed in `ollama list`.
+
+For convenience, the config includes `ollama_model` names that you should use when creating/running the models. You can choose any name, but make sure it matches the `ollama_model` field in the config.
+
+---
+
+## 🚀 Running the Pipeline
+
+```bash
+python translate_subtitles.py input.srt output.srt --config pipeline_config.json
+```
+
+If you don't specify `--literal-model` or `--natural-model`, the script will interactively ask you to choose from the configured models.
+
+Add `--nsfw` to instruct the second pass to preserve/amplify NSFW tone.
+
+---
+
+## ⚙️ Advanced Considerations
+
+- **Context management**: For long subtitle files (e.g., a movie), you may want to group blocks into batches that fit within the model's context window. The current script processes each block independently, which is safe but may lose continuity. To improve, you could collect previous translated lines as context. The config includes `context_length` to help you design such batching.
+
+- **Prompt engineering**: You can modify the prompts in the script to better suit your needs. For example, you could add instructions to preserve speaker names or timestamps.
+
+- **Performance**: If you're using a 24B model in Q3, consider using `ollama`'s built‑in batching or setting `num_ctx` to avoid context overflow.
+
+- **Error handling**: The script lacks retries – you may want to add them for production.
+
+---
+
+## 📋 Next Steps
+
+1. **Create the config file** using the JSON above (adjust paths/names as needed).
+2. **Download the GGUF files** you want to use (or pull from Ollama library).
+3. **Import models** into Ollama with appropriate names.
+4. **Run the pipeline** on a test subtitle file to validate output quality.
+
