@@ -40,7 +40,7 @@ contract:
 # =============================================================================
 spec:
   # --- Core Options ---
-  max_duration_s: 29.0
+  max_duration_s: 420.0  # Coarse scene boundaries; speech segmenter handles fine splitting
   min_duration_s: 0.2
   target_sr: 16000
   force_mono: true
@@ -57,7 +57,7 @@ spec:
   pass2_max_duration_s: 960.0
 
   # --- Silero VAD Options ---
-  silero_threshold: 0.02
+  silero_threshold: 0.06
   silero_neg_threshold: 0.1
   silero_min_silence_ms: 2000
   silero_min_speech_ms: 100
@@ -106,6 +106,7 @@ gui:
     min: 10
     max: 120
     step: 1
+    data_type: float
     group: core
 
   min_duration_s:
@@ -115,6 +116,7 @@ gui:
     min: 0.1
     max: 5.0
     step: 0.1
+    data_type: float
     group: core
 
   silero_threshold:
@@ -124,6 +126,7 @@ gui:
     min: 0.0
     max: 1.0
     step: 0.01
+    data_type: float
     group: silero
 
   silero_neg_threshold:
@@ -133,6 +136,7 @@ gui:
     min: 0.0
     max: 1.0
     step: 0.01
+    data_type: float
     group: silero
 
   silero_min_silence_ms:
@@ -142,6 +146,7 @@ gui:
     min: 100
     max: 10000
     step: 100
+    data_type: int
     group: silero
 
   silero_min_speech_ms:
@@ -151,6 +156,7 @@ gui:
     min: 10
     max: 2000
     step: 10
+    data_type: int
     group: silero
 
   silero_speech_pad_ms:
@@ -160,6 +166,7 @@ gui:
     min: 0
     max: 2000
     step: 50
+    data_type: int
     group: silero
 
 provider:
