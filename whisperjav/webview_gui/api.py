@@ -988,6 +988,19 @@ class WhisperJAVAPI:
                 "default": default,
             }
 
+            # Determine original data type — declared in YAML (primary) or inferred (fallback)
+            declared_type = hints.get("data_type")
+            if declared_type:
+                schema[param_name]["original_type"] = declared_type
+            elif default is not None:
+                # Fallback: infer from Python default (bool MUST come before int)
+                if isinstance(default, bool):
+                    schema[param_name]["original_type"] = "bool"
+                elif isinstance(default, int):
+                    schema[param_name]["original_type"] = "int"
+                elif isinstance(default, float):
+                    schema[param_name]["original_type"] = "float"
+
             # Add widget-specific properties
             if hints.get("widget") == "slider":
                 schema[param_name].update({

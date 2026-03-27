@@ -98,6 +98,7 @@ gui:
     min: 0.01
     max: 0.5
     step: 0.01
+    data_type: float
     group: detection
 
   min_speech_duration_ms:
@@ -107,6 +108,7 @@ gui:
     min: 10
     max: 500
     step: 10
+    data_type: int
     group: filters
 
   min_silence_duration_ms:
@@ -116,6 +118,7 @@ gui:
     min: 100
     max: 1000
     step: 50
+    data_type: int
     group: filters
 
   speech_pad_ms:
@@ -125,6 +128,7 @@ gui:
     min: 0
     max: 1000
     step: 50
+    data_type: int
     group: filters
 
   chunk_threshold_s:
@@ -134,6 +138,7 @@ gui:
     min: 1.0
     max: 10.0
     step: 0.5
+    data_type: float
     group: grouping
 
   max_group_duration_s:
@@ -143,6 +148,7 @@ gui:
     min: 10.0
     max: 60.0
     step: 1.0
+    data_type: float
     group: grouping
 
 # =============================================================================

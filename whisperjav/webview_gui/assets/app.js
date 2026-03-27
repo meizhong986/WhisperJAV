@@ -1892,37 +1892,37 @@ const EnsembleManager = {
     // AUDIT FIX: Ranges aligned with backend Pydantic Field constraints
     parameterMetadata: {
         // === Transcriber parameters ===
-        logprob_threshold: { ge: -5.0, le: 0.0, step: 0.1 },           // Fixed: was -1.0, backend allows -5.0
-        logprob_margin: { ge: 0.0, le: 5.0, step: 0.1 },               // Fixed: was 1.0, backend allows 5.0
-        no_speech_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        compression_ratio_threshold: { ge: 1.0, le: 5.0, step: 0.1 }, // Fixed: was 0.0-10.0, backend is 1.0-5.0
-        temperature: { ge: 0.0, le: 1.0, step: 0.01, isArrayAllowed: true },  // Note: can be array
-        hallucination_silence_threshold: { ge: 0.0, le: 10.0, step: 0.1 },    // Fixed: was 5.0, backend allows 10.0
+        logprob_threshold: { type: 'float', ge: -5.0, le: 0.0, step: 0.1 },           // Fixed: was -1.0, backend allows -5.0
+        logprob_margin: { type: 'float', ge: 0.0, le: 5.0, step: 0.1 },               // Fixed: was 1.0, backend allows 5.0
+        no_speech_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
+        compression_ratio_threshold: { type: 'float', ge: 1.0, le: 5.0, step: 0.1 }, // Fixed: was 0.0-10.0, backend is 1.0-5.0
+        temperature: { type: 'float', ge: 0.0, le: 1.0, step: 0.01, isArrayAllowed: true },  // Note: can be array
+        hallucination_silence_threshold: { type: 'float', ge: 0.0, le: 10.0, step: 0.1 },    // Fixed: was 5.0, backend allows 10.0
 
         // === Decoder parameters ===
-        patience: { ge: 0.0, le: 5.0, step: 0.1 },
-        length_penalty: { ge: 0.0, le: 2.0, step: 0.1 },
-        max_initial_timestamp: { ge: 0.0, le: 30.0, step: 0.5 },
-        beam_size: { ge: 1, le: 20, step: 1 },                        // Fixed: was 10, backend allows 20
-        best_of: { ge: 1, le: 10, step: 1 },
+        patience: { type: 'float', ge: 0.0, le: 5.0, step: 0.1 },
+        length_penalty: { type: 'float', ge: 0.0, le: 2.0, step: 0.1 },
+        max_initial_timestamp: { type: 'float', ge: 0.0, le: 30.0, step: 0.5 },
+        beam_size: { type: 'int', ge: 1, le: 20, step: 1 },                        // Fixed: was 10, backend allows 20
+        best_of: { type: 'int', ge: 1, le: 10, step: 1 },
 
         // === External VAD parameters (Silero VAD for balanced/fidelity) ===
-        threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        neg_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
+        threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
+        neg_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
 
         // === Internal VAD parameters (kotoba-faster-whisper) ===
         // Also applies to external Silero VAD - use larger ranges to cover both
         vad_filter: { type: 'boolean', default: true },
-        vad_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        min_speech_duration_ms: { ge: 0, le: 5000, step: 10 },        // Fixed: was 1000, backend allows 5000
-        max_speech_duration_s: { ge: 0.0, le: 300.0, step: 1.0 },     // Fixed: was 60.0, silero allows 300.0
-        min_silence_duration_ms: { ge: 0, le: 5000, step: 10 },       // Fixed: was 2000, backend allows 5000
-        speech_pad_ms: { ge: 0, le: 2000, step: 10 },                 // Fixed: was 500, backend allows 2000
+        vad_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
+        min_speech_duration_ms: { type: 'int', ge: 0, le: 5000, step: 10 },        // Fixed: was 1000, backend allows 5000
+        max_speech_duration_s: { type: 'float', ge: 0.0, le: 300.0, step: 1.0 },     // Fixed: was 60.0, silero allows 300.0
+        min_silence_duration_ms: { type: 'int', ge: 0, le: 5000, step: 10 },       // Fixed: was 2000, backend allows 5000
+        speech_pad_ms: { type: 'int', ge: 0, le: 2000, step: 10 },                 // Fixed: was 500, backend allows 2000
 
         // === Engine parameters (NEW - were missing) ===
-        repetition_penalty: { ge: 1.0, le: 3.0, step: 0.1 },          // Added: for faster_whisper/kotoba
-        no_repeat_ngram_size: { ge: 0, le: 10, step: 1 },             // Added: for faster_whisper/kotoba
-        chunk_length: { ge: 1, le: 30, step: 1 },                     // Added: for faster_whisper
+        repetition_penalty: { type: 'float', ge: 1.0, le: 3.0, step: 0.1 },          // Added: for faster_whisper/kotoba
+        no_repeat_ngram_size: { type: 'int', ge: 0, le: 10, step: 1 },             // Added: for faster_whisper/kotoba
+        chunk_length: { type: 'int', ge: 1, le: 30, step: 1 },                     // Added: for faster_whisper
 
         // === Boolean parameters (explicit type for robustness) ===
         suppress_blank: { type: 'boolean', default: true },
@@ -2679,8 +2679,11 @@ const EnsembleManager = {
         container.className = 'param-control';
         container.dataset.param = paramName;
 
-        // Infer original type from default value for proper type coercion on collection
-        if (defaultValue !== undefined && defaultValue !== null) {
+        // Determine original type: prefer API-provided declaration (from YAML data_type),
+        // fall back to runtime inference (has round-float bug but backward-compatible)
+        if (schema.original_type) {
+            container.dataset.originalType = schema.original_type;
+        } else if (defaultValue !== undefined && defaultValue !== null) {
             if (typeof defaultValue === 'number') {
                 container.dataset.originalType = Number.isInteger(defaultValue) ? 'int' : 'float';
             } else if (typeof defaultValue === 'boolean') {
@@ -3938,7 +3941,7 @@ const EnsembleManager = {
             input.className = 'param-number';
             input.min = constraints.ge !== undefined ? constraints.ge : 0;
             input.max = constraints.le !== undefined ? constraints.le : 9999;
-            input.step = 1;
+            input.step = constraints.step !== undefined ? constraints.step : 1;
             input.value = value !== undefined ? value : defaultValue;
         } else if (type === 'str' || type === 'string') {
             // Text input for string
@@ -4094,11 +4097,19 @@ const EnsembleManager = {
                 if (checkbox) {
                     value = checkbox.checked;
                 } else if (slider && number) {
-                    // Slider with linked number input
-                    value = parseFloat(number.value);
+                    // Slider with linked number input — branch on declared type
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(number.value, 10);
+                    } else {
+                        value = parseFloat(number.value);
+                    }
                 } else if (slider) {
                     // Slider without number input (fallback)
-                    value = parseFloat(slider.value);
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(slider.value, 10);
+                    } else {
+                        value = parseFloat(slider.value);
+                    }
                 } else if (number) {
                     // Use original type for proper conversion
                     if (originalType === 'int' || originalType === 'integer') {
@@ -4267,11 +4278,19 @@ const EnsembleManager = {
                 if (checkbox) {
                     value = checkbox.checked;
                 } else if (slider && number) {
-                    // Slider with linked number input
-                    value = parseFloat(number.value);
+                    // Slider with linked number input — branch on declared type
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(number.value, 10);
+                    } else {
+                        value = parseFloat(number.value);
+                    }
                 } else if (slider) {
                     // Slider without number input (fallback)
-                    value = parseFloat(slider.value);
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(slider.value, 10);
+                    } else {
+                        value = parseFloat(slider.value);
+                    }
                 } else if (number) {
                     if (originalType === 'int' || originalType === 'integer') {
                         value = parseInt(number.value);
