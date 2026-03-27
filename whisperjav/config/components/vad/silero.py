@@ -113,7 +113,7 @@ class SileroVAD(VADComponent):
             max_group_duration_s=29.0,
         ),
         "aggressive": SileroVADOptions(
-            threshold=0.10,
+            threshold=0.068,
             min_speech_duration_ms=30,
             max_speech_duration_s=14.0,
             min_silence_duration_ms=200,
