@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-28 (rev16 — full refresh from GitHub) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **53 open** on GitHub
+> Updated: 2026-03-28 (rev17 — closed 11, responded 7) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **55 open** on GitHub
 
 ---
 
@@ -20,13 +20,12 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **53** | +1 since rev15 (20 new issues #244-#263, 19 closed since rev15) |
-| New issues since rev15 | 20 | #244–#263 |
-| Closed since rev15 | 7 | #241, #238, #245, #256, #214, #219, #211 |
-| **NEEDS RESPONSE (no reply)** | 14 | #246, #247, #248, #250, #251, #254, #258, #259, #261, #262, #263 + #231, #233, #234 |
-| **AWAITING CONFIRMATION** | 6 | #200, #204, #207, #209, #210, #212 |
+| Total open on GitHub | **55** | Was 53 at rev16. Closed 11, but 2 older issues not previously counted + accurate recount. |
+| Closed in rev17 session | 11 | #228, #229, #235, #222, #220, #200, #204, #207, #209, #210, #212 |
+| Responded in rev17 session | 7 | #263, #261, #260, #251, #258, #234, #239 |
+| **NEEDS RESPONSE (no reply)** | 7 | #246, #247, #248, #250, #254, #259, #262 |
+| **NEEDS RESPONSE (replied, awaiting user)** | 8 | #231, #233, #251, #258, #260, #261, #263, #234 |
 | **SHIPPED (awaiting user test)** | 4 | #132, #218, #223, #236 |
-| **FIX VERIFIED (safe to close)** | 4 | #228, #229, #235, #238 |
 | Feature requests (open) | 28 | See Cluster J |
 | Deferred to v1.9+ | 11 | See v1.9+ Backlog |
 
@@ -259,31 +258,13 @@ These issues have **zero developer response**. Users are waiting.
 | #248/#252 | Roadmap | Diarization: acknowledge as v1.9+ feature. |
 | #262 | Evaluate | Cohere Transcribe: research feasibility. |
 
-### Group 2: Stale — Safe to Close (6 issues)
+### Group 2: Stale — Safe to Close — **DONE** (rev17)
 
-These can be closed immediately:
+All 6 closed: #228, #229, #235, #222, #220 (+ #238 was already closed).
 
-| # | Why | Last Activity |
-|---|---|---|
-| **#228** | Self-resolved: "installed CUDA DLLs manually" | 2026-03-18 |
-| **#229** | Self-resolved: "the cause is python environment" | 2026-03-17 |
-| **#235** | Fix shipped in post1, confirmed working | 2026-03-19 |
-| **#238** | Portuguese added in post1, released | 2026-03-19 |
-| **#222** | Responded with docs. 14 days stale. | 2026-03-14 |
-| **#220** | Responded. 14 days stale. No reply. | 2026-03-14 |
+### Group 3: Stale AWAITING — **DONE** (rev17)
 
-### Group 3: Awaiting Confirmation — At Risk of Going Stale (6 issues)
-
-| # | Waiting Since | Days | Risk |
-|---|---|---|---|
-| #200 | 2026-03-14 | 14 | HIGH — Ywocp may have moved on |
-| #204 | 2026-03-14 | 14 | HIGH — yangming2027 active on other issues |
-| #207 | 2026-03-13 | 15 | HIGH — may be stale |
-| #209 | 2026-03-14 | 14 | MEDIUM — weifu8435 active on #230 |
-| #210 | 2026-03-14 | 14 | HIGH — may be stale |
-| #212 | 2026-03-17 | 11 | MEDIUM — destinyawaits opened #259 |
-
-**Recommendation**: Send a "friendly ping" on all 6. If no response in 7 days, close with "closing for inactivity, reopen if needed."
+All 6 closed for inactivity with "feel free to reopen": #200, #204, #207, #209, #210, #212.
 
 ### Group 4: Feature Request Interdependencies
 
@@ -302,15 +283,13 @@ XXL cluster:             #242 ↔ #237 ↔ #223 ↔ #244 (all XXL-related)
 
 ### Immediate Actions (this week)
 
-| Action | Issues | Effort | Impact |
-|---|---|---|---|
-| **Close 6 stale/verified issues** | #228, #229, #235, #238, #222, #220 | 10 min | Reduces open count 53→47 |
-| **Batch respond to 7 simple issues** | #263, #261, #260, #251, #258, #234, #239 | 30 min | Unblocks 7 users |
-| **Write Ollama translation FAQ** | #255, #259, #233 | 1 hour | Resolves 3 issues + prevents future ones |
-| **Write model cache paths doc** | #250 | 15 min | Quick docs improvement |
-| **Ping 6 stale AWAITING issues** | #200, #204, #207, #209, #210, #212 | 15 min | Either gets confirmation or clears backlog |
-
-**After this batch**: Open count drops to ~40, and response debt is cleared.
+| Action | Issues | Status |
+|---|---|---|
+| ~~Close 6 stale/verified issues~~ | #228, #229, #235, #238, #222, #220 | **DONE** (rev17) |
+| ~~Batch respond to 7 simple issues~~ | #263, #261, #260, #251, #258, #234, #239 | **DONE** (rev17) |
+| **Write Ollama translation FAQ** | #255, #259, #233 | TODO |
+| **Write model cache paths doc** | #250 | TODO |
+| ~~Close 6 stale AWAITING issues~~ | #200, #204, #207, #209, #210, #212 | **DONE** (rev17) |
 
 ### v1.8.10 Release Scope (current dev branch)
 
@@ -400,7 +379,8 @@ XXL cluster:             #242 ↔ #237 ↔ #223 ↔ #244 (all XXL-related)
 
 | Date | Changes |
 |------|---------|
-| **2026-03-28** | **rev16.** Full refresh from GitHub. 53 open issues. 20 new since rev15 (#244-#263). 7 closed since rev15 (#241, #238, #245, #256, #214, #219, #211). v1.8.9.post2 released (fixes #241 CPU regression, #240 GUI). v1.8.10 dev branch: 6 commits for aggressive sensitivity retune (F7 ground truth validated), diagnostic JSON per scene, whisper param tuner utility. Added F2 (group analysis, interdependencies, closure candidates) and F3 (roadmap, recommended steps). 14 issues need developer response. 6 issues safe to close immediately. |
+| **2026-03-28** | **rev17.** Closed 11 issues: #228, #229, #235, #222, #220 (stale/verified), #200, #204, #207, #209, #210, #212 (inactivity). Responded to 7: #263, #261, #260, #251, #258, #234, #239. Open count: 55. |
+| **2026-03-28** | **rev16.** Full refresh from GitHub. Added F2 (group analysis) and F3 (roadmap). |
 | 2026-03-19 | **rev15.** 3 fixes coded for post2: #241/#240 + XXL stderr encoding. |
 | 2026-03-19 | **rev14.** v1.8.9.post2 fixes coded. |
 | 2026-03-19 | **rev13.** v1.8.9.post1 RELEASED. |
