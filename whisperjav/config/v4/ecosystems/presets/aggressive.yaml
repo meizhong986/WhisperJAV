@@ -51,7 +51,7 @@ overrides:
   # lower compression_ratio rejects repetition hallucinations and forces temp retry
   quality.no_speech: 0.60
   quality.logprob: -2.0
-  quality.compression_ratio: 2.2
+  quality.compression_ratio: 2.6
 
   # Scene detection (raised to reduce excessive scene splitting)
   pass1.energy_threshold: 32

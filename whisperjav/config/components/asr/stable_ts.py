@@ -442,12 +442,12 @@ class StableTSASR(ASRComponent):
             max_initial_timestamp=None,
             # Transcriber options - aligned with openai_whisper aggressive
             temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback matching Pass 2
-            compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops
+            compression_ratio_threshold=2.6,  # v1.8.10: 3.0→2.6, tuner-validated (run5: fastest, best overlap)
             logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor
             logprob_margin=0.0,
             no_speech_threshold=0.60,  # v1.8.10: 0.22→0.60, wide intake for soft/intimate speech
             drop_nonverbal_vocals=False,
-            condition_on_previous_text=False,
+            condition_on_previous_text=True,  # v1.8.10: tuner-validated — helps recognize dialogue echoes
             initial_prompt=None,
             word_timestamps=True,
             prepend_punctuations=None,
