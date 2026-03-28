@@ -266,7 +266,7 @@ class OpenAIWhisperASR(ASRComponent):
             compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops, forces temp retry
             logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor with wider intake
             logprob_margin=0.0,
-            no_speech_threshold=0.55,  # v1.8.10: 0.22→0.55, FIXES INVERSION — wide intake for soft speech
+            no_speech_threshold=0.60,  # v1.8.10: 0.22→0.60, wide intake for soft/intimate speech
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
