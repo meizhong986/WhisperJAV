@@ -252,9 +252,9 @@ class OpenAIWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=3,  # v1.8.10: 2→3, extra decode path for difficult audio
-            best_of=2,  # v1.8.10: 1→2, extra sample candidate per temperature
-            patience=2.5,  # v1.8.10: 2.9→2.5, efficient with beam_size=3
+            beam_size=5,  # v1.8.10: 2→5, match/exceed Pass 2 decode capacity
+            best_of=3,  # v1.8.10: 1→3, match Pass 2 sampling diversity
+            patience=2.5,  # v1.8.10: 2.9→2.5
             length_penalty=None,
             prefix=None,
             suppress_blank=False,
@@ -262,7 +262,7 @@ class OpenAIWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.2, 0.4],  # v1.8.10: 3-step fallback for finer retry
+            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback matching Pass 2
             compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops, forces temp retry
             logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor with wider intake
             logprob_margin=0.0,
@@ -280,6 +280,6 @@ class OpenAIWhisperASR(ASRComponent):
             prompt=None,
             fp16=True,
             # Exclusive options
-            hallucination_silence_threshold=4.0,  # v1.8.10: 2.5→4.0, recovers speech near silence gaps
+            hallucination_silence_threshold=None,  # v1.8.10: 2.5→None, fully disabled for aggressive flood-gate
         ),
     }

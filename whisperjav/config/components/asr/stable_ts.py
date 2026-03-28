@@ -431,9 +431,9 @@ class StableTSASR(ASRComponent):
             # Decoder options - aligned with openai_whisper aggressive
             task="transcribe",
             language="ja",
-            beam_size=3,  # v1.8.10: 2→3, extra decode path
-            best_of=2,  # v1.8.10: 1→2, extra sample candidate
-            patience=2.5,  # v1.8.10: 2.0→2.5, aligned with openai_whisper
+            beam_size=5,  # v1.8.10: 2→5, match/exceed Pass 2 decode capacity
+            best_of=3,  # v1.8.10: 1→3, match Pass 2 sampling diversity
+            patience=2.5,  # v1.8.10: 2.0→2.5
             length_penalty=None,
             prefix=None,
             suppress_blank=False,
@@ -441,7 +441,7 @@ class StableTSASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options - aligned with openai_whisper aggressive
-            temperature=[0.0, 0.2, 0.4],  # v1.8.10: 3-step fallback
+            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback matching Pass 2
             compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops
             logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor
             logprob_margin=0.0,
