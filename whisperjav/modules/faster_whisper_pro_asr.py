@@ -423,6 +423,9 @@ class FasterWhisperProASR:
             **kwargs: Optional overrides. Supports 'task' to override the default task.
                       If task='translate', output will be in English.
         """
+        # Initialize full results capture for diagnostic JSON save
+        self._last_full_results = []
+
         audio_path = Path(audio_path)
 
         # Handle task override from kwargs (important for direct-to-english support)
@@ -766,6 +769,9 @@ class FasterWhisperProASR:
             logger.debug(f"  Info type: {type(transcription_info)}")
             logger.debug(f"  Generator type: {type(segments_generator)}")
 
+            # Full segment data for diagnostic JSON (parallel to raw_segments)
+            _full_segments_for_json = []
+
             # CHANGED: Consume generator with explicit next() for granular crash tracing
             raw_segments = []
             seg_idx = 0
@@ -813,12 +819,28 @@ class FasterWhisperProASR:
                     "text": segment.text,
                     "avg_logprob": segment.avg_logprob
                 })
+
+                # Capture full segment for diagnostic JSON (unaltered)
+                from dataclasses import asdict
+                try:
+                    _full_segments_for_json.append(asdict(segment))
+                except Exception:
+                    pass  # Non-fatal: don't break pipeline if dataclass conversion fails
+
                 seg_idx += 1
 
             logger.debug(f"DIAGNOSTIC: Generator consumed successfully, got {len(raw_segments)} raw segments")
 
             # CRASH TRACER: Transcription complete
             crash_tracer.trace_transcribe_complete(len(raw_segments))
+
+            # Capture full results for diagnostic JSON
+            if hasattr(self, '_last_full_results'):
+                self._last_full_results.append({
+                    "group_start_sec": start_sec,
+                    "group_end_sec": end_sec,
+                    "segments": _full_segments_for_json,
+                })
 
             result = {"segments": raw_segments}
 
@@ -975,6 +997,18 @@ class FasterWhisperProASR:
             f.write(srt.compose(srt_subs))
 
         logger.debug(f"Saved SRT to: {output_srt_path}")
+
+        # Save full transcription results JSON alongside SRT (diagnostic artifact)
+        try:
+            if hasattr(self, '_last_full_results') and self._last_full_results:
+                import json
+                json_path = output_srt_path.with_suffix('.transcribe.json')
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(self._last_full_results, f, ensure_ascii=False, indent=2, default=str)
+                logger.debug(f"Saved transcription results JSON to: {json_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save transcription results JSON (non-fatal): {e}")
+
         return output_srt_path
 
     def cleanup(self):

@@ -201,6 +201,9 @@ class WhisperProASR:
             **kwargs: Optional overrides. Supports 'task' to override the default task.
                       If task='translate', output will be in English.
         """
+        # Initialize full results capture for diagnostic JSON save
+        self._last_full_results = []
+
         audio_path = Path(audio_path)
 
         # Handle task override from kwargs (important for direct-to-english support)
@@ -357,6 +360,15 @@ class WhisperProASR:
         logging.debug("Final Parameters for Debugging: %s", whisper_params)
 
         result = self._run_whisper_with_fallback(group_audio, whisper_params)
+
+        # Capture full whisper result for diagnostic JSON (unaltered)
+        if result and hasattr(self, '_last_full_results'):
+            self._last_full_results.append({
+                "group_start_sec": start_sec,
+                "group_end_sec": end_sec,
+                "result": result
+            })
+
         if not result or not result.get("segments"):
             return []
 
@@ -366,6 +378,15 @@ class WhisperProASR:
         """Transcribe the full audio clip without VAD segmentation."""
         whisper_params = self._prepare_whisper_params()
         result = self._run_whisper_with_fallback(audio_data, whisper_params)
+
+        # Capture full whisper result for diagnostic JSON (unaltered)
+        if result and hasattr(self, '_last_full_results'):
+            self._last_full_results.append({
+                "group_start_sec": 0.0,
+                "group_end_sec": len(audio_data) / 16000.0,
+                "result": result
+            })
+
         if not result or not result.get("segments"):
             return []
         return self._process_segments(result["segments"], 0.0)
@@ -482,6 +503,18 @@ class WhisperProASR:
             f.write(srt.compose(srt_subs))
             
         logger.debug(f"Saved SRT to: {output_srt_path}")
+
+        # Save full transcription results JSON alongside SRT (diagnostic artifact)
+        try:
+            if hasattr(self, '_last_full_results') and self._last_full_results:
+                import json
+                json_path = output_srt_path.with_suffix('.transcribe.json')
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(self._last_full_results, f, ensure_ascii=False, indent=2, default=str)
+                logger.debug(f"Saved transcription results JSON to: {json_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save transcription results JSON (non-fatal): {e}")
+
         return output_srt_path
 
     def cleanup(self):
