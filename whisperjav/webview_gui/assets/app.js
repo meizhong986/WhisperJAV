@@ -1516,8 +1516,8 @@ const EnsembleManager = {
                 this.updateByopPanel();
                 if (oldType !== newType) {
                     this.swapModelOptions(passKey, newType);
-                    this.applyPipelinePresets(passKey, newType);
                 }
+                this.applyPipelinePresets(passKey, newType);
             } else {
                 // Revert selection
                 selectElement.value = passState.pipeline;
@@ -1533,8 +1533,8 @@ const EnsembleManager = {
             this.updateByopPanel();
             if (oldType !== newType) {
                 this.swapModelOptions(passKey, newType);
-                this.applyPipelinePresets(passKey, newType);
             }
+            this.applyPipelinePresets(passKey, newType);
             this.updateBadges();
         }
     },
