@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-19 (rev15 — 3 fixes coded for post2: #241/#240 + XXL stderr encoding) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **52 open** on GitHub
+> Updated: 2026-03-28 (rev16 — full refresh from GitHub) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **53 open** on GitHub
 
 ---
 
@@ -20,367 +20,335 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **52** | +5 since rev12 (#239-#243). |
-| New issues since rev12 | 5 | #239 (AMD GPU), #240 (GUI access violation), #241 (CPU float16 crash), #242 (XXL Pass 1 request), #243 (install verification fail) |
-| Closed since rev12 | 0 | |
-| **FIX CODED (for post2)** | 3 | **#241** (CPU float16 regression), **#240** (private_mode simplification), XXL stderr encoding crash |
-| **NEEDS RESPONSE (no reply yet)** | 6 | #231, #233, #234, #240, #241, #243 |
-| **NEEDS FOLLOW-UP RESPONSE** | 2 | #225 (new data), #237 (new question from liugngg) |
+| Total open on GitHub | **53** | +1 since rev15 (20 new issues #244-#263, 19 closed since rev15) |
+| New issues since rev15 | 20 | #244–#263 |
+| Closed since rev15 | 7 | #241, #238, #245, #256, #214, #219, #211 |
+| **NEEDS RESPONSE (no reply)** | 14 | #246, #247, #248, #250, #251, #254, #258, #259, #261, #262, #263 + #231, #233, #234 |
 | **AWAITING CONFIRMATION** | 6 | #200, #204, #207, #209, #210, #212 |
-| **SHIPPED (awaiting user test)** | 6 | #132, #218, #223, #235, #236, #238 |
-| **FIX VERIFIED (safe to close)** | 2 | #228, #229 |
-| Feature requests (open) | 23 | See Cluster J |
+| **SHIPPED (awaiting user test)** | 4 | #132, #218, #223, #236 |
+| **FIX VERIFIED (safe to close)** | 4 | #228, #229, #235, #238 |
+| Feature requests (open) | 28 | See Cluster J |
 | Deferred to v1.9+ | 11 | See v1.9+ Backlog |
 
 ---
 
-## v1.8.9.post1 Hotfix — RELEASED (2026-03-19)
+## New Issues Since Rev15 (2026-03-19 to 2026-03-28)
 
-Released as follow-up to v1.8.9. All 4 items from rev12 shipped and responded to on GitHub.
+| # | Date | Reporter | Title | Category | Status |
+|---|------|----------|-------|----------|--------|
+| **#263** | 03-28 | herlong6529424-dot | GPU没有利用率 (GPU not utilized) | GPU/Install | `NEEDS RESPONSE` — screenshot shows GUI running, GPU at 0%. Likely not clicking Start, or model not downloaded yet. |
+| **#262** | 03-27 | teijiIshida | Cohere Transcribe model | Feature | `NEEDS RESPONSE` — requests Cohere's new ASR model support |
+| **#261** | 03-27 | henry99a | Network check failed: unknown url type: https | Install | `NEEDS RESPONSE` — post_install fails with SSL. Conda-constructor env missing `certifi`? |
+| **#260** | 03-27 | hawai-stack | Uninstall leaves ~6GB files | Install/UX | Community responded (oceanseamountain): AppData residual. `NEEDS RESPONSE` from dev. |
+| **#259** | 03-26 | destinyawaits | Local Translation Issues (v1.8.9-hotfix2) | Translation | `NEEDS RESPONSE` — same user as #212. Persistent local LLM issues. |
+| **#258** | 03-26 | Uillike | 我遇到的问题 (my problems) | Quality | `NEEDS RESPONSE` — intermittent issues, vague description |
+| **#256** | 03-25 | — | 安装过程报错 (install error) | Install | **CLOSED** 03-26 |
+| **#255** | 03-25 | cheny7918 | 如何用ollama进行翻译 (how to use ollama) | Translation/Docs | `NEEDS RESPONSE` — zhifanXU17 also has same problem |
+| **#254** | 03-25 | zoqapopita93 | ChronosJAV去掉非语言声音 (remove non-speech sounds) | Feature | `NEEDS RESPONSE` — asks about speech enhancement |
+| **#253** | 03-25 | KinhoLeung | Colab运行失败 (Colab run failure) | Colab | `NEEDS RESPONSE` — silero trust_repo issue on Colab |
+| **#252** | 03-25 | zoqapopita93 | 是否支持多人对话 (multi-speaker support?) | Feature | Community responded (oceanseamountain → #248). `NEEDS RESPONSE` from dev. |
+| **#251** | 03-24 | zoqapopita93 | v1.8.9.post2 启动失败 (launch failure) | Install | `NEEDS RESPONSE` — no details provided |
+| **#250** | 03-21 | lcpdguy | 模型文件夹在哪？ (where are model folders?) | Docs | `NEEDS RESPONSE` — asks for documentation of model cache locations |
+| **#248** | 03-21 | oceanseamountain | Diarization | Feature | `NEEDS RESPONSE` — requests speaker diarization |
+| **#247** | 03-21 | zly19540609 | Docker支持计划？ (Docker support?) | Feature | `NEEDS RESPONSE` |
+| **#246** | 03-20 | dadlaugh | Serverless GPU pipeline + anime-whisper hallucination | Bug/Report | `NEEDS RESPONSE` — detailed report on anime-whisper hallucination patterns |
+| **#245** | 03-20 | — | Kaggle working setup | Docs | **CLOSED** — community guide |
+| **#244** | 03-19 | techguru0 | Search for faster whisper xxl | UX | meizhong986 responded "Good point!" `AWAITING CONFIRMATION` |
+
+---
+
+## Releases Since Rev15
+
+### v1.8.9.post2 — RELEASED
 
 | Item | Issues | Fix | Status |
 |------|--------|-----|--------|
-| Ollama doubled endpoint | #132 | Removed redundant `/v1/chat/completions` append in `translate/service.py` + `translate/cli.py` | `SHIPPED` — meizhong986 responded on #132 |
-| WebUI cache on upgrade | #236 | GUI clears WebView2 cache on version change, preserves settings | `SHIPPED` — meizhong986 responded on #236 |
-| ctypes hwnd overflow | #235 | Added proper `argtypes`/`restype` for Win32 functions | `SHIPPED` — meizhong986 responded on #235 |
-| Portuguese translation target | #238 | Added to SUPPORTED_TARGETS, argparse, both GUI dropdowns | `SHIPPED` — meizhong986 responded on #238 |
+| CPU float16 regression | #241 | `resolver_v3.py` returns `auto` for non-CUDA; safety net in ASR module | **#241 CLOSED** |
+| GUI access violation | #240 | Switch to `private_mode=True`, remove `storage_path` | `SHIPPED` |
+| XXL stderr encoding | — | `errors="replace"` in subprocess call | `SHIPPED` |
 
-### Post-post1 issues (2026-03-19)
+### v1.8.10 — IN DEVELOPMENT (current branch: dev_v1.8.10)
 
-| # | Title | Severity | Root Cause | Status |
-|---|-------|----------|------------|--------|
-| **#243** | Install verification fails (PyTorch) | **MEDIUM — INSTALLER** | RTX 3050 6GB Laptop, driver 595.79. uv installs PyTorch successfully (`SUCCESS`) but verification immediately fails with `No module named 'torch'`. Path mismatch between uv install target and verification Python. Not a v1.8.9 regression. | `NEEDS RESPONSE` — meizhong986 asked for laptop confirmation |
-| **#242** | Add XXL Faster Whisper to Pass 1 | **LOW — FEATURE** | yangming2027 requests XXL as Pass 1 option (currently Pass 2 only). Reason: some users' GPUs can't run fidelity mode. | `NEEDS RESPONSE` |
-| **#241** | float16 on CPU crash | **CRITICAL — REGRESSION** | v1.8.9 changed default compute type from `int8` to `float16`. CTranslate2 does NOT support `float16` on CPU. ALL CPU-only users crash. | **FIX CODED** for post2: `resolver_v3.py` returns `auto` for non-CUDA; `faster_whisper_pro_asr.py` safety net for MPS→CPU downgrade. |
-| **#240** | GUI access violation on Windows 11 | **HIGH — BUG** | WebView2 localhost timeout + access violation in `clr_loader`/`pythonnet`. Likely caused by `private_mode=False` + `storage_path` creating persistent WebView2 data folder. | **FIX CODED** for post2: switch to `private_mode=True`, remove `storage_path` and cache-clearing function. |
-| **#239** | AMD GPU support request | **LOW — FEATURE** | User has AMD iGPU, uses Qwen3-ASR-GGUF via llama.cpp+vulkan. Duplicate of #142/#114. | `NEEDS RESPONSE` |
-| **—** | XXL stderr UnicodeDecodeError | **MEDIUM — BUG** | `subprocess.run()` in `xxl_runner.py` reads stderr with `encoding="utf-8"` but XXL exe emits Windows system codepage bytes (cp936/GBK) for Chinese filenames. Transcription completes and SRT is written, but Python crashes reading stderr. Fix: add `errors="replace"` to subprocess call. | **FIX CODED** for post2 |
-
-**#241 ROOT CAUSE ANALYSIS (CRITICAL)**: This is a direct regression from the v1.8.9 quality improvement that changed `compute_type` from `int8` to `float16`. The change was intended to improve transcription quality on NVIDIA GPUs, but `float16` is not supported on CPU by CTranslate2. The fix must either:
-- (a) Auto-detect device and fall back to `int8` on CPU, OR
-- (b) Use `auto` compute type (CTranslate2 picks best for device), OR
-- (c) Add explicit CPU guard in `faster_whisper_pro_asr.py` before model load
-
-This breaks: standalone installer users on laptops without NVIDIA GPUs, `--accept-cpu-mode` users, any system where GPU detection fails. **Needs v1.8.9.post2 immediately.**
-
-**#240 analysis**: Complex WebView2 failure. The access violation in `clr_loader`/`pythonnet` is unusual — WhisperJAV doesn't use pythonnet directly, so this might be a system-level conflict. Possible causes: (1) Antivirus intercepting localhost connections, (2) another process binding port 127.0.0.1, (3) corrupted WebView2 user data, (4) pythonnet conflict from another installed app. Need to ask: is there another Python application installed? Is there antivirus blocking localhost? What port does pywebview try to use?
-
----
-
-## v1.8.9 Stable — RELEASED (2026-03-18)
-
-Released: https://github.com/meizhong986/WhisperJAV/releases/tag/v1.8.9
-Merge commit: `eea08a0` (19 commits from `dev_v1.8.9.beta` into main)
-
-### What shipped
-
-| Category | Item | Issues |
-|----------|------|--------|
-| **Feature** | BYOP Faster Whisper XXL — GUI + CLI + worker integration | #223, #224 |
-| **Feature** | OllamaManager — smart Ollama lifecycle (CLI-only, no GUI wiring) | #132, #212, #214, #128 |
-| **Quality** | Model large-v2 → large-v3, compute int8 → float16 | #223, #224 |
-| **Quality** | All sensitivity presets retuned (ASR + VAD) | #223 |
-| **Quality** | CPS threshold 20 → 30, VAD failover | #223 |
-| **Quality** | Ensemble degraded status (honest reporting, no false SUCCESS) | — |
-| **Cleanup** | Config reduced from ~600 to 19 lines | — |
-| **Cleanup** | Dead CLI flags removed | — |
-| **Bug fix** | 14+ bugs fixed (see release notes) | — |
-
-### What did NOT ship (deferred)
-
-| Item | Issues | Why |
-|------|--------|-----|
-| MPS selective policy | #198, #227 | Not started — needs more M3/M4 data |
-| OllamaManager GUI wiring | #132, #212 | CLI-only for now |
-| Gemma 3 configs | #128 | Awaiting hyiip's PR |
-
-### Known regressions
-
-| # | Regression | Severity | Introduced By | Fix |
-|---|-----------|----------|---------------|-----|
-| **#241** | float16 compute on CPU crashes | **CRITICAL** | `compute int8 → float16` quality change | Auto-detect device, fall back to int8/auto on CPU |
-
----
-
-## v1.8.8 Stable — RELEASED (2026-03-13)
-
-All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
-
-| ID | Issue(s) | Description | Status | Notes |
-|----|----------|-------------|--------|-------|
-| A1 | #212/#214/#132 | Diagnostic token logging (batch stats, "No matches" handler) | `SHIPPED` | #132: `--provider local` confirmed working on Kaggle |
-| A2 | #212 | .subtrans stale settings override (version-stamp, auto-delete) | `SHIPPED` | Needs validation from destinyawaits/zhstark |
-| A3 | **#218** | cu118 wheel version mismatch (`UV_SKIP_WHEEL_FILENAME_CHECK=1`) | `SHIPPED` | Needs WillChengCN to confirm |
-| A4 | #212/#214 | Reduce max_tokens 2x→1x multiplier (2392→1820 for 8K ctx) | `SHIPPED` | Needs real-world validation |
-| A5 | #214 | pornify.txt → sectioned format with format example | `SHIPPED` | Internal improvement |
-| A6 | — | `--provider ollama` preview (auto-detect, num_ctx=8192, streaming) | `SHIPPED` | #132: confirmed working on Kaggle (after manual ollama install) |
-| B1 | **#200** | NVML Optimus laptop fallback (`--force-cuda` flag, guidance text) | `SHIPPED` | Needs Ywocp to confirm |
-| C1 | **#209** | Repetition cleaner pattern #8 (`sentence_phrase_repetition`) | `SHIPPED` | Needs weifu8435 to confirm |
-| C2 | **#219** | MossFormer2_SS_16K 3D tensor crash | `SHIPPED` | Issue closed 2026-03-13 |
-| — | #198 | Force greedy decoding (`num_beams=1`) on MPS | `SHIPPED` | Issue closed. MPS confirmed not accelerating Whisper. |
-| — | — | numpy 2.x migration | `SHIPPED` | |
-| — | #211 | urllib3/chardet warning suppressed | `SHIPPED` | |
-| — | — | Post-install verification timeout 30s→120s | `SHIPPED` | `63936e1` |
-| — | — | RequestsDependencyWarning suppression | `SHIPPED` | `168e8b3` |
+| Item | Issues | Description | Status |
+|------|--------|-------------|--------|
+| Config contamination firewall | — | Prevent Silero vad_params leaking to non-Silero backends | Committed |
+| Dead code removal | — | Removed unused config paths | Committed |
+| GUI defaults fix | — | Ensemble preset defaults not applied on pipeline switch | Committed |
+| **Aggressive sensitivity retune** | — | F7 acceptance test: no_speech, compression_ratio, beam_size, hallucination_silence tuned from ground truth | Committed (6 commits) |
+| **Whisper param tuner utility** | — | `scripts/whisper_param_tuner.py` — standalone hypothesis testing | Committed |
+| **Diagnostic JSON per scene** | — | Full whisper transcribe() results saved alongside scene SRTs | Committed |
 
 ---
 
 ## Cluster Analysis
 
-### Cluster A: Local LLM Translation (4 issues + 1 contributor proposal)
+### Cluster A: Local LLM Translation (5 issues)
 
-**Issues**: #196 (closed), #212, #214 (closed), #132, #128 (contributor PR), #233
-**Status**: v1.8.9.post1 fixed Ollama 404 (#132). #233 is pre-existing llama-cpp-python failure.
+**Issues**: #259, #255, #233, #212, #132
+**Theme**: Users struggling with local translation — Ollama setup, llama-cpp-python failures.
 
-| # | Title | Reporter | Platform | State | Status |
-|---|-------|----------|----------|-------|--------|
-| **#233** | translation error | WillChengCN | Windows, cu118 | **OPEN** | `--provider local`, llama-8b. `n_vocab()` AssertionError. Same as #208. Recommend `--provider ollama`. | `NEEDS RESPONSE` |
-| **#214** | 1.8.7 localLLM fail | KenZP12 | Windows, cu128 | **CLOSED** (2026-03-18) | |
-| **#212** | Regex Error - Local Translation v1.8.7 | destinyawaits | Linux, 5090 | **OPEN** | v1.8.9 comment posted. | `AWAITING CONFIRMATION` |
-| **#196** | Local Translation Errors | zhstark | Ubuntu, 5090 32GB | CLOSED | Related to #212. |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | Kaggle | **OPEN** | v1.8.9.post1 fixed doubled endpoint 404 bug. meizhong986 responded 2026-03-19. | `SHIPPED` |
-| **#128** | LLM context/batch sizing | hyiip | (contributor) | **OPEN** | Gemma 3 proposal. Redirected to OllamaManager. | `AWAITING CONFIRMATION` |
+| # | Title | Reporter | State | Status |
+|---|-------|----------|-------|--------|
+| **#259** | Local Translation Issues (v1.8.9-hotfix2) | destinyawaits | OPEN | Same user as #212. Persistent issues. | `NEEDS RESPONSE` |
+| **#255** | 如何用ollama进行翻译 | cheny7918 | OPEN | How-to question. zhifanXU17 has same issue. | `NEEDS RESPONSE` |
+| **#233** | translation error | WillChengCN | OPEN | `n_vocab()` assertion. llama-cpp-python issue. | `NEEDS RESPONSE` — recommend Ollama |
+| **#212** | Regex Error v1.8.7 | destinyawaits | OPEN | v1.8.9 comment posted. | `AWAITING CONFIRMATION` |
+| **#132** | Local LLM Kaggle | TinyRick1489 | OPEN | v1.8.9.post1 fixed Ollama 404. | `SHIPPED` |
+
+**Recommendation**: High priority to respond. #255 and #259 are active users blocked on Ollama translation. Write a concise Ollama translation guide and link from all 5 issues. Close #233 with Ollama recommendation.
 
 ---
 
 ### Cluster B: MPS / Apple Silicon (2 issues)
 
-**Issues**: #198 (closed), #227
-**Status**: #198 closed. #227 documented as known issue. MPS selective policy deferred.
-
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#198** | Transformers MPS crash | francetoastVN | **CLOSED** | MPS fix shipped v1.8.8. MPS confirmed 6x SLOWER for Whisper. |
-| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN** | MPS model-dependent behavior confirmed. | `AWAITING CONFIRMATION` |
+| **#227** | M1 MAX Transformers hang | dadlaugh | OPEN | Known MPS issue. | `AWAITING CONFIRMATION` |
+| **#246** | Serverless GPU + anime-whisper | dadlaugh | OPEN | Same user. Reports hallucination bug. | `NEEDS RESPONSE` |
+
+**Recommendation**: Respond to #246 (valuable technical report). Keep #227 as known issue. MPS deferred to v1.9+.
 
 ---
 
-### Cluster C: Network / Installation (12 issues — 2 new)
+### Cluster C: Network / Installation (14 issues)
 
 | # | Title | Reporter | State | Root Cause | Status |
 |---|-------|----------|-------|------------|--------|
-| **#243** | Install verification fails | Trenchcrack | **OPEN (NEW)** | RTX 3050 6GB Laptop. uv installs PyTorch OK but `import torch` fails. Path mismatch? Install dir: `D:\JAV`. | `NEEDS RESPONSE` |
-| **#240** | GUI access violation Win11 | m739566004-svg | **OPEN (NEW)** | WebView2 timeout + access violation. Fix coded: switch to `private_mode=True`. | `FIX CODED` for post2 |
-| **#234** | CUDA version claim | techguru0 | **OPEN** | CUDA toolkit vs compute capability confusion. | `NEEDS RESPONSE` |
-| **#229** | INSTALLATION FAILED (SSL) | WillChengCN | **OPEN** | **SELF-RESOLVED**: "the cause is python environment." | `FIX VERIFIED` — safe to close |
-| **#228** | cublas64_12.dll / first run hang | yhxkry | **OPEN** | **SELF-RESOLVED**: installed CUDA DLLs manually. | `FIX VERIFIED` — safe to close |
-| **#225** | 白屏 (GUI white screen) | github3C | **OPEN** | **UPDATE 2026-03-19**: Confirmed WebView2 Runtime is latest version (screenshot). Edge latest. Still white screen. Previous analysis (install log clean, RTX 3070, 19/19 checks pass) exhausted. | `NEEDS FOLLOW-UP` — WebView2 confirmed OK, need new hypothesis |
-| **#222** | 字幕是日语... (how to get Chinese?) | libinghui20001231-debug | **OPEN** | User confusion. Pointed to docs. | `AWAITING CONFIRMATION` |
-| **#221** | 安装完后报错 (cublas64_12.dll missing) | libinghui20001231-debug | **OPEN** | GTX 1650, old driver 462. | `AWAITING LOG` |
-| **#220** | 安装卡着不动 (install stalls) | libinghui20001231-debug | **OPEN** | Install stalls during PyTorch download. | `AWAITING LOG` |
-| **#218** | 安装错误 (uv cu118 wheel) | WillChengCN | **OPEN** | uv rejects cu118 llama-cpp wheel. | `SHIPPED` (A3). `AWAITING CONFIRMATION` |
-| **#217** | 找不到WhisperJAV-GUI.exe | loveGEM + vimbackground | **OPEN** | PyTorch download fails (network). | `AWAITING CONFIRMATION` |
-| **#210** | 安装失败 DNS error | iop335577 | **OPEN** | DNS through proxy. | `AWAITING CONFIRMATION` |
-| **#204** | VPN/v2rayN SSL failures | yangming2027 | **OPEN** | HF hub SSL errors. | `AWAITING CONFIRMATION` |
+| **#263** | GPU not utilized | herlong6529424-dot | OPEN | Likely user error (didn't click Start?) | `NEEDS RESPONSE` |
+| **#261** | Network check: unknown url type | henry99a | OPEN | SSL missing in conda env | `NEEDS RESPONSE` |
+| **#260** | Uninstall leaves 6GB | hawai-stack | OPEN | AppData/model cache residual | `NEEDS RESPONSE` |
+| **#253** | Colab silero trust_repo | KinhoLeung | OPEN | PyTorch Hub trust issue | `NEEDS RESPONSE` |
+| **#251** | post2 launch failure | zoqapopita93 | OPEN | No details | `NEEDS RESPONSE` |
+| **#243** | Install verify fails (RTX 3050) | Trenchcrack | OPEN | Path mismatch in conda-constructor | `NEEDS RESPONSE` |
+| **#240** | GUI access violation Win11 | m739566004-svg | OPEN | WebView2 failure. Fix shipped in post2. | `SHIPPED` |
+| **#229** | INSTALLATION FAILED (SSL) | WillChengCN | OPEN | Self-resolved | `FIX VERIFIED` — **close** |
+| **#228** | cublas64_12.dll / first run hang | yhxkry | OPEN | Self-resolved | `FIX VERIFIED` — **close** |
+| **#225** | GUI white screen | github3C | OPEN | WebView2 confirmed OK. Exhausted. | `NEEDS FOLLOW-UP` |
+| **#222** | 字幕是日语 (how to get Chinese?) | libinghui20001231 | OPEN | User confusion | `AWAITING CONFIRMATION` |
+| **#221** | cublas64_12.dll missing | libinghui20001231 | OPEN | Old driver GTX 1650 | `AWAITING LOG` |
+| **#220** | Install stalls | libinghui20001231 | OPEN | Network during PyTorch download | `AWAITING LOG` |
+| **#218** | cu118 wheel mismatch | WillChengCN | OPEN | uv rejects cu118 llama-cpp wheel | `SHIPPED` |
+| **#217** | GUI.exe not found | loveGEM | OPEN | PyTorch download failed | `AWAITING CONFIRMATION` |
+| **#210** | DNS error | iop335577 | OPEN | Proxy DNS | `AWAITING CONFIRMATION` |
+| **#204** | VPN/v2rayN SSL | yangming2027 | OPEN | HF hub SSL | `AWAITING CONFIRMATION` |
 
-**#225 update (2026-03-19)**: github3C confirmed WebView2 Runtime is latest version. Edge is latest. The install log was clean. This rules out the "WebView2 missing/outdated" hypothesis. New possibilities: (1) GPU driver compatibility with WebView2 rendering (RTX 3070 — try disabling hardware acceleration), (2) antivirus/firewall blocking localhost, (3) corrupted WebView2 user data directory, (4) DPI scaling issue. Need to ask user to try `--debug` flag or check if CLI transcription works.
-
-**#240 analysis**: The `pythonnet`/`clr_loader` in the stack trace is suspicious — WhisperJAV doesn't depend on pythonnet. This could be a system-level Python installation conflict. The `access violation` suggests memory corruption. The non-standard install path (`D:\WJ\`) might be relevant if there are path length or permission issues. Need to ask: (1) is there another Python distribution installed? (2) antivirus? (3) does CLI (`whisperjav video.mp4`) work?
-
----
-
-### Cluster D: GPU Detection (3 issues — 1 new)
-
-| # | Title | Reporter | State | Root Cause | Status |
-|---|-------|----------|-------|------------|--------|
-| **#239** | AMD GPU support | bmin1117 | **OPEN (NEW)** | Uses Qwen3-ASR-GGUF via llama.cpp+vulkan on AMD iGPU. Asks about WhisperJAV AMD support. Duplicate of #142/#114. | `NEEDS RESPONSE` |
-| **#200** | NVML "Driver Not Loaded" on Optimus laptop | Ywocp | **OPEN** | Dual GPU. | `SHIPPED` (B1: `--force-cuda`). `AWAITING CONFIRMATION` |
-| **#213** | Intel GPU support | DDXDB | **OPEN** | Requests `torch.xpu`. | `DEFERRED` to v1.9+ |
+**Recommendation**: Close #228, #229 immediately (self-resolved). Batch-respond to #261, #253, #251, #263 with standard diagnostics. #225 needs escalation or acceptance as "won't fix" (user-specific WebView2 issue).
 
 ---
 
-### Cluster E: GUI / WebUI (5 issues — 1 new)
-
-**Issues**: #96, #207, #235, #236, #240 (NEW)
-**Status**: #235 and #236 fixed in v1.8.9.post1. #240 is new complex WebView2 failure.
+### Cluster D: GPU Detection (3 issues)
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#240** | GUI access violation Win11 | m739566004-svg | **OPEN (NEW)** | WebView2 timeout + pythonnet crash. Complex. | `NEEDS RESPONSE` |
-| **#236** | WebUI cache prevents v1.8.9 changes | FishYu-OWO | **OPEN** | Fixed in v1.8.9.post1. meizhong986 responded. | `SHIPPED` |
-| **#235** | ctypes icon OverflowError on startup | techguru0 | **OPEN** | Fixed in v1.8.9.post1. meizhong986 responded. | `SHIPPED` |
-| **#207** | 1.86不能保存设置 | q864310563 | **OPEN** | Dup of #96. | `AWAITING CONFIRMATION` |
-| **#96** | Full settings persistence | sky9639 | OPEN | | `DEFERRED` to v1.9 |
+| **#239** | AMD GPU support | bmin1117 | OPEN | Dup of #142/#114 | `NEEDS RESPONSE` — link to existing |
+| **#200** | NVML Optimus laptop | Ywocp | OPEN | `--force-cuda` shipped v1.8.8 | `AWAITING CONFIRMATION` |
+| **#213** | Intel GPU (XPU) | DDXDB | OPEN | | `DEFERRED` v1.9+ |
 
 ---
 
-### Cluster F: Whisper Output Quality (9 issues — 2 new)
-
-**Issues**: #242 (NEW), #241 (NEW REGRESSION), #223, #224, #230, #237, #209, #215, #227
-**Severity**: **CRITICAL** — #241 is a regression that crashes ALL CPU-only users. Fix coded.
+### Cluster E: GUI / WebUI (5 issues)
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#242** | Add XXL to Pass 1 | yangming2027 | **OPEN (NEW)** | Feature request: XXL currently Pass 2 only. Some users' GPUs can't run fidelity mode. | `NEEDS RESPONSE` |
-| **#241** | float16 on CPU crash | helphelp7092 | **OPEN (NEW)** | **REGRESSION.** v1.8.9 compute type change (int8→float16) crashes on CPU. | **FIX CODED** for post2. `resolver_v3.py`: non-CUDA → `auto`. Safety net in `faster_whisper_pro_asr.py`. |
-| **#237** | XXL model/compute questions | yangming2027 | **OPEN** | **UPDATE 2026-03-19**: meizhong986 responded to all 3 questions (8 comments). New comment from **liugngg** asking whether WhisperJAV post-processes XXL ASR results (optimization aspects). | `RESPONDED` — new question from liugngg |
-| **#230** | Subtitle merging module request | weifu8435 | **OPEN** | Feature request. On roadmap for v1.9.0. | `RESPONDED` |
-| **#224** | 人声分离分析 (vocal separation) | yangming2027 | **OPEN** | v1.8.9 comment posted. | `AWAITING CONFIRMATION` |
-| **#223** | Faster Whisper XXL comparison | weifu8435 | **OPEN** | BYOP XXL + quality tuning shipped in v1.8.9. | `SHIPPED` v1.8.9 |
-| **#209** | Single subtitle very long (repetition) | weifu8435 | **OPEN** | Shipped in v1.8.8 (C1) + v1.8.9 quality tuning. | `AWAITING CONFIRMATION` |
-| **#215** | Qwen3-ASR subtitle quality | yangming2027 | **OPEN** | Expected behavior. | `AWAITING CONFIRMATION` |
-| **#227** | M1 MAX Transformers hang | dadlaugh | **OPEN** | MPS known issue documented. | `AWAITING CONFIRMATION` |
-
-**#241 impact assessment**: The error log shows the user tried multiple approaches (balanced single-pass, ensemble) — all fail with the same `float16` error. The user is on CPU (`--accept-cpu-mode`). The v1.8.9 quality change set `compute_type` to `float16` universally, but CTranslate2 (Faster-Whisper backend) only supports `float16` on CUDA GPUs. **This affects ALL users who:**
-- Have no GPU (CPU-only installs)
-- Use `--accept-cpu-mode` / `--force-cpu`
-- Have GPU detection that falls back to CPU (Optimus, driver issues)
-- Use MPS (Apple Silicon) — MPS may also not support float16 via CTranslate2
-
-**#237 liugngg question**: Asks whether WhisperJAV does any post-processing on XXL ASR output. Answer: Yes — Japanese regrouping (stable-ts), hallucination removal, repetition cleaning, timing adjustments, CPS filtering. All post-processing runs on Pass 2 output same as any other pipeline.
+| **#244** | Search for XXL path | techguru0 | OPEN | UX improvement for XXL browse | `RESPONDED` |
+| **#240** | GUI access violation | m739566004-svg | OPEN | Fix shipped post2 | `SHIPPED` |
+| **#236** | WebUI cache stale | FishYu-OWO | OPEN | Fixed post1 | `SHIPPED` |
+| **#235** | ctypes OverflowError | techguru0 | OPEN | Fixed post1 | `FIX VERIFIED` — **close** |
+| **#207** | 1.86 settings not saving | q864310563 | OPEN | Dup of #96 | `AWAITING CONFIRMATION` |
 
 ---
 
-### Cluster G: Speech Enhancement — RESOLVED
+### Cluster F: Whisper Output Quality (6 issues)
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#219** | MossFormer2_SS_16K 3D tensor crash | anon12642 | **CLOSED** (2026-03-13) | `SHIPPED` in v1.8.8. |
+| **#258** | 我遇到的问题 (intermittent quality) | Uillike | OPEN | Vague | `NEEDS RESPONSE` |
+| **#246** | anime-whisper hallucination | dadlaugh | OPEN | Detailed bug report | `NEEDS RESPONSE` |
+| **#242** | XXL in Pass 1 | yangming2027 | OPEN | Feature request | `RESPONDED` (7 comments) |
+| **#237** | XXL model questions | yangming2027 | OPEN | liugngg asked about post-processing | `NEEDS FOLLOW-UP` |
+| **#230** | Subtitle merging module | weifu8435 | OPEN | Feature → v1.9.0 | `RESPONDED` |
+| **#209** | Repetition (single long sub) | weifu8435 | OPEN | Shipped v1.8.8+v1.8.9 | `AWAITING CONFIRMATION` |
 
 ---
 
-### Cluster H: Kaggle / Colab (2 issues)
+### Cluster G: Kaggle / Colab (3 issues)
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#231** | Kaggle notebook run error | fzfile | **OPEN** | **Root cause confirmed 2026-03-18**: `llvmlite 0.43.0` too old (Kaggle pre-installed), numba requires >= 0.46.0. Import chain: `stable_whisper → whisper → numba → llvmlite`. Fix: `!pip install -U llvmlite numba`. Not a WhisperJAV bug. | `NEEDS RESPONSE` with fix |
-| **#132** | Local LLM on Kaggle | TinyRick1489 | **OPEN** | v1.8.9.post1 fixed doubled endpoint 404. meizhong986 responded 2026-03-19. | `SHIPPED` |
+| **#253** | Colab silero trust_repo | KinhoLeung | OPEN | `pass1_speech_segmenter=automatic/silero` fails with trust issue | `NEEDS RESPONSE` |
+| **#231** | Kaggle llvmlite version | fzfile | OPEN | Fix known: `pip install -U llvmlite numba` | `NEEDS RESPONSE` |
+| **#132** | Local LLM Kaggle | TinyRick1489 | OPEN | Ollama 404 fixed post1 | `SHIPPED` |
 
 ---
 
-### Cluster I: Model Support Requests (1)
+### Cluster H: Documentation / How-To (4 issues)
 
 | # | Title | Reporter | State | Status |
 |---|-------|----------|-------|--------|
-| **#232** | whisper-ja-anime-v0.1 model support | mustssr | **OPEN** | Requests `efwkjn/whisper-ja-anime-v0.1` HuggingFace model. | `AWAITING INFO` — asked for comparison results vs large-v3 |
+| **#255** | How to use Ollama for translation | cheny7918 | OPEN | Missing docs | `NEEDS RESPONSE` |
+| **#250** | Where are model folders? | lcpdguy | OPEN | Missing docs | `NEEDS RESPONSE` |
+| **#222** | How to get Chinese subtitles? | libinghui20001231 | OPEN | User confusion | `AWAITING CONFIRMATION` |
+| **#234** | CUDA version confusion | techguru0 | OPEN | Misunderstanding | `NEEDS RESPONSE` |
+
+**Recommendation**: These 4 are documentation gaps, not bugs. Write FAQ entries and respond in bulk.
 
 ---
 
-### Cluster J: Feature Requests
+### Cluster J: Feature Requests (28 total)
 
-| # | Title | Reporter | State | Summary | Target |
-|---|-------|----------|-------|---------|--------|
-| **#242** | XXL in Pass 1 | yangming2027 | OPEN (NEW) | XXL as Pass 1 option for lower-end GPUs | **Investigate** |
-| **#239** | AMD GPU support | bmin1117 | OPEN (NEW) | AMD iGPU via vulkan. Dup of #142/#114. | v1.9+ |
-| **#238** | Portuguese/Brazilian translation | SangenBR | OPEN | Translation target language | **SHIPPED v1.8.9.post1** |
-| **#232** | whisper-ja-anime-v0.1 model | mustssr | OPEN | HuggingFace anime ASR model | **Investigate** |
-| **#230** | Standalone merge module | weifu8435 | OPEN | CLI tool for multi-SRT merging | **v1.9.0** |
-| **#224** | Vocal separation (UVR MDX-Net) | yangming2027 | OPEN | Analysis of XXL's vocal separation advantage | **Investigate** |
-| **#223** | Faster Whisper XXL comparison | weifu8435 | OPEN | Quality gap with XXL | **SHIPPED v1.8.9** |
-| **#213** | Intel GPU (XPU) support | DDXDB | OPEN | torch.xpu via PyTorch XPU wheels | v1.9+ |
-| **#206** | Grey out incompatible options | techguru0 | OPEN | Block incompatible GUI choices | v1.9+ |
-| **#205** | VibeVoice ASR | kylesskim-sys | OPEN | Microsoft VibeVoice. VRAM too high. | v1.9+ |
-| **#181** | Frameless window | QQ804218 | OPEN | Cosmetic | v1.9+ |
-| **#180** | Multi-language GUI | QQ804218 | OPEN | Full i18n | v1.9+ |
-| **#175** | Chinese GUI | yangming2027 | OPEN | Subset of #180 | v1.9+ |
-| **#164** | MPEG-TS + Drive | hosmallming | OPEN | Format + cloud | Backlog |
-| **#142** | AMD Radeon | MatthaisUK | OPEN | FishYu-OWO AMD workaround (CTranslate2 ROCm wheels) | v1.9+ |
-| **#128** | Gemma 3 model upgrade | hyiip | OPEN | 128K context Gemma 3 4B/12B models. **Contributor offers.** | **v1.9.0** |
-| **#126** | Recursive directory | jl6564 | OPEN | Walk subdirs, mirror output | v1.9+ |
-| **#114** | DirectML | SingingDalong | OPEN | AMD/Intel GPU via torch-directml | v1.9+ |
-| **#99** | 4GB VRAM guidance | hosmallming | OPEN | Log VRAM, recommend settings | Backlog |
-| **#71** | Google Translate (free) | x8086 | OPEN | Fragile API | v1.9+ |
-| **#59** | Feature plans | meizhong986 | OPEN | Meta roadmap | Keep open |
-| **#51** | Batch translate wildcard | lingyunlxh | OPEN | Glob in translate CLI | Backlog |
-| **#49** | Output to source folder | meizhong986 | OPEN | Docs gap | Backlog |
-| **#44** | GUI drag-drop | lingyunlxh | OPEN | Filename vs path | Backlog |
-| **#43** | DeepL provider | teijiIshida | OPEN | Non-LLM adapter | v1.9+ |
-| **#33** | Linux pyaudio docs | org0ne | OPEN | Documentation | Backlog |
-
----
-
-## Tally
-
-### By Resolution Status
-
-| Status | Count | Issues |
-|--------|------:|--------|
-| **FIX CODED (for post2)** | 3 | **#241** (CPU float16 regression), **#240** (private_mode), XXL stderr encoding crash |
-| **NEEDS RESPONSE (new/unresponded)** | 6 | #231, #233, #234, #239, #242, #243 |
-| **NEEDS FOLLOW-UP** | 2 | #225 (new data, old hypothesis exhausted), #237 (liugngg question) |
-| **AWAITING LOG** | 2 | #220, #221 |
-| **AWAITING CONFIRMATION** | 6 | #200, #204, #207, #209, #210, #212 |
-| **SHIPPED (awaiting user test)** | 6 | #132, #218, #223, #235, #236, #238 |
-| **FIX VERIFIED (safe to close)** | 2 | #228, #229 |
-| **Feature requests (open)** | 23 | See Cluster J |
-| **DEFERRED to v1.9+** | 11 | #96, #205, #206, #213, #180, #175, #181, #142, #114, #126, #43 |
-
-### By Priority (Active Work)
-
-| Priority | # | Issue | Status | Why |
-|----------|---|-------|--------|-----|
-| **CRITICAL** | #241 | CPU float16 crash (REGRESSION) | **FIX CODED** for post2 | ALL CPU-only users crash. v1.8.9 regression. |
-| **HIGH** | #240 | GUI access violation Win11 | **FIX CODED** for post2 | `private_mode=True` removes storage folder failure mode. |
-| **MEDIUM** | — | XXL stderr UnicodeDecodeError | **FIX CODED** for post2 | Chinese filenames cause cp936 bytes on stderr, crashing subprocess.run(). Transcription succeeds but result is lost. |
-| **HIGH** | #225 | GUI white screen | `NEEDS FOLLOW-UP` | WebView2 confirmed OK. Need new hypothesis. |
-| **MEDIUM** | #243 | Install verification fails | `NEEDS RESPONSE` | RTX 3050 Laptop. uv installs OK but import fails. |
-| **MEDIUM** | #231 | Kaggle llvmlite version | `NEEDS RESPONSE` | Kaggle env issue, fix known. |
-| **MEDIUM** | #237 | liugngg question on XXL post-processing | `NEEDS FOLLOW-UP` | New question from third user. |
-| **MEDIUM** | #233 | Local LLM AssertionError | `NEEDS RESPONSE` | Pre-existing, recommend Ollama. |
-| **LOW** | #242 | XXL in Pass 1 | `NEEDS RESPONSE` | Feature request. |
-| **LOW** | #234 | CUDA version misunderstanding | `NEEDS RESPONSE` | Polite correction needed. |
-| **LOW** | #239 | AMD GPU request | `NEEDS RESPONSE` | Dup of #142/#114, link to existing. |
+| # | Title | Reporter | Priority | Target |
+|---|-------|----------|----------|--------|
+| **#262** | Cohere Transcribe model | teijiIshida | LOW | Evaluate |
+| **#254** | Remove non-speech sounds (enhancement) | zoqapopita93 | MEDIUM | v1.9 (speech enhancement exists) |
+| **#252** | Multi-speaker / diarization | zoqapopita93 | MEDIUM | v1.9+ |
+| **#248** | Diarization | oceanseamountain | MEDIUM | v1.9+ (dup of #252) |
+| **#247** | Docker support | zly19540609 | LOW | Backlog |
+| **#242** | XXL in Pass 1 | yangming2027 | MEDIUM | v1.9 |
+| **#239** | AMD GPU | bmin1117 | MEDIUM | v1.9+ (dup #142/#114) |
+| **#232** | whisper-ja-anime model | mustssr | LOW | Evaluate |
+| **#230** | Standalone merge module | weifu8435 | HIGH | v1.9.0 |
+| **#224** | Vocal separation | yangming2027 | MEDIUM | v1.9 |
+| **#213** | Intel GPU (XPU) | DDXDB | LOW | v1.9+ |
+| **#206** | Grey out incompatible options | techguru0 | MEDIUM | v1.9+ |
+| **#205** | VibeVoice ASR | kylesskim-sys | LOW | v1.9+ |
+| **#181** | Frameless window | QQ804218 | LOW | Backlog |
+| **#180** | Multi-language GUI (i18n) | QQ804218 | HIGH | v1.9.0 |
+| **#175** | Chinese GUI | yangming2027 | HIGH | v1.9.0 (subset #180) |
+| **#164** | MPEG-TS + Drive | hosmallming | LOW | Backlog |
+| **#142** | AMD Radeon ROCm | MatthaisUK | MEDIUM | v1.9+ |
+| **#128** | Gemma 3 models | hyiip | HIGH | v1.9.0 |
+| **#126** | Recursive directory | jl6564 | LOW | Backlog |
+| **#114** | DirectML | SingingDalong | MEDIUM | v1.9+ |
+| **#99** | 4GB VRAM guidance | hosmallming | LOW | Backlog |
+| **#96** | Full settings persistence | sky9639 | MEDIUM | v1.9.0 |
+| **#71** | Google Translate (free) | x8086 | LOW | Backlog |
+| **#59** | Feature plans (meta) | meizhong986 | — | Keep open |
+| **#51** | Batch translate wildcard | lingyunlxh | LOW | Backlog |
+| **#49** | Output to source folder | meizhong986 | LOW | Backlog |
+| **#44** | GUI drag-drop fix | lingyunlxh | LOW | Backlog |
+| **#43** | DeepL provider | teijiIshida | LOW | v1.9+ |
+| **#33** | Linux pyaudio docs | org0ne | LOW | Backlog |
 
 ---
 
-## Pending GitHub Actions
+## F2: Issue Group Analysis
 
-### Issues Needing Response (9)
+### Group 1: URGENT — Needs Response (14 issues, 0 comments from dev)
 
-| # | Action Needed | Priority |
-|---|--------------|----------|
-| **#241** | **CRITICAL.** Acknowledge regression. Explain: v1.8.9 compute type change breaks CPU. Fix in post2 hotfix. | CRITICAL |
-| **#243** | Investigate: PyTorch installs OK via uv but `import torch` fails. Likely path mismatch in conda-constructor env. Ask for full `INSTALLATION_FAILED_v1.8.9.txt`. | MEDIUM |
-| **#242** | Respond: XXL in Pass 1 is technically feasible. Evaluate for v1.9.0. XXL doesn't produce timestamps — needs ChronosJAV-style forced alignment in Pass 1. Not trivial. | LOW |
-| **#237** | Answer liugngg's new question: Yes, WhisperJAV post-processes XXL output (regrouping, hallucination removal, repetition cleaning, timing, CPS filtering). | MEDIUM |
-| **#231** | Respond: Root cause is Kaggle's llvmlite 0.43.0. Fix: `!pip install -U llvmlite numba`. Not a WhisperJAV bug. | MEDIUM |
-| **#233** | Respond: Known llama-cpp-python failure. Recommend `--provider ollama` (v1.8.9+). | MEDIUM |
-| **#234** | Politely correct: CUDA toolkit version depends on driver, not GPU series. | LOW |
-| **#239** | Respond: AMD support tracked in #142 and #114. FishYu-OWO proved ROCm works with CTranslate2. Planned for v1.9+. | LOW |
-| **#240** | Fix coded (private_mode=True). After post2 ships, respond: simplified WebView2 startup, should resolve access violation. Ask user to upgrade and test. | POST-RELEASE |
+These issues have **zero developer response**. Users are waiting.
 
-### Issues Needing Follow-Up (1)
+**Batch 1 — Simple responses (can do in 30 min):**
+| # | Response Type | Action |
+|---|---|---|
+| #263 | Diagnosis | Ask: did you click Start? Check if model downloaded. |
+| #261 | Known issue | SSL missing in conda env. Provide fix command. |
+| #260 | Guidance | Explain AppData/model cache locations for manual cleanup. |
+| #251 | Ask for info | Request error logs/screenshots. |
+| #258 | Ask for info | Too vague. Request logs and reproduction steps. |
+| #234 | Correction | Politely explain CUDA toolkit vs compute capability. |
+| #239 | Dup link | Link to #142/#114. AMD tracked for v1.9+. |
 
-| # | Action Needed | Priority |
-|---|--------------|----------|
-| **#225** | WebView2 is latest, Edge is latest, install log clean. Need new diagnostic approach. Ask: (1) does CLI work? (2) try `whisperjav-gui --debug`? (3) try disabling GPU hardware acceleration in Edge settings? (4) any other Python on system? | HIGH |
+**Batch 2 — Needs investigation:**
+| # | Response Type | Action |
+|---|---|---|
+| #253 | Bug fix/workaround | Silero trust_repo on Colab. Provide `torch.hub.set_dir()` workaround. |
+| #246 | Technical discussion | Valuable anime-whisper hallucination report. Engage. |
+| #255 | Documentation | Write Ollama translation guide. |
+| #250 | Documentation | Document model cache paths. |
+| #247 | Decision | Docker: yes/no/when? |
+| #248/#252 | Roadmap | Diarization: acknowledge as v1.9+ feature. |
+| #262 | Evaluate | Cohere Transcribe: research feasibility. |
 
-### Candidates for Closing
+### Group 2: Stale — Safe to Close (6 issues)
 
-| # | Condition | Notes |
-|---|-----------|-------|
-| **#229** | Self-resolved: "the cause is python environment." | `FIX VERIFIED` |
-| **#228** | Self-resolved: installed CUDA runtime DLLs manually | `FIX VERIFIED` |
-| **#222** | Responded with docs + translation instructions | Last activity 2026-03-14, 5 days stale |
-| **#211** | urllib3 warning fixed in v1.8.8 | Already closed |
+These can be closed immediately:
 
-### Decisions Needed
+| # | Why | Last Activity |
+|---|---|---|
+| **#228** | Self-resolved: "installed CUDA DLLs manually" | 2026-03-18 |
+| **#229** | Self-resolved: "the cause is python environment" | 2026-03-17 |
+| **#235** | Fix shipped in post1, confirmed working | 2026-03-19 |
+| **#238** | Portuguese added in post1, released | 2026-03-19 |
+| **#222** | Responded with docs. 14 days stale. | 2026-03-14 |
+| **#220** | Responded. 14 days stale. No reply. | 2026-03-14 |
 
-| # | Decision | Recommendation |
-|---|----------|----------------|
-| **#241/#240** | Release v1.8.9.post2 hotfix? | **YES.** Both fixes coded and tested. #241 breaks all CPU users. #240 simplifies GUI startup. |
-| **#243** | Installer verification bug — investigate? | Yes, but not hotfix scope. Investigate path mismatch in conda-constructor post-install. |
-| **#242** | XXL in Pass 1? | Evaluate for v1.9.0. Non-trivial: XXL doesn't produce timestamps. |
-| **#227** | MPS strategy — selective by model? | Defer to v1.9.0 (needs more data) |
-| **#128** | Accept hyiip's Gemma 3 contribution? | Coordinate for v1.9.0 |
+### Group 3: Awaiting Confirmation — At Risk of Going Stale (6 issues)
+
+| # | Waiting Since | Days | Risk |
+|---|---|---|---|
+| #200 | 2026-03-14 | 14 | HIGH — Ywocp may have moved on |
+| #204 | 2026-03-14 | 14 | HIGH — yangming2027 active on other issues |
+| #207 | 2026-03-13 | 15 | HIGH — may be stale |
+| #209 | 2026-03-14 | 14 | MEDIUM — weifu8435 active on #230 |
+| #210 | 2026-03-14 | 14 | HIGH — may be stale |
+| #212 | 2026-03-17 | 11 | MEDIUM — destinyawaits opened #259 |
+
+**Recommendation**: Send a "friendly ping" on all 6. If no response in 7 days, close with "closing for inactivity, reopen if needed."
+
+### Group 4: Feature Request Interdependencies
+
+```
+Diarization cluster:     #248 ↔ #252 (both ask for multi-speaker)
+AMD/Intel GPU cluster:   #114 ↔ #142 ↔ #239 ↔ #213 (all non-NVIDIA GPU)
+Translation cluster:     #255 ↔ #259 ↔ #233 ↔ #212 ↔ #132 (all local LLM)
+i18n cluster:            #175 ↔ #180 ↔ #222 (all Chinese/multi-language)
+Speech quality cluster:  #254 ↔ #224 (both speech enhancement)
+XXL cluster:             #242 ↔ #237 ↔ #223 ↔ #244 (all XXL-related)
+```
 
 ---
 
-## Duplicate / Related Issue Map
+## F3: Recommended Steps & Roadmap
 
-| Cluster | Issues | Primary | Status |
-|---------|--------|---------|--------|
-| **Local LLM translation** | #196 (closed), **#212**, #214 (closed), **#132**, **#128**, **#233** | **#132** | v1.8.9.post1 fixed Ollama 404. #233 pre-existing. |
-| **MPS/Apple Silicon** | #198 (closed), **#227** | **#227** | Known issue, deferred. |
-| **Network/SSL/Install** | **#243** (NEW), **#240** (NEW), **#234**, **#229**, **#228**, **#225**, **#222**, **#221**, **#220**, **#218**, **#217**, #204, #210 | **#243** | #228/#229 self-resolved. #225 needs new approach. #240 fix coded. #243 installer path mismatch. |
-| **GPU detection** | **#239** (NEW), **#200**, **#213** | **#200** | #239 is AMD dup of #142/#114. |
-| **GUI / WebUI** | **#240** (NEW), **#236**, **#235**, #96, **#207** | **#240** | #235/#236 fixed in post1. #240 fix coded (private_mode). |
-| **Whisper quality** | **#242** (NEW), **#241** (REGRESSION), **#237**, **#230**, **#224**, **#223**, **#209**, **#215** | **#241** | Regression fix coded. #242 feature request. |
-| **Kaggle/Colab** | **#231**, **#132** | **#132** | #132 fixed. #231 is Kaggle env. |
-| **AMD/Intel GPU** | **#239** (NEW), #142, #114, **#213** | Deferred | v1.9+ |
-| **Model support** | **#232** | **#232** | whisper-ja-anime-v0.1 request. |
-| **Translation providers** | #71, #43, **#233** | Deferred | #233 recommend Ollama |
-| **i18n** | **#222**, #180, #175 | **#180** | v1.9+ |
+### Immediate Actions (this week)
+
+| Action | Issues | Effort | Impact |
+|---|---|---|---|
+| **Close 6 stale/verified issues** | #228, #229, #235, #238, #222, #220 | 10 min | Reduces open count 53→47 |
+| **Batch respond to 7 simple issues** | #263, #261, #260, #251, #258, #234, #239 | 30 min | Unblocks 7 users |
+| **Write Ollama translation FAQ** | #255, #259, #233 | 1 hour | Resolves 3 issues + prevents future ones |
+| **Write model cache paths doc** | #250 | 15 min | Quick docs improvement |
+| **Ping 6 stale AWAITING issues** | #200, #204, #207, #209, #210, #212 | 15 min | Either gets confirmation or clears backlog |
+
+**After this batch**: Open count drops to ~40, and response debt is cleared.
+
+### v1.8.10 Release Scope (current dev branch)
+
+| Item | Issues | Status |
+|---|---|---|
+| Aggressive sensitivity retune (F7 validated) | — | Committed (6 commits) |
+| Diagnostic JSON per scene | — | Committed |
+| Whisper param tuner utility | — | Committed |
+| Config contamination firewall | — | Committed |
+| GUI ensemble preset fix | — | Committed |
+| **Respond to #246 anime-whisper hallucination** | #246 | TODO — valuable bug report |
+| **Respond to #253 Colab silero trust** | #253 | TODO — provide workaround |
+| **Fix compression_ratio_threshold** | — | Committed (2.2→2.6 tuner-validated) |
+
+### v1.9.0 Roadmap (proposed)
+
+**Theme: Platform + Translation + UX**
+
+| Priority | Item | Issues | Est. Effort |
+|---|---|---|---|
+| **P0** | Ollama full migration + GUI wiring | #132, #212, #233, #255, #259 | Large |
+| **P0** | Chinese UI (partial i18n) | #175, #180, #222 | Medium |
+| **P1** | Diarization (speaker ID) | #248, #252 | Large (new feature) |
+| **P1** | Standalone merge CLI | #230 | Medium |
+| **P1** | AMD ROCm support (document + test) | #142, #114, #239 | Medium |
+| **P1** | XXL in Pass 1 | #242 | Medium |
+| **P2** | GUI settings persistence | #96, #207 | Medium |
+| **P2** | Vocal separation investigation | #224, #254 | Medium |
+| **P2** | MPS selective policy | #227 | Small |
+| **P2** | Uninstall cleanup | #260 | Small |
+| **P3** | Docker support | #247 | Medium |
+| **P3** | Gemma 3 model configs | #128 | Small (contributor PR) |
+| **P3** | whisper-ja-anime model | #232 | Small |
+| **P3** | Grey out incompatible options | #206 | Small |
+
+### Backlog (no target)
+
+#99, #71, #59, #51, #49, #44, #43, #33, #126, #164, #181, #205, #262
 
 ---
 
@@ -388,15 +356,13 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | # | Title | Closed | Resolution |
 |---|-------|--------|------------|
-| **#214** | 1.8.7 localLLM fail | 2026-03-18 | Closed |
-| **#201** | Install SSL cert error | 2026-03-15 | Self-resolved: `pip install pip-system-certs` |
-| **#198** | MPS beam search + detection | 2026-03-15 | Fixed v1.8.8. MPS working but not accelerating Whisper. |
-| **#219** | MossFormer2_SS_16K 3D tensor crash | 2026-03-13 | Fixed v1.8.8 |
-| #208 | LLM server AssertionError | 2026-03-09 | Self-resolved |
-| #197 | Installation problem v1.8.6 | 2026-03-08 | Closed by user |
-| #196 | Local Translation Errors | 2026-03-07 | Partial fix. See #212. |
-| #195 | UnicodeDecodeError audio extraction | 2026-03-08 | Fixed |
-| #194 | M4B file support | 2026-03-08 | Fixed |
+| **#256** | 安装过程报错 | 2026-03-26 | Closed by user |
+| **#245** | Kaggle working setup | 2026-03-20 | Community guide |
+| **#241** | float16 CPU crash (REGRESSION) | 2026-03-19 | Fixed in v1.8.9.post2 |
+| **#238** | Portuguese translation | 2026-03-19 | Shipped in v1.8.9.post1 |
+| **#219** | MossFormer2 3D tensor crash | 2026-03-13 | Fixed in v1.8.8 |
+| **#214** | localLLM fail | 2026-03-18 | Closed |
+| **#211** | 启动报错 | 2026-03-13 | Fixed in v1.8.8 |
 
 ---
 
@@ -404,68 +370,29 @@ All fixes shipped. Commit `b0f9d9b release: v1.8.8 stable`.
 
 | Period | New Issues | Closed | Net | Notes |
 |--------|-----------|--------|-----|-------|
-| 2026-03-08 to 2026-03-10 | 6 (#204-#210) | 5 | +1 | v1.8.7 release cycle |
-| 2026-03-11 to 2026-03-13 | 8 (#211-#220) | 3 | +5 | v1.8.8 beta + stable |
-| 2026-03-14 | 3 (#221-#223) | 1 | +2 | Post-release influx |
-| 2026-03-15 | 3 (#224-#227) | 2 | +1 | Quality + MPS + install |
-| 2026-03-16 | 5 (#228-#232) | 0 | +5 | Install, quality, Kaggle, model request |
-| 2026-03-18 | 6 (#233-#238) | 1 | +5 | v1.8.9 release day + hotfix items |
-| **2026-03-19** | **5 (#239-#243)** | **0** | **+5** | **#241 CPU REGRESSION, #240 GUI crash, #242 feature, #243 installer** |
+| 2026-03-08 to 2026-03-10 | 6 | 5 | +1 | v1.8.7 release cycle |
+| 2026-03-11 to 2026-03-13 | 8 | 3 | +5 | v1.8.8 beta + stable |
+| 2026-03-14 to 2026-03-16 | 11 | 3 | +8 | Post-release influx |
+| 2026-03-18 | 6 | 1 | +5 | v1.8.9 release day |
+| **2026-03-19** | 5 | 0 | +5 | #241 REGRESSION, post1 released |
+| **2026-03-20 to 2026-03-28** | 15 | 7 | +8 | Steady influx, post2 released |
 
-**Trend**: 52 open issues (was 33 on 2026-03-08). Net +19 in 11 days. Each release generates 3-6 new issues within 24 hours. #241 is the first true regression — previous post-release issues were pre-existing or edge cases. The close rate is too low — 8 issues are safe to close but haven't been.
-
----
-
-## Release & Roadmap Analysis (rev13 — 2026-03-19)
-
-### v1.8.9.post1 — RELEASED (2026-03-19)
-
-Fixed #132 (Ollama 404), #236 (WebUI cache), #235 (ctypes overflow), #238 (Portuguese). All responded to on GitHub.
-
-### v1.8.9.post2 Hotfix — CODED, READY TO SHIP
-
-| Item | Issues | Root Cause | Fix | Files |
-|------|--------|------------|-----|-------|
-| **CPU float16 regression** | **#241** | v1.8.9 changed `compute_type` to `float16` unconditionally. CTranslate2 does not support `float16` on CPU. | CTranslate2 branch: `device != "cuda"` → return `"auto"`. Safety net in ASR module for MPS→CPU downgrade. | `config/resolver_v3.py`, `modules/faster_whisper_pro_asr.py` |
-| **GUI access violation** | **#240** | `private_mode=False` + `storage_path` creates persistent WebView2 data folder that can corrupt or trigger access violations. | Switch to `private_mode=True`, remove `storage_path` and `_clear_webview_cache_on_upgrade()`. All settings persist via Python backend (asr_config.json), not browser localStorage. | `webview_gui/main.py` |
-
-**Impact assessment:**
-- **#241** — CRITICAL. Fixes ALL CPU-only users, Optimus fallback users, MPS/Apple Silicon users.
-- **#240** — HIGH. Simplifies GUI startup, removes entire category of WebView2 storage failures. Also retroactively improves the #236 fix (no cache to go stale = no stale UI).
-
-### v1.9.0 — Proposed Scope
-
-**Theme: Platform expansion + UX + close the gap**
-
-| Priority | Item | Issues | Notes |
-|----------|------|--------|-------|
-| **P0** | Ollama full migration (deprecate llama-cpp-python) | #128, #132, #212, #233 | Remove ~1500 LOC fragile code |
-| **P0** | OllamaManager GUI wiring | #132, #212 | CLI-only in v1.8.9 |
-| **P0** | Chinese UI (i18n, at least partial) | #175, #180, #222 | Biggest support burden reducer |
-| **P1** | Standalone merge CLI tool | #230 | `whisperjav-merge` command |
-| **P1** | AMD ROCm support (document + partial) | #142, #114, #213, #239 | FishYu-OWO proved it works |
-| **P1** | MPS selective policy | #198, #227 | force CPU for whisper-*, allow MPS for kotoba-* |
-| **P2** | GUI settings persistence (pipeline tab) | #96, #207 | Long-standing request |
-| **P2** | Vocal separation investigation | #224 | BS-RoFormer or UVR |
-| **P2** | WebView2 reliability | #225, #240 | Two separate Win11 failures |
-| **P3** | whisper-ja-anime-v0.1 model | #232 | If standard HF format |
+**Trend**: 53 open (was 33 on 2026-03-08). Net +20 in 20 days. The close rate is improving (7 closed this week) but needs to accelerate. 6 verified-fixed issues are sitting open and should be closed immediately.
 
 ---
 
-## v1.9+ Backlog
+## Duplicate / Related Issue Map
 
-| # | Issue | Category |
-|---|-------|----------|
-| #96 | Full GUI settings persistence (pipeline tab) | Enhancement |
-| #213 | Intel GPU (XPU) support | Platform |
-| #205 | VibeVoice ASR | Feature |
-| #206 | Grey out incompatible GUI options | Feature |
-| #180/#175 | Multi-language GUI (i18n) | Enhancement |
-| #114/#142/#239 | DirectML / ROCm for AMD/Intel GPUs | Platform |
-| #126 | Recursive directory + mirror output | Feature |
-| #181 | Frameless window | Cosmetic |
-| #43 | DeepL translation provider | Feature |
-| #71 | Google Translate (no API key) | Feature |
+| Cluster | Issues | Primary | Action |
+|---------|--------|---------|--------|
+| **Local LLM** | #259, #255, #233, #212, #132 | #132 | Ollama guide resolves most |
+| **Diarization** | #248, #252 | #248 | Merge. Roadmap for v1.9. |
+| **AMD/Intel GPU** | #239, #142, #114, #213 | #142 | Link all. v1.9+. |
+| **i18n** | #175, #180, #222 | #180 | v1.9.0 scope. |
+| **Speech enhancement** | #254, #224 | #224 | Document existing backends. |
+| **XXL** | #242, #237, #223, #244 | #242 | v1.9.0 scope. |
+| **Install/Network** | #261, #253, #251, #243, #240, #225, #218, #217, #210, #204 | — | Individual fixes. |
+| **GUI** | #244, #240, #236, #235, #207, #96 | #96 | #240 fixed, #235/#236 verified. |
 
 ---
 
@@ -473,23 +400,17 @@ Fixed #132 (Ollama 404), #236 (WebUI cache), #235 (ctypes overflow), #238 (Portu
 
 | Date | Changes |
 |------|---------|
-| **2026-03-19** | **rev14.** 2 more new issues: #242 (XXL in Pass 1 feature request), #243 (installer verification fails on RTX 3050 Laptop). **v1.8.9.post2 fixes coded**: #241 (CPU float16 — `resolver_v3.py` returns `auto` for non-CUDA + safety net in `faster_whisper_pro_asr.py`) and #240 (GUI — switch to `private_mode=True`, remove `storage_path` and cache-clearing function). Reviewed all 52 open issues — no other hotfix candidates. Total open: 52. |
-| **2026-03-19** | **rev13.** v1.8.9.post1 RELEASED — fixes for #132 (Ollama 404), #236 (WebUI cache), #235 (ctypes hwnd), #238 (Portuguese) all shipped and responded to on GitHub. 3 new issues: **#241 (CRITICAL REGRESSION — CPU float16 crash, breaks ALL CPU-only users)**, #240 (GUI access violation on Win11), #239 (AMD GPU request, dup of #142/#114). #225 new data: WebView2 confirmed latest, still white screen — old hypothesis exhausted. #237 new question from liugngg about XXL post-processing. v1.8.9.post2 recommended immediately for #241. Total open: 50. |
-| 2026-03-18 | **rev12.** #238 Portuguese/Brazilian translation target added (4 files: providers.py, main.py, index.html ×2). v1.8.9.1 hotfix scope expanded to 4 items: #236 (WebUI cache), #132 (Ollama 404), #235 (ctypes hwnd), #238 (Portuguese). All coded. Total open: 47. |
-| 2026-03-18 | **rev11.1.** Root causes validated for all 3 hotfix candidates. #132: doubled endpoint path confirmed. #236: WebView2 disk cache. #235: Win32 argtypes missing. All 3 fixes coded. |
-| 2026-03-18 | **rev11.** v1.8.9 RELEASED. 5 new issues (#233-#237). #214 closed. #228 self-resolved. #231 root cause: Kaggle llvmlite. #132 new Ollama 404. Post-release bugs: #235, #236. Total open: 46. |
-| 2026-03-17 | **rev10.** #229 self-resolved. #225 install log analyzed. #231 diagnostics sent. #227 batch_size answered. V189 quality plan verified. |
-| 2026-03-16 | **rev9.** 5 new issues (#228-#232). BYOP XXL committed. #227 MPS benchmark. #223 ongoing feedback. Total open: 42. |
-| 2026-03-15 | **rev8.1** Responded to #223, #225, #227. |
-| 2026-03-15 | **rev8.** 3 new issues (#224-#227). MPS benchmark: 6x slower. #132 local works on Kaggle. |
-| 2026-03-14 | **rev7.** v1.8.8 RELEASED. 3 new issues (#221-#223). #217 ESCALATED. |
-| 2026-03-13 | rev6. All Track A/B/C code complete. 3 new issues (#218-#220). |
-| 2026-03-12 | rev5. v1.8.8b1 pre-release. 5 new issues (#213-#217). |
-| 2026-03-11 | rev4. v1.8.7 RELEASED. 3 new issues (#210-#212). |
-| 2026-03-09 | Groups B, C, D committed. Fixes shipped. |
-| 2026-03-08 | v1.8.7b1 released with China network fixes. |
-| 2026-02-27 | v1.8.5-hotfix2 released. |
+| **2026-03-28** | **rev16.** Full refresh from GitHub. 53 open issues. 20 new since rev15 (#244-#263). 7 closed since rev15 (#241, #238, #245, #256, #214, #219, #211). v1.8.9.post2 released (fixes #241 CPU regression, #240 GUI). v1.8.10 dev branch: 6 commits for aggressive sensitivity retune (F7 ground truth validated), diagnostic JSON per scene, whisper param tuner utility. Added F2 (group analysis, interdependencies, closure candidates) and F3 (roadmap, recommended steps). 14 issues need developer response. 6 issues safe to close immediately. |
+| 2026-03-19 | **rev15.** 3 fixes coded for post2: #241/#240 + XXL stderr encoding. |
+| 2026-03-19 | **rev14.** v1.8.9.post2 fixes coded. |
+| 2026-03-19 | **rev13.** v1.8.9.post1 RELEASED. |
+| 2026-03-18 | **rev12.** v1.8.9 RELEASED. |
+| 2026-03-17 | **rev10.** Pre-release review. |
+| 2026-03-16 | **rev9.** 5 new issues. BYOP XXL committed. |
+| 2026-03-15 | **rev8.** MPS benchmark: 6x slower. |
+| 2026-03-14 | **rev7.** v1.8.8 RELEASED. |
+| 2026-03-13 | rev6. All Track A/B/C code complete. |
+| 2026-03-12 | rev5. v1.8.8b1 pre-release. |
+| 2026-03-11 | rev4. v1.8.7 RELEASED. |
 
 ---
-
-*This tracker is a point-in-time analysis. For live status, see [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues).*
