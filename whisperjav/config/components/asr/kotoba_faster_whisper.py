@@ -260,10 +260,10 @@ class KotobaFasterWhisperASRComponent(ASRComponent):
             suppress_blank=False,
             without_timestamps=False,
             # Transcriber options
-            temperature=[0.0,0.1,0.5],
-            compression_ratio_threshold=3.0,
+            temperature=[0.0, 0.1, 0.3, 0.5],  # v1.8.10: added 0.3 middle step
+            compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops
             logprob_threshold=-2.0,
-            no_speech_threshold=0.2,
+            no_speech_threshold=0.50,  # v1.8.10: 0.2→0.50, wide intake for soft speech
             condition_on_previous_text=True,
             initial_prompt=None,
             word_timestamps=False,

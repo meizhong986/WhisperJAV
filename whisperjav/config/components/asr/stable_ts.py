@@ -428,24 +428,24 @@ class StableTSASR(ASRComponent):
             vad_threshold=0.25,
         ),
         "aggressive": StableTSOptions(
-            # Decoder options - same as faster_whisper
+            # Decoder options - aligned with openai_whisper aggressive
             task="transcribe",
             language="ja",
-            beam_size=2,
-            best_of=1,
-            patience=2.0,
+            beam_size=3,  # v1.8.10: 2→3, extra decode path
+            best_of=2,  # v1.8.10: 1→2, extra sample candidate
+            patience=2.5,  # v1.8.10: 2.0→2.5, aligned with openai_whisper
             length_penalty=None,
             prefix=None,
-            suppress_blank=False,  # Different!
-            suppress_tokens=[],     # Empty list, not None!
+            suppress_blank=False,
+            suppress_tokens=[],     # Empty list = suppress nothing
             without_timestamps=False,
             max_initial_timestamp=None,
-            # Transcriber options - same as faster_whisper
-            temperature=[0.0, 0.3],
-            compression_ratio_threshold=3.0,
-            logprob_threshold=-2.5,
+            # Transcriber options - aligned with openai_whisper aggressive
+            temperature=[0.0, 0.2, 0.4],  # v1.8.10: 3-step fallback
+            compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops
+            logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor
             logprob_margin=0.0,
-            no_speech_threshold=0.22,
+            no_speech_threshold=0.55,  # v1.8.10: 0.22→0.55, wide intake
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,

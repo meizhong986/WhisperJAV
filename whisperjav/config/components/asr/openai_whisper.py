@@ -252,21 +252,21 @@ class OpenAIWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=2,
-            best_of=1,
-            patience=2.9,  # v1.7.1 value
+            beam_size=3,  # v1.8.10: 2→3, extra decode path for difficult audio
+            best_of=2,  # v1.8.10: 1→2, extra sample candidate per temperature
+            patience=2.5,  # v1.8.10: 2.9→2.5, efficient with beam_size=3
             length_penalty=None,
             prefix=None,
-            suppress_blank=False,  # Different!
-            suppress_tokens=[],     # Empty list, not None!
+            suppress_blank=False,
+            suppress_tokens=[],     # Empty list = suppress nothing
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.3],
-            compression_ratio_threshold=3.0,
-            logprob_threshold=-2.5,
+            temperature=[0.0, 0.2, 0.4],  # v1.8.10: 3-step fallback for finer retry
+            compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops, forces temp retry
+            logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor with wider intake
             logprob_margin=0.0,
-            no_speech_threshold=0.22,
+            no_speech_threshold=0.55,  # v1.8.10: 0.22→0.55, FIXES INVERSION — wide intake for soft speech
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -280,6 +280,6 @@ class OpenAIWhisperASR(ASRComponent):
             prompt=None,
             fp16=True,
             # Exclusive options
-            hallucination_silence_threshold=2.5,
+            hallucination_silence_threshold=4.0,  # v1.8.10: 2.5→4.0, recovers speech near silence gaps
         ),
     }

@@ -298,7 +298,7 @@ class FasterWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=3,
+            beam_size=4,  # v1.8.10: 3→4, extra beam for difficult audio
             best_of=3,
             patience=2.5,
             length_penalty=None,
@@ -308,11 +308,11 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.2, 0.4],
-            compression_ratio_threshold=3.0,
+            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback with tighter compression check
+            compression_ratio_threshold=2.2,  # v1.8.10: 3.0→2.2, rejects repetition loops
             logprob_threshold=-2.0,
             logprob_margin=0.0,
-            no_speech_threshold=0.22,
+            no_speech_threshold=0.50,  # v1.8.10: 0.22→0.50, wide intake for soft speech
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -332,6 +332,6 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=2.5,
+            hallucination_silence_threshold=4.0,  # v1.8.10: 2.5→4.0, recovers speech near silence gaps
         ),
     }

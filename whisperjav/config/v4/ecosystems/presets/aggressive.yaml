@@ -46,10 +46,12 @@ overrides:
   decode.beam_size: 3
   decode.temperature: 0.2
 
-  # Quality thresholds
-  quality.no_speech: 0.4
-  quality.logprob: -1.5
-  quality.compression_ratio: 3.0
+  # Quality thresholds — v1.8.10: aligned with Pydantic aggressive presets
+  # Wide intake + tight quality filter design: higher no_speech lets more audio in,
+  # lower compression_ratio rejects repetition hallucinations and forces temp retry
+  quality.no_speech: 0.55
+  quality.logprob: -2.0
+  quality.compression_ratio: 2.2
 
   # Scene detection (raised to reduce excessive scene splitting)
   pass1.energy_threshold: 32
