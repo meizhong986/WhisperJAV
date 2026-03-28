@@ -375,6 +375,24 @@ class SpeechSegmenterFactory:
                     )
                     del sanitized[param_name]
 
+        # Defense-in-depth: strip params not in this backend's schema.
+        # Prevents contamination from blind merges (e.g., Silero params reaching TEN).
+        # Shared params (threshold, min_speech_duration_ms) pass through because they
+        # exist in all backend schemas. Silero-only params (speech_pad_ms, neg_threshold)
+        # are stripped for non-Silero backends.
+        reserved_keys = {"backend", "version", "variant"}
+        foreign_keys = [
+            k for k in sanitized
+            if k not in schema and k not in reserved_keys
+        ]
+        if foreign_keys:
+            for k in foreign_keys:
+                del sanitized[k]
+            logger.debug(
+                "[SegmenterFactory] Stripped %d foreign param(s) for backend '%s': %s",
+                len(foreign_keys), name, ", ".join(sorted(foreign_keys)),
+            )
+
         return sanitized
 
     @staticmethod
@@ -472,7 +490,11 @@ class SpeechSegmenterFactory:
         # Get backend from config
         backend = seg_config.get("backend", "silero")
 
-        # Merge VAD params with segmenter config for backward compatibility
-        merged_config = {**vad_params, **seg_config}
+        # Merge VAD params only for Silero-family backends.
+        # Non-Silero backends use their own config only.
+        if backend.startswith("silero"):
+            merged_config = {**vad_params, **seg_config}
+        else:
+            merged_config = dict(seg_config)
 
         return SpeechSegmenterFactory.create(backend, config=merged_config)

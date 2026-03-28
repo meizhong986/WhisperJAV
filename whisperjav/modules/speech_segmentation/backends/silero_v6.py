@@ -196,9 +196,11 @@ class SileroV6SpeechSegmenter:
                 "use_max_poss_sil_at_max_speech": self.use_max_poss_sil_at_max_speech,
             }
 
-            # Only pass neg_threshold when explicitly set (None = v6.2 auto-calculates)
-            if self.neg_threshold is not None:
-                vad_kwargs["neg_threshold"] = self.neg_threshold
+            # TEMPORARILY COMMENTED OUT for testing — let silero-vad auto-calculate
+            # neg_threshold from threshold (default: max(threshold - 0.15, 0.01))
+            # to investigate whether explicit neg_threshold is killing coverage.
+            # if self.neg_threshold is not None:
+            #     vad_kwargs["neg_threshold"] = self.neg_threshold
 
             speech_timestamps = get_speech_timestamps(
                 audio_tensor,

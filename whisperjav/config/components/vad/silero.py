@@ -97,9 +97,9 @@ class SileroVAD(VADComponent):
             min_speech_duration_ms=120,
             max_speech_duration_s=9.0,
             min_silence_duration_ms=400,
-            neg_threshold=0.4,
+            neg_threshold=0.02,
             speech_pad_ms=300,
-            chunk_threshold_s=4.0,
+            chunk_threshold_s=5.0,
             max_group_duration_s=29.0,
         ),
         "balanced": SileroVADOptions(
@@ -107,9 +107,9 @@ class SileroVAD(VADComponent):
             min_speech_duration_ms=80,
             max_speech_duration_s=11.0,
             min_silence_duration_ms=300,
-            neg_threshold=0.15,
+            neg_threshold=0.02,
             speech_pad_ms=400,
-            chunk_threshold_s=4.0,
+            chunk_threshold_s=5.0,
             max_group_duration_s=29.0,
         ),
         "aggressive": SileroVADOptions(
@@ -119,7 +119,7 @@ class SileroVAD(VADComponent):
             min_silence_duration_ms=200,
             neg_threshold=0.08,
             speech_pad_ms=500,
-            chunk_threshold_s=4.0,
+            chunk_threshold_s=5.0,
             max_group_duration_s=29.0,
         ),
     }

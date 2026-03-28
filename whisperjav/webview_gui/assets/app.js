@@ -1214,9 +1214,9 @@ const EnsembleManager = {
         pass1: {
             pipeline: 'balanced',
             sensitivity: 'aggressive',
-            sceneDetector: 'semantic',
+            sceneDetector: 'auditok',
             speechEnhancer: 'none',
-            speechSegmenter: 'silero-v6.2',  // Silero v6.2 default
+            speechSegmenter: 'ten',  // TEN VAD default for balanced/fidelity
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1547,10 +1547,10 @@ const EnsembleManager = {
 
         if (pipelineType === 'anime-whisper') {
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'ten';
+            segmenterSelect.value = 'silero-v6.2';
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'ten';
+            this.state[passKey].speechSegmenter = 'silero-v6.2';
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'qwen') {
@@ -1563,11 +1563,21 @@ const EnsembleManager = {
             this.state[passKey].framer = 'vad-grouped';
         } else {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
-            sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'silero-v6.2';
+            const pipeline = this.state[passKey].pipeline;
+            if (pipeline === 'balanced' || pipeline === 'fidelity') {
+                // TEN VAD + auditok for balanced; TEN VAD + semantic for fidelity
+                sceneSelect.value = (pipeline === 'balanced') ? 'auditok' : 'semantic';
+                segmenterSelect.value = 'ten';
+                this.state[passKey].sceneDetector = (pipeline === 'balanced') ? 'auditok' : 'semantic';
+                this.state[passKey].speechSegmenter = 'ten';
+            } else {
+                // faster, fast — keep silero-v6.2 + semantic
+                sceneSelect.value = 'semantic';
+                segmenterSelect.value = 'silero-v6.2';
+                this.state[passKey].sceneDetector = 'semantic';
+                this.state[passKey].speechSegmenter = 'silero-v6.2';
+            }
             sensitivitySelect.value = 'aggressive';
-            this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'silero-v6.2';
             this.state[passKey].sensitivity = 'aggressive';
         }
     },

@@ -50,20 +50,37 @@ class WhisperProASR:
         vad_params = params["vad"]
         provider_params = params["provider"]
 
-        # VAD parameters (passed to Speech Segmenter)
+        # Determine speech segmenter backend FIRST (needed for firewall below)
+        speech_segmenter_config = params.get("speech_segmenter", {})
+        segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")
+
+        # --- CONSTRUCTOR FIREWALL ---
+        # The resolver unconditionally produces Silero VAD presets (threshold=0.068,
+        # speech_pad_ms=500, etc.) because LEGACY_PIPELINES hardcodes vad="silero".
+        # When a non-Silero backend is selected downstream, these params are meaningless.
+        # Blanking them here prevents contamination of ALL downstream consumers:
+        # - self.vad_threshold / self.min_speech_duration_ms (logging)
+        # - merged_segmenter_config (merge guard below, now doubly safe)
+        if not segmenter_backend.startswith("silero"):
+            logger.debug(
+                "Non-Silero backend '%s': clearing resolver-produced Silero vad_params "
+                "to prevent contamination (firewall)",
+                segmenter_backend,
+            )
+            vad_params = {}
+
+        # VAD parameters for logging (now clean after firewall for non-Silero)
         self.vad_threshold = vad_params.get("threshold", 0.4)
         self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 150)
         self.vad_chunk_threshold = vad_params.get("chunk_threshold", 4.0)
 
-        # Speech Segmenter (MANDATORY - single owner of speech segmentation)
-        # All speech segmentation goes through this contract
-        speech_segmenter_config = params.get("speech_segmenter", {})
-        segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")  # Default to silero-v4.0
-
-        # CRITICAL: Merge VAD params into speech segmenter config for sensitivity tuning
-        # Without this, sensitivity settings (threshold, min_speech_duration_ms) are lost
-        # and the segmenter uses its own defaults instead of the tuned values
-        merged_segmenter_config = {**vad_params, **speech_segmenter_config}
+        # Speech Segmenter merge — defense-in-depth guard (firewall already blanked
+        # vad_params for non-Silero, but this guard prevents accidental merge even if
+        # a future code change bypasses the firewall).
+        if segmenter_backend.startswith("silero"):
+            merged_segmenter_config = {**vad_params, **speech_segmenter_config}
+        else:
+            merged_segmenter_config = dict(speech_segmenter_config)
 
         try:
             self._external_segmenter = SpeechSegmenterFactory.create(

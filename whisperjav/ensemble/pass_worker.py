@@ -1403,11 +1403,20 @@ def apply_custom_params(
             # V3 structure: params["asr"] contains all ASR params
             asr_params = params["asr"]
             if key in SEGMENTER_PARAMS:
-                # VAD params need special handling in V3
-                if "vad" not in params:
-                    params["vad"] = {}
-                params["vad"][key] = value
-                logger.debug("Pass %s: Set vad.%s", pass_number, key)
+                # Route segmenter params based on backend type.
+                # Silero backends read from params["vad"] (legacy path).
+                # Non-Silero backends read from params["speech_segmenter"].
+                seg_backend = params.get("speech_segmenter", {}).get("backend", "silero-v4.0")
+                if seg_backend.startswith("silero"):
+                    if "vad" not in params:
+                        params["vad"] = {}
+                    params["vad"][key] = value
+                    logger.debug("Pass %s: Set vad.%s", pass_number, key)
+                else:
+                    if "speech_segmenter" not in params:
+                        params["speech_segmenter"] = {}
+                    params["speech_segmenter"][key] = value
+                    logger.debug("Pass %s: Set speech_segmenter.%s", pass_number, key)
             elif key in DECODER_PARAMS or key in valid_provider_params:
                 asr_params[key] = value
                 logger.debug("Pass %s: Set asr.%s", pass_number, key)
@@ -1428,8 +1437,16 @@ def apply_custom_params(
                 decoder_params[key] = value
                 logger.debug("Pass %s: Set decoder.%s", pass_number, key)
             elif key in SEGMENTER_PARAMS:
-                vad_params[key] = value
-                logger.debug("Pass %s: Set vad.%s", pass_number, key)
+                # Route segmenter params based on backend type.
+                seg_backend = params.get("speech_segmenter", {}).get("backend", "silero-v4.0")
+                if seg_backend.startswith("silero"):
+                    vad_params[key] = value
+                    logger.debug("Pass %s: Set vad.%s", pass_number, key)
+                else:
+                    if "speech_segmenter" not in params:
+                        params["speech_segmenter"] = {}
+                    params["speech_segmenter"][key] = value
+                    logger.debug("Pass %s: Set speech_segmenter.%s", pass_number, key)
             elif key in valid_provider_params:
                 provider_params[key] = value
                 logger.debug("Pass %s: Set provider.%s", pass_number, key)

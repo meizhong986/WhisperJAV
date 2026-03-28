@@ -145,8 +145,18 @@ Controls (interactive player):
         "-s",
         choices=["conservative", "balanced", "aggressive"],
         default=None,
-        help="Use production VAD parameters for this sensitivity level "
-        "(applies to Silero segmenters only)",
+        help="Use production config for this sensitivity level "
+        "(resolved via the exact same path as GUI ensemble)",
+    )
+
+    parser.add_argument(
+        "--pipeline",
+        "-p",
+        choices=["balanced", "fidelity", "fast", "faster"],
+        default="balanced",
+        help="Pipeline preset for config resolution (default: balanced). "
+        "This determines which Pydantic presets are used, matching the "
+        "GUI ensemble pipeline selection.",
     )
 
     parser.add_argument(
@@ -242,6 +252,7 @@ def main() -> None:
     print(f"Input: {args.media_file}")
     if args.sensitivity:
         print(f"Sensitivity: {args.sensitivity}")
+        print(f"Pipeline: {args.pipeline}")
     print()
 
     # --- Step 1: Prepare audio ---
@@ -292,6 +303,7 @@ def main() -> None:
         seg_backends=args.seg_backends,
         timeout_sec=args.timeout,
         sensitivity=args.sensitivity,
+        pipeline=args.pipeline,
         user_specified_scene=user_specified_scene,
         user_specified_seg=user_specified_seg,
     )

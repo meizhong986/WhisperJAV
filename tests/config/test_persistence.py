@@ -14,8 +14,22 @@ from whisperjav.config.persistence import (
     config_exists,
     get_config_dir,
 )
-from whisperjav.config.builder import PipelineBuilder
 from whisperjav.config.errors import ConfigValidationError
+
+
+def _make_config(pipeline="balanced", sensitivity="balanced", task="transcribe",
+                 beam_size=5, temperature=0.0):
+    """Build a minimal config dict for persistence tests."""
+    return {
+        "pipeline_name": pipeline,
+        "sensitivity_name": sensitivity,
+        "task": task,
+        "params": {
+            "decoder": {"beam_size": beam_size, "task": task, "language": "ja"},
+            "provider": {"temperature": temperature},
+            "vad": {},
+        },
+    }
 
 
 @pytest.fixture
@@ -28,7 +42,7 @@ def temp_dir():
 @pytest.fixture
 def sample_config():
     """Create a sample configuration."""
-    return PipelineBuilder("balanced").with_sensitivity("aggressive").build()
+    return _make_config(pipeline="balanced", sensitivity="aggressive")
 
 
 class TestGetConfigDir:
@@ -119,13 +133,12 @@ class TestLoadConfig:
 
     def test_preserves_all_data(self, temp_dir):
         """Test all configuration data is preserved."""
-        config = (
-            PipelineBuilder("fidelity")
-            .with_sensitivity("conservative")
-            .with_task("translate")
-            .with_beam_size(3)
-            .with_temperature(0.1)
-            .build()
+        config = _make_config(
+            pipeline="fidelity",
+            sensitivity="conservative",
+            task="translate",
+            beam_size=3,
+            temperature=0.1,
         )
 
         save_config(config, "full_config", config_dir=temp_dir)
@@ -214,12 +227,10 @@ class TestRoundTrip:
 
     def test_save_load_delete_cycle(self, temp_dir):
         """Test complete save-load-delete cycle."""
-        # Create config
-        config = (
-            PipelineBuilder("balanced")
-            .with_sensitivity("aggressive")
-            .with_beam_size(10)
-            .build()
+        config = _make_config(
+            pipeline="balanced",
+            sensitivity="aggressive",
+            beam_size=10,
         )
 
         # Save
@@ -237,9 +248,9 @@ class TestRoundTrip:
     def test_multiple_configs(self, temp_dir):
         """Test managing multiple configurations."""
         configs = {
-            "speed": PipelineBuilder("faster").with_sensitivity("aggressive").build(),
-            "quality": PipelineBuilder("fidelity").with_sensitivity("conservative").build(),
-            "balanced": PipelineBuilder("balanced").with_sensitivity("balanced").build(),
+            "speed": _make_config(pipeline="faster", sensitivity="aggressive"),
+            "quality": _make_config(pipeline="fidelity", sensitivity="conservative"),
+            "balanced": _make_config(pipeline="balanced", sensitivity="balanced"),
         }
 
         # Save all

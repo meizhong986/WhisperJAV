@@ -218,36 +218,64 @@ def cleanup_audio(audio_info: AudioInfo) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Production config loading
+# Production config loading — uses the EXACT same code path as the GUI
 # ---------------------------------------------------------------------------
 
 
-def load_production_vad_config(sensitivity: str) -> Dict[str, Any]:
-    """Load VAD parameters from production Pydantic presets.
+def resolve_production_segmenter_config(
+    backend_name: str,
+    sensitivity: str = "balanced",
+    pipeline: str = "balanced",
+) -> Dict[str, Any]:
+    """Resolve the config that a speech segmenter would receive in production.
+
+    This replicates the EXACT production code path:
+      1. resolve_legacy_pipeline() — same as pass_worker.py:1287
+      2. _apply_gui_overrides() — sets speech_segmenter backend (pass_worker.py:1586)
+      3. ASR constructor firewall — blanks vad_params for non-Silero
+      4. ASR constructor merge — {**vad_params, **speech_segmenter_config} or just speech_segmenter_config
+
+    The returned config is what SpeechSegmenterFactory.create() would receive.
 
     Args:
-        sensitivity: One of 'conservative', 'balanced', 'aggressive'
+        backend_name: Speech segmenter backend (e.g., "silero-v6.2", "ten")
+        sensitivity: Sensitivity preset ("conservative", "balanced", "aggressive")
+        pipeline: Pipeline name ("balanced", "fidelity", "faster", "fast")
 
     Returns:
-        Dict of VAD parameters matching production config
+        Dict of config params exactly as production would pass to the factory
     """
-    try:
-        from whisperjav.config.components.base import get_vad_registry
+    from whisperjav.config.legacy import resolve_legacy_pipeline
 
-        registry = get_vad_registry()
-        silero_component = registry.get("silero")
+    # Step 1: Resolve pipeline — same call as pass_worker.py:1287
+    resolved_config = resolve_legacy_pipeline(
+        pipeline_name=pipeline,
+        sensitivity=sensitivity,
+        task="transcribe",
+    )
 
-        if silero_component and sensitivity in silero_component.presets:
-            preset = silero_component.presets[sensitivity]
-            return preset.model_dump()
-        else:
-            print(
-                f"  Warning: silero/{sensitivity} preset not found in registry"
-            )
-            return {}
-    except Exception as e:
-        print(f"  Warning: Failed to load production config: {e}")
-        return {}
+    params = resolved_config["params"]
+    vad_params = params.get("vad", {})
+
+    # Step 2: Apply speech segmenter backend override — same as _apply_gui_overrides()
+    if "speech_segmenter" not in params:
+        params["speech_segmenter"] = {}
+    params["speech_segmenter"]["backend"] = backend_name
+
+    speech_segmenter_config = params["speech_segmenter"]
+    segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")
+
+    # Step 3: Constructor firewall — same as faster_whisper_pro_asr.py:97-103
+    if not segmenter_backend.startswith("silero"):
+        vad_params = {}
+
+    # Step 4: Merge — same as faster_whisper_pro_asr.py:112-115
+    if segmenter_backend.startswith("silero"):
+        merged_config = {**vad_params, **speech_segmenter_config}
+    else:
+        merged_config = dict(speech_segmenter_config)
+
+    return merged_config
 
 
 # ---------------------------------------------------------------------------
@@ -425,7 +453,7 @@ def run_speech_segmentation(
     audio_data: np.ndarray,
     sample_rate: int = 16000,
     timeout_sec: int = 120,
-    vad_config: Optional[Dict[str, Any]] = None,
+    segmenter_config: Optional[Dict[str, Any]] = None,
 ) -> BackendRunResult:
     """Run a single speech segmentation backend.
 
@@ -434,7 +462,9 @@ def run_speech_segmentation(
         audio_data: Audio as numpy float32 array
         sample_rate: Sample rate of audio_data
         timeout_sec: Maximum execution time
-        vad_config: Optional production config dict (for Silero backends)
+        segmenter_config: Production-resolved config from
+            resolve_production_segmenter_config(). Already firewall-cleaned
+            and merge-applied — exactly what the ASR constructor would pass.
 
     Returns:
         BackendRunResult with speech segments as SegmentInfo list
@@ -461,9 +491,9 @@ def run_speech_segmentation(
 
     def _run() -> None:
         try:
-            if vad_config:
+            if segmenter_config:
                 segmenter = SpeechSegmenterFactory.create(
-                    backend_name, config=vad_config
+                    backend_name, config=segmenter_config
                 )
             else:
                 segmenter = SpeechSegmenterFactory.create(backend_name)
@@ -561,14 +591,6 @@ def run_speech_segmentation(
 # Orchestrator
 # ---------------------------------------------------------------------------
 
-# Silero-family backend names that accept production VAD config
-_SILERO_BACKENDS = {
-    "silero",
-    "silero-v4.0",
-    "silero-v3.1",
-    "silero-v6.2",
-}
-
 
 def run_all_backends(
     audio_info: AudioInfo,
@@ -577,6 +599,7 @@ def run_all_backends(
     seg_backends: Optional[List[str]] = None,
     timeout_sec: int = 120,
     sensitivity: Optional[str] = None,
+    pipeline: str = "balanced",
     user_specified_scene: bool = False,
     user_specified_seg: bool = False,
 ) -> Dict[str, BackendRunResult]:
@@ -588,7 +611,9 @@ def run_all_backends(
         scene_backends: Scene detector names (default: auditok, silero)
         seg_backends: Speech segmenter names (default: silero-v4.0, ten)
         timeout_sec: Timeout per backend
-        sensitivity: Production VAD preset name (applies to Silero segmenters)
+        sensitivity: Production sensitivity preset (applies to all backends
+            via the production config resolution path)
+        pipeline: Pipeline name for config resolution (default: "balanced")
         user_specified_scene: True if user explicitly passed --scene-backends
         user_specified_seg: True if user explicitly passed --seg-backends
 
@@ -619,16 +644,30 @@ def run_all_backends(
     if seg_backends:
         seg_backends = validate_backend_names(seg_backends, "seg")
 
-    # Load production VAD config if sensitivity specified
-    vad_config = None
-    if sensitivity:
-        print(f"  Loading production config for sensitivity: {sensitivity}")
-        vad_config = load_production_vad_config(sensitivity)
-        if vad_config:
-            for key, value in sorted(vad_config.items()):
-                print(f"    {key}: {value}")
-        else:
-            print("  Warning: Failed to load config, using backend defaults")
+    # Resolve production config per backend using the exact same code path
+    # as the GUI ensemble (resolve_legacy_pipeline → firewall → merge).
+    # Each backend gets its own resolved config because the firewall and merge
+    # logic produce different results per backend type.
+    seg_configs: Dict[str, Dict[str, Any]] = {}
+    if seg_backends and sensitivity:
+        print(f"  Resolving production config (pipeline={pipeline}, sensitivity={sensitivity}):")
+        for name in seg_backends:
+            try:
+                cfg = resolve_production_segmenter_config(
+                    backend_name=name,
+                    sensitivity=sensitivity,
+                    pipeline=pipeline,
+                )
+                seg_configs[name] = cfg
+                # Show config for transparency
+                display_keys = {k: v for k, v in sorted(cfg.items()) if k != "backend"}
+                if display_keys:
+                    print(f"    {name}: {display_keys}")
+                else:
+                    print(f"    {name}: (using backend defaults)")
+            except Exception as e:
+                print(f"    {name}: WARNING — config resolution failed: {e}")
+                seg_configs[name] = {}
         print()
 
     results: Dict[str, BackendRunResult] = {}
@@ -671,23 +710,21 @@ def run_all_backends(
     # --- Speech segmentation ---
     if seg_backends:
         print("Running speech segmentation backends:")
-        if vad_config:
+        if sensitivity:
             print(
-                f"  (production config applied to Silero backends, "
+                f"  (production config: pipeline={pipeline}, "
                 f"sensitivity={sensitivity})"
             )
         for name in seg_backends:
             print(f"  {name}...", end=" ", flush=True)
-            # Only apply vad_config to Silero-family backends
-            backend_config = (
-                vad_config if name in _SILERO_BACKENDS else None
-            )
+            # Use production-resolved config (already firewall-cleaned per backend)
+            backend_config = seg_configs.get(name) if seg_configs else None
             result = run_speech_segmentation(
                 name,
                 audio_data,
                 sample_rate=audio_info.sample_rate,
                 timeout_sec=timeout_sec,
-                vad_config=backend_config,
+                segmenter_config=backend_config,
             )
             key = f"seg:{name}"
             results[key] = result
