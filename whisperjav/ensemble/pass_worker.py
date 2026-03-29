@@ -1027,12 +1027,9 @@ def _build_pipeline(
     if not pipeline_class:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
 
-    # Guard: enhance_for_vad only supported by orchestrator-based pipelines
-    if pass_config.get("enhance_for_vad") and pipeline_name not in ("qwen",):
-        logger.warning(
-            "Pass %s: --enhance-for-vad ignored — only supported by qwen pipeline, not '%s'",
-            pass_number, pipeline_name,
-        )
+    # Pass enhance_for_vad flag to all pipelines via extra_kwargs
+    if pass_config.get("enhance_for_vad"):
+        extra_kwargs = {**extra_kwargs, "enhance_for_vad": True}
 
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
 

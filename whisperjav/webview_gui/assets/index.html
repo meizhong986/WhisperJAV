@@ -438,6 +438,12 @@
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
                                             </optgroup>
                                         </select>
+                                        <div class="enhance-for-vad-row" id="pass1-enhance-vad-row" style="display: none;">
+                                            <label class="checkbox-label compact" title="Enhanced audio drives VAD boundaries; original audio is fed to the ASR model">
+                                                <input type="checkbox" id="pass1-enhance-for-vad">
+                                                <span>Enhance for VAD only</span>
+                                            </label>
+                                        </div>
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass1-segmenter" class="form-select compact">
@@ -586,6 +592,12 @@
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
                                             </optgroup>
                                         </select>
+                                        <div class="enhance-for-vad-row" id="pass2-enhance-vad-row" style="display: none;">
+                                            <label class="checkbox-label compact" title="Enhanced audio drives VAD boundaries; original audio is fed to the ASR model">
+                                                <input type="checkbox" id="pass2-enhance-for-vad">
+                                                <span>Enhance for VAD only</span>
+                                            </label>
+                                        </div>
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass2-segmenter" class="form-select compact" disabled>

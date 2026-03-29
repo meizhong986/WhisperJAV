@@ -26,6 +26,7 @@ from whisperjav.modules.speech_enhancement import (
     enhance_scenes,
     get_extraction_sample_rate,
     is_passthrough_backend,
+    resample_scenes,
 )
 
 # =============================================================================
@@ -161,6 +162,12 @@ class BalancedPipeline(BasePipeline):
         enhancer_params = params.get("speech_enhancer", {})
         self._enhancer_backend_name = enhancer_params.get("backend", "none") or "none"
         self._enhancer_is_passthrough = is_passthrough_backend(self._enhancer_backend_name)
+        self._enhance_for_vad = kwargs.get("enhance_for_vad", False)
+        if self._enhance_for_vad and not self._enhancer_is_passthrough:
+            # Dual-track is fully supported in qwen/anime-whisper pipelines.
+            # For balanced/fidelity, enhancement is applied to both VAD and ASR
+            # (the VAD-only separation requires ASR module changes — planned for v1.9).
+            logger.info("Enhance-for-VAD requested — enhancement will be applied to both VAD and ASR in balanced pipeline")
 
         # v1.8.5+: Extract at 16kHz when enhancer is "none" (skip enhancement entirely)
         # Extract at 48kHz when a real enhancer is configured (enhancer needs high-SR)

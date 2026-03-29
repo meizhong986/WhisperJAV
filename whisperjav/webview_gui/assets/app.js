@@ -1377,6 +1377,10 @@ const EnsembleManager = {
             }
             this.state.pass1.speechEnhancer = e.target.value;
             this.updateDspPanel('pass1');
+            this.updateEnhanceForVadCheckbox('pass1');
+        });
+        document.getElementById('pass1-enhance-for-vad')?.addEventListener('change', (e) => {
+            this.state.pass1.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass1-segmenter').addEventListener('change', (e) => {
             this.state.pass1.speechSegmenter = e.target.value;
@@ -1398,6 +1402,10 @@ const EnsembleManager = {
             }
             this.state.pass2.speechEnhancer = e.target.value;
             this.updateDspPanel('pass2');
+            this.updateEnhanceForVadCheckbox('pass2');
+        });
+        document.getElementById('pass2-enhance-for-vad')?.addEventListener('change', (e) => {
+            this.state.pass2.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass2-segmenter').addEventListener('change', (e) => {
             this.state.pass2.speechSegmenter = e.target.value;
@@ -1782,6 +1790,17 @@ const EnsembleManager = {
                 panel.style.display = 'none';
             }
         }
+    },
+
+    // Enhance-for-VAD checkbox visibility
+    updateEnhanceForVadCheckbox(passId) {
+        const row = document.getElementById(`${passId}-enhance-vad-row`);
+        if (!row) return;
+        const enhancer = document.getElementById(`${passId}-enhancer`)?.value || 'none';
+        const isEnabled = passId === 'pass1' || this.state.pass2.enabled;
+        const isXxl = passId === 'pass2' && this.state.pass2.isXxl;
+        // Show when a real enhancer is selected (not none) and pass is enabled
+        row.style.display = (enhancer !== 'none' && enhancer !== '' && isEnabled && !isXxl) ? 'block' : 'none';
     },
 
     // BYOP Settings Panel Management
@@ -4923,7 +4942,7 @@ const EnsembleManager = {
                 isQwen: this.state.pass1.isQwen,
                 isAnimeWhisper: this.state.pass1.isAnimeWhisper,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
-                enhanceForVad: this.state.pass1.isQwen ? (this.state.pass1.enhanceForVad || false) : false
+                enhanceForVad: this.state.pass1.enhanceForVad || false
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
@@ -4941,7 +4960,7 @@ const EnsembleManager = {
                 isAnimeWhisper: this.state.pass2.isAnimeWhisper,
                 isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
-                enhanceForVad: this.state.pass2.isQwen ? (this.state.pass2.enhanceForVad || false) : false,
+                enhanceForVad: this.state.pass2.enhanceForVad || false,
                 // BYOP fields (only meaningful when pipeline is 'xxl')
                 xxlExe: this.state.pass2.isXxl ? this.state.pass2.xxlExePath : null,
                 xxlArgs: this.state.pass2.isXxl ? this.state.pass2.xxlExtraArgs : null
