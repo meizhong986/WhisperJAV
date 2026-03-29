@@ -7368,6 +7368,26 @@ window.addEventListener('pywebviewready', async () => {
     await EnsembleManager.updateSegmenterAvailability();
     await EnsembleManager.updateEnhancerAvailability();
 
+    // Reload BYOP preferences now that API is available
+    // (DOMContentLoaded init may have run before pywebview was ready)
+    try {
+        const byopPrefs = await pywebview.api.get_byop_preferences();
+        if (byopPrefs) {
+            if (byopPrefs.xxl_exe_path) {
+                AppState.state.pass2.xxlExePath = byopPrefs.xxl_exe_path;
+                const pathInput = document.getElementById('xxl-exe-path');
+                if (pathInput) pathInput.value = byopPrefs.xxl_exe_path;
+            }
+            if (byopPrefs.xxl_extra_args) {
+                AppState.state.pass2.xxlExtraArgs = byopPrefs.xxl_extra_args;
+                const argsInput = document.getElementById('xxl-extra-args');
+                if (argsInput) argsInput.value = byopPrefs.xxl_extra_args;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load BYOP preferences:', e);
+    }
+
     // Tab 4 translation settings (unaffected by persistence removal)
     await TranslationSettingsModal.loadSettingsFromBackend();
 
