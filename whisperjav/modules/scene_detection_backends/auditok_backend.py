@@ -53,13 +53,13 @@ class AuditokSceneConfig:
     pass1_min_duration: float = 0.3
     pass1_max_duration: float = 2700.0
     pass1_max_silence: float = 1.8
-    pass1_energy_threshold: int = 38
+    pass1_energy_threshold: int = 32  # dB — lower catches quiet speech
 
     # Pass 2: Fine — chunk chapters to consumer's max_duration
     pass2_min_duration: float = 0.3
     pass2_max_duration: Optional[float] = None  # Derived from max_duration - 1.0
     pass2_max_silence: float = 0.94
-    pass2_energy_threshold: int = 50
+    pass2_energy_threshold: int = 38  # dB — matches YAML default
 
     # Assist processing (bandpass + DRC for Pass 2 detection)
     assist_processing: bool = False
@@ -154,7 +154,7 @@ class AuditokSceneDetector:
 
         # Pass 1 — fall back to legacy top-level names
         legacy_max_silence = float(kwargs.get("max_silence", 1.8))
-        legacy_energy_threshold = int(kwargs.get("energy_threshold", 38))
+        legacy_energy_threshold = int(kwargs.get("energy_threshold", 32))
 
         pass1_min_duration = float(kwargs.get(
             "pass1_min_duration_s",
@@ -186,7 +186,7 @@ class AuditokSceneDetector:
             "pass2_max_silence_s",
             kwargs.get("pass2_max_silence", 0.94)
         ))
-        pass2_energy_threshold = int(kwargs.get("pass2_energy_threshold", 50))
+        pass2_energy_threshold = int(kwargs.get("pass2_energy_threshold", 38))
 
         # Brute force
         brute_force_chunk_raw = kwargs.get("brute_force_chunk_s", None)

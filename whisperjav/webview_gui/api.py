@@ -6,6 +6,7 @@ Maintains thin wrapper pattern - delegates to CLI subprocess.
 Completely decoupled from UI - can be tested standalone.
 """
 
+import json
 import os
 import sys
 import time
@@ -986,6 +987,19 @@ class WhisperJAVAPI:
                 "group": hints.get("group", "general"),
                 "default": default,
             }
+
+            # Determine original data type — declared in YAML (primary) or inferred (fallback)
+            declared_type = hints.get("data_type")
+            if declared_type:
+                schema[param_name]["original_type"] = declared_type
+            elif default is not None:
+                # Fallback: infer from Python default (bool MUST come before int)
+                if isinstance(default, bool):
+                    schema[param_name]["original_type"] = "bool"
+                elif isinstance(default, int):
+                    schema[param_name]["original_type"] = "int"
+                elif isinstance(default, float):
+                    schema[param_name]["original_type"] = "float"
 
             # Add widget-specific properties
             if hints.get("widget") == "slider":
@@ -2889,6 +2903,7 @@ class WhisperJAVAPI:
         if not hasattr(self, '_translate_process'):
             self._translate_process: Optional[subprocess.Popen] = None
             self._translate_status = "idle"
+            self._translate_error: Optional[str] = None
             self._translate_log_queue: queue.Queue = queue.Queue()
             self._translate_thread: Optional[threading.Thread] = None
             self._translate_files_total = 0
@@ -2947,6 +2962,8 @@ class WhisperJAVAPI:
                 'temperature': model_params.get('temperature') or 0.5,
                 'topP': model_params.get('top_p') or 0.9,
                 'customEndpoint': backend.get('custom_endpoint', '') or '',
+                'ollamaUrl': backend.get('ollama_url', '') or '',
+                'provider': backend.get('provider', ''),
             }
             return {"success": True, "settings": gui_settings}
         except Exception as e:
@@ -2991,6 +3008,10 @@ class WhisperJAVAPI:
                 existing['max_batch_size'] = int(settings['maxBatchSize'])
             if 'customEndpoint' in settings:
                 existing['custom_endpoint'] = settings['customEndpoint'] or None
+            if 'ollamaUrl' in settings:
+                existing['ollama_url'] = settings['ollamaUrl'] or None
+            if 'provider' in settings:
+                existing['provider'] = settings['provider']
 
             # Nested model_params
             mp = existing.setdefault('model_params', {})
@@ -3193,6 +3214,20 @@ class WhisperJAVAPI:
             if not config:
                 return {"success": False, "error": f"Unknown provider: {provider}"}
 
+            # Ollama: test server connectivity instead of API key
+            if provider == 'ollama':
+                try:
+                    from whisperjav.translate.ollama_manager import OllamaManager
+                    mgr = OllamaManager(base_url=self._get_ollama_url())
+                    if mgr.detect_server():
+                        return {"success": True, "message": "Ollama server is running"}
+                    elif mgr.detect_installation():
+                        return {"success": False, "error": "Ollama installed but not running. Click 'Start Server'."}
+                    else:
+                        return {"success": False, "error": "Ollama not installed. Visit https://ollama.com to install."}
+                except Exception as e:
+                    return {"success": False, "error": f"Ollama check failed: {e}"}
+
             # Local/Custom providers don't require API keys
             if provider in ('local', 'custom'):
                 return {
@@ -3244,6 +3279,101 @@ class WhisperJAVAPI:
 
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    # ── Ollama-specific API methods ──────────────────────────────────────
+
+    _CURATED_MODELS_FALLBACK = [
+        {"model": "hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0", "size": "8.7 GB", "label": "Shisa-v2.1-Qwen3-8B Q8"},
+        {"model": "huihui_ai/qwen2.5-abliterate:7b-instruct-q4_K_M", "size": "4.7 GB", "label": "Qwen2.5-7B-Abliterated Q4"},
+        {"model": "dolphin-llama3:8b-256k-v2.9-q4_K_M", "size": "4.8 GB", "label": "Dolphin-Llama3-8B-256K Q4"},
+    ]
+
+    def get_ollama_curated_models(self) -> Dict[str, Any]:
+        """Return the curated Ollama model list from config."""
+        config_path = Path(__file__).parent.parent / 'config' / 'ollama_models.json'
+        try:
+            with open(config_path, 'r') as f:
+                models = json.load(f)
+            return {"success": True, "models": models}
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            # Fallback so the GUI doesn't break if the config is missing
+            return {"success": True, "models": self._CURATED_MODELS_FALLBACK}
+
+    def _get_ollama_url(self):
+        """Get Ollama URL from settings or default."""
+        try:
+            from whisperjav.translate.settings import load_settings
+            settings = load_settings()
+            return settings.get('ollama_url') or None
+        except Exception:
+            return None
+
+    def detect_ollama(self) -> Dict[str, Any]:
+        """Check Ollama installation and server status."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            server_running = mgr.detect_server()
+            installation = mgr.detect_installation()
+            return {
+                "success": True,
+                "installed": installation is not None,
+                "running": server_running,
+                "install_path": installation,
+                "base_url": mgr.base_url,
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def start_ollama_server(self) -> Dict[str, Any]:
+        """Start the Ollama server if installed but not running."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            started = mgr.start_server()
+            return {"success": started}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def list_ollama_models(self) -> Dict[str, Any]:
+        """List models available on the local Ollama server."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            if not mgr.detect_server():
+                return {"success": False, "error": "Ollama server is not running"}
+            models = mgr.list_models()
+            return {"success": True, "models": models}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def recommend_ollama_model(self) -> Dict[str, Any]:
+        """Get VRAM-aware model recommendation."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager()
+            rec = mgr.recommend_model()
+            return {
+                "success": True,
+                "model": rec.name,
+                "quality": rec.quality,
+                "download_size": rec.download_size,
+                "note": rec.note,
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def pull_ollama_model(self, model_name: str) -> Dict[str, Any]:
+        """Pull (download) a model from the Ollama registry."""
+        try:
+            from whisperjav.translate.ollama_manager import OllamaManager
+            mgr = OllamaManager(base_url=self._get_ollama_url())
+            success = mgr.pull_model(model_name)
+            return {"success": success, "model": model_name}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # ── File selection methods ───────────────────────────────────────────
 
     def select_srt_files(self) -> Dict[str, Any]:
         """
@@ -3342,6 +3472,13 @@ class WhisperJAVAPI:
             provider = options.get('provider', 'deepseek')
             args.extend(["--provider", provider])
 
+            # Ollama-specific: pass URL and auto-confirm model pull
+            if provider == 'ollama':
+                ollama_url = self._get_ollama_url()
+                if ollama_url:
+                    args.extend(["--ollama-url", ollama_url])
+                args.append("--yes")  # Auto-confirm: GUI user has already chosen the model
+
             # Target language
             target = options.get('target_language', options.get('target', 'english'))
             args.extend(["--target", target])
@@ -3374,8 +3511,11 @@ class WhisperJAVAPI:
                 args.extend(["--max-batch-size", str(options['max_batch_size'])])
             if options.get('max_retries'):
                 args.extend(["--max-retries", str(options['max_retries'])])
-            if options.get('output_dir'):
-                args.extend(["-o", options['output_dir']])
+            # Output directory — honor the shared Destination section.
+            # 'source' is a sentinel meaning "save next to input file" (default).
+            _out_dir = options.get('output_dir', '')
+            if _out_dir and _out_dir.lower().strip() != 'source':
+                args.extend(["-o", _out_dir])
 
             # Streaming — default True: prevents read timeout on slow MPS/CPU inference.
             # Non-streaming blocks the HTTP connection until the last token arrives; on
@@ -3383,6 +3523,12 @@ class WhisperJAVAPI:
             # tokens incrementally so no read timeout can fire. See issue #196.
             if options.get('stream', True):
                 args.append("--stream")
+
+            # Debug logging — enables PySubtrans logging.debug() output.
+            # Shows: messages sent to API, raw model responses, batch flow,
+            # instruction loading. The checkbox is in GUI Advanced Options.
+            if options.get('debug'):
+                args.append("--debug")
 
             # Start process with unbuffered output for real-time streaming
             # PYTHONUNBUFFERED=1 ensures child process doesn't buffer stdout/stderr
@@ -3407,6 +3553,7 @@ class WhisperJAVAPI:
             )
 
             self._translate_status = "running"
+            self._translate_error = None
 
             # Start output streaming thread
             self._translate_thread = threading.Thread(
@@ -3440,6 +3587,13 @@ class WhisperJAVAPI:
                     # Parse completion: "Complete: file_a.english.srt"
                     if 'Complete:' in line:
                         self._translate_files_completed += 1
+                    # Capture error messages for GUI display
+                    if 'TRANSLATION FAILED' in line:
+                        self._translate_error = 'Translation failed — no subtitles were translated'
+                    elif line.startswith('Failed:') and not self._translate_error:
+                        self._translate_error = line.strip()
+                    elif 'Batch processing finished with' in line and 'error' in line:
+                        self._translate_error = line.strip()
         except Exception as e:
             self._translate_log_queue.put(f"\n[ERROR] {e}\n")
         finally:
@@ -3501,6 +3655,8 @@ class WhisperJAVAPI:
                         self._translate_log_queue.put("\n[SUCCESS] Translation completed.\n")
                     else:
                         self._translate_status = "error"
+                        if not self._translate_error:
+                            self._translate_error = f"Translation process exited with code {exit_code}"
                         self._translate_log_queue.put(f"\n[ERROR] Exit code: {exit_code}\n")
 
         files_total = getattr(self, '_translate_files_total', 0)
@@ -3513,7 +3669,8 @@ class WhisperJAVAPI:
             "current_file": getattr(self, '_translate_current_file', None),
             "files_completed": files_completed,
             "files_total": files_total,
-            "has_logs": not self._translate_log_queue.empty()
+            "has_logs": not self._translate_log_queue.empty(),
+            "error": self._translate_error,
         }
 
     def get_translation_logs(self) -> List[str]:

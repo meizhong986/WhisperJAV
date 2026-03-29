@@ -428,26 +428,26 @@ class StableTSASR(ASRComponent):
             vad_threshold=0.25,
         ),
         "aggressive": StableTSOptions(
-            # Decoder options - same as faster_whisper
+            # Decoder options - aligned with openai_whisper aggressive
             task="transcribe",
             language="ja",
-            beam_size=2,
-            best_of=1,
-            patience=2.0,
+            beam_size=5,  # v1.8.10: 2→5, match/exceed Pass 2 decode capacity
+            best_of=3,  # v1.8.10: 1→3, match Pass 2 sampling diversity
+            patience=2.5,  # v1.8.10: 2.0→2.5
             length_penalty=None,
             prefix=None,
-            suppress_blank=False,  # Different!
-            suppress_tokens=[],     # Empty list, not None!
+            suppress_blank=False,
+            suppress_tokens=[],     # Empty list = suppress nothing
             without_timestamps=False,
             max_initial_timestamp=None,
-            # Transcriber options - same as faster_whisper
-            temperature=[0.0, 0.3],
-            compression_ratio_threshold=3.0,
-            logprob_threshold=-2.5,
+            # Transcriber options - aligned with openai_whisper aggressive
+            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback matching Pass 2
+            compression_ratio_threshold=2.6,  # v1.8.10: 3.0→2.6, tuner-validated (run5: fastest, best overlap)
+            logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor
             logprob_margin=0.0,
-            no_speech_threshold=0.22,
+            no_speech_threshold=0.60,  # v1.8.10: 0.22→0.60, wide intake for soft/intimate speech
             drop_nonverbal_vocals=False,
-            condition_on_previous_text=False,
+            condition_on_previous_text=True,  # v1.8.10: tuner-validated — helps recognize dialogue echoes
             initial_prompt=None,
             word_timestamps=True,
             prepend_punctuations=None,

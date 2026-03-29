@@ -178,7 +178,7 @@ def translate_subtitle(
         print(f"[TRANSLATE]   Source lang: {source_lang} -> Target lang: {target_lang}", file=sys.stderr)
         print(f"[TRANSLATE]   Max batch size: {max_batch_size}", file=sys.stderr)
         print(f"[TRANSLATE]   Scene threshold: {scene_threshold}s", file=sys.stderr)
-        print(f"[TRANSLATE]   Streaming: {stream}", file=sys.stderr)
+        print(f"[TRANSLATE]   Stream requested: {stream} (actual depends on provider)", file=sys.stderr)
 
         # Log provider-specific settings
         if 'server_address' in provider_config:
@@ -192,6 +192,15 @@ def translate_subtitle(
         prompt = f"Translate these subtitles from {source_lang} into {target_lang}."
         if extra_context:
             prompt += "\n" + extra_context
+            print(f"[TRANSLATE]   Extra context: {extra_context[:200]}", file=sys.stderr)
+
+        # Qwen3-family thinking model flag: consumed later by the response
+        # parsing patch (after provider init). Remove from provider_options
+        # so it doesn't get passed to PySubtrans as an unknown option.
+        _is_thinking_model = provider_options.pop('_thinking_model', False) if provider_options else False
+        if _is_thinking_model:
+            print(f"[TRANSLATE]   Thinking model: YES (will patch response parsing)",
+                  file=sys.stderr)
 
         # Build provider options
         opt_kwargs = {
@@ -205,6 +214,14 @@ def translate_subtitle(
             'max_batch_size': max_batch_size,
             'postprocess_translation': True
         }
+
+        # Pass instruction file to PySubtrans so it can parse the
+        # ### prompt / ### instructions / ### retry_instructions sections.
+        # Previously this was handled via project.SetInstructions() which
+        # does not exist in current PySubtrans — instructions were silently
+        # dropped for ALL providers.
+        if instruction_file:
+            opt_kwargs['instruction_file'] = str(instruction_file)
 
         if 'api_base' in provider_config:
             opt_kwargs['api_base'] = _normalize_api_base(provider_config['api_base'])
@@ -220,6 +237,9 @@ def translate_subtitle(
             opt_kwargs['supports_conversation'] = provider_config['supports_conversation']
         if 'supports_system_messages' in provider_config:
             opt_kwargs['supports_system_messages'] = provider_config['supports_system_messages']
+            _sys_msg = provider_config['supports_system_messages']
+            print(f"[TRANSLATE]   System messages: {'enabled' if _sys_msg else 'DISABLED (embedded in user msg)'}",
+                  file=sys.stderr)
         if 'max_tokens' in provider_config:
             opt_kwargs['max_tokens'] = provider_config['max_tokens']
         if 'max_completion_tokens' in provider_config:
@@ -230,7 +250,8 @@ def translate_subtitle(
         # Merge provider-specific options
         if provider_options:
             opt_kwargs.update(provider_options)
-            print(f"[TRANSLATE]   Provider options: temperature={provider_options.get('temperature')}, top_p={provider_options.get('top_p')}", file=sys.stderr)
+            _po_display = {k: v for k, v in provider_options.items() if k != 'api_key'}
+            print(f"[TRANSLATE]   Provider options: {_po_display}", file=sys.stderr)
 
         # =========================================================================
         # DIAGNOSTIC: Final opt_kwargs (what PySubtrans actually receives)
@@ -249,6 +270,36 @@ def translate_subtitle(
         # Initialize options and provider
         print(f"[TRANSLATE] Initializing PySubtrans options...", file=sys.stderr)
         options = init_options(**opt_kwargs)
+
+        # =========================================================================
+        # DIAGNOSTIC: Instruction Loading Verification (always-on)
+        # =========================================================================
+        # Verify that PySubtrans actually loaded and parsed the instructions.
+        # The instruction_file dead-path bug (commit 56315f2) went undetected
+        # for months because nothing inspected what init_options() produced.
+        _loaded_inst_file = options.get('instruction_file')
+        _has_instructions = bool(options.get('instructions'))
+        _has_retry = bool(options.get('retry_instructions'))
+        if instruction_file:
+            # We asked for a specific instruction file — verify it was loaded
+            if _loaded_inst_file:
+                print(f"[TRANSLATE]   Instructions loaded: {_loaded_inst_file}", file=sys.stderr)
+                print(f"[TRANSLATE]   Sections: instructions={'YES' if _has_instructions else 'MISSING'}, "
+                      f"retry={'YES' if _has_retry else 'MISSING'}", file=sys.stderr)
+            else:
+                print(f"[TRANSLATE]   WARNING: instruction_file='{instruction_file}' was passed "
+                      f"but PySubtrans did not load it!", file=sys.stderr)
+        else:
+            print(f"[TRANSLATE]   Instructions: (default — no instruction file specified)", file=sys.stderr)
+
+        # Debug-only: instruction content preview
+        if debug:
+            _inst_text = options.get('instructions', '')
+            if _inst_text:
+                print(f"[TRANSLATE]   Instructions preview: {_inst_text[:150]}...", file=sys.stderr)
+            _prompt_text = options.get('prompt', '')
+            if _prompt_text:
+                print(f"[TRANSLATE]   Prompt: {_prompt_text[:150]}", file=sys.stderr)
 
         # Initialize provider
         print(f"[TRANSLATE] Initializing provider: {provider_config['pysubtrans_name']}...", file=sys.stderr)
@@ -345,16 +396,14 @@ def translate_subtitle(
 
         # Log subtitle count
         if hasattr(project, 'subtitles') and project.subtitles:
-            subtitle_count = len(project.subtitles) if hasattr(project.subtitles, '__len__') else 'unknown'
+            subtitle_count = getattr(project.subtitles, 'linecount', None)
+            if subtitle_count is None:
+                subtitle_count = 'unknown'
             print(f"[TRANSLATE]   Subtitle lines: {subtitle_count}", file=sys.stderr)
 
-        # Set instructions if provided
-        if instruction_file is not None and hasattr(project, 'SetInstructions'):
-            try:
-                project.SetInstructions(str(instruction_file))
-                print(f"[TRANSLATE]   Instructions loaded from: {instruction_file}", file=sys.stderr)
-            except Exception as e:
-                print(f"[TRANSLATE]   Warning: Could not load instructions: {e}", file=sys.stderr)
+        # Instructions are verified in the post-init_options() block above.
+        # The old project.SetInstructions() path was dead code — that method
+        # does not exist in current PySubtrans versions.
 
         # Register auto-save handler to save project after each batch
         if hasattr(project, 'events') and hasattr(project.events, 'batch_translated'):
@@ -371,6 +420,41 @@ def translate_subtitle(
         # Initialize translator and translate
         print(f"[TRANSLATE] Initializing translator...", file=sys.stderr)
         translator = init_translator(options, translation_provider=provider)
+
+        # =====================================================================
+        # Qwen3 thinking model workaround: patch response parsing
+        # =====================================================================
+        # Ollama returns thinking output in 'reasoning' field with empty
+        # 'content'. PySubtrans checks for 'reasoning_content' (OpenAI
+        # convention) — field name mismatch means translations are silently
+        # lost. This patch intercepts the response parsing to move
+        # 'reasoning' → 'content' when content is empty.
+        # Upstream fix: PySubtrans should also check 'reasoning' field.
+        if _is_thinking_model:
+            _client = getattr(translator, 'client', None)
+            if _client and hasattr(_client, '_process_api_response'):
+                _original_process = _client._process_api_response
+
+                def _patched_process_api_response(content, result, _orig=_original_process):
+                    """Patched to extract thinking model output from 'reasoning' field."""
+                    import copy
+                    patched_content = copy.deepcopy(content)
+                    choices = patched_content.get('choices', [])
+                    for choice in choices:
+                        msg = choice.get('message', {})
+                        if not msg.get('content') and msg.get('reasoning'):
+                            msg['content'] = msg['reasoning']
+                            if debug:
+                                print(f"[TRANSLATE]   [thinking-patch] Moved 'reasoning' → 'content' "
+                                      f"({len(msg['content'])} chars)", file=sys.stderr)
+                    return _orig(patched_content, result)
+
+                _client._process_api_response = _patched_process_api_response
+                print(f"[TRANSLATE]   Thinking model patch: ACTIVE (reasoning→content fallback)",
+                      file=sys.stderr)
+            else:
+                print(f"[TRANSLATE]   WARNING: Could not patch thinking model — "
+                      f"translator.client not found", file=sys.stderr)
 
         # Enable resume mode to skip already-translated batches when resuming
         # This is critical for interrupted translations - without it, the translator
@@ -411,24 +495,26 @@ def translate_subtitle(
         _batch_stats = {'total': 0, 'success': 0, 'no_matches': 0, 'errors': 0}
 
         def _diagnostic_batch_handler(sender, **kwargs):
-            """Track batch translation results for diagnostic summary."""
+            """Track batch translation results for diagnostic summary.
+
+            batch_translated fires for every batch attempt, regardless of whether
+            translations were extracted. We count it as 'total' only — success is
+            determined by subtracting known failures.
+            """
             _batch_stats['total'] += 1
-            _batch_stats['success'] += 1
 
         def _diagnostic_warning_handler(sender, message=None, **kwargs):
-            """Capture 'No matches found' warnings with context."""
+            """Capture translation warnings with context."""
             msg = message or kwargs.get('message', '')
             if msg is None:
                 return
             msg_str = str(msg)
             if 'No matches' in msg_str or 'no matches' in msg_str:
                 _batch_stats['no_matches'] += 1
-                # Log the raw output that failed parsing — this is the #1 diagnostic gap
+                # Warning fires before batch_translated increments total, so +1
                 print(f"\n[TRANSLATE] *** NO MATCHES DETECTED (batch #{_batch_stats['total'] + 1}) ***",
                       file=sys.stderr)
-                print(f"[TRANSLATE]   This means the model's response didn't match PySubtrans's",
-                      file=sys.stderr)
-                print(f"[TRANSLATE]   expected format (#N / Original> / Translation>).",
+                print(f"[TRANSLATE]   The model's response didn't match PySubtrans's expected format.",
                       file=sys.stderr)
                 print(f"[TRANSLATE]   Raw warning: {msg_str[:500]}", file=sys.stderr)
                 if provider_config.get('max_tokens'):
@@ -438,17 +524,65 @@ def translate_subtitle(
                       file=sys.stderr)
 
         def _diagnostic_error_handler(sender, message=None, **kwargs):
-            """Track translation errors."""
+            """Track all translation errors — not just HTTP errors."""
             _batch_stats['errors'] += 1
             msg = message or kwargs.get('message', '')
             if msg:
                 msg_str = str(msg)
-                # Log server errors (502, 500, etc.) with context
+                # Error count serves as attempt number (includes retries on same batch)
+                _err_num = _batch_stats['errors']
+                # Categorize known failure modes and give relevant advice
                 if any(code in msg_str for code in ('502', '500', '503', 'Server Error', 'timed out')):
-                    print(f"\n[TRANSLATE] *** SERVER ERROR (batch #{_batch_stats['total'] + 1}) ***",
+                    print(f"\n[TRANSLATE] *** SERVER ERROR (attempt #{_err_num}) ***",
                           file=sys.stderr)
-                    print(f"[TRANSLATE]   Error: {msg_str[:300]}", file=sys.stderr)
-                    print(f"[TRANSLATE]   This may indicate context overflow crashing the LLM server.",
+                    print(f"[TRANSLATE]   {msg_str[:500]}", file=sys.stderr)
+                    # Parse the error to give relevant advice
+                    msg_lower = msg_str.lower()
+                    if 'unable to load model' in msg_lower:
+                        print(f"[TRANSLATE]   The model blob failed to load. Possible causes:",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     - Corrupt download — try: ollama rm <model> then re-pull",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     - Ollama version too old for this GGUF format — try: ollama update",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     - Insufficient VRAM — try a smaller quantization (Q4 instead of Q6/Q8)",
+                              file=sys.stderr)
+                    elif 'context length' in msg_lower or 'too long' in msg_lower:
+                        print(f"[TRANSLATE]   Context overflow — reduce --max-batch-size or use a model with larger context.",
+                              file=sys.stderr)
+                    elif 'timed out' in msg_lower or 'timeout' in msg_lower:
+                        print(f"[TRANSLATE]   Request timed out — the model may be too slow. Try a smaller model or smaller batch size.",
+                              file=sys.stderr)
+                    else:
+                        print(f"[TRANSLATE]   Check Ollama server logs for details: ollama logs",
+                              file=sys.stderr)
+                    # Ollama's internal debug logs (GGUF parsing, tensor loading,
+                    # VRAM allocation) are only available server-side — they don't
+                    # flow through the HTTP API. Guide the user when debug is on.
+                    if debug and _err_num == 1:
+                        print(f"[TRANSLATE]   NOTE: WhisperJAV debug shows client-side HTTP traffic only.",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]   For Ollama's own server-side logs (model loading, GGUF errors):",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     Windows: check the Ollama app log or run 'ollama logs'",
+                              file=sys.stderr)
+                        print(f"[TRANSLATE]     Linux/macOS: journalctl -u ollama or OLLAMA_DEBUG=1 ollama serve",
+                              file=sys.stderr)
+                elif 'No text returned' in msg_str or 'no text' in msg_str.lower():
+                    print(f"\n[TRANSLATE] *** EMPTY RESPONSE (attempt #{_err_num}) ***",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]   The model returned no text. Possible causes:",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]     - Model failed to generate (out of memory, crashed)",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]     - Streaming response contained no content chunks",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]     - Model is too large for available VRAM",
+                          file=sys.stderr)
+                    print(f"[TRANSLATE]   Try: smaller model, reduce --max-batch-size, or check Ollama logs",
+                          file=sys.stderr)
+                else:
+                    print(f"\n[TRANSLATE] *** ERROR (attempt #{_err_num}): {msg_str[:300]} ***",
                           file=sys.stderr)
 
         # Connect diagnostic handlers to translator events
@@ -478,28 +612,67 @@ def translate_subtitle(
             _translation_success = True
         finally:
             _translation_elapsed = _time.time() - _translation_start
+
+            # =====================================================================
+            # P1/P2: Ground-truth success detection via PySubtrans project state
+            # =====================================================================
+            # The event-signal approach (counting batch_translated / error signals)
+            # is unreliable: PySubtrans catches TranslationResponseError internally
+            # and fires batch_translated anyway — errors counter stays at 0 even
+            # when ALL batches fail. Instead, check what PySubtrans actually stored.
+            _any_translated = False
+            _all_translated = False
+            if hasattr(project, 'subtitles') and project.subtitles:
+                _any_translated = getattr(project.subtitles, 'any_translated', False)
+                _all_translated = getattr(project.subtitles, 'all_translated', False)
+
             if _translation_success:
                 print(f"\n[TRANSLATE] Translation completed in {_translation_elapsed:.1f}s", file=sys.stderr)
             else:
                 print(f"\n[TRANSLATE] Translation FAILED after {_translation_elapsed:.1f}s", file=sys.stderr)
 
-            # =====================================================================
-            # A1: Diagnostic summary — always print batch stats
-            # =====================================================================
+            # Batch event stats (advisory — may undercount failures)
             print(f"[TRANSLATE] Batch statistics:", file=sys.stderr)
             print(f"[TRANSLATE]   Batches processed: {_batch_stats['total']}", file=sys.stderr)
-            print(f"[TRANSLATE]   Successful: {_batch_stats['success']}", file=sys.stderr)
-            if _batch_stats['no_matches'] > 0:
-                print(f"[TRANSLATE]   *** 'No matches' failures: {_batch_stats['no_matches']} ***", file=sys.stderr)
-                print(f"[TRANSLATE]   These failures mean the LLM produced output that PySubtrans", file=sys.stderr)
-                print(f"[TRANSLATE]   couldn't parse. Common causes:", file=sys.stderr)
-                print(f"[TRANSLATE]     - Model too small for the task (try gemma-9b or cloud)", file=sys.stderr)
-                print(f"[TRANSLATE]     - Context overflow (try smaller --max-batch-size)", file=sys.stderr)
-                print(f"[TRANSLATE]     - Missing format example in instructions", file=sys.stderr)
             if _batch_stats['errors'] > 0:
-                print(f"[TRANSLATE]   Errors: {_batch_stats['errors']}", file=sys.stderr)
+                print(f"[TRANSLATE]   Errors (signal-based): {_batch_stats['errors']}", file=sys.stderr)
+            if _batch_stats['no_matches'] > 0:
+                print(f"[TRANSLATE]   'No matches' failures: {_batch_stats['no_matches']}", file=sys.stderr)
+                print(f"[TRANSLATE]   The LLM produced output PySubtrans couldn't parse.", file=sys.stderr)
+                print(f"[TRANSLATE]   Try: smaller --max-batch-size, different model, or cloud provider",
+                      file=sys.stderr)
+            # Successful batch count — cross-check signal-based counter with
+            # ground truth. Signal counters undercount failures (PySubtrans
+            # fires batch_translated even on server errors), so if ground
+            # truth says nothing was translated, don't claim any succeeded.
+            _successful = _batch_stats['total'] - _batch_stats['errors'] - _batch_stats['no_matches']
+            if _successful > 0 and _batch_stats['total'] > 0:
+                if _any_translated:
+                    print(f"[TRANSLATE]   Successful batches: {_successful}/{_batch_stats['total']}", file=sys.stderr)
+                else:
+                    # Signal counters say N succeeded but ground truth disagrees
+                    print(f"[TRANSLATE]   Successful batches: 0/{_batch_stats['total']} "
+                          f"(signal counters reported {_successful}, but no subtitles were translated)",
+                          file=sys.stderr)
 
-        # Save final project state after successful translation
+            # Ground-truth: what PySubtrans actually stored in the project
+            print(f"[TRANSLATE] Translation result (ground truth):", file=sys.stderr)
+            print(f"[TRANSLATE]   Any subtitles translated: {'YES' if _any_translated else 'NO'}",
+                  file=sys.stderr)
+            print(f"[TRANSLATE]   All subtitles translated: {'YES' if _all_translated else 'NO'}",
+                  file=sys.stderr)
+
+            # Override success based on ground truth — if TranslateSubtitles()
+            # didn't raise but nothing was actually translated, it's a failure.
+            if _translation_success and not _any_translated and _batch_stats['total'] > 0:
+                _translation_success = False
+                print(f"[TRANSLATE] *** ALL {_batch_stats['total']} BATCHES FAILED — "
+                      f"no subtitles were translated ***", file=sys.stderr)
+                print(f"[TRANSLATE]   Common causes: model returned empty content (thinking mode),",
+                      file=sys.stderr)
+                print(f"[TRANSLATE]   output format not parseable, or server errors.", file=sys.stderr)
+
+        # Save final project state
         print(f"[TRANSLATE] Saving project state...", file=sys.stderr)
         if hasattr(project, 'SaveProject'):
             try:
@@ -536,17 +709,62 @@ def translate_subtitle(
         if isinstance(saved_path, (str, Path)):
             output_path = Path(saved_path)
 
+        # Verify the save actually produced a file.
+        # PySubtrans' SubtitleProject.SaveTranslation() catches exceptions
+        # internally (logging.error) and returns None — we never see the error.
+        # Check the filesystem to know if the save actually worked.
+        _save_succeeded = output_path.is_file()
+        if not _save_succeeded:
+            print(f"[TRANSLATE]   WARNING: SaveTranslation did not produce output at: {output_path}",
+                  file=sys.stderr)
+
+        # =====================================================================
+        # Issue 2: Clean up PySubtrans' default .translated.srt artifact
+        # =====================================================================
+        # PySubtrans creates a .translated.srt file next to the input during
+        # SaveProject() (line 303-304 of SubtitleProject.py) using the default
+        # self.outputpath. When we then call SaveTranslation(output_path) with
+        # a different path (e.g., .english.srt or a user-specified directory),
+        # we end up with TWO output files. Clean up the redundant artifact.
+        # IMPORTANT: Only clean up if the intended save succeeded — otherwise
+        # the artifact is the ONLY copy of the translation.
+        if hasattr(project, 'subtitles') and project.subtitles:
+            _default_outpath = getattr(project.subtitles, 'outputpath', None)
+            if _default_outpath:
+                _default_outpath = Path(_default_outpath)
+                if _default_outpath.exists() and _default_outpath.resolve() != output_path.resolve():
+                    if _save_succeeded:
+                        try:
+                            _default_outpath.unlink()
+                            print(f"[TRANSLATE]   Cleaned up intermediate artifact: {_default_outpath.name}",
+                                  file=sys.stderr)
+                        except OSError as _e:
+                            print(f"[TRANSLATE]   Warning: Could not remove artifact {_default_outpath.name}: {_e}",
+                                  file=sys.stderr)
+                    else:
+                        # The intended save failed but the artifact exists —
+                        # this IS the translation. Report it as the output.
+                        output_path = _default_outpath
+                        print(f"[TRANSLATE]   Using fallback output: {_default_outpath.name}",
+                              file=sys.stderr)
+
         # =========================================================================
-        # DIAGNOSTIC: Final Summary
+        # DIAGNOSTIC: Final Summary — truthful status
         # =========================================================================
         print(f"", file=sys.stderr)
         print(f"[TRANSLATE] " + "=" * 50, file=sys.stderr)
-        print(f"[TRANSLATE]   TRANSLATION COMPLETE", file=sys.stderr)
-        print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
+        if _translation_success:
+            print(f"[TRANSLATE]   TRANSLATION COMPLETE", file=sys.stderr)
+            print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
+        else:
+            print(f"[TRANSLATE]   TRANSLATION FAILED", file=sys.stderr)
+            print(f"[TRANSLATE]   All batches returned errors — no subtitles translated.", file=sys.stderr)
+            print(f"[TRANSLATE]   Output file may be empty or contain only originals.", file=sys.stderr)
         print(f"[TRANSLATE] " + "=" * 50, file=sys.stderr)
         print(f"", file=sys.stderr)
 
-        return output_path
+        # Return None on total failure so cli.py reports it as failed
+        return output_path if _translation_success else None
 
     except Exception as e:
         # Save project state before propagating error

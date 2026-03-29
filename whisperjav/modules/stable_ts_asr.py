@@ -226,7 +226,8 @@ class StableTSASR:
                 repo_or_dir=self.vad_repo,  # Config-driven, not hardcoded
                 model="silero_vad",
                 force_reload=not is_cached,  # Use cache if available
-                onnx=False
+                onnx=False,
+                trust_repo=True,  # Skip interactive prompt — crashes in Colab/Kaggle (EOFError on input())
             )
             self._vad_precached = True
             status = "from cache" if is_cached else "downloaded"
@@ -572,9 +573,21 @@ class StableTSASR:
             kwargs['task'] = self.task
         
         result = self.transcribe(audio_path, **kwargs)
-        
+
         final_output_path = Path(output_srt_path)
         self._save_to_srt(result, final_output_path)
+
+        # Save full transcription results JSON alongside SRT (diagnostic artifact)
+        try:
+            import json
+            json_path = final_output_path.with_suffix('.transcribe.json')
+            result_dict = result.to_dict() if hasattr(result, 'to_dict') else {"error": "no to_dict method"}
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(result_dict, f, ensure_ascii=False, indent=2, default=str)
+            logger.debug(f"Saved transcription results JSON to: {json_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save transcription results JSON (non-fatal): {e}")
+
         return final_output_path
     
     def _postprocess_japanese_dialogue(self,

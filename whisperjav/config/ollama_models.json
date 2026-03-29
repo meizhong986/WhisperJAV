@@ -1,0 +1,5 @@
+[
+  { "model": "hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0",    "size": "8.7 GB", "label": "Shisa-v2.1-Qwen3-8B Q8",     "rank": 1 },
+  { "model": "huihui_ai/qwen2.5-abliterate:7b-instruct-q4_K_M",      "size": "4.7 GB", "label": "Qwen2.5-7B-Abliterated Q4",  "rank": 2 },
+  { "model": "dolphin-llama3:8b-256k-v2.9-q4_K_M",                    "size": "4.8 GB", "label": "Dolphin-Llama3-8B-256K Q4",  "rank": 3 }
+]

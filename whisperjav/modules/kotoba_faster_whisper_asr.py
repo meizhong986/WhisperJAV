@@ -299,6 +299,7 @@ class KotobaFasterWhisperASR:
 
             # Collect segments
             segments = []
+            _full_segments_for_json = []
             for segment in segments_generator:
                 segments.append({
                     "start": segment.start,
@@ -306,10 +307,19 @@ class KotobaFasterWhisperASR:
                     "text": segment.text.strip(),
                     "avg_logprob": getattr(segment, "avg_logprob", None),
                 })
+                # Capture full segment for diagnostic JSON (unaltered)
+                try:
+                    from dataclasses import asdict
+                    _full_segments_for_json.append(asdict(segment))
+                except Exception:
+                    pass  # Non-fatal
                 logger.debug(f"[{segment.start:.2f}s -> {segment.end:.2f}s] {segment.text.strip()}")
 
             full_text = " ".join(seg["text"] for seg in segments if seg["text"])
             logger.info(f"Transcription complete: {len(segments)} segments")
+
+            # Store full results for diagnostic JSON save
+            self._last_full_results = _full_segments_for_json
 
             return {
                 "segments": segments,
@@ -364,6 +374,18 @@ class KotobaFasterWhisperASR:
             f.write(srt.compose(srt_subs))
 
         logger.debug(f"Saved SRT to: {output_srt_path}")
+
+        # Save full transcription results JSON alongside SRT (diagnostic artifact)
+        try:
+            if hasattr(self, '_last_full_results') and self._last_full_results:
+                import json
+                json_path = output_srt_path.with_suffix('.transcribe.json')
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(self._last_full_results, f, ensure_ascii=False, indent=2, default=str)
+                logger.debug(f"Saved transcription results JSON to: {json_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save transcription results JSON (non-fatal): {e}")
+
         return output_srt_path
 
     def cleanup(self) -> None:

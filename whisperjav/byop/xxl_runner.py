@@ -57,17 +57,20 @@ def run_xxl(
         output_dir = str(exe.parent / "_whisperjav_xxl_output")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    # Minimal integration args only — model, language, output location, format.
-    # Everything else (--verbose, --beep_off, --standard_asia, etc.) is the
-    # user's choice via extra_args.  We don't assume what XXL wants.
+    # Minimal integration args only — language, output location, format.
+    # Model is NOT hardcoded here — it comes through extra_args so the user
+    # can change it in the GUI (e.g. --model large-v3, --model large-v2).
     cmd = [
         str(exe),
         str(input_file),
-        "--model", model,
         "--language", language,
         "--output_dir", str(output_dir),
         "--output_format", "srt",
     ]
+
+    # Add --model only if not already specified in extra_args
+    if "--model" not in (extra_args or ""):
+        cmd.extend(["--model", model])
 
     if task == "translate":
         cmd.extend(["--task", "translate"])

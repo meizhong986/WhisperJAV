@@ -1939,6 +1939,215 @@ button:focus-visible,
     color: var(--error-color, #e53935);
 }
 
+/* Ollama Onboarding Panel */
+.ollama-onboarding-panel {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.ollama-state {
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--section-bg);
+}
+
+.ollama-state-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ollama-state-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.ollama-state-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.ollama-state-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.ollama-recommended-model {
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.ollama-copy-command {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.ollama-copy-command code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    user-select: all;
+}
+
+.btn-copy {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.btn-copy:hover {
+    opacity: 1;
+}
+
+.ollama-state-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.ollama-state-checking {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(23, 162, 184, 0.08);
+    border: 1px solid rgba(23, 162, 184, 0.25);
+    border-radius: var(--border-radius);
+}
+
+.ollama-checking-spinner {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 2px solid rgba(23, 162, 184, 0.25);
+    border-top-color: var(--info-color);
+    animation: ollama-spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes ollama-spin {
+    to { transform: rotate(360deg); }
+}
+
+.ollama-checking-text {
+    font-size: 11px;
+    color: var(--info-color);
+    font-weight: 500;
+}
+
+.ollama-state-ready {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(40, 167, 69, 0.08);
+    border: 1px solid rgba(40, 167, 69, 0.25);
+    border-radius: var(--border-radius);
+}
+
+.ollama-ready-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-color);
+    box-shadow: 0 0 4px rgba(40, 167, 69, 0.4);
+    flex-shrink: 0;
+}
+
+.ollama-ready-text {
+    font-size: 11px;
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.provider-deprecation-hint {
+    font-size: 11px;
+    color: #856404;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.25);
+    border-radius: var(--border-radius);
+    padding: 6px 12px;
+    margin-top: 8px;
+}
+
+/* Ollama Pull Modal — smaller variant */
+.modal-sm {
+    max-width: 400px;
+}
+
+.pull-progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: var(--disabled-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0 6px;
+}
+
+.pull-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--success-color);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.pull-progress-bar.indeterminate {
+    width: 30%;
+    animation: pull-progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pull-progress-pulse {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+}
+
+.pull-progress-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.text-error {
+    color: var(--danger-color);
+}
+
+/* Ollama Settings Row (in settings modal) */
+.ollama-settings-row {
+    margin-top: 8px;
+}
+
+.ollama-settings-row label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.ollama-settings-row input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-primary);
+}
+
 /* Translation Settings Grid */
 .translator-settings-grid {
     display: grid;
@@ -1988,7 +2197,7 @@ details[open] .collapse-icon {
     font-size: 11px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    background: var(--background-primary);
+    background: var(--input-bg);
     color: var(--text-primary);
     resize: vertical;
     min-height: 40px;

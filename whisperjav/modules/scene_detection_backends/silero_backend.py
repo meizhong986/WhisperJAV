@@ -32,8 +32,8 @@ class SileroSceneConfig(AuditokSceneConfig):
     Extends AuditokSceneConfig with Silero VAD parameters for Pass 2.
     Assistive processing is forced off (Silero doesn't benefit from it).
     """
-    # Silero VAD parameters (conservative defaults for scene detection)
-    silero_threshold: float = 0.08
+    # Silero VAD parameters for scene detection
+    silero_threshold: float = 0.06  # More sensitive — catches speech over music
     silero_neg_threshold: float = 0.15
     silero_min_silence_ms: int = 1500
     silero_min_speech_ms: int = 100
@@ -92,29 +92,53 @@ class SileroSceneDetector(AuditokSceneDetector):
 
     @staticmethod
     def _build_silero_config(kwargs: dict) -> SileroSceneConfig:
-        """Build SileroSceneConfig from legacy kwargs."""
+        """Build SileroSceneConfig from legacy kwargs.
+
+        Silero scene detection uses a higher max_duration default (420s) than
+        auditok (29s) because scene detection should produce coarse narrative
+        boundaries; fine splitting is handled by the downstream speech segmenter.
+        This prevents Silero's Pass 2 VAD from stripping away music/ambient
+        regions that contain real dialogue.
+        """
         # Build base auditok config first
         base = AuditokSceneDetector._build_config_from_kwargs(kwargs)
 
+        # Silero's own max_duration default (420s) — only apply if user
+        # didn't explicitly pass a value (base would have used 29.0 default)
+        silero_max_duration = float(
+            kwargs.get("max_duration_s", kwargs.get("max_duration", 420.0))
+        )
+
+        # If max_duration changed from auditok's default, pass2_max_duration
+        # must be re-derived (set None so __post_init__ recalculates it)
+        user_set_p2 = (
+            "pass2_max_duration_s" in kwargs or "pass2_max_duration" in kwargs
+        )
+        silero_p2_max = base.pass2_max_duration if user_set_p2 else None
+
+        # Brute-force chunk stays at 29s regardless of max_duration —
+        # if Pass 2 fails, we want reasonable-size fallback chunks, not 420s
+        silero_bf_chunk = float(kwargs.get("brute_force_chunk_s", 29.0))
+
         return SileroSceneConfig(
-            # Copy all auditok fields
-            max_duration=base.max_duration,
+            # Copy all auditok fields, with overrides for Silero defaults
+            max_duration=silero_max_duration,
             min_duration=base.min_duration,
             pass1_min_duration=base.pass1_min_duration,
             pass1_max_duration=base.pass1_max_duration,
             pass1_max_silence=base.pass1_max_silence,
             pass1_energy_threshold=base.pass1_energy_threshold,
             pass2_min_duration=base.pass2_min_duration,
-            pass2_max_duration=base.pass2_max_duration,
+            pass2_max_duration=silero_p2_max,
             pass2_max_silence=base.pass2_max_silence,
             pass2_energy_threshold=base.pass2_energy_threshold,
             brute_force_fallback=base.brute_force_fallback,
-            brute_force_chunk_s=base.brute_force_chunk_s,
+            brute_force_chunk_s=silero_bf_chunk,
             pad_edges_s=base.pad_edges_s,
             verbose_summary=base.verbose_summary,
             force_mono=base.force_mono,
             # Silero-specific parameters
-            silero_threshold=float(kwargs.get("silero_threshold", 0.08)),
+            silero_threshold=float(kwargs.get("silero_threshold", 0.06)),
             silero_neg_threshold=float(kwargs.get("silero_neg_threshold", 0.15)),
             silero_min_silence_ms=int(kwargs.get("silero_min_silence_ms", 1500)),
             silero_min_speech_ms=int(kwargs.get("silero_min_speech_ms", 100)),

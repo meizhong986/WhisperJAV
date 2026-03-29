@@ -252,23 +252,23 @@ class OpenAIWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=2,
-            best_of=1,
-            patience=2.9,  # v1.7.1 value
+            beam_size=5,  # v1.8.10: 2→5, match/exceed Pass 2 decode capacity
+            best_of=3,  # v1.8.10: 1→3, match Pass 2 sampling diversity
+            patience=2.5,  # v1.8.10: 2.9→2.5
             length_penalty=None,
             prefix=None,
-            suppress_blank=False,  # Different!
-            suppress_tokens=[],     # Empty list, not None!
+            suppress_blank=False,
+            suppress_tokens=[],     # Empty list = suppress nothing
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options
-            temperature=[0.0, 0.3],
-            compression_ratio_threshold=3.0,
-            logprob_threshold=-2.5,
+            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback matching Pass 2
+            compression_ratio_threshold=2.6,  # v1.8.10: 3.0→2.6, tuner-validated (run5: fastest, best overlap)
+            logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor with wider intake
             logprob_margin=0.0,
-            no_speech_threshold=0.22,
+            no_speech_threshold=0.60,  # v1.8.10: 0.22→0.60, wide intake for soft/intimate speech
             drop_nonverbal_vocals=False,
-            condition_on_previous_text=False,
+            condition_on_previous_text=True,  # v1.8.10: tuner-validated — helps recognize dialogue echoes
             initial_prompt=None,
             word_timestamps=True,
             prepend_punctuations=None,
@@ -280,6 +280,6 @@ class OpenAIWhisperASR(ASRComponent):
             prompt=None,
             fp16=True,
             # Exclusive options
-            hallucination_silence_threshold=2.5,
+            hallucination_silence_threshold=None,  # v1.8.10: 2.5→None, fully disabled for aggressive flood-gate
         ),
     }

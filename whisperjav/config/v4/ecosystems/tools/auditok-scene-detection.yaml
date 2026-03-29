@@ -104,6 +104,7 @@ gui:
     min: 10
     max: 120
     step: 1
+    data_type: float
     group: core
 
   min_duration_s:
@@ -113,6 +114,7 @@ gui:
     min: 0.1
     max: 5.0
     step: 0.1
+    data_type: float
     group: core
 
   pass1_max_duration_s:
@@ -122,6 +124,7 @@ gui:
     min: 60
     max: 3600
     step: 60
+    data_type: float
     group: pass1
 
   pass1_max_silence_s:
@@ -131,6 +134,7 @@ gui:
     min: 0.5
     max: 10.0
     step: 0.1
+    data_type: float
     group: pass1
 
   pass1_energy_threshold:
@@ -140,6 +144,7 @@ gui:
     min: 10
     max: 60
     step: 1
+    data_type: int
     group: pass1
 
   pass2_max_duration_s:
@@ -149,6 +154,7 @@ gui:
     min: 60
     max: 3600
     step: 60
+    data_type: float
     group: pass2
 
   pass2_max_silence_s:
@@ -158,6 +164,7 @@ gui:
     min: 0.5
     max: 5.0
     step: 0.1
+    data_type: float
     group: pass2
 
   pass2_energy_threshold:
@@ -167,12 +174,14 @@ gui:
     min: 10
     max: 60
     step: 1
+    data_type: int
     group: pass2
 
   brute_force_fallback:
     widget: toggle
     label: "Brute Force Fallback"
     description: "Use fixed chunking as fallback when scene detection fails"
+    data_type: bool
     group: fallback
 
   brute_force_chunk_s:
@@ -182,6 +191,7 @@ gui:
     min: 10
     max: 120
     step: 1
+    data_type: float
     group: fallback
 
 # Implementation provider

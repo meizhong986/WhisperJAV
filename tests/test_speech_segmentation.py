@@ -831,12 +831,13 @@ class TestParameterSanitization:
         )
         assert result["use_max_poss_sil_at_max_speech"] is True
 
-    def test_sanitize_unknown_params_pass_through(self):
-        """Params not in schema should pass through unchanged."""
+    def test_sanitize_foreign_params_stripped(self):
+        """Params not in this backend's schema should be stripped (contamination guard)."""
         result = SpeechSegmenterFactory._sanitize_params(
             "ten", {"hop_size": 256, "unknown_param": "whatever"}
         )
-        assert result["unknown_param"] == "whatever"
+        assert "unknown_param" not in result
+        assert result["hop_size"] == 256  # Known param kept
 
     def test_sanitize_unknown_backend_passes_through(self):
         """Unknown backend name should return params unchanged."""

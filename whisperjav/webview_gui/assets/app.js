@@ -1214,9 +1214,9 @@ const EnsembleManager = {
         pass1: {
             pipeline: 'balanced',
             sensitivity: 'aggressive',
-            sceneDetector: 'semantic',
+            sceneDetector: 'auditok',
             speechEnhancer: 'none',
-            speechSegmenter: 'silero-v6.2',  // Silero v6.2 default
+            speechSegmenter: 'ten',  // TEN VAD default for balanced/fidelity
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1247,7 +1247,7 @@ const EnsembleManager = {
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
             enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
             xxlExePath: '',  // Persisted path to XXL executable
-            xxlExtraArgs: '--verbose True --standard_asia'  // Default XXL args
+            xxlExtraArgs: '--model large-v3 --verbose True --standard_asia'  // Default XXL args (model user-changeable)
         },
         mergeStrategy: 'pass1_primary',
         serialMode: false,
@@ -1377,6 +1377,10 @@ const EnsembleManager = {
             }
             this.state.pass1.speechEnhancer = e.target.value;
             this.updateDspPanel('pass1');
+            this.updateEnhanceForVadCheckbox('pass1');
+        });
+        document.getElementById('pass1-enhance-for-vad')?.addEventListener('change', (e) => {
+            this.state.pass1.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass1-segmenter').addEventListener('change', (e) => {
             this.state.pass1.speechSegmenter = e.target.value;
@@ -1398,6 +1402,10 @@ const EnsembleManager = {
             }
             this.state.pass2.speechEnhancer = e.target.value;
             this.updateDspPanel('pass2');
+            this.updateEnhanceForVadCheckbox('pass2');
+        });
+        document.getElementById('pass2-enhance-for-vad')?.addEventListener('change', (e) => {
+            this.state.pass2.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass2-segmenter').addEventListener('change', (e) => {
             this.state.pass2.speechSegmenter = e.target.value;
@@ -1516,8 +1524,8 @@ const EnsembleManager = {
                 this.updateByopPanel();
                 if (oldType !== newType) {
                     this.swapModelOptions(passKey, newType);
-                    this.applyPipelinePresets(passKey, newType);
                 }
+                this.applyPipelinePresets(passKey, newType);
             } else {
                 // Revert selection
                 selectElement.value = passState.pipeline;
@@ -1533,8 +1541,8 @@ const EnsembleManager = {
             this.updateByopPanel();
             if (oldType !== newType) {
                 this.swapModelOptions(passKey, newType);
-                this.applyPipelinePresets(passKey, newType);
             }
+            this.applyPipelinePresets(passKey, newType);
             this.updateBadges();
         }
     },
@@ -1547,10 +1555,10 @@ const EnsembleManager = {
 
         if (pipelineType === 'anime-whisper') {
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'ten';
+            segmenterSelect.value = 'silero-v6.2';
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'ten';
+            this.state[passKey].speechSegmenter = 'silero-v6.2';
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'qwen') {
@@ -1563,11 +1571,21 @@ const EnsembleManager = {
             this.state[passKey].framer = 'vad-grouped';
         } else {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
-            sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'silero-v6.2';
+            const pipeline = this.state[passKey].pipeline;
+            if (pipeline === 'balanced' || pipeline === 'fidelity') {
+                // TEN VAD + auditok for balanced; TEN VAD + semantic for fidelity
+                sceneSelect.value = (pipeline === 'balanced') ? 'auditok' : 'semantic';
+                segmenterSelect.value = 'ten';
+                this.state[passKey].sceneDetector = (pipeline === 'balanced') ? 'auditok' : 'semantic';
+                this.state[passKey].speechSegmenter = 'ten';
+            } else {
+                // faster, fast — keep silero-v6.2 + semantic
+                sceneSelect.value = 'semantic';
+                segmenterSelect.value = 'silero-v6.2';
+                this.state[passKey].sceneDetector = 'semantic';
+                this.state[passKey].speechSegmenter = 'silero-v6.2';
+            }
             sensitivitySelect.value = 'aggressive';
-            this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'silero-v6.2';
             this.state[passKey].sensitivity = 'aggressive';
         }
     },
@@ -1774,6 +1792,17 @@ const EnsembleManager = {
         }
     },
 
+    // Enhance-for-VAD checkbox visibility
+    updateEnhanceForVadCheckbox(passId) {
+        const row = document.getElementById(`${passId}-enhance-vad-row`);
+        if (!row) return;
+        const enhancer = document.getElementById(`${passId}-enhancer`)?.value || 'none';
+        const isEnabled = passId === 'pass1' || this.state.pass2.enabled;
+        const isXxl = passId === 'pass2' && this.state.pass2.isXxl;
+        // Show when a real enhancer is selected (not none) and pass is enabled
+        row.style.display = (enhancer !== 'none' && enhancer !== '' && isEnabled && !isXxl) ? 'block' : 'none';
+    },
+
     // BYOP Settings Panel Management
     updateByopPanel() {
         const panel = document.getElementById('byop-settings-panel');
@@ -1892,37 +1921,37 @@ const EnsembleManager = {
     // AUDIT FIX: Ranges aligned with backend Pydantic Field constraints
     parameterMetadata: {
         // === Transcriber parameters ===
-        logprob_threshold: { ge: -5.0, le: 0.0, step: 0.1 },           // Fixed: was -1.0, backend allows -5.0
-        logprob_margin: { ge: 0.0, le: 5.0, step: 0.1 },               // Fixed: was 1.0, backend allows 5.0
-        no_speech_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        compression_ratio_threshold: { ge: 1.0, le: 5.0, step: 0.1 }, // Fixed: was 0.0-10.0, backend is 1.0-5.0
-        temperature: { ge: 0.0, le: 1.0, step: 0.01, isArrayAllowed: true },  // Note: can be array
-        hallucination_silence_threshold: { ge: 0.0, le: 10.0, step: 0.1 },    // Fixed: was 5.0, backend allows 10.0
+        logprob_threshold: { type: 'float', ge: -5.0, le: 0.0, step: 0.1 },           // Fixed: was -1.0, backend allows -5.0
+        logprob_margin: { type: 'float', ge: 0.0, le: 5.0, step: 0.1 },               // Fixed: was 1.0, backend allows 5.0
+        no_speech_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
+        compression_ratio_threshold: { type: 'float', ge: 1.0, le: 5.0, step: 0.1 }, // Fixed: was 0.0-10.0, backend is 1.0-5.0
+        temperature: { type: 'float', ge: 0.0, le: 1.0, step: 0.01, isArrayAllowed: true },  // Note: can be array
+        hallucination_silence_threshold: { type: 'float', ge: 0.0, le: 10.0, step: 0.1 },    // Fixed: was 5.0, backend allows 10.0
 
         // === Decoder parameters ===
-        patience: { ge: 0.0, le: 5.0, step: 0.1 },
-        length_penalty: { ge: 0.0, le: 2.0, step: 0.1 },
-        max_initial_timestamp: { ge: 0.0, le: 30.0, step: 0.5 },
-        beam_size: { ge: 1, le: 20, step: 1 },                        // Fixed: was 10, backend allows 20
-        best_of: { ge: 1, le: 10, step: 1 },
+        patience: { type: 'float', ge: 0.0, le: 5.0, step: 0.1 },
+        length_penalty: { type: 'float', ge: 0.0, le: 2.0, step: 0.1 },
+        max_initial_timestamp: { type: 'float', ge: 0.0, le: 30.0, step: 0.5 },
+        beam_size: { type: 'int', ge: 1, le: 20, step: 1 },                        // Fixed: was 10, backend allows 20
+        best_of: { type: 'int', ge: 1, le: 10, step: 1 },
 
         // === External VAD parameters (Silero VAD for balanced/fidelity) ===
-        threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        neg_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
+        threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
+        neg_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
 
         // === Internal VAD parameters (kotoba-faster-whisper) ===
         // Also applies to external Silero VAD - use larger ranges to cover both
         vad_filter: { type: 'boolean', default: true },
-        vad_threshold: { ge: 0.0, le: 1.0, step: 0.01 },
-        min_speech_duration_ms: { ge: 0, le: 5000, step: 10 },        // Fixed: was 1000, backend allows 5000
-        max_speech_duration_s: { ge: 0.0, le: 300.0, step: 1.0 },     // Fixed: was 60.0, silero allows 300.0
-        min_silence_duration_ms: { ge: 0, le: 5000, step: 10 },       // Fixed: was 2000, backend allows 5000
-        speech_pad_ms: { ge: 0, le: 2000, step: 10 },                 // Fixed: was 500, backend allows 2000
+        vad_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
+        min_speech_duration_ms: { type: 'int', ge: 0, le: 5000, step: 10 },        // Fixed: was 1000, backend allows 5000
+        max_speech_duration_s: { type: 'float', ge: 0.0, le: 300.0, step: 1.0 },     // Fixed: was 60.0, silero allows 300.0
+        min_silence_duration_ms: { type: 'int', ge: 0, le: 5000, step: 10 },       // Fixed: was 2000, backend allows 5000
+        speech_pad_ms: { type: 'int', ge: 0, le: 2000, step: 10 },                 // Fixed: was 500, backend allows 2000
 
         // === Engine parameters (NEW - were missing) ===
-        repetition_penalty: { ge: 1.0, le: 3.0, step: 0.1 },          // Added: for faster_whisper/kotoba
-        no_repeat_ngram_size: { ge: 0, le: 10, step: 1 },             // Added: for faster_whisper/kotoba
-        chunk_length: { ge: 1, le: 30, step: 1 },                     // Added: for faster_whisper
+        repetition_penalty: { type: 'float', ge: 1.0, le: 3.0, step: 0.1 },          // Added: for faster_whisper/kotoba
+        no_repeat_ngram_size: { type: 'int', ge: 0, le: 10, step: 1 },             // Added: for faster_whisper/kotoba
+        chunk_length: { type: 'int', ge: 1, le: 30, step: 1 },                     // Added: for faster_whisper
 
         // === Boolean parameters (explicit type for robustness) ===
         suppress_blank: { type: 'boolean', default: true },
@@ -2679,8 +2708,11 @@ const EnsembleManager = {
         container.className = 'param-control';
         container.dataset.param = paramName;
 
-        // Infer original type from default value for proper type coercion on collection
-        if (defaultValue !== undefined && defaultValue !== null) {
+        // Determine original type: prefer API-provided declaration (from YAML data_type),
+        // fall back to runtime inference (has round-float bug but backward-compatible)
+        if (schema.original_type) {
+            container.dataset.originalType = schema.original_type;
+        } else if (defaultValue !== undefined && defaultValue !== null) {
             if (typeof defaultValue === 'number') {
                 container.dataset.originalType = Number.isInteger(defaultValue) ? 'int' : 'float';
             } else if (typeof defaultValue === 'boolean') {
@@ -3938,7 +3970,7 @@ const EnsembleManager = {
             input.className = 'param-number';
             input.min = constraints.ge !== undefined ? constraints.ge : 0;
             input.max = constraints.le !== undefined ? constraints.le : 9999;
-            input.step = 1;
+            input.step = constraints.step !== undefined ? constraints.step : 1;
             input.value = value !== undefined ? value : defaultValue;
         } else if (type === 'str' || type === 'string') {
             // Text input for string
@@ -4094,11 +4126,19 @@ const EnsembleManager = {
                 if (checkbox) {
                     value = checkbox.checked;
                 } else if (slider && number) {
-                    // Slider with linked number input
-                    value = parseFloat(number.value);
+                    // Slider with linked number input — branch on declared type
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(number.value, 10);
+                    } else {
+                        value = parseFloat(number.value);
+                    }
                 } else if (slider) {
                     // Slider without number input (fallback)
-                    value = parseFloat(slider.value);
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(slider.value, 10);
+                    } else {
+                        value = parseFloat(slider.value);
+                    }
                 } else if (number) {
                     // Use original type for proper conversion
                     if (originalType === 'int' || originalType === 'integer') {
@@ -4267,11 +4307,19 @@ const EnsembleManager = {
                 if (checkbox) {
                     value = checkbox.checked;
                 } else if (slider && number) {
-                    // Slider with linked number input
-                    value = parseFloat(number.value);
+                    // Slider with linked number input — branch on declared type
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(number.value, 10);
+                    } else {
+                        value = parseFloat(number.value);
+                    }
                 } else if (slider) {
                     // Slider without number input (fallback)
-                    value = parseFloat(slider.value);
+                    if (originalType === 'int' || originalType === 'integer') {
+                        value = parseInt(slider.value, 10);
+                    } else {
+                        value = parseFloat(slider.value);
+                    }
                 } else if (number) {
                     if (originalType === 'int' || originalType === 'integer') {
                         value = parseInt(number.value);
@@ -4894,7 +4942,7 @@ const EnsembleManager = {
                 isQwen: this.state.pass1.isQwen,
                 isAnimeWhisper: this.state.pass1.isAnimeWhisper,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
-                enhanceForVad: this.state.pass1.isQwen ? (this.state.pass1.enhanceForVad || false) : false
+                enhanceForVad: this.state.pass1.enhanceForVad || false
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
@@ -4912,7 +4960,7 @@ const EnsembleManager = {
                 isAnimeWhisper: this.state.pass2.isAnimeWhisper,
                 isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
-                enhanceForVad: this.state.pass2.isQwen ? (this.state.pass2.enhanceForVad || false) : false,
+                enhanceForVad: this.state.pass2.enhanceForVad || false,
                 // BYOP fields (only meaningful when pipeline is 'xxl')
                 xxlExe: this.state.pass2.isXxl ? this.state.pass2.xxlExePath : null,
                 xxlArgs: this.state.pass2.isXxl ? this.state.pass2.xxlExtraArgs : null
@@ -5857,6 +5905,550 @@ const UpdateCheckManager = {
 };
 
 // ============================================================
+// Ollama State Manager — centralized Ollama readiness state
+// ============================================================
+const OllamaStateManager = {
+    // States: CHECKING, NOT_INSTALLED, NO_MODEL, READY
+    currentState: null,
+    localModels: [],
+    recommendation: { model: 'gemma3:4b', size: '2.5 GB', quality: 'Good' },
+
+    // Curated models config loaded from backend JSON
+    // Each entry: { model: 'gemma3:4b', size: '2.5 GB' }
+    curatedModelsConfig: [],
+
+    // DOM element mapping per tab
+    elements: {
+        ensemble: {
+            panel: 'ensembleOllamaPanel',
+            checking: 'ensembleOllamaChecking',
+            notInstalled: 'ensembleOllamaNotInstalled',
+            noModel: 'ensembleOllamaNoModel',
+            ready: 'ensembleOllamaReady',
+            recModel: 'ensembleRecModel',
+            recSize: 'ensembleRecSize',
+            cmd: 'ensembleOllamaCmd'
+        },
+        srt: {
+            panel: 'srtOllamaPanel',
+            checking: 'srtOllamaChecking',
+            notInstalled: 'srtOllamaNotInstalled',
+            noModel: 'srtOllamaNoModel',
+            ready: 'srtOllamaReady',
+            recModel: 'srtRecModel',
+            recSize: 'srtRecSize',
+            cmd: 'srtOllamaCmd'
+        }
+    },
+
+    // Derived curated model names (for READY detection)
+    get curatedModels() {
+        return this.curatedModelsConfig.map(c => c.model);
+    },
+
+    // Build a size lookup from curatedModelsConfig
+    getSizeLabel(modelName) {
+        const entry = this.curatedModelsConfig.find(c => c.model === modelName);
+        return entry ? entry.size : null;
+    },
+
+    // Get display label for a model (short label if available, else model name)
+    getDisplayLabel(modelName) {
+        const entry = this.curatedModelsConfig.find(c => c.model === modelName);
+        return entry && entry.label ? entry.label : modelName;
+    },
+
+    // Check if a local model matches a given model name (prefix matching for tags)
+    modelMatches(localModel, targetModel) {
+        return localModel === targetModel ||
+               localModel.startsWith(targetModel + ':') ||
+               targetModel.startsWith(localModel);
+    },
+
+    // Check if a model is installed locally
+    isInstalled(modelName) {
+        return this.localModels.some(lm => this.modelMatches(lm, modelName));
+    },
+
+    async loadCuratedModels() {
+        if (this.curatedModelsConfig.length > 0) return; // already loaded
+        try {
+            const result = await pywebview.api.get_ollama_curated_models();
+            if (result.success && result.models) {
+                this.curatedModelsConfig = result.models;
+            }
+        } catch (e) {
+            // Fallback — top 3 from curated list so GUI doesn't break
+            this.curatedModelsConfig = [
+                { model: 'hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0', size: '8.7 GB', label: 'Shisa-v2.1-Qwen3-8B Q8' },
+                { model: 'huihui_ai/qwen2.5-abliterate:7b-instruct-q4_K_M', size: '4.7 GB', label: 'Qwen2.5-7B-Abliterated Q4' },
+                { model: 'dolphin-llama3:8b-256k-v2.9-q4_K_M', size: '4.8 GB', label: 'Dolphin-Llama3-8B-256K Q4' },
+            ];
+        }
+    },
+
+    async checkStatus() {
+        this.currentState = 'CHECKING';
+        await this.loadCuratedModels();
+        try {
+            const status = await pywebview.api.detect_ollama();
+            if (!status.installed) {
+                this.currentState = 'NOT_INSTALLED';
+                this.localModels = [];
+                return;
+            }
+            if (!status.running) {
+                // Try auto-start (Marco's expectation)
+                try {
+                    await pywebview.api.start_ollama_server();
+                    // Re-check after start attempt
+                    const recheck = await pywebview.api.detect_ollama();
+                    if (!recheck.running) {
+                        this.currentState = 'NOT_INSTALLED';
+                        this.localModels = [];
+                        return;
+                    }
+                } catch (e) {
+                    this.currentState = 'NOT_INSTALLED';
+                    this.localModels = [];
+                    return;
+                }
+            }
+            // Server is running — check for models
+            try {
+                const result = await pywebview.api.list_ollama_models();
+                if (result.success && result.models) {
+                    this.localModels = result.models.map(m => m.name || m);
+                } else {
+                    this.localModels = [];
+                }
+            } catch (e) {
+                this.localModels = [];
+            }
+            // Check if any curated translation model is available locally
+            const hasCurated = this.localModels.some(lm =>
+                this.curatedModels.some(cm => lm === cm || lm.startsWith(cm + ':') || cm.startsWith(lm))
+            );
+            if (hasCurated || this.localModels.length > 0) {
+                this.currentState = 'READY';
+            } else {
+                this.currentState = 'NO_MODEL';
+                // Try to get recommendation
+                try {
+                    const rec = await pywebview.api.recommend_ollama_model();
+                    if (rec.success && rec.model) {
+                        this.recommendation = {
+                            model: rec.model,
+                            size: rec.size || '2.5 GB',
+                            quality: rec.quality || 'Good'
+                        };
+                    }
+                } catch (e) {
+                    // Keep default recommendation
+                }
+            }
+        } catch (e) {
+            this.currentState = 'NOT_INSTALLED';
+            this.localModels = [];
+        }
+    },
+
+    updateUI(tabPrefix) {
+        const els = this.elements[tabPrefix];
+        if (!els) return;
+
+        const panel = document.getElementById(els.panel);
+        if (!panel) return;
+
+        panel.style.display = 'block';
+
+        // Hide all state divs
+        const checking = document.getElementById(els.checking);
+        const notInstalled = document.getElementById(els.notInstalled);
+        const noModel = document.getElementById(els.noModel);
+        const ready = document.getElementById(els.ready);
+
+        if (checking) checking.style.display = 'none';
+        if (notInstalled) notInstalled.style.display = 'none';
+        if (noModel) noModel.style.display = 'none';
+        if (ready) ready.style.display = 'none';
+
+        switch (this.currentState) {
+            case 'CHECKING':
+                if (checking) checking.style.display = 'inline-flex';
+                break;
+            case 'NOT_INSTALLED':
+                if (notInstalled) notInstalled.style.display = 'block';
+                break;
+            case 'NO_MODEL':
+                if (noModel) noModel.style.display = 'block';
+                // Populate recommendation
+                const recModel = document.getElementById(els.recModel);
+                const recSize = document.getElementById(els.recSize);
+                const cmd = document.getElementById(els.cmd);
+                if (recModel) recModel.textContent = this.recommendation.model;
+                if (recSize) recSize.textContent = `(${this.recommendation.size})`;
+                if (cmd) cmd.textContent = `ollama pull ${this.recommendation.model}`;
+                break;
+            case 'READY':
+                if (ready) ready.style.display = 'flex';
+                break;
+        }
+    },
+
+    updateAllPanels() {
+        this.updateUI('ensemble');
+        this.updateUI('srt');
+    },
+
+    copyCommand(text) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                ConsoleManager.log('Command copied to clipboard', 'info');
+            }).catch(() => {});
+        }
+    },
+
+    isReady() {
+        return this.currentState === 'READY';
+    }
+};
+
+// ============================================================
+// Ollama Pull Modal — download confirmation + progress
+// ============================================================
+const OllamaPullModal = {
+    _modelName: null,
+    _modelSize: null,
+    _tabContext: null,
+    _selectEl: null,
+
+    open(modelName, modelSize, tabContext, selectEl) {
+        this._modelName = modelName;
+        this._modelSize = modelSize;
+        this._tabContext = tabContext;
+        this._selectEl = selectEl;
+
+        // Populate confirm state
+        document.getElementById('ollamaPullModelName').textContent = modelName;
+        document.getElementById('ollamaPullModelSize').textContent = modelSize;
+
+        // Show confirm, hide others
+        document.getElementById('ollamaPullConfirm').style.display = '';
+        document.getElementById('ollamaPullProgress').style.display = 'none';
+        document.getElementById('ollamaPullSuccess').style.display = 'none';
+        document.getElementById('ollamaPullError').style.display = 'none';
+
+        // Show buttons
+        const footer = document.getElementById('ollamaPullModalFooter');
+        footer.style.display = '';
+        document.getElementById('ollamaPullCancelBtn').style.display = '';
+        document.getElementById('ollamaPullDownloadBtn').style.display = '';
+
+        // Show modal
+        const modal = document.getElementById('ollamaPullModal');
+        modal.style.display = 'flex';
+
+        // Bind buttons
+        document.getElementById('ollamaPullCancelBtn').onclick = () => this.cancel();
+        document.getElementById('ollamaPullDownloadBtn').onclick = () => this.startDownload();
+        document.getElementById('ollamaPullCloseBtn').onclick = () => this.cancel();
+    },
+
+    cancel() {
+        // Revert dropdown to previous value
+        if (this._selectEl) {
+            this._selectEl.value = ProviderUIManager._previousOllamaValue[this._tabContext] || '';
+        }
+        this.close();
+    },
+
+    close() {
+        document.getElementById('ollamaPullModal').style.display = 'none';
+    },
+
+    async startDownload() {
+        const modelName = this._modelName;
+
+        // Switch to progress state
+        document.getElementById('ollamaPullConfirm').style.display = 'none';
+        document.getElementById('ollamaPullProgress').style.display = '';
+        document.getElementById('ollamaPullProgressModel').textContent = modelName;
+        document.getElementById('ollamaPullDownloadBtn').style.display = 'none';
+
+        // Show indeterminate progress (API doesn't support streaming progress)
+        const progressBar = document.getElementById('ollamaPullProgressBar');
+        progressBar.style.width = '0%';
+        progressBar.classList.add('indeterminate');
+        document.getElementById('ollamaPullProgressText').textContent = 'Downloading... check the terminal for progress. This may take a few minutes.';
+
+        // Disable cancel during download (pull_ollama_model is blocking)
+        document.getElementById('ollamaPullCancelBtn').textContent = 'Please wait...';
+        document.getElementById('ollamaPullCancelBtn').disabled = true;
+
+        try {
+            const result = await pywebview.api.pull_ollama_model(modelName);
+
+            progressBar.classList.remove('indeterminate');
+
+            if (result.success) {
+                // Success state
+                document.getElementById('ollamaPullProgress').style.display = 'none';
+                document.getElementById('ollamaPullSuccess').style.display = '';
+                document.getElementById('ollamaPullModalFooter').style.display = 'none';
+
+                // Refresh local models and rebuild dropdown
+                await OllamaStateManager.checkStatus();
+                OllamaStateManager.updateAllPanels();
+
+                // Auto-close after 1.5s and select the model
+                setTimeout(() => {
+                    this.close();
+                    // Rebuild dropdown in both tabs if needed
+                    ProviderUIManager.updateModelDropdown('ollama', this._tabContext);
+
+                    // Auto-select the newly installed model
+                    const els = ProviderUIManager.tabElements[this._tabContext];
+                    const modelSelect = document.getElementById(els.model);
+                    if (modelSelect) {
+                        modelSelect.value = modelName;
+                        ProviderUIManager._previousOllamaValue[this._tabContext] = modelName;
+                    }
+
+                    ConsoleManager.log(`Model ${modelName} downloaded successfully`, 'success');
+                }, 1500);
+            } else {
+                // Error state
+                this._showError(result.error || 'Download failed. Please try again.');
+            }
+        } catch (e) {
+            progressBar.classList.remove('indeterminate');
+            this._showError(e.message || 'Download failed. Please check your connection.');
+        }
+    },
+
+    _showError(message) {
+        document.getElementById('ollamaPullProgress').style.display = 'none';
+        document.getElementById('ollamaPullError').style.display = '';
+        document.getElementById('ollamaPullErrorText').textContent = message;
+
+        // Re-enable cancel
+        const cancelBtn = document.getElementById('ollamaPullCancelBtn');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.disabled = false;
+        cancelBtn.style.display = '';
+        document.getElementById('ollamaPullDownloadBtn').style.display = 'none';
+    }
+};
+
+// ============================================================
+// Provider UI Manager — centralized provider-change handler
+// ============================================================
+const ProviderUIManager = {
+    // Tab context element mapping
+    tabElements: {
+        ensemble: {
+            provider: 'ensembleTranslateProvider',
+            model: 'ensembleTranslateModel',
+            modelOverride: 'ensembleTranslateModelOverride',
+            apiKeyRow: null,
+            ollamaPanel: 'ensembleOllamaPanel',
+            deprecation: 'ensembleDeprecationHint'
+        },
+        srt: {
+            provider: 'translatorProvider',
+            model: 'translatorModel',
+            modelOverride: 'translatorCustomModel',
+            apiKeyRow: 'translatorApiKeyRow',
+            ollamaPanel: 'srtOllamaPanel',
+            deprecation: 'srtDeprecationHint'
+        }
+    },
+
+    async onProviderChange(provider, tabContext) {
+        const els = this.tabElements[tabContext];
+        if (!els) return;
+
+        const ollamaPanel = document.getElementById(els.ollamaPanel);
+        const deprecation = document.getElementById(els.deprecation);
+        const apiKeyRow = els.apiKeyRow ? document.getElementById(els.apiKeyRow) : null;
+        const modelEl = document.getElementById(els.model);
+        const modelOverrideEl = document.getElementById(els.modelOverride);
+
+        // Persist provider selection
+        try {
+            localStorage.setItem(`whisperjav_${tabContext}_provider`, provider);
+        } catch (e) {}
+
+        if (!provider || provider === '') {
+            // Blank placeholder — hide everything
+            if (ollamaPanel) ollamaPanel.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'none';
+            if (apiKeyRow) apiKeyRow.style.display = 'none';
+            return;
+        }
+
+        if (provider === 'ollama') {
+            if (apiKeyRow) apiKeyRow.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'none';
+            if (ollamaPanel) ollamaPanel.style.display = 'block';
+
+            // Show "Looking for Ollama server..." immediately
+            OllamaStateManager.currentState = 'CHECKING';
+            OllamaStateManager.updateUI(tabContext);
+
+            await OllamaStateManager.checkStatus();
+            OllamaStateManager.updateUI(tabContext);
+
+            if (OllamaStateManager.currentState === 'NOT_INSTALLED') {
+                // No server — hide model dropdown entirely
+                if (modelEl) modelEl.style.display = 'none';
+                if (modelOverrideEl) modelOverrideEl.style.display = 'none';
+            } else {
+                // READY or NO_MODEL — show dropdown (pull flow handles uninstalled)
+                if (modelEl) modelEl.style.display = '';
+                if (modelOverrideEl) modelOverrideEl.style.display = '';
+                this.updateModelDropdown('ollama', tabContext);
+            }
+        } else if (provider === 'local') {
+            if (apiKeyRow) apiKeyRow.style.display = 'none';
+            if (ollamaPanel) ollamaPanel.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'block';
+            if (modelEl) modelEl.style.display = '';
+            if (modelOverrideEl) modelOverrideEl.style.display = '';
+            this.updateModelDropdown('local', tabContext);
+        } else {
+            // Cloud / custom provider
+            if (apiKeyRow) apiKeyRow.style.display = '';
+            if (ollamaPanel) ollamaPanel.style.display = 'none';
+            if (deprecation) deprecation.style.display = 'none';
+            if (modelEl) modelEl.style.display = '';
+            if (modelOverrideEl) modelOverrideEl.style.display = '';
+            this.updateModelDropdown(provider, tabContext);
+        }
+    },
+
+    // Track previous dropdown value for revert on cancel
+    _previousOllamaValue: { ensemble: '', srt: '' },
+
+    updateModelDropdown(provider, tabContext) {
+        const els = this.tabElements[tabContext];
+        if (!els) return;
+
+        const modelSelect = document.getElementById(els.model);
+        if (!modelSelect) return;
+
+        const localModelLabels = {
+            'gemma-9b': 'gemma-9b (8GB)',
+            'llama-8b': 'llama-8b (6GB)',
+            'llama-3b': 'llama-3b (3GB)',
+            'auto': 'auto'
+        };
+
+        const currentValue = modelSelect.value;
+
+        if (provider === 'ollama') {
+            // Build optgroup-based dropdown
+            this._buildOllamaDropdown(modelSelect, currentValue, tabContext);
+            return;
+        }
+
+        // Non-Ollama providers — flat list
+        const providerModels = TranslatorManager.providerModels;
+        const models = providerModels[provider] || [];
+
+        modelSelect.innerHTML = '<option value="">Default</option>' +
+            models.map(m => {
+                let label = m;
+                if (provider === 'local') label = localModelLabels[m] || m;
+                return `<option value="${m}">${label}</option>`;
+            }).join('');
+
+        if (currentValue) modelSelect.value = currentValue;
+
+        if (provider === 'local' && models.includes('gemma-9b')) {
+            if (!currentValue) modelSelect.value = 'gemma-9b';
+        }
+    },
+
+    _buildOllamaDropdown(modelSelect, currentValue, tabContext) {
+        const installed = OllamaStateManager.localModels;
+        const curated = OllamaStateManager.curatedModelsConfig;
+
+        // "Installed Models" group — use short label if curated, else raw model name
+        const installedOptions = installed.map(m => {
+            const label = OllamaStateManager.getDisplayLabel(m);
+            const size = OllamaStateManager.getSizeLabel(m);
+            const sizeStr = size ? ` (${size})` : '';
+            return `<option value="${m}">${label}${sizeStr}</option>`;
+        });
+
+        // "Top Recommendations" group — curated models NOT already installed
+        const uninstalled = curated.filter(c =>
+            !installed.some(lm => OllamaStateManager.modelMatches(lm, c.model))
+        );
+        const recOptions = uninstalled.map(c => {
+            const label = c.label || c.model;
+            return `<option value="${c.model}">${label} (${c.size})</option>`;
+        });
+
+        let html = '<option value="" disabled selected>\u2014 Select a model \u2014</option>';
+
+        // Installed group
+        html += '<optgroup label="Installed Models">';
+        if (installedOptions.length > 0) {
+            html += installedOptions.join('');
+        } else {
+            html += '<option value="" disabled>(none installed)</option>';
+        }
+        html += '</optgroup>';
+
+        // Recommendations group
+        html += '<optgroup label="Top Recommendations">';
+        if (recOptions.length > 0) {
+            html += recOptions.join('');
+        } else {
+            html += '<option value="" disabled>(all installed)</option>';
+        }
+        html += '</optgroup>';
+
+        modelSelect.innerHTML = html;
+
+        // Restore previous selection if it exists
+        if (currentValue && installed.some(lm => OllamaStateManager.modelMatches(lm, currentValue))) {
+            modelSelect.value = currentValue;
+        }
+
+        // Store current value for revert on cancel
+        this._previousOllamaValue[tabContext] = modelSelect.value;
+
+        // Bind change handler for uninstalled model detection
+        // Remove old handler, add new one
+        const newSelect = modelSelect.cloneNode(true);
+        modelSelect.parentNode.replaceChild(newSelect, modelSelect);
+        newSelect.addEventListener('change', (e) => {
+            this._onOllamaModelChange(e.target, tabContext);
+        });
+    },
+
+    _onOllamaModelChange(selectEl, tabContext) {
+        const selectedModel = selectEl.value;
+        if (!selectedModel) return;
+
+        // Check if model is installed
+        if (OllamaStateManager.isInstalled(selectedModel)) {
+            // Installed — normal selection
+            this._previousOllamaValue[tabContext] = selectedModel;
+            return;
+        }
+
+        // Uninstalled — open pull confirmation
+        const size = OllamaStateManager.getSizeLabel(selectedModel) || 'unknown size';
+        OllamaPullModal.open(selectedModel, size, tabContext, selectEl);
+    }
+};
+
+// ============================================================
 // Translator Manager (Tab 4 - Standalone Translation)
 // ============================================================
 const TranslatorManager = {
@@ -5867,7 +6459,7 @@ const TranslatorManager = {
         currentFile: null
     },
 
-    // Provider model options
+    // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
@@ -5881,9 +6473,9 @@ const TranslatorManager = {
     },
 
     init() {
-        // Bind provider change
+        // Bind provider change — route through ProviderUIManager
         document.getElementById('translatorProvider')?.addEventListener('change', (e) => {
-            this.updateModelOptions(e.target.value);
+            ProviderUIManager.onProviderChange(e.target.value, 'srt');
             this.updateApiKeyStatus(e.target.value);
         });
 
@@ -5894,9 +6486,7 @@ const TranslatorManager = {
         document.getElementById('translatorStartBtn')?.addEventListener('click', () => this.startTranslation());
         document.getElementById('translatorCancelBtn')?.addEventListener('click', () => this.cancelTranslation());
 
-        // Initialize model options for default provider (Local LLM)
-        this.updateModelOptions('local');
-        this.updateApiKeyStatus('local');
+        // No default provider initialization — dropdown starts blank
 
         console.log('TranslatorManager initialized');
     },
@@ -5917,6 +6507,12 @@ const TranslatorManager = {
     // ---- Provider & model ----
 
     updateModelOptions(provider) {
+        // Ollama models are handled by ProviderUIManager with optgroups
+        if (provider === 'ollama') {
+            ProviderUIManager.updateModelDropdown('ollama', 'srt');
+            return;
+        }
+
         const modelSelect = document.getElementById('translatorModel');
         if (!modelSelect) return;
 
@@ -5930,7 +6526,8 @@ const TranslatorManager = {
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
-                const label = (provider === 'local') ? (localModelLabels[m] || m) : m;
+                let label = m;
+                if (provider === 'local') label = localModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
     },
@@ -5939,9 +6536,11 @@ const TranslatorManager = {
         const statusEl = document.getElementById('translatorApiStatus');
         if (!statusEl) return;
 
-        // Local/custom providers don't need API key
-        if (provider === 'local' || provider === 'custom') {
-            statusEl.textContent = provider === 'local' ? 'Local (No API)' : 'Custom (No API)';
+        // Ollama/Local/custom providers don't need API key
+        if (provider === 'ollama' || provider === 'local' || provider === 'custom') {
+            if (provider === 'ollama') statusEl.textContent = 'Ollama (No API Key)';
+            else if (provider === 'local') statusEl.textContent = 'Local (No API)';
+            else statusEl.textContent = 'Custom (No API)';
             statusEl.className = 'api-status configured';
             return;
         }
@@ -6007,6 +6606,8 @@ const TranslatorManager = {
         return {
             // Uses shared file list from SOURCE section (AppState.selectedFiles)
             inputs: AppState.selectedFiles,
+            // Shared Destination section — same as transcription/ensemble tabs
+            output_dir: document.getElementById('outputDir')?.value || '',
             provider: document.getElementById('translatorProvider')?.value || 'deepseek',
             model: document.getElementById('translatorCustomModel')?.value ||
                    document.getElementById('translatorModel')?.value || null,
@@ -6023,7 +6624,9 @@ const TranslatorManager = {
                        parseInt(document.getElementById('translatorRateLimit').value) : null,
             max_retries: parseInt(document.getElementById('translatorMaxRetries')?.value) || 3,
             endpoint: document.getElementById('translatorCustomEndpoint')?.value || null,
-            api_key: document.getElementById('translatorApiKey')?.value || null
+            api_key: document.getElementById('translatorApiKey')?.value || null,
+            // Debug checkbox lives in Transcription Adv. Options but is global
+            debug: document.getElementById('debugLogging')?.checked || false
         };
     },
 
@@ -6422,7 +7025,7 @@ const TranslateIntegrationManager = {
 // Translation Settings Modal Manager
 // ============================================================
 const TranslationSettingsModal = {
-    // Provider model options (shared with inline dropdown)
+    // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         deepseek: ['deepseek-chat', 'deepseek-coder'],
@@ -6447,7 +7050,8 @@ const TranslationSettingsModal = {
         maxBatchSize: 30,
         temperature: 0.5,
         topP: 0.9,
-        customEndpoint: ''
+        customEndpoint: '',
+        ollamaUrl: ''
     },
 
     init() {
@@ -6470,24 +7074,17 @@ const TranslationSettingsModal = {
         // Test connection button
         document.getElementById('translationTestConnection')?.addEventListener('click', () => this.testConnection());
 
-        // Provider change handler for inline dropdown
+        // Provider change handler for inline dropdown — route through ProviderUIManager
         document.getElementById('ensembleTranslateProvider')?.addEventListener('change', (e) => {
+            ProviderUIManager.onProviderChange(e.target.value, 'ensemble');
             this.updateModelOptions(e.target.value);
+            // Show/hide Ollama URL field in settings modal
+            document.querySelectorAll('.ollama-settings-row').forEach(el => {
+                el.style.display = (e.target.value === 'ollama') ? 'block' : 'none';
+            });
         });
 
-        // Initialize model options for default provider (Local LLM)
-        this.updateModelOptions('local');
-
-        // Set default model selection to gemma-9b (8GB VRAM)
-        const modelSelect = document.getElementById('ensembleTranslateModel');
-        if (modelSelect) {
-            // Will be populated by updateModelOptions, then set default
-            setTimeout(() => {
-                if (modelSelect.querySelector('option[value="gemma-9b"]')) {
-                    modelSelect.value = 'gemma-9b';
-                }
-            }, 0);
-        }
+        // No default provider initialization — dropdown starts blank
 
         // Load saved settings
         this.loadSettings();
@@ -6533,6 +7130,7 @@ const TranslationSettingsModal = {
         this.settings.temperature = parseFloat(document.getElementById('translationTemperature')?.value) || 0.5;
         this.settings.topP = parseFloat(document.getElementById('translationTopP')?.value) || 0.9;
         this.settings.customEndpoint = document.getElementById('translationCustomEndpoint')?.value || '';
+        this.settings.ollamaUrl = document.getElementById('translationOllamaUrl')?.value || '';
 
         // Persist to localStorage (fast cache / fallback)
         try {
@@ -6595,6 +7193,8 @@ const TranslationSettingsModal = {
         document.getElementById('translationTemperature').value = this.settings.temperature;
         document.getElementById('translationTopP').value = this.settings.topP;
         document.getElementById('translationCustomEndpoint').value = this.settings.customEndpoint;
+        const ollamaUrlEl = document.getElementById('translationOllamaUrl');
+        if (ollamaUrlEl) ollamaUrlEl.value = this.settings.ollamaUrl || '';
     },
 
     updateMultiFileWarning() {
@@ -6607,10 +7207,15 @@ const TranslationSettingsModal = {
     },
 
     updateModelOptions(provider) {
+        // Ollama models are handled by ProviderUIManager with optgroups
+        if (provider === 'ollama') {
+            ProviderUIManager.updateModelDropdown('ollama', 'ensemble');
+            return;
+        }
+
         const modelSelect = document.getElementById('ensembleTranslateModel');
         if (!modelSelect) return;
 
-        // Display labels for local models (show VRAM requirements)
         const localModelLabels = {
             'gemma-9b': 'gemma-9b (8GB)',
             'llama-8b': 'llama-8b (6GB)',
@@ -6621,7 +7226,8 @@ const TranslationSettingsModal = {
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
-                const label = (provider === 'local') ? (localModelLabels[m] || m) : m;
+                let label = m;
+                if (provider === 'local') label = localModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
 
@@ -6637,13 +7243,16 @@ const TranslationSettingsModal = {
         const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
         const apiKey = document.getElementById('translationApiKey')?.value || '';
 
-        // Local/custom providers don't need API key testing
-        if (provider === 'local' || provider === 'custom') {
+        // Ollama/Local/custom providers don't need API key testing
+        if (provider === 'ollama' || provider === 'local' || provider === 'custom') {
             if (statusEl) {
-                statusEl.textContent = provider === 'local' ? 'Local (No API)' : 'Custom (No API)';
+                if (provider === 'ollama') statusEl.textContent = 'Ollama (No API Key)';
+                else if (provider === 'local') statusEl.textContent = 'Local (No API)';
+                else statusEl.textContent = 'Custom (No API)';
                 statusEl.className = 'api-status connected';
             }
-            ConsoleManager.log(`${provider === 'local' ? 'Local LLM' : 'Custom endpoint'} provider selected - no API key required`, 'info');
+            const label = provider === 'ollama' ? 'Ollama' : provider === 'local' ? 'Local LLM' : 'Custom endpoint';
+            ConsoleManager.log(`${label} provider selected - no API key required`, 'info');
             return;
         }
 
@@ -6681,7 +7290,7 @@ const TranslationSettingsModal = {
      * Get all translation settings for processing
      */
     getFullSettings() {
-        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
+        const provider = document.getElementById('ensembleTranslateProvider')?.value || '';
         const model = document.getElementById('ensembleTranslateModel')?.value || '';
         const modelOverride = document.getElementById('ensembleTranslateModelOverride')?.value?.trim() || '';
 
@@ -6699,7 +7308,8 @@ const TranslationSettingsModal = {
             maxBatchSize: this.settings.maxBatchSize,
             temperature: this.settings.temperature,
             topP: this.settings.topP,
-            customEndpoint: this.settings.customEndpoint
+            customEndpoint: this.settings.customEndpoint,
+            ollamaUrl: this.settings.ollamaUrl
         };
     }
 };
@@ -6750,6 +7360,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initial validation
     FormManager.validateForm();
 
+    // Event delegation for onboarding buttons
+    document.addEventListener('click', (e) => {
+        // "Check Again" buttons in Ollama onboarding panels
+        if (e.target.classList.contains('ollama-check-btn')) {
+            OllamaStateManager.checkStatus().then(() => OllamaStateManager.updateAllPanels());
+        }
+        // "Copy" buttons in Ollama onboarding panels
+        if (e.target.classList.contains('btn-copy')) {
+            const code = e.target.closest('.ollama-copy-command')?.querySelector('code');
+            if (code) OllamaStateManager.copyCommand(code.textContent);
+        }
+    });
+
     ConsoleManager.log('WhisperJAV GUI initialized', 'success');
     ConsoleManager.log('Ready to process video files', 'info');
     ConsoleManager.log('Press F1 for keyboard shortcuts', 'info');
@@ -6764,6 +7387,50 @@ window.addEventListener('pywebviewready', async () => {
     await EnsembleManager.updateSegmenterAvailability();
     await EnsembleManager.updateEnhancerAvailability();
 
+    // Reload BYOP preferences now that API is available
+    // (DOMContentLoaded init may have run before pywebview was ready)
+    try {
+        const byopPrefs = await pywebview.api.get_byop_preferences();
+        if (byopPrefs) {
+            if (byopPrefs.xxl_exe_path) {
+                AppState.state.pass2.xxlExePath = byopPrefs.xxl_exe_path;
+                const pathInput = document.getElementById('xxl-exe-path');
+                if (pathInput) pathInput.value = byopPrefs.xxl_exe_path;
+            }
+            if (byopPrefs.xxl_extra_args) {
+                AppState.state.pass2.xxlExtraArgs = byopPrefs.xxl_extra_args;
+                const argsInput = document.getElementById('xxl-extra-args');
+                if (argsInput) argsInput.value = byopPrefs.xxl_extra_args;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load BYOP preferences:', e);
+    }
+
     // Tab 4 translation settings (unaffected by persistence removal)
     await TranslationSettingsModal.loadSettingsFromBackend();
+
+    // Restore saved provider selections from localStorage
+    const savedEnsemble = localStorage.getItem('whisperjav_ensemble_provider');
+    if (savedEnsemble) {
+        const dd = document.getElementById('ensembleTranslateProvider');
+        if (dd) {
+            dd.value = savedEnsemble;
+            ProviderUIManager.onProviderChange(savedEnsemble, 'ensemble');
+            TranslationSettingsModal.updateModelOptions(savedEnsemble);
+            // Show/hide Ollama URL field in settings modal
+            document.querySelectorAll('.ollama-settings-row').forEach(el => {
+                el.style.display = (savedEnsemble === 'ollama') ? 'block' : 'none';
+            });
+        }
+    }
+    const savedSrt = localStorage.getItem('whisperjav_srt_provider');
+    if (savedSrt) {
+        const dd = document.getElementById('translatorProvider');
+        if (dd) {
+            dd.value = savedSrt;
+            ProviderUIManager.onProviderChange(savedSrt, 'srt');
+            TranslatorManager.updateApiKeyStatus(savedSrt);
+        }
+    }
 });

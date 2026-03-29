@@ -14,6 +14,10 @@
     "last_mode": "fidelity",
     "last_sensitivity": "conservative",
     "last_language": "japanese",
-    "show_console": true
+    "show_console": true,
+    "byop": {
+      "xxl_exe_path": "D:\\Compressed\\Faster-Whisper-XXL_r245.2_windows_2\\Faster-Whisper-XXL\\faster-whisper-xxl.exe",
+      "xxl_extra_args": "--model large-v3 --verbose True --standard_asia"
+    }
   }
 }

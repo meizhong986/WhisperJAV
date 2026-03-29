@@ -393,7 +393,7 @@ def parse_arguments():
         "--translate-provider",
         choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq", "ollama", "local", "custom"],
         default="deepseek",
-        help="Translation AI provider (default: deepseek). Use 'ollama' for Ollama local LLM. Use 'local' for built-in llama-cpp server. Use 'custom' with --translate-endpoint for any OpenAI-compatible API."
+        help="Translation AI provider (default: deepseek). Use 'ollama' for Ollama local LLM. 'local' is deprecated in v1.8.10 — use 'ollama' instead. Use 'custom' with --translate-endpoint for any OpenAI-compatible API."
     )
     translation_group.add_argument(
         "--translate-target",
@@ -2207,6 +2207,17 @@ def main():
                 print(f"Translated: {translation_success}")
                 print(f"Failed: {translation_failed}")
                 print("="*50)
+
+                # Unload Ollama model from VRAM after all files are translated
+                if args.translate_provider == 'ollama':
+                    try:
+                        from whisperjav.translate.ollama_manager import OllamaManager
+                        _mgr = OllamaManager()
+                        _model = args.translate_model or 'gemma3:12b'
+                        if _mgr.unload_model(_model):
+                            print(f"[OLLAMA] Model {_model} unloaded from VRAM")
+                    except Exception:
+                        pass  # Best-effort — don't fail the run
 
             # ============================================================
             # VTT CONVERSION: Convert SRT outputs if requested

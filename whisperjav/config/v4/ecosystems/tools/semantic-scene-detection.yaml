@@ -119,6 +119,7 @@ gui:
     min: 5
     max: 60
     step: 1
+    data_type: float
     unit: "s"
     group: core
 
@@ -129,6 +130,7 @@ gui:
     min: 60
     max: 600
     step: 10
+    data_type: float
     unit: "s"
     group: core
 
@@ -139,6 +141,7 @@ gui:
     min: 1
     max: 15
     step: 0.5
+    data_type: float
     unit: "s"
     group: advanced
 
@@ -149,12 +152,14 @@ gui:
     min: 5
     max: 30
     step: 1
+    data_type: float
     group: advanced
 
   visualize:
     widget: toggle
     label: "Generate Visualization"
     description: "Create a PNG plot showing scene boundaries and types."
+    data_type: bool
     group: debug
 
 # =============================================================================

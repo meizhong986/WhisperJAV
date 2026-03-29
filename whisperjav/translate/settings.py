@@ -34,7 +34,8 @@ DEFAULT_SETTINGS = {
         'temperature': None,
         'top_p': None
     },
-    'instructions_files': {}
+    'instructions_files': {},
+    'ollama_url': None
 }
 
 
@@ -173,6 +174,14 @@ def resolve_config(cli_args, settings: Optional[dict] = None) -> dict:
             elif key == 'actress':
                 if value:
                     config['actress'] = value
+            elif key == 'ollama_url':
+                config['ollama_url'] = value
+
+    # Apply environment variable fallbacks (lower precedence than CLI and settings)
+    if not config.get('ollama_url'):
+        env_host = os.environ.get('OLLAMA_HOST')
+        if env_host:
+            config['ollama_url'] = env_host.rstrip('/')
 
     return config
 

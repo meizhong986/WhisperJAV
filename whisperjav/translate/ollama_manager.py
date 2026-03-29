@@ -63,6 +63,25 @@ class ModelRecommendation:
     temperature: float  # Recommended temperature
 
 
+# Optimized sampling defaults for JAV subtitle translation.
+# Based on per-model analysis of 10 local LLMs (range across models):
+#   top_k: 40–70, median 50    — constrains hallucination without starving
+#   top_p: 0.90–0.95, median 0.92 — tight enough to limit noise
+#   min_p: 0.05 (unanimous)    — floor for token probability
+#   repeat_penalty: 1.05–1.15, median 1.1 — prevents ASR fragment duplication
+#
+# These are set server-side via Ollama Modelfile PARAMETER directives because
+# PySubtrans CustomClient._generate_request_body() only passes temperature
+# to the API. By baking them into a lightweight model variant, the parameters
+# take effect without any PySubtrans modification.
+OLLAMA_SAMPLING_DEFAULTS = {
+    'top_k': 50,
+    'top_p': 0.92,
+    'min_p': 0.05,
+    'repeat_penalty': 1.1,
+}
+
+
 OLLAMA_MODEL_CONFIGS = {
     "qwen2.5:3b": {
         "num_ctx": 4096,
@@ -71,6 +90,14 @@ OLLAMA_MODEL_CONFIGS = {
         "download_size": "2.0 GB",
         "quality": "basic",
         "min_vram_gb": 0,
+    },
+    "gemma3:4b": {
+        "num_ctx": 8192,
+        "batch_size": 11,
+        "temperature": 0.3,
+        "download_size": "2.5 GB",
+        "quality": "good",
+        "min_vram_gb": 4,
     },
     "qwen2.5:7b": {
         "num_ctx": 8192,
@@ -278,6 +305,50 @@ class OllamaManager:
 
         return 8192  # Safe fallback
 
+    def is_thinking_model(self, name: str) -> bool:
+        """Check if a model uses thinking/reasoning mode by default.
+
+        Qwen3-family models (and derivatives like shisa-v2.1-qwen3-*) put
+        their output in a ``reasoning`` JSON field with empty ``content``.
+        PySubtrans reads ``content`` only, so all translations silently fail.
+
+        Appending ``/no_think`` to the user message disables thinking mode,
+        forcing output into the ``content`` field where PySubtrans expects it.
+
+        Returns True if the model name indicates a Qwen3-family model.
+        """
+        # Normalize: "hf.co/bartowski/shisa-v2.1-qwen3-8b-GGUF:Q4_K_M" → lowercase
+        lower = name.lower()
+        # Match qwen3 but NOT qwen3.5 — only Qwen3 has thinking mode,
+        # Qwen3.5 is a standard generation model without reasoning tokens.
+        # 'qwen3' in 'qwen3.5-9b' would false-positive, so we check that
+        # the character after 'qwen3' is not '.' (which starts '3.5').
+        import re
+        return bool(re.search(r'qwen3(?!\.)', lower))
+
+    def supports_system_messages(self, name: str) -> bool:
+        """Check if a model's chat template handles system messages.
+
+        Models pulled from hf.co/ as raw GGUFs often have a bare
+        ``{{ .Prompt }}`` template that drops the system role entirely.
+        When that happens, instructions sent as a system message are
+        silently discarded and the LLM never sees them.
+
+        Returns True if the template contains a reference to .System
+        (meaning system messages are rendered), False otherwise.
+        """
+        info = self.get_model_info(name)
+        if not info:
+            return True  # Optimistic fallback if we can't check
+
+        template = info.get('template', '')
+        if not template:
+            return False  # No template at all — cannot handle chat roles
+
+        # Ollama Go templates use {{ .System }} to render system messages.
+        # If the template doesn't reference it, system messages are dropped.
+        return '.System' in template
+
     def pull_model(self, name: str, progress_callback: Callable = None) -> bool:
         """Pull (download) a model. Resumable via Ollama's built-in support.
 
@@ -332,6 +403,88 @@ class OllamaManager:
             print(file=sys.stderr)  # Newline after progress
         return True
 
+    def unload_model(self, name: str) -> bool:
+        """Unload a model from VRAM/RAM immediately.
+
+        Sends a generate request with keep_alive=0 which tells Ollama to
+        evict the model from memory right away instead of waiting for the
+        default idle timeout (typically 5 minutes).
+
+        Args:
+            name: Model name (e.g., "gemma3:4b")
+
+        Returns True if the request succeeded, False otherwise.
+        """
+        try:
+            self._http_post('/api/generate', {
+                'model': name,
+                'keep_alive': 0,
+            }, timeout=10)
+            return True
+        except Exception as e:
+            print(f"[OLLAMA] Failed to unload model: {e}", file=sys.stderr)
+            return False
+
+    # ── Optimized Model Variants ─────────────────────────────────────
+
+    def _ensure_optimized_variant(self, model: str) -> str:
+        """Create or reuse an optimized model variant with tuned sampling params.
+
+        PySubtrans CustomClient only passes ``temperature`` to the Ollama API.
+        Other sampling parameters (top_k, top_p, min_p, repeat_penalty) are
+        silently ignored. This method works around that limitation by creating
+        a lightweight Ollama model variant with our recommended defaults baked
+        into the Modelfile as PARAMETER directives.
+
+        The variant is a thin metadata layer — no model weight duplication.
+        Ollama reuses the same GGUF blobs.
+
+        Args:
+            model: Original model name (e.g., "huihui_ai/hy-mt1.5-abliterated:latest")
+
+        Returns:
+            Variant model name on success, original model name on failure.
+        """
+        import hashlib
+
+        if not OLLAMA_SAMPLING_DEFAULTS:
+            return model  # No defaults to apply
+
+        # Deterministic variant name: hash of (model + params) ensures:
+        #   - Same model + same params → same variant (reuse)
+        #   - Params change in code update → new variant created
+        _key = f"{model}:{json.dumps(OLLAMA_SAMPLING_DEFAULTS, sort_keys=True)}"
+        _hash = hashlib.sha256(_key.encode()).hexdigest()[:10]
+        variant = f"whisperjav-{_hash}"
+
+        # Check if variant already exists
+        if self.check_model(variant):
+            print(f"[OLLAMA] Using optimized variant: {variant}", file=sys.stderr)
+            return variant
+
+        # Build Modelfile with optimized sampling parameters
+        lines = [f'FROM {model}']
+        for param, value in OLLAMA_SAMPLING_DEFAULTS.items():
+            lines.append(f'PARAMETER {param} {value}')
+        modelfile = '\n'.join(lines)
+
+        # Create variant via /api/create (stream=false → single JSON response)
+        try:
+            self._http_post('/api/create', {
+                'model': variant,
+                'modelfile': modelfile,
+                'stream': False,
+            }, timeout=30)
+            print(f"[OLLAMA] Created optimized variant: {variant}", file=sys.stderr)
+            _params_str = ', '.join(f'{k}={v}' for k, v in OLLAMA_SAMPLING_DEFAULTS.items())
+            print(f"[OLLAMA]   Sampling defaults: {_params_str}", file=sys.stderr)
+            return variant
+        except Exception as e:
+            print(f"[OLLAMA] Could not create optimized variant: {e}", file=sys.stderr)
+            print(f"[OLLAMA]   Continuing with original model (only temperature will be tuned)",
+                  file=sys.stderr)
+            return model
+
     # ── Hardware-Aware Recommendation ─────────────────────────────────
 
     def recommend_model(self, vram_gb: float = None) -> ModelRecommendation:
@@ -350,11 +503,13 @@ class OllamaManager:
             pick = "gemma3:12b"
         elif vram_gb >= 8:
             pick = "qwen2.5:7b"
+        elif vram_gb >= 4:
+            pick = "gemma3:4b"
         else:
             pick = "qwen2.5:3b"
 
         cfg = OLLAMA_MODEL_CONFIGS[pick]
-        note = f"Recommended for {'CPU/low VRAM' if vram_gb < 8 else f'{vram_gb:.0f} GB VRAM'}"
+        note = f"Recommended for {'CPU/low VRAM' if vram_gb < 4 else f'{vram_gb:.0f} GB VRAM'}"
 
         return ModelRecommendation(
             name=pick,
@@ -466,22 +621,49 @@ class OllamaManager:
                 )
 
         # Step 5: Get context length and build config
+        # Use the ORIGINAL model for metadata queries — the variant inherits
+        # the same GGUF blobs, context length, and template.
         actual_ctx = self.get_context_length(model)
 
         # Use curated config if available, otherwise use dynamic values
         cfg = OLLAMA_MODEL_CONFIGS.get(model, {})
         num_ctx = cfg.get('num_ctx', min(actual_ctx, 8192))
         batch_size = cfg.get('batch_size', 11)
-        temperature = cfg.get('temperature', 0.5)
+        # Default 0.3: best-fit compromise across 10 tested local models for
+        # JAV subtitle translation (range 0.2–0.4, median 0.3). Keeps strong
+        # models faithful while giving weaker models enough flexibility for
+        # fragmented ASR input. Previous default (0.5) was too high.
+        temperature = cfg.get('temperature', 0.3)
 
-        # Step 6: Return readiness info
+        # Step 6: Check if model template handles system messages
+        has_system = self.supports_system_messages(model)
+        if not has_system:
+            print(f"[OLLAMA] Model template does not handle system messages — "
+                  f"instructions will be embedded in user message", file=sys.stderr)
+
+        # Step 6b: Check if model uses thinking/reasoning mode
+        is_thinking = self.is_thinking_model(model)
+        if is_thinking:
+            print(f"[OLLAMA] Qwen3-family thinking model detected — will patch "
+                  f"response parsing to extract translations from reasoning field",
+                  file=sys.stderr)
+
+        # Step 6c: Create optimized variant with tuned sampling parameters.
+        # PySubtrans only passes temperature to the API — top_k, top_p, min_p,
+        # repeat_penalty are silently dropped. By baking them into a Modelfile
+        # variant, Ollama applies them server-side as defaults.
+        effective_model = self._ensure_optimized_variant(model)
+
+        # Step 7: Return readiness info
         return {
-            'model': model,
+            'model': effective_model,
             'num_ctx': num_ctx,
             'batch_size': batch_size,
             'temperature': temperature,
             'server_started': server_started,
             'base_url': self.base_url,
+            'supports_system_messages': has_system,
+            'thinking_model': is_thinking,
         }
 
     # ── Internal Helpers ──────────────────────────────────────────────
