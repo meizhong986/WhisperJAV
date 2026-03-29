@@ -226,7 +226,8 @@ class StableTSASR:
                 repo_or_dir=self.vad_repo,  # Config-driven, not hardcoded
                 model="silero_vad",
                 force_reload=not is_cached,  # Use cache if available
-                onnx=False
+                onnx=False,
+                trust_repo=True,  # Skip interactive prompt — crashes in Colab/Kaggle (EOFError on input())
             )
             self._vad_precached = True
             status = "from cache" if is_cached else "downloaded"
