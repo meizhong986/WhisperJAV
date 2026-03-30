@@ -54,20 +54,30 @@ class HallucinationRemover:
         self._exact_lists: Optional[Dict[str, Set[str]]] = None
         self._regex_patterns: Optional[List[Dict[str, Any]]] = None
         self._blacklist_phrases: Optional[List[str]] = None
-        
+        self._load_sources: List[str] = []  # Track where data was loaded from
+
         # Load patterns on init with fallback
         self._load_patterns_safe()
         
     def _load_patterns_safe(self):
-        """QUICK FIX: Load patterns with fallback on any failure"""
+        """Load patterns with fallback on any failure, then report to user."""
         try:
             self._load_patterns()
             if not self._exact_lists and not self._regex_patterns:
                 raise Exception("No patterns loaded from external sources")
         except Exception as e:
-            logger.warning(f"External pattern loading failed: {e}")
-            logger.debug("Using built-in fallback patterns")
+            logger.warning(f"Hallucination filter: external loading failed ({e}), using minimal built-in fallback")
             self._load_fallback_patterns()
+            self._load_sources = ["built-in fallback (5 phrases, 2 regex — network and bundled data both unavailable)"]
+
+        # Report what was loaded — visible to users at INFO level
+        exact_total = sum(
+            len(phrases) for phrases in (self._exact_lists or {}).values()
+            if isinstance(phrases, (list, set))
+        )
+        regex_total = len(self._regex_patterns or [])
+        sources = ", ".join(self._load_sources) if self._load_sources else "unknown"
+        logger.info(f"Hallucination filter: {exact_total} phrases + {regex_total} regex patterns loaded ({sources})")
     
     def _load_fallback_patterns(self):
         """QUICK FIX: Minimal built-in patterns when external sources fail"""
@@ -197,7 +207,7 @@ class HallucinationRemover:
             if bundled_path.exists():
                 with open(bundled_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    logger.info(f"Loaded hallucination filter from bundled data: {bundled_path.name}")
+                    logger.debug(f"Read bundled hallucination data: {bundled_path.name}")
                     return data
         except ImportError:
             logger.debug("Bundled hallucination filter data not available")
@@ -248,34 +258,38 @@ class HallucinationRemover:
 
         cache_path = self._get_cache_path(url)
 
+        # Identify which file this is for clearer logging
+        filter_name = "filter list" if "filter" in url.lower() else "regex patterns"
+
         # 1. Try valid cache first (fast path - no network needed)
         if self._is_cache_valid(cache_path):
             cached_data = self._load_from_cache(cache_path)
             if cached_data:
+                self._load_sources.append(f"{filter_name}: cache")
                 return cached_data
 
         # 2. Try to download fresh data
         downloaded_data = self._download_from_url(url)
         if downloaded_data:
-            # Update cache with fresh data
             self._save_to_cache(cache_path, downloaded_data)
+            self._load_sources.append(f"{filter_name}: gist (fresh download)")
             return downloaded_data
 
         # 3. Download failed - try stale cache (better than nothing)
         if cache_path.exists():
             stale_data = self._load_from_cache(cache_path)
             if stale_data:
-                logger.info(f"Using stale cache for hallucination filter (network unavailable)")
+                self._load_sources.append(f"{filter_name}: stale cache (network unavailable)")
                 return stale_data
 
-        # 4. Last resort - bundled fallback data
+        # 4. Last resort - bundled fallback data in package
         bundled_data = self._load_from_bundled(url)
         if bundled_data:
-            # Also save bundled data to cache for next time
             self._save_to_cache(cache_path, bundled_data)
+            self._load_sources.append(f"{filter_name}: bundled package data (network unavailable)")
             return bundled_data
 
-        logger.warning(f"All sources failed for hallucination filter: {url}")
+        self._load_sources.append(f"{filter_name}: FAILED — all sources exhausted")
         return None
             
     def _extract_blacklist_phrases(self, patterns: List[Dict]) -> List[str]:

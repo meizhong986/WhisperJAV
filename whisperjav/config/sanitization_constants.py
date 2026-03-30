@@ -13,7 +13,7 @@ from typing import Dict, List, Set
 class HallucinationConstants:
     """Constants for hallucination detection"""
     EXACT_LIST_URL: str = "https://gist.githubusercontent.com/meizhong986/ecca22c8ddb9dcab4f6df7813c275a00/raw/WhisperJAV_hallucination_regexp_v09.json"
-    FILTER_LIST_URL: str = "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/9e78020b9f85cb7aa3d7004d477353adbfe60ee9/WhisperJAV_hallucination_filter_sorted_v08.json"
+    FILTER_LIST_URL: str = "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/WhisperJAV_hallucination_filter_sorted_v08.json"
     FUZZY_MATCH_THRESHOLD: float = 0.9
     MIN_CONFIDENCE_THRESHOLD: float = 0.5
 

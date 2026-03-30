@@ -18,7 +18,7 @@ import logging
 
 # --- English Sanitization Constants ---
 ENGLISH_CONSTANTS = {
-    "HALLUCINATION_LIST_URL": "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/9e78020b9f85cb7aa3d7004d477353adbfe60ee9/WhisperJAV_hallucination_filter_sorted_v08.json",
+    "HALLUCINATION_LIST_URL": "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/WhisperJAV_hallucination_filter_sorted_v08.json",
     "FALLBACK_HALLUCINATION_PHRASES": {
         'um', 'uh', 'hmm', 'mhm', 'ah', 'oh', 'eh', 'uh-huh',
         'yeah', 'yep', 'yup', 'okay', 'ok', 'bye', '...',

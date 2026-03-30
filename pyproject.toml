@@ -347,6 +347,7 @@ whisperjav = [
     "webview_gui/assets/*.js",
     "webview_gui/assets/*.ico",
     "Menu/*.json",
+    "data/hallucination_filters/*.json",
 ]
 
 # -----------------------------------------------------------------------------

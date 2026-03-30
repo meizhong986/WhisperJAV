@@ -203,7 +203,7 @@ class SRTPostProcessor:
                 source_file=str(srt_path),
                 target_dir=str(temp_dir),
                 hallucination_list_url=self.config.get('hallucination_list_url', 
-                    "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/9e78020b9f85cb7aa3d7004d477353adbfe60ee9/WhisperJAV_hallucination_filter_sorted_v08.json"),
+                    "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/WhisperJAV_hallucination_filter_sorted_v08.json"),
                 cps_slow_threshold=self.config.get('cps_slow_threshold', 6.0),
                 cps_fast_threshold=self.config.get('cps_fast_threshold', 60.22),
                 max_merge_gap_sec=self.config.get('max_merge_gap_sec', 0.4),
