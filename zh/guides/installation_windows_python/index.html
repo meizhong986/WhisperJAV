@@ -1,0 +1,3722 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_python/">
+      
+      
+        <link rel="prev" href="../installation_windows_standalone/">
+      
+      
+        <link rel="next" href="../installation_mac_apple_silicon/">
+      
+      
+        
+          <link rel="alternate" href="../../../guides/installation_windows_python/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Windows (Python) - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-v189-windows-python" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../" title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Windows (Python)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../guides/installation_windows_python/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../" title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 前提条件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 前提条件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        必需软件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU 加速所需
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 所需
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python 版本兼容性
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证前提条件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装 FFmpeg
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 环境设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 环境设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#apython-venv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        选项 A：Python venv（推荐大多数用户使用）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bconda-miniconda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        选项 B：Conda / Miniconda
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        选项 C：使用现有环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 安装（自动化）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 安装（自动化）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 1：克隆仓库
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 2：激活您的环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 3：运行安装程序
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序选项
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        常用调用方式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序执行的操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装时间
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 安装（手动）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 安装（手动）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 1：升级 pip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-cuda-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 2：安装包含 CUDA 的 PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 3：安装核心依赖项
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-whisper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 4：安装 Whisper 包
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 5：安装可选包
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 6：安装 WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 7：验证
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 仅安装特定 Extras
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 仅安装特定 Extras">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可用 Extras
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-gpu-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. GPU 设置（CUDA）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. GPU 设置（CUDA）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        确定您的 CUDA 版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        驱动程序到 CUDA 的映射
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证 CUDA 是否正常工作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        切换 CUDA 版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda-toolkit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA Toolkit（通常不需要）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 运行 WhisperJAV
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 运行 WhisperJAV">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译 CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从源码运行（无需安装）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 更新到新版本
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 更新到新版本">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1git-pull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 1：Git Pull + 重新安装（开发模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 2：完整重新安装
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 3：升级命令（用于 pip 安装）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 4：内置升级工具
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 环境变量
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 环境变量">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设置环境变量（Windows）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 故障排除
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. 故障排除">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pytorch-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTorch / CUDA 问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip / 包安装问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ffmpeg_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FFmpeg 问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语音增强问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-asr-v189" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qwen3-ASR 问题（v1.8.9）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通用技巧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：磁盘空间要求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：完整包列表
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV 升级指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 前提条件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 前提条件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        必需软件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU 加速所需
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 所需
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python 版本兼容性
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证前提条件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装 FFmpeg
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 环境设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 环境设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#apython-venv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        选项 A：Python venv（推荐大多数用户使用）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bconda-miniconda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        选项 B：Conda / Miniconda
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        选项 C：使用现有环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 安装（自动化）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 安装（自动化）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 1：克隆仓库
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 2：激活您的环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 3：运行安装程序
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序选项
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        常用调用方式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序执行的操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装时间
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 安装（手动）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 安装（手动）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 1：升级 pip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-cuda-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 2：安装包含 CUDA 的 PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 3：安装核心依赖项
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-whisper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 4：安装 Whisper 包
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 5：安装可选包
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 6：安装 WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        步骤 7：验证
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 仅安装特定 Extras
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 仅安装特定 Extras">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可用 Extras
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-gpu-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. GPU 设置（CUDA）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. GPU 设置（CUDA）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        确定您的 CUDA 版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        驱动程序到 CUDA 的映射
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证 CUDA 是否正常工作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        切换 CUDA 版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda-toolkit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA Toolkit（通常不需要）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 运行 WhisperJAV
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 运行 WhisperJAV">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译 CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从源码运行（无需安装）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 更新到新版本
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 更新到新版本">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1git-pull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 1：Git Pull + 重新安装（开发模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 2：完整重新安装
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 3：升级命令（用于 pip 安装）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 4：内置升级工具
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 环境变量
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 环境变量">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设置环境变量（Windows）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 故障排除
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. 故障排除">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pytorch-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTorch / CUDA 问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip / 包安装问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ffmpeg_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FFmpeg 问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语音增强问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-asr-v189" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qwen3-ASR 问题（v1.8.9）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通用技巧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：磁盘空间要求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：完整包列表
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/zh/guides/installation_windows_python.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-v189-windows-python">WhisperJAV v1.8.9 -- Windows 安装指南（Python 源码安装）<a class="headerlink" href="#whisperjav-v189-windows-python" title="Permanent link">&para;</a></h1>
+<p>本指南面向有经验的 Python 开发者，介绍如何在 Windows 上从源码安装 WhisperJAV。如果您需要独立安装程序（无需 Python），请参阅 <a href="https://github.com/meizhong986/whisperjav/releases">Releases 页面</a>。</p>
+<hr />
+<h2 id="1">1. 前提条件<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
+<h3 id="_1">必需软件<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>软件</th>
+<th>版本</th>
+<th>用途</th>
+<th>下载</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Python</strong></td>
+<td>3.10、3.11 或 3.12</td>
+<td>运行时</td>
+<td><a href="https://www.python.org/downloads/">python.org</a></td>
+</tr>
+<tr>
+<td><strong>Git</strong></td>
+<td>任意近期版本</td>
+<td>克隆仓库、安装基于 git 的包</td>
+<td><a href="https://git-scm.com/download/win">git-scm.com</a></td>
+</tr>
+<tr>
+<td><strong>FFmpeg</strong></td>
+<td>推荐 6.x 或 7.x</td>
+<td>音视频处理</td>
+<td><a href="https://www.gyan.dev/ffmpeg/builds/">gyan.dev</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="gpu">GPU 加速所需<a class="headerlink" href="#gpu" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>软件</th>
+<th>版本</th>
+<th>用途</th>
+<th>下载</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>NVIDIA GPU 驱动程序</strong></td>
+<td>450+（CUDA 11.8）或 570+（CUDA 12.8）</td>
+<td>GPU 计算</td>
+<td><a href="https://www.nvidia.com/Download/index.aspx">nvidia.com</a></td>
+</tr>
+<tr>
+<td><strong>Visual C++ Redistributable</strong></td>
+<td>2015-2022 (x64)</td>
+<td>原生库支持</td>
+<td><a href="https://aka.ms/vs/17/release/vc_redist.x64.exe">microsoft.com</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="gui">GUI 所需<a class="headerlink" href="#gui" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>软件</th>
+<th>版本</th>
+<th>用途</th>
+<th>下载</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Microsoft Edge WebView2</strong></td>
+<td>任意版本</td>
+<td>GUI 渲染引擎</td>
+<td><a href="https://go.microsoft.com/fwlink/p/?LinkId=2124703">microsoft.com</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="python">Python 版本兼容性<a class="headerlink" href="#python" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Python 3.10-3.12：</strong> 完全支持。</li>
+<li><strong>Python 3.9：</strong> 不支持（因 <code>pysubtrans</code> 依赖项已移除支持）。</li>
+<li><strong>Python 3.13+：</strong> 不支持（<code>openai-whisper</code> 无法在 3.13+ 上编译）。</li>
+</ul>
+<h3 id="_2">验证前提条件<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<p>打开命令提示符或 PowerShell 并运行：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python --version
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git --version
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>ffmpeg -version
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>nvidia-smi
+</code></pre></div>
+<p>四个命令都应正常输出结果。如果没有 NVIDIA GPU，<code>nvidia-smi</code> 命令会失败，这是正常的 -- WhisperJAV 支持纯 CPU 运行。</p>
+<h3 id="ffmpeg">安装 FFmpeg<a class="headerlink" href="#ffmpeg" title="Permanent link">&para;</a></h3>
+<p>FFmpeg 不包含在 Python 中，必须单独安装：</p>
+<ol>
+<li>从 <a href="https://www.gyan.dev/ffmpeg/builds/">gyan.dev</a> 下载 <strong>essentials</strong> 版本。</li>
+<li>解压归档文件（例如解压到 <code>C:\ffmpeg</code>）。</li>
+<li>将 <code>bin</code> 目录添加到系统 PATH：</li>
+<li>打开<strong>系统属性</strong> &gt; <strong>环境变量</strong></li>
+<li>在<strong>系统变量</strong>下，找到 <strong>Path</strong>，点击<strong>编辑</strong></li>
+<li>点击<strong>新建</strong>，添加 <code>C:\ffmpeg\bin</code></li>
+<li>点击<strong>确定</strong>关闭所有对话框</li>
+<li>打开新的命令提示符并验证：<code>ffmpeg -version</code></li>
+</ol>
+<p>或者，如果您使用包管理器：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>REM 使用 Chocolatey：
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>choco install ffmpeg
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>REM 使用 Scoop：
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>scoop install ffmpeg
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>REM 使用 winget：
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>winget install --id=Gyan.FFmpeg -e
+</code></pre></div>
+<hr />
+<h2 id="2">2. 环境设置<a class="headerlink" href="#2" title="Permanent link">&para;</a></h2>
+<p><strong>重要：</strong> 请始终在虚拟环境或 conda 环境中安装 WhisperJAV。切勿安装到全局 Python。</p>
+<h3 id="apython-venv">选项 A：Python venv（推荐大多数用户使用）<a class="headerlink" href="#apython-venv" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>REM 创建虚拟环境
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python -m venv whisperjav-env
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>REM 激活（命令提示符）
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>whisperjav-env\Scripts\activate
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>REM 激活（PowerShell）
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>whisperjav-env\Scripts\Activate.ps1
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>REM 验证您在 venv 中（应显示 venv 路径）
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>where python
+</code></pre></div>
+<h3 id="bconda-miniconda">选项 B：Conda / Miniconda<a class="headerlink" href="#bconda-miniconda" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>REM 创建 Python 3.11 的 conda 环境
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>conda create -n whisperjav python=3.11 -y
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>REM 激活
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>conda activate whisperjav
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>REM 验证
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>python --version
+</code></pre></div>
+<h3 id="c">选项 C：使用现有环境<a class="headerlink" href="#c" title="Permanent link">&para;</a></h3>
+<p>如果您已有用于机器学习的虚拟环境（已安装 PyTorch），可以将 WhisperJAV 安装到其中。确保 PyTorch 是 CUDA 版本，而非纯 CPU 版本：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python -c &quot;import torch; print(f&#39;PyTorch {torch.__version__}, CUDA: {torch.cuda.is_available()}&#39;)&quot;
+</code></pre></div>
+<p>如果输出 <code>CUDA: True</code>，可以跳过第 4 节中的 PyTorch 安装步骤。</p>
+<hr />
+<h2 id="3">3. 安装（自动化）<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
+<p>自动化安装程序会处理 GPU 检测、CUDA 选择和分阶段包安装。</p>
+<h3 id="1_1">步骤 1：克隆仓库<a class="headerlink" href="#1_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git clone https://github.com/meizhong986/whisperjav.git
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>cd whisperjav
+</code></pre></div>
+<h3 id="2_1">步骤 2：激活您的环境<a class="headerlink" href="#2_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>REM venv：
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>whisperjav-env\Scripts\activate
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>REM conda：
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>conda activate whisperjav
+</code></pre></div>
+<h3 id="3_1">步骤 3：运行安装程序<a class="headerlink" href="#3_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>REM 标准安装（自动检测 GPU）
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>python install.py
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>REM 或使用批处理包装器：
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>installer\install_windows.bat
+</code></pre></div>
+<p>两个命令执行的操作相同。<code>.bat</code> 包装器只是定位并运行 <code>install.py</code>。</p>
+<h3 id="_3">安装程序选项<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>--cpu-only              安装仅 CPU 版本的 PyTorch（无 CUDA）
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>--cuda118               安装用于 CUDA 11.8 的 PyTorch（驱动程序 450+）
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>--cuda128               安装用于 CUDA 12.8 的 PyTorch（驱动程序 570+，默认）
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>--no-speech-enhancement 跳过语音增强包（更快的安装）
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>--minimal               最小化安装（仅转录功能，无 GUI/翻译/增强）
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>--dev                   以开发/可编辑模式安装（pip install -e）
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>--local-llm             安装本地大语言模型翻译（预编译 wheel）
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>--local-llm-build       安装本地大语言模型翻译（从源码编译）
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>--no-local-llm          跳过本地大语言模型安装
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>--skip-preflight        跳过磁盘空间和网络检查
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>--help                  显示所有选项
+</code></pre></div>
+<h3 id="_4">常用调用方式<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>REM 标准安装（推荐）
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>python install.py
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>REM 强制使用 CUDA 11.8（较旧的 GPU 驱动程序）
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>python install.py --cuda118
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>REM 仅 CPU（无 NVIDIA GPU）
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>python install.py --cpu-only
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>REM 最小化安装，用于快速测试
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>python install.py --minimal
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>REM 开发者安装（可编辑模式）
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>python install.py --dev
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>REM 包含本地大语言模型的完整安装
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>python install.py --local-llm
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>REM 快速安装（跳过较慢的可选包）
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>python install.py --no-speech-enhancement --no-local-llm
+</code></pre></div>
+<h3 id="_5">安装程序执行的操作<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>安装程序按以下顺序执行：</p>
+<ol>
+<li><strong>预检</strong> -- 验证磁盘空间（8GB 可用）、网络连接、WebView2、VC++ Redistributable</li>
+<li><strong>前提条件</strong> -- 验证 Python 版本、FFmpeg、Git</li>
+<li><strong>GPU 检测</strong> -- 识别 NVIDIA GPU 和驱动程序版本，选择 CUDA 版本</li>
+<li><strong>升级 pip</strong> -- 将 pip 升级到最新版本</li>
+<li><strong>PyTorch</strong> -- 使用正确的 CUDA 索引 URL 安装 <code>torch</code> 和 <code>torchaudio</code></li>
+<li><strong>核心依赖项</strong> -- numpy、scipy、numba、librosa、音频/字幕包</li>
+<li><strong>Whisper 包</strong> -- openai-whisper（来自 GitHub）、stable-ts（自定义 fork）、faster-whisper</li>
+<li><strong>可选包</strong> -- HuggingFace Transformers、Qwen3-ASR、翻译（pysubtrans、OpenAI、Gemini）、语音活动检测（Silero、TEN）、语音增强（ClearVoice、BS-RoFormer、ModelScope）</li>
+<li><strong>GUI 包</strong> -- PyWebView、pythonnet、pywin32</li>
+<li><strong>WhisperJAV</strong> -- 安装应用程序本身（使用 <code>--no-deps</code> 以保留分阶段环境）</li>
+<li><strong>验证</strong> -- 导入 whisperjav 并检查 torch CUDA 状态</li>
+</ol>
+<h3 id="_6">安装时间<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>大致时间</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>完整安装（含 GPU）</td>
+<td>10-20 分钟</td>
+<td>取决于网速</td>
+</tr>
+<tr>
+<td>最小化安装</td>
+<td>5-10 分钟</td>
+<td>仅转录功能</td>
+</tr>
+<tr>
+<td>仅 CPU</td>
+<td>10-15 分钟</td>
+<td>稍快（无 CUDA wheels）</td>
+</tr>
+</tbody>
+</table>
+<p>日志文件保存在仓库根目录的 <code>install_log.txt</code> 中。</p>
+<hr />
+<h2 id="4">4. 安装（手动）<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
+<p>如果您希望自行安装各个包，请按以下顺序执行。</p>
+<h3 id="1-pip">步骤 1：升级 pip<a class="headerlink" href="#1-pip" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>python -m pip install --upgrade pip
+</code></pre></div>
+<h3 id="2-cuda-pytorch">步骤 2：安装包含 CUDA 的 PyTorch<a class="headerlink" href="#2-cuda-pytorch" title="Permanent link">&para;</a></h3>
+<p>此步骤至关重要。您必须从正确的索引 URL 安装 PyTorch 以获得 GPU 支持。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>REM 用于 CUDA 12.8（驱动程序 570+，推荐用于新款 GPU）
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>REM 用于 CUDA 11.8（驱动程序 450+，通用回退方案）
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>REM 仅 CPU（无 NVIDIA GPU）
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+</code></pre></div>
+<p>验证安装：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>python -c &quot;import torch; print(f&#39;PyTorch {torch.__version__}&#39;); print(f&#39;CUDA available: {torch.cuda.is_available()}&#39;)&quot;
+</code></pre></div>
+<p>如果显示 <code>CUDA available: True</code>，说明 GPU 加速已启用。</p>
+<h3 id="3_2">步骤 3：安装核心依赖项<a class="headerlink" href="#3_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>REM 科学计算栈（numpy 必须在 numba 之前）
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>pip install &quot;numpy&gt;=2.0.0&quot; &quot;scipy&gt;=1.13.0&quot; &quot;numba&gt;=0.60.0&quot;
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>pip install &quot;librosa&gt;=0.11.0&quot; soundfile pydub pyloudnorm
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>REM 字幕处理
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>pip install pysrt srt
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>REM 工具库
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>pip install tqdm colorama requests aiofiles regex jsonschema
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>pip install &quot;pydantic&gt;=2.0,&lt;3.0&quot; &quot;PyYAML&gt;=6.0&quot;
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>REM 语音活动检测
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>pip install &quot;silero-vad&gt;=6.2&quot; auditok ten-vad
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>REM 性能
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>pip install &quot;psutil&gt;=5.9.0&quot; &quot;scikit-learn&gt;=1.3.0&quot;
+</code></pre></div>
+<h3 id="4-whisper">步骤 4：安装 Whisper 包<a class="headerlink" href="#4-whisper" title="Permanent link">&para;</a></h3>
+<p>这些包必须在 PyTorch 之后安装。它们依赖 <code>torch</code>，由于已安装了 CUDA 版本的 torch，pip 不会重新下载 CPU 版本。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>REM OpenAI Whisper（main 分支以获取最新修复）
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>pip install git+https://github.com/openai/whisper@main
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>REM Stable-ts（用于日语的自定义 fork）
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>pip install git+https://github.com/meizhong986/stable-ts-fix-setup.git@main
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>REM ffmpeg-python（必须使用 git 版本，PyPI tarball 有构建问题）
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>pip install git+https://github.com/kkroening/ffmpeg-python.git
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>REM Faster-Whisper（CTranslate2 后端）
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>pip install &quot;faster-whisper&gt;=1.1.0&quot;
+</code></pre></div>
+<h3 id="5">步骤 5：安装可选包<a class="headerlink" href="#5" title="Permanent link">&para;</a></h3>
+<p>仅安装您需要的 extras：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>REM HuggingFace（Qwen3-ASR 和 kotoba-whisper 模型所需）
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>pip install &quot;huggingface-hub&gt;=0.25.0&quot; &quot;transformers&gt;=4.40.0&quot; &quot;accelerate&gt;=0.26.0&quot; hf_xet
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>REM Qwen3-ASR（v1.8.9 新增，需要上述 HuggingFace 包）
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>pip install &quot;qwen-asr&gt;=0.0.6&quot;
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>REM 翻译
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>pip install &quot;pysubtrans&gt;=1.5.0&quot; &quot;openai&gt;=1.35.0&quot; &quot;google-genai&gt;=1.39.0&quot;
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>REM GUI（Windows）
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>pip install &quot;pywebview&gt;=5.0.0&quot; &quot;pythonnet&gt;=3.0&quot; &quot;pywin32&gt;=305&quot;
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>REM 语音增强
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>pip install &quot;modelscope&gt;=1.20&quot; oss2 addict &quot;datasets&gt;=2.14.0,&lt;4.0&quot; simplejson sortedcontainers packaging
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a>pip install git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice
+<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a>pip install bs-roformer-infer &quot;onnxruntime&gt;=1.16.0&quot;
+<a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a>
+<a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a>REM 兼容性（pyvideotrans 互操作）
+<a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>pip install &quot;av&gt;=13.0.0&quot; &quot;imageio&gt;=2.31.0&quot; &quot;imageio-ffmpeg&gt;=0.4.9&quot; &quot;httpx&gt;=0.27.0&quot; &quot;websockets&gt;=13.0&quot; &quot;soxr&gt;=0.3.0&quot;
+<a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a>
+<a id="__codelineno-15-21" name="__codelineno-15-21" href="#__codelineno-15-21"></a>REM 分析/可视化
+<a id="__codelineno-15-22" name="__codelineno-15-22" href="#__codelineno-15-22"></a>pip install matplotlib Pillow
+</code></pre></div>
+<h3 id="6-whisperjav">步骤 6：安装 WhisperJAV<a class="headerlink" href="#6-whisperjav" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>REM 标准安装（从本地源码，保留分阶段依赖项）
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>pip install --no-deps .
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>REM 或开发/可编辑模式
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>pip install --no-deps -e .
+</code></pre></div>
+<p><code>--no-deps</code> 标志是必需的。如果不使用它，pip 会重新解析所有依赖项，可能将您的 CUDA 版 PyTorch 替换为 CPU 版本。</p>
+<h3 id="7">步骤 7：验证<a class="headerlink" href="#7" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>python -c &quot;import whisperjav; print(f&#39;WhisperJAV {whisperjav.__version__}&#39;)&quot;
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>whisperjav --help
+</code></pre></div>
+<hr />
+<h2 id="5-extras">5. 仅安装特定 Extras<a class="headerlink" href="#5-extras" title="Permanent link">&para;</a></h2>
+<p>如果您只需要某些功能，可以仅安装对应的 extras。但由于 GPU 锁定要求，您应始终先手动安装 PyTorch（上述步骤 2），然后使用 <code>--no-deps</code>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>REM 错误做法：这会从 PyPI 拉取 CPU 版 PyTorch
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>pip install &quot;whisperjav[cli]&quot;
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>REM 正确做法：先安装 PyTorch，然后使用 no-deps 安装 WhisperJAV
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>pip install --no-deps -e &quot;.&quot;
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>pip install &quot;whisperjav[cli]&quot; --no-deps
+</code></pre></div>
+<p>使用自动化安装程序的简洁方式，可以组合标志：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>REM 最小化安装（仅转录功能，无 GUI/翻译/增强）
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>python install.py --minimal
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>REM 无语音增强（更快的安装）
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>python install.py --no-speech-enhancement
+</code></pre></div>
+<h3 id="extras">可用 Extras<a class="headerlink" href="#extras" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Extra</th>
+<th>内容</th>
+<th>使用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cli</code></td>
+<td>numpy、scipy、librosa、语音活动检测、scikit-learn</td>
+<td>CLI 音频处理</td>
+</tr>
+<tr>
+<td><code>gui</code></td>
+<td>pywebview、pythonnet、pywin32</td>
+<td>GUI 应用程序</td>
+</tr>
+<tr>
+<td><code>translate</code></td>
+<td>pysubtrans、openai、google-genai</td>
+<td>AI 字幕翻译</td>
+</tr>
+<tr>
+<td><code>llm</code></td>
+<td>uvicorn、fastapi</td>
+<td>本地大语言模型服务器</td>
+</tr>
+<tr>
+<td><code>enhance</code></td>
+<td>modelscope、clearvoice、bs-roformer</td>
+<td>语音增强</td>
+</tr>
+<tr>
+<td><code>huggingface</code></td>
+<td>transformers、accelerate、hf_xet</td>
+<td>HuggingFace 模型支持</td>
+</tr>
+<tr>
+<td><code>qwen</code></td>
+<td>qwen-asr（+ huggingface 依赖项）</td>
+<td>Qwen3-ASR 处理管线（v1.8.9+）</td>
+</tr>
+<tr>
+<td><code>analysis</code></td>
+<td>matplotlib、Pillow</td>
+<td>可视化工具</td>
+</tr>
+<tr>
+<td><code>compatibility</code></td>
+<td>av、imageio、httpx、websockets、soxr</td>
+<td>pyvideotrans 互操作</td>
+</tr>
+<tr>
+<td><code>dev</code></td>
+<td>pytest、ruff、pre-commit</td>
+<td>开发工具</td>
+</tr>
+<tr>
+<td><code>all</code></td>
+<td>以上全部</td>
+<td>完整安装</td>
+</tr>
+<tr>
+<td><code>colab</code></td>
+<td>cli + translate + huggingface</td>
+<td>Google Colab</td>
+</tr>
+<tr>
+<td><code>windows</code></td>
+<td>同 <code>all</code></td>
+<td>Windows 完整体验</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-gpu-cuda">6. GPU 设置（CUDA）<a class="headerlink" href="#6-gpu-cuda" title="Permanent link">&para;</a></h2>
+<h3 id="cuda">确定您的 CUDA 版本<a class="headerlink" href="#cuda" title="Permanent link">&para;</a></h3>
+<p>PyTorch 的 CUDA 版本取决于您的 NVIDIA 驱动程序版本，而非系统上安装的 CUDA Toolkit 版本。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>REM 检查您的驱动程序版本
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>nvidia-smi
+</code></pre></div>
+<p>查看输出头部中的 "Driver Version"：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>+---------------------------+
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>| NVIDIA-SMI 570.xx.xx      |   &lt;-- 这是您的驱动程序版本
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>| Driver Version: 570.xx.xx |
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>| CUDA Version: 12.8        |   &lt;-- 支持的最高 CUDA 版本
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>+---------------------------+
+</code></pre></div>
+<h3 id="cuda_1">驱动程序到 CUDA 的映射<a class="headerlink" href="#cuda_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>驱动程序版本</th>
+<th>推荐的 <code>--index-url</code></th>
+<th>标志</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>570+</td>
+<td><code>https://download.pytorch.org/whl/cu128</code></td>
+<td><code>--cuda128</code>（默认）</td>
+</tr>
+<tr>
+<td>450-569</td>
+<td><code>https://download.pytorch.org/whl/cu118</code></td>
+<td><code>--cuda118</code></td>
+</tr>
+<tr>
+<td>低于 450</td>
+<td><code>https://download.pytorch.org/whl/cpu</code></td>
+<td><code>--cpu-only</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cuda_2">验证 CUDA 是否正常工作<a class="headerlink" href="#cuda_2" title="Permanent link">&para;</a></h3>
+<p>安装完成后，验证 CUDA 是否可用：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>python -c &quot;
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>import torch
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>print(f&#39;PyTorch version: {torch.__version__}&#39;)
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>print(f&#39;CUDA available: {torch.cuda.is_available()}&#39;)
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>if torch.cuda.is_available():
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    print(f&#39;CUDA version: {torch.version.cuda}&#39;)
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    print(f&#39;GPU: {torch.cuda.get_device_name(0)}&#39;)
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>    print(f&#39;GPU memory: {torch.cuda.get_device_properties(0).total_mem / 1024**3:.1f} GB&#39;)
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>&quot;
+</code></pre></div>
+<h3 id="cuda_3">切换 CUDA 版本<a class="headerlink" href="#cuda_3" title="Permanent link">&para;</a></h3>
+<p>如果安装了错误的 CUDA 版本，请卸载后重新安装：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>pip uninstall torch torchaudio -y
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+</code></pre></div>
+<h3 id="cuda-toolkit">CUDA Toolkit（通常不需要）<a class="headerlink" href="#cuda-toolkit" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV 不需要单独安装 CUDA Toolkit。PyTorch 捆绑了自己的 CUDA 运行时。仅在从源码编译包时（例如 <code>--local-llm-build</code>）才需要 CUDA Toolkit。</p>
+<p>如有需要：<a href="https://developer.nvidia.com/cuda-downloads">CUDA Toolkit 下载</a></p>
+<hr />
+<h2 id="7-whisperjav">7. 运行 WhisperJAV<a class="headerlink" href="#7-whisperjav" title="Permanent link">&para;</a></h2>
+<h3 id="cli">CLI 使用<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>REM 基本转录
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>whisperjav video.mp4
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>REM 选择模式
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>whisperjav video.mp4 --mode balanced    # 完整处理管线（推荐）
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>whisperjav video.mp4 --mode fast        # 场景检测 + 标准 Whisper
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>whisperjav video.mp4 --mode faster      # 直接使用 Faster-Whisper（最快）
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>REM 设置灵敏度
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>whisperjav video.mp4 --mode balanced --sensitivity aggressive
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>REM 带翻译
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>whisperjav video.mp4 --translate
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>REM 使用 Qwen3-ASR 处理管线（v1.8.9 新增）
+<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>whisperjav video.mp4 --mode qwen --input-mode assembly
+<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>
+<a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>REM 处理整个目录
+<a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a>whisperjav /path/to/videos/ --mode balanced
+<a id="__codelineno-24-20" name="__codelineno-24-20" href="#__codelineno-24-20"></a>
+<a id="__codelineno-24-21" name="__codelineno-24-21" href="#__codelineno-24-21"></a>REM 查看所有选项
+<a id="__codelineno-24-22" name="__codelineno-24-22" href="#__codelineno-24-22"></a>whisperjav --help
+</code></pre></div>
+<h3 id="gui_1">GUI 使用<a class="headerlink" href="#gui_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>REM 启动 GUI
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>whisperjav-gui
+</code></pre></div>
+<p>GUI 运行要求：
+- Microsoft Edge WebView2 运行时
+- 已安装 <code>[gui]</code> extra（默认安装中已包含）</p>
+<h3 id="cli_1">翻译 CLI<a class="headerlink" href="#cli_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>REM 翻译已有字幕
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>whisperjav-translate -i subtitles.srt
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>REM 查看翻译选项
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>whisperjav-translate --help
+</code></pre></div>
+<h3 id="_7">从源码运行（无需安装）<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>如果您正在开发且未运行 <code>pip install</code>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>python -m whisperjav.main video.mp4 --mode balanced
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>python -m whisperjav.webview_gui.main
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>python -m whisperjav.translate.cli -i subtitles.srt
+</code></pre></div>
+<hr />
+<h2 id="8">8. 更新到新版本<a class="headerlink" href="#8" title="Permanent link">&para;</a></h2>
+<h3 id="1git-pull">方法 1：Git Pull + 重新安装（开发模式）<a class="headerlink" href="#1git-pull" title="Permanent link">&para;</a></h3>
+<p>如果以可编辑模式安装（<code>--dev</code>）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>cd whisperjav
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>git pull
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>pip install --no-deps -e .
+</code></pre></div>
+<p>这会更新到最新代码而无需重新下载依赖项。如果新版本添加了新的依赖项，可能需要单独安装或重新运行 <code>python install.py</code>。</p>
+<h3 id="2_2">方法 2：完整重新安装<a class="headerlink" href="#2_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>cd whisperjav
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>git pull
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>python install.py
+</code></pre></div>
+<p>这会重新运行完整安装程序，按需升级各个包。</p>
+<h3 id="3-pip">方法 3：升级命令（用于 pip 安装）<a class="headerlink" href="#3-pip" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>REM 仅升级 WhisperJAV（不更改依赖项）
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>pip install -U --no-deps git+https://github.com/meizhong986/whisperjav.git
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>REM 升级所有依赖项（可能更改 PyTorch -- 请谨慎使用）
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>pip install -U &quot;whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git&quot;
+</code></pre></div>
+<h3 id="4_1">方法 4：内置升级工具<a class="headerlink" href="#4_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>REM 检查更新
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>whisperjav-upgrade --check
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>REM 交互式升级
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>whisperjav-upgrade
+<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a>
+<a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a>REM 仅升级包，跳过依赖项
+<a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a>whisperjav-upgrade --wheel-only
+</code></pre></div>
+<hr />
+<h2 id="9">9. 环境变量<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV 支持以下环境变量：</p>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WHISPERJAV_DEBUG</code></td>
+<td><code>0</code></td>
+<td>设为 <code>1</code> 启用 GUI 调试模式（DevTools）</td>
+</tr>
+<tr>
+<td><code>WHISPERJAV_NO_ICON</code></td>
+<td><code>0</code></td>
+<td>设为 <code>1</code> 跳过图标加载（调试渲染问题）</td>
+</tr>
+<tr>
+<td><code>WHISPERJAV_CACHE_DIR</code></td>
+<td><code>.whisperjav_cache</code></td>
+<td>元数据缓存目录</td>
+</tr>
+<tr>
+<td><code>HF_HOME</code></td>
+<td><code>~/.cache/huggingface</code></td>
+<td>HuggingFace 模型缓存位置</td>
+</tr>
+<tr>
+<td><code>TORCH_HOME</code></td>
+<td><code>~/.cache/torch</code></td>
+<td>PyTorch 模型缓存位置</td>
+</tr>
+<tr>
+<td><code>CUDA_VISIBLE_DEVICES</code></td>
+<td>所有 GPU</td>
+<td>限制使用特定 GPU（例如 <code>0</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="windows">设置环境变量（Windows）<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>REM 临时（仅当前会话）
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>set WHISPERJAV_DEBUG=1
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>REM 永久（PowerShell，用户范围）
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>[Environment]::SetEnvironmentVariable(&quot;WHISPERJAV_DEBUG&quot;, &quot;1&quot;, &quot;User&quot;)
+</code></pre></div>
+<hr />
+<h2 id="10">10. 故障排除<a class="headerlink" href="#10" title="Permanent link">&para;</a></h2>
+<h3 id="pytorch-cuda">PyTorch / CUDA 问题<a class="headerlink" href="#pytorch-cuda" title="Permanent link">&para;</a></h3>
+<p><strong>问题：<code>torch.cuda.is_available()</code> 返回 <code>False</code></strong></p>
+<p>原因和解决方案：</p>
+<ol>
+<li>
+<p><strong>安装了错误的 PyTorch 版本（CPU 而非 CUDA）：</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>pip uninstall torch torchaudio -y
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>驱动程序版本对于所选 CUDA 版本过旧：</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>REM 检查驱动程序版本
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>nvidia-smi
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>REM 如果驱动程序 &lt; 570，使用 CUDA 11.8
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>未安装 NVIDIA 驱动程序：</strong>
+   从 <a href="https://www.nvidia.com/Download/index.aspx">nvidia.com</a> 下载。</p>
+</li>
+</ol>
+<p><strong>问题：<code>RuntimeError: CUDA out of memory</code></strong></p>
+<ul>
+<li>WhisperJAV 的 large-v2 模型需要约 3-4 GB GPU 显存。</li>
+<li>关闭其他占用 GPU 的应用程序。</li>
+<li>尝试使用较小的模型：<code>whisperjav video.mp4 --model medium</code></li>
+<li>如果有多个 GPU，使用 <code>CUDA_VISIBLE_DEVICES=0</code>。</li>
+</ul>
+<h3 id="pip">pip / 包安装问题<a class="headerlink" href="#pip" title="Permanent link">&para;</a></h3>
+<p><strong>问题：<code>pip install</code> 失败并提示 "Could not build wheels"</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>REM 升级 pip 和构建工具
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>pip install --upgrade pip setuptools wheel
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>REM 如需要，安装 Visual C++ Build Tools
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>REM 下载地址：https://visualstudio.microsoft.com/visual-cpp-build-tools/
+</code></pre></div>
+<p><strong>问题：依赖项冲突</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>REM 在新 venv 中重新开始
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>deactivate
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>rmdir /s /q whisperjav-env
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>python -m venv whisperjav-env
+<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>whisperjav-env\Scripts\activate
+<a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>python install.py
+</code></pre></div>
+<p><strong>问题：<code>pip install git+https://...</code> 超时失败</strong></p>
+<p>这在防火墙或 VPN 后很常见。自动化安装程序会自动处理此问题，手动安装时：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>REM 为 Git 配置延长超时
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>git config --global http.connectTimeout 120
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>git config --global http.timeout 300
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a>git config --global http.postBuffer 524288000
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a>
+<a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>REM 重试安装
+<a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a>pip install --timeout 120 git+https://github.com/openai/whisper@main
+</code></pre></div>
+<p><strong>问题：<code>numpy</code> / <code>numba</code> 导入错误</strong></p>
+<p>当 numba 在 numpy 之前安装时会出现此问题：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>pip uninstall numpy numba -y
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>pip install &quot;numpy&gt;=2.0.0&quot;
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>pip install &quot;numba&gt;=0.60.0&quot;
+</code></pre></div>
+<h3 id="ffmpeg_1">FFmpeg 问题<a class="headerlink" href="#ffmpeg_1" title="Permanent link">&para;</a></h3>
+<p><strong>问题：<code>FFmpeg is not installed or not in PATH</code></strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>REM 验证 FFmpeg 是否可访问
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>ffmpeg -version
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a>REM 如果未找到，添加到 PATH（示例）
+<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a>set PATH=C:\ffmpeg\bin;%PATH%
+<a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a>
+<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a>REM 或通过包管理器安装
+<a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a>choco install ffmpeg
+</code></pre></div>
+<p><strong>问题：<code>ffmpeg-python</code> 导入错误</strong></p>
+<p>PyPI 版本的 <code>ffmpeg-python</code> 有构建问题。请从 Git 安装：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>pip install git+https://github.com/kkroening/ffmpeg-python.git
+</code></pre></div>
+<h3 id="gui_2">GUI 问题<a class="headerlink" href="#gui_2" title="Permanent link">&para;</a></h3>
+<p><strong>问题：GUI 窗口空白或无法打开</strong></p>
+<ol>
+<li>
+<p>确认 WebView2 已安装：
+   从 <a href="https://go.microsoft.com/fwlink/p/?LinkId=2124703">microsoft.com</a> 下载</p>
+</li>
+<li>
+<p>检查 pythonnet 是否已安装：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>pip install &quot;pythonnet&gt;=3.0&quot;
+</code></pre></div></p>
+</li>
+<li>
+<p>尝试以调试模式运行：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>set WHISPERJAV_DEBUG=1
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>whisperjav-gui
+</code></pre></div></p>
+</li>
+</ol>
+<p><strong>问题：<code>ImportError: No module named 'webview'</code></strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>pip install &quot;pywebview&gt;=5.0.0&quot;
+</code></pre></div>
+<h3 id="_8">语音增强问题<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<p><strong>问题：ModelScope 下载失败</strong></p>
+<p>ModelScope 从中国 CDN 下载模型。如果您在中国境外，下载可能较慢。需要 <code>oss2</code> 包：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>pip install oss2 &quot;modelscope&gt;=1.20&quot;
+</code></pre></div>
+<p><strong>问题：<code>datasets</code> 版本冲突</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>pip install &quot;datasets&gt;=2.14.0,&lt;4.0&quot;
+</code></pre></div>
+<p><code>datasets&gt;=4.0</code> 与 ModelScope 不兼容。</p>
+<h3 id="qwen3-asr-v189">Qwen3-ASR 问题（v1.8.9）<a class="headerlink" href="#qwen3-asr-v189" title="Permanent link">&para;</a></h3>
+<p><strong>问题：<code>ImportError: No module named 'qwen_asr'</code></strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>pip install &quot;qwen-asr&gt;=0.0.6&quot;
+</code></pre></div>
+<p>注意：pip 包名为 <code>qwen-asr</code>（连字符），但 Python 导入名为 <code>qwen_asr</code>（下划线）。</p>
+<p><strong>问题：Qwen 模型下载缓慢</strong></p>
+<p>模型从 HuggingFace 下载。如需要可设置镜像：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>set HF_ENDPOINT=https://hf-mirror.com
+</code></pre></div>
+<h3 id="_9">通用技巧<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>始终检查日志文件：</strong> 运行 <code>python install.py</code> 后，检查仓库根目录的 <code>install_log.txt</code> 获取详细错误信息。</p>
+</li>
+<li>
+<p><strong>清除 pip 缓存：</strong> 如果包似乎已损坏：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>pip cache purge
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>检查正在使用哪个 Python：</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>where python
+<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>python -c &quot;import sys; print(sys.executable)&quot;
+</code></pre></div>
+   确保指向您的 venv/conda Python，而非系统 Python。</p>
+</li>
+<li>
+<p><strong>验证您的环境：</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>python -c &quot;
+<a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>import sys
+<a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>print(f&#39;Python: {sys.version}&#39;)
+<a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>print(f&#39;Executable: {sys.executable}&#39;)
+<a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>print(f&#39;Prefix: {sys.prefix}&#39;)
+<a id="__codelineno-50-6" name="__codelineno-50-6" href="#__codelineno-50-6"></a>print(f&#39;In venv: {sys.prefix != sys.base_prefix}&#39;)
+<a id="__codelineno-50-7" name="__codelineno-50-7" href="#__codelineno-50-7"></a>&quot;
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>首次转录需要额外时间：</strong> WhisperJAV 在首次使用时会下载 AI 模型（~1-3 GB）。这是一次性下载，缓存在 <code>~/.cache/huggingface/</code> 中。</p>
+</li>
+</ol>
+<hr />
+<h2 id="_10">附录：磁盘空间要求<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>大小</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python 包</td>
+<td>~4-6 GB</td>
+<td>PyTorch 最大（~2 GB）</td>
+</tr>
+<tr>
+<td>Whisper 模型（large-v2）</td>
+<td>~3 GB</td>
+<td>首次使用时下载</td>
+</tr>
+<tr>
+<td>Qwen3-ASR 模型</td>
+<td>~2-3 GB</td>
+<td>首次使用时下载（如使用 Qwen 模式）</td>
+</tr>
+<tr>
+<td>语音增强模型</td>
+<td>~1 GB</td>
+<td>首次使用时下载</td>
+</tr>
+<tr>
+<td><strong>总计（建议可用空间）</strong></td>
+<td><strong>~15 GB</strong></td>
+<td>包含临时文件余量</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_11">附录：完整包列表<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<p>完整的包及其版本列表请参阅：</p>
+<ul>
+<li><code>pyproject.toml</code> -- Extras 和依赖项规格</li>
+<li><code>whisperjav/installer/core/registry.py</code> -- 所有包的唯一真实来源</li>
+<li>运行 <code>python -m whisperjav.installer.validation</code> 检查您的安装是否与注册表一致</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../installation_windows_standalone/" class="md-footer__link md-footer__link--prev" aria-label="上一页: Windows (Installer)">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                Windows (Installer)
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../installation_mac_apple_silicon/" class="md-footer__link md-footer__link--next" aria-label="下一页: macOS (Apple Silicon)">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                macOS (Apple Silicon)
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

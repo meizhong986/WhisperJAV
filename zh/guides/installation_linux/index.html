@@ -1,0 +1,3850 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_linux/">
+      
+      
+        <link rel="prev" href="../installation_mac_apple_silicon/">
+      
+      
+        <link rel="next" href="../../user-guide/">
+      
+      
+        
+          <link rel="alternate" href="../../../guides/installation_linux/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Linux - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-linux" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../" title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Linux
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../guides/installation_linux/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../" title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        系统要求
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="系统要求">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        硬件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        支持的 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        软件
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前提条件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="前提条件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ubuntu-debian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ubuntu / Debian
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fedora-rhel-centos-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fedora / RHEL / CentOS Stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arch-linux-manjaro" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arch Linux / Manjaro
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nvidia-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NVIDIA 驱动程序和 CUDA 设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NVIDIA 驱动程序和 CUDA 设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查当前驱动程序
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nvidia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装 NVIDIA 驱动程序
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证驱动程序版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据中心/云端 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 1：源码安装（推荐）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2pip-extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 2：pip 安装并指定 Extras
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3conda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 3：Conda 环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU 验证
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装特定 Extras
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装特定 Extras">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extras_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可用 Extras
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        无图形界面服务器设置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#google-colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Colab 设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Google Colab 设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快速入门
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Colab 安装程序执行的操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#colab_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Colab 使用技巧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kaggle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kaggle 设置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        运行应用程序
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="运行应用程序">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#systemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Systemd 服务设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Systemd 服务设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        创建服务文件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        创建定时器以定期运行
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        启用并启动
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        故障排除
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="故障排除">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA 未检测到
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        库未找到错误
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        权限拒绝
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#git" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git 超时/网络问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTorch 版本不匹配
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numba-llvmlite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        numba / llvmlite 错误
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语音增强安装失败
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        内存不足（OOM）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        性能调优
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="性能调优">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        显存管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-asr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qwen3-ASR 专项调优
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境变量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        批量处理优化
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        卸载
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：架构概览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="附录：架构概览">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装流程
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        为什么必须先安装 PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        包注册表
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV 升级指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        系统要求
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="系统要求">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        硬件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        支持的 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        软件
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前提条件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="前提条件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ubuntu-debian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ubuntu / Debian
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fedora-rhel-centos-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fedora / RHEL / CentOS Stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arch-linux-manjaro" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arch Linux / Manjaro
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nvidia-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NVIDIA 驱动程序和 CUDA 设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NVIDIA 驱动程序和 CUDA 设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查当前驱动程序
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nvidia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装 NVIDIA 驱动程序
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证驱动程序版本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据中心/云端 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 1：源码安装（推荐）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2pip-extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 2：pip 安装并指定 Extras
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3conda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法 3：Conda 环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU 验证
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装特定 Extras
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装特定 Extras">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extras_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可用 Extras
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        无图形界面服务器设置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#google-colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Colab 设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Google Colab 设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快速入门
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Colab 安装程序执行的操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#colab_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Colab 使用技巧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kaggle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kaggle 设置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        运行应用程序
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="运行应用程序">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI 使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#systemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Systemd 服务设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Systemd 服务设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        创建服务文件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        创建定时器以定期运行
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        启用并启动
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        故障排除
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="故障排除">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA 未检测到
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        库未找到错误
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        权限拒绝
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#git" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git 超时/网络问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTorch 版本不匹配
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numba-llvmlite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        numba / llvmlite 错误
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语音增强安装失败
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#oom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        内存不足（OOM）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        性能调优
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="性能调优">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        显存管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qwen3-asr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qwen3-ASR 专项调优
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境变量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        批量处理优化
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        卸载
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录：架构概览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="附录：架构概览">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装流程
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        为什么必须先安装 PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        包注册表
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/zh/guides/installation_linux.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-linux">WhisperJAV Linux 安装指南<a class="headerlink" href="#whisperjav-linux" title="Permanent link">&para;</a></h1>
+<p><strong>版本：</strong> 1.8.9
+<strong>最后更新：</strong> 2026-03-19
+<strong>适用平台：</strong> Ubuntu、Debian、Fedora、RHEL、Arch Linux、Google Colab、Kaggle</p>
+<hr />
+<h2 id="_1">目录<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#系统要求">系统要求</a></li>
+<li><a href="#前提条件">前提条件</a></li>
+<li><a href="#ubuntu--debian">Ubuntu / Debian</a></li>
+<li><a href="#fedora--rhel--centos-stream">Fedora / RHEL / CentOS Stream</a></li>
+<li><a href="#arch-linux--manjaro">Arch Linux / Manjaro</a></li>
+<li><a href="#nvidia-驱动程序和-cuda-设置">NVIDIA 驱动程序和 CUDA 设置</a></li>
+<li><a href="#安装方法">安装方法</a></li>
+<li><a href="#方法-1源码安装推荐">方法 1：源码安装（推荐）</a></li>
+<li><a href="#方法-2pip-安装并指定-extras">方法 2：pip 安装并指定 Extras</a></li>
+<li><a href="#方法-3conda-环境">方法 3：Conda 环境</a></li>
+<li><a href="#gpu-验证">GPU 验证</a></li>
+<li><a href="#安装特定-extras">安装特定 Extras</a></li>
+<li><a href="#无图形界面服务器设置">无图形界面服务器设置</a></li>
+<li><a href="#google-colab-设置">Google Colab 设置</a></li>
+<li><a href="#kaggle-设置">Kaggle 设置</a></li>
+<li><a href="#运行应用程序">运行应用程序</a></li>
+<li><a href="#systemd-服务设置">Systemd 服务设置</a></li>
+<li><a href="#故障排除">故障排除</a></li>
+<li><a href="#性能调优">性能调优</a></li>
+<li><a href="#卸载">卸载</a></li>
+</ol>
+<hr />
+<h2 id="_2">系统要求<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<h3 id="_3">硬件<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>最低</th>
+<th>推荐</th>
+<th>Qwen3-ASR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU</td>
+<td>4 核（x86_64）</td>
+<td>8+ 核</td>
+<td>8+ 核</td>
+</tr>
+<tr>
+<td>内存</td>
+<td>8 GB</td>
+<td>16 GB</td>
+<td>32 GB</td>
+</tr>
+<tr>
+<td>GPU 显存</td>
+<td>4 GB（基本）</td>
+<td>8 GB</td>
+<td>16+ GB</td>
+</tr>
+<tr>
+<td>磁盘空间</td>
+<td>15 GB（安装）</td>
+<td>50 GB（安装 + 模型 + 临时文件）</td>
+<td>50+ GB</td>
+</tr>
+<tr>
+<td>网络</td>
+<td>安装时必需</td>
+<td>宽带用于模型下载</td>
+<td>3-10 GB 模型下载</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gpu">支持的 GPU<a class="headerlink" href="#gpu" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>GPU 系列</th>
+<th>显存</th>
+<th>推荐模式</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RTX 4090/4080/4070</td>
+<td>12-24 GB</td>
+<td>所有模式、Qwen3-ASR</td>
+<td>最佳性能</td>
+</tr>
+<tr>
+<td>RTX 3090/3080/3070</td>
+<td>8-24 GB</td>
+<td>所有模式、Qwen3-ASR</td>
+<td>优秀</td>
+</tr>
+<tr>
+<td>RTX 3060/3050</td>
+<td>6-12 GB</td>
+<td>Balanced、Fast</td>
+<td>12 GB 版可使用 Qwen</td>
+</tr>
+<tr>
+<td>RTX 2080/2070/2060</td>
+<td>6-11 GB</td>
+<td>Balanced、Fast</td>
+<td>良好</td>
+</tr>
+<tr>
+<td>GTX 1080 Ti/1070</td>
+<td>8-11 GB</td>
+<td>Balanced、Fast</td>
+<td>够用</td>
+</tr>
+<tr>
+<td>Tesla V100/A100</td>
+<td>16-80 GB</td>
+<td>所有模式</td>
+<td>数据中心 GPU</td>
+</tr>
+<tr>
+<td>无 GPU（仅 CPU）</td>
+<td>无</td>
+<td>仅 Faster 模式</td>
+<td>慢 10-50 倍</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">软件<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>要求</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux 内核</td>
+<td>4.15+</td>
+<td>推荐 5.4+ 以支持新款 NVIDIA 驱动程序</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>3.10、3.11 或 3.12</td>
+<td>3.9 和 3.13+ 不受支持</td>
+</tr>
+<tr>
+<td>NVIDIA 驱动程序</td>
+<td>450+（cu118）或 570+（cu128）</td>
+<td>GPU 加速所需</td>
+</tr>
+<tr>
+<td>FFmpeg</td>
+<td>4.0+</td>
+<td>音视频处理所需</td>
+</tr>
+<tr>
+<td>Git</td>
+<td>2.0+</td>
+<td>从 GitHub 安装包所需</td>
+</tr>
+<tr>
+<td>GCC / build-essential</td>
+<td>任意近期版本</td>
+<td>编译扩展所需</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_5">前提条件<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>在运行 WhisperJAV 安装程序之前，请先安装以下系统包。这些是系统级库，pip 无法安装。</p>
+<h3 id="ubuntu-debian">Ubuntu / Debian<a class="headerlink" href="#ubuntu-debian" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># 更新包列表</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># 必需：Python、构建工具、FFmpeg、Git</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span>python3<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span>python3-pip<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span>python3-venv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span>python3-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span>build-essential<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span>ffmpeg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span>git
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># 音频处理库</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">    </span>libsndfile1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span>libsndfile1-dev
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># 可选：用于 TEN VAD 原生库</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libc++1<span class="w"> </span>libc++abi1
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="c1"># 可选：用于 PyAudio/auditok（麦克风输入）</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>portaudio19-dev
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="c1"># 可选：用于 GUI（whisperjav-gui）</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">    </span>libwebkit2gtk-4.0-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">    </span>libgtk-3-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">    </span>gir1.2-webkit2-4.0
+</code></pre></div>
+<p><strong>Ubuntu 20.04 (Focal) 用户：</strong> 默认 Python 是 3.8，版本过旧。请从 deadsnakes PPA 安装 Python 3.10+：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo<span class="w"> </span>add-apt-repository<span class="w"> </span>ppa:deadsnakes/ppa
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>python3.11<span class="w"> </span>python3.11-venv<span class="w"> </span>python3.11-dev
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># 后续所有命令中使用 python3.11 代替 python3</span>
+</code></pre></div>
+<h3 id="fedora-rhel-centos-stream">Fedora / RHEL / CentOS Stream<a class="headerlink" href="#fedora-rhel-centos-stream" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># 必需：Python、构建工具、FFmpeg、Git</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>python3<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>python3-pip<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span>python3-devel<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>gcc<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span>gcc-c++<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span>ffmpeg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span>git
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="c1"># 音频处理库</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libsndfile<span class="w"> </span>libsndfile-devel
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># 可选：用于 PyAudio/auditok</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>portaudio-devel
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="c1"># 可选：用于 GUI</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span>webkit2gtk4.0-devel<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">    </span>gtk3-devel
+</code></pre></div>
+<p><strong>RHEL/CentOS：</strong> FFmpeg 不在默认仓库中。请先启用 RPM Fusion：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># RHEL 9 / CentOS Stream 9</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-9.noarch.rpm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span>https://mirrors.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-9.noarch.rpm
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>ffmpeg
+</code></pre></div>
+<h3 id="arch-linux-manjaro">Arch Linux / Manjaro<a class="headerlink" href="#arch-linux-manjaro" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># 必需：Python、构建工具、FFmpeg、Git</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>--noconfirm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span>python<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span>python-pip<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span>base-devel<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span>ffmpeg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span>git
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1"># 音频处理库</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>--noconfirm<span class="w"> </span>libsndfile
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="c1"># 可选：用于 PyAudio/auditok</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>--noconfirm<span class="w"> </span>portaudio
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># 可选：用于 GUI</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>--noconfirm<span class="w"> </span>webkit2gtk<span class="w"> </span>gtk3
+</code></pre></div>
+<hr />
+<h2 id="nvidia-cuda">NVIDIA 驱动程序和 CUDA 设置<a class="headerlink" href="#nvidia-cuda" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV 使用 PyTorch 进行 GPU 推理。您需要安装 NVIDIA 驱动程序，但不需要单独安装 CUDA Toolkit -- PyTorch 自带 CUDA 运行时。</p>
+<h3 id="_6">检查当前驱动程序<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># 检查是否已安装 NVIDIA 驱动程序</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>nvidia-smi
+</code></pre></div>
+<p>如果找不到 <code>nvidia-smi</code>，您需要安装 NVIDIA 驱动程序。</p>
+<h3 id="nvidia">安装 NVIDIA 驱动程序<a class="headerlink" href="#nvidia" title="Permanent link">&para;</a></h3>
+<p><strong>Ubuntu / Debian：</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># 方法 1：Ubuntu 推荐的驱动程序工具（最简单）</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sudo<span class="w"> </span>ubuntu-drivers<span class="w"> </span>autoinstall
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>sudo<span class="w"> </span>reboot
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># 方法 2：指定驱动程序版本</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>nvidia-driver-570
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>sudo<span class="w"> </span>reboot
+</code></pre></div>
+<p><strong>Fedora：</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># 先启用 RPM Fusion 仓库（见上文），然后：</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>akmod-nvidia<span class="w"> </span>xorg-x11-drv-nvidia-cuda
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>sudo<span class="w"> </span>reboot
+</code></pre></div>
+<p><strong>Arch Linux：</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>nvidia<span class="w"> </span>nvidia-utils
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sudo<span class="w"> </span>reboot
+</code></pre></div>
+<h3 id="_7">验证驱动程序版本<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>安装并重启后：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nvidia-smi
+</code></pre></div>
+<p>查看输出中的驱动程序版本。这决定了 PyTorch 将使用的 CUDA 版本：</p>
+<table>
+<thead>
+<tr>
+<th>驱动程序版本</th>
+<th>CUDA 支持</th>
+<th>PyTorch 索引</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>570+</td>
+<td>CUDA 12.8</td>
+<td>最佳性能（默认）</td>
+</tr>
+<tr>
+<td>450-569</td>
+<td>CUDA 11.8</td>
+<td>通用回退方案</td>
+</tr>
+<tr>
+<td>&lt; 450</td>
+<td>无</td>
+<td>仅 CPU（请更新驱动程序！）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gpu_1">数据中心/云端 GPU<a class="headerlink" href="#gpu_1" title="Permanent link">&para;</a></h3>
+<p>对于 Tesla、A100、H100 或其他数据中心 GPU，安装数据中心驱动程序：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Ubuntu</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>nvidia-headless-570-server<span class="w"> </span>nvidia-utils-570-server
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>sudo<span class="w"> </span>reboot
+</code></pre></div>
+<hr />
+<h2 id="_8">安装方法<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h3 id="1">方法 1：源码安装（推荐）<a class="headerlink" href="#1" title="Permanent link">&para;</a></h3>
+<p>此方法使用自动化安装程序，处理 GPU 检测、安装顺序和重试逻辑。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># 步骤 1：克隆仓库</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/meizhong986/whisperjav.git
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nb">cd</span><span class="w"> </span>whisperjav
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># 步骤 2：创建并激活虚拟环境</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/.venv/whisperjav
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nb">source</span><span class="w"> </span>~/.venv/whisperjav/bin/activate
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="c1"># 步骤 3：运行安装程序</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>python<span class="w"> </span>install.py
+</code></pre></div>
+<p>安装程序将：
+1. 检查 Python 版本、FFmpeg、Git、磁盘空间和网络
+2. 检测 GPU 并选择最优 CUDA 版本
+3. 安装包含 GPU 支持的 PyTorch（或回退到 CPU）
+4. 按正确顺序安装所有依赖项
+5. 安装 WhisperJAV
+6. 验证安装</p>
+<p><strong>安装程序选项：</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># 仅 CPU（无 GPU）</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>python<span class="w"> </span>install.py<span class="w"> </span>--cpu-only
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># 强制指定 CUDA 版本</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>python<span class="w"> </span>install.py<span class="w"> </span>--cuda118<span class="w">     </span><span class="c1"># 用于较旧驱动程序（450+）</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>python<span class="w"> </span>install.py<span class="w"> </span>--cuda128<span class="w">     </span><span class="c1"># 用于新款驱动程序（570+）</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># 跳过可选功能</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>python<span class="w"> </span>install.py<span class="w"> </span>--no-speech-enhancement
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>python<span class="w"> </span>install.py<span class="w"> </span>--minimal<span class="w">     </span><span class="c1"># 仅转录功能</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="c1"># 包含本地大语言模型翻译</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>python<span class="w"> </span>install.py<span class="w"> </span>--local-llm<span class="w">          </span><span class="c1"># 预编译 wheel（快速）</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>python<span class="w"> </span>install.py<span class="w"> </span>--local-llm-build<span class="w">    </span><span class="c1"># 从源码编译（慢）</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>python<span class="w"> </span>install.py<span class="w"> </span>--no-local-llm<span class="w">       </span><span class="c1"># 跳过且不提示</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a><span class="c1"># 开发模式（可编辑安装）</span>
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>python<span class="w"> </span>install.py<span class="w"> </span>--dev
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a><span class="c1"># 跳过预检</span>
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>python<span class="w"> </span>install.py<span class="w"> </span>--skip-preflight
+</code></pre></div>
+<p><strong>替代方案：使用 shell 包装器：</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>chmod<span class="w"> </span>+x<span class="w"> </span>installer/install_linux.sh
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>./installer/install_linux.sh
+</code></pre></div>
+<p>shell 包装器会检查 PEP 668（外部管理的 Python）并委托给 <code>install.py</code>。</p>
+<h3 id="2pip-extras">方法 2：pip 安装并指定 Extras<a class="headerlink" href="#2pip-extras" title="Permanent link">&para;</a></h3>
+<p>如果您想更精细地控制安装内容，可以直接使用 pip。但必须先安装 PyTorch。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># 步骤 1：创建并激活虚拟环境</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/.venv/whisperjav
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nb">source</span><span class="w"> </span>~/.venv/whisperjav/bin/activate
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># 步骤 2：升级 pip</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="c1"># 步骤 3：安装包含 CUDA 的 PyTorch（必须最先安装！）</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="c1"># 驱动程序 570+：</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu128
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="c1"># 驱动程序 450-569：</span>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu118
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="c1"># 仅 CPU：</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cpu
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>
+<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="c1"># 步骤 4：安装 WhisperJAV 及所需 extras</span>
+<a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[cli] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>
+<a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="c1"># 或从本地克隆安装：</span>
+<a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/meizhong986/whisperjav.git
+<a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a><span class="nb">cd</span><span class="w"> </span>whisperjav
+<a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[cli]&quot;</span>
+</code></pre></div>
+<p><strong>重要：</strong> 始终先使用 <code>--index-url</code> 安装 PyTorch，然后再安装 WhisperJAV。如果跳过此步骤，pip 将安装仅 CPU 版本的 PyTorch，性能会慢 10-50 倍。</p>
+<h3 id="3conda">方法 3：Conda 环境<a class="headerlink" href="#3conda" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># 步骤 1：创建 conda 环境</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>whisperjav<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>-y
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>conda<span class="w"> </span>activate<span class="w"> </span>whisperjav
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="c1"># 步骤 2：通过 conda 安装 PyTorch（自动处理 CUDA）</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchaudio<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">12</span>.8<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia<span class="w"> </span>-y
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="c1"># 或用于 CUDA 11.8：</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchaudio<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">11</span>.8<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia<span class="w"> </span>-y
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="c1"># 步骤 3：安装 conda 未提供的系统依赖项</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>conda<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>-y
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="c1"># 步骤 4：安装 WhisperJAV</span>
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="c1"># 或从本地克隆：</span>
+<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="nb">cd</span><span class="w"> </span>whisperjav
+<a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all]&quot;</span>
+</code></pre></div>
+<hr />
+<h2 id="gpu_2">GPU 验证<a class="headerlink" href="#gpu_2" title="Permanent link">&para;</a></h2>
+<p>安装完成后，验证 GPU 支持是否正常工作：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># 快速检查：CUDA 是否可用？</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(f&#39;CUDA available: {torch.cuda.is_available()}&#39;)&quot;</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(f&#39;GPU: {torch.cuda.get_device_name(0)}&#39;) if torch.cuda.is_available() else print(&#39;No GPU&#39;)&quot;</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(f&#39;CUDA version: {torch.version.cuda}&#39;)&quot;</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="c1"># 完整诊断：</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>python3<span class="w"> </span>-m<span class="w"> </span>whisperjav.utils.preflight_check<span class="w"> </span>-v
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="c1"># 设备检测报告：</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>python3<span class="w"> </span>-m<span class="w"> </span>whisperjav.utils.device_detector
+</code></pre></div>
+<p>GPU 正常工作时的预期输出：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>CUDA available: True
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>GPU: NVIDIA GeForce RTX 4090
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>CUDA version: 12.8
+</code></pre></div>
+<p>如果 CUDA 显示 False，请参阅<a href="#cuda-未检测到">故障排除：CUDA 未检测到</a>。</p>
+<hr />
+<h2 id="extras">安装特定 Extras<a class="headerlink" href="#extras" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV 使用模块化的 extras 系统。仅安装您需要的功能：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># 激活 venv 并先安装 PyTorch 之后：</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="c1"># 仅 CLI（转录，无 GUI）</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[cli] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="c1"># CLI + 翻译</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[cli,translate] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="c1"># CLI + GUI</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[cli,gui] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="c1"># CLI + Qwen3-ASR（大型模型，需要 8+ GB 显存）</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[cli,qwen] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="c1"># Unix 优化（CLI + 翻译 + 增强 + huggingface，无 GUI）</span>
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[unix] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>
+<a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a><span class="c1"># 所有功能</span>
+<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+</code></pre></div>
+<h3 id="extras_1">可用 Extras<a class="headerlink" href="#extras_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Extra</th>
+<th>说明</th>
+<th>需要的系统依赖项</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cli</code></td>
+<td>音频处理、语音活动检测、场景检测</td>
+<td>libsndfile</td>
+</tr>
+<tr>
+<td><code>gui</code></td>
+<td>PyWebView GUI 界面</td>
+<td>libwebkit2gtk-4.0-dev、libgtk-3-dev</td>
+</tr>
+<tr>
+<td><code>translate</code></td>
+<td>AI 字幕翻译（云端 API）</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>llm</code></td>
+<td>本地大语言模型服务器（FastAPI）</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>enhance</code></td>
+<td>语音增强（ClearVoice、BS-RoFormer）</td>
+<td>libsndfile</td>
+</tr>
+<tr>
+<td><code>huggingface</code></td>
+<td>HuggingFace Transformers 集成</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>qwen</code></td>
+<td>Qwen3-ASR 处理管线（需要 huggingface）</td>
+<td>无（推荐 8+ GB 显存）</td>
+</tr>
+<tr>
+<td><code>analysis</code></td>
+<td>可视化和分析工具</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>compatibility</code></td>
+<td>pyvideotrans 集成</td>
+<td>无</td>
+</tr>
+<tr>
+<td><code>all</code></td>
+<td>所有功能组合</td>
+<td>以上全部</td>
+</tr>
+<tr>
+<td><code>unix</code></td>
+<td>CLI + 翻译 + 增强 + huggingface + 分析 + 兼容性</td>
+<td>libsndfile</td>
+</tr>
+<tr>
+<td><code>colab</code></td>
+<td>针对 Google Colab 优化</td>
+<td>不适用（Colab 已预装大部分）</td>
+</tr>
+<tr>
+<td><code>kaggle</code></td>
+<td>针对 Kaggle 优化</td>
+<td>不适用</td>
+</tr>
+<tr>
+<td><code>dev</code></td>
+<td>开发工具（pytest、ruff）</td>
+<td>无</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_9">无图形界面服务器设置<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<p>用于无显示器的服务器（仅 SSH、云端虚拟机、CI/CD）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># 步骤 1：安装前提条件（不需要 GUI 包）</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span>python3<span class="w"> </span>python3-pip<span class="w"> </span>python3-venv<span class="w"> </span>python3-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span>build-essential<span class="w"> </span>ffmpeg<span class="w"> </span>git<span class="w"> </span>libsndfile1
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="c1"># 步骤 2：创建 venv</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/.venv/whisperjav
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="nb">source</span><span class="w"> </span>~/.venv/whisperjav/bin/activate
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="c1"># 步骤 3：安装 PyTorch</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu128
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="c1"># 步骤 4：安装 WhisperJAV（unix extra = 无 GUI 依赖项）</span>
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;whisperjav[unix] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a><span class="c1"># 或使用安装程序的最小化标志：</span>
+<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>python<span class="w"> </span>install.py<span class="w"> </span>--minimal
+</code></pre></div>
+<p><strong>无图形界面运行要点：</strong>
+- 使用 <code>[unix]</code> extra 或 <code>[cli]</code> extra 代替 <code>[all]</code> 以跳过 GUI 依赖项
+- GUI（<code>whisperjav-gui</code>）需要显示服务器和 WebKit2GTK -- 在服务器上请跳过
+- CLI 模式（<code>whisperjav</code>）完全支持无图形界面运行
+- 如果出现 matplotlib 警告，请设置 <code>MPLBACKEND=Agg</code>（无显示器用于绘图）</p>
+<hr />
+<h2 id="google-colab">Google Colab 设置<a class="headerlink" href="#google-colab" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV 包含专用的 Colab 安装程序，可自动处理所有设置。</p>
+<h3 id="_10">快速入门<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<p>在 Colab 笔记本单元格中：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># 单元格 1：克隆并安装</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="err">!</span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">meizhong986</span><span class="o">/</span><span class="n">WhisperJAV</span><span class="o">.</span><span class="n">git</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="err">!</span><span class="n">bash</span> <span class="n">WhisperJAV</span><span class="o">/</span><span class="n">installer</span><span class="o">/</span><span class="n">install_colab</span><span class="o">.</span><span class="n">sh</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># 单元格 2：上传或挂载您的视频</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">google.colab</span><span class="w"> </span><span class="kn">import</span> <span class="n">drive</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">drive</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="s1">&#39;/content/drive&#39;</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># 单元格 3：转录</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="err">!</span><span class="n">MPLBACKEND</span><span class="o">=</span><span class="n">Agg</span> <span class="o">/</span><span class="n">content</span><span class="o">/</span><span class="n">whisperjav_env</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">whisperjav</span> \
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="o">/</span><span class="n">content</span><span class="o">/</span><span class="n">drive</span><span class="o">/</span><span class="n">MyDrive</span><span class="o">/</span><span class="n">video</span><span class="o">.</span><span class="n">mp4</span> \
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    <span class="o">--</span><span class="n">mode</span> <span class="n">balanced</span> \
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="o">--</span><span class="n">sensitivity</span> <span class="n">aggressive</span>
+</code></pre></div>
+<h3 id="colab">Colab 安装程序执行的操作<a class="headerlink" href="#colab" title="Permanent link">&para;</a></h3>
+<ol>
+<li>安装 <code>uv</code> 包管理器（比 pip 快 10-100 倍）</li>
+<li>在 <code>/content/whisperjav_env</code> 创建隔离的虚拟环境</li>
+<li>安装与 Colab GPU 匹配的、包含 CUDA 支持的 PyTorch</li>
+<li>安装系统库（portaudio、libsndfile、ffmpeg、libc++）</li>
+<li>安装 WhisperJAV 及所有 extras，包括 Qwen3-ASR</li>
+<li>尝试从预编译 wheels 安装 llama-cpp-python（可选）</li>
+</ol>
+<h3 id="colab_1">Colab 使用技巧<a class="headerlink" href="#colab_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>使用 <code>MPLBACKEND=Agg</code> 避免 matplotlib 显示错误</li>
+<li>挂载 Google Drive 以持久保存输出字幕</li>
+<li>加载别名文件以使用更短的命令：
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>!source<span class="w"> </span>/content/whisperjav_aliases.sh
+</code></pre></div></li>
+<li>调试模式：<code>!bash WhisperJAV/installer/install_colab.sh --debug</code></li>
+</ul>
+<hr />
+<h2 id="kaggle">Kaggle 设置<a class="headerlink" href="#kaggle" title="Permanent link">&para;</a></h2>
+<p>与 Colab 类似，但使用基于 pip 的方式：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># 单元格 1：安装</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="err">!</span><span class="n">pip</span> <span class="n">install</span> <span class="n">torch</span> <span class="n">torchaudio</span> <span class="o">--</span><span class="n">index</span><span class="o">-</span><span class="n">url</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">download</span><span class="o">.</span><span class="n">pytorch</span><span class="o">.</span><span class="n">org</span><span class="o">/</span><span class="n">whl</span><span class="o">/</span><span class="n">cu128</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="err">!</span><span class="n">pip</span> <span class="n">install</span> <span class="s2">&quot;whisperjav[kaggle] @ git+https://github.com/meizhong986/whisperjav.git&quot;</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="c1"># 单元格 2：验证</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="err">!</span><span class="n">python</span> <span class="o">-</span><span class="n">c</span> <span class="s2">&quot;import whisperjav; print(whisperjav.__version__)&quot;</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="c1"># 单元格 3：转录</span>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="err">!</span><span class="n">whisperjav</span> <span class="o">/</span><span class="n">kaggle</span><span class="o">/</span><span class="nb">input</span><span class="o">/</span><span class="n">your</span><span class="o">-</span><span class="n">dataset</span><span class="o">/</span><span class="n">video</span><span class="o">.</span><span class="n">mp4</span> <span class="o">--</span><span class="n">mode</span> <span class="n">balanced</span>
+</code></pre></div>
+<hr />
+<h2 id="_11">运行应用程序<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<h3 id="cli">CLI 使用<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># 先激活虚拟环境</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="nb">source</span><span class="w"> </span>~/.venv/whisperjav/bin/activate
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># 基本转录</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>whisperjav<span class="w"> </span>video.mp4
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="c1"># 指定模式和灵敏度</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>balanced<span class="w"> </span>--sensitivity<span class="w"> </span>aggressive
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="c1"># Faster 模式（精度较低，速度快）</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>faster
+<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>
+<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="c1"># 启用语音增强</span>
+<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>balanced<span class="w"> </span>--enhance
+<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>
+<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a><span class="c1"># 使用 Qwen3-ASR 处理管线（需要 [qwen] extra）</span>
+<a id="__codelineno-25-17" name="__codelineno-25-17" href="#__codelineno-25-17"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>qwen<span class="w"> </span>--input-mode<span class="w"> </span>assembly
+<a id="__codelineno-25-18" name="__codelineno-25-18" href="#__codelineno-25-18"></a>
+<a id="__codelineno-25-19" name="__codelineno-25-19" href="#__codelineno-25-19"></a><span class="c1"># 带翻译</span>
+<a id="__codelineno-25-20" name="__codelineno-25-20" href="#__codelineno-25-20"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--translate<span class="w"> </span>--translate-provider<span class="w"> </span>deepseek
+<a id="__codelineno-25-21" name="__codelineno-25-21" href="#__codelineno-25-21"></a>
+<a id="__codelineno-25-22" name="__codelineno-25-22" href="#__codelineno-25-22"></a><span class="c1"># 批量处理（目录中所有 .mp4 文件）</span>
+<a id="__codelineno-25-23" name="__codelineno-25-23" href="#__codelineno-25-23"></a>whisperjav<span class="w"> </span>/path/to/videos/<span class="w"> </span>--mode<span class="w"> </span>balanced
+<a id="__codelineno-25-24" name="__codelineno-25-24" href="#__codelineno-25-24"></a>
+<a id="__codelineno-25-25" name="__codelineno-25-25" href="#__codelineno-25-25"></a><span class="c1"># 指定输出目录</span>
+<a id="__codelineno-25-26" name="__codelineno-25-26" href="#__codelineno-25-26"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--output-dir<span class="w"> </span>/path/to/subtitles/
+<a id="__codelineno-25-27" name="__codelineno-25-27" href="#__codelineno-25-27"></a>
+<a id="__codelineno-25-28" name="__codelineno-25-28" href="#__codelineno-25-28"></a><span class="c1"># 帮助</span>
+<a id="__codelineno-25-29" name="__codelineno-25-29" href="#__codelineno-25-29"></a>whisperjav<span class="w"> </span>--help
+<a id="__codelineno-25-30" name="__codelineno-25-30" href="#__codelineno-25-30"></a>
+<a id="__codelineno-25-31" name="__codelineno-25-31" href="#__codelineno-25-31"></a><span class="c1"># 环境预检</span>
+<a id="__codelineno-25-32" name="__codelineno-25-32" href="#__codelineno-25-32"></a>whisperjav<span class="w"> </span>--check
+</code></pre></div>
+<h3 id="gui">GUI 使用<a class="headerlink" href="#gui" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># 需要 [gui] extra 和 WebKit2GTK</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="nb">source</span><span class="w"> </span>~/.venv/whisperjav/bin/activate
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>whisperjav-gui
+</code></pre></div>
+<p><strong>注意：</strong> GUI 需要显示服务器（X11 或 Wayland）和 WebKit2GTK。除非使用 X11 转发或 VNC，否则无法通过 SSH 使用。</p>
+<h3 id="_12">翻译<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># 翻译已有字幕</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>whisperjav-translate<span class="w"> </span>-i<span class="w"> </span>subtitles.srt<span class="w"> </span>--provider<span class="w"> </span>deepseek
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># 使用特定指令翻译</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>whisperjav-translate<span class="w"> </span>-i<span class="w"> </span>subtitles.srt<span class="w"> </span>--provider<span class="w"> </span>gemini<span class="w"> </span>--instructions<span class="w"> </span>standard
+</code></pre></div>
+<hr />
+<h2 id="systemd">Systemd 服务设置<a class="headerlink" href="#systemd" title="Permanent link">&para;</a></h2>
+<p>用于在服务器上自动化/定时转录：</p>
+<h3 id="_13">创建服务文件<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/systemd/system/whisperjav-batch.service<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="s">[Unit]</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="s">Description=WhisperJAV Batch Transcription</span>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="s">After=network.target</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="s">[Service]</span>
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="s">Type=oneshot</span>
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a><span class="s">User=your-username</span>
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a><span class="s">Group=your-group</span>
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a><span class="s">WorkingDirectory=/home/your-username</span>
+<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a><span class="s">Environment=&quot;PATH=/home/your-username/.venv/whisperjav/bin:/usr/local/bin:/usr/bin&quot;</span>
+<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a><span class="s">Environment=&quot;MPLBACKEND=Agg&quot;</span>
+<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a><span class="s">ExecStart=/home/your-username/.venv/whisperjav/bin/whisperjav \</span>
+<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a><span class="s">    /data/incoming/ \</span>
+<a id="__codelineno-28-15" name="__codelineno-28-15" href="#__codelineno-28-15"></a><span class="s">    --mode balanced \</span>
+<a id="__codelineno-28-16" name="__codelineno-28-16" href="#__codelineno-28-16"></a><span class="s">    --output-dir /data/subtitles/</span>
+<a id="__codelineno-28-17" name="__codelineno-28-17" href="#__codelineno-28-17"></a><span class="s">StandardOutput=journal</span>
+<a id="__codelineno-28-18" name="__codelineno-28-18" href="#__codelineno-28-18"></a><span class="s">StandardError=journal</span>
+<a id="__codelineno-28-19" name="__codelineno-28-19" href="#__codelineno-28-19"></a>
+<a id="__codelineno-28-20" name="__codelineno-28-20" href="#__codelineno-28-20"></a><span class="s">[Install]</span>
+<a id="__codelineno-28-21" name="__codelineno-28-21" href="#__codelineno-28-21"></a><span class="s">WantedBy=multi-user.target</span>
+<a id="__codelineno-28-22" name="__codelineno-28-22" href="#__codelineno-28-22"></a><span class="s">EOF</span>
+</code></pre></div>
+<h3 id="_14">创建定时器以定期运行<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/systemd/system/whisperjav-batch.timer<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="s">[Unit]</span>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="s">Description=Run WhisperJAV batch transcription hourly</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="s">[Timer]</span>
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="s">OnCalendar=hourly</span>
+<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="s">Persistent=true</span>
+<a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a>
+<a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a><span class="s">[Install]</span>
+<a id="__codelineno-29-10" name="__codelineno-29-10" href="#__codelineno-29-10"></a><span class="s">WantedBy=timers.target</span>
+<a id="__codelineno-29-11" name="__codelineno-29-11" href="#__codelineno-29-11"></a><span class="s">EOF</span>
+</code></pre></div>
+<h3 id="_15">启用并启动<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>daemon-reload
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>whisperjav-batch.timer
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>whisperjav-batch.timer
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="c1"># 检查状态</span>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>status<span class="w"> </span>whisperjav-batch.timer
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>
+<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a><span class="c1"># 查看日志</span>
+<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>whisperjav-batch.service<span class="w"> </span>-f
+</code></pre></div>
+<hr />
+<h2 id="_16">故障排除<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<h3 id="cuda">CUDA 未检测到<a class="headerlink" href="#cuda" title="Permanent link">&para;</a></h3>
+<p><strong>症状：</strong> <code>torch.cuda.is_available()</code> 返回 <code>False</code></p>
+<p><strong>诊断步骤：</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="c1"># 步骤 1：检查 NVIDIA 驱动程序是否已加载</span>
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>nvidia-smi
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="c1"># 步骤 2：检查 PyTorch 是否安装了 CUDA 版本</span>
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(torch.version.cuda)&quot;</span>
+<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a><span class="c1"># 应输出 &quot;12.8&quot; 或 &quot;11.8&quot;，而非 &quot;None&quot;</span>
+<a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a>
+<a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a><span class="c1"># 步骤 3：检查驱动程序兼容性</span>
+<a id="__codelineno-31-9" name="__codelineno-31-9" href="#__codelineno-31-9"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(torch.__version__)&quot;</span>
+<a id="__codelineno-31-10" name="__codelineno-31-10" href="#__codelineno-31-10"></a>nvidia-smi<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-3
+<a id="__codelineno-31-11" name="__codelineno-31-11" href="#__codelineno-31-11"></a><span class="c1"># 将驱动程序版本与 CUDA 要求进行比较</span>
+</code></pre></div>
+<p><strong>常见原因和解决方案：</strong></p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>安装了仅 CPU 版本的 PyTorch</td>
+<td><code>pip uninstall torch torchaudio &amp;&amp; pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128</code></td>
+</tr>
+<tr>
+<td>驱动程序对于 CUDA 12.8 过旧</td>
+<td>更新驱动程序：<code>sudo apt install nvidia-driver-570</code> 或使用 <code>--cuda118</code></td>
+</tr>
+<tr>
+<td>未安装 NVIDIA 驱动程序</td>
+<td>安装驱动程序（见 <a href="#nvidia-驱动程序和-cuda-设置">NVIDIA 驱动程序设置</a>）</td>
+</tr>
+<tr>
+<td>在容器中运行但未传递 GPU</td>
+<td>向 Docker 传递 <code>--gpus all</code>：<code>docker run --gpus all ...</code></td>
+</tr>
+<tr>
+<td>加载了 Nouveau 驱动程序而非 nvidia</td>
+<td>禁用 nouveau：<code>echo "blacklist nouveau" | sudo tee /etc/modprobe.d/blacklist-nouveau.conf &amp;&amp; sudo update-initramfs -u &amp;&amp; sudo reboot</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_17">库未找到错误<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<p><strong><code>OSError: sndfile library not found</code></strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Ubuntu/Debian</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libsndfile1<span class="w"> </span>libsndfile1-dev
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="c1"># Fedora/RHEL</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libsndfile<span class="w"> </span>libsndfile-devel
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>
+<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a><span class="c1"># Arch</span>
+<a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a>sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>libsndfile
+</code></pre></div>
+<p><strong><code>ModuleNotFoundError: No module named '_tkinter'</code></strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># Ubuntu/Debian</span>
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>python3-tk
+<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>
+<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="c1"># Fedora</span>
+<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>python3-tkinter
+</code></pre></div>
+<p><strong><code>ImportError: libwebkit2gtk-4.0.so: cannot open shared object file</code></strong></p>
+<p>GUI 需要 WebKit2GTK。仅使用 CLI 时不需要。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="c1"># Ubuntu/Debian</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>libwebkit2gtk-4.0-dev
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="c1"># Fedora</span>
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>webkit2gtk4.0-devel
+</code></pre></div>
+<h3 id="_18">权限拒绝<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<p><strong><code>ERROR: Could not install packages due to an EnvironmentError: [Errno 13] Permission denied</code></strong></p>
+<p>您正在尝试在没有虚拟环境的情况下安装到系统 Python。请创建虚拟环境：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/.venv/whisperjav
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="nb">source</span><span class="w"> </span>~/.venv/whisperjav/bin/activate
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="c1"># 然后重试安装</span>
+</code></pre></div>
+<p><strong><code>error: externally-managed-environment</code></strong>（PEP 668）</p>
+<p>同样的解决方案 -- 创建并激活虚拟环境。此错误出现在 Debian 12+、Ubuntu 24.04+ 及类似的现代发行版上。</p>
+<p>如果 <code>python3 -m venv</code> 失败并提示 "No module named venv"：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># Ubuntu/Debian</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>python3-venv
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="c1"># 或对于特定版本：</span>
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>python3.11-venv
+</code></pre></div>
+<h3 id="git">Git 超时/网络问题<a class="headerlink" href="#git" title="Permanent link">&para;</a></h3>
+<p><strong>症状：</strong> <code>Failed to connect to github.com port 443 after 21 ms</code></p>
+<p>这在中国大陆防火墙（GFW）后或 VPN 连接慢时常见。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># 选项 1：安装程序在重试时自动配置 Git 超时</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="c1"># 只需重新运行安装程序 -- 它会检测并处理此问题</span>
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="c1"># 选项 2：手动配置 Git</span>
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>http.connectTimeout<span class="w"> </span><span class="m">120</span>
+<a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>http.timeout<span class="w"> </span><span class="m">300</span>
+<a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>http.maxRetries<span class="w"> </span><span class="m">5</span>
+<a id="__codelineno-37-8" name="__codelineno-37-8" href="#__codelineno-37-8"></a>
+<a id="__codelineno-37-9" name="__codelineno-37-9" href="#__codelineno-37-9"></a><span class="c1"># 选项 3：使用代理</span>
+<a id="__codelineno-37-10" name="__codelineno-37-10" href="#__codelineno-37-10"></a><span class="nb">export</span><span class="w"> </span><span class="nv">https_proxy</span><span class="o">=</span>http://your-proxy:port
+<a id="__codelineno-37-11" name="__codelineno-37-11" href="#__codelineno-37-11"></a><span class="nb">export</span><span class="w"> </span><span class="nv">http_proxy</span><span class="o">=</span>http://your-proxy:port
+</code></pre></div>
+<h3 id="pytorch">PyTorch 版本不匹配<a class="headerlink" href="#pytorch" title="Permanent link">&para;</a></h3>
+<p><strong>症状：</strong> <code>RuntimeError: CUDA error: CUBLAS_STATUS_NOT_INITIALIZED</code> 或类似错误</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="c1"># 检查当前版本</span>
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(f&#39;PyTorch: {torch.__version__}, CUDA: {torch.version.cuda}&#39;)&quot;</span>
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a><span class="c1"># 重新安装匹配版本</span>
+<a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a>pip<span class="w"> </span>uninstall<span class="w"> </span>torch<span class="w"> </span>torchaudio<span class="w"> </span>-y
+<a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu128
+</code></pre></div>
+<h3 id="numba-llvmlite">numba / llvmlite 错误<a class="headerlink" href="#numba-llvmlite" title="Permanent link">&para;</a></h3>
+<p><strong>症状：</strong> <code>ImportError: numba needs NumPy 1.x</code> 或 <code>Cannot import llvmlite</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="c1"># 重新安装 numpy 和 numba</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;numpy&gt;=2.0.0&quot;</span>
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>pip<span class="w"> </span>install<span class="w"> </span>--force-reinstall<span class="w"> </span><span class="s2">&quot;numba&gt;=0.60.0&quot;</span>
+</code></pre></div>
+<h3 id="_19">语音增强安装失败<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
+<p><strong>症状：</strong> modelscope / clearvoice 安装失败</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="c1"># 这些包是可选的。不安装它们也可以：</span>
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>python<span class="w"> </span>install.py<span class="w"> </span>--no-speech-enhancement
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>
+<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="c1"># 或单独安装特定后端：</span>
+<a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a>pip<span class="w"> </span>install<span class="w"> </span>clearvoice<span class="w">       </span><span class="c1"># 仅 ClearVoice</span>
+<a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a>pip<span class="w"> </span>install<span class="w"> </span>bs-roformer-infer<span class="w"> </span><span class="c1"># 仅 BS-RoFormer</span>
+</code></pre></div>
+<h3 id="oom">内存不足（OOM）<a class="headerlink" href="#oom" title="Permanent link">&para;</a></h3>
+<p><strong>症状：</strong> 转录时出现 <code>CUDA out of memory</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="c1"># 使用较小的模型</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>faster
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="c1"># 减少 Qwen 处理管线的批量大小</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>qwen<span class="w"> </span>--input-mode<span class="w"> </span>vad_slicing
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="c1"># 监控 GPU 显存</span>
+<a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a>watch<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span><span class="w"> </span>nvidia-smi
+</code></pre></div>
+<hr />
+<h2 id="_20">性能调优<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>
+<h3 id="_21">显存管理<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>GPU 显存</th>
+<th>推荐设置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4 GB</td>
+<td>仅 <code>--mode faster</code></td>
+</tr>
+<tr>
+<td>6 GB</td>
+<td><code>--mode fast</code> 或 <code>--mode balanced</code> 配合小模型</td>
+</tr>
+<tr>
+<td>8 GB</td>
+<td><code>--mode balanced --sensitivity balanced</code></td>
+</tr>
+<tr>
+<td>12 GB</td>
+<td><code>--mode balanced --sensitivity aggressive</code></td>
+</tr>
+<tr>
+<td>16+ GB</td>
+<td>所有模式，包括 <code>--mode qwen --input-mode assembly</code></td>
+</tr>
+<tr>
+<td>24+ GB</td>
+<td>所有模式，大批量大小</td>
+</tr>
+</tbody>
+</table>
+<h3 id="qwen3-asr">Qwen3-ASR 专项调优<a class="headerlink" href="#qwen3-asr" title="Permanent link">&para;</a></h3>
+<p>Qwen3-ASR 需要较大的显存。根据 GPU 选择输入模式：</p>
+<table>
+<thead>
+<tr>
+<th>输入模式</th>
+<th>显存占用</th>
+<th>质量</th>
+<th>速度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>assembly</code></td>
+<td>最高（文本生成与对齐分离）</td>
+<td>长场景最佳</td>
+<td>中等</td>
+</tr>
+<tr>
+<td><code>context_aware</code></td>
+<td>高（耦合 ASR + 对齐）</td>
+<td>对话最佳</td>
+<td>较慢</td>
+</tr>
+<tr>
+<td><code>vad_slicing</code></td>
+<td>较低（短片段）</td>
+<td>适合噪声音频</td>
+<td>最快</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="c1"># Assembly 模式（推荐用于 16+ GB 显存）</span>
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>qwen<span class="w"> </span>--input-mode<span class="w"> </span>assembly
+<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>
+<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a><span class="c1"># VAD slicing 模式（用于 8 GB 显存）</span>
+<a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--mode<span class="w"> </span>qwen<span class="w"> </span>--input-mode<span class="w"> </span>vad_slicing
+</code></pre></div>
+<h3 id="_22">环境变量<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="c1"># 限制 GPU 显存使用（总显存的比例）</span>
+<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PYTORCH_CUDA_ALLOC_CONF</span><span class="o">=</span>max_split_size_mb:512
+<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>
+<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a><span class="c1"># 在多 GPU 系统中使用特定 GPU</span>
+<a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="m">0</span>
+<a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a>
+<a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a><span class="c1"># 禁用 matplotlib 显示（无图形界面服务器）</span>
+<a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MPLBACKEND</span><span class="o">=</span>Agg
+<a id="__codelineno-43-9" name="__codelineno-43-9" href="#__codelineno-43-9"></a>
+<a id="__codelineno-43-10" name="__codelineno-43-10" href="#__codelineno-43-10"></a><span class="c1"># 在 Ampere+ GPU 上启用 TF32 以加速推理</span>
+<a id="__codelineno-43-11" name="__codelineno-43-11" href="#__codelineno-43-11"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TORCH_ALLOW_TF32</span><span class="o">=</span><span class="m">1</span>
+</code></pre></div>
+<h3 id="_23">批量处理优化<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
+<p>处理多个文件时：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="c1"># 处理所有 .mp4 文件</span>
+<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>whisperjav<span class="w"> </span>/path/to/videos/<span class="w"> </span>--mode<span class="w"> </span>balanced
+<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>
+<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="c1"># 使用 screen/tmux 处理长时间运行的任务</span>
+<a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a>tmux<span class="w"> </span>new<span class="w"> </span>-s<span class="w"> </span>whisperjav
+<a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a>whisperjav<span class="w"> </span>/path/to/videos/<span class="w"> </span>--mode<span class="w"> </span>balanced<span class="w"> </span>--sensitivity<span class="w"> </span>aggressive
+<a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a><span class="c1"># 按 Ctrl+B, D 分离；tmux attach -t whisperjav 重新连接</span>
+</code></pre></div>
+<hr />
+<h2 id="_24">卸载<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="c1"># 删除虚拟环境</span>
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.venv/whisperjav
+<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a>
+<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a><span class="c1"># 删除缓存的模型（可选，节省磁盘空间）</span>
+<a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.cache/whisper
+<a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.cache/huggingface
+<a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a>
+<a id="__codelineno-45-8" name="__codelineno-45-8" href="#__codelineno-45-8"></a><span class="c1"># 删除桌面条目（如已创建）</span>
+<a id="__codelineno-45-9" name="__codelineno-45-9" href="#__codelineno-45-9"></a>rm<span class="w"> </span>-f<span class="w"> </span>~/.local/share/applications/whisperjav.desktop
+<a id="__codelineno-45-10" name="__codelineno-45-10" href="#__codelineno-45-10"></a>
+<a id="__codelineno-45-11" name="__codelineno-45-11" href="#__codelineno-45-11"></a><span class="c1"># 删除源码（如已克隆）</span>
+<a id="__codelineno-45-12" name="__codelineno-45-12" href="#__codelineno-45-12"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/whisperjav<span class="w">  </span><span class="c1"># 根据实际路径调整</span>
+</code></pre></div>
+<hr />
+<h2 id="_25">附录：架构概览<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h2>
+<h3 id="_26">安装流程<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>install_linux.sh（薄包装器）
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>    |
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>    v
+<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>install.py（编排器）
+<a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a>    |
+<a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a>    +-- 预检（磁盘、网络）
+<a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a>    +-- detect_gpu() --&gt; CUDA 版本选择
+<a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a>    +-- 步骤 1：pip 升级
+<a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a>    +-- 步骤 2：PyTorch（通过 --index-url 锁定 GPU 版本）
+<a id="__codelineno-46-10" name="__codelineno-46-10" href="#__codelineno-46-10"></a>    +-- 步骤 3：核心依赖项（numpy、scipy、numba、音频库）
+<a id="__codelineno-46-11" name="__codelineno-46-11" href="#__codelineno-46-11"></a>    +-- 步骤 4：Whisper 包（openai-whisper、stable-ts、faster-whisper）
+<a id="__codelineno-46-12" name="__codelineno-46-12" href="#__codelineno-46-12"></a>    +-- 步骤 5：可选包（HuggingFace、Qwen、翻译、语音活动检测、语音增强、GUI）
+<a id="__codelineno-46-13" name="__codelineno-46-13" href="#__codelineno-46-13"></a>    +-- 步骤 6：WhisperJAV（--no-deps 以保留 GPU 版 torch）
+<a id="__codelineno-46-14" name="__codelineno-46-14" href="#__codelineno-46-14"></a>    +-- 验证
+</code></pre></div>
+<h3 id="pytorch_1">为什么必须先安装 PyTorch<a class="headerlink" href="#pytorch_1" title="Permanent link">&para;</a></h3>
+<p>PyPI 上的 PyTorch 是仅 CPU 版本。如果直接运行 <code>pip install whisperjav</code>，pip 会从 PyPI 解析 torch 并安装仅 CPU 版本，导致推理速度慢 10-50 倍。通过先使用 <code>--index-url https://download.pytorch.org/whl/cu128</code> 安装 torch，GPU 版本会被"锁定"，后续包会将其视为已满足。</p>
+<h3 id="_27">包注册表<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
+<p>所有包定义位于 <code>whisperjav/installer/core/registry.py</code>。这是以下信息的唯一真实来源：
+- 包名称和版本
+- 安装顺序（PyTorch 优先，numba 在 numpy 之后等）
+- 每个包属于哪个 extras
+- 平台特定的包（仅 Windows、仅 Linux）
+- 导入名称映射（例如 <code>opencv-python</code> 导入为 <code>cv2</code>）</p>
+<p>添加或修改依赖项时，请更新注册表并运行验证：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>python<span class="w"> </span>-m<span class="w"> </span>whisperjav.installer.validation
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../installation_mac_apple_silicon/" class="md-footer__link md-footer__link--prev" aria-label="上一页: macOS (Apple Silicon)">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                macOS (Apple Silicon)
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../user-guide/" class="md-footer__link md-footer__link--next" aria-label="下一页: 用户指南">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                用户指南
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/translation-glossary/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/translation-glossary/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/translation-glossary/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/MANUAL_ROLLBACK/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/MANUAL_ROLLBACK/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/MANUAL_ROLLBACK/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/UPGRADE/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/UPGRADE/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/UPGRADE/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/UPGRADE_TROUBLESHOOTING/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/UPGRADE_TROUBLESHOOTING/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/UPGRADE_TROUBLESHOOTING/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/faq/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/faq/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/faq/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/adr/ADR-001-yaml-config-architecture/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/adr/ADR-001-yaml-config-architecture/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/adr/ADR-001-yaml-config-architecture/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/adr/ADR-002-batched-transcription-pipeline/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/adr/ADR-002-batched-transcription-pipeline/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/adr/ADR-002-batched-transcription-pipeline/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/architecture/ADR-003-qwen3-asr-integration/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/architecture/ADR-003-qwen3-asr-integration/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/architecture/ADR-003-qwen3-asr-integration/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/architecture/ADR-004-dedicated-qwen-pipeline/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/architecture/ADR-004-dedicated-qwen-pipeline/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/architecture/ADR-004-dedicated-qwen-pipeline/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/architecture/CONFIG_SOURCES_HIERARCHY/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/architecture/CONFIG_SOURCES_HIERARCHY/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/architecture/CONFIG_SOURCES_HIERARCHY/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/developer/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/developer/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/developer/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/getting-started/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/guides/gui_user_guide/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/gui_user_guide/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/gui_user_guide/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/guides/installation_linux/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_linux/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_linux/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/guides/installation_mac_apple_silicon/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_mac_apple_silicon/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_mac_apple_silicon/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/guides/installation_windows_python/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_windows_python/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_python/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/guides/installation_windows_standalone/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_windows_standalone/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_standalone/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/pipelines/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/pipelines/chronosjav/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/chronosjav/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/chronosjav/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/pipelines/ensemble/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/ensemble/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/ensemble/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/pipelines/qwen3-asr/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/qwen3-asr/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/qwen3-asr/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/user-guide/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/user-guide/cli-reference/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/cli-reference/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/cli-reference/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/user-guide/output-formats/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/output-formats/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/output-formats/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/user-guide/translation/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/translation/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/translation/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/user-guide/workflows/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/workflows/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/workflows/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/translation-glossary/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/translation-glossary/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/translation-glossary/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/MANUAL_ROLLBACK/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/MANUAL_ROLLBACK/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/MANUAL_ROLLBACK/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/UPGRADE/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/UPGRADE/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/UPGRADE/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/UPGRADE_TROUBLESHOOTING/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/UPGRADE_TROUBLESHOOTING/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/UPGRADE_TROUBLESHOOTING/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/faq/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/faq/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/faq/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/adr/ADR-001-yaml-config-architecture/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/adr/ADR-001-yaml-config-architecture/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/adr/ADR-001-yaml-config-architecture/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/adr/ADR-002-batched-transcription-pipeline/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/adr/ADR-002-batched-transcription-pipeline/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/adr/ADR-002-batched-transcription-pipeline/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/architecture/ADR-003-qwen3-asr-integration/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/architecture/ADR-003-qwen3-asr-integration/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/architecture/ADR-003-qwen3-asr-integration/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/architecture/ADR-004-dedicated-qwen-pipeline/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/architecture/ADR-004-dedicated-qwen-pipeline/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/architecture/ADR-004-dedicated-qwen-pipeline/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/architecture/CONFIG_SOURCES_HIERARCHY/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/architecture/CONFIG_SOURCES_HIERARCHY/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/architecture/CONFIG_SOURCES_HIERARCHY/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/developer/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/developer/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/developer/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/getting-started/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/guides/gui_user_guide/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/gui_user_guide/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/gui_user_guide/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/guides/installation_linux/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_linux/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_linux/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/guides/installation_mac_apple_silicon/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_mac_apple_silicon/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_mac_apple_silicon/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_python/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_python/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_windows_python/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_standalone/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_standalone/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/guides/installation_windows_standalone/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/pipelines/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/pipelines/chronosjav/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/chronosjav/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/chronosjav/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/pipelines/ensemble/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/ensemble/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/ensemble/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/pipelines/qwen3-asr/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/qwen3-asr/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/pipelines/qwen3-asr/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/user-guide/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/user-guide/cli-reference/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/cli-reference/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/cli-reference/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/user-guide/output-formats/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/output-formats/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/output-formats/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/user-guide/translation/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/translation/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/translation/"/>
+    </url>
+    <url>
+        <loc>https://meizhong986.github.io/WhisperJAV/zh/user-guide/workflows/</loc>
+        <lastmod>2026-03-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://meizhong986.github.io/WhisperJAV/zh/user-guide/workflows/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://meizhong986.github.io/WhisperJAV/user-guide/workflows/"/>
+    </url>
+</urlset>
