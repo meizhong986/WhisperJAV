@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-29 (rev18) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **55 open** on GitHub
+> Updated: 2026-03-30 (rev19) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **54 open** on GitHub
 
 ---
 
@@ -20,43 +20,55 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **55** | Was 53 at rev16. Closed 11 in rev17, but recount found 2 older uncounted. |
-| Closed in this session | 11 | #228, #229, #235, #222, #220, #200, #204, #207, #209, #210, #212 |
-| Responded in this session | 8 | #263, #261, #260, #251, #258, #234, #239, #253 |
-| **FIX CODED (for v1.8.10)** | 3 | #253 (Silero trust_repo), XXL exe persistence, XXL model in extra args |
-| **NEEDS RESPONSE (no reply)** | 7 | #246, #247, #248, #250, #254, #259, #262 |
-| **AWAITING USER REPLY** | 7 | #251, #258, #261, #263, #234, #243, #244 |
-| **SHIPPED (awaiting test)** | 3 | #132, #236, #240 |
-| Feature requests (open) | 28 | See Cluster J |
+| Total open on GitHub | **54** | Was 55 at rev18. #253 closed (Silero trust_repo shipped). |
+| **v1.8.10 RELEASED** | — | 39 commits. Aggressive retune, Ollama GUI, bug fixes. |
+| **NEW since rev18** | 1 | #264 (model download location) |
+| **NEEDS RESPONSE (no reply)** | 8 | #246, #247, #248, #250, #254, #259, #262, #264 |
+| **USER REPLIED (needs follow-up)** | 5 | #217, #231, #243, #255, #263 |
+| **AWAITING USER REPLY** | 5 | #234, #244, #251, #258, #261 |
+| **SHIPPED (awaiting test)** | 4 | #132, #236, #240, #253 |
+| Feature requests (open) | 28 | See Feature Requests section |
 
 ---
 
-## v1.8.10 — IN DEVELOPMENT (dev_v1.8.10, 37 commits ahead of main)
+## v1.8.10 — RELEASED (2026-03-30)
 
-### What's committed
+### What shipped
 
-| Category | Item | Issues | Commits |
-|----------|------|--------|---------|
-| **Quality** | Aggressive sensitivity retune (F7 ground truth validated) | — | `e6ffd52`, `abc84c6`, `1ccdd9d`, `a6a9ad0` |
-| **Quality** | compression_ratio=2.6, condition_on_previous_text=True (tuner-validated) | — | `a6a9ad0` |
-| **Tooling** | Whisper param tuner utility (`scripts/whisper_param_tuner.py`) | — | `57e9f0a` |
-| **Tooling** | Diagnostic JSON per scene (full transcribe() results) | — | `c0dbf60` |
-| **Bug fix** | Config contamination firewall, dead code removal | — | `ae2f0f3` |
-| **Bug fix** | GUI ensemble presets not applied on pipeline switch | — | `6eaa07d` |
-| **Bug fix** | XXL exe path not restored on app restart | — | `fd1648c` |
-| **Bug fix** | XXL --model moved to user-editable Extra Args | — | `ff692bb` |
-| **Bug fix** | Silero VAD crashes in Colab/Kaggle (trust_repo) | #253 | `9329840` |
-| **Feature** | Enhance-for-VAD checkbox in ensemble UI, all pipelines | — | `06f0c2d` |
+| Category | Item | Issues |
+|----------|------|--------|
+| **Quality** | Aggressive sensitivity retune (F7 ground truth validated, 76.5% → 92.6%) | — |
+| **Quality** | compression_ratio=2.6, condition_on_previous_text=True (tuner-validated) | — |
+| **Feature** | Ollama first-class GUI integration (provider, onboarding, model download, VRAM cleanup) | #132, #128 |
+| **Feature** | Enhance-for-VAD checkbox in ensemble UI, all pipelines | — |
+| **Tooling** | Whisper param tuner utility (`scripts/whisper_param_tuner.py`) | — |
+| **Tooling** | Diagnostic JSON per scene (full transcribe() results) | — |
+| **Bug fix** | Config contamination firewall, dead code removal | — |
+| **Bug fix** | GUI ensemble presets not applied on pipeline switch | — |
+| **Bug fix** | XXL exe path not restored on app restart | — |
+| **Bug fix** | XXL --model moved to user-editable Extra Args | — |
+| **Bug fix** | Silero VAD crashes in Colab/Kaggle (trust_repo) | #253 |
+| **Bug fix** | Translation diagnostic hardening (12+ fixes) | — |
+| **Bug fix** | Colab/Kaggle notebook fixes (llvmlite, trust_repo) | #253, #231 |
 
-### What still needs doing for v1.8.10
+---
 
-| Item | Priority | Status |
-|---|---|---|
-| Respond to #263 (new screenshot from user) | HIGH | TODO |
-| Respond to remaining 7 NEEDS RESPONSE issues | MEDIUM | TODO |
-| Write Ollama translation FAQ | MEDIUM | TODO (#255, #259, #233) |
-| Write model cache paths doc | LOW | TODO (#250) |
-| Test enhance-for-VAD checkbox in GUI | HIGH | TODO |
+## v1.8.10 Hotfix Candidates
+
+Issues discovered during or after v1.8.10 release that may warrant a post-release patch.
+
+| Item | Source | Priority | Scope |
+|---|---|---|---|
+| Colab install: remove venv, reuse system torch | Colab test log analysis | **HIGH** | `install_colab.sh` + notebooks — coded, needs testing |
+| Colab install: llama-cpp wheel filename bug (uv rejects generic name) | Colab test log F3 | MEDIUM | `install_colab.sh` — coded |
+| Progress counter `[2/1]` — denominator wrong when directory has subdirs | Colab test log F2 | LOW | `main.py` or `unified_progress.py` |
+| Notebook file scan doesn't match WhisperJAV's recursive scan | Colab test log F1 | LOW | Notebook cell — cosmetic mismatch |
+| #263 follow-up — user shared console log, needs diagnosis | GitHub | MEDIUM | Response needed |
+| #255 — 3 users asking how to use Ollama for translation | GitHub | MEDIUM | FAQ or response — v1.8.10 ships the feature |
+| #264 — model download location request (new issue) | GitHub | LOW | Response needed |
+| #217 — vimbackground still can't install (PyTorch download fails in China) | GitHub | LOW | Network/region issue, hard to fix |
+
+**Recommendation**: Ship hotfix (`v1.8.10.post1`) with the Colab install fix after Colab testing confirms it works. The progress counter and notebook scan mismatch are cosmetic — defer.
 
 ---
 
@@ -66,40 +78,44 @@
 
 | # | Title | Reporter | Status | Notes |
 |---|-------|----------|--------|-------|
-| **#263** | GPU not utilized | herlong6529424-dot | `AWAITING REPLY` | Responded. User replied with screenshot — needs follow-up. |
+| **#264** | 模型默认下载位置 + 系列问题 | yuliQAQ | `NEEDS RESPONSE` | NEW. Chinese. Multiple requests: model download path, other. |
+| **#263** | GPU not utilized | herlong6529424-dot | `NEEDS FOLLOW-UP` | User replied with console log showing successful processing. GPU may be working but Task Manager misleading. Need to read log carefully. |
 | **#261** | Network check: unknown url type https | henry99a | `AWAITING REPLY` | Responded with SSL fix. |
 | **#260** | Uninstall leaves 6GB | hawai-stack | `AWAITING REPLY` | Responded with cache paths. |
-| **#259** | Local Translation Issues (hotfix2) | destinyawaits | `NEEDS RESPONSE` | Same user as closed #212. |
+| **#259** | Local Translation Issues (hotfix2) | destinyawaits | `NEEDS RESPONSE` | Same user as closed #212. Likely needs Ollama FAQ (v1.8.10 ships Ollama GUI). |
 | **#258** | 我遇到的问题 (vague) | Uillike | `AWAITING REPLY` | Asked for logs. |
-| **#253** | Colab silero trust_repo | KinhoLeung | `FIX CODED` v1.8.10 | trust_repo=True added. Responded with workaround. |
+| **#255** | 如何用ollama进行翻译 | cheny7918 | `NEEDS FOLLOW-UP` | 3 users asking. v1.8.10 ships Ollama GUI — respond with upgrade instructions. |
+| **#253** | Colab silero trust_repo | KinhoLeung | `SHIPPED` v1.8.10 | **CLOSED** on GitHub. trust_repo=True + env var. |
 | **#251** | post2 launch failure | zoqapopita93 | `AWAITING REPLY` | Asked for details. |
-| **#246** | anime-whisper hallucination bug | dadlaugh | `NEEDS RESPONSE` | Valuable technical report. |
-| **#243** | Install verify fails (RTX 3050) | Trenchcrack | `AWAITING REPLY` | Asked for confirmation. |
+| **#246** | anime-whisper hallucination bug | dadlaugh | `NEEDS RESPONSE` | Valuable technical report. Serverless GPU pipeline + hallucination in anime-whisper model. |
+| **#243** | Install verify fails (RTX 3050) | Trenchcrack | `NEEDS FOLLOW-UP` | Community member (JiwaniZakir) replied asking for full log. |
 | **#240** | GUI access violation Win11 | m739566004-svg | `SHIPPED` post2 | private_mode=True fix shipped. |
-| **#237** | XXL model questions | yangming2027 | `NEEDS FOLLOW-UP` | liugngg question about post-processing. |
+| **#237** | XXL model questions | yangming2027 | `NEEDS FOLLOW-UP` | liugngg question about post-processing. Active community discussion. |
 | **#234** | CUDA version confusion | techguru0 | `AWAITING REPLY` | Corrected. |
-| **#233** | translation error (local LLM) | WillChengCN | `NEEDS RESPONSE` | Recommend Ollama. |
+| **#233** | translation error (local LLM) | WillChengCN | `NEEDS RESPONSE` | Recommend Ollama + v1.8.10 upgrade. |
+| **#231** | Kaggle notebook error | fzfile | `NEEDS FOLLOW-UP` | We responded with llvmlite fix. User confirmed fix but hit translation error. New user (Liiesl) asking for update. |
 | **#225** | GUI white screen | github3C | `STALE` | WebView2 confirmed OK. Exhausted hypotheses. |
+| **#217** | GUI.exe not found | loveGEM | `NEEDS FOLLOW-UP` | vimbackground replied again 03-30. Root cause: PyTorch download fails in China (network). Suggested mirror/offline install. |
 
-### Stale / Low Activity (6)
+### Stale / Low Activity (5)
 
 | # | Title | Last Activity | Recommendation |
 |---|-------|---------------|----------------|
-| #236 | WebUI cache stale | 03-19 | Close (fixed in post1) |
-| #231 | Kaggle llvmlite | 03-27 | Respond with fix: `pip install -U llvmlite numba` |
-| #227 | M1 MAX hang | 03-17 | Keep open as known issue |
-| #221 | cublas64_12.dll missing | 03-14 | Close for inactivity |
-| #218 | cu118 wheel mismatch | 03-14 | Close (shipped in post1) |
-| #217 | GUI.exe not found | 03-17 | Close for inactivity |
+| #244 | search for XXL | 03-19 | We responded. Close for inactivity if no reply. |
+| #236 | WebUI cache stale | 03-19 | `SHIPPED` post1. Close. |
+| #232 | whisper-ja-anime model | 03-16 | We responded. Evaluate model. |
+| #221 | cublas64_12.dll missing | 03-14 | We responded. Close for inactivity. |
+| #218 | cu118 wheel mismatch | 03-14 | `SHIPPED` post1. Close. |
 
 ### Feature Requests (28)
 
 | # | Title | Priority | Target |
 |---|-------|----------|--------|
+| **#264** | Model download location customization | LOW | Evaluate |
 | **#262** | Cohere Transcribe model | LOW | Evaluate |
 | **#254** | Remove non-speech sounds | MEDIUM | v1.9 |
 | **#252** | Multi-speaker / diarization | MEDIUM | v1.9+ |
-| **#250** | Model folder documentation | LOW | v1.8.10 (docs) |
+| **#250** | Model folder documentation | LOW | v1.8.10 hotfix (docs) |
 | **#248** | Diarization | MEDIUM | v1.9+ (dup #252) |
 | **#247** | Docker support | LOW | Backlog |
 | **#242** | XXL in Pass 1 | MEDIUM | v1.9 |
@@ -107,7 +123,6 @@
 | **#232** | whisper-ja-anime model | LOW | Evaluate |
 | **#230** | Standalone merge module | HIGH | v1.9.0 |
 | **#224** | Vocal separation | MEDIUM | v1.9 |
-| **#223** | XXL comparison/integration | — | `SHIPPED` v1.8.9 |
 | **#215** | Qwen3-ASR quality | LOW | Expected behavior |
 | **#213** | Intel GPU (XPU) | LOW | v1.9+ |
 | **#206** | Grey out incompatible options | MEDIUM | v1.9 |
@@ -117,7 +132,6 @@
 | **#175** | Chinese GUI | HIGH | v1.9.0 |
 | **#164** | MPEG-TS + Drive | LOW | Backlog |
 | **#142** | AMD Radeon ROCm | MEDIUM | v1.9+ |
-| **#132** | Local LLM Kaggle | — | `SHIPPED` post1 |
 | **#128** | Gemma 3 models | HIGH | v1.9.0 |
 | **#126** | Recursive directory | LOW | Backlog |
 | **#114** | DirectML | MEDIUM | v1.9+ |
@@ -137,68 +151,71 @@
 
 | Action | Issues | Status |
 |---|---|---|
-| ~~Close 6 stale/verified issues~~ | #228, #229, #235, #222, #220 | **DONE** (rev17) |
-| ~~Batch respond to 7 simple issues~~ | #263, #261, #260, #251, #258, #234, #239 | **DONE** (rev17) |
-| ~~Fix Silero trust_repo for Colab~~ | #253 | **DONE** (rev18) |
-| ~~Fix XXL exe path persistence~~ | — | **DONE** (rev18) |
-| ~~Fix XXL model in Extra Args~~ | — | **DONE** (rev18) |
-| ~~Restore enhance-for-VAD checkbox~~ | — | **DONE** (rev18) |
-| **Follow up #263** (user replied with screenshot) | #263 | TODO |
-| **Close 3 more stale issues** | #221, #218, #217 | TODO |
-| **Write Ollama translation FAQ** | #255, #259, #233 | TODO |
-| **Write model cache paths doc** | #250 | TODO |
+| ~~v1.8.10 released~~ | All fix-coded items | **DONE** (rev19) |
+| ~~Close #253~~ | Silero trust_repo | **DONE** (rev19) |
+| **Respond to #255** (Ollama FAQ — 3 users waiting) | #255 | TODO |
+| **Respond to #264** (model download location) | #264 | TODO |
+| **Follow up #263** (read user's console log carefully) | #263 | TODO |
+| **Follow up #231** (Kaggle translation error) | #231 | TODO |
+| **Close 3 stale issues** | #221, #218, #236 | TODO |
 | **Respond to #246** (anime-whisper hallucination) | #246 | TODO |
+| **Respond to #259** (local translation → upgrade to v1.8.10 Ollama) | #259 | TODO |
+| **Test Colab install fix** and ship v1.8.10.post1 | — | TODO |
 
 ---
 
-## F3: Release Roadmap & Recommendations
+## Release Roadmap
 
-### v1.8.10 — Release Candidate
+### v1.8.10.post1 — Hotfix (Colab Install)
 
-**Theme: Quality + Stability + Developer Tools**
+**Theme: Colab Installation Fix**
 
-37 commits ahead of main. Ready to stabilize and release.
+Fix is coded on dev branch, needs Colab testing before release.
 
-| Category | Items | Risk |
-|---|---|---|
-| **Aggressive sensitivity retune** | 6 commits, F7 ground truth validated with param tuner | LOW — tuner-verified |
-| **Diagnostic JSON per scene** | Full whisper results saved alongside SRTs | LOW — additive only |
-| **Param tuner utility** | `scripts/whisper_param_tuner.py` | LOW — standalone script |
-| **Bug fixes** | XXL persistence, config contamination, GUI presets, Colab trust_repo | LOW — targeted fixes |
-| **Enhance-for-VAD UI** | Checkbox restored in ensemble panel | LOW — additive UI |
+| Item | Risk |
+|---|---|
+| Remove venv, reuse Colab's system torch (~50s faster, ~2GB less bandwidth) | LOW — tested logic, needs Colab verification |
+| Fix llama-cpp wheel filename bug (uv rejects generic name) | LOW — filename fix only |
+| Notebook updates (remove venv references) | LOW — config changes only |
 
-**Recommendation**: Release as v1.8.10 after closing remaining stale issues and writing the Ollama FAQ. No blockers.
+**Recommendation**: Test on Colab, then release as v1.8.10.post1. No code changes to core pipeline.
 
 ---
 
-### v1.8.x — Potential post-release patches
+### v1.8.11 — Optional Maintenance Release
 
-| Item | Trigger | Scope |
-|---|---|---|
-| #263 follow-up | If GPU not utilized is a real bug | Patch |
-| Ollama FAQ doc | Written as docs, not code | Docs only |
-| Additional Colab/Kaggle fixes | If more reports come in | Patch |
+Only needed if post-v1.8.10 bug reports accumulate. Currently not planned.
+
+| Potential item | Trigger |
+|---|---|
+| #263 GPU utilization fix | If diagnosis reveals a real bug |
+| Progress counter `[2/1]` fix | If more users report |
+| #217 China PyTorch download mirror | If we add mirror support |
+| Customize Parameters UI fixes (F1-F10 from audit) | If user demand emerges |
+
+**Recommendation**: Skip v1.8.11 unless a blocking bug surfaces. Move to v1.9.0 scope.
 
 ---
 
-### v1.9.0 — Proposed Scope
+### v1.9.0 — Next Major Release
 
 **Theme: Platform Expansion + Translation Overhaul + UX**
 
 | Priority | Item | Issues | Effort | Notes |
 |---|---|---|---|---|
-| **P0** | Ollama full migration (deprecate llama-cpp-python) | #132, #233, #255, #259 | Large | Remove ~1500 LOC fragile code. GUI wiring for Ollama. |
+| **P0** | Ollama full migration (deprecate llama-cpp-python) | #132, #233, #255, #259 | Large | Remove ~1500 LOC fragile code. llama-cpp already broken on Colab. |
 | **P0** | Chinese UI (partial i18n) | #175, #180 | Medium | Biggest support burden reducer. 40%+ of issues are in Chinese. |
 | **P1** | Speaker diarization | #248, #252 | Large | New capability. pyannote-audio or similar. |
-| **P1** | Standalone merge CLI | #230 | Medium | `whisperjav-merge` command |
-| **P1** | XXL in Pass 1 | #242 | Medium | Needs forced alignment since XXL has no timestamps. |
+| **P1** | Standalone merge CLI | #230 | Medium | `whisperjav-merge` command. 7 comments, active demand. |
+| **P1** | XXL in Pass 1 | #242 | Medium | Needs forced alignment since XXL has no timestamps. 7 comments. |
 | **P1** | AMD ROCm support | #142, #114, #239 | Medium | Document + test. FishYu-OWO proved it works. |
 | **P1** | Full dual-track enhance-for-VAD | — | Medium | ASR module needs separate VAD/ASR audio paths for balanced/fidelity. |
 | **P2** | GUI settings persistence | #96 | Medium | Long-standing request. |
-| **P2** | MPS selective policy | #227 | Small | Force CPU for whisper, allow MPS for kotoba. |
 | **P2** | Vocal separation investigation | #224, #254 | Medium | BS-RoFormer or UVR integration. |
 | **P2** | Grey out incompatible options | #206 | Small | Prevent invalid GUI combinations. |
 | **P2** | Uninstall cleanup tool | #260 | Small | Script to find and remove cached models. |
+| **P2** | Model cache paths documentation | #250 | Small | FAQ / docs. |
+| **P2** | MPS selective policy | #227 | Small | Force CPU for whisper, allow MPS for kotoba. |
 | **P3** | Docker support | #247 | Medium | Dockerfile + compose. |
 | **P3** | Gemma 3 model configs | #128 | Small | Contributor PR from hyiip. |
 | **P3** | whisper-ja-anime model | #232 | Small | If standard HF format. |
@@ -213,18 +230,15 @@
 
 | Area | Item | Why |
 |---|---|---|
-| **Architecture** | Plugin system for ASR backends | Currently hardcoded pipeline classes. Plugin architecture enables community contributions without core changes. |
-| **Architecture** | Separate installer from runtime | Currently entangled. Clean separation enables Docker, cloud, and headless deployments. |
-| **Architecture** | Web-based UI (replace pywebview) | PyWebView has persistent issues (#225, #240, WebView2 dependency). A proper web UI (Flask/FastAPI) eliminates platform-specific GUI bugs. |
-| **Scale** | Batch processing dashboard | Current batch is sequential. Dashboard with queue, progress, ETA for large libraries. |
-| **Scale** | GPU memory management overhaul | Current JIT load/unload is fragile. Proper memory budget system for multi-model workflows. |
-| **Ecosystem** | Public API / SDK | Enable third-party integrations. REST API for remote processing. |
-| **Ecosystem** | Community model registry | Centralized config sharing for community-tuned models/presets. |
-| **Quality** | Ground truth test framework | Formalize the F7 acceptance test pattern. CI/CD with regression detection on quality metrics. |
-| **Platform** | Linux native installer | Currently source-only on Linux. AppImage or deb package. |
-| **Platform** | Cloud deployment guide | AWS/GCP/Lambda with GPU. Serverless transcription service pattern. |
-
-**v2.0 is a major version bump** — breaking changes acceptable. The key insight from v1.8.x: the biggest technical debts are the PyWebView GUI, the llama-cpp-python translation stack, and the tightly-coupled pipeline architecture.
+| **Architecture** | Plugin system for ASR backends | Hardcoded pipeline classes → community contributions without core changes |
+| **Architecture** | Separate installer from runtime | Entangled today. Clean separation enables Docker, cloud, headless |
+| **Architecture** | Web-based UI (replace pywebview) | PyWebView has persistent issues (#225, #240). Proper web UI eliminates platform bugs |
+| **Scale** | Batch processing dashboard | Queue, progress, ETA for large libraries |
+| **Scale** | GPU memory management overhaul | Proper memory budget system for multi-model workflows |
+| **Ecosystem** | Public API / SDK | REST API for remote processing |
+| **Quality** | Ground truth test framework | Formalize F7 pattern. CI/CD with regression detection |
+| **Platform** | Linux native installer | AppImage or deb package |
+| **Platform** | China mirror support | #217 — PyTorch download fails behind GFW. Mirror URLs or offline bundle |
 
 ---
 
@@ -232,13 +246,14 @@
 
 | Cluster | Issues | Primary | Action |
 |---------|--------|---------|--------|
-| **Local LLM** | #259, #255, #233, #132 | #132 | Ollama FAQ resolves most |
+| **Local LLM / Ollama** | #259, #255, #233, #132 | #132 | v1.8.10 ships Ollama GUI. Respond with upgrade. |
 | **Diarization** | #248, #252 | #248 | Merge. v1.9 roadmap. |
 | **AMD/Intel GPU** | #239, #142, #114, #213 | #142 | v1.9+. Link all. |
 | **i18n** | #175, #180 | #180 | v1.9.0 P0. |
 | **Speech enhancement** | #254, #224 | #224 | v1.9. |
 | **XXL** | #242, #237, #223, #244 | #242 | v1.9. |
-| **Install/Network** | #261, #253, #251, #243, #240, #225 | — | Individual fixes. |
+| **Install/Network** | #261, #253, #251, #243, #240, #225, #217 | — | Individual fixes. |
+| **Model management** | #264, #250 | #250 | Docs / FAQ. |
 
 ---
 
@@ -246,7 +261,8 @@
 
 | Date | Changes |
 |------|---------|
-| **2026-03-29** | **rev18.** Refreshed from GitHub. 55 open. Session work: fixed XXL exe persistence, XXL model in extra args, Silero trust_repo for Colab (#253), restored enhance-for-VAD checkbox. Added F3 roadmap for v1.8.10, v1.9.0, v2.0. |
+| **2026-03-30** | **rev19.** v1.8.10 released. 54 open. #253 closed. New: #264. Refreshed all issue statuses from GitHub. Added v1.8.10.post1 hotfix plan (Colab install fix). Updated roadmap. |
+| 2026-03-29 | **rev18.** Refreshed from GitHub. 55 open. Session work: aggressive retune, Ollama GUI, bug fixes. Added F3 roadmap. |
 | 2026-03-28 | **rev17.** Closed 11. Responded 7. |
 | 2026-03-28 | **rev16.** Full refresh. |
 | 2026-03-19 | **rev15.** 3 fixes coded for post2. |

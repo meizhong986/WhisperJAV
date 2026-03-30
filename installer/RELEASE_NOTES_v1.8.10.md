@@ -1,20 +1,19 @@
-# WhisperJAV v1.8.10
+**Quality + Stability + Ollama (beta)**
+Transcription accuracy significantly improved in aggressive mode
+Ollama integration is now available in GUI 
+Many bugs fixed across the board
 
-**Quality + Ollama + Stability** — Transcription accuracy significantly improved through ground-truth-validated parameter tuning. Ollama is now a first-class translation provider in the GUI. Several bugs fixed across the board.
+---
 
-## What's New
 
-### Transcription Quality Improvement
+Transcription Quality Improvement
 
-- **Aggressive sensitivity retune** — I ran the aggressive preset against Netflix ground truth (68 subtitles, 293s clip) and found that several parameters were working against each other. Coverage improved from 76.5% to 92.6% after four iterations of testing. If you use aggressive mode, this is a meaningful accuracy upgrade.
+- **Aggressive sensitivity retune** — I ran the aggressive preset against Netflix ground truth in my test cases. I found that several parameters were working against each other. Coverage improved from 76.5% to 92.6% after the accuracy upgrade.
 
-- **Key parameter changes** — `no_speech_threshold` was inverted (the "aggressive" value was actually the most restrictive). Fixed across all four ASR backends. `compression_ratio_threshold` tightened from 3.0 to 2.6 to reject hallucination loops while keeping legitimate Japanese dialogue. `condition_on_previous_text` enabled for aggressive mode to help recognize repeated dialogue. Decode capacity increased (beam_size, best_of) so the model has more room to find correct transcriptions in difficult audio.
 
-- **Diagnostic JSON per scene** — Full Whisper transcribe() results are now saved as JSON alongside each scene SRT. This includes per-segment no_speech_prob, compression_ratio, and temperature — useful for understanding why specific segments were captured or missed. Saved automatically, no configuration needed.
+Ollama GUI Integration
 
-### Ollama GUI Integration
-
-- **Ollama as a first-class provider** — Select "Ollama" from the provider dropdown in the Ensemble tab or Standalone Translation tab. No more workarounds with "Custom Server" or manual endpoint configuration. (#132, #128)
+- **Ollama as a provider** — Pre-installed Ollama is required. WhisperJAV integrates into your installed Ollama. In GUI select "Ollama" from the provider dropdown in the Ensemble tab or Standalone Translation tab. Wait for Ollama server to be discovered and connect. Select model or provide model. 
 
 - **Three-state onboarding** — When you select Ollama, the GUI detects your setup and shows the right panel: not installed (download link), no model (recommended model with copyable `ollama pull` command), or connected (green status dot).
 
@@ -28,11 +27,12 @@
 
 - **llama-cpp deprecated** — The "Local LLM" option is renamed to "llama-cpp (deprecated)". I plan to remove it entirely in v1.9.0 in favor of Ollama.
 
-### Enhance for VAD
+Speech Enhanceer for VAD ONLY option
 
 - **Checkbox in ensemble UI** — The "Enhance for VAD only" option (use enhanced audio for speech detection but original audio for transcription) is now accessible as a checkbox below each enhancer dropdown in the ensemble tab. Previously this was only available inside the Qwen Customize Parameters modal. Works for all pipelines. (#253)
 
-## Bug Fixes
+---
+Bug Fixes
 
 - **XXL exe path lost on restart** — The BYOP panel's XXL executable path was not restored when reopening the app. Caused by a race condition between DOMContentLoaded and pywebview API readiness. Fixed by reloading BYOP preferences after pywebview is ready.
 
@@ -50,26 +50,72 @@
 
 - **Output directory not honored** — Fixed output path handling and added artifact cleanup safety guard.
 
-## How to Upgrade
+---
 
-**Windows installer users:**
+### How to Upgrade or Install
+
+**Upgrade from 1.8.9:**
+
 ```
-whisperjav-upgrade
+pip install -U --no-deps "whisperjav @ git+https://github.com/meizhong986/whisperjav.git@v1.8.10"
 ```
 
-**Source install (git) users:**
-```
-git pull && uv sync
-```
-Or simply: `whisperjav-upgrade`
+**Fresh Install:**
 
-**Colab / Kaggle users:**
-Re-run your install cell — it always pulls the latest version.
+### Windows — Standalone Installer (.exe)
 
-**pip users:**
+
+1. Download **WhisperJAV-1.8.9-Windows-x86_64.exe** from the Assets below
+2. Run the installer (no admin rights required)
+3. Wait 10-20 minutes for setup to complete
+4. Launch from the Desktop shortcut
+
+Installs to `%LOCALAPPDATA%\WhisperJAV`. A desktop shortcut is created automatically. Your GPU is detected automatically.
+
+### macOS
+
+Requires [Git](https://git-scm.com/downloads). The install script checks for everything else (Xcode CLI Tools, Python, FFmpeg, PortAudio) and tells you exactly what to install if anything is missing. Open Terminal and run:
+
+```bash
+cd ~
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+git checkout v1.8.9
+installer/install_mac.sh
 ```
-pip install -U "whisperjav @ git+https://github.com/meizhong986/whisperjav.git@v1.8.10"
+
+After installation, open the `whisperjav` folder in Finder and double-click **WhisperJAV.command** to launch the GUI.
+
+### Linux
+
+Requires Git and Python 3.10-3.12. The install script handles PEP 668 (externally-managed) environments on Debian 12+ / Ubuntu 24.04+. Open a terminal and run:
+
+```bash
+cd ~
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+git checkout v1.8.9
+installer/install_linux.sh
 ```
+
+After installation, launch the GUI with `./WhisperJAV.sh`.
+
+### Windows — Source Install
+
+Requires [Git](https://git-scm.com/downloads) and [Python 3.10-3.12](https://www.python.org/downloads/). Open a terminal and run:
+
+```
+cd %USERPROFILE%
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+git checkout v1.8.9
+installer\install_windows.bat
+```
+
+After installation, double-click **WhisperJAV.bat** to launch the GUI.
+
+
+
 
 ## Compatibility
 
@@ -95,22 +141,9 @@ Same as v1.8.9 — no dependency changes.
 - Chinese GUI (partial i18n) (#175, #180)
 - Speaker diarization (#248, #252)
 
+---
 ## Technical Details
 
-<details>
-<summary>Click to expand — for power users and contributors</summary>
-
-### Aggressive Preset Changes (all backends)
-
-| Parameter | Before | After | Why |
-|-----------|--------|-------|-----|
-| no_speech_threshold | 0.22 (OpenAI) / 0.22 (Faster) | 0.60 / 0.55 | Was inverted — lower = more restrictive, not more aggressive |
-| compression_ratio_threshold | 3.0 | 2.6 | Rejects hallucination loops (ratio ~10) while keeping legitimate repetition (ratio 2.0-2.5) |
-| beam_size | 2 (OpenAI) / 3 (Faster) | 5 / 4 | More decode capacity for difficult audio |
-| best_of | 1 / 3 | 3 / 3 | More sampling diversity |
-| condition_on_previous_text | False | True | Helps recognize dialogue echoes and repeated phrases |
-| hallucination_silence_threshold | 2.5 (OpenAI) | None (disabled) | Was suppressing real speech near silence gaps |
-| temperature | [0.0, 0.2, 0.4] | [0.0, 0.15, 0.3, 0.5] | 4-step fallback with finer initial steps |
 
 ### New Developer Tools
 
@@ -118,26 +151,3 @@ Same as v1.8.9 — no dependency changes.
 
 - Diagnostic JSON — Saved to `{scene_name}_diagnostic.json` alongside scene SRTs. Contains full segment data including no_speech_prob, compression_ratio, temperature per segment.
 
-### Ollama GUI Architecture
-
-- `OllamaStateManager` — centralized state machine (CHECKING / NOT_INSTALLED / NO_MODEL / READY)
-- `ProviderUIManager` — centralized provider-change handler for both tabs
-- `OllamaPullModal` — download confirmation + progress + error handling
-- Curated models loaded from `whisperjav/config/ollama_models.json` (not hardcoded in JS)
-- New API methods: `detect_ollama()`, `start_ollama_server()`, `list_ollama_models()`, `recommend_ollama_model()`, `pull_ollama_model()`, `get_ollama_curated_models()`
-
-### Files Changed (39 commits)
-
-Major files modified:
-- `whisperjav/config/components/asr/` — all 4 ASR preset files (aggressive retune)
-- `whisperjav/modules/whisper_pro_asr.py` — diagnostic JSON save
-- `whisperjav/modules/faster_whisper_pro_asr.py` — diagnostic JSON save
-- `whisperjav/modules/stable_ts_asr.py` — diagnostic JSON save + trust_repo
-- `whisperjav/modules/speech_segmentation/backends/silero.py` — trust_repo
-- `whisperjav/webview_gui/assets/app.js` — Ollama integration, XXL fixes, enhance-for-VAD
-- `whisperjav/webview_gui/assets/index.html` — Ollama panels, enhance-for-VAD checkbox
-- `whisperjav/webview_gui/api.py` — 6 new Ollama API methods
-- `whisperjav/translate/` — 8 files for translation diagnostic hardening
-- `scripts/whisper_param_tuner.py` — new utility
-
-</details>
