@@ -30,7 +30,81 @@ from enum import Enum
 
 warnings.filterwarnings('ignore')
 
-__version__ = "7.0.0"
+__version__ = "7.1.0"
+
+
+def _diagnose_environment(log_fn=None):
+    """Log library versions and compatibility status for semantic scene detection.
+
+    This diagnostic runs once per process.  It checks numpy/librosa/numba/
+    soundfile versions and known incompatibilities that can cause hangs or
+    crashes during feature extraction.  (#267)
+    """
+    _log = log_fn or (lambda msg, *a, **kw: print(msg))
+
+    def _ver(module_name):
+        try:
+            mod = __import__(module_name)
+            return getattr(mod, "__version__", getattr(mod, "version", "?"))
+        except ImportError:
+            return "NOT INSTALLED"
+
+    np_ver = _ver("numpy")
+    lr_ver = _ver("librosa")
+    nb_ver = _ver("numba")
+    sf_ver = _ver("soundfile")
+
+    _log(f"[Semantic Diag] numpy={np_ver}  librosa={lr_ver}  numba={nb_ver}  soundfile={sf_ver}")
+
+    # --- compatibility checks ---
+    warnings_found = []
+
+    # numpy 2.x + old librosa
+    try:
+        np_major = int(str(np_ver).split(".")[0])
+    except (ValueError, IndexError):
+        np_major = 0
+
+    if np_major >= 2:
+        # librosa < 0.11.0 uses np.complex (removed in numpy 2.0)
+        try:
+            lr_parts = [int(x) for x in str(lr_ver).split(".")[:3] if x.isdigit()]
+            if len(lr_parts) >= 2 and (lr_parts[0], lr_parts[1]) < (0, 11):
+                warnings_found.append(
+                    f"librosa {lr_ver} is NOT compatible with numpy {np_ver} "
+                    f"(need librosa >= 0.11.0).  This may cause AttributeError or hang."
+                )
+        except Exception:
+            pass
+
+        # numba < 0.60.0 does not support numpy 2.x binary ABI
+        try:
+            nb_parts = [int(x) for x in str(nb_ver).split(".")[:2] if x.isdigit()]
+            if len(nb_parts) >= 2 and (nb_parts[0], nb_parts[1]) < (0, 60):
+                warnings_found.append(
+                    f"numba {nb_ver} is NOT compatible with numpy {np_ver} "
+                    f"(need numba >= 0.60.0).  JIT compilation may hang."
+                )
+        except Exception:
+            pass
+
+    # ffmpeg version (informational)
+    try:
+        ffmpeg_result = subprocess.run(
+            ["ffmpeg", "-version"], capture_output=True, text=True, timeout=5
+        )
+        ffmpeg_line = ffmpeg_result.stdout.split("\n")[0] if ffmpeg_result.stdout else "?"
+        _log(f"[Semantic Diag] ffmpeg: {ffmpeg_line}")
+    except Exception as e:
+        _log(f"[Semantic Diag] ffmpeg: unavailable ({e})")
+
+    for w in warnings_found:
+        _log(f"[Semantic Diag] *** WARNING: {w}")
+
+    if not warnings_found:
+        _log("[Semantic Diag] All version checks passed.")
+
+    return warnings_found
 
 # ==========================================
 # 0. EXCEPTIONS
@@ -194,31 +268,66 @@ class StreamFeatureExtractor:
     def extract(self, file_path, progress_callback: Optional[Callable[[float, str], None]] = None) -> tuple:
         if progress_callback: progress_callback(0.0, "Initializing feature extraction...")
         self._log(f"--> [1/5] Streaming features ({self.chunk_dur}s chunks)...")
+
+        # --- Diagnostic: environment check (runs once per process) ---
+        if not getattr(StreamFeatureExtractor, '_diag_done', False):
+            _diagnose_environment(self._log)
+            StreamFeatureExtractor._diag_done = True
+
         temp_wav = None
         process_path = file_path
-        
+
+        # --- Diagnostic step 1: soundfile probe ---
+        self._log(f"[1/5 diag] Step 1: sf.info({os.path.basename(file_path)})...")
+        t0 = time.time()
         try:
-            sf.info(file_path)
-        except Exception:
+            probe = sf.info(file_path)
+            self._log(
+                f"[1/5 diag] Step 1 OK: {probe.format} {probe.subtype}, "
+                f"{probe.samplerate}Hz, {probe.channels}ch, "
+                f"{probe.duration:.1f}s ({time.time()-t0:.2f}s)"
+            )
+        except Exception as e:
+            self._log(f"[1/5 diag] Step 1 FAILED: {e} — falling back to ffmpeg conversion")
             try:
                 if progress_callback: progress_callback(0.05, "Converting to WAV...")
+                t1 = time.time()
                 temp_wav = convert_to_temp_wav(file_path, self.sr)
+                self._log(f"[1/5 diag] Step 1b: ffmpeg conversion OK ({time.time()-t1:.2f}s)")
                 process_path = temp_wav
-            except Exception as e:
-                self._log(f"Error: {e}", logging.ERROR)
-                raise AudioLoadError(f"Failed to convert/load audio: {e}")
+            except Exception as e2:
+                self._log(f"Error: {e2}", logging.ERROR)
+                raise AudioLoadError(f"Failed to convert/load audio: {e2}")
 
         try:
+            # --- Diagnostic step 2: audio info ---
+            self._log("[1/5 diag] Step 2: Reading audio metadata...")
+            t0 = time.time()
             info = sf.info(process_path)
             total_dur = info.duration
             native_sr = info.samplerate
             block_size = int(self.chunk_dur * native_sr)
             feature_list = []
-            
-            # Estimate total blocks for progress
             total_blocks = int(np.ceil(info.frames / block_size))
+            self._log(
+                f"[1/5 diag] Step 2 OK: {total_dur:.1f}s, {native_sr}Hz, "
+                f"block_size={block_size}, total_blocks={total_blocks} ({time.time()-t0:.2f}s)"
+            )
+            if native_sr != self.sr:
+                self._log(f"[1/5 diag] Will resample {native_sr}Hz → {self.sr}Hz (librosa)")
+
+            # --- Diagnostic step 3: streaming loop ---
+            self._log("[1/5 diag] Step 3: Starting sf.blocks() iterator...")
+            t_loop = time.time()
 
             for i, block in enumerate(sf.blocks(process_path, blocksize=block_size, always_2d=True)):
+                t_chunk = time.time()
+                if i == 0:
+                    self._log(
+                        f"[1/5 diag] Step 3 OK: First block received "
+                        f"(shape={block.shape}, {time.time()-t_loop:.2f}s)"
+                    )
+
                 # Update progress (0.1 to 0.8 range reserved for extraction)
                 if progress_callback:
                     p = 0.1 + (0.7 * (i / total_blocks))
@@ -226,9 +335,12 @@ class StreamFeatureExtractor:
 
                 if block.shape[1] > 1: y = np.mean(block, axis=1)
                 else: y = block.flatten()
-                
+
                 if native_sr != self.sr:
+                    t_rs = time.time()
                     y = librosa.resample(y, orig_sr=native_sr, target_sr=self.sr)
+                    if i == 0:
+                        self._log(f"[1/5 diag] Step 4: librosa.resample OK ({time.time()-t_rs:.2f}s)")
 
                 min_samples = self.hop_length * self.config.min_samples_multiplier
                 if len(y) < min_samples:
@@ -236,6 +348,9 @@ class StreamFeatureExtractor:
 
                 # Extract
                 try:
+                    if i == 0:
+                        self._log("[1/5 diag] Step 5: librosa feature extraction (first chunk)...")
+
                     mfcc = librosa.feature.mfcc(y=y, sr=self.sr, n_mfcc=self.config.n_mfcc)
                     delta = librosa.feature.delta(mfcc)
                     rms = librosa.feature.rms(y=y)
@@ -246,8 +361,19 @@ class StreamFeatureExtractor:
 
                     feats = np.vstack([mfcc, delta, rms, zcr, contrast, chroma_std])
                     feature_list.append(feats)
+
+                    if i == 0:
+                        self._log(
+                            f"[1/5 diag] Step 5 OK: First chunk features extracted "
+                            f"(shape={feats.shape}, {time.time()-t_chunk:.2f}s)"
+                        )
                 except Exception as e:
                     raise FeatureExtractionError(f"Extraction failed at chunk {i}: {e}")
+
+            self._log(
+                f"[1/5 diag] Streaming complete: {len(feature_list)} chunks "
+                f"in {time.time()-t_loop:.1f}s"
+            )
 
             full_features = np.hstack(feature_list)
             times = librosa.frames_to_time(np.arange(full_features.shape[1]), sr=self.sr, hop_length=self.hop_length)
@@ -598,6 +724,7 @@ def process_movie_v7(
         else: print(msg)
 
     log(f"Starting processing for: {file_path}")
+    log(f"SemanticAudioClustering engine v{__version__}")
 
     # 1. Extraction
     extractor = StreamFeatureExtractor(config, logger)

@@ -58,19 +58,24 @@ def run_xxl(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     # Minimal integration args only — language, output location, format.
-    # Model is NOT hardcoded here — it comes through extra_args so the user
-    # can change it in the GUI (e.g. --model large-v3, --model large-v2).
+    # Model comes from the dedicated model parameter (--pass2-model CLI flag
+    # or GUI model selector).  Any --model in extra_args is stripped to
+    # prevent conflict.  (#272)
     cmd = [
         str(exe),
         str(input_file),
         "--language", language,
         "--output_dir", str(output_dir),
         "--output_format", "srt",
+        "--model", model,
     ]
 
-    # Add --model only if not already specified in extra_args
-    if "--model" not in (extra_args or ""):
-        cmd.extend(["--model", model])
+    # Strip --model from extra_args — the explicit model parameter above
+    # is authoritative.  Legacy GUI defaults included --model in extra_args
+    # which silently overrode the dedicated model field.  (#272)
+    if extra_args and "--model" in extra_args:
+        import re
+        extra_args = re.sub(r"--model\s+\S+", "", extra_args).strip()
 
     if task == "translate":
         cmd.extend(["--task", "translate"])

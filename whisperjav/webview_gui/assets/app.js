@@ -1247,7 +1247,7 @@ const EnsembleManager = {
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
             enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
             xxlExePath: '',  // Persisted path to XXL executable
-            xxlExtraArgs: '--model large-v3 --verbose True --standard_asia'  // Default XXL args (model user-changeable)
+            xxlExtraArgs: '--verbose True --standard_asia'  // Default XXL args (model flows via dedicated model field)
         },
         mergeStrategy: 'pass1_primary',
         serialMode: false,
