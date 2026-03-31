@@ -1756,6 +1756,15 @@ def main():
 
         if args.scene_detection_method:
             logger.info(f"Using scene detection method: {args.scene_detection_method}")
+            # Inject into resolved_config so pipelines (fidelity, balanced, fast)
+            # pick it up via features["scene_detection"]["method"].
+            # Without this, the factory defaults to auditok. (#269)
+            if resolved_config and "features" in resolved_config:
+                scene_cfg = resolved_config["features"].get("scene_detection")
+                if scene_cfg is None:
+                    scene_cfg = {}
+                    resolved_config["features"]["scene_detection"] = scene_cfg
+                scene_cfg["method"] = args.scene_detection_method
 
     except Exception as e:
         logger.error(f"Failed to resolve configuration: {e}")
