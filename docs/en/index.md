@@ -75,7 +75,7 @@ That's it. For more control, see the [GUI User Guide](guides/gui_user_guide.md).
 | **BYOP XXL** | Bring Your Own Pipeline — use Faster Whisper XXL as Pass 2 in ensemble mode |
 | **ChronosJAV** | Dedicated pipeline with anime-whisper and Kotoba models for anime/JAV content |
 | **Qwen3-ASR** | Alternative ASR engine with strong Japanese performance |
-| **AI Translation** | Translate subtitles using Ollama, DeepSeek, Gemini, Claude, GPT, or local LLMs |
+| **AI Translation** | Translate subtitles using Ollama (local), DeepSeek, Gemini, Claude, GPT, or other providers |
 | **Speech enhancement** | ClearVoice denoising, BS-RoFormer vocal isolation, FFmpeg DSP chain |
 | **Scene detection** | Auditok, Silero, Semantic — split long audio for better accuracy |
 | **GUI + CLI** | Full-featured GUI for interactive use, CLI for automation and scripting |

@@ -1,6 +1,6 @@
 # WhisperJAV GUI User Guide
 
-> Screenshots from v1.8.9 · Windows 11
+> Screenshots from v1.8.10 · Windows 11
 
 ---
 
@@ -240,6 +240,14 @@ When **FFmpeg DSP** is selected as the speech enhancer, an additional panel appe
 | De-esser | Reduce harsh sibilance (s/t sounds) |
 | Amplify | Boost overall volume |
 
+### Enhance for VAD Only (v1.8.10+)
+
+When a speech enhancer is selected (anything other than "None"), a checkbox appears below the enhancer dropdown:
+
+**Enhance for VAD only** — When checked, the enhanced audio is used only for voice activity detection (VAD). The original unprocessed audio is sent to the ASR model for transcription. This gives you the benefit of better speech boundary detection from enhanced audio while preserving the original audio characteristics that Whisper was trained on.
+
+This option is available for all pipelines. When the enhancer is set to "None", the checkbox is hidden.
+
 ### Merge Strategy
 
 When Pass 2 is enabled, choose how the two outputs are combined:
@@ -272,10 +280,12 @@ The **AI SRT Translate** tab (Tab 4) is a standalone tool for translating existi
 
 ### Provider & Model
 
+Providers are grouped into **Local LLM** and **Cloud AI** in the dropdown.
+
 | Provider | Notes |
 |----------|-------|
-| **Ollama** | Local LLM via Ollama. Free, private, no API key needed. Recommended over Local. |
-| **Local** | Uses a local LLM server (llama-cpp). Free, private. Legacy — consider Ollama instead. |
+| **Ollama** | Connects to your locally installed Ollama. Free, private, no API key. See below. |
+| **llama-cpp (deprecated)** | Legacy local LLM server. Being removed in v1.9.0 — use Ollama instead. |
 | **DeepSeek** | Cloud API. Cost-effective, good quality for CJK languages. |
 | **Gemini** | Google's API. Good multilingual support. |
 | **Claude** | Anthropic's API. High quality, higher cost. |
@@ -287,6 +297,38 @@ The **AI SRT Translate** tab (Tab 4) is a standalone tool for translating existi
 
 Each provider populates a **Model** dropdown with available models. Use **Custom model override** to specify a model ID not in the list.
 
+### Ollama Integration (v1.8.10+)
+
+WhisperJAV connects to your locally installed [Ollama](https://ollama.com). You must install Ollama separately — WhisperJAV does not include it.
+
+When you select Ollama as the provider, the GUI detects your setup and shows one of three panels:
+
+| State | What you see | What to do |
+|-------|-------------|------------|
+| **Not installed** | Download link and "Check Again" button | Install Ollama from ollama.com, then click "Check Again" |
+| **No model** | Recommended model with `ollama pull` command | Copy the command and run it in your terminal, or select a model from the dropdown to download it |
+| **Connected** | Green status dot, model dropdown populated | Select a model and proceed |
+
+The model dropdown is split into two groups:
+
+- **Installed Models** — models already on your machine (shown with download sizes)
+- **Recommendations** — suggested models you haven't installed yet
+
+Selecting an uninstalled model opens a download confirmation popup. The model is pulled directly from within the GUI.
+
+VRAM-based recommendations:
+
+| GPU VRAM | Recommended Model |
+|----------|-------------------|
+| 4 GB | gemma3:4b |
+| 8 GB | qwen2.5:7b |
+| 12 GB | gemma3:12b |
+| 16 GB+ | qwen2.5:14b |
+
+After translation completes, WhisperJAV automatically unloads the model from VRAM so your GPU is free for other work.
+
+If Ollama is installed but not running, the GUI starts the server automatically.
+
 ### API Key & Connection Test
 
 For cloud providers, enter your API key and click **Test Connection** to verify it works. A status icon shows the result.
@@ -294,7 +336,7 @@ For cloud providers, enter your API key and click **Test Connection** to verify 
 - Green checkmark: connection successful
 - Red X: connection failed (check key and endpoint)
 
-The Local provider does not require an API key — it starts a llama-cpp server automatically.
+Ollama does not require an API key.
 
 ### Language & Tone
 
@@ -439,6 +481,16 @@ Accessible from the **Translation Settings** button in the Ensemble tab's AI-tra
 4. Enter API key and test connection
 5. Set target language
 6. Click **Start**
+
+### Translate with Ollama (Free, Local)
+
+1. Install [Ollama](https://ollama.com) on your machine
+2. Go to **AI SRT Translate** tab (Tab 4)
+3. Select **Ollama** from the provider dropdown
+4. Wait for the green "connected" status
+5. Select or download a model (e.g., gemma3:4b for 4GB VRAM, qwen2.5:7b for 8GB)
+6. Add your SRT file(s) and click **Start**
+7. No API key or internet needed — everything runs locally on your GPU
 
 ### CPU-Only Mode (No GPU)
 
