@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-04-01 (rev22) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **55 open** on GitHub
+> Updated: 2026-04-01 (rev23) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **55 open** on GitHub
 
 ---
 
@@ -21,12 +21,12 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **55** | Unchanged from rev21. No new issues, no closures. |
+| Total open on GitHub | **55** | Unchanged from rev22. No new issues. |
 | **v1.8.10 RELEASED** | — | 2026-03-30. 39 commits. |
-| **FIX CODED (on main, not released)** | 3 | Hallucination filter, Colab install, XXL model flag (#272) |
-| **NEEDS RESPONSE** | 0 | All cleared. |
-| **NEEDS FOLLOW-UP** | 1 | #259 (temp file overwrite bug) |
-| **AWAITING REPLY** | 7 | #234, #251, #258, #260, #261, #267, #271 |
+| **FIX CODED (on main, not released)** | 4 | Hallucination filter, Colab, XXL model (#272), translation overwrite (#259) |
+| **FIX CODED (local, not pushed)** | 1 | numba cache dir (#267, #263) |
+| **NEEDS RESPONSE** | 1 | #267 (user asking whether to wait for code fix or apply temp workaround) |
+| **AWAITING REPLY** | 6 | #234, #251, #258, #260, #261, #263 |
 | Feature requests (open) | 29 | See Feature Requests section |
 
 ---
@@ -59,10 +59,10 @@ These fixes are committed to main after v1.8.10 was tagged. Colab/pip users get 
 | # | Title | Reporter | Status | Notes |
 |---|-------|----------|--------|-------|
 | **#272** | XXL ignores --pass2-model large-v2 flag | TinyRick1489 | `FIX CODED` | Fix on main (`e50df15`). Responded with upgrade instructions. Awaiting user confirmation. |
-| **#271** | Ollama "Could Not Create Optimized Variant" | justantopair-ai | `AWAITING REPLY` | Asked which model. Non-fatal variant warning + translation format mismatch — likely model not suited for translation. |
-| **#267** | Stuck on streaming features (Qwen+Semantic) | OrangeFarmHorse | `AWAITING REPLY` | Hang pinpointed at `librosa.feature.mfcc()`. Standalone test script (`test_semantic_diag.py`) sent to user to isolate system vs subprocess issue. Waiting on results. |
+| **#271** | Ollama "Could Not Create Optimized Variant" | justantopair-ai | `RESOLVED` | User confirmed general-purpose models (qwen3:14b, qwen3.5:9b) produce format errors. Guided to use instruct models. gemma3:12b works well. |
+| **#267** | Stuck on streaming features (Qwen+Semantic) | OrangeFarmHorse | `NEEDS RESPONSE` | **ROOT CAUSE FOUND**: numba PermissionError — can't write JIT cache to `C:\Tools\whisperjav\lib\site-packages\librosa\__pycache__\`. Fix coded locally (`ensure_numba_cache_dir`). User asking whether to wait or apply temp workaround. |
 | **#265** | Hallucination in Chinese translation (large-v2) | yangming2027 | `NEEDS FOLLOW-UP` | 3 post-processing suggestions with sample SRTs: trailing period, leading dash, line wrapping. Also shared Subtitle Edit multi-replace XML. |
-| **#263** | GPU not utilized / stuck at VAD | herlong6529424-dot | `AWAITING REPLY` | RTX 3070 8GB. Process hangs during Silero VAD. Asked for debug log + short file test. No response yet. |
+| **#263** | GPU not utilized / stuck at VAD | herlong6529424-dot | `AWAITING REPLY` | Likely same root cause as #267 (numba cache permissions). Responded with diagnostic script + upgrade instructions. |
 | **#261** | Network check: unknown url type https | henry99a | `AWAITING REPLY` | NSIS SSL context issue. User found workaround (run from cmd). |
 | **#260** | Uninstall leaves 6GB | hawai-stack | `AWAITING REPLY` | Responded with cache paths. |
 | **#259** | Local Translation Issues (hotfix2) | destinyawaits | `NEEDS FOLLOW-UP` | **Ollama confirmed working.** New bug: temp file overwrites existing English subtitles in same folder — save path not respected until task complete. |
@@ -129,8 +129,9 @@ These fixes are committed to main after v1.8.10 was tagged. Colab/pip users get 
 
 | Action | Issues | Status |
 |---|---|---|
-| ~~Analyze #267 diagnostic log~~ (standalone test script sent) | #267 | **DONE** — awaiting user test results |
-| **Respond to #259** (temp file overwrite bug — new report from user) | #259 | **TODO** |
+| **Respond to #267** (user asking: wait for fix or apply temp workaround?) | #267 | **TODO** — fix coded locally, needs commit+push |
+| ~~Respond to #259~~ (temp file overwrite — fix coded) | #259 | **DONE** — fix on main (`cfcbddf`) |
+| ~~Respond to #263~~ (diagnostic script + upgrade instructions sent) | #263 | **DONE** — awaiting user response |
 | Assess #265 post-processing suggestions (trailing period, leading dash, line wrap) | #265 | TODO — v1.9 scope |
 | ~~Respond to #272~~ (fix coded, upgrade instructions given) | #272 | **DONE** — awaiting user confirmation |
 | ~~Respond to #271~~ (asked which model, explained variant warning) | #271 | **DONE** — awaiting user reply |
@@ -214,39 +215,23 @@ A hotfix would only be needed if:
 
 ## Emerging Patterns
 
-### Semantic Scene Detection Hanging (#267) — PINPOINTED
+### Semantic Scene Detection Hanging (#267) — ROOT CAUSE FOUND
 
-**Symptom**: Process hangs at `librosa.feature.mfcc()` — the first librosa feature extraction call inside SemanticAudioClustering.
+**Root cause**: numba PermissionError. The conda-constructor installs to `C:\Tools\whisperjav\` (system-level, installed as admin). User runs as regular account ("Animal"). numba's JIT cache tries to write to `librosa/__pycache__/` inside site-packages — permission denied. numba hangs instead of failing cleanly (Windows `tempfile._mkstemp_inner` retry/stall on access check).
 
-**Diagnostic log (2026-04-01, v7.1.0)**:
+**Evidence** (Ctrl+C traceback from standalone test):
 ```
-[Semantic Diag] numpy=2.2.6  librosa=0.11.0  numba=0.64.0  soundfile=0.13.1
-[Semantic Diag] ffmpeg: ffmpeg version 7.1.1
-[Semantic Diag] All version checks passed.
-[1/5 diag] Step 1 OK: WAV PCM_16, 16000Hz, 1ch, 120.0s (0.00s)
-[1/5 diag] Step 2 OK: 120.0s, 16000Hz, block_size=960000, total_blocks=2 (0.00s)
-[1/5 diag] Step 3 OK: First block received (shape=(960000, 1), 0.00s)
-[1/5 diag] Step 5: librosa feature extraction (first chunk)...
-← HANGS HERE
+PermissionError: [Errno 13] Permission denied: 'C:\\Tools\\whisperjav\\lib\\site-packages\\librosa\\__pycache__\\tmpktp60s15'
 ```
+Stack: `librosa.feature.mfcc()` → lazy import `librosa.filters` → numba `@jit` decorator → `FunctionCache` → `ensure_cache_path()` → `tempfile.TemporaryFile(dir=__pycache__)` → hang.
 
-**What is ruled out**:
-- numpy/librosa/numba version incompatibility (all versions compatible, checks passed)
-- soundfile/libsndfile issues (WAV reads fine, 0.00s)
-- ffmpeg issues (not involved — audio is already 16kHz WAV)
-- File length (2min = 1.9h hang identically)
-- Pipeline (Qwen + Balanced both hang)
-- Audio content (auditok processes same files fine)
-- Resampling (native SR = target SR, no resample triggered)
+**Fix**: `ensure_numba_cache_dir()` in `whisperjav/utils/console.py` — sets `NUMBA_CACHE_DIR` to a user-writable location (`%LOCALAPPDATA%\whisperjav\numba_cache`) before any librosa import. Coded locally, not yet pushed.
 
-**What remains**: The hang is at the first `librosa.feature.mfcc()` call. This function uses numpy/scipy for FFT and DCT — no numba directly. However, librosa may trigger numba JIT compilation through internal utility imports. numba 0.64.0 is very recent and could have platform-specific issues.
-
-**Next diagnostic step**: Ask user to test with `NUMBA_DISABLE_JIT=1` environment variable to confirm/eliminate numba as the cause.
-
-### Silero VAD Hanging (#263)
+### Silero VAD Hanging (#263) — Likely Same Root Cause
 
 **Symptom**: Process hangs during Silero VAD. Log shows "Starting speech segmentation with: silero-v4.0" with no "complete" message. RTX 3070 8GB.
-**Status**: Waiting on user debug log + short file test. No response since 2026-03-31.
+**Hypothesis**: Likely same numba PermissionError as #267. Silero backend uses `librosa.resample` (`silero_backend.py:217`) which triggers the same numba JIT cache chain.
+**Status**: Sent diagnostic script + upgrade instructions (2026-04-01). Awaiting user response.
 
 ### Translation Temp File Overwrite (#259) — NEW BUG
 
@@ -254,10 +239,10 @@ A hotfix would only be needed if:
 **Reporter**: destinyawaits (also confirmed Ollama working after v1.8.10 upgrade).
 **Status**: Needs investigation — is this PySubtrans behavior or WhisperJAV's translation wrapper?
 
-### Ollama Model Suitability (#271)
+### Ollama Model Suitability (#271) — RESOLVED
 
 **Symptom**: Translation format errors with Ollama. Model output doesn't match PySubtrans expected format.
-**Assessment**: Likely model not suited for structured translation tasks. Asked user which model they're using. Non-fatal "optimized variant" warning is separate (Ollama rejected Modelfile create with HTTP 400).
+**Resolution**: User confirmed general-purpose models (qwen3:14b, qwen3.5:9b) produce format errors. Guided to use instruct models. gemma3:12b confirmed working well for translation.
 
 ---
 
@@ -285,7 +270,8 @@ A hotfix would only be needed if:
 
 | Date | Changes |
 |------|---------|
-| **2026-04-01** | **rev22.** 55 open (unchanged). Committed `e50df15`: XXL model flag fix (#272) + semantic diagnostics v7.1.0 (#267). Responded to #271, #272, #267. #267 diagnostic log arrived — hang pinpointed at `librosa.feature.mfcc()` first call. All library versions compatible. Next step: test NUMBA_DISABLE_JIT=1. #259 user confirmed Ollama working + reported new temp file overwrite bug. All NEEDS RESPONSE cleared. |
+| **2026-04-01** | **rev23.** 55 open. #267 ROOT CAUSE FOUND: numba PermissionError on conda-constructor installs (can't write JIT cache to site-packages). Fix coded: `ensure_numba_cache_dir()` in `console.py`. #259 translation overwrite fix coded (`cfcbddf`). #271 resolved — user guided to instruct models, gemma3:12b works. #263 responded with diagnostic script (likely same root cause as #267). |
+| 2026-04-01 | **rev22.** 55 open. `e50df15`: XXL model flag fix (#272) + semantic diagnostics v7.1.0 (#267). `cfcbddf`: translation overwrite fix (#259) + diagnostic script (#267). |
 | 2026-03-31 | **rev21.** 54→55 open. New: #271, #272. Closed: #269. #267 debug logs arrived. #272 confirmed. |
 | 2026-03-31 | **rev20.** 55→54 open. New: #265, #267, #268, #269. Closed: #218, #221, #236, #244. All NEEDS RESPONSE cleared. |
 | 2026-03-30 | **rev19.** v1.8.10 released. 54 open. #253 closed. |

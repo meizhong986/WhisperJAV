@@ -239,12 +239,43 @@ def suppress_dependency_warnings() -> None:
     )
 
 
+def ensure_numba_cache_dir() -> None:
+    """Ensure numba's JIT cache directory is writable.
+
+    numba caches compiled functions in ``__pycache__`` directories inside
+    installed packages (e.g. ``site-packages/librosa/__pycache__/``).
+    On conda-constructor installs the site-packages directory may not be
+    writable by the current user, causing numba to hang indefinitely
+    when it tries to verify write access.  (#267)
+
+    Fix: redirect the cache to a user-writable location via the
+    ``NUMBA_CACHE_DIR`` environment variable.  If the user has already
+    set this variable, we respect their choice.
+    """
+    import os
+    if "NUMBA_CACHE_DIR" in os.environ:
+        return
+
+    # Choose a platform-appropriate user-writable directory
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+    else:
+        base = os.environ.get("XDG_CACHE_HOME", os.path.join(os.path.expanduser("~"), ".cache"))
+
+    cache_dir = os.path.join(base, "whisperjav", "numba_cache")
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        os.environ["NUMBA_CACHE_DIR"] = cache_dir
+    except OSError:
+        pass  # Best effort — if we can't create it, let numba try its default
+
+
 def setup_console() -> None:
     """
     Complete console setup for WhisperJAV.
 
-    Combines UTF-8 encoding fix and warning suppression.
-    Call this at the start of any entry point.
+    Combines UTF-8 encoding fix, warning suppression, and environment
+    setup.  Call this at the start of any entry point.
 
     Example:
         from whisperjav.utils.console import setup_console
@@ -255,6 +286,7 @@ def setup_console() -> None:
     """
     ensure_utf8_console()
     suppress_dependency_warnings()
+    ensure_numba_cache_dir()
 
 
 def check_extras_installed(extra_name: str, required_packages: list[str]) -> tuple[bool, list[str]]:
