@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-03-31 (rev21) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **55 open** on GitHub
+> Updated: 2026-04-01 (rev22) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **55 open** on GitHub
 
 ---
 
@@ -21,13 +21,12 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **55** | Was 54 at rev20. New: #271, #272. Closed: #269. Net +1. |
+| Total open on GitHub | **55** | Unchanged from rev21. No new issues, no closures. |
 | **v1.8.10 RELEASED** | — | 2026-03-30. 39 commits. |
-| **FIX CODED (on main, not released)** | 2 | Hallucination filter bundle, Colab install |
-| **NEW since rev20** | 2 | #271 (Ollama variant error), #272 (XXL model flag ignored) |
-| **NEEDS RESPONSE** | 2 | #271, #272 |
-| **NEEDS FOLLOW-UP** | 2 | #265, #267 (debug logs arrived) |
-| **AWAITING REPLY** | 5 | #234, #251, #258, #260, #261 |
+| **FIX CODED (on main, not released)** | 3 | Hallucination filter, Colab install, XXL model flag (#272) |
+| **NEEDS RESPONSE** | 0 | All cleared. |
+| **NEEDS FOLLOW-UP** | 1 | #259 (temp file overwrite bug) |
+| **AWAITING REPLY** | 7 | #234, #251, #258, #260, #261, #267, #271 |
 | Feature requests (open) | 29 | See Feature Requests section |
 
 ---
@@ -44,11 +43,11 @@ These fixes are committed to main after v1.8.10 was tagged. Colab/pip users get 
 
 | Commit | Item | Issues | Risk |
 |--------|------|--------|------|
+| `e50df15` | XXL model flag not forwarded to subprocess; semantic scene detect diagnostics v7.1.0 | #272, #267 | LOW — XXL arg fix + diagnostic logging |
 | `1bfe548` | Hallucination filter: bundled JSON missing from wheel, stale gist URLs, INFO logging | #265 | LOW — packaging + logging |
 | `4a600b2` | `--scene-detection-method` ignored in standard pipeline modes | #269 (closed) | LOW — one-line injection |
 | `2533438` | Docs: GUI user guide updated for Ollama + enhance-for-VAD | — | LOW — docs only |
 | `a6b473d` | Colab install: remove venv, reuse system torch, fix llama-cpp filename | #231 | LOW — Colab-tested |
-| `a6b473d` | Colab/Kaggle notebooks: remove venv references | #231 | LOW — config changes |
 | `f875303` | Issue tracker rev20 | — | — |
 
 ---
@@ -59,14 +58,14 @@ These fixes are committed to main after v1.8.10 was tagged. Colab/pip users get 
 
 | # | Title | Reporter | Status | Notes |
 |---|-------|----------|--------|-------|
-| **#272** | XXL ignores --pass2-model large-v2 flag | TinyRick1489 | `NEEDS RESPONSE` | **NEW.** Confirmed bug with debug log. WhisperJAV logs model=large-v2 but XXL subprocess loads large-v3. Flag not forwarded to XXL command line. |
-| **#271** | Ollama "Could Not Create Optimized Variant" | justantopair-ai | `NEEDS RESPONSE` | **NEW.** qwen3:14b error. Also reports gist timeout fetching instructions_standard.txt, plot summary cutoff in GUI, translation errors. 3 screenshots. |
-| **#267** | Stuck on streaming features (Qwen+Semantic) | OrangeFarmHorse | `NEEDS FOLLOW-UP` | **Debug logs arrived.** All 3 test runs (short clip, long file, balanced pipeline) hang at exact same point: "[1/5] Streaming features (60s chunks)..." inside SemanticAudioClustering v7.0.0. File length irrelevant. RTX 5060 Ti (Blackwell). |
-| **#265** | Hallucination in Chinese translation (large-v2) | yangming2027 | `NEEDS FOLLOW-UP` | User provided 3 concrete post-processing suggestions: (1) trailing period inconsistency, (2) leading dash removal, (3) long subtitle line wrapping. Sample SRT files attached. Also requesting merge module (#230). |
+| **#272** | XXL ignores --pass2-model large-v2 flag | TinyRick1489 | `FIX CODED` | Fix on main (`e50df15`). Responded with upgrade instructions. Awaiting user confirmation. |
+| **#271** | Ollama "Could Not Create Optimized Variant" | justantopair-ai | `AWAITING REPLY` | Asked which model. Non-fatal variant warning + translation format mismatch — likely model not suited for translation. |
+| **#267** | Stuck on streaming features (Qwen+Semantic) | OrangeFarmHorse | `AWAITING REPLY` | Hang pinpointed at `librosa.feature.mfcc()`. Standalone test script (`test_semantic_diag.py`) sent to user to isolate system vs subprocess issue. Waiting on results. |
+| **#265** | Hallucination in Chinese translation (large-v2) | yangming2027 | `NEEDS FOLLOW-UP` | 3 post-processing suggestions with sample SRTs: trailing period, leading dash, line wrapping. Also shared Subtitle Edit multi-replace XML. |
 | **#263** | GPU not utilized / stuck at VAD | herlong6529424-dot | `AWAITING REPLY` | RTX 3070 8GB. Process hangs during Silero VAD. Asked for debug log + short file test. No response yet. |
 | **#261** | Network check: unknown url type https | henry99a | `AWAITING REPLY` | NSIS SSL context issue. User found workaround (run from cmd). |
 | **#260** | Uninstall leaves 6GB | hawai-stack | `AWAITING REPLY` | Responded with cache paths. |
-| **#259** | Local Translation Issues (hotfix2) | destinyawaits | `RESPONDED` | Responded with v1.8.10 Ollama upgrade instructions. |
+| **#259** | Local Translation Issues (hotfix2) | destinyawaits | `NEEDS FOLLOW-UP` | **Ollama confirmed working.** New bug: temp file overwrites existing English subtitles in same folder — save path not respected until task complete. |
 | **#258** | 我遇到的问题 (vague) | Uillike | `AWAITING REPLY` | Asked for logs. |
 | **#255** | 如何用ollama进行翻译 | cheny7918 | `RESPONDED` | Responded with v1.8.10 Ollama upgrade instructions. 3 users. |
 | **#251** | post2 launch failure (fastgit SSL) | zoqapopita93 | `AWAITING REPLY` | Diagnosed: fastgit mirror SSL failure. Provided 3 solutions. |
@@ -130,16 +129,13 @@ These fixes are committed to main after v1.8.10 was tagged. Colab/pip users get 
 
 | Action | Issues | Status |
 |---|---|---|
-| **Respond to #272** (XXL model flag bug — confirmed with debug log) | #272 | **TODO** |
-| **Respond to #271** (Ollama variant error — 3 screenshots, needs diagnosis) | #271 | **TODO** |
-| **Investigate #267** (debug logs available — semantic hang at streaming features) | #267 | **TODO** — logs ready for code analysis |
+| ~~Analyze #267 diagnostic log~~ (standalone test script sent) | #267 | **DONE** — awaiting user test results |
+| **Respond to #259** (temp file overwrite bug — new report from user) | #259 | **TODO** |
 | Assess #265 post-processing suggestions (trailing period, leading dash, line wrap) | #265 | TODO — v1.9 scope |
-| ~~Respond to #269~~ (scene-detect fix coded) | #269 | **DONE** — issue closed |
-| ~~All NEEDS RESPONSE cleared~~ | — | **DONE** at rev20. 2 new NEEDS RESPONSE since. |
+| ~~Respond to #272~~ (fix coded, upgrade instructions given) | #272 | **DONE** — awaiting user confirmation |
+| ~~Respond to #271~~ (asked which model, explained variant warning) | #271 | **DONE** — awaiting user reply |
+| ~~Respond to #267~~ (added diagnostic logging, asked to upgrade and retest) | #267 | **DONE** — user responded with diagnostic log |
 | ~~Follow up #263~~ (requested debug log + short file test) | #263 | **DONE** — waiting on user |
-| ~~Follow up #267~~ (requested debug log + short file test) | #267 | **DONE** — user responded with 4 log files |
-| ~~Push commits to main~~ | — | **DONE** |
-| ~~Test Colab install fix on Colab~~ | — | **DONE** |
 
 ---
 
@@ -151,24 +147,19 @@ Colab/pip users get these automatically. .exe installer users get them via `whis
 
 | Item | Commit | Status |
 |---|---|---|
+| XXL model flag fix (#272) + semantic diagnostics v7.1.0 (#267) | `e50df15` | Pushed |
 | Hallucination filter bundled in wheel | `1bfe548` | Pushed |
 | --scene-detection-method fix (#269) | `4a600b2` | Pushed. #269 closed. |
 | Docs: GUI guide for Ollama + enhance-for-VAD | `2533438` | Pushed |
-| Issue tracker rev20 | `f875303` | Pushed |
 | Colab install: remove venv, reuse system torch | `a6b473d` | Pushed. Colab-tested. |
-| Colab/Kaggle notebook: remove venv refs | `a6b473d` | Pushed. Colab-tested. |
 
-### v1.8.10-hotfix — If Needed
+### v1.8.10-hotfix — Not Currently Needed
 
-**Candidate bugs:**
+All fixes are on main and accessible via `pip install --no-deps --upgrade`. No blocking bugs requiring a versioned hotfix release. The #272 XXL fix and #267 diagnostics are already available to pip/Colab users.
 
-| Bug | Issue | Severity | Hotfix? |
-|---|---|---|---|
-| XXL ignores --pass2-model flag | #272 | MEDIUM | **Yes — if fix is small.** Confirmed bug, user on Kaggle CLI. |
-| Semantic scene detect hangs on Blackwell GPUs | #267 | HIGH | **No.** Needs investigation first. Workaround exists (auditok). |
-| Ollama optimization variant error | #271 | LOW | **No.** Likely Ollama-side issue, not WhisperJAV bug. |
-
-**Recommendation**: Investigate #272 first. If the fix is a one-liner (model flag not forwarded to XXL subprocess args), it's a good hotfix candidate alongside the already-pushed fixes.
+A hotfix would only be needed if:
+- A blocking bug is found that affects .exe installer users specifically
+- The #267 semantic hang turns out to be a code bug (currently investigating)
 
 ### v1.9.0 — Next Major Release
 
@@ -179,6 +170,7 @@ Colab/pip users get these automatically. .exe installer users get them via `whis
 | **P0** | Ollama full migration (deprecate llama-cpp-python) | #132, #233, #255, #259 | Large | Remove ~1500 LOC. llama-cpp already broken on Colab. |
 | **P0** | Chinese UI (partial i18n) | #175, #180 | Medium | 40%+ issues are Chinese. Biggest support burden reducer. |
 | **P0** | Unified CLI override layer | #269 | Small | Fix architectural divergence between standard/ensemble override paths. |
+| **P1** | Translation temp file overwrite fix | #259 | Small | Save path not respected until task complete — overwrites existing SRTs. |
 | **P1** | Post-translation hallucination filter (Chinese) | #265 | Medium | User contributed 130-rule XML. Automate as post-process option. |
 | **P1** | Post-processing polish (trailing period, leading dash, line wrapping) | #265 | Small | 3 concrete suggestions from yangming2027 with sample SRTs. |
 | **P1** | Standalone merge CLI | #230 | Medium | `whisperjav-merge`. Active demand (yangming2027, weifu8435). |
@@ -187,7 +179,7 @@ Colab/pip users get these automatically. .exe installer users get them via `whis
 | **P1** | AMD ROCm support | #142, #114, #239 | Medium | Document + test. |
 | **P1** | Additional translation targets | #268 | Small | Thai, Korean requested. May be PySubtrans config only. |
 | **P1** | Full dual-track enhance-for-VAD | — | Medium | ASR module separate VAD/ASR audio paths. |
-| **P2** | Semantic scene detection hanging investigation | #267 | Medium | Hangs at "[1/5] Streaming features" on Blackwell GPU. Debug logs available. Needs code-level investigation. |
+| **P2** | Semantic scene detection: librosa.feature.mfcc hang | #267 | Medium | Diagnostic log pinpointed hang at first `librosa.feature.mfcc()` call. Versions all compatible. Suspected numba JIT issue — needs further investigation. |
 | **P2** | GUI settings persistence | #96 | Medium | Long-standing request. |
 | **P2** | Vocal separation | #224, #254 | Medium | BS-RoFormer / UVR integration. |
 | **P2** | Grey out incompatible options | #206 | Small | Prevent invalid GUI combos. |
@@ -222,37 +214,50 @@ Colab/pip users get these automatically. .exe installer users get them via `whis
 
 ## Emerging Patterns
 
-### Semantic Scene Detection Hanging (#267) — DEBUG LOGS AVAILABLE
+### Semantic Scene Detection Hanging (#267) — PINPOINTED
 
-**Symptom**: Process hangs at "[1/5] Streaming features (60s chunks)..." inside SemanticAudioClustering v7.0.0.
+**Symptom**: Process hangs at `librosa.feature.mfcc()` — the first librosa feature extraction call inside SemanticAudioClustering.
 
-**Evidence from 4 log files (2026-03-31)**:
-- 2-minute clip hangs identically to 1.9-hour file → **file length is NOT the cause**
-- Both Qwen and Balanced pipelines hang → **pipeline is NOT the cause**
-- Auditok works perfectly on same files → **audio content is NOT the cause**
-- `SemanticClusteringAdapter initialized` successfully — engine loads, hangs during feature extraction
-- RTX 5060 Ti (Blackwell architecture) — possibly GPU/driver-specific
-- `--debug` flag produces no additional output from inside the streaming step
+**Diagnostic log (2026-04-01, v7.1.0)**:
+```
+[Semantic Diag] numpy=2.2.6  librosa=0.11.0  numba=0.64.0  soundfile=0.13.1
+[Semantic Diag] ffmpeg: ffmpeg version 7.1.1
+[Semantic Diag] All version checks passed.
+[1/5 diag] Step 1 OK: WAV PCM_16, 16000Hz, 1ch, 120.0s (0.00s)
+[1/5 diag] Step 2 OK: 120.0s, 16000Hz, block_size=960000, total_blocks=2 (0.00s)
+[1/5 diag] Step 3 OK: First block received (shape=(960000, 1), 0.00s)
+[1/5 diag] Step 5: librosa feature extraction (first chunk)...
+← HANGS HERE
+```
 
-**Hypothesis (unverified)**: The feature streaming step may use a GPU operation (torch audio feature extraction) that is incompatible with the Blackwell/RTX 50 series drivers or CUDA version. The hang occurs inside a library call, not in WhisperJAV code.
+**What is ruled out**:
+- numpy/librosa/numba version incompatibility (all versions compatible, checks passed)
+- soundfile/libsndfile issues (WAV reads fine, 0.00s)
+- ffmpeg issues (not involved — audio is already 16kHz WAV)
+- File length (2min = 1.9h hang identically)
+- Pipeline (Qwen + Balanced both hang)
+- Audio content (auditok processes same files fine)
+- Resampling (native SR = target SR, no resample triggered)
 
-**Next step**: Read the semantic scene detection source code to identify what "[1/5] Streaming features" does — what library calls, what GPU operations. Determine if there's a known Blackwell compatibility issue.
+**What remains**: The hang is at the first `librosa.feature.mfcc()` call. This function uses numpy/scipy for FFT and DCT — no numba directly. However, librosa may trigger numba JIT compilation through internal utility imports. numba 0.64.0 is very recent and could have platform-specific issues.
+
+**Next diagnostic step**: Ask user to test with `NUMBA_DISABLE_JIT=1` environment variable to confirm/eliminate numba as the cause.
 
 ### Silero VAD Hanging (#263)
 
-**Symptom**: Process hangs during Silero VAD initialization/inference. Log shows "Starting speech segmentation with: silero-v4.0" with no "complete" message. User has RTX 3070 8GB, processing a 2.4h file (314 scenes).
-**Status**: Waiting on user debug log + short file test. No response since 2026-03-31 request.
+**Symptom**: Process hangs during Silero VAD. Log shows "Starting speech segmentation with: silero-v4.0" with no "complete" message. RTX 3070 8GB.
+**Status**: Waiting on user debug log + short file test. No response since 2026-03-31.
 
-### XXL Model Flag Ignored (#272) — CONFIRMED BUG
+### Translation Temp File Overwrite (#259) — NEW BUG
 
-**Symptom**: `--pass2-model large-v2` is logged correctly by WhisperJAV but not forwarded to the Faster-Whisper-XXL subprocess. XXL loads large-v3 by default.
-**Evidence**: Debug log shows `[Worker 3816] Pass 2: BYOP XXL (exe=..., model=large-v2)` but XXL subprocess output says `'large-v3' model may produce worse results`.
-**Root cause**: The `--model` flag is likely missing from the XXL subprocess command construction in `pass_worker.py` or `xxl_runner.py`.
+**Symptom**: During AI SRT Translate, the temp file is created in the same folder as the input SRT and overwrites existing English subtitles generated earlier (e.g., by DeepSeek). The user-specified save path is not used until the task completes.
+**Reporter**: destinyawaits (also confirmed Ollama working after v1.8.10 upgrade).
+**Status**: Needs investigation — is this PySubtrans behavior or WhisperJAV's translation wrapper?
 
-### Hallucination in Chinese Translation (#265)
+### Ollama Model Suitability (#271)
 
-**Symptom**: After Japanese transcription + DeepSeek translation to Chinese, hallucination phrases appear in Chinese output.
-**Assessment**: Two contributing factors: (1) hallucination filter was not bundled in wheel — fix committed; (2) no post-translation sanitization step exists. User provided 3 concrete post-processing suggestions with sample SRTs.
+**Symptom**: Translation format errors with Ollama. Model output doesn't match PySubtrans expected format.
+**Assessment**: Likely model not suited for structured translation tasks. Asked user which model they're using. Non-fatal "optimized variant" warning is separate (Ollama rejected Modelfile create with HTTP 400).
 
 ---
 
@@ -260,18 +265,19 @@ Colab/pip users get these automatically. .exe installer users get them via `whis
 
 | Cluster | Issues | Primary | Action |
 |---------|--------|---------|--------|
-| **Local LLM / Ollama** | #271, #259, #255, #233, #132 | #132 | v1.8.10 ships Ollama GUI. #271 new (variant error). |
+| **Local LLM / Ollama** | #271, #259, #255, #233, #132 | #132 | #259 Ollama working, new temp file bug. #271 awaiting model info. |
 | **Diarization** | #248, #252 | #248 | v1.9+. Both responded. |
 | **AMD/Intel GPU** | #239, #142, #114, #213 | #142 | v1.9+. |
 | **i18n** | #175, #180 | #180 | v1.9.0 P0. |
 | **Speech enhancement** | #254, #224 | #224 | v1.9. |
-| **XXL** | #272, #242, #237, #223 | #242 | #272 is a bug (model flag). #242 is feature (Pass 1). |
+| **XXL** | #272, #242, #237, #223 | #242 | #272 fix coded. #242 is feature (Pass 1). |
 | **Install/Network** | #261, #251, #243, #240, #225, #217 | — | Individual. |
 | **Model management** | #264, #250 | #250 | Docs / FAQ. |
 | **Translation targets** | #268 | #268 | Thai + Korean. v1.9+. |
-| **Scene detection** | #267 | — | Debug logs available. Needs code investigation. |
+| **Scene detection** | #267 | — | Hang pinpointed at librosa.feature.mfcc(). Next: test NUMBA_DISABLE_JIT=1. |
 | **Hallucination** | #265, #246 | #265 | Post-translation filter for v1.9. |
 | **Merge module** | #230, #265 | #230 | v1.9.0 P1. yangming2027 strong advocate. |
+| **Translation UX** | #259 | #259 | Temp file overwrite bug. New. |
 
 ---
 
@@ -279,8 +285,9 @@ Colab/pip users get these automatically. .exe installer users get them via `whis
 
 | Date | Changes |
 |------|---------|
-| **2026-03-31** | **rev21.** 54→55 open. New: #271 (Ollama variant error), #272 (XXL model flag bug). Closed: #269. #267 debug logs arrived — hangs at "[1/5] Streaming features" regardless of file length/pipeline, Blackwell GPU. #272 confirmed with debug log — model flag not forwarded to XXL subprocess. |
-| 2026-03-31 | **rev20.** 55→54 open. New: #265, #267, #268, #269. Closed: #218, #221, #236, #244. All fixes pushed to main (4 commits). Colab tested. All NEEDS RESPONSE cleared. |
+| **2026-04-01** | **rev22.** 55 open (unchanged). Committed `e50df15`: XXL model flag fix (#272) + semantic diagnostics v7.1.0 (#267). Responded to #271, #272, #267. #267 diagnostic log arrived — hang pinpointed at `librosa.feature.mfcc()` first call. All library versions compatible. Next step: test NUMBA_DISABLE_JIT=1. #259 user confirmed Ollama working + reported new temp file overwrite bug. All NEEDS RESPONSE cleared. |
+| 2026-03-31 | **rev21.** 54→55 open. New: #271, #272. Closed: #269. #267 debug logs arrived. #272 confirmed. |
+| 2026-03-31 | **rev20.** 55→54 open. New: #265, #267, #268, #269. Closed: #218, #221, #236, #244. All NEEDS RESPONSE cleared. |
 | 2026-03-30 | **rev19.** v1.8.10 released. 54 open. #253 closed. |
 | 2026-03-29 | **rev18.** 55 open. Session work: aggressive retune, Ollama GUI, bug fixes. |
 | 2026-03-28 | **rev17.** Closed 11. Responded 7. |

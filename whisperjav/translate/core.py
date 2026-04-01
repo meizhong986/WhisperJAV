@@ -385,6 +385,14 @@ def translate_subtitle(
         print(f"[TRANSLATE] Loading subtitle project...", file=sys.stderr)
         project = init_project(options, filepath=str(input_path), persistent=True)
 
+        # Set output path immediately so ALL intermediate saves (SaveProject
+        # after each batch) go to the user's desired location.  Without this,
+        # PySubtrans defaults to writing in the input directory — either as
+        # *.translated.srt (new project) or *.{target_lang}.srt (resumed from
+        # .subtrans) — which can overwrite existing translations.  (#259)
+        if hasattr(project, 'subtitles') and project.subtitles:
+            project.subtitles.outputpath = str(output_path)
+
         # Check if resuming from existing project
         if hasattr(project, 'existing_project') and project.existing_project:
             print("[TRANSLATE]   Resuming from existing project file (.subtrans)", file=sys.stderr)
