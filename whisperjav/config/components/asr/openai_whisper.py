@@ -49,8 +49,8 @@ class OpenAIWhisperOptions(BaseModel):
     )
     length_penalty: Optional[float] = Field(
         None,
-        ge=0.0, le=2.0,
-        description="Exponential length penalty"
+        ge=-2.0, le=2.0,
+        description="Exponential length penalty (negative = prefer shorter sequences)"
     )
     prefix: Optional[str] = Field(
         None,
@@ -69,14 +69,14 @@ class OpenAIWhisperOptions(BaseModel):
         description="Only sample text tokens"
     )
     max_initial_timestamp: Optional[float] = Field(
-        None,
+        0.0,
         ge=0.0,
-        description="Max initial timestamp"
+        description="Max initial timestamp (0 = prevent phantom early timestamps)"
     )
 
     # === Transcriber Options (common_transcriber_options) ===
     temperature: Union[float, List[float]] = Field(
-        [0.0, 0.1],
+        [0.0],
         description="Temperature for sampling. List enables fallback temperatures."
     )
     compression_ratio_threshold: float = Field(
@@ -85,7 +85,7 @@ class OpenAIWhisperOptions(BaseModel):
         description="Threshold for gzip compression ratio"
     )
     logprob_threshold: float = Field(
-        -1.2,
+        -0.75,
         ge=-5.0, le=0.0,
         description="Average log probability threshold"
     )
@@ -95,7 +95,7 @@ class OpenAIWhisperOptions(BaseModel):
         description="Margin for log probability filtering"
     )
     no_speech_threshold: float = Field(
-        0.5,
+        0.55,
         ge=0.0, le=1.0,
         description="No speech probability threshold"
     )
@@ -148,9 +148,9 @@ class OpenAIWhisperOptions(BaseModel):
 
     # === Exclusive Options (exclusive_whisper_plus_faster_whisper) ===
     hallucination_silence_threshold: Optional[float] = Field(
-        2.0,
+        None,
         ge=0.0, le=10.0,
-        description="Skip silent periods longer than this (seconds)"
+        description="Skip silent periods longer than this (seconds). None = disabled."
     )
 
 
@@ -184,21 +184,21 @@ class OpenAIWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=1,
+            beam_size=2,                          # v1.8.10-hf1: 1→2, beam=2 improves decode quality
             best_of=1,
             patience=1.5,
-            length_penalty=None,
+            length_penalty=-0.5,                  # v1.8.10-hf1: None→-0.5, prevents long hallucination runs
             prefix=None,
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=None,
+            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
             # Transcriber options
             temperature=[0.0],
-            compression_ratio_threshold=2.4,
-            logprob_threshold=-1.0,
+            compression_ratio_threshold=2.2,      # v1.8.10-hf1: 2.4→2.2, catches degenerate loops earlier
+            logprob_threshold=-0.6,               # v1.8.10-hf1: -1.0→-0.6, tighter quality gate
             logprob_margin=0.1,
-            no_speech_threshold=0.74,
+            no_speech_threshold=0.45,             # v1.8.10-hf1: 0.74→0.45, aggressive non-speech rejection
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -212,7 +212,7 @@ class OpenAIWhisperASR(ASRComponent):
             prompt=None,
             fp16=True,
             # Exclusive options
-            hallucination_silence_threshold=1.5,
+            hallucination_silence_threshold=None,  # v1.8.10-hf1: 1.5→None, disabled
         ),
         "balanced": OpenAIWhisperOptions(
             # Decoder options
@@ -226,13 +226,13 @@ class OpenAIWhisperASR(ASRComponent):
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=None,
+            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
             # Transcriber options
-            temperature=[0.0, 0.1],
+            temperature=[0.0],                    # v1.8.10-hf1: [0.0, 0.1]→[0.0], no fallback
             compression_ratio_threshold=2.4,
-            logprob_threshold=-1.2,
+            logprob_threshold=-0.75,              # v1.8.10-hf1: -1.2→-0.75, tighter quality gate
             logprob_margin=0.2,
-            no_speech_threshold=0.5,
+            no_speech_threshold=0.55,             # v1.8.10-hf1: 0.5→0.55
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -246,40 +246,40 @@ class OpenAIWhisperASR(ASRComponent):
             prompt=None,
             fp16=True,
             # Exclusive options
-            hallucination_silence_threshold=2.0,
+            hallucination_silence_threshold=None,  # v1.8.10-hf1: 2.0→None, disabled
         ),
         "aggressive": OpenAIWhisperOptions(
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=5,  # v1.8.10: 2→5, match/exceed Pass 2 decode capacity
-            best_of=3,  # v1.8.10: 1→3, match Pass 2 sampling diversity
-            patience=2.5,  # v1.8.10: 2.9→2.5
+            beam_size=4,                          # v1.8.10-hf1: 5→4, lower beams reduce hallucination risk
+            best_of=3,
+            patience=2.5,
             length_penalty=None,
             prefix=None,
-            suppress_blank=False,
-            suppress_tokens=[],     # Empty list = suppress nothing
+            suppress_blank=True,                  # v1.8.10-hf1: False→True, critical hallucination control
+            suppress_tokens=None,                 # v1.8.10-hf1: []→None, use Whisper defaults with suppress_blank=True
             without_timestamps=False,
-            max_initial_timestamp=None,
+            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
             # Transcriber options
-            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback matching Pass 2
-            compression_ratio_threshold=2.6,  # v1.8.10: 3.0→2.6, tuner-validated (run5: fastest, best overlap)
-            logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor with wider intake
+            temperature=[0.0],                    # v1.8.10-hf1: [0.0,0.15,0.3,0.5]→[0.0], no fallback
+            compression_ratio_threshold=2.6,
+            logprob_threshold=-1.0,               # v1.8.10-hf1: -2.0→-1.0, tighter quality gate
             logprob_margin=0.0,
-            no_speech_threshold=0.60,  # v1.8.10: 0.22→0.60, wide intake for soft/intimate speech
+            no_speech_threshold=0.75,             # v1.8.10-hf1: 0.60→0.75, tuned to hallucination clustering (>0.6)
             drop_nonverbal_vocals=False,
-            condition_on_previous_text=True,  # v1.8.10: tuner-validated — helps recognize dialogue echoes
+            condition_on_previous_text=False,      # v1.8.10-hf1: True→False, prevents hallucination propagation
             initial_prompt=None,
             word_timestamps=True,
             prepend_punctuations=None,
             append_punctuations=None,
             clip_timestamps=None,
             # Engine options
-            verbose=False,  # Only aggressive has this explicitly set
+            verbose=False,
             carry_initial_prompt=None,
             prompt=None,
             fp16=True,
             # Exclusive options
-            hallucination_silence_threshold=None,  # v1.8.10: 2.5→None, fully disabled for aggressive flood-gate
+            hallucination_silence_threshold=None,  # Disabled
         ),
     }

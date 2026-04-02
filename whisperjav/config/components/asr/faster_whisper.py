@@ -52,8 +52,8 @@ class FasterWhisperOptions(BaseModel):
     )
     length_penalty: Optional[float] = Field(
         None,
-        ge=0.0, le=2.0,
-        description="Exponential length penalty"
+        ge=-2.0, le=2.0,
+        description="Exponential length penalty (negative = prefer shorter sequences)"
     )
     prefix: Optional[str] = Field(
         None,
@@ -72,14 +72,14 @@ class FasterWhisperOptions(BaseModel):
         description="Only sample text tokens"
     )
     max_initial_timestamp: Optional[float] = Field(
-        None,
+        0.0,
         ge=0.0,
-        description="Max initial timestamp"
+        description="Max initial timestamp (0 = prevent phantom early timestamps)"
     )
 
     # === Transcriber Options (common_transcriber_options) ===
     temperature: Union[float, List[float]] = Field(
-        [0.0, 0.1],
+        [0.0],
         description="Temperature for sampling. List enables fallback temperatures."
     )
     compression_ratio_threshold: float = Field(
@@ -88,7 +88,7 @@ class FasterWhisperOptions(BaseModel):
         description="Threshold for gzip compression ratio"
     )
     logprob_threshold: float = Field(
-        -1.2,
+        -0.75,
         ge=-5.0, le=0.0,
         description="Average log probability threshold"
     )
@@ -98,7 +98,7 @@ class FasterWhisperOptions(BaseModel):
         description="Margin for log probability filtering"
     )
     no_speech_threshold: float = Field(
-        0.5,
+        0.55,
         ge=0.0, le=1.0,
         description="No speech probability threshold"
     )
@@ -143,7 +143,7 @@ class FasterWhisperOptions(BaseModel):
         description="Penalty for token repetition"
     )
     no_repeat_ngram_size: int = Field(
-        2,
+        3,
         ge=0, le=10,
         description="N-gram size to prevent repetition"
     )
@@ -182,9 +182,9 @@ class FasterWhisperOptions(BaseModel):
 
     # === Exclusive Options (exclusive_whisper_plus_faster_whisper) ===
     hallucination_silence_threshold: Optional[float] = Field(
-        2.0,
+        None,
         ge=0.0, le=10.0,
-        description="Skip silent periods longer than this (seconds)"
+        description="Skip silent periods longer than this (seconds). None = disabled."
     )
 
 
@@ -218,21 +218,21 @@ class FasterWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=1,
+            beam_size=2,                          # v1.8.10-hf1: 1→2, improves decode quality
             best_of=1,
-            patience=1.2,
-            length_penalty=None,
+            patience=1.5,                         # v1.8.10-hf1: 1.2→1.5, scales with beam size
+            length_penalty=-0.5,                  # v1.8.10-hf1: None→-0.5, prevents long hallucination runs
             prefix=None,
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=None,
+            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
             # Transcriber options
-            temperature=0.0,  # Deterministic — accuracy over coverage
+            temperature=[0.0],                    # v1.8.10-hf1: 0.0→[0.0], consistent list format
             compression_ratio_threshold=2.2,
-            logprob_threshold=-1.0,
+            logprob_threshold=-0.6,               # v1.8.10-hf1: -1.0→-0.6, tighter quality gate
             logprob_margin=0.1,
-            no_speech_threshold=0.7,
+            no_speech_threshold=0.45,             # v1.8.10-hf1: 0.7→0.45, aggressive non-speech rejection
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -243,7 +243,7 @@ class FasterWhisperASR(ASRComponent):
             # Engine options
             chunk_length=None,
             repetition_penalty=1.8,
-            no_repeat_ngram_size=2,
+            no_repeat_ngram_size=3,               # v1.8.10-hf1: 2→3, prevents repetition loops
             prompt_reset_on_temperature=None,
             hotwords=None,
             multilingual=False,
@@ -252,7 +252,7 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=1.5,
+            hallucination_silence_threshold=None,  # v1.8.10-hf1: 1.5→None, disabled
         ),
         "balanced": FasterWhisperOptions(
             # Decoder options
@@ -266,13 +266,13 @@ class FasterWhisperASR(ASRComponent):
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=None,
+            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
             # Transcriber options
-            temperature=[0.0, 0.2],
+            temperature=[0.0],                    # v1.8.10-hf1: [0.0, 0.2]→[0.0], no fallback
             compression_ratio_threshold=2.4,
-            logprob_threshold=-1.2,
+            logprob_threshold=-0.75,              # v1.8.10-hf1: -1.2→-0.75, tighter quality gate
             logprob_margin=0.2,
-            no_speech_threshold=0.4,
+            no_speech_threshold=0.55,             # v1.8.10-hf1: 0.4→0.55
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -283,7 +283,7 @@ class FasterWhisperASR(ASRComponent):
             # Engine options
             chunk_length=None,
             repetition_penalty=1.5,
-            no_repeat_ngram_size=2,
+            no_repeat_ngram_size=3,               # v1.8.10-hf1: 2→3, prevents repetition loops
             prompt_reset_on_temperature=None,
             hotwords=None,
             multilingual=False,
@@ -292,29 +292,29 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=2.0,
+            hallucination_silence_threshold=None,  # v1.8.10-hf1: 2.0→None, disabled
         ),
         "aggressive": FasterWhisperOptions(
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=4,  # v1.8.10: 3→4, extra beam for difficult audio
+            beam_size=4,
             best_of=3,
             patience=2.5,
             length_penalty=None,
             prefix=None,
-            suppress_blank=False,
-            suppress_tokens=[],
+            suppress_blank=True,                  # v1.8.10-hf1: False→True, critical hallucination control
+            suppress_tokens=None,                 # v1.8.10-hf1: []→None, use defaults with suppress_blank=True
             without_timestamps=False,
-            max_initial_timestamp=None,
+            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
             # Transcriber options
-            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback with tighter compression check
-            compression_ratio_threshold=2.6,  # v1.8.10: 3.0→2.6, tuner-validated
-            logprob_threshold=-2.0,
+            temperature=[0.0],                    # v1.8.10-hf1: [0.0,0.15,0.3,0.5]→[0.0], no fallback
+            compression_ratio_threshold=2.6,
+            logprob_threshold=-1.0,               # v1.8.10-hf1: -2.0→-1.0, tighter quality gate
             logprob_margin=0.0,
-            no_speech_threshold=0.55,  # v1.8.10: 0.22→0.55, wide intake for soft/intimate speech
+            no_speech_threshold=0.75,             # v1.8.10-hf1: 0.55→0.75, tuned to hallucination clustering
             drop_nonverbal_vocals=False,
-            condition_on_previous_text=True,  # v1.8.10: tuner-validated — helps recognize dialogue echoes
+            condition_on_previous_text=False,      # v1.8.10-hf1: True→False, prevents hallucination propagation
             initial_prompt=None,
             word_timestamps=True,
             prepend_punctuations=None,
@@ -323,7 +323,7 @@ class FasterWhisperASR(ASRComponent):
             # Engine options
             chunk_length=30,
             repetition_penalty=1.3,
-            no_repeat_ngram_size=2,
+            no_repeat_ngram_size=3,               # v1.8.10-hf1: 2→3, prevents repetition loops
             prompt_reset_on_temperature=None,
             hotwords=None,
             multilingual=False,
@@ -332,6 +332,6 @@ class FasterWhisperASR(ASRComponent):
             language_detection_segments=None,
             log_progress=False,
             # Exclusive options
-            hallucination_silence_threshold=4.0,  # v1.8.10: 2.5→4.0, recovers speech near silence gaps
+            hallucination_silence_threshold=None,  # v1.8.10-hf1: 4.0→None, disabled
         ),
     }
