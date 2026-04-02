@@ -103,7 +103,7 @@ class TimingConstants:
     MAX_SAFE_CPS: float = 30.0
 
     # The minimum number of characters a subtitle needs to have to be checked.
-    MIN_TEXT_LENGTH_FOR_CPS_CHECK: int = 3
+    MIN_TEXT_LENGTH_FOR_CPS_CHECK: int = 1  # was 3; lowered so 2-char hallucinations like 息子 are CPS-checked
     # ----------------------------------------------------
 
     MIN_READING_TIME_RATIO: float = 0.8

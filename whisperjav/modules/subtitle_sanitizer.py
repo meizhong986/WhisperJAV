@@ -1020,11 +1020,18 @@ class SubtitleSanitizer:
 
     def _remove_abnormally_fast_subs(self, subtitles: List[pysrt.SubRipItem]) -> List[pysrt.SubRipItem]:
 
-        """Removes subtitles with a CPS higher than MAX_SAFE_CPS and records an artifact."""
+        """Removes subtitles with abnormal CPS (too fast OR too slow) and records artifacts.
+
+        Too fast (> MAX_SAFE_CPS): hallucination squeezed into impossible timing.
+        Too slow (< MIN_SAFE_CPS) for short text (≤ 4 chars): hallucination label
+        stretched over silence (e.g., 息子 spanning 3.7s = 0.54 CPS).
+        """
 
         timing_consts = self.constants['timing']
 
         max_cps = timing_consts.MAX_SAFE_CPS
+
+        min_cps = timing_consts.MIN_SAFE_CPS
 
         min_len = timing_consts.MIN_TEXT_LENGTH_FOR_CPS_CHECK
 
@@ -1050,17 +1057,28 @@ class SubtitleSanitizer:
 
                     logger.debug(f"Removing Abnormally Fast Subtitle #{sub.index} ({actual_cps:.1f} CPS). Text: '{sub.text}'")
 
-                    # Record the removal before deleting
+                    self._record_removal(sub, sub.index, reason, "content_cleaning_cps")
+
+                    continue
+
+                # Short text with abnormally slow CPS = hallucination label over silence
+                # (e.g., 息子 at 0.54 CPS, パパ at 0.8 CPS). Only for short text (≤ 4 chars)
+                # to avoid removing genuine slow-spoken sentences.
+                if text_len <= 4 and actual_cps < min_cps:
+
+                    reason = f"abnormally_slow_cps_{actual_cps:.1f}"
+
+                    logger.debug(f"Removing Abnormally Slow Short Subtitle #{sub.index} ({actual_cps:.1f} CPS, {text_len} chars). Text: '{sub.text}'")
 
                     self._record_removal(sub, sub.index, reason, "content_cleaning_cps")
 
                     continue
 
-            
+
 
             kept_subs.append(sub)
 
-        
+
 
         return kept_subs
 
