@@ -1597,11 +1597,24 @@ def _apply_gui_overrides(
                 resolved_config["workflow"]["vad"] = "none"
             logger.debug("Pass %s: Disabled speech segmentation (backend = none)", pass_number)
         else:
-            # Set speech segmenter backend
-            resolved_config["params"]["speech_segmenter"]["backend"] = segmenter_backend
+            # Resolve sensitivity preset for this backend from YAML config.
+            # Uses the same resolution as Qwen pipeline: YAML spec → sensitivity preset → user overrides.
+            # resolve_qwen_sensitivity() returns only SEGMENTER_PARAMS keys, filtered and safe.
+            sensitivity = pass_config.get("sensitivity", "balanced")
+            segmenter_params = resolve_qwen_sensitivity(
+                segmenter_backend, sensitivity, None
+            )
+            # Set backend name + all resolved sensitivity params
+            resolved_config["params"]["speech_segmenter"] = {
+                "backend": segmenter_backend,
+                **segmenter_params,
+            }
             if "workflow" in resolved_config:
                 resolved_config["workflow"]["vad"] = segmenter_backend
-            logger.debug("Pass %s: Override speech_segmenter = %s", pass_number, segmenter_backend)
+            logger.debug(
+                "Pass %s: Override speech_segmenter = %s, resolved %d sensitivity params (%s)",
+                pass_number, segmenter_backend, len(segmenter_params), sensitivity,
+            )
 
     # Override speech enhancer if specified
     speech_enhancer = pass_config.get("speech_enhancer")

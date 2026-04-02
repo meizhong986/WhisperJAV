@@ -110,14 +110,11 @@ gui:
   hop_size:
     widget: dropdown
     label: "Hop Size"
-    description: "Frame size in samples at 16kHz"
+    description: "Frame size in samples at 16kHz (160=10ms, 256=16ms, 512=32ms)"
     options:
-      - value: 160
-        label: "160 (10ms)"
-      - value: 256
-        label: "256 (16ms)"
-      - value: 512
-        label: "512 (32ms)"
+      - "160"
+      - "256"
+      - "512"
     data_type: int
     group: processing
 
