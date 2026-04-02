@@ -111,11 +111,11 @@
       "notes": "Thank you for watching message (past and present tense)"
     },
     {
-      "pattern": "また(ね|[次の]動画でお会いしましょう)[!！]?",
+      "pattern": "(また)?(次(回|の).{0,4}(映像|動画).{0,4}(お会い|会いましょう)|またね)[!！。]?",
       "category": "closing_phrase",
       "confidence": 0.9,
       "replacement": "",
-      "notes": "See you later/next time message"
+      "notes": "See you next time — handles 次回/次の, 映像/動画 variants, with or without また prefix"
     },
     {
       "pattern": "(私|僕)の[チャンネル]",
@@ -230,11 +230,11 @@
       "notes": "Meta reference to fast-forward, ending, etc."
     },
     {
-      "pattern": "^[a-zA-Z]+$",
+      "pattern": "^[a-zA-Z][a-zA-Z\\s]+$",
       "category": "nonsensical",
       "confidence": 0.85,
       "replacement": "",
-      "notes": "Single English word in otherwise Japanese context"
+      "notes": "English-only text (single or multi-word) in Japanese context"
     },
     {
       "pattern": "(thank you|thanks|subscribe|follow|watching|translation|translated)",
