@@ -41,6 +41,7 @@ class HallucinationRemover:
         ("『", "』"),
         ("「", "」"),
         ("《", "》"),
+        ("★", "★"),    # Whisper hallucination pattern: ★content★
     )
 
     def __init__(self, constants: HallucinationConstants, 
@@ -328,8 +329,14 @@ class HallucinationRemover:
         
     def remove_hallucinations(self, text: str, language: Optional[str] = None) -> Tuple[str, List[Dict[str, Any]]]:
         """
-        REVISED: Performs strict, full-line, exact-match removal.
-        No partial matching, no regex, no fuzzy logic.
+        Multi-stage hallucination detection: bracket detection, exact matching
+        (with punctuation normalization), and regex pattern matching.
+
+        Priority order:
+        1. Bracket context detection (fully wrapped text)
+        2. Exact full-line matching against filter list
+        3. Exact matching with trailing punctuation stripped
+        4. Regex patterns from regexp_v09.json (closing phrases, sound effects, etc.)
         """
         if not text or not text.strip() or not self._exact_lists:
             return text, []
@@ -370,7 +377,7 @@ class HallucinationRemover:
             }]
             return '', modifications
 
-        # Strict, full-line, exact matching
+        # Strict, full-line, exact matching (try raw first, then punctuation-stripped)
         if normalized_text in lang_list:
             modifications = [{
                 'type': 'exact_match_full_line',
@@ -382,7 +389,32 @@ class HallucinationRemover:
                 'language': effective_language,
             }]
             return '', modifications
-        
+
+        # Retry with trailing punctuation stripped (catches おやすみなさい。 → おやすみなさい)
+        punct_stripped = re.sub(r'[。！!？?～〜~♪☆♡♥❤💕💛]+$', '', normalized_text).strip()
+        if punct_stripped and punct_stripped != normalized_text and punct_stripped in lang_list:
+            modifications = [{
+                'type': 'exact_match_punct_normalized',
+                'pattern': punct_stripped,
+                'category': 'hallucination',
+                'confidence': 1.0,
+                'original': text,
+                'modified': '',
+                'language': effective_language,
+            }]
+            return '', modifications
+
+        # Apply regex patterns from regexp_v09.json (closing phrases, sound effects, etc.)
+        if self._regex_patterns:
+            regex_text, regex_mods = self._apply_regex_matching(normalized_text)
+            if regex_mods:
+                # If regex fully emptied the text, remove the subtitle
+                if not regex_text.strip():
+                    return '', regex_mods
+                # If regex partially stripped (e.g., parenthetical prefix removed),
+                # return the cleaned text
+                return regex_text.strip(), regex_mods
+
         return text, []
 
     def _is_bracketed_context(self, text: str) -> Optional[Dict[str, Any]]:
@@ -520,52 +552,67 @@ class HallucinationRemover:
             
         return text, modifications
         
+    # Categories where a regex match means the ENTIRE line is a hallucination
+    # and should be fully removed (not just the matched portion stripped).
+    FULL_LINE_REMOVAL_CATEGORIES = {
+        'closing_phrase',       # "ご視聴ありがとうございます" — entire line is hallucination
+        'meta_reference',       # "チャンネル登録お願いします" — entire line is hallucination
+        'media_reference',      # "私のチャンネル" — entire line is hallucination
+        'nonsensical',          # gibberish patterns — entire line is hallucination
+    }
+
     def _apply_regex_matching(self, text: str) -> Tuple[str, List[Dict]]:
-        """Apply regex pattern matching with improved error handling"""
+        """Apply regex pattern matching from regexp_v09.json.
+
+        For 'closing_phrase'/'meta_reference'/'media_reference'/'nonsensical' categories:
+            A match means the entire line is a hallucination → full removal.
+        For 'sound_effect'/'emoji'/'repeated_vocalization' categories:
+            A match strips only the matched portion (e.g., parenthetical prefix).
+        """
         modifications = []
         current_text = text
-        
-        logger.debug(f"Applying regex matching to: '{text[:50]}...'")
-        patterns_tested = 0
-        patterns_matched = 0
-        
+
         for pattern_info in self._regex_patterns:
             pattern = pattern_info.get('pattern', '')
             category = pattern_info.get('category', '')
             confidence = pattern_info.get('confidence', 0.9)
             replacement = pattern_info.get('replacement', '')
-            
-            patterns_tested += 1
-            
+
             # Skip if confidence too low
             if confidence < self.constants.MIN_CONFIDENCE_THRESHOLD:
                 continue
-                
+
             try:
-                # Check if pattern matches
                 if re.search(pattern, current_text):
-                    logger.debug(f"Regex match found - Category: {category}, Pattern: {pattern[:50]}...")
-                    
-                    # Apply the replacement
-                    new_text = self._apply_regex_replacement_safe(pattern, replacement, current_text)
-                    
-                    if new_text != current_text:
+                    if category in self.FULL_LINE_REMOVAL_CATEGORIES:
+                        # Full-line removal: the entire subtitle is a hallucination
                         modifications.append({
-                            'type': 'regex_match',
+                            'type': 'regex_full_line_removal',
                             'pattern': pattern,
                             'category': category,
                             'confidence': confidence,
                             'original': current_text,
-                            'modified': new_text
+                            'modified': ''
                         })
-                        current_text = new_text.strip()
-                        patterns_matched += 1
-                        
+                        return '', modifications
+                    else:
+                        # Partial strip: remove only the matched portion (e.g., parenthetical prefix)
+                        new_text = self._apply_regex_replacement_safe(pattern, replacement, current_text)
+                        if new_text != current_text:
+                            modifications.append({
+                                'type': 'regex_partial_strip',
+                                'pattern': pattern,
+                                'category': category,
+                                'confidence': confidence,
+                                'original': current_text,
+                                'modified': new_text
+                            })
+                            current_text = new_text.strip()
+
             except re.error as e:
                 logger.warning(f"Regex error for pattern '{pattern[:30]}...': {e}")
                 continue
-                
-        logger.debug(f"Regex matching complete: {patterns_tested} patterns tested, {patterns_matched} matched")
+
         return current_text, modifications
 
     def _apply_regex_replacement_safe(self, pattern: str, replacement: str, text: str) -> str:

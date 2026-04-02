@@ -84,6 +84,15 @@ class MergeEngine:
         merge_func = self.strategies[strategy]
         merged_subs = merge_func(subs1, subs2)
 
+        # Post-merge deduplication: remove consecutive subtitles with identical text
+        # This catches duplicates created when pass1 and pass2 produce the same text
+        # at nearly the same timestamp (they become adjacent after merge + sort)
+        pre_dedup_count = len(merged_subs)
+        merged_subs = self._deduplicate_consecutive(merged_subs)
+        dedup_removed = pre_dedup_count - len(merged_subs)
+        if dedup_removed > 0:
+            logger.info(f"Post-merge deduplication removed {dedup_removed} consecutive duplicates")
+
         # Re-index subtitles
         for i, sub in enumerate(merged_subs, 1):
             sub.index = i
@@ -95,11 +104,31 @@ class MergeEngine:
             'pass1_count': len(subs1),
             'pass2_count': len(subs2),
             'merged_count': len(merged_subs),
+            'dedup_removed': dedup_removed,
             'strategy': strategy
         }
 
         logger.info(f"Merge complete: {len(merged_subs)} subtitles in final output")
         return stats
+
+    def _deduplicate_consecutive(self, subs: List[Subtitle]) -> List[Subtitle]:
+        """Remove consecutive subtitles with identical text.
+
+        After merging pass1 and pass2, the same dialogue can appear twice
+        at nearly the same timestamp (one from each pass). This removes
+        the second occurrence of any consecutive pair with identical text.
+        """
+        if len(subs) < 2:
+            return subs
+
+        result = [subs[0]]
+        for i in range(1, len(subs)):
+            if subs[i].text.strip() != result[-1].text.strip():
+                result.append(subs[i])
+            else:
+                logger.debug(f"Dedup: removed consecutive duplicate '{subs[i].text.strip()[:40]}'")
+
+        return result
 
     def _parse_srt(self, path: Path) -> List[Subtitle]:
         """Parse an SRT file into Subtitle objects."""

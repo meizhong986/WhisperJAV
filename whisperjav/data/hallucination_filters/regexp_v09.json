@@ -97,18 +97,18 @@
       "notes": "Please subscribe message in various forms"
     },
     {
-      "pattern": "(ご|お)?視聴(して)?[いただきくれて]?(ありがとう|ございました)",
+      "pattern": "(ご|お)?視聴(して)?(いただき|くださっ?て|くれて)?\\s*(ありがとうございました|ありがとうございます|ありがとう)",
       "category": "closing_phrase",
       "confidence": 0.9,
       "replacement": "",
-      "notes": "Thank you for watching message in various forms"
+      "notes": "Thank you for watching — handles いただき/くださって conjugations, past+present tense"
     },
     {
-      "pattern": "見てくれて(ありがとう|ございました)[!！]?",
+      "pattern": "見てくれて(ありがとう|ございました|ございます)[!！。]?",
       "category": "closing_phrase",
       "confidence": 0.9,
       "replacement": "",
-      "notes": "Thank you for watching message"
+      "notes": "Thank you for watching message (past and present tense)"
     },
     {
       "pattern": "また(ね|[次の]動画でお会いしましょう)[!！]?",
