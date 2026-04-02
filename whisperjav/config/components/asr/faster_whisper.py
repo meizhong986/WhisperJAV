@@ -221,7 +221,7 @@ class FasterWhisperASR(ASRComponent):
             beam_size=2,                          # v1.8.10-hf1: 1→2, improves decode quality
             best_of=1,
             patience=1.5,                         # v1.8.10-hf1: 1.2→1.5, scales with beam size
-            length_penalty=-0.5,                  # v1.8.10-hf1: None→-0.5, prevents long hallucination runs
+            length_penalty=None,                   # v1.8.10-hf1: reverted, negative values crash OpenAI Whisper
             prefix=None,
             suppress_tokens=None,
             suppress_blank=True,

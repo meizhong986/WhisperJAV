@@ -187,7 +187,7 @@ class OpenAIWhisperASR(ASRComponent):
             beam_size=2,                          # v1.8.10-hf1: 1→2, beam=2 improves decode quality
             best_of=1,
             patience=1.5,
-            length_penalty=-0.5,                  # v1.8.10-hf1: None→-0.5, prevents long hallucination runs
+            length_penalty=None,                   # v1.8.10-hf1: reverted, OpenAI Whisper requires 0-1 (alpha exponent)
             prefix=None,
             suppress_tokens=None,
             suppress_blank=True,
