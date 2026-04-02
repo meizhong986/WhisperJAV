@@ -44,7 +44,11 @@ class WhisperProASR:
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA -> MPS -> CPU
-        self.device = model_config.get("device", get_best_device())
+        # OpenAI Whisper does NOT accept "auto" — it passes device directly to
+        # torch.load(map_location=device). Resolve "auto" to a concrete device.
+        self.device = model_config.get("device") or get_best_device()
+        if self.device == "auto":
+            self.device = get_best_device()
         
         decoder_params = params["decoder"]
         vad_params = params["vad"]

@@ -148,7 +148,11 @@ class StableTSASR:
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA -> MPS -> CPU
-        self.device = model_config.get("device", get_best_device())
+        # Standard mode wraps OpenAI Whisper which does NOT accept "auto" —
+        # it passes device to torch.load(map_location=device). Resolve here.
+        self.device = model_config.get("device") or get_best_device()
+        if self.device == "auto":
+            self.device = get_best_device()
         self.turbo_mode = turbo_mode
 
         # CTRANSLATE2 COMPATIBILITY: MPS is not supported by ctranslate2/faster-whisper
