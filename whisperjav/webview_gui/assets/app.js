@@ -1921,7 +1921,7 @@ const EnsembleManager = {
     // AUDIT FIX: Ranges aligned with backend Pydantic Field constraints
     parameterMetadata: {
         // === Transcriber parameters ===
-        logprob_threshold: { type: 'float', ge: -5.0, le: 0.0, step: 0.1 },           // Fixed: was -1.0, backend allows -5.0
+        logprob_threshold: { type: 'float', ge: -5.0, le: 0.0, step: 0.05 },          // H4 fix: step 0.1→0.05 to reach balanced default -0.75
         logprob_margin: { type: 'float', ge: 0.0, le: 5.0, step: 0.1 },               // Fixed: was 1.0, backend allows 5.0
         no_speech_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
         compression_ratio_threshold: { type: 'float', ge: 1.0, le: 5.0, step: 0.1 }, // Fixed: was 0.0-10.0, backend is 1.0-5.0
@@ -1930,7 +1930,7 @@ const EnsembleManager = {
 
         // === Decoder parameters ===
         patience: { type: 'float', ge: 0.0, le: 5.0, step: 0.1 },
-        length_penalty: { type: 'float', ge: 0.0, le: 2.0, step: 0.1 },
+        length_penalty: { type: 'float', ge: -2.0, le: 2.0, step: 0.1 },             // C2 fix: ge 0.0→-2.0 to allow conservative preset -0.5
         max_initial_timestamp: { type: 'float', ge: 0.0, le: 30.0, step: 0.5 },
         beam_size: { type: 'int', ge: 1, le: 20, step: 1 },                        // Fixed: was 10, backend allows 20
         best_of: { type: 'int', ge: 1, le: 10, step: 1 },
@@ -2115,7 +2115,7 @@ const EnsembleManager = {
 
             // Generate Segmenter tab (backend-specific parameters)
             const segmenterBackend = passState.speechSegmenter || 'silero';
-            await this.generateSegmenterTab('tab-segmenter', segmenterBackend, allDefaults.vad, currentValues);
+            await this.generateSegmenterTab('tab-segmenter', segmenterBackend, currentValues, passState.customized, passState.sensitivity);
 
             // Generate Enhancer tab (backend-specific parameters)
             const enhancerBackend = passState.speechEnhancer || 'none';
@@ -2279,7 +2279,7 @@ const EnsembleManager = {
             advanced: {
                 label: 'Advanced Options',
                 description: 'Additional parameters for fine-tuning',
-                params: ['word_timestamps', 'repetition_penalty', 'no_repeat_ngram_size', 'max_initial_timestamp']
+                params: ['word_timestamps', 'repetition_penalty', 'no_repeat_ngram_size', 'chunk_length', 'max_initial_timestamp']  // M2 fix: added chunk_length
             }
         };
 
@@ -2364,7 +2364,7 @@ const EnsembleManager = {
     /**
      * Generate Segmenter tab - loads backend-specific parameters from API.
      */
-    async generateSegmenterTab(tabId, backend, vadDefaults, currentValues) {
+    async generateSegmenterTab(tabId, backend, currentValues, isCustomized, sensitivity) {
         const container = document.getElementById(tabId);
         if (!container) return;
 
@@ -2405,6 +2405,11 @@ const EnsembleManager = {
                 return;
             }
 
+            // Resolve sensitivity-appropriate preset overrides (M5 fix)
+            const presets = result.presets || {};
+            const activeSensitivity = sensitivity || 'balanced';
+            const presetOverrides = presets[activeSensitivity] || {};
+
             // Group parameters if groups are provided
             const groups = result.groups || { general: Object.keys(parameters) };
 
@@ -2424,13 +2429,17 @@ const EnsembleManager = {
                     if (!paramSchema) continue;
 
                     const defaultValue = defaults[paramName];
-                    // Check vadDefaults for legacy values, then currentValues
-                    let currentValue = vadDefaults[paramName];
-                    if (currentValue === undefined) {
+                    // M5 fix: resolve value priority:
+                    // 1. User's customized value (if customized)
+                    // 2. Sensitivity preset override (if not customized)
+                    // 3. Backend's YAML spec default
+                    let currentValue;
+                    if (isCustomized && currentValues[paramName] !== undefined) {
                         currentValue = currentValues[paramName];
-                    }
-                    if (currentValue === undefined) {
-                        currentValue = defaultValue;
+                    } else {
+                        currentValue = (presetOverrides[paramName] !== undefined)
+                            ? presetOverrides[paramName]
+                            : defaultValue;
                     }
 
                     const control = this.generateSchemaControl(paramName, paramSchema, currentValue, defaultValue);
@@ -2761,9 +2770,12 @@ const EnsembleManager = {
                 const options = schema.options || [];
                 options.forEach(opt => {
                     const option = document.createElement('option');
-                    option.value = opt.value;
-                    option.textContent = opt.label;
-                    if (opt.value === currentValue || opt.value === defaultValue) {
+                    // M4 fix: handle both string/number and {value, label} object formats
+                    const val = (typeof opt === 'object' && opt !== null) ? opt.value : opt;
+                    const lbl = (typeof opt === 'object' && opt !== null) ? opt.label : String(opt);
+                    option.value = val;
+                    option.textContent = lbl;
+                    if (String(val) === String(currentValue) || String(val) === String(defaultValue)) {
                         option.selected = true;
                     }
                     input.appendChild(option);
@@ -4102,13 +4114,22 @@ const EnsembleManager = {
 
         // Non-Transformers pipeline customization (new tab structure)
         const fullParams = {};
+        const enhancerParams = {};  // Separate namespace — enhancer params (device, model)
+                                    // must NOT leak into ASR params (key name collision)
         const validationWarnings = [];
 
-        // Collect ALL values from all tab panels (includes context tab for Qwen)
+        // Collect values from all tab panels (includes context tab for Qwen).
+        // Enhancer tab params are routed to a separate dict because neural
+        // enhancer backends (zipenhancer, clearvoice, bs-roformer) expose
+        // "device" and "model" keys that collide with the ASR model tab's
+        // identically-named keys. The enhancer backend receives its config
+        // via --passN-speech-enhancer, not via --passN-params.
         const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
+
+            const target = (tab === 'enhancer') ? enhancerParams : fullParams;
 
             // Collect standard param-control values
             panel.querySelectorAll('.param-control').forEach(control => {
@@ -4205,7 +4226,7 @@ const EnsembleManager = {
 
                     // Store validated value (skip null for optional params that were empty)
                     if (value !== null) {
-                        fullParams[paramName] = value;
+                        target[paramName] = value;
                     }
                 }
             });
@@ -4214,7 +4235,7 @@ const EnsembleManager = {
             panel.querySelectorAll('.backend-selector').forEach(select => {
                 const paramName = select.dataset.param;
                 if (paramName && select.value) {
-                    fullParams[paramName] = select.value;
+                    target[paramName] = select.value;
                 }
             });
 
@@ -4226,7 +4247,7 @@ const EnsembleManager = {
                     list.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
                         selectedValues.push(cb.value);
                     });
-                    fullParams[paramName] = selectedValues;
+                    target[paramName] = selectedValues;
                 }
             });
         });
@@ -4284,13 +4305,17 @@ const EnsembleManager = {
         try {
             // Collect Transformers-specific parameters from the new tab structure
             const hfParams = {};
+            const enhancerParams = {};  // Separate namespace — same isolation as applyCustomization()
             const passState = this.state[passKey];
 
-        // Collect ALL values from tab panels using the same approach as non-Transformers
+        // Collect values from tab panels. Enhancer tab params are isolated
+        // to prevent key collision (enhancer "device"/"model" vs ASR "device"/"model").
         const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
+
+            const target = (tab === 'enhancer') ? enhancerParams : hfParams;
 
             // Collect standard param-control values
             panel.querySelectorAll('.param-control').forEach(control => {
@@ -4340,7 +4365,7 @@ const EnsembleManager = {
                 }
 
                 if (value !== undefined && value !== null) {
-                    hfParams[paramName] = value;
+                    target[paramName] = value;
                 }
             });
 
@@ -4348,7 +4373,7 @@ const EnsembleManager = {
             panel.querySelectorAll('.backend-selector').forEach(select => {
                 const paramName = select.dataset.param;
                 if (paramName && select.value) {
-                    hfParams[paramName] = select.value;
+                    target[paramName] = select.value;
                 }
             });
 
@@ -4360,7 +4385,7 @@ const EnsembleManager = {
                     list.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
                         selectedValues.push(cb.value);
                     });
-                    hfParams[paramName] = selectedValues;
+                    target[paramName] = selectedValues;
                 }
             });
         });
@@ -4697,12 +4722,15 @@ const EnsembleManager = {
 
         const passState = this.state[passKey];
 
-        // Collect custom params from the modal form (same logic as applyCustomization)
+        // Collect custom params from the modal form (same logic as applyCustomization).
+        // Enhancer tab is excluded — its params (device, model) collide with ASR keys
+        // and the enhancer backend receives config via --passN-speech-enhancer, not params.
         const params = {};
         const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
+            if (tab === 'enhancer') return;  // Skip — same isolation as applyCustomization()
             panel.querySelectorAll('.param-control').forEach(control => {
                 const paramName = control.dataset.param;
                 if (!paramName) return;

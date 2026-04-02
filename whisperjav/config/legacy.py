@@ -234,11 +234,11 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
     # Different backends accept different parameters
     # Common transcriber options (shared by all backends)
     provider_params = {
-        'temperature': asr_params.get('temperature', [0.0, 0.1]),
+        'temperature': asr_params.get('temperature', [0.0]),                  # CL1b: match balanced Pydantic default
         'compression_ratio_threshold': asr_params.get('compression_ratio_threshold', 2.4),
-        'logprob_threshold': asr_params.get('logprob_threshold', -1.2),
+        'logprob_threshold': asr_params.get('logprob_threshold', -0.75),        # CL1b: was -1.2, match balanced Pydantic
         'logprob_margin': asr_params.get('logprob_margin', 0.2),
-        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.5),
+        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.55),     # CL1b: was 0.5, match balanced Pydantic
         'drop_nonverbal_vocals': asr_params.get('drop_nonverbal_vocals', False),
         'condition_on_previous_text': asr_params.get('condition_on_previous_text', False),
         'initial_prompt': asr_params.get('initial_prompt'),
@@ -254,7 +254,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         provider_params.update({
             'chunk_length': asr_params.get('chunk_length'),
             'repetition_penalty': asr_params.get('repetition_penalty', 1.5),
-            'no_repeat_ngram_size': asr_params.get('no_repeat_ngram_size', 2),
+            'no_repeat_ngram_size': asr_params.get('no_repeat_ngram_size', 3),     # H1: was 2, match Pydantic default
             'prompt_reset_on_temperature': asr_params.get('prompt_reset_on_temperature'),
             'hotwords': asr_params.get('hotwords'),
             'multilingual': asr_params.get('multilingual', False),
@@ -263,7 +263,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
             'language_detection_segments': asr_params.get('language_detection_segments'),
             'log_progress': asr_params.get('log_progress', False),
             # exclusive_whisper_plus_faster_whisper
-            'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold', 2.0),
+            'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold'),  # None = disabled, no fallback (C1 fix)
         })
     elif asr_name == 'openai_whisper':
         # openai_whisper_engine_options
@@ -273,7 +273,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
             'prompt': asr_params.get('prompt'),
             'fp16': asr_params.get('fp16', True),
             # exclusive_whisper_plus_faster_whisper
-            'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold', 2.0),
+            'hallucination_silence_threshold': asr_params.get('hallucination_silence_threshold'),  # None = disabled, no fallback (C1 fix)
         })
     elif asr_name == 'stable_ts':
         # stable_ts_engine_options

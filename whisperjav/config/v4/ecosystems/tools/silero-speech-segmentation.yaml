@@ -48,6 +48,7 @@ spec:
   # --- Core VAD Parameters ---
   # Keys are flat (no "vad." prefix) to match the routing layer (SEGMENTER_PARAMS)
   threshold: 0.18
+  neg_threshold: 0.02    # H3: hysteresis threshold for speech end detection
   min_speech_duration_ms: 100
   min_silence_duration_ms: 300
   speech_pad_ms: 400
@@ -78,6 +79,7 @@ presets:
   # Lower padding — threshold 0.05 already detects speech very early.
   aggressive:
     threshold: 0.05
+    neg_threshold: 0.08   # H3: higher hysteresis for aggressive detection
     min_speech_duration_ms: 30
     min_silence_duration_ms: 300
     speech_pad_ms: 300
@@ -85,16 +87,25 @@ presets:
 # =============================================================================
 # GUI Hints
 # =============================================================================
-# Only functional, routable parameters are exposed here.
-# Removed from GUI (not passed to Silero API by backend code):
-#   - neg_threshold: stored but excluded from Silero API call (silero.py lines 266-274)
-#   - max_speech_duration_s: stored but excluded from Silero API call
+# Functional parameters exposed to GUI.
+# Not exposed:
+#   - max_speech_duration_s: stored but excluded from old Silero API call
 #   - version: controlled by factory name (silero vs silero-v3.1), not a parameter
 gui:
   threshold:
     widget: slider
     label: "Speech Threshold"
     description: "Probability threshold to detect speech (lower = more sensitive)"
+    min: 0.01
+    max: 0.5
+    step: 0.01
+    data_type: float
+    group: detection
+
+  neg_threshold:
+    widget: slider
+    label: "Negative Threshold"
+    description: "Hysteresis threshold for speech end detection (lower = more persistent)"
     min: 0.01
     max: 0.5
     step: 0.01

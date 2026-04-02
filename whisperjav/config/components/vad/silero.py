@@ -32,7 +32,7 @@ class SileroVADOptions(BaseModel):
     """
 
     threshold: float = Field(
-        0.25,
+        0.18,
         ge=0.0, le=1.0,
         description="Speech probability threshold. Lower = more sensitive."
     )
@@ -62,7 +62,7 @@ class SileroVADOptions(BaseModel):
         description="Padding added around detected speech in milliseconds."
     )
     chunk_threshold_s: float = Field(
-        0.2,
+        2.5,
         ge=0.0, le=30.0,
         description="Gap threshold for segment grouping (seconds). Segments with gaps larger than this are split into separate groups."
     )
@@ -93,33 +93,33 @@ class SileroVAD(VADComponent):
     # === Presets - tuned for v1.8.9 ===
     presets = {
         "conservative": SileroVADOptions(
-            threshold=0.28,
-            min_speech_duration_ms=120,
-            max_speech_duration_s=9.0,
-            min_silence_duration_ms=400,
+            threshold=0.35,                   # H2/CL1b: was 0.28, match YAML
+            min_speech_duration_ms=150,        # H2/CL1b: was 120, match YAML
+            max_speech_duration_s=9.0,         # Pydantic-only (not in YAML)
+            min_silence_duration_ms=300,        # H2/CL1b: was 400, match YAML
             neg_threshold=0.02,
-            speech_pad_ms=300,
-            chunk_threshold_s=5.0,
+            speech_pad_ms=500,                 # H2/CL1b: was 300, match YAML
+            chunk_threshold_s=2.5,             # H2/CL1b: was 5.0, match YAML spec
             max_group_duration_s=29.0,
         ),
         "balanced": SileroVADOptions(
             threshold=0.18,
-            min_speech_duration_ms=80,
-            max_speech_duration_s=11.0,
+            min_speech_duration_ms=100,         # H2/CL1b: was 80, match YAML spec
+            max_speech_duration_s=11.0,         # Pydantic-only (not in YAML)
             min_silence_duration_ms=300,
             neg_threshold=0.02,
             speech_pad_ms=400,
-            chunk_threshold_s=5.0,
+            chunk_threshold_s=2.5,             # H2/CL1b: was 5.0, match YAML spec
             max_group_duration_s=29.0,
         ),
         "aggressive": SileroVADOptions(
-            threshold=0.068,
+            threshold=0.05,                    # H2/CL1b: was 0.068, match YAML
             min_speech_duration_ms=30,
-            max_speech_duration_s=14.0,
-            min_silence_duration_ms=200,
+            max_speech_duration_s=14.0,         # Pydantic-only (not in YAML)
+            min_silence_duration_ms=300,        # H2/CL1b: was 200, match YAML
             neg_threshold=0.08,
-            speech_pad_ms=500,
-            chunk_threshold_s=5.0,
+            speech_pad_ms=300,                 # H2/CL1b: was 500, match YAML
+            chunk_threshold_s=2.5,             # H2/CL1b: was 5.0, match YAML spec
             max_group_duration_s=29.0,
         ),
     }
