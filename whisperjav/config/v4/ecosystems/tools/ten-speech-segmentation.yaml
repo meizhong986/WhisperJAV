@@ -50,7 +50,8 @@ spec:
 
   # --- Duration Filters ---
   min_speech_duration_ms: 150  # v1.8.10-hf1: 100→150, match Silero for consistency
-  min_silence_duration_ms: 150 # v1.8.10-hf1: 100→150, match Silero (not implemented in backend)
+  min_silence_duration_ms: 150 # v1.8.10-hf1: 100→150, match Silero — now implemented in backend
+  max_speech_duration_s: 6     # v1.8.10-hf2: added, limits individual segment length (split at prob minima)
 
   # --- Segment Padding ---
   # end_pad extends segment end to capture trailing speech.
@@ -75,6 +76,7 @@ presets:
     threshold: 0.42               # v1.8.10-hf2: 0.45→0.42, relaxed per forensic analysis
     min_speech_duration_ms: 200
     min_silence_duration_ms: 200
+    max_speech_duration_s: 5      # v1.8.10-hf2: added, match Silero v6.2 pattern
     max_group_duration_s: 7
     start_pad_ms: 0
     end_pad_ms: 300
@@ -89,6 +91,7 @@ presets:
     threshold: 0.22               # v1.8.10-hf2: 0.10→0.22, reduce noise capture per forensic analysis
     min_speech_duration_ms: 100
     min_silence_duration_ms: 100  # v1.8.10-hf2: 80→100, reduce micro-fragmentation
+    max_speech_duration_s: 7      # v1.8.10-hf2: added, match Silero v6.2 pattern
     max_group_duration_s: 9
     start_pad_ms: 0
     end_pad_ms: 100
@@ -128,7 +131,26 @@ gui:
     data_type: int
     group: filters
 
-  # min_silence_duration_ms: removed from GUI — backend stores but does not implement it (ten.py)
+  min_silence_duration_ms:
+    widget: spinner
+    label: "Min Silence Duration (ms)"
+    description: "Minimum silence gap to keep segments separate (shorter gaps are merged)"
+    min: 10
+    max: 500
+    step: 10
+    data_type: int
+    group: filters
+
+  max_speech_duration_s:
+    widget: slider
+    label: "Max Speech Duration (s)"
+    description: "Split long speech segments at quiet points (prevents oversized chunks)"
+    min: 1.0
+    max: 30.0
+    step: 0.5
+    data_type: float
+    unit: "s"
+    group: filters
 
   chunk_threshold_s:
     widget: slider
