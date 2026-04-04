@@ -45,7 +45,7 @@ contract:
 # =============================================================================
 spec:
   # --- Core VAD Parameters ---
-  threshold: 0.25              # v1.8.10-hf1: 0.20→0.25, calibrated for TEN scoring behavior
+  threshold: 0.32              # v1.8.10-hf2: 0.25→0.32, tightened per forensic analysis
   hop_size: 256
 
   # --- Duration Filters ---
@@ -72,10 +72,10 @@ presets:
   # Best for: Clean audio, studio recordings
   # Higher end_pad compensates for late detection at threshold 0.45.
   conservative:
-    threshold: 0.45               # v1.8.10-hf1: 0.5→0.45, calibrated for TEN scoring
-    min_speech_duration_ms: 200   # v1.8.10-hf1: 150→200, match Silero
-    min_silence_duration_ms: 200  # v1.8.10-hf1: 150→200, match Silero
-    max_group_duration_s: 7       # v1.8.10-hf1: added, hard cap for segment size
+    threshold: 0.42               # v1.8.10-hf2: 0.45→0.42, relaxed per forensic analysis
+    min_speech_duration_ms: 200
+    min_silence_duration_ms: 200
+    max_group_duration_s: 7
     start_pad_ms: 0
     end_pad_ms: 300
 
@@ -86,10 +86,10 @@ presets:
   # Best for: Noisy audio, soft speech
   # Lower end_pad — threshold 0.10 already detects speech early.
   aggressive:
-    threshold: 0.10
-    min_speech_duration_ms: 100   # v1.8.10-hf1: 50→100, match Silero for consistency
-    min_silence_duration_ms: 80   # v1.8.10-hf1: 50→80, match Silero
-    max_group_duration_s: 9       # v1.8.10-hf1: added, hard cap for segment size
+    threshold: 0.22               # v1.8.10-hf2: 0.10→0.22, reduce noise capture per forensic analysis
+    min_speech_duration_ms: 100
+    min_silence_duration_ms: 100  # v1.8.10-hf2: 80→100, reduce micro-fragmentation
+    max_group_duration_s: 9
     start_pad_ms: 0
     end_pad_ms: 100
 

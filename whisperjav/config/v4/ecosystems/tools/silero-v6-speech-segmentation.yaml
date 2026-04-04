@@ -49,8 +49,8 @@ contract:
 # =============================================================================
 spec:
   # --- Core VAD Parameters ---
-  threshold: 0.35    # JAV-tuned: captures speech overlapping with breathing/moaning
-  neg_threshold: null  # Auto-calculated as threshold - 0.15 by v6.2 (= 0.20)
+  threshold: 0.32    # v1.8.10-hf2: 0.35→0.32, relaxed per forensic analysis
+  neg_threshold: null  # Auto-calculated as threshold - 0.15 by v6.2 — do NOT override
 
   # --- Duration Filters ---
   min_speech_duration_ms: 150   # v1.8.10-hf1: 100→150, filter noise while preserving short utterances
@@ -78,12 +78,12 @@ presets:
   # Higher padding compensates for late detection — threshold 0.5 misses
   # soft onsets, so 350ms padding recovers the clipped edges.
   conservative:
-    threshold: 0.5
-    min_speech_duration_ms: 200   # v1.8.10-hf1: 150→200
+    threshold: 0.42               # v1.8.10-hf2: 0.5→0.42, relaxed per forensic analysis
+    min_speech_duration_ms: 200
     min_silence_duration_ms: 200
-    max_speech_duration_s: 5      # v1.8.10-hf1: added, limits Whisper context
-    max_group_duration_s: 7       # v1.8.10-hf1: added, prevents long segments
-    chunk_threshold_s: 1.0        # v1.8.10-hf1: added (override spec 1.5)
+    max_speech_duration_s: 5
+    max_group_duration_s: 7
+    chunk_threshold_s: 1.0
     speech_pad_ms: 350
 
   # Balanced: Default settings for general use
@@ -93,13 +93,13 @@ presets:
   # Best for: Noisy audio, soft speech, whispered dialogue
   # v1.8.10-hf1: threshold 0.068→0.15, tighter VAD to reduce non-speech input
   aggressive:
-    threshold: 0.15               # v1.8.10-hf1: 0.068→0.15, keeps noise out while preserving quiet speech
-    neg_threshold: 0.08           # Kept as-is (auto-calc from 0.15 would give 0.0, nonsensical)
-    min_speech_duration_ms: 100   # v1.8.10-hf1: 50→100, captures short moans vs filtering noise
-    min_silence_duration_ms: 80   # v1.8.10-hf1: 50→80, controls segmentation granularity
-    max_speech_duration_s: 7      # v1.8.10-hf1: added, limits Whisper context length
-    max_group_duration_s: 9       # v1.8.10-hf1: added, prevents long hallucination segments
-    chunk_threshold_s: 2.0        # v1.8.10-hf1: added, controls merging of nearby segments
+    threshold: 0.12               # v1.8.10-hf2: 0.15→0.12, more sensitive per forensic analysis
+    # neg_threshold: omitted — let v6.2 auto-calculate (threshold - 0.15)
+    min_speech_duration_ms: 100
+    min_silence_duration_ms: 100  # v1.8.10-hf2: 80→100, reduce micro-fragmentation
+    max_speech_duration_s: 7
+    max_group_duration_s: 9
+    chunk_threshold_s: 2.0
     speech_pad_ms: 150
 
 # =============================================================================
