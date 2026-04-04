@@ -669,8 +669,47 @@ class FasterWhisperProASR:
             # CRASH TRACER: Transcription complete
             crash_tracer.trace_transcribe_complete(len(raw_segments))
 
-            # Apply segment filtering (same as VAD path)
-            filtered_segments = self._segment_filter.filter_segments(raw_segments)
+            # Apply segment filtering (same logic as VAD path in _transcribe_vad_group)
+            filtered_segments = []
+            for seg in raw_segments:
+                text = seg.get("text", "").strip()
+                if not text:
+                    continue
+
+                # suppress_high: unconditionally remove end-credit hallucinations
+                if any(suppress in text for suppress in self.suppress_high):
+                    logger.debug(f"Filtered segment due to suppression word: {text[:30]}...")
+                    continue
+
+                # suppress_low: penalise avg_logprob for suspect phrases
+                avg_logprob = seg.get("avg_logprob", 0.0)
+                for suppress_word in self.suppress_low:
+                    if suppress_word in text:
+                        avg_logprob -= 0.15
+
+                segment_duration = max(0.0, float(seg["end"] - seg["start"]))
+                should_filter, reason, effective_threshold = self._segment_filter.should_filter(
+                    avg_logprob=avg_logprob,
+                    duration=segment_duration,
+                    text=text,
+                )
+
+                if should_filter:
+                    if reason == "logprob":
+                        logger.debug(
+                            "Filtered segment with logprob %.3f (threshold %.3f): %s",
+                            avg_logprob,
+                            effective_threshold if effective_threshold is not None else -1.0,
+                            f"{text[:50]}...",
+                        )
+                        self._filter_statistics['logprob_filtered'] += 1
+                    else:
+                        logger.debug(f"Filtered nonverbal segment: {text[:50]}...")
+                        self._filter_statistics['nonverbal_filtered'] += 1
+                    continue
+
+                filtered_segments.append(seg)
+
             logger.debug(f"After filtering: {len(filtered_segments)} segments (removed {len(raw_segments) - len(filtered_segments)})")
 
             return filtered_segments

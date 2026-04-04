@@ -236,9 +236,9 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
     provider_params = {
         'temperature': asr_params.get('temperature', [0.0]),                  # CL1b: match balanced Pydantic default
         'compression_ratio_threshold': asr_params.get('compression_ratio_threshold', 2.4),
-        'logprob_threshold': asr_params.get('logprob_threshold', -0.75),        # CL1b: was -1.2, match balanced Pydantic
-        'logprob_margin': asr_params.get('logprob_margin', 0.2),
-        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.55),     # CL1b: was 0.5, match balanced Pydantic
+        'logprob_threshold': asr_params.get('logprob_threshold', -1.00),        # v1.8.10-hf2: -0.75→-1.00, match balanced Pydantic
+        'logprob_margin': asr_params.get('logprob_margin', 0.0),              # v1.8.10-hf2: 0.2→0.0, match balanced Pydantic
+        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.70),   # v1.8.10-hf2: 0.55→0.70, match balanced Pydantic
         'drop_nonverbal_vocals': asr_params.get('drop_nonverbal_vocals', False),
         'condition_on_previous_text': asr_params.get('condition_on_previous_text', False),
         'initial_prompt': asr_params.get('initial_prompt'),

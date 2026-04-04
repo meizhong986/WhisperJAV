@@ -196,9 +196,9 @@ class OpenAIWhisperASR(ASRComponent):
             # Transcriber options
             temperature=[0.0],
             compression_ratio_threshold=2.2,      # v1.8.10-hf1: 2.4→2.2, catches degenerate loops earlier
-            logprob_threshold=-0.6,               # v1.8.10-hf1: -1.0→-0.6, tighter quality gate
-            logprob_margin=0.1,
-            no_speech_threshold=0.45,             # v1.8.10-hf1: 0.74→0.45, aggressive non-speech rejection
+            logprob_threshold=-0.80,              # v1.8.10-hf2: -0.6→-0.80, relaxed gate per forensic analysis
+            logprob_margin=0.0,                   # v1.8.10-hf2: 0.1→0.0, eliminate short-segment special case
+            no_speech_threshold=0.60,             # v1.8.10-hf2: 0.45→0.60, reduce silent suppression of speech
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -230,9 +230,9 @@ class OpenAIWhisperASR(ASRComponent):
             # Transcriber options
             temperature=[0.0],                    # v1.8.10-hf1: [0.0, 0.1]→[0.0], no fallback
             compression_ratio_threshold=2.4,
-            logprob_threshold=-0.75,              # v1.8.10-hf1: -1.2→-0.75, tighter quality gate
-            logprob_margin=0.2,
-            no_speech_threshold=0.55,             # v1.8.10-hf1: 0.5→0.55
+            logprob_threshold=-1.00,              # v1.8.10-hf2: -0.75→-1.00, relaxed gate per forensic analysis
+            logprob_margin=0.0,                   # v1.8.10-hf2: 0.2→0.0, eliminate short-segment special case
+            no_speech_threshold=0.70,             # v1.8.10-hf2: 0.55→0.70, reduce silent suppression of speech
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -264,9 +264,9 @@ class OpenAIWhisperASR(ASRComponent):
             # Transcriber options
             temperature=[0.0],                    # v1.8.10-hf1: [0.0,0.15,0.3,0.5]→[0.0], no fallback
             compression_ratio_threshold=2.6,
-            logprob_threshold=-1.0,               # v1.8.10-hf1: -2.0→-1.0, tighter quality gate
+            logprob_threshold=-1.30,              # v1.8.10-hf2: -1.0→-1.30, relaxed gate per forensic analysis
             logprob_margin=0.0,
-            no_speech_threshold=0.75,             # v1.8.10-hf1: 0.60→0.75, tuned to hallucination clustering (>0.6)
+            no_speech_threshold=0.90,             # v1.8.10-hf2: 0.75→0.90, reduce silent suppression of speech
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,      # v1.8.10-hf1: True→False, prevents hallucination propagation
             initial_prompt=None,
