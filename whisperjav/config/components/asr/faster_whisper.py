@@ -106,6 +106,13 @@ class FasterWhisperOptions(BaseModel):
         False,
         description="Drop non-verbal vocalizations (laughter, coughing, etc.)"
     )
+    post_model_filter_enabled: bool = Field(
+        False,
+        description="Enable WhisperJAV's post-model gate (logprob filter). "
+                    "Default OFF for Faster-Whisper — R6 forensic analysis "
+                    "showed the gate drops 60% of raw output including "
+                    "correct content. Set True to re-enable the gate."
+    )
     condition_on_previous_text: bool = Field(
         False,
         description="Condition on previous output"

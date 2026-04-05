@@ -240,6 +240,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'logprob_margin': asr_params.get('logprob_margin', 0.0),              # v1.8.10-hf2: 0.2→0.0, match balanced Pydantic
         'no_speech_threshold': asr_params.get('no_speech_threshold', 0.70),   # v1.8.10-hf2: 0.55→0.70, match balanced Pydantic
         'drop_nonverbal_vocals': asr_params.get('drop_nonverbal_vocals', False),
+        'post_model_filter_enabled': asr_params.get('post_model_filter_enabled'),  # None = use ASR module's pipeline-specific default
         'condition_on_previous_text': asr_params.get('condition_on_previous_text', False),
         'initial_prompt': asr_params.get('initial_prompt'),
         'word_timestamps': asr_params.get('word_timestamps', True),

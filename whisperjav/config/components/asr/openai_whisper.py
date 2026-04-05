@@ -103,6 +103,14 @@ class OpenAIWhisperOptions(BaseModel):
         False,
         description="Drop non-verbal vocalizations (laughter, coughing, etc.)"
     )
+    post_model_filter_enabled: bool = Field(
+        True,
+        description="Enable WhisperJAV's post-model gate (logprob filter). "
+                    "Default ON for OpenAI Whisper — R5 forensic analysis "
+                    "showed the gate catches hallucinations the sanitizer "
+                    "misses while still achieving 83.8% capture. Set False "
+                    "to disable the gate."
+    )
     condition_on_previous_text: bool = Field(
         False,
         description="Condition on previous output"

@@ -107,7 +107,19 @@ class WhisperProASR:
         raw_margin = self.whisper_params.get("logprob_margin", 0.0)
         self.logprob_margin = float(raw_margin or 0.0)
         self.drop_nonverbal_vocals = bool(self.whisper_params.get("drop_nonverbal_vocals", False))
+        # Post-model gate: ON by default for fidelity pipeline (OpenAI Whisper).
+        # R5 forensic analysis showed the gate catches hallucinations that the
+        # sanitizer misses, while fidelity still achieves 83.8% capture rate.
+        # User can override via config.
+        # Note: we explicitly check for None to handle the case where legacy
+        # config injects None for the key (distinct from key-not-present).
+        _raw_filter_enabled = self.whisper_params.get("post_model_filter_enabled")
+        if _raw_filter_enabled is None:
+            self.post_model_filter_enabled = True  # OpenAI Whisper pipeline default
+        else:
+            self.post_model_filter_enabled = bool(_raw_filter_enabled)
         filter_config = SegmentFilterConfig(
+            enabled=self.post_model_filter_enabled,
             logprob_threshold=self.logprob_threshold,
             logprob_margin=self.logprob_margin,
             drop_nonverbal_vocals=self.drop_nonverbal_vocals,
@@ -116,6 +128,7 @@ class WhisperProASR:
 
         self.whisper_params.pop("logprob_margin", None)
         self.whisper_params.pop("drop_nonverbal_vocals", None)
+        self.whisper_params.pop("post_model_filter_enabled", None)
 
         # Ensure task is set correctly
         self.whisper_params['task'] = task

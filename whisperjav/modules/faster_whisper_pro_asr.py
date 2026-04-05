@@ -135,7 +135,19 @@ class FasterWhisperProASR:
         raw_margin = self.whisper_params.get("logprob_margin", 0.0)
         self.logprob_margin = float(raw_margin or 0.0)
         self.drop_nonverbal_vocals = bool(self.whisper_params.get("drop_nonverbal_vocals", False))
+        # Post-model gate: OFF by default for balanced pipeline (Faster-Whisper).
+        # R6 forensic analysis showed the gate drops 60% of raw model output,
+        # including correct content. Faster-Whisper's internal Layer 1 filter
+        # already handles most quality filtering. User can override via config.
+        # Note: we explicitly check for None to handle the case where legacy
+        # config injects None for the key (distinct from key-not-present).
+        _raw_filter_enabled = self.whisper_params.get("post_model_filter_enabled")
+        if _raw_filter_enabled is None:
+            self.post_model_filter_enabled = False  # Faster-Whisper pipeline default
+        else:
+            self.post_model_filter_enabled = bool(_raw_filter_enabled)
         filter_config = SegmentFilterConfig(
+            enabled=self.post_model_filter_enabled,
             logprob_threshold=self.logprob_threshold,
             logprob_margin=self.logprob_margin,
             drop_nonverbal_vocals=self.drop_nonverbal_vocals,
@@ -145,6 +157,7 @@ class FasterWhisperProASR:
         # Helper-only parameters should not be forwarded to the backend
         self.whisper_params.pop("logprob_margin", None)
         self.whisper_params.pop("drop_nonverbal_vocals", None)
+        self.whisper_params.pop("post_model_filter_enabled", None)
 
         # Ensure task is set correctly
         self.whisper_params['task'] = task

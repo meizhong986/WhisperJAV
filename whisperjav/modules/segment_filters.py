@@ -9,8 +9,24 @@ from typing import Optional, Tuple
 
 @dataclass
 class SegmentFilterConfig:
-    """Configuration bundle for reusable logprob/nonverbal filtering."""
+    """Configuration bundle for reusable logprob/nonverbal filtering.
 
+    Attributes:
+        enabled: Master switch. When False, should_filter() always returns
+            (False, None, None) — the gate is bypassed entirely and ALL
+            segments pass through. Default True preserves existing behavior.
+        logprob_threshold: Gate threshold for avg_logprob. Segments below
+            this are discarded. Setting to None also disables the logprob
+            check (but nonverbal check can still run).
+        logprob_margin: For short segments (<= short_segment_window), the
+            threshold is tightened by this margin.
+        drop_nonverbal_vocals: If True, discards segments matching nonverbal
+            patterns (music notes, moan keywords, simple vocalizations).
+        short_segment_window: Duration threshold (seconds) below which
+            logprob_margin is applied.
+    """
+
+    enabled: bool = True
     logprob_threshold: Optional[float] = None
     logprob_margin: float = 0.0
     drop_nonverbal_vocals: bool = False
@@ -55,6 +71,7 @@ class SegmentFilterHelper:
     SIMPLE_VOCAL_MAX_LENGTH = 6
 
     def __init__(self, config: SegmentFilterConfig):
+        self.enabled = bool(config.enabled)
         self.threshold = config.logprob_threshold
         self.margin = max(0.0, config.logprob_margin or 0.0)
         self.drop_nonverbal = bool(config.drop_nonverbal_vocals)
@@ -65,7 +82,13 @@ class SegmentFilterHelper:
 
         Returns (should_filter, reason, effective_threshold).
         Reason is 'logprob' or 'nonverbal'.
+
+        If the gate is disabled (enabled=False), always returns
+        (False, None, None) — every segment passes through.
         """
+        if not self.enabled:
+            return False, None, None
+
         effective_threshold: Optional[float] = self.threshold
 
         if effective_threshold is not None and self.margin > 0 and duration <= self.short_window:

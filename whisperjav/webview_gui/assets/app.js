@@ -1896,6 +1896,7 @@ const EnsembleManager = {
         transcriber: [
             'temperature', 'compression_ratio_threshold', 'logprob_threshold',
             'logprob_margin', 'no_speech_threshold', 'drop_nonverbal_vocals',
+            'post_model_filter_enabled',
             'condition_on_previous_text', 'initial_prompt', 'word_timestamps',
             'prepend_punctuations', 'append_punctuations', 'clip_timestamps',
             'hallucination_silence_threshold'
@@ -1959,6 +1960,7 @@ const EnsembleManager = {
         condition_on_previous_text: { type: 'boolean', default: false },
         word_timestamps: { type: 'boolean', default: true },
         drop_nonverbal_vocals: { type: 'boolean', default: false },
+        post_model_filter_enabled: { type: 'boolean', default: true },  // Default: ON (OpenAI Whisper). Faster-Whisper preset overrides to False.
         log_progress: { type: 'boolean', default: false },
         multilingual: { type: 'boolean', default: false },
         regroup: { type: 'boolean', default: true },
@@ -2356,7 +2358,8 @@ const EnsembleManager = {
             word_timestamps: 'Enable word-level timestamps',
             repetition_penalty: 'Penalty for repeating tokens',
             no_repeat_ngram_size: 'Prevent repeating n-grams of this size',
-            max_initial_timestamp: 'Maximum initial timestamp position'
+            max_initial_timestamp: 'Maximum initial timestamp position',
+            post_model_filter_enabled: 'Enable post-model quality gate (logprob filter). Default OFF for Faster-Whisper, ON for OpenAI Whisper. Disable to let all model output through to the sanitizer.'
         };
         return descriptions[paramName] || '';
     },
