@@ -381,9 +381,47 @@ def translate_subtitle(
                 except OSError as _e:
                     print(f"[TRANSLATE]   Warning: Could not delete .subtrans: {_e}", file=sys.stderr)
 
-        # Initialize project (PySubtrans 1.5.x expects subtitle path in 'filepath' kwarg)
+        # Initialize project (Surgical fix: Manual initialization to bypass init_project's 
+        # double-preprocessing and auto-batching bugs during resume)
         print(f"[TRANSLATE] Loading subtitle project...", file=sys.stderr)
-        project = init_project(options, filepath=str(input_path), persistent=True)
+        
+        from PySubtrans import SubtitleProject, Options, preprocess_subtitles, batch_subtitles
+        project = SubtitleProject(persistent=True)
+        
+        # Load project data (loads .subtrans if exists, otherwise loads .srt)
+        project.InitialiseProject(str(input_path))
+        
+        # Merge options
+        if project.existing_project:
+            _project_settings = project.GetProjectSettings()
+            options.update(_project_settings)
+        
+        # Determine if we are truly resuming based on whether scenes were loaded
+        _is_resuming = project.existing_project and project.subtitles and project.subtitles.scenes
+        
+        if _is_resuming:
+            # FORCE disable preprocessing and batching if we loaded an existing project.
+            # PySubtrans's init_project() bug is that it re-runs these even when resuming,
+            # which mutates line IDs/counts and breaks batch.all_translated checks.
+            print(f"[TRANSLATE]   Resuming: Skipping preprocessing and batching to protect existing state", file=sys.stderr)
+            options['preprocess_subtitles'] = False
+            _should_auto_batch = False
+        else:
+            _should_auto_batch = True
+
+        # Run preprocessing ONLY for new projects
+        if options.get_bool('preprocess_subtitles'):
+            preprocess_subtitles(project.subtitles, options)
+
+        # Run batching ONLY for new projects
+        if _should_auto_batch:
+            batch_subtitles(
+                project.subtitles,
+                scene_threshold=options.get_float('scene_threshold') or 60.0,
+                min_batch_size=options.get_int('min_batch_size') or 1,
+                max_batch_size=options.get_int('max_batch_size') or 100,
+                prevent_overlap=options.get_bool('prevent_overlapping_times'),
+            )
 
         # Set output path immediately so ALL intermediate saves (SaveProject
         # after each batch) go to the user's desired location.  Without this,
