@@ -271,11 +271,14 @@ def resolve_config_v3(
     vad_params = {}
     if vad and vad != "none":
         vad_registry = get_vad_registry()
-        if vad not in vad_registry:
+        # Normalize versioned names to registry key (e.g., "silero-v3.1" → "silero")
+        # The version suffix is used by the segmenter factory, not the preset registry.
+        vad_registry_key = vad.split("-")[0] if vad.startswith("silero-v") else vad
+        if vad_registry_key not in vad_registry:
             available = list(vad_registry.keys())
             raise ValueError(f"Unknown VAD component: {vad}. Available: {available}")
 
-        vad_component = vad_registry[vad]
+        vad_component = vad_registry[vad_registry_key]
         vad_preset = vad_component.get_preset(sensitivity)
         if vad_preset is None:
             raise ValueError(f"VAD '{vad}' has no preset for sensitivity '{sensitivity}'")
