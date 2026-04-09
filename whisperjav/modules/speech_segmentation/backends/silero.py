@@ -156,10 +156,10 @@ class SileroSpeechSegmenter:
             int(speech_pad_ms) if speech_pad_ms is not None
             else defaults["speech_pad_ms"]
         )
-        self.neg_threshold = (
-            float(neg_threshold) if neg_threshold is not None
-            else defaults.get("neg_threshold", 0.15)
-        )
+        # neg_threshold: NOT supported by v3.1/v4.0 API — stored for config
+        # compatibility only, never passed to get_speech_timestamps().
+        # None = let VAD internal logic handle (the intended default).
+        self.neg_threshold = float(neg_threshold) if neg_threshold is not None else None
         self.max_speech_duration_s = (
             float(max_speech_duration_s) if max_speech_duration_s is not None
             else defaults.get("max_speech_duration_s", float("inf"))

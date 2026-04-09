@@ -47,15 +47,18 @@ contract:
 spec:
   # --- Core VAD Parameters ---
   # Keys are flat (no "vad." prefix) to match the routing layer (SEGMENTER_PARAMS)
-  threshold: 0.18
-  neg_threshold: 0.02    # H3: hysteresis threshold for speech end detection
+  threshold: 0.28                   # v1.8.10-hf3: 0.18→0.28, retuned for v3.1/v4.0 mega-group prevention
+  # neg_threshold: omitted — not supported by v3.1/v4.0 API, let VAD internal logic handle
   min_speech_duration_ms: 100
   min_silence_duration_ms: 300
   speech_pad_ms: 400
 
+  # --- Duration Limits ---
+  max_speech_duration_s: 7          # v1.8.10-hf3: added, limits per-segment speech duration
+
   # --- Segment Grouping ---
   chunk_threshold_s: 2.5
-  max_group_duration_s: 29.0  # Upper bound to stay within Whisper's 30s context window
+  max_group_duration_s: 9           # v1.8.10-hf3: 29.0→9, prevents mega-groups that degrade model quality
 
 # =============================================================================
 # Sensitivity Presets
@@ -63,25 +66,29 @@ spec:
 presets:
   # Conservative: Higher thresholds, fewer false positives
   # Best for: Clean audio, clear speech, minimal background noise
-  # Higher padding compensates for late detection at threshold 0.35.
+  # v1.8.10-hf3: retuned to prevent Silero v3.1/v4.0 mega-groups
   conservative:
-    threshold: 0.35
+    threshold: 0.41                 # v1.8.10-hf3: 0.35→0.41
     min_speech_duration_ms: 150
     min_silence_duration_ms: 300
+    max_speech_duration_s: 6        # v1.8.10-hf3: added
+    max_group_duration_s: 8         # v1.8.10-hf3: added
     speech_pad_ms: 500
 
   # Balanced: Default settings for general use
   # Best for: Mixed content, typical audio quality
-  balanced: {}  # Uses spec defaults
+  balanced: {}  # Uses spec defaults (threshold=0.28, max_speech=7, max_group=9)
 
-  # Aggressive: Lower thresholds, maximum detail capture
+  # Aggressive: Maximum detail capture with controlled group sizes
   # Best for: Difficult audio, soft speech, noisy backgrounds
-  # Lower padding — threshold 0.05 already detects speech very early.
+  # v1.8.10-hf3: raised from 0.05→0.18 to prevent mega-groups on v3.1/v4.0
   aggressive:
-    threshold: 0.05
-    neg_threshold: 0.08   # H3: higher hysteresis for aggressive detection
+    threshold: 0.18                 # v1.8.10-hf3: 0.05→0.18
+    # neg_threshold: omitted — not supported by v3.1/v4.0 API
     min_speech_duration_ms: 30
     min_silence_duration_ms: 300
+    max_speech_duration_s: 8        # v1.8.10-hf3: added
+    max_group_duration_s: 10        # v1.8.10-hf3: added
     speech_pad_ms: 300
 
 # =============================================================================

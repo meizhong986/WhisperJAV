@@ -103,7 +103,7 @@ class FasterWhisperProASR:
             vad_params = {}
 
         # VAD parameters for logging (now clean after firewall for non-Silero)
-        self.vad_threshold = vad_params.get("threshold", 0.18)
+        self.vad_threshold = vad_params.get("threshold", 0.28)
         self.min_speech_duration_ms = vad_params.get("min_speech_duration_ms", 100)
 
         # Speech Segmenter merge — defense-in-depth guard (firewall already blanked

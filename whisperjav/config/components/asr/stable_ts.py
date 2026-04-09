@@ -48,8 +48,8 @@ class StableTSOptions(BaseModel):
     )
     length_penalty: Optional[float] = Field(
         None,
-        ge=0.0, le=2.0,
-        description="Exponential length penalty"
+        ge=-2.0, le=2.0,
+        description="Exponential length penalty (negative = prefer shorter sequences)"
     )
     prefix: Optional[str] = Field(
         None,

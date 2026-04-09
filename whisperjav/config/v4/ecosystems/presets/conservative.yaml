@@ -37,12 +37,12 @@ description_long: |
 
 # Cross-cutting overrides applied to all models/tools
 overrides:
-  # Decoding overrides
-  decode.beam_size: 3
+  # Decoding overrides — v1.8.10-hf3: uniform beam_size=2 across sensitivities
+  decode.beam_size: 2
   decode.temperature: 0.0
 
-  # Quality thresholds
-  quality.no_speech: 0.7
+  # Quality thresholds — v1.8.10-hf3: aligned with Pydantic conservative presets
+  quality.no_speech: 0.46
   quality.logprob: -0.8
   quality.compression_ratio: 2.2
 

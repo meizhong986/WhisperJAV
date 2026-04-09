@@ -34,9 +34,10 @@ class SileroVADOptions(BaseConfig):
         ge=0,
         description="Minimum silence to split segments (milliseconds)."
     )
-    neg_threshold: float = Field(
+    neg_threshold: Optional[float] = Field(
+        default=None,
         ge=0.0, le=1.0,
-        description="Negative threshold for speech end detection."
+        description="Negative threshold for speech end detection. None = let VAD internal logic handle."
     )
     speech_pad_ms: int = Field(
         ge=0,

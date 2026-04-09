@@ -13,12 +13,12 @@ from .vad import SileroVADOptions, StableTSVADOptions
 # Common Transcriber Options Presets
 TRANSCRIBER_PRESETS = {
     Sensitivity.BALANCED: TranscriberOptions(
-        temperature=[0.0, 0.1],
+        temperature=[0.0],                        # v1.8.10-hf3: [0.0, 0.1]→[0.0]
         compression_ratio_threshold=2.4,
-        logprob_threshold=-1.2,
-        logprob_margin=0.2,
+        logprob_threshold=-1.00,                  # v1.8.10-hf3: -1.2→-1.00
+        logprob_margin=0.0,                       # v1.8.10-hf3: 0.2→0.0
         drop_nonverbal_vocals=False,
-        no_speech_threshold=0.5,
+        no_speech_threshold=0.65,                 # v1.8.10-hf3: 0.5→0.65
         condition_on_previous_text=False,
         initial_prompt=None,
         word_timestamps=True,
@@ -28,11 +28,11 @@ TRANSCRIBER_PRESETS = {
     ),
     Sensitivity.CONSERVATIVE: TranscriberOptions(
         temperature=[0.0],
-        compression_ratio_threshold=2.4,
-        logprob_threshold=-1.0,
-        logprob_margin=0.1,
+        compression_ratio_threshold=2.2,          # v1.8.10-hf3: 2.4→2.2
+        logprob_threshold=-0.80,                  # v1.8.10-hf3: -1.0→-0.80
+        logprob_margin=0.0,                       # v1.8.10-hf3: 0.1→0.0
         drop_nonverbal_vocals=False,
-        no_speech_threshold=0.74,
+        no_speech_threshold=0.46,                 # v1.8.10-hf3: 0.74→0.46
         condition_on_previous_text=False,
         initial_prompt=None,
         word_timestamps=True,
@@ -41,12 +41,12 @@ TRANSCRIBER_PRESETS = {
         clip_timestamps=None
     ),
     Sensitivity.AGGRESSIVE: TranscriberOptions(
-        temperature=[0.0, 0.3],
-        compression_ratio_threshold=3.0,
-        logprob_threshold=-2.5,
+        temperature=[0.0, 0.17],                  # v1.8.10-hf3: [0.0, 0.3]→[0.0, 0.17]
+        compression_ratio_threshold=2.6,          # v1.8.10-hf3: 3.0→2.6
+        logprob_threshold=-1.00,                  # v1.8.10-hf3: -2.5→-1.00
         logprob_margin=0.0,
         drop_nonverbal_vocals=False,
-        no_speech_threshold=0.22,
+        no_speech_threshold=0.77,                 # v1.8.10-hf3: 0.22→0.77
         condition_on_previous_text=False,
         initial_prompt=None,
         word_timestamps=True,
@@ -61,41 +61,41 @@ DECODER_PRESETS = {
     Sensitivity.BALANCED: DecoderOptions(
         task="transcribe",
         language="ja",
-        best_of=1,
+        best_of=2,                                # v1.8.10-hf3: 1→2
         beam_size=2,
-        patience=2.0,
+        patience=1.6,                             # v1.8.10-hf3: 2.0→1.6
         length_penalty=None,
         prefix=None,
         suppress_tokens=None,
         suppress_blank=True,
         without_timestamps=False,
-        max_initial_timestamp=None
+        max_initial_timestamp=0.0                 # v1.8.10-hf3: None→0.0
     ),
     Sensitivity.CONSERVATIVE: DecoderOptions(
         task="transcribe",
         language="ja",
-        best_of=1,
-        beam_size=1,
-        patience=1.5,
+        best_of=2,                                # v1.8.10-hf3: 1→2
+        beam_size=2,                              # v1.8.10-hf3: 1→2
+        patience=1.2,                             # v1.8.10-hf3: 1.5→1.2
         length_penalty=None,
         prefix=None,
         suppress_tokens=None,
         suppress_blank=True,
         without_timestamps=False,
-        max_initial_timestamp=None
+        max_initial_timestamp=0.0                 # v1.8.10-hf3: None→0.0
     ),
     Sensitivity.AGGRESSIVE: DecoderOptions(
         task="transcribe",
         language="ja",
-        best_of=1,
-        beam_size=2,
+        best_of=2,                                # v1.8.10-hf3: 1→2
+        beam_size=2,                              # v1.8.10-hf3: kept at 2
         patience=2.0,
         length_penalty=None,
         prefix=None,
-        suppress_tokens=[],  # Empty list, not None
-        suppress_blank=False,
+        suppress_tokens=None,                     # v1.8.10-hf3: []→None
+        suppress_blank=True,                      # v1.8.10-hf3: False→True
         without_timestamps=False,
-        max_initial_timestamp=None
+        max_initial_timestamp=0.0                 # v1.8.10-hf3: None→0.0
     ),
 }
 
@@ -105,28 +105,28 @@ DECODER_PRESETS = {
 # To load in v4: registry.get("silero-speech-segmentation").get_resolved_config("balanced")
 SILERO_VAD_PRESETS = {
     Sensitivity.BALANCED: SileroVADOptions(
-        threshold=0.18,
+        threshold=0.28,                       # v1.8.10-hf3: 0.18→0.28
         min_speech_duration_ms=100,
-        max_speech_duration_s=11.0,
+        max_speech_duration_s=7.0,            # v1.8.10-hf3: 11.0→7.0
         min_silence_duration_ms=300,
-        neg_threshold=0.15,
+        # neg_threshold: None — let VAD internal logic handle
         speech_pad_ms=400
     ),
     Sensitivity.CONSERVATIVE: SileroVADOptions(
-        threshold=0.35,
+        threshold=0.41,                       # v1.8.10-hf3: 0.35→0.41
         min_speech_duration_ms=150,
-        max_speech_duration_s=9.0,
+        max_speech_duration_s=6.0,            # v1.8.10-hf3: 9.0→6.0
         min_silence_duration_ms=300,
-        neg_threshold=0.3,
-        speech_pad_ms=400
+        # neg_threshold: None — let VAD internal logic handle
+        speech_pad_ms=500
     ),
     Sensitivity.AGGRESSIVE: SileroVADOptions(
-        threshold=0.05,
+        threshold=0.18,                       # v1.8.10-hf3: 0.05→0.18
         min_speech_duration_ms=30,
-        max_speech_duration_s=14.0,
+        max_speech_duration_s=8.0,            # v1.8.10-hf3: 14.0→8.0
         min_silence_duration_ms=300,
-        neg_threshold=0.1,
-        speech_pad_ms=600
+        # neg_threshold: None — let VAD internal logic handle
+        speech_pad_ms=300
     ),
 }
 
@@ -151,7 +151,7 @@ FASTER_WHISPER_ENGINE_PRESETS = {
     Sensitivity.BALANCED: FasterWhisperEngineOptions(
         chunk_length=None,
         repetition_penalty=1.5,
-        no_repeat_ngram_size=2,  # Must be int!
+        no_repeat_ngram_size=3,                   # v1.8.10-hf3: 2→3, match Pydantic presets
         prompt_reset_on_temperature=None,
         hotwords=None,
         multilingual=False,
@@ -163,7 +163,7 @@ FASTER_WHISPER_ENGINE_PRESETS = {
     Sensitivity.CONSERVATIVE: FasterWhisperEngineOptions(
         chunk_length=None,
         repetition_penalty=1.8,
-        no_repeat_ngram_size=2,
+        no_repeat_ngram_size=3,                   # v1.8.10-hf3: 2→3, match Pydantic presets
         prompt_reset_on_temperature=None,
         hotwords=None,
         multilingual=False,
@@ -173,9 +173,9 @@ FASTER_WHISPER_ENGINE_PRESETS = {
         log_progress=False
     ),
     Sensitivity.AGGRESSIVE: FasterWhisperEngineOptions(
-        chunk_length=30,  # Increased from 14 to avoid ctranslate2 divide-by-zero crash
-        repetition_penalty=1.1,
-        no_repeat_ngram_size=2,
+        chunk_length=30,
+        repetition_penalty=1.3,                   # v1.8.10-hf3: 1.1→1.3, match Pydantic presets
+        no_repeat_ngram_size=3,                   # v1.8.10-hf3: 2→3, match Pydantic presets
         prompt_reset_on_temperature=None,
         hotwords=None,
         multilingual=False,
@@ -222,10 +222,11 @@ STABLE_TS_ENGINE_OPTIONS = StableTSEngineOptions(
 )
 
 # Hallucination silence thresholds (exclusive_whisper_plus_faster_whisper)
+# v1.8.10-hf1: All set to None in Pydantic presets (disabled)
 HALLUCINATION_THRESHOLDS = {
-    Sensitivity.BALANCED: 2.0,
-    Sensitivity.CONSERVATIVE: 1.5,
-    Sensitivity.AGGRESSIVE: 2.5,
+    Sensitivity.BALANCED: None,
+    Sensitivity.CONSERVATIVE: None,
+    Sensitivity.AGGRESSIVE: None,
 }
 
 

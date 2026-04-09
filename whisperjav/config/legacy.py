@@ -220,8 +220,8 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'task': asr_params.get('task', 'transcribe'),
         'language': asr_params.get('language', 'ja'),
         'beam_size': asr_params.get('beam_size', 2),
-        'best_of': asr_params.get('best_of', 1),
-        'patience': asr_params.get('patience', 2.0),
+        'best_of': asr_params.get('best_of', 2),              # v1.8.10-hf3: 1→2, match balanced Pydantic
+        'patience': asr_params.get('patience', 1.6),            # v1.8.10-hf3: 2.0→1.6, match balanced Pydantic
         'length_penalty': asr_params.get('length_penalty'),
         'prefix': asr_params.get('prefix'),
         'suppress_tokens': asr_params.get('suppress_tokens'),
@@ -238,7 +238,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'compression_ratio_threshold': asr_params.get('compression_ratio_threshold', 2.4),
         'logprob_threshold': asr_params.get('logprob_threshold', -1.00),        # v1.8.10-hf2: -0.75→-1.00, match balanced Pydantic
         'logprob_margin': asr_params.get('logprob_margin', 0.0),              # v1.8.10-hf2: 0.2→0.0, match balanced Pydantic
-        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.70),   # v1.8.10-hf2: 0.55→0.70, match balanced Pydantic
+        'no_speech_threshold': asr_params.get('no_speech_threshold', 0.65),   # v1.8.10-hf3: 0.70→0.65, match balanced Pydantic
         'drop_nonverbal_vocals': asr_params.get('drop_nonverbal_vocals', False),
         'post_model_filter_enabled': asr_params.get('post_model_filter_enabled'),  # None = use ASR module's pipeline-specific default
         'condition_on_previous_text': asr_params.get('condition_on_previous_text', False),

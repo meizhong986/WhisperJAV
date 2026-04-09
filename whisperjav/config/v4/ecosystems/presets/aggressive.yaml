@@ -42,15 +42,13 @@ description_long: |
 
 # Cross-cutting overrides
 overrides:
-  # Decoding overrides (beam_size 3 balances quality vs speed)
-  decode.beam_size: 3
-  decode.temperature: 0.2
+  # Decoding overrides — v1.8.10-hf3: uniform beam_size=2 across sensitivities
+  decode.beam_size: 2
+  decode.temperature: 0.17
 
-  # Quality thresholds — v1.8.10: aligned with Pydantic aggressive presets
-  # Wide intake + tight quality filter design: higher no_speech lets more audio in,
-  # lower compression_ratio rejects repetition hallucinations and forces temp retry
-  quality.no_speech: 0.60
-  quality.logprob: -2.0
+  # Quality thresholds — v1.8.10-hf3: aligned with Pydantic aggressive presets
+  quality.no_speech: 0.77
+  quality.logprob: -1.0
   quality.compression_ratio: 2.6
 
   # Scene detection (raised to reduce excessive scene splitting)

@@ -192,21 +192,21 @@ class OpenAIWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=2,                          # v1.8.10-hf1: 1→2, beam=2 improves decode quality
-            best_of=1,
-            patience=1.5,
-            length_penalty=None,                   # v1.8.10-hf1: reverted, OpenAI Whisper requires 0-1 (alpha exponent)
+            beam_size=2,
+            best_of=2,                            # v1.8.10-hf3: 1→2, uniform across sensitivities
+            patience=1.2,                         # v1.8.10-hf3: 1.5→1.2, retuned per forensic analysis
+            length_penalty=None,
             prefix=None,
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
+            max_initial_timestamp=0.0,
             # Transcriber options
             temperature=[0.0],
-            compression_ratio_threshold=2.2,      # v1.8.10-hf1: 2.4→2.2, catches degenerate loops earlier
-            logprob_threshold=-0.80,              # v1.8.10-hf2: -0.6→-0.80, relaxed gate per forensic analysis
-            logprob_margin=0.0,                   # v1.8.10-hf2: 0.1→0.0, eliminate short-segment special case
-            no_speech_threshold=0.60,             # v1.8.10-hf2: 0.45→0.60, reduce silent suppression of speech
+            compression_ratio_threshold=2.2,
+            logprob_threshold=-0.80,
+            logprob_margin=0.0,
+            no_speech_threshold=0.46,             # v1.8.10-hf3: 0.60→0.46, retuned per forensic analysis
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -227,20 +227,20 @@ class OpenAIWhisperASR(ASRComponent):
             task="transcribe",
             language="ja",
             beam_size=2,
-            best_of=1,
-            patience=2.0,
+            best_of=2,                            # v1.8.10-hf3: 1→2, uniform across sensitivities
+            patience=1.6,                         # v1.8.10-hf3: 2.0→1.6, retuned per forensic analysis
             length_penalty=None,
             prefix=None,
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
+            max_initial_timestamp=0.0,
             # Transcriber options
-            temperature=[0.0],                    # v1.8.10-hf1: [0.0, 0.1]→[0.0], no fallback
+            temperature=[0.0],
             compression_ratio_threshold=2.4,
-            logprob_threshold=-1.00,              # v1.8.10-hf2: -0.75→-1.00, relaxed gate per forensic analysis
-            logprob_margin=0.0,                   # v1.8.10-hf2: 0.2→0.0, eliminate short-segment special case
-            no_speech_threshold=0.70,             # v1.8.10-hf2: 0.55→0.70, reduce silent suppression of speech
+            logprob_threshold=-1.00,
+            logprob_margin=0.0,
+            no_speech_threshold=0.65,             # v1.8.10-hf3: 0.70→0.65, retuned per forensic analysis
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,
             initial_prompt=None,
@@ -260,21 +260,21 @@ class OpenAIWhisperASR(ASRComponent):
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=4,                          # v1.8.10-hf1: 5→4, lower beams reduce hallucination risk
-            best_of=3,
-            patience=2.5,
+            beam_size=2,                          # v1.8.10-hf3: 4→2, uniform across sensitivities
+            best_of=2,                            # v1.8.10-hf3: 3→2, uniform across sensitivities
+            patience=2.0,                         # v1.8.10-hf3: 2.5→2.0, retuned per forensic analysis
             length_penalty=None,
             prefix=None,
-            suppress_blank=True,                  # v1.8.10-hf1: False→True, critical hallucination control
-            suppress_tokens=None,                 # v1.8.10-hf1: []→None, use Whisper defaults with suppress_blank=True
+            suppress_blank=True,
+            suppress_tokens=None,
             without_timestamps=False,
-            max_initial_timestamp=0.0,            # v1.8.10-hf1: None→0, prevent phantom early timestamps
+            max_initial_timestamp=0.0,
             # Transcriber options
-            temperature=[0.0],                    # v1.8.10-hf1: [0.0,0.15,0.3,0.5]→[0.0], no fallback
+            temperature=[0.0, 0.17],              # v1.8.10-hf3: [0.0]→[0.0, 0.17], light fallback for aggressive
             compression_ratio_threshold=2.6,
-            logprob_threshold=-1.30,              # v1.8.10-hf2: -1.0→-1.30, relaxed gate per forensic analysis
+            logprob_threshold=-1.00,              # v1.8.10-hf3: -1.30→-1.00, uniform across sensitivities
             logprob_margin=0.0,
-            no_speech_threshold=0.90,             # v1.8.10-hf2: 0.75→0.90, reduce silent suppression of speech
+            no_speech_threshold=0.77,             # v1.8.10-hf3: 0.90→0.77, retuned per forensic analysis
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,      # v1.8.10-hf1: True→False, prevents hallucination propagation
             initial_prompt=None,
