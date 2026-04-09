@@ -95,7 +95,7 @@ def _filter_none_values(params: Dict[str, Any]) -> Dict[str, Any]:
 LEGACY_PIPELINES = {
     "balanced": {
         "asr": "faster_whisper",
-        "vad": "silero",
+        "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
         "description": "Full feature set with scene detection and VAD. Best quality.",
     },
@@ -113,7 +113,7 @@ LEGACY_PIPELINES = {
     },
     "fidelity": {
         "asr": "openai_whisper",
-        "vad": "silero",
+        "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
         "description": "OpenAI Whisper with VAD and scene detection. Maximum fidelity.",
     },

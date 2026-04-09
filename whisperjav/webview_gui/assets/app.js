@@ -1216,7 +1216,7 @@ const EnsembleManager = {
             sensitivity: 'aggressive',
             sceneDetector: 'auditok',
             speechEnhancer: 'none',
-            speechSegmenter: 'ten',  // TEN VAD default for balanced/fidelity
+            speechSegmenter: 'silero-v3.1',  // Silero v3.1 default for balanced/fidelity
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1573,11 +1573,11 @@ const EnsembleManager = {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
             const pipeline = this.state[passKey].pipeline;
             if (pipeline === 'balanced' || pipeline === 'fidelity') {
-                // TEN VAD + auditok for balanced; TEN VAD + semantic for fidelity
+                // Silero v3.1 + auditok for balanced; Silero v3.1 + semantic for fidelity
                 sceneSelect.value = (pipeline === 'balanced') ? 'auditok' : 'semantic';
-                segmenterSelect.value = 'ten';
+                segmenterSelect.value = 'silero-v3.1';
                 this.state[passKey].sceneDetector = (pipeline === 'balanced') ? 'auditok' : 'semantic';
-                this.state[passKey].speechSegmenter = 'ten';
+                this.state[passKey].speechSegmenter = 'silero-v3.1';
             } else {
                 // faster, fast — keep silero-v6.2 + semantic
                 sceneSelect.value = 'semantic';

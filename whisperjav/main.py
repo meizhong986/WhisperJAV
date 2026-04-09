@@ -344,7 +344,7 @@ def parse_arguments():
                              metavar="BACKEND",
                              help=(
                                  "Speech segmentation backend: "
-                                 "silero/silero-v4.0 (default), silero-v3.1, "
+                                 "silero-v3.1 (default for balanced/fidelity), silero/silero-v4.0, "
                                  "silero-v6.2 (pip pkg, max_speech_duration_s + hysteresis), "
                                  "nemo/nemo-lite (fast frame VAD ~0.5GB), "
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
