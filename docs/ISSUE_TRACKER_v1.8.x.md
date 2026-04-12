@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-04-11 (rev32) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **53 open** on GitHub
+> Updated: 2026-04-12 (rev33) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **54 open** on GitHub
 
 ---
 
@@ -21,11 +21,13 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **57** | Unchanged from rev24. |
+| Total open on GitHub | **54** | +1 new: #287. |
 | **v1.8.10.post3 RELEASED** | — | 2026-04-09. 25 commits since v1.8.10. Tagged + pushed + GitHub release published. |
-| **NEEDS RESPONSE** | **0** | All responded. |
+| **v1.8.11 dev branch** | — | 2026-04-12. Ollama curated list fix + `--ollama-max-tokens` flag coded. |
+| **NEEDS RESPONSE** | **1** | **#287** (all subtitles "!!" — new, needs investigation). |
 | **NEEDS FOLLOW-UP** | **0** | All followed up. |
 | **AWAITING REPLY** | 15 | #263, #286, #271, #268, #262, #280, #282, #281, #284, #259, #217, #265, #274, #279 |
+| **FIX CODED (v1.8.11)** | 2 | #271 (curated model list + `--ollama-max-tokens`). |
 | **Closed this session** | **1** | **#267** (user confirmed fix) |
 | **Closed last session** | 5 | #234, #251, #258, #260, #285 (closed by reporter) |
 | **SHIPPED in post3** | 6 | #272, #269, #265 (filter), #259, #267 (partial), #231 |
@@ -52,6 +54,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 
 | # | Title | Reporter | Status | Notes |
 |---|-------|----------|--------|-------|
+| **#287** | All subtitles are "!!" with latest version | zoqapopita93 | `NEEDS RESPONSE` | **NEW 04-12.** All output subtitles contain only "!!". Screenshot attached showing config. Likely sanitizer/hallucination issue or ASR regression. P1 — needs investigation. |
 | **#286** | CUDA kernel error on GTX 1050 Ti | techguru0 | `AWAITING REPLY` | Responded 04-11: humble acknowledgment of variant installer idea, noted backlog, re-asked if 2.5.1+cu118 worked. |
 | **#285** | Batch/Scene length translation questions | oceanseamountain | `CLOSED` | **Closed by reporter 04-10** after my answer. |
 | **#284** | v1.8.10 install stuck during PyTorch phase | qq73-maker | `AWAITING REPLY` | Responded 04-09: suggested post3 installer, asked about network/proxy. Two users affected. |
@@ -59,7 +62,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#281** | Ollama not detected in GUI | wlee15 | `AWAITING REPLY` | Responded 04-09: confirmed @vicecity2930 workaround, explained Server URL field. |
 | **#280** | Qwen3-ASR TypeError: `check_model_inputs()` | zoqapopita93 | `AWAITING REPLY` | Responded 04-09: upstream `transformers` mismatch, suggested `pip install --no-deps transformers==4.49.0`. |
 | **#274** | Pipeline aggregation mode question | cuixiaopi | `AWAITING REPLY` | Responded 04-09: explained 2-pass ensemble mode. |
-| **#271** | Ollama translation model issues | justantopair-ai | `AWAITING REPLY` | Responded 04-11: confirmed `--ollama-max-tokens` CLI flag for v1.8.11. Confirmed @l34240013's finding: curated list #1 IS Shisa-v2.1-Qwen3-8B (thinking model). Will replace with instruct-only models in v1.8.11. Answered token-budget question (no standard mechanism). |
+| **#271** | Ollama translation model issues | justantopair-ai | `FIX CODED` | **v1.8.11**: curated model list fixed (removed thinking model, new defaults: gemma3:12b, qwen2.5:7b-instruct). `--ollama-max-tokens` CLI flag added. Responded 04-12 with fix confirmation. |
 | **#268** | Thai + Korean translation targets | yedkung69-ctrl | `AWAITING REPLY` | Responded 04-11: acknowledged GUI gap, noted for v1.9.0 i18n work, mentioned CLI workaround. |
 | **#267** | Stuck on Streaming features (Qwen+Semantic) | OrangeFarmHorse | `CLOSED` | **CLOSED 04-11.** User confirmed `NUMBA_DISABLE_JIT=1` workaround works. Numba post3 fix was insufficient — v1.8.11 needs deeper investigation. |
 | **#265** | Hallucination + post-processing suggestions | yangming2027 | `AWAITING REPLY` | Responded 04-09: answered @zoqapopita93 (v2 vs v3, custom params), noted post3 post-processing improvements. |
@@ -129,19 +132,16 @@ All P0 and P1 responses posted on 2026-04-09:
 - #284 (install stuck), #280 (Qwen3-ASR), #267 (numba follow-up)
 - #281 (Ollama UX), #282 (Ollama GitHub), #271 (thinking models), #259 (overwrite fix)
 
-### Outstanding Actions (rev32)
+### Outstanding Actions (rev33)
 
-All items from rev31 completed:
-- ✓ #263 responded (proxy explanation + silero-v6.2 push)
-- ✓ #267 **CLOSED** (user confirmed fix)
-- ✓ #286 responded (humble variant ack + re-ask)
-- ✓ #271 responded (CLI flag commitment + curated list fix + token budget answer)
-- ✓ #268 responded (GUI gap acknowledged for v1.9.0)
-- ✓ #262 responded (thanked @anon12642)
+**v1.8.11 dev branch started (2026-04-12):**
+- ✓ #271 **FIX CODED**: curated Ollama model list fixed — removed Shisa-v2.1-Qwen3-8B (thinking model), new defaults: gemma3:12b (#1), qwen2.5:7b-instruct (#2). Responded to thread.
+- ✓ #271 **FIX CODED**: `--ollama-max-tokens` CLI flag added (both entry points + service layer). Responded to thread.
+- **#287 NEEDS RESPONSE** — new bug (04-12): all subtitles are "!!". Needs investigation.
 
-**Curated Ollama model list bug confirmed (#271)** — `config/ollama_models.json` rank #1 is `Shisa-v2.1-Qwen3-8B` (Qwen3 thinking model, breaks PySubtrans format). **v1.8.11 action**: replace with instruct-only models.
+**Remaining v1.8.11 candidates** (from ranked list): #263 torch.hub China fix, #267 numba architectural fix, #280 Qwen3-ASR pin, sanitizer hardening (#287 investigation), #265 hallucination improvements.
 
-**Board clean: 0 NEEDS RESPONSE, 0 NEEDS FOLLOW-UP.** 15 issues AWAITING REPLY from users.
+**15 issues AWAITING REPLY from users.** Normal turnaround 1-3 days.
 
 ### Architectural concerns
 
@@ -160,13 +160,13 @@ All items from rev31 completed:
 
 5. **Install hardening track for v1.9.0 must explicitly cover China-network scenarios** — #284, #217, #251, #261, #263 all touch this. It's a coherent cluster that needs systematic treatment, not piecemeal fixes.
 
-6. **Ollama `--max-tokens` not exposed to CLI** — user-requested. Trivial fix for v1.8.11.
+6. ~~**Ollama `--max-tokens` not exposed to CLI**~~ — **FIXED in v1.8.11 dev** (commit 275adb5). `--ollama-max-tokens` flag added to both CLI entry points.
 
 7. **Translate tab source language dropdown hard-coded to CJK** — needs GUI fix to pass through all Whisper languages. v1.9.0.
 
 8. **Per-GPU-arch installer variants question (#286)** — techguru0 referenced VideOCR's approach of separate cu118 (10-series) and cu129 (16-50 series) installers. Worth considering for v1.9.0 install hardening, but adds maintenance burden.
 
-9. **Curated Ollama model list is broken (#271)** — `config/ollama_models.json` ranks `Shisa-v2.1-Qwen3-8B` as #1 — but Qwen3 is a thinking model that breaks PySubtrans format. **This is the exact model @l34240013 reported failing.** Action for v1.8.11: replace with instruct-only models. Suggested replacements: `gemma3:12b-it`, `qwen2.5:7b-instruct`, `translategemma:12b`.
+9. ~~**Curated Ollama model list is broken (#271)**~~ — **FIXED in v1.8.11 dev** (commit 275adb5). Removed `Shisa-v2.1-Qwen3-8B` (thinking model). New curated list: `gemma3:12b` (#1), `qwen2.5:7b-instruct` (#2), `qwen2.5-abliterate` (#3), `dolphin-llama3` (#4). All instruct-only.
 
 10. **Discussion #257 — community translation knowledge** — referenced by @justantopair-ai in #271. Active community thread about translation models, settings, and findings. Worth mining for v1.9.0 hardening insights and Ollama model recommendations. **Future hardening reference.**
 
@@ -235,7 +235,8 @@ All items from rev31 completed:
 
 | Date | Changes |
 |------|---------|
-| **2026-04-11** | **rev32.** 54→53 open. **#267 CLOSED** (user confirmed `NUMBA_DISABLE_JIT=1` works). All 6 follow-ups responded: #263 (proxy + silero-v6.2), #286 (humble variant ack), #271 (CLI flag commit + Shisa-Qwen3 curated list bug), #268 (GUI gap), #262 (Cohere thanks). **Found: curated Ollama #1 model is a Qwen3 thinking model — bug for v1.8.11.** Discussion #257 noted as future hardening reference. |
+| **2026-04-12** | **rev33.** 53→54 open (+1 new: #287). **v1.8.11 dev branch started.** Two fixes coded: (1) Ollama curated model list — removed thinking model, new instruct-only defaults. (2) `--ollama-max-tokens` CLI flag added to both entry points. #271 responded with fix confirmation. #287 new bug identified (all subtitles "!!", NEEDS RESPONSE). |
+| 2026-04-11 | **rev32.** 54→53 open. **#267 CLOSED** (user confirmed `NUMBA_DISABLE_JIT=1` works). All 6 follow-ups responded: #263 (proxy + silero-v6.2), #286 (humble variant ack), #271 (CLI flag commit + Shisa-Qwen3 curated list bug), #268 (GUI gap), #262 (Cohere thanks). **Found: curated Ollama #1 model is a Qwen3 thinking model — bug for v1.8.11.** Discussion #257 noted as future hardening reference. |
 | 2026-04-11 | **rev31.** 54 open. #267 user confirmed fix. #263 user replied with proxy question. 5 new follow-ups identified. |
 | 2026-04-10 | **rev30.** 55→54 open. #285 closed by reporter. #263 corrected diagnosis (GFW). Posted silero-v6.2 workaround. |
 | 2026-04-10 | **rev29.** 55 open. All P0/P1/P2 responded. Board clean. |
