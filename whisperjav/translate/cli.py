@@ -346,6 +346,12 @@ def main():
         help="List locally available Ollama models and exit"
     )
     ollama_group.add_argument(
+        '--ollama-max-tokens', type=int, default=None,
+        help="Override auto-computed max output tokens for Ollama translation. "
+             "By default, WhisperJAV computes this from context window and batch size. "
+             "Use this to manually cap token budget (e.g., 2048, 4096)."
+    )
+    ollama_group.add_argument(
         '--yes', '-y',
         action='store_true',
         help="Auto-confirm prompts (model downloads, server starts)"
@@ -594,6 +600,9 @@ def main():
         _user_batch = merged.get('max_batch_size', readiness['batch_size'])
         ollama_batch_size = cap_batch_size_for_context(_user_batch, ollama_n_ctx)
         ollama_max_tokens = compute_max_output_tokens(ollama_batch_size, ollama_n_ctx)
+        _user_max_tokens = getattr(args, 'ollama_max_tokens', None)
+        if _user_max_tokens is not None:
+            ollama_max_tokens = _user_max_tokens
 
         if 'num_ctx' not in provider_options:
             provider_options['num_ctx'] = ollama_n_ctx

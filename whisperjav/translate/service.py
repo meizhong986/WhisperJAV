@@ -206,6 +206,7 @@ def translate_with_config(
     endpoint: Optional[str] = None,
     ollama_url: Optional[str] = None,
     auto_confirm: bool = False,
+    ollama_max_tokens: Optional[int] = None,
 ) -> Optional[Path]:
     """
     Translate subtitle file with full configuration resolution.
@@ -377,6 +378,8 @@ def translate_with_config(
             n_ctx = readiness['num_ctx']
             resolved_max_batch_size = cap_batch_size_for_context(resolved_max_batch_size, n_ctx)
             max_tokens = compute_max_output_tokens(resolved_max_batch_size, n_ctx)
+            if ollama_max_tokens is not None:
+                max_tokens = ollama_max_tokens
 
             if temperature is None and readiness.get('temperature'):
                 provider_options['temperature'] = readiness['temperature']

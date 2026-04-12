@@ -452,6 +452,10 @@ def parse_arguments():
         help="Custom Ollama server URL (default: http://localhost:11434)"
     )
     translation_group.add_argument(
+        "--ollama-max-tokens", type=int, default=None,
+        help="Override auto-computed max output tokens for Ollama translation (e.g., 2048, 4096)"
+    )
+    translation_group.add_argument(
         "--yes", "-y",
         action="store_true",
         help="Auto-confirm prompts (model downloads, server starts)"
@@ -1288,6 +1292,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             endpoint=getattr(args, 'translate_endpoint', None),
                             ollama_url=getattr(args, 'ollama_url', None),
                             auto_confirm=getattr(args, 'yes', False),
+                            ollama_max_tokens=getattr(args, 'ollama_max_tokens', None),
                         )
 
                         if translated_path:
