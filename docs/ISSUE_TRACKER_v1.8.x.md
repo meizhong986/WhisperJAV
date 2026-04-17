@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-04-17 (rev36) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **61 open** on GitHub
+> Updated: 2026-04-17 (rev37) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **61 open** on GitHub
 
 ---
 
@@ -53,7 +53,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 
 | # | Title | Reporter | Status | Notes |
 |---|-------|----------|--------|-------|
-| **#291** | Google Colab Step 3 Translation — `ModuleNotFoundError: starlette_context` | ktrankc | `FIX CODED` | **Root cause verified**: `install_colab.sh` line 176 did not include `[llm]` extra, so `starlette-context` + `sse-starlette` + `uvicorn` + `fastapi` + `pydantic-settings` were missing. **Fix: added `llm` to extras list for v1.8.11.** Responded 04-17 with manual workaround + migration-to-ollama path. |
+| **#291** | Google Colab Step 3 Translation — `ModuleNotFoundError: starlette_context` | ktrankc | `FIX CODED` | **Root cause verified**: `install_colab.sh` line 176 did not include `[llm]` extra, so `starlette-context` + `sse-starlette` + `uvicorn` + `fastapi` + `pydantic-settings` were missing. **Fix committed as `b3499a2` for v1.8.11.** Responded 04-17 with manual workaround + migration-to-ollama path. |
 | **#290** | Google Colab Pass 2 Error — "Killed" after MossFormer2 load | ktrankc | `AWAITING REPLY` | Responded 04-17: "Killed" is ambiguous (OOM killer vs Colab runtime kill vs cgroup) — asked for Colab tier, file size, resource panel observation; recommended trying `zipenhancer` or `ffmpeg-dsp` to test ClearVoice memory hypothesis. |
 | **#289** | PyTorch CUDA 12.8 install timeouts | coco7887 | `AWAITING REPLY` | Responded 04-17 with bilingual China-network template (community ask + mirror roadmap + whl workaround). |
 | **#287** | All subtitles are "!!" with latest version | zoqapopita93 | `AWAITING REPLY` | Responded 04-12 asking user to switch segmenter VAD to TEN-VAD or Silero v3.1. Awaiting user reply. |
@@ -148,13 +148,49 @@ All P0 and P1 responses posted on 2026-04-09:
 - **#217** loveGEM/vimbackground — user gave up after OpenAI Whisper install also failed post manual torch install. Candidate for close with a summary of "complete manual install path" or a pointer to future China-mirror installer roadmap (v1.9.0 install hardening).
 - **#247** Docker support — foxfire881 follow-up for NAS/CPU use case (04-17). Low priority, brief acknowledgment sufficient.
 
-**v1.8.11 dev status (unchanged since rev33):**
-- ✓ #271 **FIX CODED**: curated Ollama model list fixed + `--ollama-max-tokens` flag.
-- No new commits since 04-12.
+**v1.8.11 dev status (as of rev36):**
+- ✓ `275adb5` — #271: curated Ollama model list (removed thinking model) + `--ollama-max-tokens` CLI flag.
+- ✓ `b3499a2` — #291: `install_colab.sh` adds `llm` extra (starlette-context + fastapi + uvicorn + pydantic-settings + sse-starlette).
 
-**Remaining v1.8.11 candidates**: #263 torch.hub China fix, #267 numba architectural fix, sanitizer hardening (#287 investigation — dependent on user reply re: VAD swap), #265 hallucination improvements, Colab hardening (#290/#291 regression pair).
+**Candidate v1.8.11 scope decisions** — see "Immediate Open Issues for v1.8.11" section below.
 
 **14 issues AWAITING REPLY from users.** Normal turnaround 1-3 days.
+
+### Immediate Open Issues for v1.8.11 (rev36 scoping)
+
+**Tier A — Release blockers (must resolve before tagging):**
+
+| # | Issue | Decision gate |
+|---|-------|--------------|
+| **#287** | "All subtitles are !!" with latest version | **Quality regression risk.** Owner asked user to test TEN-VAD / Silero v3.1 swap 04-12. If user confirms silero-v3.1 is the culprit (post3 switched default to v3.1), this is a silent regression from post3 affecting any user who didn't customize VAD. Must either (a) get user repro info and fix, (b) swap default back to v4.0, or (c) ship with a documented known-issue note. **Cannot tag v1.8.11 until resolved.** |
+
+**Tier B — Opportunistic, small, low-risk:**
+
+| # | Issue | Effort | Rationale |
+|---|-------|--------|-----------|
+| **#280** | Qwen3-ASR `check_model_inputs()` TypeError | S | Pin `transformers==4.49.0` in the `qwen` extra. One-line fix in pyproject.toml, unblocks Qwen3-ASR users without waiting for upstream `qwen_asr` fix. |
+| **#290** | Colab Pass 2 "Killed" | S-M | If user replies confirming ClearVoice is the trigger (zipenhancer works), add a Colab memory detection → auto-downgrade to `zipenhancer` on free-tier RAM. Skip if user doesn't respond in time. |
+
+**Tier C — Defer to v1.9.0 or later (document, don't code):**
+
+| # | Issue | Deferred to | Why defer |
+|---|-------|-------------|-----------|
+| **#267** | Semantic hang / numba JIT cache fix insufficient | v1.9.0 | User confirmed `NUMBA_DISABLE_JIT=1` workaround. Full fix needs investigation of WHY `ensure_numba_cache_dir()` didn't take effect — architectural, not a 1-week fix. |
+| **#263, #284, #289, #217, #261** | China-network install cluster | **v1.9.1** (explicitly stated in posted replies) | Mirrors for GitHub / HuggingFace / PyTorch official sources need design work. Cannot rush. |
+| **#265** | Post-translation hallucination filter (Chinese) | v1.9.0 | Post3 already improved sanitizer. Custom rules + v2 word list is a v1.9 item. |
+| **#286** | GTX 1050 Ti Pascal kernel | v1.9.0 install hardening | Per-GPU-arch variants is a maintenance-heavy path — needs dedicated planning. |
+
+**Tier D — Monitoring (not actioned):**
+
+- All 18 AWAITING REPLY items — normal turnaround 1-3 days.
+- #217 — if user gives up permanently (no reply in 10 days), sympathetic close candidate.
+- 5 China-network issues posted 04-17 with community ask — monitor for any VPN/DNS recipes shared by users.
+
+**Release recommendation:**
+
+Cut v1.8.11 once **#287 is resolved or documented** and **#280 one-line transformers pin is applied**. Everything else is either already coded (#271, #291) or defer-eligible. This keeps v1.8.11 a focused patch release and preserves v1.9.0/v1.9.1 scope for the larger architectural work (i18n, Ollama migration, China mirrors, install hardening).
+
+---
 
 ### Architectural concerns
 
@@ -257,7 +293,8 @@ All P0 and P1 responses posted on 2026-04-09:
 
 | Date | Changes |
 |------|---------|
-| **2026-04-17** | **rev36.** Posted 4 replies: #291 (root cause identified — Colab install missing `[llm]` extra; workaround given + v1.8.11 fix promised), #290 (factual: "Killed" is ambiguous, asked for Colab tier/file size/resource panel, recommended zipenhancer to test ClearVoice hypothesis), #292 (owner ack to community-answered thread, pointed to translategemma:12b / qwen2.5:7b-instruct), #293 (logged Whisper initial_prompt exposure as v1.9+ candidate). **#291 FIX CODED for v1.8.11**: `installer/install_colab.sh` line 176 — added `llm` to extras list (pulls in `starlette-context`, `sse-starlette`, `uvicorn`, `fastapi`, `pydantic-settings`). Both Colab notebooks reference this script, so the fix propagates. NEEDS RESPONSE queue now empty. |
+| **2026-04-17** | **rev37.** Commits landed on `dev-1.8.11`: `b3499a2` (Colab `llm` extra fix for #291) + `a737bdf` (docs rev36). Added "Immediate Open Issues for v1.8.11" section with Tier A/B/C/D scoping: #287 tagged as release blocker (quality regression risk from silero-v3.1 default swap), #280 as opportunistic one-line pin, #267/China-network cluster/#265/#286 explicitly deferred to v1.9.0 or v1.9.1. |
+| 2026-04-17 | **rev36.** Posted 4 replies: #291 (root cause identified — Colab install missing `[llm]` extra; workaround given + v1.8.11 fix promised), #290 (factual: "Killed" is ambiguous, asked for Colab tier/file size/resource panel, recommended zipenhancer to test ClearVoice hypothesis), #292 (owner ack to community-answered thread, pointed to translategemma:12b / qwen2.5:7b-instruct), #293 (logged Whisper initial_prompt exposure as v1.9+ candidate). **#291 FIX CODED for v1.8.11**: `installer/install_colab.sh` line 176 — added `llm` to extras list (pulls in `starlette-context`, `sse-starlette`, `uvicorn`, `fastapi`, `pydantic-settings`). Both Colab notebooks reference this script, so the fix propagates. NEEDS RESPONSE queue now empty. |
 | 2026-04-17 | **rev35.** Posted bilingual China-network template (Chinese + English) to 5 issues: #289, #284, #217, #263, #261. Template asks community to share working VPN / DNS / CUDA+PyTorch combos, flags **v1.9.1 China-mirror exploration** as a goal (without timeline commitment), and repeats the pre-downloaded whl + `Scripts\pip.exe install --no-deps` + silero-v6.2 interim workarounds. All 5 issues now AWAITING REPLY. |
 | 2026-04-17 | **rev34.** 54→61 open. **5 new issues**: #293 (translation context), #292 (low GPU util), #291 (Colab local-LLM starlette_context), #290 (Colab Pass 2 OOM), #289 (CUDA 12.8 timeouts). **4 previously-untracked** added: #223, #227, #232, #246. **1 closed**: #281 (user resolved via admin reinstall). **Status flips**: #287 NEEDS RESPONSE → AWAITING REPLY (owner asked about VAD swap). #217 AWAITING REPLY → NEEDS FOLLOW-UP (user gave up after whisper install also failed). **Removed**: #128 (was PR, merged, not issue). **New cluster**: Colab regressions (#290, #291) suggests post3 introduced a regression pair. Install/PyTorch/China cluster grew to 6 issues. |
 | 2026-04-12 | **rev33.** 53→54 open (+1 new: #287). **v1.8.11 dev branch started.** Two fixes coded: (1) Ollama curated model list — removed thinking model, new instruct-only defaults. (2) `--ollama-max-tokens` CLI flag added to both entry points. #271 responded with fix confirmation. #287 new bug identified (all subtitles "!!", NEEDS RESPONSE). |
