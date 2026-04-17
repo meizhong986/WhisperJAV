@@ -173,7 +173,7 @@ info "This may take 1-3 minutes..."
 # --system: required since we're not in a venv
 # --no-build-isolation: not needed, uv handles this
 # Colab's torch/numpy/etc. are reused — only WhisperJAV's own deps are installed.
-if ! uv pip install --system "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}#egg=whisperjav[cli,enhance,translate,huggingface,qwen,analysis,compatibility]"; then
+if ! uv pip install --system "git+${WHISPERJAV_REPO}@${WHISPERJAV_BRANCH}#egg=whisperjav[cli,enhance,translate,huggingface,qwen,analysis,compatibility,llm]"; then
     error "WhisperJAV installation failed"
     exit 1
 fi
