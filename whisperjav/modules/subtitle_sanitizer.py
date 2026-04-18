@@ -6,9 +6,11 @@
 
 import pysrt
 
+import re
+
 import shutil
 
-import copy 
+import copy
 
 from pathlib import Path
 
@@ -31,6 +33,29 @@ from whisperjav.modules.repetition_cleaner import RepetitionCleaner
 from whisperjav.modules.cross_subtitle_processor import CrossSubtitleProcessor
 
 from whisperjav.modules.timing_adjuster import TimingAdjuster
+
+
+# Fix 2 (v1.8.11) — symbol-only purge.
+# Matches any character that counts as linguistic content:
+#   · hiragana (U+3041-U+3096 + U+309D-U+309F)
+#   · katakana letters + prolonged sound mark (U+30A1-U+30FA, U+30FC-U+30FF)
+#     — U+30FB (・ middle dot) and U+30A0 (double hyphen) are punctuation, excluded
+#   · CJK unified ideographs (U+4E00-U+9FFF)
+#   · fullwidth digits (U+FF10-U+FF19)
+#   · fullwidth uppercase Latin (U+FF21-U+FF3A)
+#   · fullwidth lowercase Latin (U+FF41-U+FF5A)
+#   · halfwidth ASCII alnum (A-Z, a-z, 0-9)
+# Subtitles whose text contains NONE of these are pure punctuation/emoji/
+# whitespace residue (e.g. the '!!' seen in #287) and get dropped.
+_HAS_LINGUISTIC_CONTENT = re.compile(
+    r'[\u3041-\u3096\u309D-\u309F'  # hiragana (skip U+3040 reserved, U+3097-U+309C marks)
+    r'\u30A1-\u30FA\u30FC-\u30FF'   # katakana letters + ー (skip U+30A0 double hyphen, U+30FB middle dot)
+    r'\u4E00-\u9FFF'                # CJK unified ideographs
+    r'\uFF10-\uFF19'                # fullwidth digits
+    r'\uFF21-\uFF3A'                # fullwidth uppercase Latin
+    r'\uFF41-\uFF5A'                # fullwidth lowercase Latin
+    r'A-Za-z0-9]'                   # halfwidth ASCII alnum
+)
 
 
 
@@ -881,6 +906,21 @@ class SubtitleSanitizer:
                 self._record_removal(original_sub_for_comparison, original_sub_for_comparison.index, final_reason, "content_cleaning", all_mods)
 
                 continue # Skip to the next subtitle
+
+
+
+            # Fix 2 (v1.8.11): symbol-only purge — defense-in-depth for #287.
+            # If the text contains no hiragana/katakana/kanji/alnum after the
+            # mutating sanitizers above, it is punctuation/emoji/whitespace
+            # residue (e.g. '!!' or '。' left behind by partial-strip).
+            # Drop it so it never reaches the CPS filter / timing / output.
+            if not _HAS_LINGUISTIC_CONTENT.search(modified_text):
+
+                logger.debug(f"Symbol-only residue dropped #{original_sub_for_comparison.index}: '{modified_text[:30]}'")
+
+                self._record_removal(original_sub_for_comparison, original_sub_for_comparison.index, "symbol_only_residue", "content_cleaning", all_mods)
+
+                continue
 
 
 
