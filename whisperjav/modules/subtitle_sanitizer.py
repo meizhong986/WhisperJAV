@@ -1081,7 +1081,13 @@ class SubtitleSanitizer:
 
         for sub in subtitles:
 
-            text_len = len(sub.text_without_tags.strip())
+            # Fix 3 (v1.8.11): exclude internal newlines from char count.
+            # A multi-line subtitle has visible text content, not 'newline' content;
+            # counting '\n' toward text_len inflates the length and causes the
+            # slow-CPS check (which fires on text_len <= 4) to skip subs that
+            # would otherwise qualify as short. .strip() only trims leading/
+            # trailing whitespace, so it doesn't remove internal newlines.
+            text_len = len(sub.text_without_tags.replace('\n', '').strip())
 
             duration_s = sub.duration.ordinal / 1000.0
 
