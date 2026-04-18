@@ -8,10 +8,16 @@ Usage:
 """
 
 import difflib
+import io
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+# Force UTF-8 stdout so Japanese text in diff output doesn't crash on Windows
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", newline="")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", newline="")
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))

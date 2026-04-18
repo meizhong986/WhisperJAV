@@ -18,6 +18,11 @@ CACHE_DIR = Path.home() / ".cache" / "whisperjav" / "hallucination_filters"
 CACHE_MAX_AGE_DAYS = 7  # Re-download if cache is older than this
 DOWNLOAD_TIMEOUT = 10  # Seconds to wait for download
 
+# Bash-style substring slice syntax used by regexp_v09.json replacements:
+#   ${N:0:M}  ->  keep first M characters of match.group(N)
+# See hallucination_remover._apply_regex_replacement_safe for semantics.
+_SLICE_SYNTAX_RE = re.compile(r'^\$\{(\d+):0:(\d+)\}$')
+
 class HallucinationRemover:
     """Handles exact, regex, and fuzzy hallucination detection with improved debugging"""
 
@@ -616,22 +621,52 @@ class HallucinationRemover:
         return current_text, modifications
 
     def _apply_regex_replacement_safe(self, pattern: str, replacement: str, text: str) -> str:
-        """QUICK FIX: Safe regex replacement handling"""
+        """Safe regex replacement with ${N:0:M} slice-syntax support.
+
+        Supported replacement forms:
+            ''                  -> drop match (empty replacement)
+            '<literal>'         -> standard re.sub replacement
+            '${N:0:M}'          -> keep first M chars of match.group(N)
+            '${...}' malformed  -> drop match (safe fallback)
+
+        The ${N:0:M} syntax is required by several patterns in
+        regexp_v09.json that partially strip excessive kana repetition
+        (e.g. "あああああ..." -> "ああ"). Before this fix, all ${...}
+        replacements fell through to empty, producing the #287 symptom
+        where long kana runs with trailing punctuation would leave only
+        the punctuation (e.g. "いいいいい...?" -> "?").
+        """
         try:
             if not replacement or replacement in ['', 'null', 'None']:
                 return re.sub(pattern, '', text)
-            
-            # Handle malformed replacement strings
+
+            # Slice syntax: keep first M chars of group N
+            slice_match = _SLICE_SYNTAX_RE.match(replacement)
+            if slice_match:
+                group_num = int(slice_match.group(1))
+                keep_count = int(slice_match.group(2))
+
+                def _slice_replace(m):
+                    try:
+                        captured = m.group(group_num)
+                        if captured is None:
+                            return ''
+                        return captured[:keep_count]
+                    except (IndexError, TypeError):
+                        return ''
+
+                return re.sub(pattern, _slice_replace, text)
+
+            # Malformed or unsupported ${...} form — safe fallback to empty
             if replacement.startswith('${') and '}' not in replacement:
                 logger.debug(f"Malformed replacement '{replacement}' - using empty replacement")
                 return re.sub(pattern, '', text)
-            
-            # For now, just use simple replacements
             if replacement.startswith('${'):
-                return re.sub(pattern, '', text)  # QUICK FIX: Remove complex replacements
-            
+                logger.debug(f"Unsupported ${{...}} replacement '{replacement}' - using empty replacement")
+                return re.sub(pattern, '', text)
+
             return re.sub(pattern, replacement, text)
-            
+
         except re.error as e:
             logger.warning(f"Regex error in pattern '{pattern[:30]}...': {e}")
             return text
