@@ -1,0 +1,55 @@
+1
+00:00:00,000 --> 00:00:05,000
+[SANITIZATION SUMMARY]
+
+Original subtitles: 5
+
+Hallucinations modified/removed: 0
+
+Repetitions modified/removed: 0
+
+Final subtitles: 0
+
+Config: balanced
+
+2
+00:00:00,000 --> 00:00:00,500
+[TIMING MODIFIED - Substantial Content Change]
+Original: いいいいいいいいいいいい?
+Modified: ?
+Duration: 0.50s -> 0.30s
+Category: timing_adjustment | Confidence: 1.00
+
+3
+00:00:00,000 --> 00:00:00,500
+[MODIFIED - Regex Partial Strip]
+Original: いいいいいいいいいいいい?
+Modified: ?
+Category: repeated_vocalization | Confidence: 0.80
+
+4
+00:00:06,000 --> 00:00:08,000
+[REMOVED - Hallucination]
+Original: !!
+Category: nonsensical | Confidence: 0.90
+
+5
+00:00:09,000 --> 00:00:19,000
+[TIMING MODIFIED - Abnormally Slow Cps]
+Original: あ
+い
+う
+え
+Modified: あ
+い
+う
+え
+Duration: 10.00s -> 1.00s
+Category: timing_adjustment | Confidence: 1.00
+
+6
+00:00:24,000 --> 00:00:27,000
+[REMOVED - Hallucination]
+Original: こんにちは
+Category: hallucination | Confidence: 1.00
+
