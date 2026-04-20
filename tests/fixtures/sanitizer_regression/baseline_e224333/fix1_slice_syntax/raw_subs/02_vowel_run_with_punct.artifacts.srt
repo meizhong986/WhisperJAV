@@ -1,0 +1,29 @@
+1
+00:00:00,000 --> 00:00:05,000
+[SANITIZATION SUMMARY]
+
+Original subtitles: 1
+
+Hallucinations modified/removed: 0
+
+Repetitions modified/removed: 0
+
+Final subtitles: 0
+
+Config: balanced
+
+2
+00:00:00,000 --> 00:00:00,500
+[TIMING MODIFIED - Substantial Content Change]
+Original: いいいいいいいいいいいい?
+Modified: ?
+Duration: 0.50s -> 0.30s
+Category: timing_adjustment | Confidence: 1.00
+
+3
+00:00:00,000 --> 00:00:00,500
+[MODIFIED - Regex Partial Strip]
+Original: いいいいいいいいいいいい?
+Modified: ?
+Category: repeated_vocalization | Confidence: 0.80
+

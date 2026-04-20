@@ -1,0 +1,37 @@
+Baseline captured at HEAD: e224333
+Total fixtures: 31
+Successful: 31
+Errors: 0
+
+--- Successful captures ---
+  combined/01_all_four_fixes_together.srt: 0 -> 0
+  combined/02_negative_control_all_legitimate.srt: 0 -> 0
+  fix1_slice_syntax/01_vowel_run_alone.srt: 0 -> 0
+  fix1_slice_syntax/02_vowel_run_with_punct.srt: 0 -> 0
+  fix1_slice_syntax/02b_vowel_run_with_period.srt: 0 -> 0
+  fix1_slice_syntax/03_vocalization_hagh.srt: 0 -> 0
+  fix1_slice_syntax/04_small_tsu_run.srt: 0 -> 0
+  fix1_slice_syntax/05_long_vowel_mark.srt: 0 -> 0
+  fix1_slice_syntax/06_non_slice_replacement.srt: 0 -> 0
+  fix1_slice_syntax/07_kana_in_context.srt: 0 -> 0
+  fix2_symbol_purge/01_bang_only.srt: 0 -> 0
+  fix2_symbol_purge/02_question_only.srt: 0 -> 0
+  fix2_symbol_purge/03_ellipsis_only.srt: 0 -> 0
+  fix2_symbol_purge/04_music_notes_only.srt: 0 -> 0
+  fix2_symbol_purge/05_animal_emoji_only.srt: 0 -> 0
+  fix2_symbol_purge/06_fullwidth_punct_only.srt: 0 -> 0
+  fix2_symbol_purge/07_whitespace_plus_punct.srt: 0 -> 0
+  fix2_symbol_purge/08_mixed_kana_and_punct.srt: 0 -> 0
+  fix2_symbol_purge/09_kanji_only.srt: 0 -> 0
+  fix2_symbol_purge/10_fullwidth_alnum.srt: 0 -> 0
+  fix2_symbol_purge/11_fix1_residue_kana_plus_q.srt: 0 -> 0
+  fix3_newline_cps/01_multiline_normal.srt: 0 -> 0
+  fix3_newline_cps/02_multiline_fast.srt: 0 -> 0
+  fix3_newline_cps/03_multiline_slow_short.srt: 0 -> 0
+  fix3_newline_cps/04_single_line_baseline.srt: 0 -> 0
+  fix5a_sdh/01_tortoise_shell.srt: 0 -> 0
+  fix5a_sdh/02_new_music_symbols.srt: 0 -> 0
+  fix5a_sdh/03_sdh_bgm.srt: 0 -> 0
+  fix5a_sdh/04_sdh_breathing.srt: 0 -> 0
+  fix5a_sdh/05_sdh_noise.srt: 0 -> 0
+  fix5a_sdh/06_regression_existing_music_symbol.srt: 0 -> 0

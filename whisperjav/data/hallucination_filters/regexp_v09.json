@@ -265,11 +265,11 @@
       "notes": "Sound effect descriptions in other languages"
     },
     {
-      "pattern": "[♪★☆♡♥❤🐕🐦🐬🐾💦📢]",
+      "pattern": "[♪♫♩♬🎵🎶★☆♡♥❤🐕🐦🐬🐾💦📢]",
       "category": "emoji",
       "confidence": 1.0,
       "replacement": "",
-      "notes": "Emoji and special characters"
+      "notes": "Emoji and special characters (incl. music notes ♫♩♬🎵🎶 added in v1.8.11)"
     },
     {
       "pattern": "(?:^|\\s)I'm (hungry|sorry)(?:$|\\s|[.,!?])",
@@ -298,6 +298,20 @@
       "confidence": 0.9,
       "replacement": "",
       "notes": "Cooking instructions"
+    },
+    {
+      "pattern": "〔[^〕]+〕",
+      "category": "sound_effect",
+      "confidence": 0.9,
+      "replacement": "",
+      "notes": "Tortoise shell brackets with content — SDH annotation (added v1.8.11)"
+    },
+    {
+      "pattern": "[\\(\\[（【][^\\)\\]）】]*(歓声|喘息|呼吸|ノイズ|SE|BGM|SFX)[^\\)\\]）】]*[\\)\\]）】]",
+      "category": "sound_effect",
+      "confidence": 0.95,
+      "replacement": "",
+      "notes": "SDH audience/breathing/noise/BGM/SE/SFX annotations in brackets (added v1.8.11)"
     }
   ]
 }
