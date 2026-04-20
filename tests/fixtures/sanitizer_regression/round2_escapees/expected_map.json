@@ -1,0 +1,564 @@
+{
+  "expected_drops": [
+    {
+      "idx": 1,
+      "cat": "CAT1",
+      "text": "ありがとうございました。"
+    },
+    {
+      "idx": 2,
+      "cat": "CAT1",
+      "text": "さようなら!"
+    },
+    {
+      "idx": 3,
+      "cat": "CAT1",
+      "text": "さようなら。"
+    },
+    {
+      "idx": 4,
+      "cat": "CAT1",
+      "text": "今日もご視聴いただきありがとうございます。"
+    },
+    {
+      "idx": 5,
+      "cat": "CAT1",
+      "text": "最後までご視聴いただきありがとうございます。"
+    },
+    {
+      "idx": 6,
+      "cat": "CAT1",
+      "text": "最後までご視聴頂きありがとうございました!"
+    },
+    {
+      "idx": 7,
+      "cat": "CAT1",
+      "text": "最後までご視聴頂きありがとうございました。"
+    },
+    {
+      "idx": 8,
+      "cat": "CAT1",
+      "text": "最後まで視聴してくださって 本当にありがとうございます。"
+    },
+    {
+      "idx": 9,
+      "cat": "CAT1",
+      "text": "最後まで視聴してくださって 本当にありがとうございます💛"
+    },
+    {
+      "idx": 10,
+      "cat": "CAT1",
+      "text": "次回は美味しいビデオでお会いしましょう。"
+    },
+    {
+      "idx": 11,
+      "cat": "CAT1",
+      "text": "次回の動画でお会いしましょう"
+    },
+    {
+      "idx": 12,
+      "cat": "CAT2",
+      "text": "by H."
+    },
+    {
+      "idx": 13,
+      "cat": "CAT2",
+      "text": "ぺぺ"
+    },
+    {
+      "idx": 14,
+      "cat": "CAT2",
+      "text": "ガブッ🐶"
+    },
+    {
+      "idx": 15,
+      "cat": "CAT2",
+      "text": "🐯 Sound Hodori 사운드 호돌이 サウンド ホドリ"
+    },
+    {
+      "idx": 16,
+      "cat": "CAT2",
+      "text": "🐯 Sound Hodori 사운드 호돌이 サウンドゥ ホドリ"
+    },
+    {
+      "idx": 17,
+      "cat": "CAT3",
+      "text": "おしまいです。"
+    },
+    {
+      "idx": 18,
+      "cat": "CAT3",
+      "text": "おまけ"
+    },
+    {
+      "idx": 19,
+      "cat": "CAT3",
+      "text": "エンディング"
+    },
+    {
+      "idx": 20,
+      "cat": "CAT3",
+      "text": "コール"
+    },
+    {
+      "idx": 21,
+      "cat": "CAT3",
+      "text": "スイッチオン"
+    },
+    {
+      "idx": 22,
+      "cat": "CAT3",
+      "text": "マッチング"
+    },
+    {
+      "idx": 23,
+      "cat": "CAT3",
+      "text": "以上で終了です"
+    },
+    {
+      "idx": 24,
+      "cat": "CAT3",
+      "text": "以上で終わりです。"
+    },
+    {
+      "idx": 25,
+      "cat": "CAT3",
+      "text": "以上です。"
+    },
+    {
+      "idx": 26,
+      "cat": "CAT3",
+      "text": "次回予告"
+    },
+    {
+      "idx": 27,
+      "cat": "CAT3",
+      "text": "音だけ"
+    },
+    {
+      "idx": 28,
+      "cat": "CAT3",
+      "text": "音でみる?"
+    },
+    {
+      "idx": 29,
+      "cat": "CAT5",
+      "text": "あ……"
+    },
+    {
+      "idx": 30,
+      "cat": "CAT5",
+      "text": "あ……あ……"
+    },
+    {
+      "idx": 31,
+      "cat": "CAT5",
+      "text": "ああ…"
+    },
+    {
+      "idx": 32,
+      "cat": "CAT5",
+      "text": "あぁっ…"
+    },
+    {
+      "idx": 33,
+      "cat": "CAT5",
+      "text": "あ゛ぁん"
+    },
+    {
+      "idx": 34,
+      "cat": "CAT5",
+      "text": "あ゛ぁんっ"
+    },
+    {
+      "idx": 35,
+      "cat": "CAT5",
+      "text": "あ゛あ゛あ"
+    },
+    {
+      "idx": 36,
+      "cat": "CAT5",
+      "text": "あ゛ー…"
+    },
+    {
+      "idx": 37,
+      "cat": "CAT5",
+      "text": "あはぁ…"
+    },
+    {
+      "idx": 38,
+      "cat": "CAT5",
+      "text": "いっ"
+    },
+    {
+      "idx": 39,
+      "cat": "CAT5",
+      "text": "うぅ"
+    },
+    {
+      "idx": 40,
+      "cat": "CAT5",
+      "text": "うぅー"
+    },
+    {
+      "idx": 41,
+      "cat": "CAT5",
+      "text": "うぅん…"
+    },
+    {
+      "idx": 42,
+      "cat": "CAT5",
+      "text": "おぅ"
+    },
+    {
+      "idx": 43,
+      "cat": "CAT5",
+      "text": "おぅ…"
+    },
+    {
+      "idx": 44,
+      "cat": "CAT5",
+      "text": "おぉー"
+    },
+    {
+      "idx": 45,
+      "cat": "CAT5",
+      "text": "おぉー…"
+    },
+    {
+      "idx": 46,
+      "cat": "CAT5",
+      "text": "おふぅ…"
+    },
+    {
+      "idx": 47,
+      "cat": "CAT5",
+      "text": "おふぅ……"
+    },
+    {
+      "idx": 48,
+      "cat": "CAT5",
+      "text": "おほっ"
+    },
+    {
+      "idx": 49,
+      "cat": "CAT5",
+      "text": "くっ"
+    },
+    {
+      "idx": 50,
+      "cat": "CAT5",
+      "text": "ちぃー"
+    },
+    {
+      "idx": 51,
+      "cat": "CAT5",
+      "text": "ちゅっ"
+    },
+    {
+      "idx": 52,
+      "cat": "CAT5",
+      "text": "はぁ…"
+    },
+    {
+      "idx": 53,
+      "cat": "CAT5",
+      "text": "はぁ……"
+    },
+    {
+      "idx": 54,
+      "cat": "CAT5",
+      "text": "はぁっ はぁっ"
+    },
+    {
+      "idx": 55,
+      "cat": "CAT5",
+      "text": "はっw"
+    },
+    {
+      "idx": 56,
+      "cat": "CAT5",
+      "text": "ふぅ…"
+    },
+    {
+      "idx": 57,
+      "cat": "CAT5",
+      "text": "ふぅ……"
+    },
+    {
+      "idx": 58,
+      "cat": "CAT5",
+      "text": "ふぅー"
+    },
+    {
+      "idx": 59,
+      "cat": "CAT5",
+      "text": "ふふっ"
+    },
+    {
+      "idx": 60,
+      "cat": "CAT5",
+      "text": "んっ…"
+    },
+    {
+      "idx": 61,
+      "cat": "CAT5",
+      "text": "んふっ"
+    },
+    {
+      "idx": 62,
+      "cat": "CAT5",
+      "text": "んふふっ"
+    },
+    {
+      "idx": 63,
+      "cat": "CAT5",
+      "text": "んんっ…"
+    },
+    {
+      "idx": 64,
+      "cat": "CAT5",
+      "text": "チュッ"
+    },
+    {
+      "idx": 65,
+      "cat": "CAT6",
+      "text": "あ"
+    },
+    {
+      "idx": 66,
+      "cat": "CAT6",
+      "text": "す"
+    },
+    {
+      "idx": 67,
+      "cat": "CAT6",
+      "text": "つ"
+    },
+    {
+      "idx": 68,
+      "cat": "CAT6",
+      "text": "ね"
+    },
+    {
+      "idx": 69,
+      "cat": "CAT6",
+      "text": "は"
+    },
+    {
+      "idx": 70,
+      "cat": "CAT6",
+      "text": "ふ"
+    },
+    {
+      "idx": 71,
+      "cat": "CAT6",
+      "text": "ド"
+    },
+    {
+      "idx": 72,
+      "cat": "CAT6",
+      "text": "パ"
+    },
+    {
+      "idx": 73,
+      "cat": "CAT6",
+      "text": "プッ"
+    },
+    {
+      "idx": 74,
+      "cat": "CAT6",
+      "text": "ン"
+    },
+    {
+      "idx": 75,
+      "cat": "CAT7",
+      "text": "あ…"
+    },
+    {
+      "idx": 76,
+      "cat": "CAT7",
+      "text": "お…"
+    },
+    {
+      "idx": 77,
+      "cat": "CAT7",
+      "text": "おは…"
+    },
+    {
+      "idx": 78,
+      "cat": "CAT7",
+      "text": "おも…"
+    },
+    {
+      "idx": 79,
+      "cat": "CAT7",
+      "text": "おわ…"
+    },
+    {
+      "idx": 80,
+      "cat": "CAT7",
+      "text": "てよ"
+    },
+    {
+      "idx": 81,
+      "cat": "CAT7",
+      "text": "ん…"
+    },
+    {
+      "idx": 82,
+      "cat": "CAT11",
+      "text": "こん"
+    },
+    {
+      "idx": 83,
+      "cat": "CAT11",
+      "text": "にゃ…"
+    },
+    {
+      "idx": 84,
+      "cat": "CAT11",
+      "text": "にゃー"
+    },
+    {
+      "idx": 85,
+      "cat": "CAT11",
+      "text": "ぱっ!"
+    },
+    {
+      "idx": 86,
+      "cat": "CAT11",
+      "text": "ぴゅん"
+    },
+    {
+      "idx": 87,
+      "cat": "CAT11",
+      "text": "ぷりぷり"
+    },
+    {
+      "idx": 88,
+      "cat": "CAT11",
+      "text": "ほいっ"
+    },
+    {
+      "idx": 89,
+      "cat": "CAT11",
+      "text": "ぽいっ"
+    },
+    {
+      "idx": 90,
+      "cat": "CAT11",
+      "text": "ぽっ"
+    },
+    {
+      "idx": 91,
+      "cat": "CAT11",
+      "text": "ぽん"
+    },
+    {
+      "idx": 92,
+      "cat": "CAT11",
+      "text": "ぽん!"
+    },
+    {
+      "idx": 93,
+      "cat": "CAT11",
+      "text": "ぽんぽん"
+    },
+    {
+      "idx": 94,
+      "cat": "CAT11",
+      "text": "よいしょ"
+    },
+    {
+      "idx": 95,
+      "cat": "CAT11",
+      "text": "ガクッ"
+    },
+    {
+      "idx": 96,
+      "cat": "CAT11",
+      "text": "シュッ"
+    },
+    {
+      "idx": 97,
+      "cat": "CAT11",
+      "text": "チョッ"
+    },
+    {
+      "idx": 98,
+      "cat": "CAT11",
+      "text": "パッ"
+    },
+    {
+      "idx": 99,
+      "cat": "CAT11",
+      "text": "パチン"
+    },
+    {
+      "idx": 100,
+      "cat": "CAT11",
+      "text": "パチン!"
+    },
+    {
+      "idx": 101,
+      "cat": "CAT11",
+      "text": "ピシッ"
+    },
+    {
+      "idx": 102,
+      "cat": "CAT11",
+      "text": "ポンッ"
+    }
+  ],
+  "expected_keeps": [
+    {
+      "idx": 103,
+      "cat": "CTRL",
+      "label": "ctrl_particle_ha",
+      "text": "こんにちは、元気ですか"
+    },
+    {
+      "idx": 104,
+      "cat": "CTRL",
+      "label": "ctrl_particle_ne",
+      "text": "今日はいい天気ですね"
+    },
+    {
+      "idx": 105,
+      "cat": "CTRL",
+      "label": "ctrl_dialogue_1",
+      "text": "それは面白い話だと思う"
+    },
+    {
+      "idx": 106,
+      "cat": "CTRL",
+      "label": "ctrl_jav_dialogue",
+      "text": "やめて、ちょっと待って"
+    },
+    {
+      "idx": 107,
+      "cat": "CTRL",
+      "label": "ctrl_ellipsis_ok",
+      "text": "気持ちいい、もっと欲しい"
+    },
+    {
+      "idx": 108,
+      "cat": "CTRL",
+      "label": "ctrl_mixed_script",
+      "text": "アメリカに行きたいです"
+    },
+    {
+      "idx": 109,
+      "cat": "CTRL",
+      "label": "ctrl_number",
+      "text": "部屋番号は301です"
+    },
+    {
+      "idx": 110,
+      "cat": "CTRL",
+      "label": "ctrl_fullwidth",
+      "text": "ＡＢＣの発表"
+    }
+  ]
+}

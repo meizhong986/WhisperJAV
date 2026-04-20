@@ -1,2 +1,5 @@
 # Diff script working output — not committed (regenerated each run)
 current_*/
+
+# Round-2 verifier working output — regenerated each run
+round2_escapees/_run_output/

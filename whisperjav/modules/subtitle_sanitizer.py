@@ -277,11 +277,29 @@ class SubtitleSanitizer:
 
                 self._record_timing_modification(mod)
 
-            
+
+
+            # Stage 2.5 (v1.8.11 Round-2) — Defensive empty-text drop gate.
+            # Phase 1 drops empty-after-cleaning subs inside the per-sub loop,
+            # and the current timing_adjuster mutates only start/end (cannot
+            # produce empty text). This gate is a belt-and-suspenders guard
+            # for any future phase-2 stage that might drop sub content, so
+            # that empty text never reaches renumbering or output.
+
+            non_empty_subs = [s for s in timed_subs if s.text and s.text.strip()]
+
+            if len(non_empty_subs) < len(timed_subs):
+
+                logger.debug(
+                    f"Empty-drop gate removed {len(timed_subs) - len(non_empty_subs)} "
+                    f"empty-text subtitle(s) before renumbering"
+                )
+
+
 
             # 3. Final Renumbering
 
-            final_subtitles = self._renumber_subtitles(timed_subs)
+            final_subtitles = self._renumber_subtitles(non_empty_subs)
 
             
 

@@ -23,6 +23,61 @@ DOWNLOAD_TIMEOUT = 10  # Seconds to wait for download
 # See hallucination_remover._apply_regex_replacement_safe for semantics.
 _SLICE_SYNTAX_RE = re.compile(r'^\$\{(\d+):0:(\d+)\}$')
 
+# ---------------------------------------------------------------------------
+# v1.8.11 Round-2 sanitizer hardening — module-level constants/helpers.
+# ---------------------------------------------------------------------------
+# Stage 1.1.a.5: Emoji-contains drop gate.
+# Lines containing ANY character in these blocks are dropped entirely — in JAV
+# speech-to-text output, emoji are pathological (training-data bleed, SDH
+# markers, channel watermarks like "🐯 Sound Hodori"). Ranges:
+#   U+2600-U+26FF   Miscellaneous Symbols (★ ☆ ♡ ♥ ♪ ♫ ♩ ♬ ...)
+#   U+2702-U+27B0   Dingbats
+#   U+1F300-U+1FAFF Emoji blocks (pictographs, emoticons, transport,
+#                   supplemental, extended-A)
+_EMOJI_RE = re.compile(
+    r'[\u2600-\u26FF\u2702-\u27B0\U0001F300-\U0001FAFF]'
+)
+
+# Stage 1.1.d: Full-normalized exact-match.
+# Characters stripped during normalization for filter-list matching.
+# Deliberately excluded (NOT stripped): ー U+30FC prolonged-sound mark
+# (letter-like, part of words like ふぅー), ゛ U+3099 combining voicing mark
+# (diacritic, important for CAT5 voiced-vowel moans like あ゛ぁん), and all
+# hiragana / katakana / CJK / alphanumeric characters.
+_NORMALIZATION_STRIP_CHARS = frozenset(
+    # Whitespace (ASCII + fullwidth space)
+    ' \t\n\r\x0b\x0c\u3000'
+    # Quotes (ASCII + smart + JP brackets used as quotes)
+    '"\'`'
+    '\u2018\u2019\u201C\u201D'       # ' ' " "
+    '\u300C\u300D\u300E\u300F'       # 「 」 『 』
+    # Punctuation — ASCII
+    '.,!?;:-'
+    # Punctuation — fullwidth
+    '\uFF0E\uFF0C\uFF01\uFF1F\uFF1B\uFF1A'  # ． ， ！ ？ ； ：
+    # Punctuation — Japanese
+    '\u3002\u3001\u30FB'             # 。 、 ・
+    '\u2026'                         # …
+    # Stylistic dashes / tildes
+    '\u301C\u3030\uFF5E~'            # 〜 〰 ～ ~
+)
+
+
+def _normalize_for_match(text: str) -> str:
+    """Normalize text for stage 1.1.d full-normalized hallucination match.
+
+    Strips whitespace, quotes, and punctuation listed in
+    _NORMALIZATION_STRIP_CHARS; case-folds Latin. Preserves letter-like marks
+    (U+30FC ー) and diacritics (U+3099 ゛) — these are semantic, not
+    punctuation.
+
+    Empty return value means the text was pure-punct/whitespace and cannot
+    meaningfully match a filter entry (would match anything).
+    """
+    if not text:
+        return ''
+    return ''.join(ch for ch in text if ch not in _NORMALIZATION_STRIP_CHARS).lower()
+
 class HallucinationRemover:
     """Handles exact, regex, and fuzzy hallucination detection with improved debugging"""
 
@@ -62,8 +117,15 @@ class HallucinationRemover:
         self._blacklist_phrases: Optional[List[str]] = None
         self._load_sources: List[str] = []  # Track where data was loaded from
 
+        # v1.8.11 Round-2: normalized-form exact-match sets per language.
+        # Built once from _exact_lists after loading; used by stage 1.1.d in
+        # remove_hallucinations to catch escapees that differ from list
+        # entries only in whitespace / punctuation / case.
+        self._normalized_exact_lists: Optional[Dict[str, Set[str]]] = None
+
         # Load patterns on init with fallback
         self._load_patterns_safe()
+        self._build_normalized_exact_lists()
         
     def _load_patterns_safe(self):
         """Load patterns with fallback on any failure, then report to user."""
@@ -110,7 +172,64 @@ class HallucinationRemover:
         
         self._blacklist_phrases = ['www', 'ok', '笑', 'wwwww']
         logger.debug(f"Loaded fallback patterns: {len(self._exact_lists)} exact lists, {len(self._regex_patterns)} regex patterns")
-        
+
+    def _build_normalized_exact_lists(self) -> None:
+        """Build per-language normalized-form sets for stage 1.1.d.
+
+        Called once at init after _load_patterns_safe. For each language
+        section in _exact_lists, normalizes every raw entry using
+        _normalize_for_match and stores the resulting set in
+        _normalized_exact_lists. Entries that normalize to empty (pure
+        punctuation / whitespace) are skipped — they would match any sub.
+
+        This runs at load time so the per-sub matching path in
+        remove_hallucinations only does a single normalize + set membership
+        check (O(n) on text length, O(1) on lookup).
+        """
+        self._normalized_exact_lists = {}
+        if not self._exact_lists:
+            return
+
+        for lang, phrases in self._exact_lists.items():
+            if not isinstance(phrases, (list, set)):
+                continue
+            normalized: Set[str] = set()
+            for phrase in phrases:
+                if not phrase or not isinstance(phrase, str):
+                    continue
+                norm = _normalize_for_match(phrase)
+                if norm:
+                    normalized.add(norm)
+            if normalized:
+                self._normalized_exact_lists[lang] = normalized
+
+        total = sum(len(s) for s in self._normalized_exact_lists.values())
+        logger.debug(
+            f"Built normalized exact-match sets: {total} unique entries "
+            f"across {len(self._normalized_exact_lists)} languages"
+        )
+
+    def _get_normalized_lang_set(
+        self, mapped_language: str, effective_language: str
+    ) -> Optional[Set[str]]:
+        """Fetch the normalized exact-match set for a language.
+
+        Uses the same fallback chain as the raw _exact_lists lookup in
+        remove_hallucinations: mapped name (e.g. 'japanese') → ISO code
+        (e.g. 'ja') → final fallback to 'japanese'/'ja'.
+        """
+        if not self._normalized_exact_lists:
+            return None
+        nset = self._normalized_exact_lists.get(mapped_language)
+        if not nset:
+            nset = self._normalized_exact_lists.get(effective_language)
+        if not nset:
+            for fallback in ('japanese', 'ja'):
+                if fallback in self._normalized_exact_lists:
+                    nset = self._normalized_exact_lists[fallback]
+                    break
+        return nset
+
     def _load_patterns(self):
         """Load all hallucination patterns with improved error handling"""
         # Load exact match list
@@ -382,6 +501,25 @@ class HallucinationRemover:
             }]
             return '', modifications
 
+        # Stage 1.1.a.5 (v1.8.11 Round-2) — Emoji-contains drop gate.
+        # Any character in the broad emoji ranges (see _EMOJI_RE above)
+        # anywhere in the sub triggers a full-sub drop. Runs immediately
+        # after bracket detection so emoji lines skip exact-match, regex,
+        # repetition cleaning, and CPS checks. Covers CAT2 channel
+        # watermarks (🐯 Sound Hodori…), CAT1 emoji-tailed outros, and
+        # any sub sprinkled with music notes / pictograms.
+        if _EMOJI_RE.search(text):
+            modifications = [{
+                'type': 'emoji_contains_drop',
+                'pattern': '_EMOJI_RE',
+                'category': 'emoji_hallucination',
+                'confidence': 1.0,
+                'original': text,
+                'modified': '',
+                'language': effective_language,
+            }]
+            return '', modifications
+
         # Strict, full-line, exact matching (try raw first, then punctuation-stripped)
         if normalized_text in lang_list:
             modifications = [{
@@ -408,6 +546,30 @@ class HallucinationRemover:
                 'language': effective_language,
             }]
             return '', modifications
+
+        # Stage 1.1.d (v1.8.11 Round-2) — Full-normalized exact match.
+        # Strips all whitespace + quotes + punctuation anywhere in the text
+        # (not just trailing) and case-folds Latin, then checks against a
+        # pre-built normalized set. Catches escapees that differ from list
+        # entries by internal spaces ("はぁっ はぁっ"), multi-character
+        # ellipsis ("はぁ……" vs list "はぁ…"), non-trailing punctuation,
+        # or case ("by H." vs "BY H.").
+        normalized_for_match = _normalize_for_match(text)
+        if normalized_for_match:
+            lang_normalized_set = self._get_normalized_lang_set(
+                mapped_language, effective_language
+            )
+            if lang_normalized_set and normalized_for_match in lang_normalized_set:
+                modifications = [{
+                    'type': 'exact_match_full_normalized',
+                    'pattern': normalized_for_match,
+                    'category': 'hallucination',
+                    'confidence': 1.0,
+                    'original': text,
+                    'modified': '',
+                    'language': effective_language,
+                }]
+                return '', modifications
 
         # Apply regex patterns from regexp_v09.json (closing phrases, sound effects, etc.)
         if self._regex_patterns:
