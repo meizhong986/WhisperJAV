@@ -9,10 +9,12 @@ from .faster_whisper import FasterWhisperASR
 from .stable_ts import StableTSASR
 from .openai_whisper import OpenAIWhisperASR
 from .kotoba_faster_whisper import KotobaFasterWhisperASRComponent
+from .pywhispercpp import PyWhisperCppASRComponent
 
 __all__ = [
     'FasterWhisperASR',
     'StableTSASR',
     'OpenAIWhisperASR',
     'KotobaFasterWhisperASRComponent',
+    'PyWhisperCppASRComponent',
 ]
