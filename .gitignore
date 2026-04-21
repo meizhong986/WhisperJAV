@@ -85,8 +85,10 @@ output/
 *.mkv
 *.srt
 !examples/*.srt
+!tests/fixtures/**/*.srt
 .tmp/
 raw_subs/
+!tests/fixtures/**/raw_subs/
 
 # Installer binaries
 installer/*.exe

@@ -1,0 +1,50 @@
+1
+00:00:00,000 --> 00:00:05,000
+[SANITIZATION SUMMARY]
+
+Original subtitles: 22
+
+Hallucinations modified/removed: 0
+
+Repetitions modified/removed: 0
+
+Final subtitles: 0
+
+Config: balanced
+
+2
+00:00:00,000 --> 00:00:02,000
+[REMOVED - Hallucination]
+Original: こんにちは
+Category: hallucination | Confidence: 1.00
+
+3
+00:00:09,000 --> 00:00:11,000
+[REMOVED - Hallucination]
+Original: すみません
+Category: hallucination | Confidence: 1.00
+
+4
+00:00:12,000 --> 00:00:13,500
+[REMOVED - Hallucination]
+Original: はい
+Category: hallucination | Confidence: 1.00
+
+5
+00:00:16,000 --> 00:00:17,500
+[REMOVED - Hallucination]
+Original: そうですね
+Category: hallucination | Confidence: 1.00
+
+6
+00:00:18,000 --> 00:00:20,000
+[REMOVED - Hallucination]
+Original: 気持ちいい
+Category: hallucination | Confidence: 1.00
+
+7
+00:00:34,000 --> 00:00:36,000
+[REMOVED - Hallucination]
+Original: お母さん
+Category: hallucination | Confidence: 1.00
+
