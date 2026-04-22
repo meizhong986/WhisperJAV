@@ -101,14 +101,21 @@ presets:
 
 # =============================================================================
 # GUI Hints — consumed by webview_gui/api.get_segmenter_schema
+# -----------------------------------------------------------------------------
+# Ranges chosen to cover plausible tuning space without unsafe extremes.
+# Groups organise widgets into labelled panels in the customize dialog.
 # =============================================================================
 gui:
+  # --- Detection (core sensitivity controls) -------------------------------
   threshold:
     widget: slider
     label: "Speech Threshold"
-    description: "Probability to trigger speech onset (lower = more sensitive)"
-    min: 0.1
-    max: 0.9
+    description: >
+      Probability to trigger speech onset. Lower = more sensitive (catches
+      whispers/soft speech at the cost of more false alarms). Higher = stricter
+      (fewer detections, cleaner but may miss soft speech).
+    min: 0.05
+    max: 0.95
     step: 0.05
     data_type: float
     group: detection
@@ -116,17 +123,23 @@ gui:
   neg_threshold:
     widget: slider
     label: "Offset Threshold (hysteresis)"
-    description: "Below this probability, candidate speech may end. Leave empty for auto (threshold − 0.15)."
-    min: 0.0
-    max: 0.9
+    description: >
+      Probability below which a candidate speech segment may end. Typically
+      0.10–0.20 below the onset threshold to give hysteresis. Leave empty for
+      auto-calculation (threshold − 0.15, clamped at 0.01 minimum).
+    min: 0.05
+    max: 0.90
     step: 0.05
     data_type: float
     group: detection
 
+  # --- Duration filters ----------------------------------------------------
   min_speech_duration_ms:
     widget: spinner
     label: "Min Speech Duration (ms)"
-    description: "Drop segments shorter than this"
+    description: >
+      Drop segments shorter than this. Too low (<50 ms) keeps noise bursts;
+      too high (>300 ms) discards short utterances like はい, うん, ね.
     min: 20
     max: 500
     step: 20
@@ -136,9 +149,12 @@ gui:
   min_silence_duration_ms:
     widget: spinner
     label: "Min Silence Duration (ms)"
-    description: "Silence must be at least this long to end a segment"
+    description: >
+      Silence gap must be at least this long to end a segment. Shorter
+      silences are absorbed into the current speech region. Raise to merge
+      close utterances; lower to split tightly-coupled speech.
     min: 20
-    max: 2000
+    max: 1000
     step: 20
     data_type: int
     group: filters
@@ -146,28 +162,38 @@ gui:
   max_speech_duration_s:
     widget: slider
     label: "Max Speech Duration (s)"
-    description: "Force-split longer speech. Empty = inherit group max."
+    description: >
+      Force-split any single speech segment longer than this. Leave empty
+      (null) to inherit the Max Group Duration below — recommended.
     min: 2.0
-    max: 30.0
+    max: 20.0
     step: 0.5
     data_type: float
     unit: "s"
     group: filters
 
+  # --- Padding -------------------------------------------------------------
   speech_pad_ms:
     widget: spinner
     label: "Speech Padding (ms)"
-    description: "Padding added around each segment (overlap-prevented)"
+    description: >
+      Padding added before and after each detected segment to catch soft
+      onsets and trailing Japanese particles. Overlap with adjacent segments
+      is automatically prevented.
     min: 0
-    max: 800
+    max: 600
     step: 20
     data_type: int
     group: padding
 
+  # --- Grouping (downstream ASR chunking) ----------------------------------
   chunk_threshold_s:
     widget: slider
     label: "Group Gap Threshold (s)"
-    description: "Segments separated by larger gaps go into different groups"
+    description: >
+      Two consecutive segments separated by a gap larger than this are placed
+      into different ASR groups. Smaller = more, tighter groups. Larger =
+      fewer, longer groups.
     min: 0.5
     max: 5.0
     step: 0.1
@@ -178,18 +204,23 @@ gui:
   max_group_duration_s:
     widget: slider
     label: "Max Group Duration (s)"
-    description: "Upper bound for ASR chunks (Whisper 30s context)"
+    description: >
+      Upper bound for a grouped-segment ASR chunk. Should stay well under the
+      ASR model context (30 s for Whisper). Typical JAV sweet spot: 8–10 s.
     min: 4.0
-    max: 29.0
+    max: 14.0
     step: 1.0
     data_type: float
     unit: "s"
     group: grouping
 
+  # --- Runtime -------------------------------------------------------------
   force_cpu:
     widget: checkbox
     label: "Force CPU (disable GPU inference)"
-    description: "Useful when CUDA is present but unstable, or to free GPU for ASR"
+    description: >
+      Bypass CUDAExecutionProvider even when available. Useful when the GPU
+      is needed for ASR or when ONNX CUDA is unstable on the current driver.
     data_type: bool
     group: processing
 
