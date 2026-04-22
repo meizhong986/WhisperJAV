@@ -28,6 +28,7 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "whisper-vad-medium": "whisperjav.modules.speech_segmentation.backends.whisper_vad.WhisperVadSpeechSegmenter",
     "ten": "whisperjav.modules.speech_segmentation.backends.ten.TenSpeechSegmenter",
     "silero-v6.2": "whisperjav.modules.speech_segmentation.backends.silero_v6.SileroV6SpeechSegmenter",
+    "whisperseg": "whisperjav.modules.speech_segmentation.backends.whisperseg.WhisperSegSpeechSegmenter",
     "none": "whisperjav.modules.speech_segmentation.backends.none.NullSpeechSegmenter",
 }
 
@@ -56,6 +57,12 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
     "silero-v6.2": {
         "packages": ["silero_vad"],
         "install_hint": "pip install silero-vad>=6.2",
+        "always_available": False,
+    },
+    "whisperseg": {
+        # onnxruntime is the real gate; transformers/huggingface_hub are usually present
+        "packages": ["onnxruntime"],
+        "install_hint": "pip install whisperjav[whisperseg] (or whisperjav[whisperseg-gpu] for CUDA)",
         "always_available": False,
     },
     "whisper": {
@@ -131,6 +138,18 @@ _PARAM_SCHEMAS = {
         "max_group_duration_s":    (float, None,  True),
         "use_overlap_smoothing":   (bool,  False, False),
     },
+    "whisperseg": {
+        "threshold":               (float, 0.35, False),
+        "neg_threshold":           (float, None, True),   # None → auto (threshold - 0.15)
+        "min_speech_duration_ms":  (int,   100,  False),
+        "min_silence_duration_ms": (int,   100,  False),
+        "speech_pad_ms":           (int,   300,  False),
+        "max_speech_duration_s":   (float, None, True),   # None → inherit max_group
+        "chunk_threshold_s":       (float, 1.0,  True),
+        "max_group_duration_s":    (float, None, True),
+        "force_cpu":               (bool,  False, False),
+        "num_threads":             (int,   1,    False),
+    },
 }
 
 
@@ -165,7 +184,7 @@ class SpeechSegmenterFactory:
     @staticmethod
     def list_unique_backends() -> List[str]:
         """Return list of unique backend names (without version aliases)."""
-        return ["silero", "nemo", "whisper", "ten", "none"]
+        return ["silero", "nemo", "whisper", "ten", "whisperseg", "none"]
 
     @staticmethod
     def is_backend_available(name: str) -> Tuple[bool, str]:
@@ -222,10 +241,11 @@ class SpeechSegmenterFactory:
             "whisper-vad-medium": "Whisper VAD (medium)",
             "silero-v6.2": "Silero VAD v6.2",
             "ten": "TEN VAD",
+            "whisperseg": "WhisperSeg (JA-ASMR)",
             "none": "None (Skip)",
         }
 
-        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "none"]:
+        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "whisperseg", "none"]:
             available, hint = SpeechSegmenterFactory.is_backend_available(name)
             backends.append({
                 "name": name,

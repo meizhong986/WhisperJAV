@@ -1,0 +1,201 @@
+# =============================================================================
+# WhisperSeg Speech Segmentation Tool Configuration
+# =============================================================================
+# Whisper-encoder encoder-decoder VAD (ONNX), 20 ms frame resolution, trained
+# on ~500 h Japanese ASMR. Specialized for soft/whispered speech common in JAV.
+# Lineage: WhisperSeg research (Gu et al., 2023).
+# Requires: pip install whisperjav[whisperseg]        (CPU)
+#           pip install whisperjav[whisperseg-gpu]    (CUDA via onnxruntime-gpu)
+# Model: TransWithAI/Whisper-Vad-EncDec-ASMR-onnx (MIT, HuggingFace Hub)
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: whisperseg-speech-segmentation
+  displayName: "WhisperSeg (JA-ASMR)"
+  description: |
+    Speech segmentation using WhisperSeg — a Whisper-base encoder paired with a
+    lightweight 2-layer transformer decoder, exported to ONNX. Produces
+    frame-level speech probabilities at 20 ms resolution over 30-second input
+    windows. Trained on ~500 hours of Japanese ASMR with accurate timestamps,
+    yielding strong performance on whispered and soft speech. Inherits
+    Whisper's multilingual robustness for non-JA content.
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - whisper
+    - asmr
+    - japanese
+    - onnx
+    - vad
+  dependencies:
+    - "onnxruntime>=1.16"
+    - "transformers>=4.40"
+    - "huggingface_hub>=0.20"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+
+# =============================================================================
+# Tool Parameters (Balanced preset as default)
+# Silero-v6.2-aligned — known-good JAV values; vendor default is threshold=0.5
+# =============================================================================
+spec:
+  # --- Core VAD Parameters ---
+  threshold: 0.35
+  neg_threshold: null          # null = auto: max(threshold - 0.15, 0.01)
+
+  # --- Duration Filters ---
+  min_speech_duration_ms: 100
+  min_silence_duration_ms: 100
+  max_speech_duration_s: null  # null = inherit max_group_duration_s
+
+  # --- Segment Padding ---
+  speech_pad_ms: 300
+
+  # --- Segment Grouping ---
+  chunk_threshold_s: 1.0
+  max_group_duration_s: 9.0    # Silero-v6.2 balanced baseline; below Whisper 30s
+
+  # --- Runtime ---
+  force_cpu: false
+  num_threads: 1               # 1 → auto (cpu_count // 2) on CPU
+
+# =============================================================================
+# Sensitivity Presets
+# Layering: spec defaults < sensitivity preset < user overrides
+# =============================================================================
+presets:
+  # Conservative: higher threshold, fewer false positives
+  # Best for: clean studio audio, dominant single-speaker content
+  conservative:
+    threshold: 0.45
+    min_speech_duration_ms: 150
+    min_silence_duration_ms: 200
+    speech_pad_ms: 200
+    max_group_duration_s: 8.0
+
+  # Balanced: spec defaults
+  balanced: {}
+
+  # Aggressive: lower threshold, maximum speech capture
+  # Best for: whispered dialogue, quiet intimate audio, JAV-typical scenes
+  aggressive:
+    threshold: 0.25
+    min_speech_duration_ms: 80
+    min_silence_duration_ms: 80
+    speech_pad_ms: 400
+    max_group_duration_s: 10.0
+
+# =============================================================================
+# GUI Hints — consumed by webview_gui/api.get_segmenter_schema
+# =============================================================================
+gui:
+  threshold:
+    widget: slider
+    label: "Speech Threshold"
+    description: "Probability to trigger speech onset (lower = more sensitive)"
+    min: 0.1
+    max: 0.9
+    step: 0.05
+    data_type: float
+    group: detection
+
+  neg_threshold:
+    widget: slider
+    label: "Offset Threshold (hysteresis)"
+    description: "Below this probability, candidate speech may end. Leave empty for auto (threshold − 0.15)."
+    min: 0.0
+    max: 0.9
+    step: 0.05
+    data_type: float
+    group: detection
+
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: "Drop segments shorter than this"
+    min: 20
+    max: 500
+    step: 20
+    data_type: int
+    group: filters
+
+  min_silence_duration_ms:
+    widget: spinner
+    label: "Min Silence Duration (ms)"
+    description: "Silence must be at least this long to end a segment"
+    min: 20
+    max: 2000
+    step: 20
+    data_type: int
+    group: filters
+
+  max_speech_duration_s:
+    widget: slider
+    label: "Max Speech Duration (s)"
+    description: "Force-split longer speech. Empty = inherit group max."
+    min: 2.0
+    max: 30.0
+    step: 0.5
+    data_type: float
+    unit: "s"
+    group: filters
+
+  speech_pad_ms:
+    widget: spinner
+    label: "Speech Padding (ms)"
+    description: "Padding added around each segment (overlap-prevented)"
+    min: 0
+    max: 800
+    step: 20
+    data_type: int
+    group: padding
+
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: "Segments separated by larger gaps go into different groups"
+    min: 0.5
+    max: 5.0
+    step: 0.1
+    data_type: float
+    unit: "s"
+    group: grouping
+
+  max_group_duration_s:
+    widget: slider
+    label: "Max Group Duration (s)"
+    description: "Upper bound for ASR chunks (Whisper 30s context)"
+    min: 4.0
+    max: 29.0
+    step: 1.0
+    data_type: float
+    unit: "s"
+    group: grouping
+
+  force_cpu:
+    widget: checkbox
+    label: "Force CPU (disable GPU inference)"
+    description: "Useful when CUDA is present but unstable, or to free GPU for ASR"
+    data_type: bool
+    group: processing
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.whisperseg
+  class: WhisperSegSpeechSegmenter

@@ -161,6 +161,10 @@ def validate_pyproject_sync(pyproject_path: Path = None) -> List[str]:
         "dev",      # Development dependencies
         "test",     # Testing dependencies
         "docs",     # Documentation dependencies
+        # WhisperSeg VAD (v1.8.12+) — pyproject composes onnxruntime (already
+        # registered under ENHANCE) + whisperjav[huggingface]. No registry drift.
+        "whisperseg",
+        "whisperseg-gpu",  # adds onnxruntime-gpu (not registered; opt-in wheel)
     }
 
     actual_extras = set(actual.keys())

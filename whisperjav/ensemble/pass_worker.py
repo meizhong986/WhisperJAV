@@ -117,6 +117,7 @@ _SEGMENTER_TOOL_NAMES = {
     "whisper-vad-base": "whisper-vad-speech-segmentation",
     "whisper-vad-small": "whisper-vad-speech-segmentation",
     "whisper-vad-medium": "whisper-vad-speech-segmentation",
+    "whisperseg": "whisperseg-speech-segmentation",
 }
 
 # Provider params - common transcriber options shared by all backends

@@ -230,6 +230,23 @@ huggingface = [
     "hf_xet",  # Faster HuggingFace downloads
 ]
 
+# WhisperSeg ONNX speech segmenter (v1.8.12+)
+# Install with: pip install whisperjav[whisperseg]
+# Backend: TransWithAI/Whisper-Vad-EncDec-ASMR-onnx (MIT, 119 MB on first run)
+# Note: CPU-only. For CUDA, use whisperjav[whisperseg-gpu] instead.
+whisperseg = [
+    "onnxruntime>=1.16.0",
+    "whisperjav[huggingface]",  # transformers (WhisperFeatureExtractor) + huggingface-hub
+]
+
+# WhisperSeg GPU variant — onnxruntime-gpu wheel is ~400 MB
+# Install with: pip install whisperjav[whisperseg-gpu]
+# Do NOT install alongside whisperseg; the -gpu package replaces the CPU one.
+whisperseg-gpu = [
+    "whisperjav[whisperseg]",
+    "onnxruntime-gpu>=1.16.0",
+]
+
 # Qwen3-ASR support (v1.8.3+)
 # Install with: pip install whisperjav[qwen]
 # Note: Requires huggingface extra for transformers backend

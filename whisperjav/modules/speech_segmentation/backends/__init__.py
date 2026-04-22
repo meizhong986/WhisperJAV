@@ -6,6 +6,7 @@ Available backends:
 - silero-v6.2: Silero VAD v6.2 via pip (max_speech_duration_s + hysteresis)
 - nemo: NVIDIA NeMo VAD
 - ten: TEN Framework VAD
+- whisperseg: WhisperSeg encoder-decoder VAD (ONNX, trained on Japanese ASMR)
 - none: Passthrough (no segmentation)
 """
 
