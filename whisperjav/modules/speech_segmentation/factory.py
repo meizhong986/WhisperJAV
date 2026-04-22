@@ -99,7 +99,6 @@ _PARAM_SCHEMAS = {
         "min_speech_duration_ms":  (int,   None,  True),
         "min_silence_duration_ms": (int,   None,  True),
         "speech_pad_ms":           (int,   None,  True),
-        "neg_threshold":           (float, None,  True),
         "max_speech_duration_s":   (float, None,  True),
         "chunk_threshold_s":       (float, None,  True),
         "max_group_duration_s":    (float, None,  True),
@@ -108,7 +107,6 @@ _PARAM_SCHEMAS = {
     },
     "silero-v6.2": {
         "threshold":                        (float, 0.35, False),
-        "neg_threshold":                    (float, None, True),   # None = auto-calc
         "min_speech_duration_ms":           (int,   100,  False),
         "max_speech_duration_s":            (float, None, True),   # None = inherit
         "min_silence_duration_ms":          (int,   100,  False),
@@ -140,7 +138,6 @@ _PARAM_SCHEMAS = {
     },
     "whisperseg": {
         "threshold":               (float, 0.35, False),
-        "neg_threshold":           (float, None, True),   # None → auto (threshold - 0.15)
         "min_speech_duration_ms":  (int,   100,  False),
         "min_silence_duration_ms": (int,   100,  False),
         "speech_pad_ms":           (int,   300,  False),

@@ -21,8 +21,6 @@ High-quality Voice Activity Detection from Silero team.
 Parameter values match v1 asr_config.json exactly for backward compatibility.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 from whisperjav.config.components.base import VADComponent, register_vad
@@ -52,11 +50,6 @@ class SileroVADOptions(BaseModel):
         300,
         ge=0, le=5000,
         description="Minimum silence duration to split segments."
-    )
-    neg_threshold: Optional[float] = Field(
-        None,
-        ge=0.0, le=1.0,
-        description="Negative speech threshold for deactivation. None = let VAD internal logic handle."
     )
     speech_pad_ms: int = Field(
         700,

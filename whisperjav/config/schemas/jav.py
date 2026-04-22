@@ -68,6 +68,5 @@ class JAVAudioConfig(BaseConfig):
 
         if self.quiet_speech_boost:
             adjustments["min_speech_duration_ms"] = -50  # Shorter min
-            adjustments["neg_threshold"] = -0.05
 
         return adjustments

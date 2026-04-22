@@ -86,7 +86,6 @@ DECODER_PARAMS = {
 SEGMENTER_PARAMS = {
     # Core VAD (Silero, shared)
     "threshold",
-    "neg_threshold",           # Keep for CLI backward compat (not in GUI)
     "min_speech_duration_ms",
     "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
     "min_silence_duration_ms",

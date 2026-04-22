@@ -109,7 +109,6 @@ SILERO_VAD_PRESETS = {
         min_speech_duration_ms=100,
         max_speech_duration_s=7.0,            # v1.8.10-hf3: 11.0→7.0
         min_silence_duration_ms=300,
-        # neg_threshold: None — let VAD internal logic handle
         speech_pad_ms=400
     ),
     Sensitivity.CONSERVATIVE: SileroVADOptions(
@@ -117,7 +116,6 @@ SILERO_VAD_PRESETS = {
         min_speech_duration_ms=150,
         max_speech_duration_s=6.0,            # v1.8.10-hf3: 9.0→6.0
         min_silence_duration_ms=300,
-        # neg_threshold: None — let VAD internal logic handle
         speech_pad_ms=500
     ),
     Sensitivity.AGGRESSIVE: SileroVADOptions(
@@ -125,7 +123,6 @@ SILERO_VAD_PRESETS = {
         min_speech_duration_ms=30,
         max_speech_duration_s=8.0,            # v1.8.10-hf3: 14.0→8.0
         min_silence_duration_ms=300,
-        # neg_threshold: None — let VAD internal logic handle
         speech_pad_ms=300
     ),
 }

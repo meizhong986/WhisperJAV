@@ -3,8 +3,10 @@ Silero VAD v6.2 speech segmentation backend.
 
 Uses the silero-vad pip package (>=6.2) which provides:
 - max_speech_duration_s: Force-splits long speech chunks at internal silences
-- neg_threshold: Hysteresis for stable segmentation in noisy audio
 - speech_pad_ms: Internal padding (no manual sample-based padding needed)
+
+The library auto-computes a negative (offset) threshold as
+max(threshold − 0.15, 0.01); this is not overridden by WhisperJAV.
 
 These features solve TEN VAD's failure to detect pauses in fast Japanese
 dialogue scenes with background audio.
@@ -29,7 +31,9 @@ class SileroV6SpeechSegmenter:
     Silero VAD v6.2 speech segmentation backend.
 
     Uses the silero-vad pip package API (load_silero_vad, get_speech_timestamps)
-    with v6.2 features: max_speech_duration_s, neg_threshold, and speech_pad_ms.
+    with v6.2 features: max_speech_duration_s and speech_pad_ms. The library
+    auto-computes the offset (hysteresis) threshold internally from the onset
+    threshold — not overridden.
 
     JAV-tuned defaults:
     - threshold=0.35: Captures speech overlapping with breathing/moaning
@@ -45,7 +49,6 @@ class SileroV6SpeechSegmenter:
     def __init__(
         self,
         threshold: float = 0.35,
-        neg_threshold: Optional[float] = None,
         min_speech_duration_ms: int = 100,
         max_speech_duration_s: Optional[float] = None,
         min_silence_duration_ms: int = 100,
@@ -62,10 +65,9 @@ class SileroV6SpeechSegmenter:
         Args:
             threshold: Speech probability threshold [0.0, 1.0]. Higher = more
                 selective. Default 0.35 (JAV-tuned: captures speech overlapping
-                with breathing/moaning; v6.2 library default is 0.5).
-            neg_threshold: Hysteresis threshold for speech end detection.
-                None = auto-calculated as threshold - 0.15 by v6.2.
-                Provides stable segmentation in noisy audio.
+                with breathing/moaning; v6.2 library default is 0.5). The
+                offset threshold is auto-computed inside silero-vad as
+                max(threshold − 0.15, 0.01); not user-tunable.
             min_speech_duration_ms: Minimum speech segment duration.
                 Default 100ms to preserve short Japanese utterances.
             max_speech_duration_s: Force-split long speech at internal silences.
@@ -87,7 +89,6 @@ class SileroV6SpeechSegmenter:
             **kwargs: Absorbs factory-injected parameters (e.g., version) harmlessly.
         """
         self.threshold = float(threshold)
-        self.neg_threshold = float(neg_threshold) if neg_threshold is not None else None
         self.min_speech_duration_ms = int(min_speech_duration_ms)
         self.min_silence_duration_ms = int(min_silence_duration_ms)
         self.speech_pad_ms = int(speech_pad_ms)
@@ -196,11 +197,10 @@ class SileroV6SpeechSegmenter:
                 "use_max_poss_sil_at_max_speech": self.use_max_poss_sil_at_max_speech,
             }
 
-            # TEMPORARILY COMMENTED OUT for testing — let silero-vad auto-calculate
-            # neg_threshold from threshold (default: max(threshold - 0.15, 0.01))
-            # to investigate whether explicit neg_threshold is killing coverage.
-            # if self.neg_threshold is not None:
-            #     vad_kwargs["neg_threshold"] = self.neg_threshold
+            # Note: neg_threshold is intentionally NOT forwarded. silero-vad
+            # computes it internally as max(threshold - 0.15, 0.01), which
+            # matches the library default and is what forensic testing showed
+            # works best for JAV content.
 
             speech_timestamps = get_speech_timestamps(
                 audio_tensor,
@@ -305,7 +305,6 @@ class SileroV6SpeechSegmenter:
         """Return current parameters."""
         return {
             "threshold": self.threshold,
-            "neg_threshold": self.neg_threshold,
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "max_speech_duration_s": self.max_speech_duration_s,
             "min_silence_duration_ms": self.min_silence_duration_ms,
