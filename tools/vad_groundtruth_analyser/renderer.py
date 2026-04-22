@@ -118,21 +118,8 @@ def _format_vad_hover(seg: VadSegment, backend_name: str) -> str:
     return "<br>".join(parts)
 
 
-def _metrics_badge(rep: BackendReport) -> str:
-    """Short metric summary for the y-axis label of a backend row."""
-    parts = [f"<b>{rep.display_name}</b>"]
-    if rep.metrics is not None:
-        m = rep.metrics
-        parts.append(
-            f"F1={m.frame_f1:.2f}  P={m.frame_precision:.2f}  "
-            f"R={m.frame_recall:.2f}<br>"
-            f"miss={m.missed_speech_pct:.1f}%  FA={m.false_alarm_pct:.1f}%"
-        )
-    else:
-        parts.append(
-            f"{rep.num_segments} segs  cov={rep.coverage_ratio*100:.1f}%"
-        )
-    return "<br>".join(parts)
+# (previous _metrics_badge helper removed — label composition moved inline
+# into render_html where it's attached as a y-axis title per row.)
 
 
 def _add_segment_bars(
@@ -235,22 +222,24 @@ def render_html(
     total = sum(row_heights)
     row_heights = [h / total for h in row_heights]
 
-    subplot_titles = ["Waveform"]
-    if has_gt_row:
-        subplot_titles.append("Ground Truth")
-    for name, rep in successful_backends:
-        subplot_titles.append(_metrics_badge(rep))
-
+    # NOTE: We intentionally do NOT use subplot_titles. Plotly places them in
+    # the narrow gap between rows, which (with tight vertical_spacing) makes
+    # each label visually read as if it belonged to the row ABOVE it. Instead,
+    # we attach labels as y-axis titles — these are anchored to their own
+    # subplot and render to the LEFT of each row, unambiguously.
     fig = make_subplots(
         rows=n_rows,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.02,
+        vertical_spacing=0.03,
         row_heights=row_heights,
-        subplot_titles=subplot_titles,
     )
 
-    # --- Row 0: Waveform ---------------------------------------------------
+    # Collected (row_idx, label_text, colour) for horizontal annotations
+    # rendered in the left margin once the layout is finalised.
+    row_labels: List[tuple] = []
+
+    # --- Row 1: Waveform ---------------------------------------------------
     ds = _downsample_waveform(waveform, max_points=waveform_points)
     x_wave = np.linspace(0.0, duration, len(ds))
     fig.add_trace(
@@ -266,6 +255,7 @@ def render_html(
         ),
         row=1, col=1,
     )
+    row_labels.append((1, "<b>Waveform</b><br>amplitude", COLORS["waveform"]))
 
     current_row = 2
 
@@ -282,10 +272,17 @@ def render_html(
             name="Ground Truth",
         )
         fig.update_yaxes(
-            visible=False,
+            showticklabels=False,
             range=[-0.5, 0.5],
             row=current_row, col=1,
         )
+        # Record this row's label + colour for horizontal annotation pass below.
+        gt_n = report.ground_truth.get("num_segments", len(gt_segments)) if report.ground_truth else len(gt_segments)
+        row_labels.append((
+            current_row,
+            f"<b>Ground Truth</b><br>{gt_n} segments",
+            COLORS["ground_truth"],
+        ))
         current_row += 1
 
     # --- Backend rows -----------------------------------------------------
@@ -302,10 +299,25 @@ def render_html(
             name=rep.display_name,
         )
         fig.update_yaxes(
-            visible=False,
+            showticklabels=False,
             range=[-0.5, 0.5],
             row=current_row, col=1,
         )
+        # Build per-row label (will be rendered horizontally via annotation below)
+        label_lines = [f"<b>{rep.display_name}</b>"]
+        if rep.metrics is not None:
+            m = rep.metrics
+            label_lines.append(
+                f"F1={m.frame_f1:.2f}  P={m.frame_precision:.2f}  R={m.frame_recall:.2f}"
+            )
+            label_lines.append(
+                f"miss={m.missed_speech_pct:.1f}%  FA={m.false_alarm_pct:.1f}%"
+            )
+        else:
+            label_lines.append(
+                f"{rep.num_segments} segs  cov={rep.coverage_ratio * 100:.1f}%"
+            )
+        row_labels.append((current_row, "<br>".join(label_lines), line_color))
         current_row += 1
 
     # --- Layout & cosmetics -----------------------------------------------
@@ -341,40 +353,85 @@ def render_html(
         plot_bgcolor=BG_DARK,
         paper_bgcolor=BG_DARK,
         font=dict(color=TEXT_LIGHT, family="Arial, sans-serif"),
-        margin=dict(l=60, r=30, t=70, b=60),
-        height=max(400, 220 + n_rows * 100),
+        # Wider left margin hosts horizontal row labels.
+        # Wider bottom margin hosts the metric-glossary footer.
+        margin=dict(l=240, r=30, t=80, b=120),
+        height=max(400, 260 + n_rows * 100),
         bargap=0,
     )
 
-    # Waveform y-axis: amplitude, gridded
+    # Waveform y-axis: amplitude ticks + gridlines (label handled by annotation).
     fig.update_yaxes(
-        title_text="amp",
-        title_font=dict(size=10),
         gridcolor=GRID,
         zerolinecolor=GRID,
         row=1, col=1,
     )
 
-    # Share x-axis range; add range slider on the last row
+    # Shared x-axis; NO rangeslider (Plotly's native box-zoom / drag-pan / scroll
+    # zoom already cover navigation, and a rangeslider on the last row shows a
+    # misleading miniature of only that backend's trace).
     fig.update_xaxes(
         gridcolor=GRID,
         zerolinecolor=GRID,
         range=[0, duration],
     )
     fig.update_xaxes(
-        rangeslider=dict(visible=True, thickness=0.05, bgcolor=BG_DARK),
         title_text="Time (seconds)",
         row=n_rows, col=1,
     )
 
-    # Subplot titles — make them left-aligned and small
-    for ann in fig.layout.annotations:
-        ann.update(
-            xanchor="left",
-            x=0.0,
-            xref="paper",
-            font=dict(size=10, color=TEXT_LIGHT),
+    # --- Horizontal row labels in the left margin ----------------------------
+    # Each row's yaxis domain is in paper coordinates after make_subplots.
+    # We anchor each label's right edge just outside the plot area (paper x≈-0.005)
+    # and its vertical midpoint at the row's centre, with textangle=0 (horizontal).
+    for row_idx, label_text, colour in row_labels:
+        axis_key = "yaxis" if row_idx == 1 else f"yaxis{row_idx}"
+        try:
+            domain = fig.layout[axis_key].domain
+            y_center = (float(domain[0]) + float(domain[1])) / 2.0
+        except (AttributeError, KeyError, TypeError):
+            # Fallback: evenly divide [0, 1] if domain not populated.
+            y_center = 1.0 - (row_idx - 0.5) / n_rows
+        fig.add_annotation(
+            text=label_text,
+            xref="paper", yref="paper",
+            x=-0.005, y=y_center,
+            xanchor="right", yanchor="middle",
+            showarrow=False,
+            textangle=0,
+            font=dict(size=11, color=colour),
+            align="right",
         )
+
+    # --- Metric-glossary footer (bottom margin) ------------------------------
+    # Explains the per-row abbreviations so the chart is self-documenting.
+    # Different content for GT vs GT-less modes.
+    if report.ground_truth:
+        footer_text = (
+            "<b>Metrics glossary</b>   "
+            f"F1 = 2·P·R / (P+R), harmonic mean of precision and recall   "
+            f"&nbsp;•&nbsp;   P (precision) = backend-speech frames that are also GT-speech   "
+            f"&nbsp;•&nbsp;   R (recall) = GT-speech frames covered by backend<br>"
+            f"miss% = GT-speech frames not covered by backend   "
+            f"&nbsp;•&nbsp;   FA% (false-alarm) = backend-speech frames with no GT overlap   "
+            f"&nbsp;•&nbsp;   frame grid = {report.frame_ms} ms"
+        )
+    else:
+        footer_text = (
+            "<b>GT-less mode</b> — no ground-truth SRT was provided.<br>"
+            "Per backend: segs = segment count,  cov% = fraction of audio marked as speech.   "
+            "Agreement matrix (in console summary + JSON) = pairwise F1 between successful backends."
+        )
+    fig.add_annotation(
+        text=footer_text,
+        xref="paper", yref="paper",
+        x=0.5, y=-0.12,
+        xanchor="center", yanchor="top",
+        showarrow=False,
+        textangle=0,
+        font=dict(size=10, color="#bbbbbb"),
+        align="center",
+    )
 
     # Write self-contained offline HTML
     output_path = Path(output_path)
