@@ -450,10 +450,13 @@
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1" selected>Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
-                                            <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
-                                            <option value="whisper-vad">Whisper VAD (small)</option>
-                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
-                                            <option value="whisper-vad-medium">Whisper VAD (medium)</option>
+                                            <!-- Hidden from GUI in v1.8.12 — still selectable via --speech-segmenter CLI.
+                                                 NeMo Lite: requires heavy nemo_toolkit (2GB+), usually unavailable.
+                                                 Whisper VAD variants: superseded by WhisperSeg for JAV content. -->
+                                            <!-- <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option> -->
+                                            <!-- <option value="whisper-vad">Whisper VAD (small)</option> -->
+                                            <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
+                                            <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
                                             <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Requires onnxruntime (install via whisperjav[whisperseg] or [enhance]).">WhisperSeg (JA-ASMR)</option>
                                             <option value="none">None</option>
@@ -605,10 +608,13 @@
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1" selected>Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
-                                            <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option>
-                                            <option value="whisper-vad">Whisper VAD (small)</option>
-                                            <option value="whisper-vad-tiny">Whisper VAD (tiny)</option>
-                                            <option value="whisper-vad-medium">Whisper VAD (medium)</option>
+                                            <!-- Hidden from GUI in v1.8.12 — still selectable via --pass2-speech-segmenter CLI.
+                                                 NeMo Lite: requires heavy nemo_toolkit (2GB+), usually unavailable.
+                                                 Whisper VAD variants: superseded by WhisperSeg for JAV content. -->
+                                            <!-- <option value="nemo-lite" disabled title="Requires nemo_toolkit (not installed)">NeMo Lite (N/A)</option> -->
+                                            <!-- <option value="whisper-vad">Whisper VAD (small)</option> -->
+                                            <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
+                                            <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
                                             <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Requires onnxruntime (install via whisperjav[whisperseg] or [enhance]).">WhisperSeg (JA-ASMR)</option>
                                             <option value="none">None</option>
