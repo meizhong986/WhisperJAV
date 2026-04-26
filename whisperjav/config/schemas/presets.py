@@ -2,6 +2,21 @@
 Sensitivity presets for WhisperJAV Configuration System v2.0.
 
 Contains all preset values from asr_config.json organized by sensitivity level.
+
+v1.8.12 status
+--------------
+This module is LEGACY (v2 config). The runtime source of truth for preset values
+is the per-engine component file:
+
+    whisperjav/config/components/asr/faster_whisper.py
+    whisperjav/config/components/asr/openai_whisper.py
+    whisperjav/config/components/asr/stable_ts.py
+
+Values in this file mirror the **faster-whisper** component for the most common
+runtime paths (balanced pipeline). One known engine divergence is NOT reflected
+here — openai-whisper uses ``logprob_threshold = -1.30`` for the Aggressive
+sensitivity (vs. faster-whisper's ``-1.00``). For the openai-whisper canonical
+values, read ``components/asr/openai_whisper.py`` directly.
 """
 
 from .base import Sensitivity
@@ -15,10 +30,10 @@ TRANSCRIBER_PRESETS = {
     Sensitivity.BALANCED: TranscriberOptions(
         temperature=[0.0],                        # v1.8.10-hf3: [0.0, 0.1]→[0.0]
         compression_ratio_threshold=2.4,
-        logprob_threshold=-1.00,                  # v1.8.10-hf3: -1.2→-1.00
+        logprob_threshold=-0.85,                  # v1.8.10-hf3: -1.2→-1.00; v1.8.12: -1.00→-0.85, engine-split retune
         logprob_margin=0.0,                       # v1.8.10-hf3: 0.2→0.0
         drop_nonverbal_vocals=False,
-        no_speech_threshold=0.65,                 # v1.8.10-hf3: 0.5→0.65
+        no_speech_threshold=0.71,                 # v1.8.10-hf3: 0.5→0.65; v1.8.12: 0.65→0.71, engine-split retune
         condition_on_previous_text=False,
         initial_prompt=None,
         word_timestamps=True,
@@ -29,10 +44,10 @@ TRANSCRIBER_PRESETS = {
     Sensitivity.CONSERVATIVE: TranscriberOptions(
         temperature=[0.0],
         compression_ratio_threshold=2.2,          # v1.8.10-hf3: 2.4→2.2
-        logprob_threshold=-0.80,                  # v1.8.10-hf3: -1.0→-0.80
+        logprob_threshold=-0.70,                  # v1.8.10-hf3: -1.0→-0.80; v1.8.12: -0.80→-0.70, engine-split retune
         logprob_margin=0.0,                       # v1.8.10-hf3: 0.1→0.0
         drop_nonverbal_vocals=False,
-        no_speech_threshold=0.46,                 # v1.8.10-hf3: 0.74→0.46
+        no_speech_threshold=0.54,                 # v1.8.10-hf3: 0.74→0.46; v1.8.12: 0.46→0.54, engine-split retune
         condition_on_previous_text=False,
         initial_prompt=None,
         word_timestamps=True,
@@ -43,10 +58,10 @@ TRANSCRIBER_PRESETS = {
     Sensitivity.AGGRESSIVE: TranscriberOptions(
         temperature=[0.0, 0.17],                  # v1.8.10-hf3: [0.0, 0.3]→[0.0, 0.17]
         compression_ratio_threshold=2.6,          # v1.8.10-hf3: 3.0→2.6
-        logprob_threshold=-1.00,                  # v1.8.10-hf3: -2.5→-1.00
+        logprob_threshold=-1.00,                  # v1.8.10-hf3: -2.5→-1.00 (faster-whisper aligned; openai-whisper uses -1.30, see module docstring)
         logprob_margin=0.0,
         drop_nonverbal_vocals=False,
-        no_speech_threshold=0.77,                 # v1.8.10-hf3: 0.22→0.77
+        no_speech_threshold=0.84,                 # v1.8.10-hf3: 0.22→0.77; v1.8.12: 0.77→0.84, engine-split retune
         condition_on_previous_text=False,
         initial_prompt=None,
         word_timestamps=True,
@@ -61,9 +76,9 @@ DECODER_PRESETS = {
     Sensitivity.BALANCED: DecoderOptions(
         task="transcribe",
         language="ja",
-        best_of=2,                                # v1.8.10-hf3: 1→2
+        best_of=1,                                # v1.8.10-hf3: 1→2; v1.8.12: 2→1, engine-split retune
         beam_size=2,
-        patience=1.6,                             # v1.8.10-hf3: 2.0→1.6
+        patience=1.5,                             # v1.8.10-hf3: 2.0→1.6; v1.8.12: 1.6→1.5, engine-split retune
         length_penalty=None,
         prefix=None,
         suppress_tokens=None,
@@ -74,9 +89,9 @@ DECODER_PRESETS = {
     Sensitivity.CONSERVATIVE: DecoderOptions(
         task="transcribe",
         language="ja",
-        best_of=2,                                # v1.8.10-hf3: 1→2
+        best_of=1,                                # v1.8.10-hf3: 1→2; v1.8.12: 2→1, engine-split retune
         beam_size=2,                              # v1.8.10-hf3: 1→2
-        patience=1.2,                             # v1.8.10-hf3: 1.5→1.2
+        patience=1.0,                             # v1.8.10-hf3: 1.5→1.2; v1.8.12: 1.2→1.0, engine-split retune
         length_penalty=None,
         prefix=None,
         suppress_tokens=None,
@@ -87,8 +102,8 @@ DECODER_PRESETS = {
     Sensitivity.AGGRESSIVE: DecoderOptions(
         task="transcribe",
         language="ja",
-        best_of=2,                                # v1.8.10-hf3: 1→2
-        beam_size=2,                              # v1.8.10-hf3: kept at 2
+        best_of=1,                                # v1.8.10-hf3: 1→2; v1.8.12: 2→1, engine-split retune
+        beam_size=3,                              # v1.8.10-hf3: kept at 2; v1.8.12: 2→3, engine-split retune
         patience=2.0,
         length_penalty=None,
         prefix=None,
