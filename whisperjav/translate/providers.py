@@ -68,5 +68,5 @@ PROVIDER_CONFIGS = {
     }
 }
 
-SUPPORTED_SOURCES = {'japanese', 'korean', 'chinese'}
-SUPPORTED_TARGETS = {'english', 'chinese', 'indonesian', 'portuguese', 'spanish'}
+SUPPORTED_SOURCES = {'japanese', 'korean', 'chinese', 'zh-tw', 'zh-hk'}
+SUPPORTED_TARGETS = {'english', 'chinese', 'zh-tw', 'zh-hk', 'indonesian', 'portuguese', 'spanish'}

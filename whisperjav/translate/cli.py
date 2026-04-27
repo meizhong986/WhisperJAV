@@ -73,14 +73,23 @@ def generate_output_path(input_path: str, target_lang: str) -> str:
     input_path = Path(input_path)
     stem = input_path.stem
 
-    # If stem has language code, replace it
+    # If stem has language code anywhere, strip them to avoid player confusion
+    lang_suffixes = [
+        'japanese', 'english', 'ja', 'en', 'jp', 
+        'chinese', 'cht', 'chs', 'zh-tw', 'zh-hk', 'zh-cn',
+        'traditional-chinese', 'simplified-chinese'
+    ]
     parts = stem.split('.')
-    if len(parts) > 1:
-        # Remove last part if it looks like a language code
-        if parts[-1] in ['japanese', 'english', 'ja', 'en', 'jp']:
-            stem = '.'.join(parts[:-1])
+    # Filter out any part that is a known language code
+    new_parts = [p for p in parts if p.lower() not in lang_suffixes]
+    stem = '.'.join(new_parts)
 
-    output_name = f"{stem}.{target_lang}.srt"
+    # Map language code to file suffix (zh-tw/zh-hk -> cht)
+    file_suffix = target_lang
+    if target_lang in ['zh-tw', 'zh-hk']:
+        file_suffix = 'cht'
+
+    output_name = f"{stem}.{file_suffix}.srt"
     return str(input_path.parent / output_name)
 
 

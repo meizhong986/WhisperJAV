@@ -189,7 +189,15 @@ def translate_subtitle(
             print(f"[TRANSLATE]   API base: {provider_config['api_base']}", file=sys.stderr)
 
         # Build prompt
-        prompt = f"Translate these subtitles from {source_lang} into {target_lang}."
+        language_prompts = {
+            'zh-tw': 'Chinese Traditional (Taiwan)',
+            'zh-hk': 'Chinese Traditional (Hong Kong)',
+            'chinese': 'Chinese Simplified',
+        }
+        prompt_target = language_prompts.get(target_lang.lower(), target_lang)
+        prompt_source = language_prompts.get(source_lang.lower(), source_lang)
+
+        prompt = f"Translate these subtitles from {prompt_source} into {prompt_target}."
         if extra_context:
             prompt += "\n" + extra_context
             print(f"[TRANSLATE]   Extra context: {extra_context[:200]}", file=sys.stderr)

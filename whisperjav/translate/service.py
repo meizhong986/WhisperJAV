@@ -325,9 +325,19 @@ def translate_with_config(
         stem = input_file.stem
         # Remove existing language suffix if present
         parts = stem.split('.')
-        if len(parts) > 1 and parts[-1] in ['japanese', 'english', 'ja', 'en', 'jp', 'chinese', 'indonesian', 'spanish']:
+        lang_suffixes = [
+            'japanese', 'english', 'ja', 'en', 'jp', 
+            'chinese', 'cht', 'chs', 'zh-tw', 'zh-hk', 'zh-cn',
+            'indonesian', 'portuguese', 'spanish'
+        ]
+        if len(parts) > 1 and parts[-1] in lang_suffixes:
             stem = '.'.join(parts[:-1])
-        resolved_output_path = input_file.parent / f"{stem}.{target_lang}.srt"
+        # Map language code to file suffix (zh-tw/zh-hk -> cht)
+        file_suffix = target_lang
+        if target_lang in ['zh-tw', 'zh-hk']:
+            file_suffix = 'cht'
+            
+        resolved_output_path = input_file.parent / f"{stem}.{file_suffix}.srt"
 
     # Log configuration
     logger.info(f"Translation: {input_file.name} -> {target_lang}")
