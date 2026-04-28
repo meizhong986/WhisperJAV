@@ -83,19 +83,29 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
 #   - coerce_fn: Type constructor to coerce values (int, float, bool)
 #   - default_value: Fallback when value is None and nullable=False
 #   - nullable: If True, None is a valid value (don't substitute default)
+# v1.8.12: GUI-fallback defaults aligned to YAML balanced presets so that empty
+# input fields produce the same effective config as a freshly-loaded preset.
+# Prior values were stale relative to YAML and produced unexpected behavior on
+# the cleared-input path.
 _PARAM_SCHEMAS = {
     "ten": {
-        "threshold":               (float, 0.26,  False),
+        "threshold":               (float, 0.32,  False),  # v1.8.12: 0.26→0.32 (YAML balanced)
         "hop_size":                (int,   256,   False),
-        "min_speech_duration_ms":  (int,   81,    False),
-        "min_silence_duration_ms": (int,   100,   False),
-        "start_pad_ms":            (int,   50,    False),
-        "end_pad_ms":              (int,   150,   False),
+        "min_speech_duration_ms":  (int,   150,   False),  # v1.8.12: 81→150 (YAML balanced)
+        "min_silence_duration_ms": (int,   150,   False),  # v1.8.12: 100→150 (YAML balanced)
+        "max_speech_duration_s":   (float, 5.0,   True),   # v1.8.12: NEW — was being stripped by foreign-key gate
+        "start_pad_ms":            (int,   0,     False),  # v1.8.12: 50→0 (YAML balanced)
+        "end_pad_ms":              (int,   200,   False),  # v1.8.12: 150→200 (YAML balanced)
         "chunk_threshold_s":       (float, 1.0,   True),
-        "max_group_duration_s":    (float, 29.0,  True),
+        "max_group_duration_s":    (float, 6.0,   True),   # v1.8.12: 29.0→6.0 (YAML balanced)
     },
     "silero": {
-        "threshold":               (float, None,  True),   # None → VERSION_DEFAULTS
+        # All nullable: backend SileroSpeechSegmenter consumes None values via
+        # VERSION_DEFAULTS (v3.1 vs v4.0). Pydantic SileroVAD presets supply
+        # concrete values for the production path (legacy balanced/fidelity);
+        # silero.py:165 chunk_threshold_s=4.0 hardcoded fallback intentionally
+        # left as-is (impact unverified).
+        "threshold":               (float, None,  True),
         "min_speech_duration_ms":  (int,   None,  True),
         "min_silence_duration_ms": (int,   None,  True),
         "speech_pad_ms":           (int,   None,  True),
@@ -106,15 +116,15 @@ _PARAM_SCHEMAS = {
         "end_pad_samples":         (int,   20800, False),
     },
     "silero-v6.2": {
-        "threshold":                        (float, 0.35, False),
-        "min_speech_duration_ms":           (int,   100,  False),
-        "max_speech_duration_s":            (float, None, True),   # None = inherit
-        "min_silence_duration_ms":          (int,   100,  False),
-        "speech_pad_ms":                    (int,   350,  False),
+        "threshold":                        (float, 0.32, False),  # v1.8.12: 0.35→0.32 (YAML balanced)
+        "min_speech_duration_ms":           (int,   150,  False),  # v1.8.12: 100→150 (YAML balanced)
+        "max_speech_duration_s":            (float, 5.0,  True),   # v1.8.12: None→5.0 (YAML balanced)
+        "min_silence_duration_ms":          (int,   150,  False),  # v1.8.12: 100→150 (YAML balanced)
+        "speech_pad_ms":                    (int,   250,  False),  # v1.8.12: 350→250 (YAML balanced)
         "min_silence_at_max_speech":        (int,   98,   False),
         "use_max_poss_sil_at_max_speech":   (bool,  True, False),
-        "chunk_threshold_s":                (float, 1.0,  True),
-        "max_group_duration_s":             (float, 29.0, True),
+        "chunk_threshold_s":                (float, 1.5,  True),   # v1.8.12: 1.0→1.5 (YAML balanced)
+        "max_group_duration_s":             (float, 6.0,  True),   # v1.8.12: 29.0→6.0 (YAML balanced)
     },
     "whisper-vad": {
         "no_speech_threshold":     (float, 0.6,   False),
@@ -141,9 +151,9 @@ _PARAM_SCHEMAS = {
         "min_speech_duration_ms":  (int,   100,  False),
         "min_silence_duration_ms": (int,   100,  False),
         "speech_pad_ms":           (int,   300,  False),
-        "max_speech_duration_s":   (float, None, True),   # None → inherit max_group
+        "max_speech_duration_s":   (float, 5.0,  True),   # v1.8.12: None→5.0 (YAML balanced, explicit)
         "chunk_threshold_s":       (float, 1.0,  True),
-        "max_group_duration_s":    (float, None, True),
+        "max_group_duration_s":    (float, 6.0,  True),   # v1.8.12: None→6.0 (YAML balanced)
         "force_cpu":               (bool,  False, False),
         "num_threads":             (int,   1,    False),
     },

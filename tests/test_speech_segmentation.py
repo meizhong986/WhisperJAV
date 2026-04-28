@@ -778,11 +778,12 @@ class TestParameterSanitization:
 
     def test_sanitize_none_non_nullable_gets_default(self):
         """None value for non-nullable param should get schema default."""
+        # v1.8.12: factory ten threshold default aligned to YAML balanced (0.32)
         result = SpeechSegmenterFactory._sanitize_params(
             "ten", {"hop_size": None, "threshold": None}
         )
         assert result["hop_size"] == 256
-        assert result["threshold"] == 0.20
+        assert result["threshold"] == 0.32
 
     def test_sanitize_string_to_int(self):
         """String should be coerced to int."""
@@ -986,12 +987,12 @@ class TestParameterSanitizationTEN:
         assert isinstance(segmenter.hop_size, int)
 
     def test_none_threshold_gets_default(self):
-        """None threshold should get schema default 0.20."""
+        """None threshold should get schema default 0.32 (v1.8.12 YAML balanced)."""
         segmenter = SpeechSegmenterFactory.create("ten", config={"threshold": None})
-        assert segmenter.threshold == 0.20
+        assert segmenter.threshold == 0.32
 
     def test_all_none_params_get_defaults(self):
-        """All None params should get safe defaults."""
+        """All None params should get safe defaults aligned to YAML balanced (v1.8.12)."""
         segmenter = SpeechSegmenterFactory.create("ten", config={
             "threshold": None,
             "hop_size": None,
@@ -999,9 +1000,9 @@ class TestParameterSanitizationTEN:
             "start_pad_ms": None,
             "end_pad_ms": None,
         })
-        assert segmenter.threshold == 0.20
+        assert segmenter.threshold == 0.32
         assert segmenter.hop_size == 256
-        assert segmenter.min_speech_duration_ms == 100
+        assert segmenter.min_speech_duration_ms == 150
         assert segmenter.start_pad_ms == 0
         assert segmenter.end_pad_ms == 200
 
