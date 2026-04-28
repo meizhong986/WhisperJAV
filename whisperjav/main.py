@@ -546,10 +546,11 @@ def parse_arguments():
                                 "for ASR transcription (Qwen/Decoupled pipelines only)")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="silero-v6.2",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
-                                    "nemo", "nemo-lite", "whisper-vad", "ten"],
+                                    "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg"],
                            help="Speech segmentation backend for VAD-based chunking: "
                                 "silero-v6.2 (default, force-splits long chunks), "
-                                "ten, silero/silero-v4.0/v3.1, nemo/nemo-lite, whisper-vad, none")
+                                "ten, silero/silero-v4.0/v3.1, whisperseg (JA-ASMR ONNX), "
+                                "nemo/nemo-lite, whisper-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
