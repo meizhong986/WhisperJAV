@@ -712,6 +712,11 @@ class QwenPipeline(BasePipeline):
             from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
             segmenter_kwargs = dict(self.segmenter_config or {})
             segmenter_kwargs["max_group_duration_s"] = self.segmenter_max_group_duration
+            # v1.8.12: forward chunk_threshold_s so anime-mode override (0.5) and
+            # any pipeline-constructor override actually reach the factory.
+            # Prior to this, only max_group_duration_s was injected and the
+            # chunk_threshold from segmenter_config (YAML) silently won.
+            segmenter_kwargs["chunk_threshold_s"] = self.segmenter_chunk_threshold
             segmenter = SpeechSegmenterFactory.create(
                 self.segmenter_backend,
                 **segmenter_kwargs,
