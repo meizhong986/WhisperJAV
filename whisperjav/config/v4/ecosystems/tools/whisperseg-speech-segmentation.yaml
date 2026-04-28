@@ -61,14 +61,20 @@ spec:
   # --- Duration Filters ---
   min_speech_duration_ms: 100
   min_silence_duration_ms: 100
-  max_speech_duration_s: null  # null = inherit max_group_duration_s
+  # v1.8.12: explicit value 5 (was null/inherit) per JA-subtitle research.
+  # Setting it explicitly is required for the tight retune since otherwise
+  # the backend inherits max_group_duration_s and the two values would be
+  # identical, defeating the purpose of two distinct caps.
+  max_speech_duration_s: 5
 
   # --- Segment Padding ---
   speech_pad_ms: 300
 
   # --- Segment Grouping ---
   chunk_threshold_s: 1.0
-  max_group_duration_s: 9.0    # Silero-v6.2 balanced baseline; below Whisper 30s
+  # v1.8.12: tightened 9→6. Typical JA dialogue groups span 2-3 subs over
+  # ~6s; this matches the natural distribution.
+  max_group_duration_s: 6
 
   # --- Runtime ---
   force_cpu: false
@@ -81,24 +87,33 @@ spec:
 presets:
   # Conservative: higher threshold, fewer false positives
   # Best for: clean studio audio, dominant single-speaker content
+  # v1.8.12: max_speech (null inherit→6), max_group 8→7 (JA-sub-research,
+  # inverted gradient: conservative threshold misses softer onsets, so
+  # slightly looser caps let the few detected segments capture full utterances)
   conservative:
     threshold: 0.45
     min_speech_duration_ms: 150
     min_silence_duration_ms: 200
     speech_pad_ms: 200
-    max_group_duration_s: 8.0
+    max_speech_duration_s: 6
+    max_group_duration_s: 7
 
   # Balanced: spec defaults
+  # v1.8.12: spec defaults updated to max_speech=5, max_group=6
   balanced: {}
 
   # Aggressive: lower threshold, maximum speech capture
   # Best for: whispered dialogue, quiet intimate audio, JAV-typical scenes
+  # v1.8.12: max_speech (null inherit→4), max_group 10→5 (JA-sub-research,
+  # inverted gradient: lower threshold catches more bursts, so tighter caps
+  # keep utterances distinct rather than lumped)
   aggressive:
     threshold: 0.25
     min_speech_duration_ms: 80
     min_silence_duration_ms: 80
     speech_pad_ms: 400
-    max_group_duration_s: 10.0
+    max_speech_duration_s: 4
+    max_group_duration_s: 5
 
 # =============================================================================
 # GUI Hints — consumed by webview_gui/api.get_segmenter_schema
