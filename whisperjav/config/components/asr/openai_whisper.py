@@ -261,7 +261,7 @@ class OpenAIWhisperASR(ASRComponent):
             task="transcribe",
             language="ja",
             beam_size=3,                          # v1.8.10-hf3: 4→2; v1.8.12: 2→3, engine-split retune
-            best_of=1,                            # v1.8.10-hf3: 3→2; v1.8.12: 2→1, engine-split retune
+            best_of=2,                            # v1.8.10-hf3: 3→2; v1.8.12: 2→1; v1.8.12.post1: 1→2, mirror faster_whisper aggressive fix
             patience=2.0,                         # v1.8.10-hf3: 2.5→2.0, retuned per forensic analysis
             length_penalty=None,
             prefix=None,

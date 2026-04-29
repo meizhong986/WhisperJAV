@@ -102,7 +102,7 @@ DECODER_PRESETS = {
     Sensitivity.AGGRESSIVE: DecoderOptions(
         task="transcribe",
         language="ja",
-        best_of=1,                                # v1.8.10-hf3: 1→2; v1.8.12: 2→1, engine-split retune
+        best_of=2,                                # v1.8.10-hf3: 1→2; v1.8.12: 2→1; v1.8.12.post1: 1→2, mirror faster_whisper aggressive fix
         beam_size=3,                              # v1.8.10-hf3: kept at 2; v1.8.12: 2→3, engine-split retune
         patience=2.0,
         length_penalty=None,
