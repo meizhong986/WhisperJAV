@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-04-18 (rev38) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **63 open** on GitHub
+> Updated: 2026-04-25 (rev44) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **70 open** on GitHub
 
 ---
 
@@ -21,16 +21,43 @@
 
 | Category | Count | Notes |
 |----------|------:|-------|
-| Total open on GitHub | **63** | +2 new since rev37: #294, #295. |
-| **v1.8.10.post3 RELEASED** | — | 2026-04-09. Stable. |
-| **v1.8.11 dev branch** | — | **SANITIZER FIXES COMPLETE 2026-04-18**. 6 commits since rev37 (5 in sanitizer chain + 1 Colab). All 91 unit tests pass. Ready to tag pending user go-ahead. |
-| **NEEDS RESPONSE** | **2** | #294 (CaliburnKoko, translation truncation), #295 (lukazzz007, best settings question). |
-| **NEEDS FOLLOW-UP** | **2** | #290 (user replied 04-17 23:41 with new threading error on zipenhancer — genuine Colab bug), #247 (foxfire881 Docker NAS ask — light ack). |
-| **AWAITING REPLY** | 18 | Unchanged from rev37. Normal turnaround 1-3 days. |
-| **FIX CODED (v1.8.11)** | **6** | `275adb5` #271 curated Ollama list + `--ollama-max-tokens`; `b3499a2` #291 Colab `llm` extra; `93bb71a` #287 Fix 1 `${N:0:M}`; `fc5353c` #287 Fix 2 symbol purge; `3508005` Fix 3 CPS newline; `783b218` Fix 5a SDH patterns. |
-| **Closed since rev37** | 0 | |
-| **SHIPPED in post3** | 6 | #272, #269, #265 (filter), #259, #267 (partial), #231. |
-| Feature requests (open) | 35 | +1: #295 arguably a question not a FR — counted under bugs. |
+| Total open on GitHub | **70** | +1 net since rev42: **+2 NEW** (#307 sanitization Q, #308 English-source + ASS/SSA request), **−1 closed** (#298 user-closed 04-23 agreeing dup of #96). |
+| **v1.8.11 RELEASED** | — | **2026-04-20**. Tagged, merged to main, pushed. GitHub Release published with `.exe` installer. |
+| **v1.8.12 dev** | — | `dev_v1.8.12` has 6 commits on top of v1.8.11: WhisperSeg VAD backend + vad_groundtruth_analyser tool + GUI wiring. NOT released. |
+| **v1.8.10.post3 RELEASED** | — | 2026-04-09. Stable (prior release). |
+| **NEEDS RESPONSE** | **6** | **#300, #304, #305, #306, #307, #308.** (#302 responded 04-25 after log-read → AWAITING REPLY.) |
+| **NEEDS FOLLOW-UP** | **3** | **#271, #231, #264.** (#294 was flipped to NEEDS FOLLOW-UP in rev43; responded 04-25 and now AWAITING REPLY.) |
+| **AWAITING REPLY** | 23 | +2 vs rev43: **#294 + #302** flipped back to AWAITING REPLY after 04-25 forensic diagnosis + response. |
+| **SHIPPED in v1.8.11, user notified** | **2** | #287, #291. (#271 was SHIPPED but received a new follow-up ask → NEEDS FOLLOW-UP.) |
+| **Closed since rev38** | 3 | #295 (reporter), #301 (Kukuindi merged into #302), **#298 (yy739566004 closed 04-23 after agreeing dup of #96)**. |
+| **SHIPPED in post3** | 6 | #272, #269, #265 (filter), #259, #267 (partial), #231 (reopened — see follow-up above). |
+| Feature requests (open) | 36 | Net 0 since rev42: **+#308** (English source + ASS/SSA), **−#298** (closed as dup of #96). |
+
+---
+
+## v1.8.11 — RELEASED (2026-04-20)
+
+Tagged and merged to main on 2026-04-20 (merge commit `97ad9a4`). GitHub Release published with `.exe` installer built from `dev-1.8.11`. Release notes in commit `e4f9b52`.
+
+**User-facing fixes** (from release notes):
+- **Subtitle sanitization** (#287): Hardening pass targeting residual `!!` / symbol-only output and SDH-style tokens that escaped previous rules.
+- **Ollama** (#271): Curated model list updated — replaced `Shisa-v2.1-Qwen3-8B` (thinking model breaking PySubtrans format) with `gemma3:12b`, `qwen2.5:7b-instruct`, `qwen2.5-abliterate`, `dolphin-llama3` (all instruct-only). Added `--ollama-max-tokens` CLI flag for output-length tuning.
+- **Colab** (#291): `install_colab.sh` now pulls in `[llm]` extra so `--provider local` works (starlette-context, sse-starlette, uvicorn, fastapi, pydantic-settings).
+
+**Developer-level changes** (hidden from release notes by user preference):
+- `${N:0:M}` slice syntax in `hallucination_remover._apply_regex_replacement_safe` (root cause of #287).
+- Symbol-only subtitle drop as defense-in-depth.
+- CPS character counting excludes `\n`.
+- New SDH patterns: tortoise shell, music symbols, HI keywords.
+- Round-2 emoji drop + normalized match + additional escapees.
+
+**Commits merged into main** via `97ad9a4` (16 commits from `dev-1.8.11`): `275adb5`, `eb05858`, `b3499a2`, `a737bdf`, `e224333`, `970af55`, `93bb71a`, `fc5353c`, `3508005`, `783b218`, `96ea413`, `bb2e020`, `10f5b13`, `e4f9b52`, `e459468`, `793d305`.
+
+**Post-release operational steps:**
+- ✅ Installer `.exe` built from `dev-1.8.11` and uploaded to GitHub Release.
+- ✅ Release notes published on GitHub Release page.
+- ✅ Tag `v1.8.11` moved to merge commit (was initially misplaced on old main; force-pushed correction).
+- ⏳ **Pending**: Sync `regexp_v09.json` to the gist referenced by `HallucinationConstants.EXACT_LIST_URL` — Fix 5a's new SDH patterns only reach offline users (bundled fallback) otherwise.
 
 ---
 
@@ -53,18 +80,27 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 
 | # | Title | Reporter | Status | Notes |
 |---|-------|----------|--------|-------|
-| **#295** | Best settings question | lukazzz007 | `NEEDS RESPONSE` | **NEW 04-18.** User says "not really an issue", asks for best-accuracy settings. P2 — brief guide answer suitable. |
-| **#294** | Doesn't translate the whole file | CaliburnKoko | `NEEDS RESPONSE` | **NEW 04-17.** Says v1.8.10 hotfix truncates SRT translation to first few minutes, hours-long processing. Pre-1.8.10 worked. P1 — needs log + translation provider info to diagnose. |
-| **#291** | Google Colab Step 3 Translation — `ModuleNotFoundError: starlette_context` | ktrankc | `FIX CODED` | **Root cause verified**: `install_colab.sh` line 176 did not include `[llm]` extra, so `starlette-context` + `sse-starlette` + `uvicorn` + `fastapi` + `pydantic-settings` were missing. **Fix committed as `b3499a2` for v1.8.11.** Responded 04-17 with manual workaround + migration-to-ollama path. |
-| **#290** | Google Colab Pass 2 Error — "Killed" after MossFormer2 load | ktrankc | `NEEDS FOLLOW-UP` | **User replied 04-17 23:41**: Colab Pro, MP3 71MB, resource panel not near ceiling on first attempt. Tried zipenhancer → **different failure**: `Failed to initialize ModelScope pipeline: cannot set number of interop threads after parallel work has started`. Process doesn't crash but enhancement fails silently for all 272 scenes. **New finding: ZipEnhancer has a Colab-specific threading-init bug.** ClearVoice OOM happens even on Pro tier. Needs v1.8.12 investigation. |
+| **#307** | Question: Principles behind JA SRT sanitization | yedkung69-ctrl | `NEEDS RESPONSE` | **NEW 04-23.** Polite thanks + deep question: how does the sanitization pipeline work under the hood? Asks about regex patterns, NLP filtering, dictionary blacklists, VAD-stage acoustic features. Good opportunity for a documentation-friendly answer. P2. Could become a FAQ entry or a docs page. |
+| **#308** | Add English source + ASS/SSA subtitle format | SangenBR | `NEEDS RESPONSE` | **NEW 04-23.** Feature request with screenshot: (1) add "English" to Source Language in AI SRT Translate (currently the target is English but source isn't selectable as English), (2) support .ass / .ssa input in the translate pipeline. P2 feature — tracked under Feature Requests. |
+| **#306** | Ensemble Mode with Anime-Whisper truncating subs | ktrankc | `NEEDS RESPONSE` | **NEW 04-23.** RunPod CUDA env, v1.8.11, `--pass1 transformers:kotoba-v2.2` + `--pass2 transformers:litagin/anime-whisper` ensemble. Pass1 produced 355 subs OK; Pass2 produced **1 segment of 13,229 chars** (anime-whisper hallucinated) which sanitizer truncated → **0 subs** from Pass 2. Merge fell back to Pass1 (351 after dedup). Clustered with #246 (anime-whisper hallucination). |
+| **#305** | 设置目标语言为中文时会有部分翻译内容变成英文 | ric-reff | `NEEDS RESPONSE` | **NEW 04-22.** CN translation target produces "large chunks of English" in output. Reporter tested `llama-cpp gemma-9b` AND `ollama shisa-v2.1-qwen3-8b` (same root cause as #271 — `shisa-v2.1-qwen3-8b` is exactly the thinking model removed from curated list in v1.8.11). Recommend `qwen2.5:7b-instruct` or `translategemma:12b`. |
+| **#304** | Why can't I use Fidelity mode? | wenkine-2026 | `NEEDS RESPONSE` | **NEW 04-22.** Console shows PyTorch incompat: GTX 1050 Ti (CC 6.1) vs. PyTorch built for sm_75+. Log reports "v1.8.10" header. Same pattern as #286. CC 6.x hardware isn't supported by the shipped CUDA wheel. Need compat-matrix FAQ / clear error. |
+| **#302** | V1.8.11 do not translate whole file & super slow than 1.8.10 | Kukuindi | `AWAITING REPLY` | **NEW 04-21.** User attached Content.txt + Deug.log.txt. **Forensic 04-25 (logs read)**: pipeline finished OK; 203 scenes, silero-v4.0 VAD found speech in 100%, but ASR produced only 28 raw subs (11% VAD→sub conversion). Root cause: ASR `no_speech_threshold=0.77` rejecting whispered/quiet JAV speech as silence. **Responded 04-25** ([comment-4317113423](https://github.com/meizhong986/WhisperJAV/issues/302#issuecomment-4317113423)): advised raising `no_speech_threshold` to **0.85** via Ensemble tab → Customize Parameters. |
+| **#301** | V1.8.11 Does not translate whole file | Kukuindi | `CLOSED` | Closed by reporter 04-21 same day as filing. Likely self-merged into their #302 (same author). |
+| **#300** | v1.8.11 install.py issue | ktrankc | `NEEDS RESPONSE` | **NEW 04-21.** uv resolver deadlock: `whisperjav[all]` → `bs-roformer-infer` → `requests>=2.31`, but pytorch index pins `requests==2.28.1`; `--index-strategy unsafe-best-match` not passed. User reverted to 1.8.10.post3 and install succeeded. Install regression specific to `[all]` + uv + pytorch index ordering. |
+| **#297** | Blank subtitle file after transcription completed | teijiIshida | `AWAITING REPLY` | **NEW 04-19.** Windows 11 25H2, GUI v1.8.10-hotfix3. Multiple files in queue transcribed, only 1 produced subtitles, rest are 0kb. User attached `whisperjav.logs.txt`. **Responded 04-21**: asked for debug-enabled log + batch-vs-separate-runs clarification + segmenter swap (log shows silero-v4.0, default is v3.1). |
+| **#296** | Model outputting "thinking or reasoning in the translation" | triatomic | `AWAITING REPLY` | **NEW 04-19.** User on `gemma3-12b` seeing chain-of-thought text in SRT output. Classic thinking-model pattern (same root cause as #271). **Responded 04-21**: explained gemma3 can still mix reasoning; recommended `translategemma:12b` or `qwen2.5:7b-instruct`; noted v1.8.11 curated list fix. |
+| **#294** | Doesn't translate the whole file | CaliburnKoko | `AWAITING REPLY` | **NEW 04-17.** **Update 04-23**: user replied with 5 log attachments. Reports: video ~116 min, output SRT only reaches ~8 min. **Forensic 04-25 (logs read)**: pipeline finished OK; 278 scenes, silero-v4.0 VAD found speech in 94%, but ASR produced only 141 raw subs (33% VAD→sub conversion). Raw stitched had dialogue 0–8 min + "Chili" hallucinations at 50–58 min + empty everywhere else. Root cause: ASR `no_speech_threshold=0.77` rejecting whispered/quiet JAV audio as silence. **Responded 04-25** ([comment-4317113102](https://github.com/meizhong986/WhisperJAV/issues/294#issuecomment-4317113102)): advised raising `no_speech_threshold` to **0.85** via Ensemble tab → Customize Parameters. |
+| **#291** | Google Colab Step 3 Translation — `ModuleNotFoundError: starlette_context` | ktrankc | `SHIPPED` v1.8.11 | **FIX SHIPPED** (`b3499a2`). User notified 04-21 with same-session pip workaround + recommended migration to `--provider ollama`. Also noted Gemini 2.0 Flash retirement. |
+| **#290** | Google Colab Pass 2 Error — "Killed" after MossFormer2 load | ktrankc | `AWAITING REPLY` | **ESCALATED 04-21 02:47**: user tested on **V100 32GB (OOM), RTX 8000 48GB (OOM), RTX PRO 6000 WS 96GB (OOM — PyTorch holding 94GB of 96GB available)**. ClearVoice-FRCRN_SE_16K gives separate numpy error: `Cannot interpret '113705354' as a data type`. OOM at 96GB rules out "heavy model"; points to tensor-retention / numpy-ModelScope interop issue. **Responded 04-21** ([comment-4287955148](https://github.com/meizhong986/WhisperJAV/issues/290#issuecomment-4287955148)): deep dive deferred to 2.x, ClearVoice to be **masked out in v1.8.12**, user invited to share any root-cause findings. |
 | **#289** | PyTorch CUDA 12.8 install timeouts | coco7887 | `AWAITING REPLY` | Responded 04-17 with bilingual China-network template (community ask + mirror roadmap + whl workaround). |
-| **#287** | All subtitles are "!!" with latest version | zoqapopita93 | `AWAITING REPLY` | Responded 04-12 asking user to switch segmenter VAD to TEN-VAD or Silero v3.1. Awaiting user reply. |
+| **#287** | All subtitles are "!!" with latest version | zoqapopita93 | `SHIPPED` v1.8.11 | **FIX SHIPPED**: full sanitizer fix chain. User notified 04-21 with root-cause explanation + upgrade paths (installer `.exe` + `Scripts\pip.exe --no-deps`). |
 | **#286** | CUDA kernel error on GTX 1050 Ti | techguru0 | `AWAITING REPLY` | User replied 04-14 "will try it" re: PyTorch 2.5.1 downgrade. Waiting on result. |
 | **#284** | v1.8.10 install stuck during PyTorch phase | qq73-maker | `AWAITING REPLY` | Follow-up 04-17: posted bilingual China-network template (community ask + mirror roadmap). |
 | **#282** | Why does Ollama need GitHub connection? | KenZP12 | `AWAITING REPLY` | Responded 04-09: gist fetch for instructions, bundled fallback works offline. |
 | **#280** | Qwen3-ASR TypeError: `check_model_inputs()` | zoqapopita93 | `AWAITING REPLY` | Responded 04-09: upstream `transformers` mismatch, suggested `pip install --no-deps transformers==4.49.0`. |
 | **#274** | Pipeline aggregation mode question | cuixiaopi | `AWAITING REPLY` | Responded 04-09: explained 2-pass ensemble mode. |
-| **#271** | Ollama translation model issues | justantopair-ai | `FIX CODED` | **v1.8.11**: curated model list fixed. `--ollama-max-tokens` CLI flag added. Responded 04-12. |
+| **#271** | Ollama translation model issues | justantopair-ai | `NEEDS FOLLOW-UP` | **FIX SHIPPED v1.8.11** (`275adb5`): curated model list + `--ollama-max-tokens`. User notification posted 04-21. **04-22: TinyRick1489 asked for `--ollama-num-ctx` flag** — reports batch auto-reduced to 11 with HF-sourced models. New ask on top of the resolved thread. |
 | **#268** | Thai + Korean translation targets | yedkung69-ctrl | `AWAITING REPLY` | Responded 04-11: GUI gap noted for v1.9.0. |
 | **#265** | Hallucination + post-processing suggestions | yangming2027 | `AWAITING REPLY` | Responded 04-09: answered @zoqapopita93, noted post3 improvements. |
 | **#263** | GPU not utilized / stuck at VAD | herlong6529424-dot | `AWAITING REPLY` | Follow-up 04-17: bilingual China-network template. |
@@ -76,27 +112,29 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#240** | GUI access violation Win11 | m739566004-svg | `SHIPPED` post2 | |
 | **#237** | XXL model questions | yangming2027 | `COMMUNITY` | |
 | **#233** | Translation error (local LLM) | WillChengCN | `RESPONDED` | Ollama recommended. |
-| **#231** | Kaggle notebook error | fzfile | `SHIPPED` post3 | Colab fix shipped. Reopened by #290/#291 patterns. |
+| **#231** | Kaggle notebook error | fzfile | `NEEDS FOLLOW-UP` | Kaggle notebook fixes (llvmlite + TORCH_HUB_TRUST_REPO + translate command path) pushed 04-21. **04-22: fzfile replied** "Sorry for the late reply. I haven't used the translation function recently, **and there are still error prompts**." Need to verify whether user tested latest notebook or an older cached one. |
 | **#227** | M1 Max transformer mode issues | dadlaugh | `STALE` | From 2026-03-17. Apple Silicon transformer mode. Not actively tracked. |
 | **#225** | GUI white screen | github3C | `STALE` | |
 | **#217** | GUI.exe not found (China network) | loveGEM | `AWAITING REPLY` | Follow-up 04-17: bilingual China-network template posted (community ask + mirror roadmap + whl workaround). User vimbackground had given up after whisper install also failed. |
 
-### Feature Requests (34)
+### Feature Requests (36)
 
 | # | Title | Priority | Target |
 |---|-------|----------|--------|
+| **#308** | Add English as source language for AI SRT Translate + ASS/SSA format support | LOW | v1.9+ — **NEW 04-23.** SangenBR. Two asks: (1) English source language in Translate dropdown (target already supports English), (2) read/write ASS/SSA subtitles (currently SRT-only). `NEEDS RESPONSE`. |
+| ~~**#298**~~ | ~~Settings persistence for API/prompt fields~~ | — | **CLOSED 04-23** (yy739566004 agreed duplicate of #96, tracked there). |
 | **#293** | Translation context / Whisper prompt feature | LOW | v1.9+ — **NEW 04-16.** User asks if movie descriptions/names as prompt would improve accuracy. Whisper and Qwen3-ASR both support initial prompt. Valid P2 ask. |
 | **#292** | Low GPU utilization with higher-end models | LOW | v1.9+ — **NEW 04-17.** User running supergemma4-26b MoE on RTX 4090. Community (@justantopair-ai) already answered with good technical explanation. Probably just needs a thumbs-up from owner. |
-| **#279** | Stash integration | LOW | Backlog |
+| **#279** | Stash integration | LOW | Backlog — l34240013 provided detailed workflow (filename convention `<VIDEO>.<LANG>.srt`, auto-trigger points). **Responded 04-21**: thanked for integration detail, backlog-confirmed (no v1.9.0 timeline). |
 | **#268** | Thai + Korean translation targets | LOW | v1.9+ |
 | **#265** | Post-translation hallucination filter (Chinese) | MEDIUM | v1.9 |
-| **#264** | Model download location customization | LOW | Responded |
+| **#264** | Model download location customization | LOW | **NEEDS FOLLOW-UP** — **04-22: starkwsam replied** challenging maintainer's answer: "your answer about `HF_HOME=I:\hf_cache` / (e.g., `I:\cache` and `I:\cache\huggingface`) lacks coherence with the earlier detailed explanation — are you a pure AI reply or verified in practice?" Wants concrete set of env vars + folder-creation steps to relocate BOTH OpenAI Whisper cache AND HF cache to I-drive. Needs a humble, verified re-reply. |
 | **#262** | Cohere Transcribe model | LOW | v1.9.x |
 | **#254** | Remove non-speech sounds | MEDIUM | v1.9 |
 | **#252** | Multi-speaker / diarization | MEDIUM | v1.9+ |
 | **#250** | Model folder documentation | LOW | Docs / FAQ |
 | **#248** | Diarization | MEDIUM | v1.9+ |
-| **#247** | Docker support | LOW | Backlog — **foxfire881 new comment 04-17** requesting docker-compose for NAS deployment (CPU-only, 7x24 use case). |
+| **#247** | Docker support | LOW | Backlog — foxfire881 requested docker-compose for NAS CPU-only 7x24 use case. **Responded 04-21**: acknowledged NAS motivator, backlog. |
 | **#246** | Serverless GPU pipeline + anime-whisper hallucination | LOW | v1.9+ — from 2026-03-31. Cluster with #265. |
 | **#242** | XXL in Pass 1 | MEDIUM | v1.9 |
 | **#239** | AMD GPU | MEDIUM | v1.9+ |
@@ -137,66 +175,75 @@ All P0 and P1 responses posted on 2026-04-09:
 - #284 (install stuck), #280 (Qwen3-ASR), #267 (numba follow-up)
 - #281 (Ollama UX), #282 (Ollama GitHub), #271 (thinking models), #259 (overwrite fix)
 
-### Outstanding Actions (rev38)
+### Outstanding Actions (rev43)
 
-**NEEDS RESPONSE queue (2):**
-- **#294** CaliburnKoko — translation truncated to first few minutes after updating to v1.8.10 hotfix. P1 bug claim but input-starved (no provider/log). Need to ask: translation provider (Ollama/local/API), approximate input SRT length, any console errors.
-- **#295** lukazzz007 — best-settings question, user explicitly says "not really an issue". Brief accuracy guide suitable (P2). Point to `--mode balanced --sensitivity aggressive` + Ollama for translation.
+**Triage queue — 7 NEEDS RESPONSE + 4 NEEDS FOLLOW-UP (updated 2026-04-24 rev43):**
 
-**NEEDS FOLLOW-UP queue (2):**
-- **#290** ktrankc — **User replied 04-17 23:41 with genuine new Colab bug**: ZipEnhancer (the workaround I recommended) fails on Colab with threading-init error. Also confirmed Colab Pro (not free-tier), 71MB MP3, RAM not near ceiling initially. **This is a v1.8.12 item** — ModelScope pipeline init runs `torch.set_num_interop_threads()` after torch has already started work, crashes on Colab's parallel-initialized runtime. Need owner reply acknowledging the new bug and pointing user to `ffmpeg-dsp` or `none` as workaround. ClearVoice OOM on Pro tier also notable.
-- **#247** Docker support — foxfire881 follow-up for NAS/CPU use case (04-17). Brief acknowledgment sufficient.
+**⚠️ Cluster alert — v1.8.11 translation truncation on long files:**
+- **#294** (CaliburnKoko, 116-min video → 8-min output) + **#302** (Kukuindi, truncated at ~31 min) — two independent reports on v1.8.11 with **attached logs on both**. Very likely a real regression. Priority P1 action: read the two log sets side-by-side, run a git-bisect if necessary between v1.8.10.post3 and the v1.8.11 merge commit. Fix candidate for v1.8.12.
 
-**v1.8.11 sanitizer fixes COMPLETE (2026-04-18):**
-- ✓ `275adb5` #271 Ollama curated list + `--ollama-max-tokens`
-- ✓ `b3499a2` #291 Colab `llm` extra
-- ✓ `970af55` #287 regression corpus (154 files, baseline frozen at HEAD `e224333`)
-- ✓ `93bb71a` #287 Fix 1 — `${N:0:M}` slice syntax implemented (17 unit tests pass)
-- ✓ `fc5353c` #287 Fix 2 — symbol-only purge (37 unit tests pass)
-- ✓ `3508005` #287 Fix 3 — CPS char count excludes `\n` (7 unit tests pass)
-- ✓ `783b218` #287 Fix 5a — tortoise shell + new music symbols + SDH keywords (30 unit tests pass)
+**Other rev42 items still outstanding** (see rev42 list below):
 
-**Total**: 91/91 unit tests pass. Regression corpus diff: 19 identical, 12 changed (all Category A per ACCEPTANCE.md). Real JAV forensic run: 51→49 subs, zero symbol-only residues leaked, legitimate dialogue preserved. CLI smoke test: `--help` exits 0. Self-review per CLAUDE.md Rule 8: complete.
+**P0 / P1 — install + translation regressions:**
+- **#300** (ktrankc, install regression) — reproduce with `pip install "whisperjav[all] @ git+…v1.8.11"` on Python 3.10/3.11 via uv. Probably needs either pinning `requests>=2.31` in the `[torch]` extra's resolution hint or recommending `--index-strategy unsafe-best-match`. User workaround works (checkout post3), so this isn't blocking everyone — but it IS blocking fresh clean installs of v1.8.11 via uv.
+- **#294 + #302 CLUSTER** (v1.8.11 long-file translation truncation) — both users confirm on v1.8.11 with attached logs. P1. Diagnose first, reply second; the root-cause finding informs both replies.
+- **#306** (ktrankc, anime-whisper ensemble produces 13k-char hallucination) — clustered with #246. Anime-whisper needs explicit `chunk_length_s` + `return_timestamps` tuning when used in Pass 2 of ensemble. Suggest reducing chunk_length or switching Pass 2 to kotoba.
+- **#305** (ric-reff, CN target producing English chunks) — SAME root cause as #271. User is running `shisa-v2.1-qwen3-8b` which was blacklisted in v1.8.11 curated list (thinking model). Tell them: upgrade to v1.8.11 and use `qwen2.5:7b-instruct` or `translategemma:12b`.
+- **#231** (fzfile follow-up) — ask user which notebook they ran (Kaggle in the repo vs. cached). Fixes are in `notebook/WhisperJAV_kaggle_parallel_edition.ipynb` on main; if they're on an older cached notebook the error persists.
+- **#271** (TinyRick1489 follow-up) — `--ollama-num-ctx` is a reasonable one-liner flag. Consider for v1.8.12 or v1.9.0 scope.
 
-**18 issues AWAITING REPLY from users.** Normal turnaround 1-3 days.
+**P2 — clarifications + new:**
+- **#307** (yedkung69-ctrl, sanitization principles Q) — friendly question. Good reply candidate: short tour of the sanitizer pipeline (regex/exact-match gists, CPS filter, symbol-only drop, hallucination-pattern repo) + pointer to `hallucination_remover.py` in the code. Could become a FAQ / docs section long-term.
+- **#308** (SangenBR, English source + ASS/SSA) — feature request. Reply: English source is a small GUI dropdown fix for v1.8.12 or v1.9.0; ASS/SSA format support is a broader subtitle-I/O track (connects to #43 DeepL and #44 GUI drag-drop — bigger work).
+- **#304** (wenkine-2026, fidelity on GTX 1050 Ti) — hardware incompat. CC 6.1 not supported by current PyTorch wheel (needs 7.5+). Point to #286 thread or a FAQ. Consider documenting min GPU compute capability.
+- **#264** (starkwsam, cache paths challenge) — humble factual re-reply needed. Verify `XDG_CACHE_HOME` actually moves Whisper cache on Windows (check in a clean env). Give exact System Environment Variables steps with folder-create instructions.
 
-### v1.8.11 Release Readiness (rev38 scoping — updated 2026-04-18)
+---
 
-**Tier A (was release blocker) — RESOLVED:**
+### Previous batch (rev40-rev41, 2026-04-21) — All replies posted
 
-| # | Issue | Resolution |
-|---|-------|-----------|
-| **#287** | "All subtitles are !!" | **FIX COMPLETE**. Root cause: `${N:0:M}` replacement syntax in `hallucination_remover._apply_regex_replacement_safe` was never implemented — dropped matched kana runs to empty, leaving trailing punctuation. Chain of 4 surgical fixes (Fix 1 ~ root cause; Fix 2 symbol purge defense-in-depth; Fix 3 CPS newline correctness; Fix 5a SDH coverage gaps) addresses both the direct bug and the adjacent correctness gaps identified during investigation. 91/91 unit tests pass. Regression corpus verified. Tier A is no longer a blocker. |
+**10 replies posted across P0/P1/P2 queues.** Comment links below:
 
-**Tier B — NOT included in v1.8.11 (scope discipline):**
+**P0 — post-release notifications (3):**
+- #287 → [comment-4285124363](https://github.com/meizhong986/WhisperJAV/issues/287#issuecomment-4285124363): v1.8.11 sanitizer fix, upgrade paths for installer + in-place pip.
+- #271 → [comment-4285124420](https://github.com/meizhong986/WhisperJAV/issues/271#issuecomment-4285124420): curated list + `--ollama-max-tokens` shipped, mentioned @TinyRick1489.
+- #291 → [comment-4285124483](https://github.com/meizhong986/WhisperJAV/issues/291#issuecomment-4285124483): Colab `[llm]` fix, Gemini 2.0 Flash retirement noted.
 
-| # | Issue | Decision |
-|---|-------|---------|
-| **#280** | Qwen3-ASR `check_model_inputs()` TypeError | **Not bundled.** Would be a one-line transformers pin, but outside the sanitizer scope we locked. Defer to v1.8.12 or v1.9.0. |
-| **#290** | Colab ClearVoice/ZipEnhancer failures | **v1.8.12 item.** User's 04-17 reply revealed a second bug (threading init) — needs investigation, not a quick fix. |
+**P0 — new issues (2):**
+- #297 → [comment-4285124255](https://github.com/meizhong986/WhisperJAV/issues/297#issuecomment-4285124255): asked for debug log + segmenter swap + batch-vs-separate-runs clarification.
+- #296 → [comment-4285124305](https://github.com/meizhong986/WhisperJAV/issues/296#issuecomment-4285124305): thinking-model explanation, recommended `translategemma:12b` / `qwen2.5:7b-instruct`.
 
-**Tier C — Deferred (unchanged from rev36):**
+**P1 (2):**
+- #290 → [comment-4285124773](https://github.com/meizhong986/WhisperJAV/issues/290#issuecomment-4285124773): summarized 3 failure modes, workaround (ffmpeg-dsp/none), v1.8.12 fix commitment.
+- #294 → [comment-4285124829](https://github.com/meizhong986/WhisperJAV/issues/294#issuecomment-4285124829): 4-point info-gathering (provider, length, console, model) + missing-vs-untranslated check.
 
-| # | Issue | Target |
-|---|-------|--------|
-| **#267** | Semantic hang / numba insufficient | v1.9.0 |
-| **#263, #284, #289, #217, #261** | China-network install cluster | v1.9.1 (explicitly stated in posted replies) |
-| **#265** | Post-translation hallucination filter | v1.9.0 |
-| **#286** | GTX 1050 Ti Pascal kernel | v1.9.0 install hardening |
+**P2 (3):**
+- #264 → [comment-4285124879](https://github.com/meizhong986/WhisperJAV/issues/264#issuecomment-4285124879): distinguished Whisper vs HF cache, `XDG_CACHE_HOME` for Whisper.
+- #279 → [comment-4285124938](https://github.com/meizhong986/WhisperJAV/issues/279#issuecomment-4285124938): thanked for workflow detail, backlog confirmation.
+- #247 → [comment-4285124985](https://github.com/meizhong986/WhisperJAV/issues/247#issuecomment-4285124985): thanked @foxfire881 for NAS motivator, backlog.
 
-**Tier D — Monitoring:**
+**Board state after rev41 batch**: 0 NEEDS RESPONSE, 0 NEEDS FOLLOW-UP, 22 AWAITING REPLY, 3 SHIPPED-awaiting-confirm.
 
-- 18 AWAITING REPLY items, normal turnaround.
-- China-network 5-issue cluster — watching for user-shared VPN/DNS recipes.
-- #217 — close candidate if no reply ~2026-04-27 (10 days from post).
+**Board state at rev42**: 5 NEEDS RESPONSE, 3 NEEDS FOLLOW-UP, 22 AWAITING REPLY, 2 SHIPPED-awaiting-confirm.
 
-**v1.8.11 is READY TO TAG.** Pending actions before release:
+**Board state at rev43**: 7 NEEDS RESPONSE, 4 NEEDS FOLLOW-UP, 21 AWAITING REPLY, 2 SHIPPED-awaiting-confirm.
 
-1. **Sync `regexp_v09.json` to gist** referenced by `HallucinationConstants.EXACT_LIST_URL` — otherwise Fix 5a's new patterns only reach offline users who fall through to bundled fallback. This is a maintainer operational step, not a code step.
-2. **Version bump**: update `whisperjav/__version__.py` and `installer/VERSION` to `1.8.11`.
-3. **Release notes**: draft covering #287 root cause + Fix 1/2/3/5a, plus previously landed Colab `llm` extra (#291) and Ollama curated list (#271). Tone should note that #287 users on silero-v3.1 default no longer see `!!` residue.
-4. **Tag + GitHub release** (mark as pre-release first, watch for regressions, then promote to stable).
-5. **Comment on #287** explaining root cause + asking reporter to confirm on their input.
+**Board state at rev44 (04-25 after #294 + #302 forensic + responses)**: **6 NEEDS RESPONSE, 3 NEEDS FOLLOW-UP, 23 AWAITING REPLY, 2 SHIPPED-awaiting-confirm.**
+
+### Operational follow-ups from v1.8.11 release
+
+- ✅ **Regex gist (`EXACT_LIST_URL`, gist `ecca22c8ddb9dcab4f6df7813c275a00`, `regexp_v09.json`)** — verified live 2026-04-21: contains v1.8.11 Fix 5a patterns (tortoise shell `〔[^〕]+〕`, emoji class expanded with `♫♩♬🎵🎶`, bracketed SDH keywords for 歓声/喘息/呼吸/ノイズ/SE/BGM/SFX). All three annotated "added v1.8.11" in the gist.
+- ✅ **Filter gist (`FILTER_LIST_URL`, gist `4882bdb3f4f5aa4034a112cebd2e0845`, `filter_sorted_v08.json`)** — manually updated by maintainer 2026-04-21. Separate from Fix 5a but now current.
+- ✅ Version bump, release notes, tag, merge, push — all complete.
+- ✅ `.exe` uploaded to GitHub Release.
+- ⚠️ Tag correction: the v1.8.11 tag was initially created on the wrong commit (old main, 1.8.10.post3 source) and force-moved to the merge commit after the merge. No-one fetched the bad tag in the interim.
+
+**Note on gist architecture**: there are TWO separate hallucination gists. `EXACT_LIST_URL` → regex patterns (v09). `FILTER_LIST_URL` → exact-match phrase list (v08). Fix 5a modified only the regex file. Worth documenting in a developer-facing note for the next maintainer update to avoid confusion.
+
+### Close candidates — re-evaluate on 2026-04-27
+- **#217** loveGEM — China-network template posted 04-17. If no reply by 04-27 (10 days), close with "feel free to reopen if you still need help".
+- **#251** zoqapopita93 (fastgit SSL) — older AWAITING. Revisit.
+- **#261** henry99a — user found cmd workaround long ago. Ask if issue is resolved.
 
 ---
 
@@ -229,7 +276,20 @@ All P0 and P1 responses posted on 2026-04-09:
 
 11. **Colab Pass 2 OOM regression (#290)** — ClearVoice 48kHz (MossFormer2_SE_48K) appears to push Colab free-tier memory past the kill threshold. Pass 1 completes 7908s of audio fine; Pass 2 dies during speech enhancement load. Options: (a) lower speech_enhancer default on Colab to `zipenhancer` (16kHz, much smaller), (b) add Colab memory detection and auto-downgrade, (c) document Colab memory constraint in Colab notebook header. Likely regression from post3 ClearVoice-48kHz default.
 
-12. **Colab local-LLM break (#291)** — `starlette_context` not pulled in as transitive dep by current `llama-cpp-python[server]`. The deprecation warning already says migrate to Ollama. Since v1.9.0 will remove llama-cpp entirely, fix options: (a) pin `starlette-context` in Colab extras, (b) surface explicit error guiding to `--provider ollama`, (c) no-op (deprecated path, will be gone in v1.9.0).
+12. ~~**Colab local-LLM break (#291)**~~ — **FIXED in v1.8.11** (commit `b3499a2`). `install_colab.sh` now pulls the `[llm]` extra, bringing in `starlette-context`, `sse-starlette`, `uvicorn`, `fastapi`, `pydantic-settings`. Still-valid observation: `--provider local` is scheduled for removal in v1.9.0 regardless.
+
+14. **ClearVoice looks like a MEMORY LEAK, not a heavy model (#290)** — updated 2026-04-21 with new data from reporter @ktrankc. Original 3-mode hypothesis was insufficient. New evidence:
+    - **V100 32GB** → CUDA OOM during MossFormer2_SE_48K
+    - **RTX 8000 48GB** → CUDA OOM
+    - **RTX PRO 6000 WS 96GB** → CUDA OOM, **PyTorch already holding 94.28 GiB** when ClearVoice tried to allocate 868 MiB
+    - **Colab Pro** → RAM "Killed"
+    - **RTX 3090 24GB** → CUDA OOM at 21.8GB
+    - **Colab L4 (ZipEnhancer)** → separate ModelScope threading-init race (real bug)
+    - **ClearVoice-FRCRN_SE_16K** → separate numpy error: `Cannot interpret '113705354' as a data type`
+
+    OOM on 96GB VRAM rules out the "model is big" interpretation. Either ClearVoice isn't releasing scene tensors between enhancement calls, or there's a numpy / ModelScope binary-compat issue that bleeds memory. Verified 04-21: `clearvoice.py` DOES resample correctly to the model's native SR (so wrong-kHz-to-48K hypothesis is NOT the cause) and DOES call `del` + `gc.collect()` + `torch.cuda.empty_cache()` in `cleanup()` — but `cleanup()` only fires on `__del__`, not per-scene. The enhancer instance is reused across all scenes with no `torch.no_grad()` wrapper and no explicit `.eval()` enforcement in `_process_audio`.
+
+    **Decision 04-21**: do NOT attempt a leak fix in v1.8.12. Mask ClearVoice out in the GUI + CLI, keep backend code in place, defer deep dive to the 2.x series. Rationale: cross-hardware scaling (32GB→96GB all OOM) suggests a fundamental interop issue that needs careful investigation, not a quick patch. Users are directed to `zipenhancer` (owner's own daily driver) or `ffmpeg-dsp`.
 
 13. **#281 closure pattern (uninstall+reinstall with admin)** — wlee15 resolved Ollama detection by reinstalling as all-users with admin. Similar to other "all-users-install fixes it" reports. Worth investigating why user-local installs have more Ollama detection friction. Could be a PATH / env var inheritance issue.
 
@@ -239,13 +299,13 @@ All P0 and P1 responses posted on 2026-04-09:
 
 | Cluster | Issues | Primary | Status |
 |---------|--------|---------|--------|
-| **Ollama / Translation** | #293, #292, #282, #271, #259, #255, #233, #132 | #132 | #281 CLOSED by reporter (uninstall+reinstall as admin). #271 FIX CODED. Community-saturated cluster. |
+| **Ollama / Translation** | #296, #293, #292, #282, #271, #259, #255, #233, #132 | #132 | #281 CLOSED. **#271 SHIPPED in v1.8.11** (curated list + max-tokens flag). **#296 NEW**: same thinking-model pattern as #271 with gemma3. Community-saturated cluster. |
 | **Install: PyTorch download / China network** | #289, #284, #217, #263, #261, #243 | #284 | **Growing cluster** — 6 issues touching PyTorch download timeouts / TLS resets / GFW. v1.9.0 install hardening imperative. |
 | **Install: GPU architecture mismatch** | #286, #243 | #286 | GTX 10-series Pascal kernel dropped from recent torch wheels. Downgrade to 2.5.1+cu118 workaround. |
-| **Colab regressions** | #291, #290, #231 | #290 | post3 fixed #231 for numpy2 but Pass 2 OOM (#290) and local LLM (#291) now broken. |
+| **Colab regressions** | #291, #290, #231 | #290 | **#291 SHIPPED in v1.8.11** (`[llm]` extra). **#290 STILL OPEN** — now 3 failure modes confirmed across Colab Pro/L4 and 3090 24GB. ClearVoice memory profile is the thread. v1.8.12. |
 | **Semantic hang / numba** | #267 (closed), #263 | #267 | Fix shipped in post3 but reported insufficient. #263 distinct root cause (GFW). |
 | **Qwen3-ASR** | #280, #215 | #280 | Upstream transformers mismatch. |
-| **Quality / Sanitizer regression** | #287, #265, #246 | #287 | #287 "!!" only — possible silero-v3.1-default regression. Awaiting user VAD-swap test. |
+| **Quality / Sanitizer regression** | #287, #297, #265, #246 | #287 | **#287 SHIPPED in v1.8.11** (full sanitizer chain). **#297 NEW**: blank SRT on batch — unknown if related; needs log review. |
 | **Diarization** | #248, #252 | #248 | v1.9+. |
 | **AMD/Intel GPU** | #239, #142, #114, #213 | #142 | v1.9+. |
 | **i18n** | #175, #180 | #180 | v1.9.0 P0. |
@@ -255,6 +315,19 @@ All P0 and P1 responses posted on 2026-04-09:
 ---
 
 ## Release Roadmap
+
+### v1.8.12 — Next Point Release (candidate scope)
+
+**Theme: Post-1.8.11 hardening, Colab memory, installer PATH**
+
+| Priority | Item | Issues | Effort | Notes |
+|---|---|---|---|---|
+| **P0** | Mask ClearVoice out of enhancer options | #290 | Small | **Decision 04-21**: disable (mask out) ClearVoice in GUI dropdown + CLI choices + factory guard (fall back to `zipenhancer` / `ffmpeg-dsp` if old config still requests it). Keep backend code in place for re-enable after 2.x deep dive. Separately: ZipEnhancer ModelScope threading-init race (real bug, still fix in v1.8.12). Separately: ClearVoice leak investigation deferred to **2.x**. |
+| **P0** | Installer PATH bug | — | Small | Standalone installer fails to persist user PATH — system `ffmpeg` (potentially 8.x) wins over bundled 7.1.1. Hypothesized link to audio-processing hangs (unverified). See `memory/project_v1812_installer_path_bug.md`. |
+| **P1** | Default backend flip: `auditok→semantic`, `silero-v3.1→ten` | — | Small | 8 edits across CLI + GUI Ensemble tab. Notebook already has these defaults on `dev-1.8.11`. See `memory/project_v1812_default_backends_flip.md`. |
+| **P1** | Blank SRT on batch triage (#297) | #297 | ? | Triage first — may or may not be bug. Review attached log. |
+| **P2** | Qwen3-ASR transformers pin | #280 | Small | One-line pin. Was deferred from v1.8.11 for scope discipline. |
+| **P2** | Gist sync operational check | — | Trivial | Confirm `regexp_v09.json` synced to `HallucinationConstants.EXACT_LIST_URL` gist (flagged as pending in rev38 pre-release checklist). |
 
 ### v1.9.0 — Next Major Release
 
@@ -301,7 +374,13 @@ All P0 and P1 responses posted on 2026-04-09:
 
 | Date | Changes |
 |------|---------|
-| **2026-04-18** | **rev38.** 61→63 open (+2 new: #294 truncated translation, #295 best-settings question). **v1.8.11 sanitizer fix work COMPLETE**: 5 commits landed (`970af55` corpus, `93bb71a` Fix 1 ${N:0:M}, `fc5353c` Fix 2 symbol purge, `3508005` Fix 3 CPS newline, `783b218` Fix 5a SDH patterns). 91/91 unit tests pass. Regression corpus verified (19 identical, 12 Category-A changes). Real JAV forensic run showed zero symbol-only residues leaked. **#287 Tier A blocker RESOLVED.** #290 flipped to NEEDS FOLLOW-UP: user replied with new ZipEnhancer threading bug (v1.8.12 item). v1.8.11 ready to tag pending version bump, gist sync for Fix 5a, and release notes. |
+| **2026-04-25** | **rev44.** Forensic log-read on **#294 + #302** (v1.8.11 "translation truncation" cluster). Result: **not a translation bug, not a regression unique to v1.8.11**. Both runs finished normally — pipeline: full-duration audio extract → auditok scene detect (278 / 203 scenes) → silero-v4.0 VAD finds speech in 94% / 100% → faster-whisper-large-v3 aggressive preset (`no_speech_threshold=0.77`) silently classifies most whispered/breathy scenes as silence. Result: 33% / 11% VAD-segment→subtitle conversion. #294 raw stitched contained real dialogue 0-8 min + 16 `Chili` hallucinations at 50-58 min + empty 42+58 min stretches. Secondary finding: **`BalancedPipeline` creates `silero-v4.0` despite v1.8.10.post3 defaulting to silero-v3.1** — config resolver logs v3.1 but factory call uses v4.0 with `version='v4.0'` param. Requires code-level check. Response sent to both users: raise `no_speech_threshold` from 0.77 → 0.85 via Ensemble tab → Customize Parameters (GUI route). #294 and #302 flipped to AWAITING REPLY. v1.8.12 candidate: if users confirm 0.85 helps, promote aggressive default in `components/asr/faster_whisper.py` and `openai_whisper.py`. Separately, consider one-line CLI flag `--no-speech-threshold` for easier user experimentation. **Board state**: **6 NEEDS RESPONSE, 3 NEEDS FOLLOW-UP, 23 AWAITING REPLY, 2 SHIPPED-awaiting-confirm.** |
+| **2026-04-24** | **rev43.** 69→70 open. **+2 new issues** since rev42: **#307** (yedkung69-ctrl — polite Q about JA SRT sanitization pipeline principles; good documentation opportunity), **#308** (SangenBR — feature: add English as source language in AI SRT Translate + support ASS/SSA subtitle format). **1 closed** (#298 yy739566004 closed 04-23 agreeing it's a duplicate of #96, as requested 04-21). **#294 flipped to NEEDS FOLLOW-UP**: CaliburnKoko replied 04-23 with 5 log attachments — reports **116-min video truncated to 8-min output on v1.8.11**. **Cluster alert**: #294 + #302 are two independent v1.8.11 translation-truncation reports with attached logs — probable real regression, warrants git-bisect. **Board state**: **7 NEEDS RESPONSE, 4 NEEDS FOLLOW-UP, 21 AWAITING REPLY, 2 SHIPPED-awaiting-confirm.** |
+| **2026-04-24** | **rev42.** 65→69 open. **+5 new issues** since rev41: **#300** (ktrankc — v1.8.11 uv install deadlock, `bs-roformer-infer requests>=2.31` vs pytorch index `requests==2.28.1`; user reverted to post3), **#302** (Kukuindi — v1.8.11 does not translate whole file, slower than v1.8.10, logs attached), **#304** (wenkine-2026 — fidelity mode unusable on GTX 1050 Ti; PyTorch sm_75+ incompat, same pattern as #286), **#305** (ric-reff — CN target producing English chunks when using `shisa-v2.1-qwen3-8b`, exactly the thinking model blacklisted in v1.8.11), **#306** (ktrankc — anime-whisper Pass 2 in ensemble produces 13k-char hallucination → 0 subs after sanitization, clusters with #246). **1 closed** (#301 Kukuindi self-closed, merged into their #302). **3 issues flipped to NEEDS FOLLOW-UP** since rev41: #271 (TinyRick1489 asks for `--ollama-num-ctx` flag on 04-22), #231 (fzfile replied 04-22 "still error prompts" for translation, needs notebook-version clarification), #264 (starkwsam challenges cache explanation 04-22, questions if owner's reply is "pure AI"). **Board state**: **5 NEEDS RESPONSE, 3 NEEDS FOLLOW-UP, 22 AWAITING REPLY, 2 SHIPPED-awaiting-confirm.** Separately: `dev_v1.8.12` has 6 commits on top of v1.8.11 (WhisperSeg VAD backend added, new `tools/vad_groundtruth_analyser` utility, GUI wiring, dropdown cleanup, neg_threshold purge) — NOT released. |
+| **2026-04-21** | **rev41.** 64→65 open (+1 new: **#298** yy739566004 — settings persistence for API/prompt fields, duplicate of #96, added to Feature Requests as MEDIUM v1.9.0 target). **#290 responded and flipped AWAITING REPLY** ([comment-4287955148](https://github.com/meizhong986/WhisperJAV/issues/290#issuecomment-4287955148)): reporter @ktrankc had escalated 04-21 02:47 with new failure data — ClearVoice OOM on **V100 32GB, RTX 8000 48GB, and RTX PRO 6000 WS 96GB** (PyTorch holding 94GB of 96GB), plus FRCRN_SE_16K numpy dtype error (`Cannot interpret '113705354'`). Verified code-level: sample-rate hypothesis ruled out (backend resamples correctly), but no per-scene cache clear and enhancer instance reused across all scenes. **Decision: mask ClearVoice out in v1.8.12**, defer leak investigation to 2.x. Rationale: cross-hardware scaling (32→96GB all OOM) suggests interop issue that needs a proper deep dive, not a patch. v1.8.12 P0 roadmap row updated from "leak fix + auto-fallback" to "mask out". Architectural concern #14 updated with verified facts and decision. **Board state**: 0 NEEDS RESPONSE, 0 NEEDS FOLLOW-UP, 23 AWAITING REPLY, 3 SHIPPED-awaiting-confirm. #298 responded ([comment-4287968531](https://github.com/meizhong986/WhisperJAV/issues/298#issuecomment-4287968531)) — pointed to #96, asked permission to close. |
+| 2026-04-21 | **rev40.** 64 open (no net change). **10 replies posted in one batch** — all P0 / P1 / P2 queues cleared. P0 notifications: #287 (sanitizer fix chain explained + upgrade paths), #271 (curated list + max-tokens, @-mentioned TinyRick1489), #291 (Colab `[llm]` fix + same-session pip workaround + Gemini 2.0 retirement note). P0 new issues: #297 (asked for debug log + segmenter swap + batch-run clarification), #296 (thinking-model explanation + translategemma/qwen2.5-instruct recommendation). P1: #290 (3-mode ClearVoice/ZipEnhancer summary + ffmpeg-dsp workaround + v1.8.12 commitment), #294 (4-point info-gather). P2: #264 (Whisper vs HF cache distinction), #279 (Stash backlog ack), #247 (Docker NAS ack). All 7 NEEDS-RESPONSE/FOLLOW-UP items flipped to AWAITING REPLY. **Board state**: 0 NEEDS RESPONSE, 0 NEEDS FOLLOW-UP, 22 AWAITING REPLY, 3 SHIPPED-awaiting-confirm. Operational follow-up: `regexp_v09.json` gist sync for Fix 5a still pending. |
+| **2026-04-20** | **rev39.** 63→64 open. **v1.8.11 RELEASED** (merge commit `97ad9a4`, tag `v1.8.11`, `.exe` + release notes on GitHub). Post-release state flips: **#287, #271, #291 → SHIPPED** (user notifications pending). **2 new issues**: #297 (teijiIshida — blank SRT files on batch, v1.8.10-hotfix3, NEEDS RESPONSE, P0-P1 triage with attached log), #296 (triatomic — gemma3-12b thinking output, classic #271 pattern). **1 closed**: #295 (lukazzz007, by reporter after community pointed to Discussion #257). **#290 updated**: user added 3rd failure mode on RTX 3090 24GB (ClearVoice CUDA OOM) — cross-environment ClearVoice memory issue now clear. **#264, #279, #247 flipped to NEEDS FOLLOW-UP** (user replies after owner's last comment). **Release-state anomaly corrected**: v1.8.11 tag was initially placed on old main (1.8.10.post3 source) due to a missed `git merge` step; force-moved to correct merge commit within ~2hrs, no one fetched the bad tag. **v1.8.12 candidate scope added to roadmap**: Colab memory fix (#290), installer PATH bug, default backend flip (auditok→semantic, silero-v3.1→ten), #297 triage, #280 one-liner. |
+| 2026-04-18 | **rev38.** 61→63 open (+2 new: #294 truncated translation, #295 best-settings question). **v1.8.11 sanitizer fix work COMPLETE**: 5 commits landed (`970af55` corpus, `93bb71a` Fix 1 ${N:0:M}, `fc5353c` Fix 2 symbol purge, `3508005` Fix 3 CPS newline, `783b218` Fix 5a SDH patterns). 91/91 unit tests pass. Regression corpus verified (19 identical, 12 Category-A changes). Real JAV forensic run showed zero symbol-only residues leaked. **#287 Tier A blocker RESOLVED.** #290 flipped to NEEDS FOLLOW-UP: user replied with new ZipEnhancer threading bug (v1.8.12 item). v1.8.11 ready to tag pending version bump, gist sync for Fix 5a, and release notes. |
 | 2026-04-17 | **rev37.** Commits landed on `dev-1.8.11`: `b3499a2` (Colab `llm` extra fix for #291) + `a737bdf` (docs rev36). Added "Immediate Open Issues for v1.8.11" section with Tier A/B/C/D scoping: #287 tagged as release blocker (quality regression risk from silero-v3.1 default swap), #280 as opportunistic one-line pin, #267/China-network cluster/#265/#286 explicitly deferred to v1.9.0 or v1.9.1. |
 | 2026-04-17 | **rev36.** Posted 4 replies: #291 (root cause identified — Colab install missing `[llm]` extra; workaround given + v1.8.11 fix promised), #290 (factual: "Killed" is ambiguous, asked for Colab tier/file size/resource panel, recommended zipenhancer to test ClearVoice hypothesis), #292 (owner ack to community-answered thread, pointed to translategemma:12b / qwen2.5:7b-instruct), #293 (logged Whisper initial_prompt exposure as v1.9+ candidate). **#291 FIX CODED for v1.8.11**: `installer/install_colab.sh` line 176 — added `llm` to extras list (pulls in `starlette-context`, `sse-starlette`, `uvicorn`, `fastapi`, `pydantic-settings`). Both Colab notebooks reference this script, so the fix propagates. NEEDS RESPONSE queue now empty. |
 | 2026-04-17 | **rev35.** Posted bilingual China-network template (Chinese + English) to 5 issues: #289, #284, #217, #263, #261. Template asks community to share working VPN / DNS / CUDA+PyTorch combos, flags **v1.9.1 China-mirror exploration** as a goal (without timeline commitment), and repeats the pre-downloaded whl + `Scripts\pip.exe install --no-deps` + silero-v6.2 interim workarounds. All 5 issues now AWAITING REPLY. |

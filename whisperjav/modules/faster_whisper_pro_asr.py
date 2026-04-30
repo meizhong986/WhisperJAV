@@ -84,7 +84,10 @@ class FasterWhisperProASR:
 
         # Determine speech segmenter backend FIRST (needed for firewall below)
         speech_segmenter_config = params.get("speech_segmenter", {})
-        segmenter_backend = speech_segmenter_config.get("backend", "silero-v4.0")
+        # v1.8.12: aligned with LEGACY_PIPELINES["balanced"]["vad"] = "silero-v3.1".
+        # Prior fallback to "silero-v4.0" silently overrode the v3.1 declaration
+        # because resolve_legacy_pipeline never sets params.speech_segmenter.backend.
+        segmenter_backend = speech_segmenter_config.get("backend", "silero-v3.1")
 
         # --- CONSTRUCTOR FIREWALL ---
         # The resolver unconditionally produces Silero VAD presets (threshold=0.068,

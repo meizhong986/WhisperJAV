@@ -86,7 +86,6 @@ DECODER_PARAMS = {
 SEGMENTER_PARAMS = {
     # Core VAD (Silero, shared)
     "threshold",
-    "neg_threshold",           # Keep for CLI backward compat (not in GUI)
     "min_speech_duration_ms",
     "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
     "min_silence_duration_ms",
@@ -117,6 +116,7 @@ _SEGMENTER_TOOL_NAMES = {
     "whisper-vad-base": "whisper-vad-speech-segmentation",
     "whisper-vad-small": "whisper-vad-speech-segmentation",
     "whisper-vad-medium": "whisper-vad-speech-segmentation",
+    "whisperseg": "whisperseg-speech-segmentation",
 }
 
 # Provider params - common transcriber options shared by all backends

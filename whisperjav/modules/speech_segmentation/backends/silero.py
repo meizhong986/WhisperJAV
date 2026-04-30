@@ -71,18 +71,17 @@ class SileroSpeechSegmenter:
         "latest": "snakers4/silero-vad",
     }
 
-    # Default parameters per version (v4.0 is more sensitive)
-    # Note: These are fallbacks when config doesn't provide values.
+    # Default parameters per version (v4.0 is more sensitive).
+    # These are fallbacks when config doesn't provide values.
     # Production values come from config/components/vad/silero.py presets.
-    # NOT supported in v3.1/v4.0: neg_threshold, max_speech_duration_s
-    # (kept in config for future Silero versions)
+    # Note: max_speech_duration_s is NOT supported by v3.1/v4.0 API — kept
+    # in the dict for config compatibility but never forwarded to the model.
     VERSION_DEFAULTS = {
         "v4.0": {
             "threshold": 0.25,
             "min_speech_duration_ms": 150,
             "min_silence_duration_ms": 300,
             "speech_pad_ms": 700,
-            "neg_threshold": 0.15,  # Not used by v4.0, kept for config compatibility
             "max_speech_duration_s": float("inf"),  # No limit by default
             "max_group_duration_s": 29.0,  # Upper bound for group duration (Whisper 30s limit)
         },
@@ -91,7 +90,6 @@ class SileroSpeechSegmenter:
             "min_speech_duration_ms": 90,
             "min_silence_duration_ms": 300,
             "speech_pad_ms": 700,
-            "neg_threshold": 0.35,  # Not used by v3.1, kept for config compatibility
             "max_speech_duration_s": float("inf"),
             "max_group_duration_s": 29.0,  # Upper bound for group duration (Whisper 30s limit)
         },
@@ -106,7 +104,6 @@ class SileroSpeechSegmenter:
         speech_pad_ms: Optional[int] = None,
         chunk_threshold_s: Optional[float] = None,
         max_group_duration_s: Optional[float] = None,
-        neg_threshold: Optional[float] = None,
         max_speech_duration_s: Optional[float] = None,
         start_pad_samples: int = 11200,
         end_pad_samples: int = 20800,
@@ -125,8 +122,6 @@ class SileroSpeechSegmenter:
             max_group_duration_s: Maximum duration for a segment group (seconds).
                 Groups are split if adding a segment would exceed this limit.
                 Default 29s to stay within Whisper's 30s context window.
-            neg_threshold: Speech end threshold (hysteresis). NOT supported by
-                Silero v3.1/v4.0 - kept for config compatibility with future versions.
             max_speech_duration_s: Maximum speech segment duration before
                 forced split. Use float("inf") for no limit.
             start_pad_samples: Samples to pad before speech start (at 16kHz)
@@ -156,10 +151,6 @@ class SileroSpeechSegmenter:
             int(speech_pad_ms) if speech_pad_ms is not None
             else defaults["speech_pad_ms"]
         )
-        # neg_threshold: NOT supported by v3.1/v4.0 API — stored for config
-        # compatibility only, never passed to get_speech_timestamps().
-        # None = let VAD internal logic handle (the intended default).
-        self.neg_threshold = float(neg_threshold) if neg_threshold is not None else None
         self.max_speech_duration_s = (
             float(max_speech_duration_s) if max_speech_duration_s is not None
             else defaults.get("max_speech_duration_s", float("inf"))
@@ -253,7 +244,6 @@ class SileroSpeechSegmenter:
             "min_silence_duration_ms", self.min_silence_duration_ms
         )
         speech_pad_ms = kwargs.get("speech_pad_ms", self.speech_pad_ms)
-        neg_threshold = kwargs.get("neg_threshold", self.neg_threshold)
         max_speech_duration_s = kwargs.get(
             "max_speech_duration_s", self.max_speech_duration_s
         )
@@ -265,9 +255,9 @@ class SileroSpeechSegmenter:
         # Run VAD
         audio_tensor = torch.FloatTensor(audio_16k)
 
-        # Build kwargs for get_speech_timestamps
-        # NOT supported in v3.1/v4.0: neg_threshold, max_speech_duration_s
-        # (kept in config for future Silero versions)
+        # Build kwargs for get_speech_timestamps.
+        # Note: max_speech_duration_s is NOT supported by v3.1/v4.0 API —
+        # stored on self for config compatibility but never forwarded.
         vad_kwargs = {
             "sampling_rate": VAD_SR,
             "threshold": threshold,
@@ -431,7 +421,6 @@ class SileroSpeechSegmenter:
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "speech_pad_ms": self.speech_pad_ms,
-            "neg_threshold": self.neg_threshold,
             "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,

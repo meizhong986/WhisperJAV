@@ -712,6 +712,11 @@ class QwenPipeline(BasePipeline):
             from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
             segmenter_kwargs = dict(self.segmenter_config or {})
             segmenter_kwargs["max_group_duration_s"] = self.segmenter_max_group_duration
+            # v1.8.12: forward chunk_threshold_s so anime-mode override (0.5) and
+            # any pipeline-constructor override actually reach the factory.
+            # Prior to this, only max_group_duration_s was injected and the
+            # chunk_threshold from segmenter_config (YAML) silently won.
+            segmenter_kwargs["chunk_threshold_s"] = self.segmenter_chunk_threshold
             segmenter = SpeechSegmenterFactory.create(
                 self.segmenter_backend,
                 **segmenter_kwargs,
@@ -916,17 +921,49 @@ class QwenPipeline(BasePipeline):
         # For Qwen pipeline, Phase 8 is bypassed until a Qwen-specific
         # sanitizer is implemented.  The stitched SRT from Phase 7 is used
         # as the final output directly.
-        logger.info("[QwenPipeline PID %s] Phase 8: Skipped (legacy sanitizer disabled for Qwen)", os.getpid())
+        #
+        # v1.8.12.post2: For anime-whisper generator, additionally apply the
+        # AnimeWhisperCleaner SRT filter to drop ellipsis-only artifact lines
+        # ("…", "…?", "…」", etc.) and renumber surviving entries.
         phase8_start = time.time()
+
+        # v1.8.12.post2: anime-whisper-specific SRT filter.
+        # Operates IN PLACE on stitched_srt_path BEFORE the copy to final.
+        anime_filter_stats = None
+        if self.generator_backend == "anime-whisper" and num_subtitles > 0:
+            from whisperjav.modules.subtitle_pipeline.cleaners.anime_whisper import (
+                AnimeWhisperCleaner,
+            )
+            anime_filter_stats = AnimeWhisperCleaner().filter_srt_file(stitched_srt_path)
+            num_subtitles = anime_filter_stats["final_count"]
+            logger.info(
+                "[QwenPipeline PID %s] Phase 8: anime SRT filter — %d → %d entries "
+                "(-%d ellipsis-only, -%d empty)",
+                os.getpid(),
+                anime_filter_stats["original_count"],
+                anime_filter_stats["final_count"],
+                anime_filter_stats["dropped_ellipsis"],
+                anime_filter_stats["dropped_empty"],
+            )
+        else:
+            logger.info(
+                "[QwenPipeline PID %s] Phase 8: Skipped (legacy sanitizer disabled for Qwen)",
+                os.getpid(),
+            )
 
         final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
 
         if num_subtitles > 0:
             shutil.copy2(stitched_srt_path, final_srt_path)
             stats = {"total_subtitles": num_subtitles, "sanitizer_skipped": True}
+            if anime_filter_stats:
+                # Surface anime-filter counters into the per-pass stats so the
+                # quality_metrics block below can report them.
+                stats["anime_ellipsis_dropped"] = anime_filter_stats["dropped_ellipsis"]
+                stats["anime_empty_dropped"] = anime_filter_stats["dropped_empty"]
             processed_path = final_srt_path
             logger.info(
-                "[QwenPipeline PID %s] Phase 8: %d subtitles passed through (no sanitization)",
+                "[QwenPipeline PID %s] Phase 8: %d subtitles in final output",
                 os.getpid(), num_subtitles,
             )
         else:

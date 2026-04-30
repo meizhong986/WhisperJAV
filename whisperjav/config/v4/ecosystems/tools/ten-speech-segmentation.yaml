@@ -51,7 +51,10 @@ spec:
   # --- Duration Filters ---
   min_speech_duration_ms: 150  # v1.8.10-hf1: 100→150, match Silero for consistency
   min_silence_duration_ms: 150 # v1.8.10-hf1: 100→150, match Silero — now implemented in backend
-  max_speech_duration_s: 6     # v1.8.10-hf2: added, limits individual segment length (split at prob minima)
+  # v1.8.12: tightened 6→5 per JA-subtitle research (majority of JA subs are
+  # <3s with ~800ms gaps). TEN backend force-splits at probability minima
+  # when a segment exceeds this duration.
+  max_speech_duration_s: 5
 
   # --- Segment Padding ---
   # end_pad extends segment end to capture trailing speech.
@@ -63,7 +66,9 @@ spec:
 
   # --- Segment Grouping ---
   chunk_threshold_s: 1.0
-  max_group_duration_s: 8      # v1.8.10-hf1: 29.0→8, hard cap for segment size
+  # v1.8.12: tightened 8→6. Typical JA dialogue groups span 2-3 subs over
+  # ~6s; this matches the natural distribution.
+  max_group_duration_s: 6
 
 # =============================================================================
 # Sensitivity Presets
@@ -71,28 +76,32 @@ spec:
 presets:
   # Conservative: Higher threshold, fewer false positives
   # Best for: Clean audio, studio recordings
-  # Higher end_pad compensates for late detection at threshold 0.45.
+  # Higher end_pad compensates for late detection at threshold 0.42.
+  # v1.8.12: max_speech 5→6, max_group 7→7 (JA-sub-research, inverted gradient)
   conservative:
-    threshold: 0.42               # v1.8.10-hf2: 0.45→0.42, relaxed per forensic analysis
+    threshold: 0.42
     min_speech_duration_ms: 200
     min_silence_duration_ms: 200
-    max_speech_duration_s: 5      # v1.8.10-hf2: added, match Silero v6.2 pattern
+    max_speech_duration_s: 6
     max_group_duration_s: 7
     start_pad_ms: 0
     end_pad_ms: 300
 
   # Balanced: Default settings for general use
+  # v1.8.12: spec defaults updated to max_speech=5, max_group=6
   balanced: {}  # Uses spec defaults
 
   # Aggressive: Lower threshold, maximum capture
   # Best for: Noisy audio, soft speech
-  # Lower end_pad — threshold 0.10 already detects speech early.
+  # Lower end_pad — threshold 0.22 already detects speech early.
+  # v1.8.12: max_speech 7→4, max_group 9→5 (JA-sub-research, inverted gradient:
+  # lower threshold catches more bursts, so tighter caps keep them distinct)
   aggressive:
-    threshold: 0.22               # v1.8.10-hf2: 0.10→0.22, reduce noise capture per forensic analysis
+    threshold: 0.22
     min_speech_duration_ms: 100
-    min_silence_duration_ms: 100  # v1.8.10-hf2: 80→100, reduce micro-fragmentation
-    max_speech_duration_s: 7      # v1.8.10-hf2: added, match Silero v6.2 pattern
-    max_group_duration_s: 9
+    min_silence_duration_ms: 100
+    max_speech_duration_s: 4
+    max_group_duration_s: 5
     start_pad_ms: 0
     end_pad_ms: 100
 

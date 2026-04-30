@@ -1907,7 +1907,7 @@ const EnsembleManager = {
             'without_timestamps', 'max_initial_timestamp'
         ],
         vad: [
-            'threshold', 'neg_threshold', 'min_speech_duration_ms',
+            'threshold', 'min_speech_duration_ms',
             'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
         ],
         // Internal VAD parameters for kotoba-faster-whisper pipeline
@@ -1938,7 +1938,6 @@ const EnsembleManager = {
 
         // === External VAD parameters (Silero VAD for balanced/fidelity) ===
         threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
-        neg_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
 
         // === Internal VAD parameters (kotoba-faster-whisper) ===
         // Also applies to external Silero VAD - use larger ranges to cover both

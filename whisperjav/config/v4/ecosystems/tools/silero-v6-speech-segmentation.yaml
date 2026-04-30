@@ -17,8 +17,9 @@ metadata:
     Speech segmentation using Silero VAD v6.2 pip package.
     Key v6.2 features:
     - max_speech_duration_s: Force-splits long speech chunks at internal silences
-    - neg_threshold: Hysteresis for stable segmentation in noisy audio
     - speech_pad_ms: Internal padding (no manual sample-based padding needed)
+    The offset (hysteresis) threshold is auto-computed inside silero-vad as
+    max(threshold - 0.15, 0.01); not user-tunable.
     JAV-tuned defaults: threshold=0.5, speech_pad_ms=200, min_speech_duration_ms=100.
   version: "1.0.0"
   tags:
@@ -50,11 +51,14 @@ contract:
 spec:
   # --- Core VAD Parameters ---
   threshold: 0.32    # v1.8.10-hf2: 0.35→0.32, relaxed per forensic analysis
-  neg_threshold: null  # Auto-calculated as threshold - 0.15 by v6.2 — do NOT override
+  # neg_threshold is intentionally not exposed. silero-vad v6.2 auto-computes
+  # it internally as max(threshold - 0.15, 0.01) — kept consistent across runs.
 
   # --- Duration Filters ---
   min_speech_duration_ms: 150   # v1.8.10-hf1: 100→150, filter noise while preserving short utterances
-  max_speech_duration_s: 6      # v1.8.10-hf1: null→6, limits Whisper context length
+  # v1.8.12: tightened 6→5 per JA-subtitle research (majority of JA subs are
+  # <3s with ~800ms gaps). v6.2 enforces this internally via force-split.
+  max_speech_duration_s: 5
   min_silence_duration_ms: 150  # v1.8.10-hf1: 100→150, controls segmentation granularity
 
   # --- Segment Padding ---
@@ -67,7 +71,9 @@ spec:
 
   # --- Segment Grouping ---
   chunk_threshold_s: 1.5         # v1.8.10-hf1: 1.0→1.5, controls merging of nearby segments
-  max_group_duration_s: 8        # v1.8.10-hf1: 29.0→8, prevents long hallucination segments
+  # v1.8.12: tightened 8→6. Typical JA dialogue groups span 2-3 subs over
+  # ~6s; this matches the natural distribution.
+  max_group_duration_s: 6
 
 # =============================================================================
 # Sensitivity Presets
@@ -75,30 +81,32 @@ spec:
 presets:
   # Conservative: Higher threshold, fewer false positives
   # Best for: Clean audio, studio recordings
-  # Higher padding compensates for late detection — threshold 0.5 misses
+  # Higher padding compensates for late detection — threshold 0.42 misses
   # soft onsets, so 350ms padding recovers the clipped edges.
+  # v1.8.12: max_speech 5→6, max_group 7→7 (JA-sub-research, inverted gradient)
   conservative:
-    threshold: 0.42               # v1.8.10-hf2: 0.5→0.42, relaxed per forensic analysis
+    threshold: 0.42
     min_speech_duration_ms: 200
     min_silence_duration_ms: 200
-    max_speech_duration_s: 5
+    max_speech_duration_s: 6
     max_group_duration_s: 7
     chunk_threshold_s: 1.0
     speech_pad_ms: 350
 
   # Balanced: Default settings for general use
+  # v1.8.12: spec defaults updated to max_speech=5, max_group=6
   balanced: {}  # Uses spec defaults
 
   # Aggressive: Lower threshold, maximum capture
   # Best for: Noisy audio, soft speech, whispered dialogue
-  # v1.8.10-hf1: threshold 0.068→0.15, tighter VAD to reduce non-speech input
+  # v1.8.12: max_speech 7→4, max_group 9→5 (JA-sub-research, inverted gradient:
+  # lower threshold catches more bursts, so tighter caps keep them distinct)
   aggressive:
-    threshold: 0.12               # v1.8.10-hf2: 0.15→0.12, more sensitive per forensic analysis
-    # neg_threshold: omitted — let v6.2 auto-calculate (threshold - 0.15)
+    threshold: 0.12
     min_speech_duration_ms: 100
-    min_silence_duration_ms: 100  # v1.8.10-hf2: 80→100, reduce micro-fragmentation
-    max_speech_duration_s: 7
-    max_group_duration_s: 9
+    min_silence_duration_ms: 100
+    max_speech_duration_s: 4
+    max_group_duration_s: 5
     chunk_threshold_s: 2.0
     speech_pad_ms: 150
 
@@ -112,16 +120,6 @@ gui:
     description: "Probability threshold to detect speech (higher = more selective)"
     min: 0.1
     max: 0.9
-    step: 0.05
-    data_type: float
-    group: detection
-
-  neg_threshold:
-    widget: slider
-    label: "Negative Threshold"
-    description: "Hysteresis threshold for speech end (null = auto: threshold - 0.15)"
-    min: 0.05
-    max: 0.8
     step: 0.05
     data_type: float
     group: detection

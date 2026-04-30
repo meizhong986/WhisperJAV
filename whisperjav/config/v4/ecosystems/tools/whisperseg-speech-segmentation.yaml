@@ -1,0 +1,235 @@
+# =============================================================================
+# WhisperSeg Speech Segmentation Tool Configuration
+# =============================================================================
+# Whisper-encoder encoder-decoder VAD (ONNX), 20 ms frame resolution, trained
+# on ~500 h Japanese ASMR. Specialized for soft/whispered speech common in JAV.
+# Lineage: WhisperSeg research (Gu et al., 2023).
+# Requires: pip install whisperjav[whisperseg]        (CPU)
+#           pip install whisperjav[whisperseg-gpu]    (CUDA via onnxruntime-gpu)
+# Model: TransWithAI/Whisper-Vad-EncDec-ASMR-onnx (MIT, HuggingFace Hub)
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: whisperseg-speech-segmentation
+  displayName: "WhisperSeg (JA-ASMR)"
+  description: |
+    Speech segmentation using WhisperSeg — a Whisper-base encoder paired with a
+    lightweight 2-layer transformer decoder, exported to ONNX. Produces
+    frame-level speech probabilities at 20 ms resolution over 30-second input
+    windows. Trained on ~500 hours of Japanese ASMR with accurate timestamps,
+    yielding strong performance on whispered and soft speech. Inherits
+    Whisper's multilingual robustness for non-JA content.
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - whisper
+    - asmr
+    - japanese
+    - onnx
+    - vad
+  dependencies:
+    - "onnxruntime>=1.16"
+    - "transformers>=4.40"
+    - "huggingface_hub>=0.20"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+
+# =============================================================================
+# Tool Parameters (Balanced preset as default)
+# Silero-v6.2-aligned — known-good JAV values; vendor default is threshold=0.5
+# =============================================================================
+spec:
+  # --- Core VAD Parameters ---
+  threshold: 0.35
+  # Offset (hysteresis) threshold is always auto-derived as
+  # max(threshold − 0.15, 0.01) inside the backend. Not user-tunable.
+
+  # --- Duration Filters ---
+  min_speech_duration_ms: 100
+  min_silence_duration_ms: 100
+  # v1.8.12: explicit value 5 (was null/inherit) per JA-subtitle research.
+  # Setting it explicitly is required for the tight retune since otherwise
+  # the backend inherits max_group_duration_s and the two values would be
+  # identical, defeating the purpose of two distinct caps.
+  max_speech_duration_s: 5
+
+  # --- Segment Padding ---
+  speech_pad_ms: 300
+
+  # --- Segment Grouping ---
+  chunk_threshold_s: 1.0
+  # v1.8.12: tightened 9→6. Typical JA dialogue groups span 2-3 subs over
+  # ~6s; this matches the natural distribution.
+  max_group_duration_s: 6
+
+  # --- Runtime ---
+  force_cpu: false
+  num_threads: 1               # 1 → auto (cpu_count // 2) on CPU
+
+# =============================================================================
+# Sensitivity Presets
+# Layering: spec defaults < sensitivity preset < user overrides
+# =============================================================================
+presets:
+  # Conservative: higher threshold, fewer false positives
+  # Best for: clean studio audio, dominant single-speaker content
+  # v1.8.12: max_speech (null inherit→6), max_group 8→7 (JA-sub-research,
+  # inverted gradient: conservative threshold misses softer onsets, so
+  # slightly looser caps let the few detected segments capture full utterances)
+  conservative:
+    threshold: 0.45
+    min_speech_duration_ms: 150
+    min_silence_duration_ms: 200
+    speech_pad_ms: 200
+    max_speech_duration_s: 6
+    max_group_duration_s: 7
+
+  # Balanced: spec defaults
+  # v1.8.12: spec defaults updated to max_speech=5, max_group=6
+  balanced: {}
+
+  # Aggressive: lower threshold, maximum speech capture
+  # Best for: whispered dialogue, quiet intimate audio, JAV-typical scenes
+  # v1.8.12: max_speech (null inherit→4), max_group 10→5 (JA-sub-research,
+  # inverted gradient: lower threshold catches more bursts, so tighter caps
+  # keep utterances distinct rather than lumped)
+  aggressive:
+    threshold: 0.25
+    min_speech_duration_ms: 80
+    min_silence_duration_ms: 80
+    speech_pad_ms: 400
+    max_speech_duration_s: 4
+    max_group_duration_s: 5
+
+# =============================================================================
+# GUI Hints — consumed by webview_gui/api.get_segmenter_schema
+# -----------------------------------------------------------------------------
+# Ranges chosen to cover plausible tuning space without unsafe extremes.
+# Groups organise widgets into labelled panels in the customize dialog.
+# =============================================================================
+gui:
+  # --- Detection (core sensitivity controls) -------------------------------
+  threshold:
+    widget: slider
+    label: "Speech Threshold"
+    description: >
+      Probability to trigger speech onset. Lower = more sensitive (catches
+      whispers/soft speech at the cost of more false alarms). Higher = stricter
+      (fewer detections, cleaner but may miss soft speech).
+    min: 0.05
+    max: 0.95
+    step: 0.05
+    data_type: float
+    group: detection
+
+  # --- Duration filters ----------------------------------------------------
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: >
+      Drop segments shorter than this. Too low (<50 ms) keeps noise bursts;
+      too high (>300 ms) discards short utterances like はい, うん, ね.
+    min: 20
+    max: 500
+    step: 20
+    data_type: int
+    group: filters
+
+  min_silence_duration_ms:
+    widget: spinner
+    label: "Min Silence Duration (ms)"
+    description: >
+      Silence gap must be at least this long to end a segment. Shorter
+      silences are absorbed into the current speech region. Raise to merge
+      close utterances; lower to split tightly-coupled speech.
+    min: 20
+    max: 1000
+    step: 20
+    data_type: int
+    group: filters
+
+  max_speech_duration_s:
+    widget: slider
+    label: "Max Speech Duration (s)"
+    description: >
+      Force-split any single speech segment longer than this. Leave empty
+      (null) to inherit the Max Group Duration below — recommended.
+    min: 2.0
+    max: 20.0
+    step: 0.5
+    data_type: float
+    unit: "s"
+    group: filters
+
+  # --- Padding -------------------------------------------------------------
+  speech_pad_ms:
+    widget: spinner
+    label: "Speech Padding (ms)"
+    description: >
+      Padding added before and after each detected segment to catch soft
+      onsets and trailing Japanese particles. Overlap with adjacent segments
+      is automatically prevented.
+    min: 0
+    max: 600
+    step: 20
+    data_type: int
+    group: padding
+
+  # --- Grouping (downstream ASR chunking) ----------------------------------
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: >
+      Two consecutive segments separated by a gap larger than this are placed
+      into different ASR groups. Smaller = more, tighter groups. Larger =
+      fewer, longer groups.
+    min: 0.5
+    max: 5.0
+    step: 0.1
+    data_type: float
+    unit: "s"
+    group: grouping
+
+  max_group_duration_s:
+    widget: slider
+    label: "Max Group Duration (s)"
+    description: >
+      Upper bound for a grouped-segment ASR chunk. Should stay well under the
+      ASR model context (30 s for Whisper). Typical JAV sweet spot: 8–10 s.
+    min: 4.0
+    max: 14.0
+    step: 1.0
+    data_type: float
+    unit: "s"
+    group: grouping
+
+  # --- Runtime -------------------------------------------------------------
+  force_cpu:
+    widget: checkbox
+    label: "Force CPU (disable GPU inference)"
+    description: >
+      Bypass CUDAExecutionProvider even when available. Useful when the GPU
+      is needed for ASR or when ONNX CUDA is unstable on the current driver.
+    data_type: bool
+    group: processing
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.whisperseg
+  class: WhisperSegSpeechSegmenter

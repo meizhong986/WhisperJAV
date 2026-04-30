@@ -2,16 +2,16 @@
 """Version information for WhisperJAV."""
 
 # PEP 440 compliant version for pip/wheel
-__version__ = "1.8.11"
+__version__ = "1.8.12"
 
 # Human-readable version for display in UI
-__version_display__ = "1.8.11"
+__version_display__ = "1.8.12"
 
 # Version metadata
 __version_info__ = {
     "major": 1,
     "minor": 8,
-    "patch": 11,
+    "patch": 12,
     "release": "",
     "architecture": "v4.4"
 }

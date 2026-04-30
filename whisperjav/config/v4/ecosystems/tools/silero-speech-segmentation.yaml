@@ -48,17 +48,25 @@ spec:
   # --- Core VAD Parameters ---
   # Keys are flat (no "vad." prefix) to match the routing layer (SEGMENTER_PARAMS)
   threshold: 0.28                   # v1.8.10-hf3: 0.18→0.28, retuned for v3.1/v4.0 mega-group prevention
-  # neg_threshold: omitted — not supported by v3.1/v4.0 API, let VAD internal logic handle
   min_speech_duration_ms: 100
   min_silence_duration_ms: 300
   speech_pad_ms: 400
 
   # --- Duration Limits ---
-  max_speech_duration_s: 7          # v1.8.10-hf3: added, limits per-segment speech duration
+  # v1.8.12: tightened max_speech_duration_s 7→5 per JA-subtitle research:
+  # majority of JA subtitles are <3s with ~800ms gaps. Tighter caps keep the
+  # detector aligned with natural utterance length distribution.
+  # NOTE: silero v3.1/v4.0 library does not enforce max_speech_duration_s
+  # internally — it is stored on the segmenter for config compatibility but
+  # never forwarded to the model. Only max_group_duration_s is enforced here.
+  max_speech_duration_s: 5
 
   # --- Segment Grouping ---
   chunk_threshold_s: 2.5
-  max_group_duration_s: 9           # v1.8.10-hf3: 29.0→9, prevents mega-groups that degrade model quality
+  # v1.8.12: tightened 9→6. JA-subtitle research shows typical groups span
+  # 2-3 subs separated by ~800ms gaps, so a 6s group cap matches reality
+  # without forcing artificial splits.
+  max_group_duration_s: 6
 
 # =============================================================================
 # Sensitivity Presets
@@ -66,29 +74,33 @@ spec:
 presets:
   # Conservative: Higher thresholds, fewer false positives
   # Best for: Clean audio, clear speech, minimal background noise
-  # v1.8.10-hf3: retuned to prevent Silero v3.1/v4.0 mega-groups
+  # v1.8.12: max_speech 6→6, max_group 8→7 (JA-sub-research tight retune,
+  # inverted gradient: conservative threshold misses softer onsets, so
+  # slightly looser caps let the few detected segments capture full utterances)
   conservative:
-    threshold: 0.41                 # v1.8.10-hf3: 0.35→0.41
+    threshold: 0.41
     min_speech_duration_ms: 150
     min_silence_duration_ms: 300
-    max_speech_duration_s: 6        # v1.8.10-hf3: added
-    max_group_duration_s: 8         # v1.8.10-hf3: added
+    max_speech_duration_s: 6
+    max_group_duration_s: 7
     speech_pad_ms: 500
 
   # Balanced: Default settings for general use
   # Best for: Mixed content, typical audio quality
-  balanced: {}  # Uses spec defaults (threshold=0.28, max_speech=7, max_group=9)
+  # v1.8.12: spec defaults updated to max_speech=5, max_group=6
+  balanced: {}  # Uses spec defaults
 
   # Aggressive: Maximum detail capture with controlled group sizes
   # Best for: Difficult audio, soft speech, noisy backgrounds
-  # v1.8.10-hf3: raised from 0.05→0.18 to prevent mega-groups on v3.1/v4.0
+  # v1.8.12: max_speech 8→4, max_group 10→5 (JA-sub-research tight retune,
+  # inverted gradient: lower threshold detects more bursts, so tighter caps
+  # keep utterances distinct rather than lumped)
   aggressive:
-    threshold: 0.18                 # v1.8.10-hf3: 0.05→0.18
-    # neg_threshold: omitted — not supported by v3.1/v4.0 API
+    threshold: 0.18
     min_speech_duration_ms: 30
     min_silence_duration_ms: 300
-    max_speech_duration_s: 8        # v1.8.10-hf3: added
-    max_group_duration_s: 10        # v1.8.10-hf3: added
+    max_speech_duration_s: 4
+    max_group_duration_s: 5
     speech_pad_ms: 300
 
 # =============================================================================
@@ -103,16 +115,6 @@ gui:
     widget: slider
     label: "Speech Threshold"
     description: "Probability threshold to detect speech (lower = more sensitive)"
-    min: 0.01
-    max: 0.5
-    step: 0.01
-    data_type: float
-    group: detection
-
-  neg_threshold:
-    widget: slider
-    label: "Negative Threshold"
-    description: "Hysteresis threshold for speech end detection (lower = more persistent)"
     min: 0.01
     max: 0.5
     step: 0.01

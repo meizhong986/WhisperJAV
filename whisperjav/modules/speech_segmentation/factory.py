@@ -28,6 +28,7 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "whisper-vad-medium": "whisperjav.modules.speech_segmentation.backends.whisper_vad.WhisperVadSpeechSegmenter",
     "ten": "whisperjav.modules.speech_segmentation.backends.ten.TenSpeechSegmenter",
     "silero-v6.2": "whisperjav.modules.speech_segmentation.backends.silero_v6.SileroV6SpeechSegmenter",
+    "whisperseg": "whisperjav.modules.speech_segmentation.backends.whisperseg.WhisperSegSpeechSegmenter",
     "none": "whisperjav.modules.speech_segmentation.backends.none.NullSpeechSegmenter",
 }
 
@@ -58,6 +59,12 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "install_hint": "pip install silero-vad>=6.2",
         "always_available": False,
     },
+    "whisperseg": {
+        # onnxruntime is the real gate; transformers/huggingface_hub are usually present
+        "packages": ["onnxruntime"],
+        "install_hint": "pip install whisperjav[whisperseg] (or whisperjav[whisperseg-gpu] for CUDA)",
+        "always_available": False,
+    },
     "whisper": {
         "packages": ["faster_whisper"],
         "install_hint": "pip install faster-whisper",
@@ -76,23 +83,32 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
 #   - coerce_fn: Type constructor to coerce values (int, float, bool)
 #   - default_value: Fallback when value is None and nullable=False
 #   - nullable: If True, None is a valid value (don't substitute default)
+# v1.8.12: GUI-fallback defaults aligned to YAML balanced presets so that empty
+# input fields produce the same effective config as a freshly-loaded preset.
+# Prior values were stale relative to YAML and produced unexpected behavior on
+# the cleared-input path.
 _PARAM_SCHEMAS = {
     "ten": {
-        "threshold":               (float, 0.26,  False),
+        "threshold":               (float, 0.32,  False),  # v1.8.12: 0.26→0.32 (YAML balanced)
         "hop_size":                (int,   256,   False),
-        "min_speech_duration_ms":  (int,   81,    False),
-        "min_silence_duration_ms": (int,   100,   False),
-        "start_pad_ms":            (int,   50,    False),
-        "end_pad_ms":              (int,   150,   False),
+        "min_speech_duration_ms":  (int,   150,   False),  # v1.8.12: 81→150 (YAML balanced)
+        "min_silence_duration_ms": (int,   150,   False),  # v1.8.12: 100→150 (YAML balanced)
+        "max_speech_duration_s":   (float, 5.0,   True),   # v1.8.12: NEW — was being stripped by foreign-key gate
+        "start_pad_ms":            (int,   0,     False),  # v1.8.12: 50→0 (YAML balanced)
+        "end_pad_ms":              (int,   200,   False),  # v1.8.12: 150→200 (YAML balanced)
         "chunk_threshold_s":       (float, 1.0,   True),
-        "max_group_duration_s":    (float, 29.0,  True),
+        "max_group_duration_s":    (float, 6.0,   True),   # v1.8.12: 29.0→6.0 (YAML balanced)
     },
     "silero": {
-        "threshold":               (float, None,  True),   # None → VERSION_DEFAULTS
+        # All nullable: backend SileroSpeechSegmenter consumes None values via
+        # VERSION_DEFAULTS (v3.1 vs v4.0). Pydantic SileroVAD presets supply
+        # concrete values for the production path (legacy balanced/fidelity);
+        # silero.py:165 chunk_threshold_s=4.0 hardcoded fallback intentionally
+        # left as-is (impact unverified).
+        "threshold":               (float, None,  True),
         "min_speech_duration_ms":  (int,   None,  True),
         "min_silence_duration_ms": (int,   None,  True),
         "speech_pad_ms":           (int,   None,  True),
-        "neg_threshold":           (float, None,  True),
         "max_speech_duration_s":   (float, None,  True),
         "chunk_threshold_s":       (float, None,  True),
         "max_group_duration_s":    (float, None,  True),
@@ -100,16 +116,15 @@ _PARAM_SCHEMAS = {
         "end_pad_samples":         (int,   20800, False),
     },
     "silero-v6.2": {
-        "threshold":                        (float, 0.35, False),
-        "neg_threshold":                    (float, None, True),   # None = auto-calc
-        "min_speech_duration_ms":           (int,   100,  False),
-        "max_speech_duration_s":            (float, None, True),   # None = inherit
-        "min_silence_duration_ms":          (int,   100,  False),
-        "speech_pad_ms":                    (int,   350,  False),
+        "threshold":                        (float, 0.32, False),  # v1.8.12: 0.35→0.32 (YAML balanced)
+        "min_speech_duration_ms":           (int,   150,  False),  # v1.8.12: 100→150 (YAML balanced)
+        "max_speech_duration_s":            (float, 5.0,  True),   # v1.8.12: None→5.0 (YAML balanced)
+        "min_silence_duration_ms":          (int,   150,  False),  # v1.8.12: 100→150 (YAML balanced)
+        "speech_pad_ms":                    (int,   250,  False),  # v1.8.12: 350→250 (YAML balanced)
         "min_silence_at_max_speech":        (int,   98,   False),
         "use_max_poss_sil_at_max_speech":   (bool,  True, False),
-        "chunk_threshold_s":                (float, 1.0,  True),
-        "max_group_duration_s":             (float, 29.0, True),
+        "chunk_threshold_s":                (float, 1.5,  True),   # v1.8.12: 1.0→1.5 (YAML balanced)
+        "max_group_duration_s":             (float, 6.0,  True),   # v1.8.12: 29.0→6.0 (YAML balanced)
     },
     "whisper-vad": {
         "no_speech_threshold":     (float, 0.6,   False),
@@ -130,6 +145,17 @@ _PARAM_SCHEMAS = {
         "chunk_threshold_s":       (float, None,  True),
         "max_group_duration_s":    (float, None,  True),
         "use_overlap_smoothing":   (bool,  False, False),
+    },
+    "whisperseg": {
+        "threshold":               (float, 0.35, False),
+        "min_speech_duration_ms":  (int,   100,  False),
+        "min_silence_duration_ms": (int,   100,  False),
+        "speech_pad_ms":           (int,   300,  False),
+        "max_speech_duration_s":   (float, 5.0,  True),   # v1.8.12: None→5.0 (YAML balanced, explicit)
+        "chunk_threshold_s":       (float, 1.0,  True),
+        "max_group_duration_s":    (float, 6.0,  True),   # v1.8.12: None→6.0 (YAML balanced)
+        "force_cpu":               (bool,  False, False),
+        "num_threads":             (int,   1,    False),
     },
 }
 
@@ -165,7 +191,7 @@ class SpeechSegmenterFactory:
     @staticmethod
     def list_unique_backends() -> List[str]:
         """Return list of unique backend names (without version aliases)."""
-        return ["silero", "nemo", "whisper", "ten", "none"]
+        return ["silero", "nemo", "whisper", "ten", "whisperseg", "none"]
 
     @staticmethod
     def is_backend_available(name: str) -> Tuple[bool, str]:
@@ -222,10 +248,11 @@ class SpeechSegmenterFactory:
             "whisper-vad-medium": "Whisper VAD (medium)",
             "silero-v6.2": "Silero VAD v6.2",
             "ten": "TEN VAD",
+            "whisperseg": "WhisperSeg (JA-ASMR)",
             "none": "None (Skip)",
         }
 
-        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "none"]:
+        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "whisperseg", "none"]:
             available, hint = SpeechSegmenterFactory.is_backend_available(name)
             backends.append({
                 "name": name,
