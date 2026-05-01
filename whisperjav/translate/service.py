@@ -207,6 +207,7 @@ def translate_with_config(
     ollama_url: Optional[str] = None,
     auto_confirm: bool = False,
     ollama_max_tokens: Optional[int] = None,
+    ollama_num_ctx: Optional[int] = None,
 ) -> Optional[Path]:
     """
     Translate subtitle file with full configuration resolution.
@@ -376,6 +377,10 @@ def translate_with_config(
 
             resolved_model = readiness['model']
             n_ctx = readiness['num_ctx']
+            # User --ollama-num-ctx override applied before batch_size cap
+            # and max_tokens computation so both honor the override.
+            if ollama_num_ctx is not None:
+                n_ctx = ollama_num_ctx
             resolved_max_batch_size = cap_batch_size_for_context(resolved_max_batch_size, n_ctx)
             max_tokens = compute_max_output_tokens(resolved_max_batch_size, n_ctx)
             if ollama_max_tokens is not None:

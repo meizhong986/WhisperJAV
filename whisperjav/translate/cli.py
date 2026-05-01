@@ -352,6 +352,13 @@ def main():
              "Use this to manually cap token budget (e.g., 2048, 4096)."
     )
     ollama_group.add_argument(
+        '--ollama-num-ctx', type=int, default=None,
+        help="Override Ollama context window size for translation (e.g., 8192, 16384). "
+             "By default, WhisperJAV uses the curated num_ctx for the model. "
+             "Use this when running a model with a non-default context window. "
+             "Note: batch size and max-tokens are auto-recomputed from this override."
+    )
+    ollama_group.add_argument(
         '--yes', '-y',
         action='store_true',
         help="Auto-confirm prompts (model downloads, server starts)"
@@ -597,6 +604,13 @@ def main():
         # Dynamic config from model metadata
         model = readiness['model']
         ollama_n_ctx = readiness['num_ctx']
+        # User --ollama-num-ctx override is applied BEFORE batch_size capping
+        # and max_tokens computation, so both downstream values honor the override.
+        _user_n_ctx = getattr(args, 'ollama_num_ctx', None)
+        if _user_n_ctx is not None:
+            print(f"[OLLAMA] num_ctx overridden by --ollama-num-ctx: "
+                  f"{ollama_n_ctx} -> {_user_n_ctx}", file=sys.stderr)
+            ollama_n_ctx = _user_n_ctx
         _user_batch = merged.get('max_batch_size', readiness['batch_size'])
         ollama_batch_size = cap_batch_size_for_context(_user_batch, ollama_n_ctx)
         ollama_max_tokens = compute_max_output_tokens(ollama_batch_size, ollama_n_ctx)

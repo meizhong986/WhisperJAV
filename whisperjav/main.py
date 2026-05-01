@@ -458,6 +458,12 @@ def parse_arguments():
         help="Override auto-computed max output tokens for Ollama translation (e.g., 2048, 4096)"
     )
     translation_group.add_argument(
+        "--ollama-num-ctx", type=int, default=None,
+        help="Override Ollama context window size (e.g., 8192, 16384). "
+             "By default, WhisperJAV uses the curated value for the model. "
+             "Use this when running a model with a larger/smaller context than the default."
+    )
+    translation_group.add_argument(
         "--yes", "-y",
         action="store_true",
         help="Auto-confirm prompts (model downloads, server starts)"
@@ -1296,6 +1302,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             ollama_url=getattr(args, 'ollama_url', None),
                             auto_confirm=getattr(args, 'yes', False),
                             ollama_max_tokens=getattr(args, 'ollama_max_tokens', None),
+                            ollama_num_ctx=getattr(args, 'ollama_num_ctx', None),
                         )
 
                         if translated_path:
