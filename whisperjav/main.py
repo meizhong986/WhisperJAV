@@ -1893,13 +1893,40 @@ def main():
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
         import json
+        import copy
+
+        # v1.8.13 (#312): Mirror the WhisperProASR firewall
+        # (whisper_pro_asr.py:71-77) in the dump output. The legacy resolver
+        # always emits silero VAD presets because LEGACY_PIPELINES hardcodes
+        # vad="silero". At runtime, those silero params get cleared by the
+        # firewall when a non-silero segmenter is selected — so the dump
+        # was historically misleading (showed silero values for ten/whisperseg/
+        # silero-v6.2 backends). Apply the same firewall here so users see
+        # the runtime-effective config.
+        dump_resolved = copy.deepcopy(resolved_config) if resolved_config else None
+        if dump_resolved is not None and isinstance(dump_resolved, dict):
+            params = dump_resolved.get("params") or {}
+            ss = params.get("speech_segmenter") or {}
+            backend = ss.get("backend") or "silero-v3.1"  # firewall default
+            if backend and not backend.startswith("silero"):
+                cleared_vad = params.pop("vad", None)
+                params["_dump_note"] = (
+                    f"Resolver-produced silero vad_params cleared for non-silero "
+                    f"backend '{backend}' to mirror the runtime firewall "
+                    f"(whisper_pro_asr.py). Actual runtime VAD settings come from "
+                    f"the {backend} YAML preset at sensitivity='{args.sensitivity}'."
+                )
+                if cleared_vad:
+                    params["_dump_cleared_vad"] = cleared_vad
+                dump_resolved["params"] = params
+
         dump_data = {
             "mode": args.mode,
             "pipeline": getattr(args, 'pipeline', None),
             "sensitivity": args.sensitivity,
             "subs_language": args.subs_language,
             "language_code": language_code,
-            "resolved_config": resolved_config,
+            "resolved_config": dump_resolved,
             "cli_args": {
                 "model": args.model,
                 "ensemble": args.ensemble,
