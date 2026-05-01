@@ -176,7 +176,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#308** | Add English as source language for AI SRT Translate + ASS/SSA format support | LOW | **PARTIAL — v1.8.13 ships English source language** (commit 7cb4d77). ASS/SSA format support deferred to v1.9.0 Translation expansion theme. SangenBR. |
 | ~~**#298**~~ | ~~Settings persistence for API/prompt fields~~ | — | **CLOSED 04-23** (yy739566004 agreed duplicate of #96, tracked there). |
 | **#293** | Translation context / Whisper prompt feature | LOW | v1.9+ — **NEW 04-16.** User asks if movie descriptions/names as prompt would improve accuracy. Whisper and Qwen3-ASR both support initial prompt. Valid P2 ask. |
-| **#292** | Low GPU utilization with higher-end models | LOW | v1.9+ — **NEW 04-17.** User running supergemma4-26b MoE on RTX 4090. Community (@justantopair-ai) already answered with good technical explanation. Probably just needs a thumbs-up from owner. |
+| **#292** | Low GPU utilization with higher-end models | LOW | **RESOLVED in thread** — owner replied 2026-04-17 thanking @justantopair-ai for the MoE explanation, recommending `translategemma:12b` / `qwen2.5:7b-instruct` for 24GB VRAM. Tracker entry stale until rev48. |
 | **#279** | Stash integration | LOW | Backlog — l34240013 provided detailed workflow (filename convention `<VIDEO>.<LANG>.srt`, auto-trigger points). **Responded 04-21**: thanked for integration detail, backlog-confirmed (no v1.9.0 timeline). |
 | **#268** | Thai + Korean translation targets | LOW | v1.9+ |
 | **#265** | Post-translation hallucination filter (Chinese) | MEDIUM | v1.9 |
