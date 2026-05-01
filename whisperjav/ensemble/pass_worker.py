@@ -386,7 +386,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_attn": "auto",
     "qwen_enhancer": "none",
     "qwen_enhancer_model": None,
-    "qwen_segmenter": "silero-v6.2",
+    "qwen_segmenter": "whisperseg",  # v1.8.13: was "silero-v6.2"
     "qwen_sensitivity": "balanced",
     "qwen_japanese_postprocess": False,
     "qwen_postprocess_preset": "high_moan",
@@ -1143,11 +1143,13 @@ def _build_pipeline(
         if pass_config.get("speech_segmenter"):
             qwen_defaults["qwen_segmenter"] = pass_config["speech_segmenter"]
             logger.debug("Pass %s: Override qwen_segmenter = %s", pass_number, pass_config["speech_segmenter"])
-        # anime-whisper: default to TEN VAD (must override BEFORE sensitivity resolution)
+        # anime-whisper: v1.8.13 default flipped TEN -> WhisperSeg (must
+        # override BEFORE sensitivity resolution). Only fires when user did
+        # not pass --pass{N}-speech-segmenter.
         _aw_gen = qwen_defaults.get("qwen_generator_backend", "qwen3")
         if _aw_gen == "anime-whisper" and not pass_config.get("speech_segmenter"):
-            qwen_defaults["qwen_segmenter"] = "ten"
-            logger.debug("Pass %s: anime-whisper default qwen_segmenter = ten", pass_number)
+            qwen_defaults["qwen_segmenter"] = "whisperseg"
+            logger.debug("Pass %s: anime-whisper default qwen_segmenter = whisperseg", pass_number)
         # Resolve sensitivity preset into segmenter_config
         # Layering: YAML spec < sensitivity preset < user custom overrides
         qwen_sensitivity = (
@@ -1181,7 +1183,7 @@ def _build_pipeline(
         if _cli_pad is not None:
             user_segmenter_overrides["speech_pad_ms"] = max(0, int(_cli_pad))
             logger.debug("Pass %s: CLI speech_pad_ms override = %s ms", pass_number, _cli_pad)
-        segmenter_backend = qwen_defaults.get("qwen_segmenter", "silero-v6.2")
+        segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")
         segmenter_config = resolve_qwen_sensitivity(
             segmenter_backend, qwen_sensitivity, user_segmenter_overrides or None
         )
@@ -1207,7 +1209,7 @@ def _build_pipeline(
             "speech_enhancer": qwen_defaults.get("qwen_enhancer", "none"),
             "speech_enhancer_model": qwen_defaults.get("qwen_enhancer_model", None),
             "enhance_for_vad": pass_config.get("enhance_for_vad", False),
-            "speech_segmenter": qwen_defaults.get("qwen_segmenter", "silero-v6.2"),
+            "speech_segmenter": qwen_defaults.get("qwen_segmenter", "whisperseg"),
             "japanese_postprocess": qwen_defaults.get("qwen_japanese_postprocess", False),
             "postprocess_preset": qwen_defaults.get("qwen_postprocess_preset", "high_moan"),
             "qwen_input_mode": qwen_defaults.get("qwen_input_mode", "assembly"),

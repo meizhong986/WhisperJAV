@@ -35,7 +35,7 @@ class VadGroupedFramer:
 
     def __init__(
         self,
-        segmenter_backend: str = "ten",
+        segmenter_backend: str = "whisperseg",  # v1.8.13: was "ten"
         max_group_duration_s: float = 29.0,
         chunk_threshold_s: float = 1.0,
         min_frame_duration_s: float = 0.1,

@@ -551,12 +551,13 @@ def parse_arguments():
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
                            help="Dual-track mode: use enhanced audio for VAD/framing but original audio "
                                 "for ASR transcription (Qwen/Decoupled pipelines only)")
-    qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="silero-v6.2",
+    qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg"],
                            help="Speech segmentation backend for VAD-based chunking: "
-                                "silero-v6.2 (default, force-splits long chunks), "
-                                "ten, silero/silero-v4.0/v3.1, whisperseg (JA-ASMR ONNX), "
+                                "whisperseg (default since v1.8.13, JA-ASMR ONNX), "
+                                "silero-v6.2 (force-splits long chunks), "
+                                "ten, silero/silero-v4.0/v3.1, "
                                 "nemo/nemo-lite, whisper-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
@@ -1115,12 +1116,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
-        _qwen_segmenter = getattr(args, 'qwen_segmenter', 'silero-v6.2')
-        # anime-whisper: default to TEN VAD (must override BEFORE sensitivity resolution)
+        _qwen_segmenter = getattr(args, 'qwen_segmenter', 'whisperseg')
+        # anime-whisper: v1.8.13 default flipped TEN -> WhisperSeg (must
+        # override BEFORE sensitivity resolution). Only fires when user did
+        # not explicitly pass --qwen-segmenter.
         _gen_backend_early = getattr(args, 'qwen_generator', 'qwen3')
         if _gen_backend_early == "anime-whisper":
             if not any(a.startswith('--qwen-segmenter') for a in sys.argv):
-                _qwen_segmenter = "ten"
+                _qwen_segmenter = "whisperseg"
         _user_vad_overrides = {}
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:

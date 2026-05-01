@@ -273,12 +273,21 @@ class QwenPipeline(BasePipeline):
 
         # anime-whisper: vad_only (skip ForcedAligner, save ~1GB VRAM),
         # passthrough cleaner, no step-down (no aligner = no collapse),
-        # TEN VAD segmenter with tighter grouping for anime speech patterns
+        # WhisperSeg segmenter (v1.8.13: was TEN VAD; flipped to align with
+        # system-wide WhisperSeg default), with tighter grouping for anime
+        # speech patterns.
+        # NOTE: this still silently overrides whatever segmenter the caller
+        # passed. Architectural concern (silent override of explicit user
+        # choice) deferred to v1.9.x — for now the override matches the
+        # system-wide default so users picking anime-whisper get whisperseg
+        # consistently. If user explicitly wants e.g. silero-v3.1 for non-JA
+        # audio with anime-whisper, they would need to use the qwen pipeline
+        # directly (not anime-whisper preset).
         if generator_backend == "anime-whisper":
             self.timestamp_mode = TimestampMode.VAD_ONLY
             self.assembly_cleaner_enabled = False
             self.stepdown_enabled = False
-            self.segmenter_backend = "ten"
+            self.segmenter_backend = "whisperseg"
             self.segmenter_chunk_threshold = 0.5
             self.segmenter_max_group_duration = 5.0
 
