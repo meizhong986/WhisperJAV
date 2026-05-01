@@ -3216,7 +3216,10 @@ const EnsembleManager = {
         let modelOptions = modelDef.options;
         let modelDefault = modelDef.default;
         if (passState && passState.isAnimeWhisper) {
-            modelOptions = [{ value: 'litagin/anime-whisper', label: 'anime-whisper (~4GB VRAM)' }];
+            modelOptions = [
+                { value: 'litagin/anime-whisper', label: 'litagin/anime-whisper (default, ~4GB VRAM)' },
+                { value: 'efwkjn/whisper-ja-anime-v0.3', label: 'efwkjn/whisper-ja-anime-v0.3 (experimental, community #232)' },
+            ];
             modelDefault = 'litagin/anime-whisper';
         }
         container.appendChild(this.createTransformersDropdown(

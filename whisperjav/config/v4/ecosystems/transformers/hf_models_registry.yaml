@@ -100,9 +100,24 @@ models:
       - stable
 
   # ---------------------------------------------------------------------------
-  # Anime-Optimized Models (Commented - Pending Testing)
+  # Anime-Optimized Models
   # ---------------------------------------------------------------------------
-  # Uncomment these models after testing to make them available to users
+  # Active entries are selectable in the GUI ChronosJAV → anime-whisper model dropdown.
+  # Commented entries are kept for future evaluation but not yet exposed.
+  #
+  # v0.3 added in v1.8.13 (community recommendation from #232 mustssr, who tested
+  # v0.1 against litagin/anime-whisper and reported "each have their own strengths").
+  # Ships as opt-in, not default. v1.9.x ASR expansion will benchmark variants
+  # side-by-side on the Netflix-GT JAV reference.
+  - id: "efwkjn/whisper-ja-anime-v0.3"
+    label: "Whisper JA Anime v0.3 (efwkjn, experimental)"
+    category: anime
+    description: "Community-recommended Japanese anime-focused model v0.3 — see issue #232. Ships as opt-in alongside litagin/anime-whisper default."
+    tags:
+      - japanese
+      - anime
+      - experimental
+      - community
   #
   # - id: "litagin/anime-whisper"
   #   label: "Anime Whisper (litagin)"
@@ -130,14 +145,6 @@ models:
   #     - japanese
   #     - anime
   #     - large
-  #
-  # - id: "efwkjn/whisper-ja-anime-v0.3"
-  #   label: "Whisper JA Anime v0.3"
-  #   category: anime
-  #   description: "Japanese anime-focused model v0.3"
-  #   tags:
-  #     - japanese
-  #     - anime
 
   # ---------------------------------------------------------------------------
   # Community Japanese Models (Commented - Pending Testing)
