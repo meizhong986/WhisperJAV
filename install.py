@@ -498,6 +498,16 @@ def run_uv_sync(extras: list, cuda_version: str, dev: bool = False,
     # route macOS to default PyPI via platform marker.
     if cuda_version != "metal" and cuda_version in PYTORCH_INDEXES:
         cmd.extend(["--index", f"pytorch={PYTORCH_INDEXES[cuda_version]}"])
+        # v1.8.13 (#300, #313): when the PyTorch index is added, also tell uv
+        # to consider all indexes when resolving each package, not just the
+        # first one that has it. Without this, bs-roformer-infer's
+        # `requests>=2.31` requirement deadlocks against the PyTorch index's
+        # pinned `requests==2.28.1` because uv only looks at PyTorch's
+        # version. With this flag uv also checks PyPI for a compatible
+        # `requests` version. The "unsafe" naming refers to dependency-
+        # confusion risk, but here we're already using the PyTorch index by
+        # explicit configuration — no new attack surface introduced.
+        cmd.extend(["--index-strategy", "unsafe-best-match"])
 
     if dev:
         # dev deps are defined as [project.optional-dependencies] extra,
