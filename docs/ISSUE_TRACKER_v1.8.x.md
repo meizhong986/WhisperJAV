@@ -180,11 +180,11 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#279** | Stash integration | LOW | Backlog — l34240013 provided detailed workflow (filename convention `<VIDEO>.<LANG>.srt`, auto-trigger points). **Responded 04-21**: thanked for integration detail, backlog-confirmed (no v1.9.0 timeline). |
 | **#268** | Thai + Korean translation targets | LOW | v1.9+ |
 | **#265** | Post-translation hallucination filter (Chinese) | MEDIUM | v1.9 |
-| **#264** | Model download location customization | LOW | **NEEDS FOLLOW-UP** — **04-22: starkwsam replied** challenging maintainer's answer: "your answer about `HF_HOME=I:\hf_cache` / (e.g., `I:\cache` and `I:\cache\huggingface`) lacks coherence with the earlier detailed explanation — are you a pure AI reply or verified in practice?" Wants concrete set of env vars + folder-creation steps to relocate BOTH OpenAI Whisper cache AND HF cache to I-drive. Needs a humble, verified re-reply. |
+| **#264** | Model download location customization | LOW | **DOCS SHIPPED v1.8.13** (commit c1b1a89) — `docs/en/faq.md` now has "Models & Cache" section covering verified env vars (HF_HOME, XDG_CACHE_HOME, TORCH_HOME, MODELSCOPE_CACHE) with Windows + Linux/macOS paths and example values. Reply to starkwsam pending; will point to FAQ. |
 | **#262** | Cohere Transcribe model | MEDIUM | v1.9.x — **Spike 2026-05-01**: weights GATED on HuggingFace (Apache-2.0 code, 2B Conformer, custom class, `trust_remote_code=True`). Decision: roadmap to v1.9.x, document HF access-request flow during install. **Responded 05-01** ([comment-4361061540](https://github.com/meizhong986/WhisperJAV/issues/262#issuecomment-4361061540)). See `_cohere_spike/FINDINGS.md`. |
 | **#254** | Remove non-speech sounds | MEDIUM | v1.9 |
 | **#252** | Multi-speaker / diarization | MEDIUM | v1.9+ |
-| **#250** | Model folder documentation | LOW | Docs / FAQ |
+| **#250** | Model folder documentation | LOW | **DOCS SHIPPED v1.8.13** (commit c1b1a89) — paths table in `docs/en/faq.md` "Models & Cache" section. |
 | **#248** | Diarization | MEDIUM | v1.9+ |
 | **#247** | Docker support | LOW | Backlog — foxfire881 requested docker-compose for NAS CPU-only 7x24 use case. **Responded 04-21**: acknowledged NAS motivator, backlog. |
 | **#246** | Serverless GPU pipeline + anime-whisper hallucination | LOW | v1.9+ — from 2026-03-31. Cluster with #265. |
@@ -205,7 +205,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#142** | AMD Radeon ROCm | MEDIUM | v1.9+ |
 | **#126** | Recursive directory | LOW | Backlog |
 | **#114** | DirectML | MEDIUM | v1.9+ |
-| **#99** | 4GB VRAM guidance | LOW | Backlog |
+| **#99** | 4GB VRAM guidance | LOW | **DOCS SHIPPED v1.8.13** (commit c1b1a89) — pipeline+model VRAM table + speech-enhancer/translation memory advice in `docs/en/faq.md` "Models & Cache" section. |
 | **#96** | Settings persistence | MEDIUM | v1.9.0 |
 | **#71** | Google Translate (free) | LOW | Backlog |
 | **#59** | Feature plans (meta) | — | Keep open |
