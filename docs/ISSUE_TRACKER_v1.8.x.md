@@ -181,7 +181,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#268** | Thai + Korean translation targets | LOW | v1.9+ |
 | **#265** | Post-translation hallucination filter (Chinese) | MEDIUM | v1.9 |
 | **#264** | Model download location customization | LOW | **NEEDS FOLLOW-UP** — **04-22: starkwsam replied** challenging maintainer's answer: "your answer about `HF_HOME=I:\hf_cache` / (e.g., `I:\cache` and `I:\cache\huggingface`) lacks coherence with the earlier detailed explanation — are you a pure AI reply or verified in practice?" Wants concrete set of env vars + folder-creation steps to relocate BOTH OpenAI Whisper cache AND HF cache to I-drive. Needs a humble, verified re-reply. |
-| **#262** | Cohere Transcribe model | LOW | v1.9.x |
+| **#262** | Cohere Transcribe model | MEDIUM | v1.9.x — **Spike 2026-05-01**: weights GATED on HuggingFace (Apache-2.0 code, 2B Conformer, custom class, `trust_remote_code=True`). Decision: roadmap to v1.9.x, document HF access-request flow during install. **Responded 05-01** ([comment-4361061540](https://github.com/meizhong986/WhisperJAV/issues/262#issuecomment-4361061540)). See `_cohere_spike/FINDINGS.md`. |
 | **#254** | Remove non-speech sounds | MEDIUM | v1.9 |
 | **#252** | Multi-speaker / diarization | MEDIUM | v1.9+ |
 | **#250** | Model folder documentation | LOW | Docs / FAQ |
