@@ -1274,6 +1274,7 @@ const EnsembleManager = {
     ],
     animeWhisperModels: [
         { value: 'litagin/anime-whisper', label: 'anime-whisper    ~4GB' },
+        { value: 'efwkjn/whisper-ja-anime-v0.3', label: 'efwkjn/whisper-ja-anime-v0.3    ~3GB (experimental, #232)' },
         { value: 'kotoba-tech/kotoba-whisper-v2.0', label: 'Kotoba v2.0    ~2GB' },
         { value: 'kotoba-tech/kotoba-whisper-v2.1', label: 'Kotoba v2.1    ~2GB' }
     ],
