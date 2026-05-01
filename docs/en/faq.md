@@ -102,6 +102,67 @@ See the [Upgrade Guide](UPGRADE.md) for details.
 
 ---
 
+## Models & Cache
+
+### Where are the AI models stored?
+
+WhisperJAV downloads models on first use and caches them on disk. The cache locations follow each library's standard convention — WhisperJAV does not override them:
+
+| Cache | Default path (Linux/macOS) | Default path (Windows) | Used by |
+|-------|---------------------------|------------------------|---------|
+| HuggingFace | `~/.cache/huggingface/` | `%USERPROFILE%\.cache\huggingface\` | Kotoba, anime-whisper, Qwen3-ASR, WhisperSeg, transformers backend |
+| OpenAI Whisper | `~/.cache/whisper/` | `%USERPROFILE%\.cache\whisper\` | Standard `large-v2` / `large-v3` / `turbo` models |
+| Faster-Whisper | (uses HuggingFace cache above) | (uses HuggingFace cache above) | `fidelity` / `balanced` / `fast` modes via faster-whisper |
+| PyTorch Hub | `~/.cache/torch/hub/` | `%USERPROFILE%\.cache\torch\hub\` | Silero VAD weights |
+| ModelScope | `~/.cache/modelscope/` | `%USERPROFILE%\.cache\modelscope\` | ZipEnhancer / ClearVoice (when used) |
+| WhisperJAV-internal | `~/.whisperjav_cache/` | `%LOCALAPPDATA%\.whisperjav_cache\` | Update checker cache, numba JIT cache redirect |
+
+A typical WhisperJAV install ends up with **5-15 GB** in HuggingFace + Whisper caches after a few sessions, depending on which models you've used.
+
+### How do I move the cache to a different drive?
+
+Set the relevant environment variable **before** launching WhisperJAV. Each library reads its own variable:
+
+| Cache to relocate | Env variable | Example value |
+|-------------------|--------------|---------------|
+| HuggingFace (most models) | `HF_HOME` | `D:\AI\hf_cache` |
+| OpenAI Whisper | `XDG_CACHE_HOME` | `D:\AI\cache` (Whisper cache becomes `D:\AI\cache\whisper`) |
+| PyTorch Hub | `TORCH_HOME` | `D:\AI\torch` |
+| ModelScope | `MODELSCOPE_CACHE` | `D:\AI\modelscope` |
+
+**Windows GUI users**: set these via System Properties → Environment Variables → User variables, then restart WhisperJAV. The GUI inherits its environment from your user profile.
+
+**CLI users**: export them in your shell profile (`.bashrc` / `.zshrc`) or pass per-command.
+
+After relocating, your old caches are still on disk in the original locations — copy or move them to the new path so models don't re-download.
+
+### How do I free up disk space after uninstall?
+
+The standalone installer removes the WhisperJAV install directory, but model caches in your home / AppData persist (libraries place them outside the install dir by design). To fully clean up:
+
+1. Delete the cache directories listed in the table above
+2. Delete the WhisperJAV-internal cache: `~/.whisperjav_cache` (Linux/macOS) or `%LOCALAPPDATA%\.whisperjav_cache` (Windows)
+3. If you set custom `HF_HOME` etc. env vars, clean those paths instead
+
+Total disk reclaimed varies — usually 5-15 GB.
+
+### What if I have only 4 GB VRAM?
+
+Model recommendations for 4 GB VRAM:
+
+| Pipeline | Model | VRAM | Notes |
+|----------|-------|------|-------|
+| **fast** | `turbo-int8` | ~3 GB | Recommended starting point |
+| **faster** | `turbo-int8-batch8` | ~5 GB (peak) | May still work via fallback to CPU offload |
+| **balanced** | `large-v2-int8` | ~6 GB | Likely too large; use `fast` instead |
+
+Tips:
+- Avoid running other GPU-heavy applications simultaneously (Chrome, games, video encoding)
+- Translation with local LLMs needs separate VRAM (3-8 GB depending on model). On a 4 GB GPU, prefer cloud translation providers (DeepSeek, OpenRouter) for the translation step.
+- Speech enhancers (`clearvoice`, `bs-roformer`, `zipenhancer`) each need 1-3 GB extra. Use `none` or `ffmpeg-dsp` (CPU-only) if VRAM is tight.
+
+---
+
 ## Troubleshooting
 
 ### Processing fails with an error
