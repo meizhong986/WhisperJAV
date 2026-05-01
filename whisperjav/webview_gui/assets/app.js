@@ -1216,7 +1216,7 @@ const EnsembleManager = {
             sensitivity: 'aggressive',
             sceneDetector: 'auditok',
             speechEnhancer: 'none',
-            speechSegmenter: 'silero-v3.1',  // Silero v3.1 default for balanced/fidelity
+            speechSegmenter: 'whisperseg',  // v1.8.13: WhisperSeg system-wide default
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1234,7 +1234,7 @@ const EnsembleManager = {
             sensitivity: 'balanced',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'silero-v6.2',  // Silero v6.2 (matches Qwen pipeline defaults)
+            speechSegmenter: 'whisperseg',  // v1.8.13: WhisperSeg system-wide default
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
@@ -1554,37 +1554,41 @@ const EnsembleManager = {
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
+        // v1.8.13: WhisperSeg is the system-wide segmenter default. All branches
+        // below set whisperseg as the per-pipeline preset; users can manually
+        // override via the dropdown (e.g., switch to silero-v3.1 for non-JA audio).
         if (pipelineType === 'anime-whisper') {
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'silero-v6.2';
+            segmenterSelect.value = 'whisperseg';
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'silero-v6.2';
+            this.state[passKey].speechSegmenter = 'whisperseg';
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'qwen') {
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'silero-v6.2';
+            segmenterSelect.value = 'whisperseg';
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'silero-v6.2';
+            this.state[passKey].speechSegmenter = 'whisperseg';
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
             const pipeline = this.state[passKey].pipeline;
             if (pipeline === 'balanced' || pipeline === 'fidelity') {
-                // Silero v3.1 + auditok for balanced; Silero v3.1 + semantic for fidelity
+                // v1.8.13: whisperseg + auditok for balanced; whisperseg + semantic for fidelity
                 sceneSelect.value = (pipeline === 'balanced') ? 'auditok' : 'semantic';
-                segmenterSelect.value = 'silero-v3.1';
+                segmenterSelect.value = 'whisperseg';
                 this.state[passKey].sceneDetector = (pipeline === 'balanced') ? 'auditok' : 'semantic';
-                this.state[passKey].speechSegmenter = 'silero-v3.1';
+                this.state[passKey].speechSegmenter = 'whisperseg';
             } else {
-                // faster, fast — keep silero-v6.2 + semantic
+                // faster, fast — runtime has vad=none per LEGACY_PIPELINES, but
+                // dropdown still gets the system-wide default for UI consistency
                 sceneSelect.value = 'semantic';
-                segmenterSelect.value = 'silero-v6.2';
+                segmenterSelect.value = 'whisperseg';
                 this.state[passKey].sceneDetector = 'semantic';
-                this.state[passKey].speechSegmenter = 'silero-v6.2';
+                this.state[passKey].speechSegmenter = 'whisperseg';
             }
             sensitivitySelect.value = 'aggressive';
             this.state[passKey].sensitivity = 'aggressive';
