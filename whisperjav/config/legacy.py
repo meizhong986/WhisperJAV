@@ -95,6 +95,15 @@ def _filter_none_values(params: Dict[str, Any]) -> Dict[str, Any]:
 LEGACY_PIPELINES = {
     "balanced": {
         "asr": "faster_whisper",
+        # NOTE: this `vad` field names a VAD Pydantic component (registry has
+        # only "silero" — defines the preset values that flow into
+        # params["vad"]). It is NOT the runtime speech-segmenter backend
+        # selector. The runtime segmenter default (v1.8.13: whisperseg) is
+        # set in whisper_pro_asr.py / faster_whisper_pro_asr.py fallbacks
+        # and gates params["vad"] via the firewall (clears silero presets
+        # for non-silero runtime backends). Keep this as silero-v3.1 so the
+        # resolver loads the v3.1 preset values; the firewall handles the
+        # rest when whisperseg becomes the runtime default.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
         "description": "Full feature set with scene detection and VAD. Best quality.",
@@ -113,6 +122,7 @@ LEGACY_PIPELINES = {
     },
     "fidelity": {
         "asr": "openai_whisper",
+        # See balanced note above — same architecture applies.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
         "description": "OpenAI Whisper with VAD and scene detection. Maximum fidelity.",

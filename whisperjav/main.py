@@ -340,17 +340,18 @@ def parse_arguments():
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
                                  "ten", "whisperseg", "none"
                              ],
-                             default=None,  # None = use silero (default)
+                             default=None,  # None = use whisperseg (v1.8.13 default for balanced/fidelity)
                              metavar="BACKEND",
                              help=(
                                  "Speech segmentation backend: "
-                                 "silero-v3.1 (default for balanced/fidelity), silero/silero-v4.0, "
-                                 "silero-v6.2 (pip pkg, max_speech_duration_s + hysteresis), "
+                                 "whisperseg (default for balanced/fidelity since v1.8.13 — "
+                                 "Whisper-encoder VAD trained on JA ASMR, ONNX, F1=0.787 on Netflix-GT JAV), "
+                                 "silero-v3.1 (recommended for non-Japanese audio), "
+                                 "silero/silero-v4.0, silero-v6.2 (pip pkg, max_speech_duration_s + hysteresis), "
                                  "nemo/nemo-lite (fast frame VAD ~0.5GB), "
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), "
-                                 "whisperseg (Whisper-encoder VAD trained on JA ASMR, ONNX, opt-in extra), "
                                  "none (disable segmentation)"
                              ))
     tuning_group.add_argument("--initial-prompt",
@@ -1833,8 +1834,20 @@ def main():
             resolved_config["params"]["speech_segmenter"]["backend"] = "none"
             logger.info("Speech segmentation disabled via --no-vad flag (backend set to 'none')")
 
-    # Apply --speech-segmenter override
+    # Apply --speech-segmenter (explicit override, or v1.8.13 default = whisperseg)
     speech_segmenter = getattr(args, 'speech_segmenter', None)
+    if speech_segmenter is None and resolved_config is not None:
+        # v1.8.13: when user didn't pass --speech-segmenter, populate the
+        # system-wide default (whisperseg) into resolved_config. This keeps
+        # the resolver output, dump_params output, and runtime behavior
+        # consistent. Without this, the dump would show silero VAD presets
+        # (from the resolver's `vad` field) with no speech_segmenter.backend,
+        # which is misleading — the runtime fallback in whisper_pro_asr.py
+        # would still produce whisperseg behavior, but the dump wouldn't
+        # show it.
+        speech_segmenter = "whisperseg"
+        logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
+
     if speech_segmenter is not None and resolved_config is not None:
         if "params" not in resolved_config:
             resolved_config["params"] = {}

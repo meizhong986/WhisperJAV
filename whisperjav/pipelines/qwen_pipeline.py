@@ -114,7 +114,8 @@ class QwenPipeline(BasePipeline):
         enhance_for_vad: bool = False,  # Dual-track: enhanced audio for VAD, original for ASR
 
         # Speech segmentation / VAD (Phase 4)
-        speech_segmenter: str = "silero-v6.2",  # Default to Silero v6.2 for VAD
+        # v1.8.13: default flipped silero-v6.2 -> whisperseg (system-wide default flip).
+        speech_segmenter: str = "whisperseg",
         segmenter_max_group_duration: float = 6.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
         segmenter_chunk_threshold: float = 1.0,  # Silence gap threshold for VAD frame grouping
         segmenter_config: Optional[Dict[str, Any]] = None,  # GUI/CLI custom segmenter params

@@ -56,10 +56,14 @@ class WhisperProASR:
 
         # Determine speech segmenter backend FIRST (needed for firewall below)
         speech_segmenter_config = params.get("speech_segmenter", {})
-        # v1.8.12: aligned with LEGACY_PIPELINES["fidelity"]["vad"] = "silero-v3.1".
-        # Prior fallback to "silero-v4.0" silently overrode the v3.1 declaration
-        # because resolve_legacy_pipeline never sets params.speech_segmenter.backend.
-        segmenter_backend = speech_segmenter_config.get("backend", "silero-v3.1")
+        # v1.8.13: default flipped silero-v3.1 -> whisperseg to align with
+        # LEGACY_PIPELINES["fidelity"]["vad"] = "whisperseg" (resolver-level
+        # default). The fallback only fires when speech_segmenter.backend is
+        # not set (e.g., direct module instantiation bypassing the resolver).
+        # v1.8.12 history: aligned with v3.1 to fix prior silent override to
+        # silero-v4.0 — that alignment is preserved by keeping resolver and
+        # fallback in sync.
+        segmenter_backend = speech_segmenter_config.get("backend", "whisperseg")
 
         # --- CONSTRUCTOR FIREWALL ---
         # The resolver unconditionally produces Silero VAD presets (threshold=0.068,

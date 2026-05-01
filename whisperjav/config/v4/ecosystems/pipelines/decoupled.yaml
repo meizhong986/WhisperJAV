@@ -105,8 +105,12 @@ pipeline:
 
   # --- Speech Segmentation / VAD ---
   # Groups speech segments within scenes for framing.
-  # Available: ten (default), silero, nemo, whisper-vad
-  speech_segmenter: ten
+  # v1.8.13: default flipped ten -> whisperseg (system-wide default flip,
+  # aligned with LEGACY_PIPELINES). For non-Japanese audio, override to
+  # silero-v3.1 via CLI/GUI/config override.
+  # Available: whisperseg (default), silero, silero-v3.1, silero-v6.2,
+  # ten, nemo, whisper-vad
+  speech_segmenter: whisperseg
   segmenter_max_group_duration: 6.0  # seconds
 
   # --- Step-Down Retry (Phase 3 of IMPL-001) ---
