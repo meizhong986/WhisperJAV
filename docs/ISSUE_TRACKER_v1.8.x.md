@@ -150,7 +150,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#282** | Why does Ollama need GitHub connection? | KenZP12 | **CLOSED** 05-01 | Closed (rev47 sweep) — Q&A answered, 22d silent. Reopen invitation given. |
 | **#280** | Qwen3-ASR TypeError: `check_model_inputs()` | zoqapopita93 | `AWAITING REPLY` | Responded 04-09: upstream `transformers` mismatch, suggested `pip install --no-deps transformers==4.49.0`. |
 | **#274** | Pipeline aggregation mode question | cuixiaopi | **CLOSED** 05-01 | Closed (rev47 sweep) — Q&A answered, 22d silent. Reopen invitation given. |
-| **#271** | Ollama translation model issues | justantopair-ai | `AWAITING REPLY` | **FIX SHIPPED v1.8.11.** TinyRick1489 04-22 asked for `--ollama-num-ctx` flag. **Responded 04-30** ([comment-4358676849](https://github.com/meizhong986/WhisperJAV/issues/271#issuecomment-4358676849)): acknowledged as fair ask, added to v1.8.13 candidate list. |
+| **#271** | Ollama translation model issues | justantopair-ai | `AWAITING REPLY` | **FIX SHIPPED v1.8.11.** TinyRick1489 04-22 follow-up: `--ollama-num-ctx` flag. **SHIPPED in v1.8.13** (commit 544ad2a) — registered in both `whisperjav.main` and `whisperjav.translate.cli` entry points; applied before batch_size cap so downstream values honor the override. Reply pending to TinyRick1489. |
 | **#268** | Thai + Korean translation targets | yedkung69-ctrl | `AWAITING REPLY` | Responded 04-11: GUI gap noted for v1.9.0. |
 | **#265** | Hallucination + post-processing suggestions | yangming2027 | `AWAITING REPLY` | Responded 04-09: answered @zoqapopita93, noted post3 improvements. |
 | **#263** | GPU not utilized / stuck at VAD | herlong6529424-dot | `AWAITING REPLY` | Follow-up 04-17: bilingual China-network template. |
