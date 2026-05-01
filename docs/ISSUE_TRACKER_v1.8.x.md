@@ -190,7 +190,7 @@ See `installer/RELEASE_NOTES_v1.8.10.post3.md` for full details.
 | **#246** | Serverless GPU pipeline + anime-whisper hallucination | LOW | v1.9+ — from 2026-03-31. Cluster with #265. |
 | **#242** | XXL in Pass 1 | MEDIUM | v1.9 |
 | **#239** | AMD GPU | MEDIUM | v1.9+ |
-| **#232** | Whisper-ja-anime-v0.1 model support | LOW | v1.9+ — from 2026-03-16. Cluster with #205, #246. |
+| **#232** | Whisper-ja-anime-v0.X model support | MEDIUM | **v1.8.13 PARTIAL** — added `efwkjn/whisper-ja-anime-v0.3` (newer same-author variant) as opt-in selectable model in ChronosJAV → anime-whisper mode. Default stays `litagin/anime-whisper`. **Responded 05-01** ([comment-4361241844](https://github.com/meizhong986/WhisperJAV/issues/232#issuecomment-4361241844)) asking mustssr to compare v0.3 against his v0.1 evaluation workflow. v1.9.x ASR backend expansion will benchmark anime-whisper variants side-by-side. Cluster with #205, #246. |
 | **#230** | Standalone merge module | HIGH | v1.9.0 |
 | **#224** | Vocal separation | MEDIUM | v1.9 |
 | **#223** | Subtitle edit to PurfView Faster Whisper for Pass 2 | LOW | Backlog — from 2026-03-25. Cluster with #230 (merge module). |
