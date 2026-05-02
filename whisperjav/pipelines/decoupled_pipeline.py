@@ -201,7 +201,10 @@ class DecoupledPipeline(BasePipeline):
         enhance_for_vad: bool = False,  # Dual-track: enhanced audio for VAD, original for ASR
 
         # Speech segmentation / VAD (Phase 4)
-        speech_segmenter: str = "ten",
+        # v1.8.13: was "ten" — flipped to whisperseg as part of system-wide
+        # default flip. DecoupledPipeline is selected via --mode decoupled
+        # (separate from anime-whisper which uses QwenPipeline).
+        speech_segmenter: str = "whisperseg",
         segmenter_max_group_duration: float = 6.0,
         segmenter_config: Optional[Dict[str, Any]] = None,
 
