@@ -271,23 +271,26 @@ class QwenPipeline(BasePipeline):
         # Generator backend selection (v1.8.6+)
         self.generator_backend = generator_backend
 
-        # anime-whisper: vad_only (skip ForcedAligner, save ~1GB VRAM),
+        # anime-whisper preset: vad_only (skip ForcedAligner, save ~1GB VRAM),
         # passthrough cleaner, no step-down (no aligner = no collapse),
-        # WhisperSeg segmenter (v1.8.13: was TEN VAD; flipped to align with
-        # system-wide WhisperSeg default), with tighter grouping for anime
-        # speech patterns.
-        # NOTE: this still silently overrides whatever segmenter the caller
-        # passed. Architectural concern (silent override of explicit user
-        # choice) deferred to v1.9.x — for now the override matches the
-        # system-wide default so users picking anime-whisper get whisperseg
-        # consistently. If user explicitly wants e.g. silero-v3.1 for non-JA
-        # audio with anime-whisper, they would need to use the qwen pipeline
-        # directly (not anime-whisper preset).
+        # tighter grouping for anime speech patterns.
+        #
+        # v1.8.13 (post-acceptance test): segmenter_backend is NO LONGER
+        # overridden here. Earlier versions hard-stamped "ten" (or after
+        # commit 3dbcd00, "whisperseg") regardless of caller choice. This
+        # silently broke explicit-choice cases (e.g., user A/B-testing
+        # ten vs whisperseg in pass1 vs pass2 — both ran the override).
+        # The system-wide default chain (main.py + pass_worker.py) ensures
+        # that anime-whisper takes whisperseg by default when the user
+        # doesn't pass an explicit segmenter, so removing this override
+        # preserves the default behavior while honoring explicit choices.
+        # The other anime-whisper presets (timestamp_mode, cleaner,
+        # stepdown, chunk/max_group) remain because they are tightly
+        # coupled to the anime-whisper generator's expectations.
         if generator_backend == "anime-whisper":
             self.timestamp_mode = TimestampMode.VAD_ONLY
             self.assembly_cleaner_enabled = False
             self.stepdown_enabled = False
-            self.segmenter_backend = "whisperseg"
             self.segmenter_chunk_threshold = 0.5
             self.segmenter_max_group_duration = 5.0
 
