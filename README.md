@@ -95,6 +95,7 @@ Seven pipelines, each with different tradeoffs. Scene detection, speech enhancem
 | **transformers** | HuggingFace Kotoba | Optional | Configurable | Optional | Kotoba Japanese models |
 | **qwen** | Qwen3-ASR | Semantic | Configurable | Silero | Qwen ASR with forced alignment |
 | **anime** | anime-whisper | Semantic | Configurable | TEN | Anime/JAV-tuned dialogue |
+| **whispercpp** | whisper.cpp | Auditok | Configurable | — | **Mac Metal GPU acceleration** |
 
 ### Sensitivity Settings
 

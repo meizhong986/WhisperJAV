@@ -124,6 +124,13 @@ LEGACY_PIPELINES = {
         "description": "Japanese-optimized Kotoba Faster-Whisper with internal VAD.",
         "use_v3_structure": True,  # Return V3 config, not legacy mapped
     },
+    "whispercpp": {
+        "asr": "pywhispercpp",
+        "vad": "none",  # whisper.cpp handles VAD internally
+        "features": ["auditok_scene_detection"],
+        "description": "whisper.cpp with Metal GPU acceleration on Apple Silicon.",
+        "use_v3_structure": True,
+    },
     # NOTE: "transformers" mode is NOT listed here.
     # It uses dedicated --hf-* CLI arguments and bypasses legacy config resolution entirely.
     # See whisperjav/pipelines/transformers_pipeline.py for its implementation.

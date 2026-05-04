@@ -73,6 +73,7 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
+from whisperjav.pipelines.whispercpp_pipeline import WhisperCppPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
 from whisperjav.__version__ import __version__, __version_display__
@@ -162,8 +163,8 @@ def parse_arguments():
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen"], default="balanced",
-                       help="Processing mode (default: balanced)")
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen", "whispercpp"], default="balanced",
+                       help="Processing mode (default: balanced). 'whispercpp' uses whisper.cpp with Metal GPU on Mac.")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
     parser.add_argument("--language", choices=["japanese", "korean", "chinese", "english"],
@@ -1214,6 +1215,19 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 qwen_kwargs["segmenter_max_group_duration"] = 5.0
 
         pipeline = QwenPipeline(**qwen_kwargs)
+        effective_mode = args.mode
+    elif args.mode == "whispercpp":
+        # Whisper.cpp pipeline with Metal GPU acceleration on Mac
+        from whisperjav.pipelines.whispercpp_pipeline import WhisperCppPipeline
+        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+        pipeline = WhisperCppPipeline(
+            output_dir=initial_output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp,
+            resolved_config=resolved_config,
+            progress_display=progress,
+            subs_language=args.subs_language,
+        )
         effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
