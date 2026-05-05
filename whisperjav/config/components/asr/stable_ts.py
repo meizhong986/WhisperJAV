@@ -290,7 +290,13 @@ class StableTSASR(ASRComponent):
 
     # === ASR-specific ===
     provider = "stable_ts"
-    model_id = "large-v3"
+    # v1.8.13: reverted large-v3 → large-v2 for consistency with FasterWhisper
+    # backend (whose v1.8.12 aggressive preset retune was tuned against large-v2
+    # forensic acceptance data and interacts pathologically with large-v3 on
+    # JAV content — see faster_whisper.py:211 comment for full context). Stable-TS
+    # presets share the same lineage. Aligning the default avoids per-backend
+    # divergence; users wanting v3 can opt in with --model large-v3.
+    model_id = "large-v2"
     supported_tasks = ["transcribe", "translate"]
     compatible_vad = ["none"]  # Stable-TS has built-in VAD
 

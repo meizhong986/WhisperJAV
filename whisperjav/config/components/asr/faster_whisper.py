@@ -208,7 +208,19 @@ class FasterWhisperASR(ASRComponent):
 
     # === ASR-specific ===
     provider = "faster_whisper"
-    model_id = "large-v3"
+    # v1.8.13: reverted large-v3 → large-v2. Empirical regression discovered
+    # during F4/F6/F7 acceptance testing on dev_v1.8.13: the v1.8.12 aggressive
+    # ASR preset (no_speech=0.84, beam=3, best_of=2, temperature=[0.0, 0.17],
+    # compression=2.6, repetition_penalty=1.3, no_repeat_ngram_size=3,
+    # chunk_length=30) produces catastrophic empty output on JAV content with
+    # large-v3 (6–10 of 68 GT entries) but works correctly with large-v2
+    # (33+ segments captured in diagnostic suite, 52 entries in F5 ensemble
+    # pass1 on the same audio). The v1.8.12 preset retune was tuned against
+    # large-v2 forensic acceptance data; the same values interact pathologically
+    # with large-v3 on continuous-energy non-phonetic content (JAV moaning).
+    # Until the preset is re-tuned for large-v3 in v1.9.x, large-v2 stays the
+    # safer default. Users wanting v3 can opt in with --model large-v3.
+    model_id = "large-v2"
     supported_tasks = ["transcribe", "translate"]
     compatible_vad = ["silero", "faster_whisper_vad", "none"]
 
