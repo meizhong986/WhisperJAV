@@ -394,6 +394,41 @@ PARAM_VARIANTS: Dict[str, Dict[str, Any]] = {
         "no_speech_threshold": 0.6,
         "compression_ratio_threshold": 2.4,
     },
+    # Run G_PROD_CL30 — v1.8.13 production aggressive preset EXACTLY,
+    # with chunk_length=30 (current production value). This is the baseline
+    # for the chunk_length isolation test (compare against H_PROD_NOCL).
+    # Source: whisperjav/config/components/asr/faster_whisper.py:304-343
+    # (FasterWhisperOptions["aggressive"]).
+    "G_PROD_CL30": {
+        **_base_params(),
+        "beam_size": 3,                            # v1.8.12 retune
+        "best_of": 2,                              # v1.8.12.post1 fix
+        "patience": 2.0,
+        "temperature": [0.0, 0.17],                # v1.8.10-hf3 light fallback
+        "compression_ratio_threshold": 2.6,
+        "log_prob_threshold": -1.0,
+        "no_speech_threshold": 0.84,               # v1.8.12 retune
+        "repetition_penalty": 1.3,
+        "no_repeat_ngram_size": 3,
+        "chunk_length": 30,                        # v1.8.10 ctranslate2 crash fix (this variant)
+    },
+    # Run H_PROD_NOCL — IDENTICAL to G_PROD_CL30 except chunk_length=None.
+    # Tests the user's hypothesis that chunk_length=30 contributes to the
+    # empty-output pathology. If H produces meaningfully more output than G,
+    # chunk_length is implicated.
+    "H_PROD_NOCL": {
+        **_base_params(),
+        "beam_size": 3,
+        "best_of": 2,
+        "patience": 2.0,
+        "temperature": [0.0, 0.17],
+        "compression_ratio_threshold": 2.6,
+        "log_prob_threshold": -1.0,
+        "no_speech_threshold": 0.84,
+        "repetition_penalty": 1.3,
+        "no_repeat_ngram_size": 3,
+        "chunk_length": None,                      # ← THE TEST: remove chunk_length
+    },
 }
 
 
