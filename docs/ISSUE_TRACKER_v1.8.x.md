@@ -1,6 +1,6 @@
 # WhisperJAV Issue Tracker — v1.8.x Cycle
 
-> Updated: 2026-05-05 (rev49.3) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **69 open** on GitHub
+> Updated: 2026-05-05 (rev49.4) | Source: [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) | **69 open** on GitHub
 
 ---
 
@@ -117,19 +117,55 @@ Tagged `v1.8.12` and merged `dev_v1.8.12` to `main` on 2026-04-30. GitHub Releas
 
 ---
 
-## v1.8.14 candidates (next point release — small/scoped)
+## v1.8.14 — LOCKED SCOPE (rev49.4, theme: ChronosJAV — Cohere generator + install UX polish)
+
+> **Theme**: ChronosJAV: Cohere generator (decoupled pipeline) + install UX polish.
+> ChronosJAV is the project's name for the model-agnostic decoupled pipeline architecture
+> (`whisperjav/pipelines/decoupled_pipeline.py` + `subtitle_pipeline/{generators,framers,aligners,cleaners}/`).
+> Cohere lands as a new **TextGenerator** plug-in alongside qwen3 and anime-whisper, reusing the existing
+> Qwen3 ForcedAligner for word-level timestamps via the protocol's contract — no new dependencies.
+
+### Headline feature: Cohere generator (`#262`)
 
 | Priority | Item | Issues | Notes |
 |---|---|---|---|
-| ~~**P0 NEW**~~ | ~~Kaggle expert-edition translation broken (#315)~~ | — | **CLOSED OFF-RELEASE 2026-05-05** (commit [4103606](https://github.com/meizhong986/WhisperJAV/commit/4103606)). |
-| ~~**P0 NEW**~~ | ~~Kaggle expert-edition missing qwen ASR option (#318)~~ | — | **CLOSED OFF-RELEASE 2026-05-05** (commit [4103606](https://github.com/meizhong986/WhisperJAV/commit/4103606)). |
-| **P1 NEW** | Installer Phase 3 progress feedback | #314 | zoqapopita93 05-01: PyTorch install (Phase 3) prints `Attempt 1/3` then silent for 2GB+ download. User can't tell hang vs download. Fix: pass `-v` or `--progress` to the `uv pip install` invocation, log the full command, add a network-check timeout warning. Cluster with #284, #317. |
-| **P1 NEW** | Installer proxy support docs / flag | #317 | zoqapopita93 05-03: `安装包如何设置代理进行安装？` Asks how to set proxy for the standalone installer. Same root cause as China-network cluster. Doc fix: README/FAQ section on `HTTP_PROXY` / `HTTPS_PROXY` env vars + recommend setting them in the cmd before launching the installer. Possibly add explicit `--proxy URL` flag to `install.py`. |
-| **P1 NEW** | macOS SSL CERTIFICATE_VERIFY_FAILED | #320 | Madaerpao 05-05: macOS Apple Silicon, Python 3.12.0a3 (alpha!), preflight check fails reaching PyPI. Likely missing system certs (`Install Certificates.command` from Python.app) or alpha-Python issue. Doc fix: macOS install instructions should mention running `Install Certificates.command` after Python install. Triage: ask user to retest on stable Python 3.12+. |
-| **P2 carry-over** | ctranslate2 internal state contamination in Model Reuse Pattern | — | Discovered during F5/F6 forensic in v1.8.13 dev. faster-whisper / ctranslate2 retains internal GPU state across `transcribe()` calls that's NOT freed by `torch.cuda.empty_cache()` or `gc.collect()`. Production WhisperJAV's `_ensure_asr` Model Reuse Pattern (single WhisperModel reused across all files in a batch) may silently degrade recall on later files in long batch runs. Mitigation candidate: periodic `WhisperModel` reload after N transcribes. |
-| **P2 carry-over** | Installer PATH fix for bundled ffmpeg | — | Standalone installer fails to persist user PATH; system ffmpeg (potentially 8.x) wins over bundled 7.1. Hypothesized link to audio-processing hangs (unverified). See `memory/project_v1812_installer_path_bug.md`. |
-| **P2 carry-over** | ZipEnhancer Colab init bug | (closed #290) | ModelScope threading-init race on Colab L4. #290 closed but root bug remains. Real bug separate from ClearVoice memory issue. |
-| **P2 carry-over** | Qwen3-ASR `transformers` version pin | #280 | One-line pin. Deferred since v1.8.11 for scope discipline. |
+| **P0 HEADLINE** | Cohere `TextGenerator` adapter — `whisperjav/modules/subtitle_pipeline/generators/cohere.py` | #262 | New file, ~250 lines, structural clone of `anime_whisper.py`. Wraps `transformers.AutoProcessor` + `CohereAsrForConditionalGeneration` (or `trust_remote_code` fallback if class not native). Handles `audio_chunk_index` mechanism returned by Cohere's processor. Lifecycle: `load()` / `unload()` / `safe_cuda_cleanup()`. Lessons from repka3's `cohere-transcribe-vad-word-timestamps` repo are documented in the planning doc (see step 3). |
+| **P0 HEADLINE** | Generator factory registration (1-line change) | — | Add `"cohere": "...generators.cohere.CohereGenerator"` to `_REGISTRY` in `whisperjav/modules/subtitle_pipeline/generators/factory.py:14`. Discoverable via `TextGeneratorFactory.available()`. |
+| **P0 HEADLINE** | YAML profile + CLI plumbing | — | New `whisperjav/config/v4/ecosystems/pipelines/decoupled-cohere.yaml` profile (clone of `decoupled.yaml` with `generator.backend: cohere`, `speech_segmenter: whisperseg`, longer scene durations matching Cohere's preference for contiguous segments). Verify `--generator cohere` CLI flag flows through `decoupled_pipeline.py:342-358` factory call. |
+| **P0 HEADLINE** | HF gating UX | — | (a) FAQ section in `docs/en/faq.md` "Using the Cohere ASR backend" — accept terms → get HF token → set `HF_TOKEN` (Windows `setx` / Linux/macOS `export`) → run with `--generator cohere`. (b) Helpful runtime error in `cohere.py` `load()` mirroring repka3's `_format_load_error` pattern (catch `gated`/`403`/`access to model` strings, emit diagnostic pointing to model page + FAQ). |
+| **P0 HEADLINE** | Aligner reuse via existing `Qwen3ForcedAlignerAdapter` | — | Zero code change. The orchestrator at `subtitle_pipeline/orchestrator.py:632` already calls `aligner.align_batch(audio_paths, texts, language="ja")` after generator emits text. `merge_master_with_timestamps()` at `qwen_asr.py:33-90` reconciles Cohere's punctuated text with the aligner's unpunctuated word-level timestamps. |
+
+### Pre-flight verification (before code drafting)
+
+| Item | Why |
+|---|---|
+| Verify `from transformers import CohereAsrForConditionalGeneration` import works in the WJ env | If native, no `trust_remote_code` needed. If not, document `trust_remote_code=True` fallback path. Resolved in step 2. |
+| Identify which transformers version added `CohereAsrForConditionalGeneration` | Pin requirement in pyproject.toml or document the version constraint. |
+
+### Install UX polish (carry-overs from rev49 scope split)
+
+| Priority | Item | Issues | Notes |
+|---|---|---|---|
+| **P1** | Installer Phase 3 progress feedback | #314 | zoqapopita93: PyTorch install prints `Attempt 1/3` then silent for 2GB+. Fix: `-v`/`--progress` to `uv pip install`, explicit command logging, network-timeout warning. |
+| **P1** | Installer proxy support docs / flag | #317 | zoqapopita93: how to set proxy for installer. Doc + maybe `--proxy URL` flag in install.py. |
+| **P1** | macOS SSL CERTIFICATE_VERIFY_FAILED | #320 | Madaerpao: Apple Silicon Python 3.12.0a3 — likely missing certs. Doc fix: macOS install instructions add `Install Certificates.command` step. |
+| **P2** | Qwen3-ASR `transformers` version pin | #280 | One-line pin. Deferred since v1.8.11 — landing now. |
+
+### Carry-overs deferred to v1.9.0 (architectural)
+
+| Item | Why deferred |
+|---|---|
+| ctranslate2 state contamination in Model Reuse Pattern | Architectural fix — pairs with v1.9.0 "unified segmenter param routing" track. |
+| Installer PATH fix for bundled ffmpeg | Architectural — ties into installer rework. |
+| ZipEnhancer Colab init bug (orphaned from closed #290) | v2.x speech-enhancer deep dive. |
+
+### Out of scope for v1.8.14 (explicit)
+
+- Cohere as default in any preset (stays opt-in until JAV bench data)
+- Cohere-specific `TextCleaner` (start with `passthrough`; revisit if artifacts emerge during benchmark)
+- Forced-alignment via repka3's `ctc-forced-aligner` + MMS-300m (we reuse Qwen3 ForcedAligner instead — see study notes in planning doc)
+- Backend-specific VAD presets formalized as a config schema (v1.9.0 unified segmenter routing)
+- All v1.9.0 architectural items (large-v3 retune, firewall elimination, silero retune review)
 
 ## v1.9.0 — major release roadmap (additions surfaced in v1.8.13 dev)
 
@@ -276,20 +312,27 @@ These clusters frame v1.8.14 / v1.9.0 / v2.x scope. Counts are open-issue rough 
 
 ## Recommended scope split — v1.8.14 vs v1.9.0
 
-### v1.8.14 — small/scoped point release (target: 2026-05-12 to 2026-05-19)
+### v1.8.14 — LOCKED SCOPE (rev49.4, 2026-05-05)
 
-**Theme**: Notebook fixes + install UX polish + post-release closure actions.
+**Theme**: ChronosJAV: Cohere generator (decoupled pipeline) + install UX polish.
 
-| Priority | Item | Effort |
-|---|---|---|
-| P0 | Fix Kaggle expert translate broken (#315) — 1-line notebook fix | Trivial |
-| P0 | Add qwen to Kaggle pass1_quality dropdown (#318) | Trivial |
-| P0 | Close #304 with brief ack (CC 6.1 hardware, point to docs) | Trivial |
-| P0 | Post 6 ship-notification replies (#271, #312, #313, #300, #308, #232 follow-up) | Small |
-| P1 | Installer Phase 3 progress feedback (#314) | Small |
-| P1 | Doc HTTP_PROXY for install.py + macOS cert command (#317, #320) | Small |
-| P1 | Triage replies for #316, #319 (point to existing clusters) | Small |
-| P2 | Qwen3-ASR transformers pin (#280) — long-deferred 1-line | Trivial |
+**Strategic framing**: ChronosJAV is the project name for the model-agnostic decoupled pipeline architecture (Generator/Framer/Aligner/Cleaner contracts with factory registries). v1.8.14 introduces Cohere as the second opt-in headline TextGenerator backend (alongside qwen3 and anime-whisper), reusing the existing Qwen3 ForcedAligner for word-level timestamps with zero new dependencies. This positions WhisperJAV past being "a Whisper wrapper" toward being a reasoning-agnostic transcript construction system, setting up v1.9.0's segmenter-routing refactor as the natural follow-on.
+
+| Priority | Item | Issues | Effort |
+|---|---|---|---|
+| **P0 HEADLINE** | Cohere `TextGenerator` adapter (`cohere.py`, structural clone of `anime_whisper.py`) | #262 | Medium |
+| **P0 HEADLINE** | Generator factory registry (1-line) + decoupled-cohere YAML profile | — | Trivial |
+| **P0 HEADLINE** | HF gating UX (FAQ section + runtime error template) | #262 | Small |
+| **P0 HEADLINE** | Verify `CohereAsrForConditionalGeneration` import in WJ env (avoid `trust_remote_code` if possible) | — | Trivial (preflight) |
+| **P1** | Installer Phase 3 progress feedback (`#314`) | #314 | Small |
+| **P1** | Installer proxy docs + macOS SSL cert command (`#317`, `#320`) | #317, #320 | Small |
+| **P2** | Qwen3-ASR `transformers` version pin (`#280`) | #280 | Trivial |
+
+**Note**: closed-off-release items already shipped (#315, #318, #304 closure, 6 ship-notification replies for v1.8.13) — those landed in rev49.1-49.3. v1.8.14 dev is greenfield from here.
+
+**Pre-step gating**: Before any code drafting, write planning doc (`docs/plans/V1814_CHRONOSJAV_COHERE_PLAN.md`) covering vision, scope, implementation plan, open decisions, risks, success criteria, schedule. Owner reviews + redirects before code.
+
+**Deferred to v1.9.0** (out of scope here): default flip to Cohere, Cohere-specific cleaner, backend-specific VAD presets formalized, large-v3 retune, segmenter routing refactor.
 
 **Out-of-scope for v1.8.14** (defer to v1.9.0):
 - Re-tune aggressive preset for large-v3 (architectural)
@@ -683,6 +726,7 @@ All previously listed close candidates have been actioned in the rev47 stale-thr
 
 | Date | Changes |
 |------|---------|
+| **2026-05-05** | **rev49.4. v1.8.14 theme LOCKED — ChronosJAV: Cohere generator (decoupled pipeline) + install UX polish.** Strategic re-scoping from "small notebook fixes + install UX polish" to a headline-feature point release. Justification: the Kaggle notebook items (#315, #318) and #304 closure already shipped off-release in rev49.1-49.3, so the small-fixes theme has effectively been delivered. v1.8.14 now adds Cohere as the second opt-in headline TextGenerator backend in the model-agnostic decoupled pipeline architecture (which the project will refer to as ChronosJAV going forward). Architecture review: Cohere fits as a `TextGenerator` plug-in alongside qwen3 and anime-whisper via the existing `TextGeneratorFactory` registry; word-level timestamps are reused from the existing `Qwen3ForcedAlignerAdapter` (with `merge_master_with_timestamps()` reconciling Cohere's punctuated output with the aligner's unpunctuated word timestamps). Zero new dependencies — repka3's `ctc-forced-aligner` + MMS-300m approach is rejected in favor of WhisperJAV's existing Japanese-trained Qwen3 ForcedAligner-0.6B. Gating UX: documented one-time HF terms acceptance + `HF_TOKEN` env var (Windows `setx` / Linux `export`) — added to v1.8.13's existing FAQ env-var section + a helpful runtime error template cloned from repka3's `_format_load_error`. Carry-overs from rev49 scope split: install UX polish (#314, #317, #320, #280). v1.9.0 deferrals confirmed: large-v3 retune, segmenter routing refactor, silero retune review remain v1.9.0 P0s. **Pre-code gate**: comprehensive planning doc to be written at `docs/plans/V1814_CHRONOSJAV_COHERE_PLAN.md` before any code touches the repo, owner review required. **Pre-flight check**: verify `CohereAsrForConditionalGeneration` is native in current WJ env's transformers (per repka3's working code, may now be upstreamed past the v1.8.12 spike's transformers 4.57.6) to determine whether `trust_remote_code` is needed or avoidable. **Open count unchanged**: 69. **No GitHub state changes** in rev49.4 — pure tracker scope-lock. |
 | **2026-05-05** | **rev49.3. P2 triage batch — 3 replies + 1 closure.** Open count 70 → 69. **#304 CLOSED** ([comment-4380373098](https://github.com/meizhong986/WhisperJAV/issues/304#issuecomment-4380373098)) per reporter's "Please close" request — brief CC 6.1 hardware-incompat ack. **#316 REPLIED** ([comment-4380374226](https://github.com/meizhong986/WhisperJAV/issues/316#issuecomment-4380374226)) — ffmpeg manual-split workaround + #230 merge module pointer + v1.9+/v2.x backlog framing. **#319 REPLIED** ([comment-4380374766](https://github.com/meizhong986/WhisperJAV/issues/319#issuecomment-4380374766)) — pointed to existing AMD cluster (#142 ROCm, #114 DirectML, #239 AMD GPU) + ROCm-vs-DirectML scope note. **Board state**: 6 NEEDS RESPONSE remaining (#314, #315, #317, #318, #320, plus #313-N2 acknowledgement) — wait, #315 + #318 already addressed via off-release commit (rev49.2). Updated count: **3 NEEDS RESPONSE remaining** (#314, #317, #320 — all China/Linux/macOS install UX cluster), 2 NEEDS FOLLOW-UP, ~33 AWAITING REPLY (the 3 just-replied items added). Triage queue significantly cleared. |
 | **2026-05-05** | **rev49.2. Off-release Kaggle notebook fix shipped on `main` (commit [4103606](https://github.com/meizhong986/WhisperJAV/commit/4103606)) — closes #315 + #318.** Two fixes in one commit per user direction (no version bump): (a) **#318** — `qwen` added to both `pass1_quality` and `pass2_quality` `#@param` dropdowns in `notebook/WhisperJAV_kaggle_parallel_edition.ipynb` (cell-1); (b) **#315** — cell-3's translation `cmd = [translate_cmd]` was passing `f"{sys.executable} -m whisperjav.translate.cli"` as a single argv token, producing `[Errno 2] No such file or directory: '/usr/bin/python3 -m whisperjav.translate.cli'`. Replaced with the split pattern already used in cell-2's `build_cmd()`: `endswith('whisperjav-translate')` for Colab single-executable, else `.split()` for Kaggle module form. **Replies posted** to both issues pointing to commit 4103606: #315 ([comment-4379964548](https://github.com/meizhong986/WhisperJAV/issues/315#issuecomment-4379964548)), #318 ([comment-4379965185](https://github.com/meizhong986/WhisperJAV/issues/318#issuecomment-4379965185)). Both flipped to AWAITING REPLY. **Side effect**: NotebookEdit collapsed the affected cells' source from list-of-strings to single-string format — both forms valid in nbformat, Jupyter renders identically, but produces noisy diff. **v1.8.14 candidate count reduced** from 5 NEW items to 3 (#314, #317, #320 still open; #315 + #318 now closed off-release). |
 | **2026-05-05** | **rev49.1. v1.8.13 ship-notification batch posted (6 replies).** Comment URLs: #271 ([4379539059](https://github.com/meizhong986/WhisperJAV/issues/271#issuecomment-4379539059)) `--ollama-num-ctx` shipped to TinyRick1489; #312 ([4379539708](https://github.com/meizhong986/WhisperJAV/issues/312#issuecomment-4379539708)) `dump_params` runtime mirror to TinyRick1489; #300 ([4379540442](https://github.com/meizhong986/WhisperJAV/issues/300#issuecomment-4379540442)) Linux uv-deadlock fix to ktrankc; #313 ([4379541165](https://github.com/meizhong986/WhisperJAV/issues/313#issuecomment-4379541165)) Linux uv-deadlock fix to parheliamm + l34240013 ack; #264 ([4379546139](https://github.com/meizhong986/WhisperJAV/issues/264#issuecomment-4379546139)) bilingual cache-FAQ reply to @starkwsam with AI-disclosure intro per their "纯AI解答吗" pushback; #308 ([4379555973](https://github.com/meizhong986/WhisperJAV/issues/308#issuecomment-4379555973)) English-source-shipped + ASS/SSA-not-planned to SangenBR. **Editorial revisions before posting** per user direction (CL1/CL2): stripped install-path boilerplate from Kaggle-user replies (#271, #312, also #308) since lazy/unrelated to the actual user environment. CL3: #264 fully bilingual. CL5: #308 ASS/SSA framed honestly as not-planned/unlikely-near-term, not as v1.9.0-deferred. **GitHub 504 mid-batch on #264** — verified comment did NOT land before retrying (last comment was still starkwsam 04-21). Retry succeeded. **Tracker rows updated** for all 6 to AWAITING REPLY with comment URLs. **Reply drafts file** `docs/release_v1.8.13_reply_drafts.md` is now historical — drafts captured in posted comments. **Board state**: 9 NEEDS RESPONSE (unchanged — none of the 6 replied items were in NEEDS RESPONSE), 2 NEEDS FOLLOW-UP, ~32 AWAITING REPLY (+6 from this batch + #232 already posted 05-01), 4 SHIPPED-v1.8.13 still awaiting reply post (the docs-shipped #99, #232, #250, #292), 8 SHIPPED-v1.8.12 (retest pending). |
