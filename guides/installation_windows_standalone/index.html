@@ -1,0 +1,4101 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/guides/installation_windows_standalone/">
+      
+      
+        <link rel="prev" href="../../getting-started/">
+      
+      
+        <link rel="next" href="../installation_windows_python/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../../zh/guides/installation_windows_standalone/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Windows (Installer) - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-windows-standalone-installation-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Windows (Installer)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../zh/guides/installation_windows_standalone/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="System Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minimum-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimum Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-for-best-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended for Best Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU Compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-nvidia-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported NVIDIA GPUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before You Install
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Before You Install">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-update-your-nvidia-driver-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Update Your NVIDIA Driver (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-ensure-webview2-is-installed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Ensure WebView2 is Installed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-free-up-disk-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Free Up Disk Space
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-temporary-antivirus-exclusion-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Temporary Antivirus Exclusion (If Needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-download-the-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Download the Installer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-run-the-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Run the Installer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-accept-the-license-agreement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Accept the License Agreement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-choose-installation-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Choose Installation Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-choose-installation-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Choose Installation Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-6-installation-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Installation Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-7-post-installation-automated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7: Post-Installation (Automated)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 7: Post-Installation (Automated)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-preflight-checks-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Preflight Checks (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-gpu-detection-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: GPU Detection (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-pytorch-installation-3-5-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: PyTorch Installation (3-5 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-35-core-whisper-packages-2-3-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.5: Core Whisper Packages (2-3 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-python-dependencies-3-5-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Python Dependencies (3-5 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-whisperjav-application-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: WhisperJAV Application (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-53-local-llm-translation-optional-interactive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5.3: Local LLM Translation (Optional, Interactive)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-55-58-launcher-and-icon-setup-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5.5-5.8: Launcher and Icon Setup (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-8-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8: Complete
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-run-experience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-Run Experience
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-Run Experience">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#launching-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Launching WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#first-transcription-ai-model-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First Transcription: AI Model Download
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#basic-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verifying-your-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying Your Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verifying Your Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#check-gpu-acceleration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check GPU Acceleration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-whisperjav-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check WhisperJAV Version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-installation-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Installation Log
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-from-a-previous-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading from a Previous Version
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrading from a Previous Version">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-upgrade-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Upgrade Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-upgrade-via-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Upgrade via pip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preserving-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preserving Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uninstallation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uninstallation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Uninstallation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-windows-settings-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 1: Windows Settings (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-uninstall-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 2: Uninstall Script
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-3-manual-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 3: Manual Removal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nvidia-driver-not-found-or-no-nvidia-gpu-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "NVIDIA driver not found" or "No NVIDIA GPU detected"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webview2-runtime-not-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "WebView2 runtime not detected"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-connection-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Network connection failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#git-connection-timeout-or-failed-to-connect-to-githubcom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Git connection timeout" or "Failed to connect to github.com"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-disk-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Out of disk space"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-failed-after-retries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Installation failed after retries"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-install-script-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Post-install script failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gui-wont-launch-or-blank-window-appears" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "GUI won't launch" or blank window appears
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#processing-is-very-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Processing is very slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-download-stuck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Model download stuck"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#application-crashes-during-processing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application crashes during processing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#silentunattended-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Silent/Unattended Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Silent/Unattended Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#faq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FAQ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FAQ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-do-i-need-an-nvidia-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Do I need an NVIDIA GPU?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-how-much-disk-space-do-i-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: How much disk space do I need?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-can-i-install-on-a-network-drive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Can I install on a network drive?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-is-my-data-sent-to-the-internet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Is my data sent to the internet?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-can-i-use-this-alongside-another-python-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Can I use this alongside another Python installation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-how-do-i-update-to-a-newer-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: How do I update to a newer version?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-what-video-formats-are-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: What video formats are supported?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-where-are-the-subtitle-files-saved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Where are the subtitle files saved?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-the-installer-is-stuck-at-extracting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: The installer is stuck at "Extracting packages"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-can-i-move-the-installation-after-it-is-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Can I move the installation after it is complete?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-what-is-the-local-llm-option-during-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: What is the "local LLM" option during installation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-i-am-behind-a-corporate-firewall-great-firewall-of-china" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: I am behind a corporate firewall / Great Firewall of China
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Technical Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-directory-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Directory Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-file-locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log File Locations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="System Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minimum-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimum Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-for-best-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended for Best Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU Compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-nvidia-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported NVIDIA GPUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before You Install
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Before You Install">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-update-your-nvidia-driver-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Update Your NVIDIA Driver (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-ensure-webview2-is-installed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Ensure WebView2 is Installed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-free-up-disk-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Free Up Disk Space
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-temporary-antivirus-exclusion-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Temporary Antivirus Exclusion (If Needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-download-the-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Download the Installer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-run-the-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Run the Installer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-accept-the-license-agreement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Accept the License Agreement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-choose-installation-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Choose Installation Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-choose-installation-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Choose Installation Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-6-installation-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Installation Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-7-post-installation-automated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7: Post-Installation (Automated)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 7: Post-Installation (Automated)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-preflight-checks-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Preflight Checks (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-gpu-detection-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: GPU Detection (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-pytorch-installation-3-5-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: PyTorch Installation (3-5 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-35-core-whisper-packages-2-3-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.5: Core Whisper Packages (2-3 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-python-dependencies-3-5-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Python Dependencies (3-5 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-whisperjav-application-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: WhisperJAV Application (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-53-local-llm-translation-optional-interactive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5.3: Local LLM Translation (Optional, Interactive)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-55-58-launcher-and-icon-setup-1-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5.5-5.8: Launcher and Icon Setup (&lt; 1 minute)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-8-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8: Complete
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-run-experience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-Run Experience
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-Run Experience">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#launching-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Launching WhisperJAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#first-transcription-ai-model-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First Transcription: AI Model Download
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#basic-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verifying-your-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying Your Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verifying Your Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#check-gpu-acceleration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check GPU Acceleration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-whisperjav-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check WhisperJAV Version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-installation-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Installation Log
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-from-a-previous-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading from a Previous Version
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrading from a Previous Version">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-upgrade-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Upgrade Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-upgrade-via-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Upgrade via pip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preserving-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preserving Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uninstallation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uninstallation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Uninstallation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-windows-settings-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 1: Windows Settings (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-uninstall-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 2: Uninstall Script
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-3-manual-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 3: Manual Removal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nvidia-driver-not-found-or-no-nvidia-gpu-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "NVIDIA driver not found" or "No NVIDIA GPU detected"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webview2-runtime-not-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "WebView2 runtime not detected"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-connection-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Network connection failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#git-connection-timeout-or-failed-to-connect-to-githubcom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Git connection timeout" or "Failed to connect to github.com"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-disk-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Out of disk space"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-failed-after-retries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Installation failed after retries"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-install-script-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Post-install script failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gui-wont-launch-or-blank-window-appears" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "GUI won't launch" or blank window appears
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#processing-is-very-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Processing is very slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-download-stuck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Model download stuck"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#application-crashes-during-processing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application crashes during processing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#silentunattended-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Silent/Unattended Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Silent/Unattended Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#faq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FAQ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FAQ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q-do-i-need-an-nvidia-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Do I need an NVIDIA GPU?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-how-much-disk-space-do-i-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: How much disk space do I need?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-can-i-install-on-a-network-drive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Can I install on a network drive?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-is-my-data-sent-to-the-internet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Is my data sent to the internet?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-can-i-use-this-alongside-another-python-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Can I use this alongside another Python installation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-how-do-i-update-to-a-newer-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: How do I update to a newer version?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-what-video-formats-are-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: What video formats are supported?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-where-are-the-subtitle-files-saved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Where are the subtitle files saved?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-the-installer-is-stuck-at-extracting-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: The installer is stuck at "Extracting packages"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-can-i-move-the-installation-after-it-is-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: Can I move the installation after it is complete?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-what-is-the-local-llm-option-during-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: What is the "local LLM" option during installation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q-i-am-behind-a-corporate-firewall-great-firewall-of-china" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q: I am behind a corporate firewall / Great Firewall of China
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Technical Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-directory-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation Directory Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-file-locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log File Locations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/en/guides/installation_windows_standalone.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-windows-standalone-installation-guide">WhisperJAV Windows Standalone Installation Guide<a class="headerlink" href="#whisperjav-windows-standalone-installation-guide" title="Permanent link">&para;</a></h1>
+<p><strong>Version:</strong> 1.8.9
+<strong>Last Updated:</strong> 2026-03-19
+<strong>Installer Type:</strong> Standalone .exe (no admin required)</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#system-requirements">System Requirements</a></li>
+<li><a href="#before-you-install">Before You Install</a></li>
+<li><a href="#installation-steps">Installation Steps</a></li>
+<li><a href="#first-run-experience">First-Run Experience</a></li>
+<li><a href="#verifying-your-installation">Verifying Your Installation</a></li>
+<li><a href="#upgrading-from-a-previous-version">Upgrading from a Previous Version</a></li>
+<li><a href="#uninstallation">Uninstallation</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#silentunattended-installation">Silent/Unattended Installation</a></li>
+<li><a href="#faq">FAQ</a></li>
+</ol>
+<hr />
+<h2 id="system-requirements">System Requirements<a class="headerlink" href="#system-requirements" title="Permanent link">&para;</a></h2>
+<h3 id="minimum-requirements">Minimum Requirements<a class="headerlink" href="#minimum-requirements" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Operating System</td>
+<td>Windows 10 (64-bit) or Windows 11</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>8 GB</td>
+</tr>
+<tr>
+<td>Free Disk Space</td>
+<td>8 GB (installation + AI models + cache)</td>
+</tr>
+<tr>
+<td>Internet</td>
+<td>Required during installation for downloading dependencies</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>Microsoft Edge WebView2 (installer will prompt if missing)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="recommended-for-best-performance">Recommended for Best Performance<a class="headerlink" href="#recommended-for-best-performance" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPU</td>
+<td>NVIDIA GPU with 6+ GB VRAM (RTX 2060 or better)</td>
+</tr>
+<tr>
+<td>GPU Driver</td>
+<td>NVIDIA Driver 570+ (for CUDA 12.8 support)</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>16 GB</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>SSD (significantly faster processing)</td>
+</tr>
+<tr>
+<td>Internet</td>
+<td>Broadband connection (for initial model download)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gpu-compatibility">GPU Compatibility<a class="headerlink" href="#gpu-compatibility" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV uses NVIDIA CUDA for GPU-accelerated transcription. The installer automatically detects your GPU and installs the appropriate version:</p>
+<table>
+<thead>
+<tr>
+<th>Your NVIDIA Driver</th>
+<th>CUDA Version Installed</th>
+<th>Compatible GPUs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>570 or newer</td>
+<td>CUDA 12.8 (optimal)</td>
+<td>RTX 20xx, 30xx, 40xx, 50xx series</td>
+</tr>
+<tr>
+<td>450 - 569</td>
+<td>CUDA 11.8 (universal)</td>
+<td>All CUDA-capable NVIDIA GPUs</td>
+</tr>
+<tr>
+<td>No NVIDIA GPU</td>
+<td>CPU-only (slower)</td>
+<td>Any system (6-10x slower than GPU)</td>
+</tr>
+</tbody>
+</table>
+<p>If you do not have an NVIDIA GPU, WhisperJAV will still work in CPU-only mode. Processing will be slower (approximately 30-60 minutes per hour of video, compared to 5-10 minutes with a GPU).</p>
+<h3 id="supported-nvidia-gpus">Supported NVIDIA GPUs<a class="headerlink" href="#supported-nvidia-gpus" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>GeForce:</strong> GTX 1060+, RTX 2060+, RTX 3060+, RTX 4060+, RTX 5070+</li>
+<li><strong>Quadro / RTX Professional:</strong> Quadro RTX, RTX A-series</li>
+<li><strong>Data Center:</strong> T4, A10, A100, H100, B100</li>
+</ul>
+<hr />
+<h2 id="before-you-install">Before You Install<a class="headerlink" href="#before-you-install" title="Permanent link">&para;</a></h2>
+<h3 id="1-update-your-nvidia-driver-recommended">1. Update Your NVIDIA Driver (Recommended)<a class="headerlink" href="#1-update-your-nvidia-driver-recommended" title="Permanent link">&para;</a></h3>
+<p>For the best performance, update your NVIDIA driver to version 570 or newer:</p>
+<ol>
+<li>Visit <a href="https://www.nvidia.com/drivers">nvidia.com/drivers</a></li>
+<li>Select your GPU model</li>
+<li>Download and install the latest "Game Ready" or "Studio" driver</li>
+<li>Restart your computer after installation</li>
+</ol>
+<p>You can check your current driver version by:
+- Right-clicking on the desktop and selecting "NVIDIA Control Panel"
+- Looking at the bottom-left corner for "Driver Version"</p>
+<h3 id="2-ensure-webview2-is-installed">2. Ensure WebView2 is Installed<a class="headerlink" href="#2-ensure-webview2-is-installed" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV uses Microsoft Edge WebView2 for its graphical interface. Most Windows 10 and 11 systems have this pre-installed. If you are unsure, the installer will check for you and provide a download link if needed.</p>
+<p>To check manually:
+1. Open "Add or remove programs" in Windows Settings
+2. Search for "WebView2"
+3. If "Microsoft Edge WebView2 Runtime" appears, you are ready</p>
+<p>If not installed, download it from:
+<a href="https://go.microsoft.com/fwlink/p/?LinkId=2124703">https://go.microsoft.com/fwlink/p/?LinkId=2124703</a></p>
+<h3 id="3-free-up-disk-space">3. Free Up Disk Space<a class="headerlink" href="#3-free-up-disk-space" title="Permanent link">&para;</a></h3>
+<p>Ensure you have at least 8 GB of free space on the drive where WhisperJAV will be installed. The space breakdown is approximately:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Base installation (Python + conda)</td>
+<td>~500 MB</td>
+</tr>
+<tr>
+<td>PyTorch with CUDA</td>
+<td>~2.5 GB</td>
+</tr>
+<tr>
+<td>Python dependencies</td>
+<td>~1.5 GB</td>
+</tr>
+<tr>
+<td>AI models (downloaded on first use)</td>
+<td>~3 GB</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>~7.5 GB</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-temporary-antivirus-exclusion-if-needed">4. Temporary Antivirus Exclusion (If Needed)<a class="headerlink" href="#4-temporary-antivirus-exclusion-if-needed" title="Permanent link">&para;</a></h3>
+<p>Some antivirus software may flag the installer or post-installation downloads. If you encounter issues:</p>
+<ol>
+<li>Temporarily disable real-time scanning, or</li>
+<li>Add an exclusion for <code>%LOCALAPPDATA%\WhisperJAV</code></li>
+</ol>
+<hr />
+<h2 id="installation-steps">Installation Steps<a class="headerlink" href="#installation-steps" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-download-the-installer">Step 1: Download the Installer<a class="headerlink" href="#step-1-download-the-installer" title="Permanent link">&para;</a></h3>
+<p>Download <code>WhisperJAV-1.8.9-Windows-x86_64.exe</code> from the <a href="https://github.com/meizhong986/whisperjav/releases">GitHub Releases page</a>.</p>
+<p>The installer file is approximately 150 MB.</p>
+<h3 id="step-2-run-the-installer">Step 2: Run the Installer<a class="headerlink" href="#step-2-run-the-installer" title="Permanent link">&para;</a></h3>
+<p>Double-click the downloaded <code>.exe</code> file. You do <strong>not</strong> need to run it as Administrator.</p>
+<p>If Windows SmartScreen shows a warning:
+1. Click "More info"
+2. Click "Run anyway"</p>
+<h3 id="step-3-accept-the-license-agreement">Step 3: Accept the License Agreement<a class="headerlink" href="#step-3-accept-the-license-agreement" title="Permanent link">&para;</a></h3>
+<p>Read and accept the MIT license agreement to continue.</p>
+<h3 id="step-4-choose-installation-type">Step 4: Choose Installation Type<a class="headerlink" href="#step-4-choose-installation-type" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Just Me (recommended):</strong> Installs for the current user only. No admin privileges needed.</li>
+<li><strong>All Users:</strong> Installs for all users on the computer. Requires admin privileges.</li>
+</ul>
+<h3 id="step-5-choose-installation-location">Step 5: Choose Installation Location<a class="headerlink" href="#step-5-choose-installation-location" title="Permanent link">&para;</a></h3>
+<p>The default location is:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>C:\Users\[YourName]\AppData\Local\WhisperJAV
+</code></pre></div></p>
+<p>You can change this to any location. Keep these guidelines in mind:
+- Avoid paths with spaces (e.g., "Program Files") if possible
+- Avoid paths longer than 46 characters unless you have Long Paths enabled
+- Avoid paths with special characters (accented letters, CJK characters)</p>
+<h3 id="step-6-installation-options">Step 6: Installation Options<a class="headerlink" href="#step-6-installation-options" title="Permanent link">&para;</a></h3>
+<p>The installer will show optional settings:
+- <strong>Add to PATH:</strong> Enabled by default. Allows running <code>whisperjav</code> from the command line and enables future upgrades via <code>pip install -U</code>.
+- <strong>Create shortcuts:</strong> Creates a desktop shortcut for easy access.</p>
+<p>Click "Install" to begin.</p>
+<h3 id="step-7-post-installation-automated">Step 7: Post-Installation (Automated)<a class="headerlink" href="#step-7-post-installation-automated" title="Permanent link">&para;</a></h3>
+<p>After the base environment is extracted, a post-installation script runs automatically. This is the longest part of the installation. A console window will appear showing progress:</p>
+<h4 id="phase-1-preflight-checks-1-minute">Phase 1: Preflight Checks (&lt; 1 minute)<a class="headerlink" href="#phase-1-preflight-checks-1-minute" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Disk space verification (8 GB minimum)</li>
+<li>Network connectivity check (to PyPI)</li>
+<li>Visual C++ Redistributable check (auto-installed if missing)</li>
+<li>WebView2 runtime check (prompts download if missing)</li>
+</ul>
+<h4 id="phase-2-gpu-detection-1-minute">Phase 2: GPU Detection (&lt; 1 minute)<a class="headerlink" href="#phase-2-gpu-detection-1-minute" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Detects NVIDIA GPU and driver version</li>
+<li>Selects appropriate CUDA version</li>
+</ul>
+<h4 id="phase-3-pytorch-installation-3-5-minutes">Phase 3: PyTorch Installation (3-5 minutes)<a class="headerlink" href="#phase-3-pytorch-installation-3-5-minutes" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Downloads and installs PyTorch with CUDA support (~2.5 GB)</li>
+<li>If no GPU is detected, you will be asked whether to install CPU-only PyTorch</li>
+</ul>
+<h4 id="phase-35-core-whisper-packages-2-3-minutes">Phase 3.5: Core Whisper Packages (2-3 minutes)<a class="headerlink" href="#phase-35-core-whisper-packages-2-3-minutes" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Installs OpenAI Whisper, Stable-TS, FFmpeg-Python from GitHub</li>
+<li>These packages use git and may trigger Git timeout handling for users behind firewalls</li>
+</ul>
+<h4 id="phase-4-python-dependencies-3-5-minutes">Phase 4: Python Dependencies (3-5 minutes)<a class="headerlink" href="#phase-4-python-dependencies-3-5-minutes" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Installs all remaining Python packages from requirements file</li>
+<li>Approximately 500 MB of downloads</li>
+</ul>
+<h4 id="phase-5-whisperjav-application-1-minute">Phase 5: WhisperJAV Application (&lt; 1 minute)<a class="headerlink" href="#phase-5-whisperjav-application-1-minute" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Installs the WhisperJAV application from the bundled wheel</li>
+</ul>
+<h4 id="phase-53-local-llm-translation-optional-interactive">Phase 5.3: Local LLM Translation (Optional, Interactive)<a class="headerlink" href="#phase-53-local-llm-translation-optional-interactive" title="Permanent link">&para;</a></h4>
+<ul>
+<li>You will be prompted to install a local Large Language Model for offline translation</li>
+<li>Type "Y" to install (recommended) or "N" to skip</li>
+<li>If you do not respond within 30 seconds, it defaults to "Y"</li>
+<li>This can be installed later if you skip it now</li>
+</ul>
+<h4 id="phase-55-58-launcher-and-icon-setup-1-minute">Phase 5.5-5.8: Launcher and Icon Setup (&lt; 1 minute)<a class="headerlink" href="#phase-55-58-launcher-and-icon-setup-1-minute" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Creates <code>WhisperJAV-GUI.exe</code> launcher in the installation directory</li>
+<li>Verifies icon files</li>
+</ul>
+<p>After all phases complete, a desktop shortcut named "WhisperJAV v1.8.9" is created.</p>
+<h3 id="step-8-complete">Step 8: Complete<a class="headerlink" href="#step-8-complete" title="Permanent link">&para;</a></h3>
+<p>The installation summary will display:
+- Installation directory
+- Python version
+- PyTorch version and CUDA status
+- WebView2 status
+- Installation time</p>
+<p>Press Enter to close the installer window.</p>
+<p><strong>Total installation time:</strong> 10-20 minutes depending on internet speed and hardware.</p>
+<hr />
+<h2 id="first-run-experience">First-Run Experience<a class="headerlink" href="#first-run-experience" title="Permanent link">&para;</a></h2>
+<h3 id="launching-whisperjav">Launching WhisperJAV<a class="headerlink" href="#launching-whisperjav" title="Permanent link">&para;</a></h3>
+<p>Double-click the <strong>"WhisperJAV v1.8.9"</strong> shortcut on your desktop. Alternatively, double-click <code>WhisperJAV-GUI.exe</code> in the installation directory.</p>
+<h3 id="first-transcription-ai-model-download">First Transcription: AI Model Download<a class="headerlink" href="#first-transcription-ai-model-download" title="Permanent link">&para;</a></h3>
+<p>The first time you process a video, WhisperJAV needs to download AI models. This is a one-time process:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Size</th>
+<th>Download Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Whisper Large-v3</td>
+<td>~3 GB</td>
+<td>5-10 minutes</td>
+</tr>
+</tbody>
+</table>
+<p>The download progress is shown in the GUI. After the initial download, models are cached locally and no further downloads are needed.</p>
+<p>Models are stored in:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>C:\Users\[YourName]\.cache\whisper\
+</code></pre></div></p>
+<h3 id="basic-workflow">Basic Workflow<a class="headerlink" href="#basic-workflow" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Add files:</strong> Click "Add File(s)" or drag and drop video/audio files</li>
+<li><strong>Select mode:</strong> Choose "Balanced" for best quality, "Faster" for speed</li>
+<li><strong>Start processing:</strong> Click "Start"</li>
+<li><strong>Find your subtitles:</strong> Output SRT files are saved next to your input files in an <code>_output</code> folder</li>
+</ol>
+<hr />
+<h2 id="verifying-your-installation">Verifying Your Installation<a class="headerlink" href="#verifying-your-installation" title="Permanent link">&para;</a></h2>
+<h3 id="check-gpu-acceleration">Check GPU Acceleration<a class="headerlink" href="#check-gpu-acceleration" title="Permanent link">&para;</a></h3>
+<p>After installation, open a command prompt from the installation directory and run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python -c &quot;import torch; print(f&#39;CUDA available: {torch.cuda.is_available()}&#39;); print(f&#39;GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \&quot;None\&quot;}&#39;)&quot;
+</code></pre></div>
+<p>Expected output for GPU systems:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>CUDA available: True
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>GPU: NVIDIA GeForce RTX 4070
+</code></pre></div></p>
+<h3 id="check-whisperjav-version">Check WhisperJAV Version<a class="headerlink" href="#check-whisperjav-version" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python -c &quot;from whisperjav.__version__ import __version__; print(f&#39;WhisperJAV {__version__}&#39;)&quot;
+</code></pre></div>
+<p>Expected output:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>WhisperJAV 1.8.9
+</code></pre></div></p>
+<h3 id="check-installation-log">Check Installation Log<a class="headerlink" href="#check-installation-log" title="Permanent link">&para;</a></h3>
+<p>The installation log is located at:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>[install_directory]\install_log_v1.8.9.txt
+</code></pre></div></p>
+<p>This file contains detailed information about every step of the installation process and is useful for diagnosing issues.</p>
+<hr />
+<h2 id="upgrading-from-a-previous-version">Upgrading from a Previous Version<a class="headerlink" href="#upgrading-from-a-previous-version" title="Permanent link">&para;</a></h2>
+<h3 id="automatic-upgrade-detection">Automatic Upgrade Detection<a class="headerlink" href="#automatic-upgrade-detection" title="Permanent link">&para;</a></h3>
+<p>If you install WhisperJAV v1.8.9 to the same directory as a previous version, the installer will:</p>
+<ol>
+<li>Detect the existing WhisperJAV installation</li>
+<li>Ask if you want to replace it</li>
+<li>If you confirm, it will cleanly remove the old version before installing</li>
+</ol>
+<p>Your user configuration in <code>%APPDATA%\WhisperJAV</code> is preserved during upgrades.</p>
+<h3 id="manual-upgrade-via-pip">Manual Upgrade via pip<a class="headerlink" href="#manual-upgrade-via-pip" title="Permanent link">&para;</a></h3>
+<p>If you have PATH enabled (the default), you can upgrade without re-downloading the installer:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pip install -U &quot;whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git&quot;
+</code></pre></div>
+<h3 id="preserving-configuration">Preserving Configuration<a class="headerlink" href="#preserving-configuration" title="Permanent link">&para;</a></h3>
+<p>User settings are stored in:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>%APPDATA%\WhisperJAV\whisperjav_config.json
+</code></pre></div></p>
+<p>This file is NOT deleted during upgrades or reinstallation. If you are upgrading from a version older than v1.8.0, the installer will automatically migrate your configuration from the old location.</p>
+<hr />
+<h2 id="uninstallation">Uninstallation<a class="headerlink" href="#uninstallation" title="Permanent link">&para;</a></h2>
+<h3 id="method-1-windows-settings-recommended">Method 1: Windows Settings (Recommended)<a class="headerlink" href="#method-1-windows-settings-recommended" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open Windows Settings &gt; Apps &gt; Apps &amp; features</li>
+<li>Search for "WhisperJAV"</li>
+<li>Click "Uninstall"</li>
+<li>Follow the prompts</li>
+</ol>
+<h3 id="method-2-uninstall-script">Method 2: Uninstall Script<a class="headerlink" href="#method-2-uninstall-script" title="Permanent link">&para;</a></h3>
+<p>Run the <code>uninstall_v1.8.9.bat</code> file located in the installation directory. This interactive script will:</p>
+<ol>
+<li>Remove the desktop shortcut</li>
+<li>Remove the Start Menu shortcut</li>
+<li>Ask whether to delete user configuration files</li>
+<li>Ask whether to delete cached AI models (~3 GB)</li>
+<li>Remove the installation directory</li>
+</ol>
+<h3 id="method-3-manual-removal">Method 3: Manual Removal<a class="headerlink" href="#method-3-manual-removal" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Delete the installation directory:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>%LOCALAPPDATA%\WhisperJAV
+</code></pre></div>
+   (or your custom installation location)</p>
+</li>
+<li>
+<p><strong>Delete the desktop shortcut:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>%USERPROFILE%\Desktop\WhisperJAV v1.8.9.lnk
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>(Optional) Delete cached AI models</strong> to free approximately 3 GB:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>%USERPROFILE%\.cache\whisper
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>(Optional) Delete user configuration:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>%APPDATA%\WhisperJAV
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>(Optional) Clean PATH entries:</strong>
+   If "Add to PATH" was enabled during installation, remove these entries from your user PATH:</p>
+</li>
+<li><code>[install_dir]\Scripts</code></li>
+<li><code>[install_dir]\Library\bin</code></li>
+</ol>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="installation-issues">Installation Issues<a class="headerlink" href="#installation-issues" title="Permanent link">&para;</a></h3>
+<h4 id="nvidia-driver-not-found-or-no-nvidia-gpu-detected">"NVIDIA driver not found" or "No NVIDIA GPU detected"<a class="headerlink" href="#nvidia-driver-not-found-or-no-nvidia-gpu-detected" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> No NVIDIA GPU installed, or drivers are not installed/outdated.</p>
+<p><strong>Solution:</strong>
+- If you have an NVIDIA GPU, download and install the latest driver from <a href="https://www.nvidia.com/drivers">nvidia.com/drivers</a>
+- If you do not have an NVIDIA GPU, accept the CPU-only installation when prompted. Processing will be slower but fully functional.</p>
+<h4 id="webview2-runtime-not-detected">"WebView2 runtime not detected"<a class="headerlink" href="#webview2-runtime-not-detected" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> Microsoft Edge WebView2 is not installed. This is required for the graphical interface.</p>
+<p><strong>Solution:</strong>
+1. The installer will automatically open a download page
+2. Download and install the "Evergreen Standalone Installer" from <a href="https://go.microsoft.com/fwlink/p/?LinkId=2124703">Microsoft</a>
+3. After installation, press Enter in the installer window to continue</p>
+<h4 id="network-connection-failed">"Network connection failed"<a class="headerlink" href="#network-connection-failed" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> No internet connection or firewall blocking downloads.</p>
+<p><strong>Solution:</strong>
+- Check your internet connection
+- Temporarily disable VPN or proxy
+- Check firewall settings: allow <code>python.exe</code>, <code>pip.exe</code>, <code>git.exe</code>, and <code>uv.exe</code> to access the internet
+- If behind a corporate firewall, contact your IT department</p>
+<h4 id="git-connection-timeout-or-failed-to-connect-to-githubcom">"Git connection timeout" or "Failed to connect to github.com"<a class="headerlink" href="#git-connection-timeout-or-failed-to-connect-to-githubcom" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> GitHub is blocked or slow (common behind the Great Firewall of China or with some VPN configurations).</p>
+<p><strong>Solution:</strong>
+- The installer automatically detects this and configures extended Git timeouts
+- Wait for the automatic retry (up to 3 attempts)
+- If retries fail, try:
+  - Switching to a different VPN endpoint
+  - Using a GitHub mirror/proxy
+  - Running the installer at a different time when network congestion is lower</p>
+<h4 id="out-of-disk-space">"Out of disk space"<a class="headerlink" href="#out-of-disk-space" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> Less than 8 GB of free space on the installation drive.</p>
+<p><strong>Solution:</strong>
+- Free up disk space and re-run the installer
+- Choose a different installation drive with more space
+- Note that AI models (downloaded on first use) also require approximately 3 GB</p>
+<h4 id="installation-failed-after-retries">"Installation failed after retries"<a class="headerlink" href="#installation-failed-after-retries" title="Permanent link">&para;</a></h4>
+<p><strong>Solution:</strong>
+1. Check <code>install_log_v1.8.9.txt</code> in the installation directory for the specific error
+2. Common causes:
+   - Antivirus blocking downloads: add an exclusion for the installation directory
+   - Network timeout: try again with a better connection
+   - Corrupted download: delete the installation directory and start fresh
+3. Try running the installer as Administrator (right-click &gt; Run as administrator)</p>
+<h4 id="post-install-script-failed">"Post-install script failed"<a class="headerlink" href="#post-install-script-failed" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> An error occurred during the automated package installation phase.</p>
+<p><strong>Solution:</strong>
+1. Check <code>install_log_v1.8.9.txt</code> for the specific phase that failed
+2. If it failed at PyTorch installation: check your GPU driver version
+3. If it failed at dependency installation: check network connectivity
+4. Re-run the installer; it will detect the existing partial installation and offer to replace it</p>
+<h3 id="runtime-issues">Runtime Issues<a class="headerlink" href="#runtime-issues" title="Permanent link">&para;</a></h3>
+<h4 id="gui-wont-launch-or-blank-window-appears">"GUI won't launch" or blank window appears<a class="headerlink" href="#gui-wont-launch-or-blank-window-appears" title="Permanent link">&para;</a></h4>
+<p><strong>Solution:</strong>
+1. Ensure WebView2 is installed (see above)
+2. Try launching from the command line to see error messages:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>cd %LOCALAPPDATA%\WhisperJAV
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>python.exe -m whisperjav.webview_gui.main
+</code></pre></div>
+3. Check if antivirus is blocking the application</p>
+<h4 id="processing-is-very-slow">Processing is very slow<a class="headerlink" href="#processing-is-very-slow" title="Permanent link">&para;</a></h4>
+<p><strong>Solution:</strong>
+1. Check if GPU acceleration is enabled by looking at the console output when processing starts
+2. If it says "CPU-only mode", your GPU is not being used
+3. Verify CUDA installation: <code>python -c "import torch; print(torch.cuda.is_available())"</code>
+4. Close other GPU-intensive applications (games, video editors)
+5. Use "Faster" mode for quicker results at the cost of some accuracy</p>
+<h4 id="model-download-stuck">"Model download stuck"<a class="headerlink" href="#model-download-stuck" title="Permanent link">&para;</a></h4>
+<p><strong>Solution:</strong>
+- Large models (approximately 3 GB) take 5-20 minutes depending on your connection
+- The download will resume if interrupted
+- If stuck for more than 30 minutes, cancel and check your internet connection
+- Models are cached in <code>%USERPROFILE%\.cache\whisper\</code></p>
+<h4 id="application-crashes-during-processing">Application crashes during processing<a class="headerlink" href="#application-crashes-during-processing" title="Permanent link">&para;</a></h4>
+<p><strong>Solution:</strong>
+1. Ensure you have enough RAM (16 GB recommended for large models)
+2. Try processing one file at a time
+3. Use a smaller Whisper model (e.g., "medium" instead of "large-v3")
+4. Check the GUI console for error messages
+5. Report persistent crashes at <a href="https://github.com/meizhong986/whisperjav/issues">GitHub Issues</a></p>
+<hr />
+<h2 id="silentunattended-installation">Silent/Unattended Installation<a class="headerlink" href="#silentunattended-installation" title="Permanent link">&para;</a></h2>
+<p>The installer supports command-line options for automated deployment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=C:\WhisperJAV
+</code></pre></div>
+<h3 id="available-options">Available Options<a class="headerlink" href="#available-options" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/S</code></td>
+<td>Silent mode (no GUI)</td>
+<td>Off</td>
+</tr>
+<tr>
+<td><code>/Q</code></td>
+<td>Quiet mode (suppress console output)</td>
+<td>Off</td>
+</tr>
+<tr>
+<td><code>/D=&lt;path&gt;</code></td>
+<td>Installation directory (must be last parameter)</td>
+<td><code>%LOCALAPPDATA%\WhisperJAV</code></td>
+</tr>
+<tr>
+<td><code>/InstallationType=AllUsers</code></td>
+<td>Install for all users (requires admin)</td>
+<td>JustMe</td>
+</tr>
+<tr>
+<td><code>/AddToPath=0</code> or <code>1</code></td>
+<td>Add to system PATH</td>
+<td>1 (on)</td>
+</tr>
+<tr>
+<td><code>/NoShortcuts=0</code> or <code>1</code></td>
+<td>Skip shortcut creation</td>
+<td>0 (create shortcuts)</td>
+</tr>
+<tr>
+<td><code>/InstallLocalLLM=0</code> or <code>1</code></td>
+<td>Install local LLM translation</td>
+<td>Prompt</td>
+</tr>
+<tr>
+<td><code>/NoRegistry=0</code> or <code>1</code></td>
+<td>Skip registry entries</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>/?</code></td>
+<td>Show help</td>
+<td>--</td>
+</tr>
+</tbody>
+</table>
+<h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
+<p>Install silently to a custom directory:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=D:\WhisperJAV
+</code></pre></div></p>
+<p>Install silently, skip local LLM, no PATH modification:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /AddToPath=0 /InstallLocalLLM=0
+</code></pre></div></p>
+<hr />
+<h2 id="faq">FAQ<a class="headerlink" href="#faq" title="Permanent link">&para;</a></h2>
+<h3 id="q-do-i-need-an-nvidia-gpu">Q: Do I need an NVIDIA GPU?<a class="headerlink" href="#q-do-i-need-an-nvidia-gpu" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> No. WhisperJAV works on any Windows 10/11 system. Without an NVIDIA GPU, it runs in CPU-only mode, which is approximately 6-10 times slower. For occasional use, CPU mode is perfectly fine. For regular use or long videos, an NVIDIA GPU is strongly recommended.</p>
+<h3 id="q-how-much-disk-space-do-i-need">Q: How much disk space do I need?<a class="headerlink" href="#q-how-much-disk-space-do-i-need" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> Approximately 8 GB total: about 4.5 GB for the installation and about 3 GB for AI models (downloaded on first use). If you also install the local LLM for translation, add approximately 4-8 GB more.</p>
+<h3 id="q-can-i-install-on-a-network-drive">Q: Can I install on a network drive?<a class="headerlink" href="#q-can-i-install-on-a-network-drive" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> This is not recommended. WhisperJAV requires fast disk access for temporary files and model loading. Install on a local SSD for the best experience.</p>
+<h3 id="q-is-my-data-sent-to-the-internet">Q: Is my data sent to the internet?<a class="headerlink" href="#q-is-my-data-sent-to-the-internet" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> No. All transcription happens locally on your computer. Internet access is only needed during installation (to download packages) and on first run (to download AI models). After that, WhisperJAV works completely offline. The only exception is if you use cloud translation providers (DeepSeek, Gemini, etc.), which require API keys and send subtitle text to those services.</p>
+<h3 id="q-can-i-use-this-alongside-another-python-installation">Q: Can I use this alongside another Python installation?<a class="headerlink" href="#q-can-i-use-this-alongside-another-python-installation" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> Yes. WhisperJAV installs its own isolated Python environment. It does not interfere with any existing Python installation on your system.</p>
+<h3 id="q-how-do-i-update-to-a-newer-version">Q: How do I update to a newer version?<a class="headerlink" href="#q-how-do-i-update-to-a-newer-version" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> Download and run the new installer. If you install to the same directory, the installer will detect the previous version and offer to replace it. Your user settings are preserved. Alternatively, if PATH was enabled, run: <code>pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"</code></p>
+<h3 id="q-what-video-formats-are-supported">Q: What video formats are supported?<a class="headerlink" href="#q-what-video-formats-are-supported" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> WhisperJAV supports any format that FFmpeg can read, which includes virtually all common video and audio formats: MP4, MKV, AVI, MOV, WMV, FLV, WebM, MP3, WAV, FLAC, AAC, OGG, and many others.</p>
+<h3 id="q-where-are-the-subtitle-files-saved">Q: Where are the subtitle files saved?<a class="headerlink" href="#q-where-are-the-subtitle-files-saved" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> Subtitle files (SRT format) are saved next to your input video files in an <code>_output</code> subfolder. For example, if your video is at <code>D:\Videos\movie.mp4</code>, the subtitle will be at <code>D:\Videos\movie_output\movie.srt</code>.</p>
+<h3 id="q-the-installer-is-stuck-at-extracting-packages">Q: The installer is stuck at "Extracting packages"<a class="headerlink" href="#q-the-installer-is-stuck-at-extracting-packages" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> This phase extracts the conda packages and can take 2-5 minutes depending on your disk speed. It may appear frozen but is working. Check disk activity in Task Manager to confirm.</p>
+<h3 id="q-can-i-move-the-installation-after-it-is-complete">Q: Can I move the installation after it is complete?<a class="headerlink" href="#q-can-i-move-the-installation-after-it-is-complete" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> No. Moving the installation directory will break internal paths. If you need to change the location, uninstall and reinstall to the new location.</p>
+<h3 id="q-what-is-the-local-llm-option-during-installation">Q: What is the "local LLM" option during installation?<a class="headerlink" href="#q-what-is-the-local-llm-option-during-installation" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> This installs llama-cpp-python, which enables translating subtitles using a local AI model on your computer, without needing API keys or internet access. It requires additional disk space (4-8 GB) and works best with an NVIDIA GPU. You can skip this during installation and add it later if needed.</p>
+<h3 id="q-i-am-behind-a-corporate-firewall-great-firewall-of-china">Q: I am behind a corporate firewall / Great Firewall of China<a class="headerlink" href="#q-i-am-behind-a-corporate-firewall-great-firewall-of-china" title="Permanent link">&para;</a></h3>
+<p><strong>A:</strong> The installer has built-in detection and handling for slow or blocked connections to GitHub. It will automatically configure extended timeouts and retry failed downloads. If installation still fails, try using a VPN or proxy that allows access to github.com and pypi.org.</p>
+<hr />
+<h2 id="technical-details">Technical Details<a class="headerlink" href="#technical-details" title="Permanent link">&para;</a></h2>
+<h3 id="installation-directory-structure">Installation Directory Structure<a class="headerlink" href="#installation-directory-structure" title="Permanent link">&para;</a></h3>
+<p>After installation, the directory structure looks like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>%LOCALAPPDATA%\WhisperJAV\
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    python.exe                    # Python interpreter
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    pythonw.exe                   # Python (no console window)
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    WhisperJAV-GUI.exe            # GUI launcher
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    whisperjav_icon.ico           # Application icon
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    install_log_v1.8.9.txt        # Installation log
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    uninstall_v1.8.9.bat          # Uninstall script
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>    Lib\                          # Python standard library
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>        site-packages\
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>            whisperjav\           # WhisperJAV application code
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>            torch\                # PyTorch
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>            ...
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>    Scripts\                      # Executable scripts
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>        whisperjav.exe            # CLI entry point
+<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>        whisperjav-gui.exe        # GUI entry point
+<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a>        whisperjav-translate.exe  # Translation CLI
+<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>        pip.exe                   # Package manager
+<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a>        ...
+<a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a>    Library\
+<a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a>        bin\                      # FFmpeg, git, and other tools
+<a id="__codelineno-17-21" name="__codelineno-17-21" href="#__codelineno-17-21"></a>            ffmpeg.exe
+<a id="__codelineno-17-22" name="__codelineno-17-22" href="#__codelineno-17-22"></a>            git.exe
+<a id="__codelineno-17-23" name="__codelineno-17-23" href="#__codelineno-17-23"></a>            ...
+</code></pre></div>
+<h3 id="log-file-locations">Log File Locations<a class="headerlink" href="#log-file-locations" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Log</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Installation log</td>
+<td><code>[install_dir]\install_log_v1.8.9.txt</code></td>
+<td>Detailed installation progress</td>
+</tr>
+<tr>
+<td>Failure marker</td>
+<td><code>[install_dir]\INSTALLATION_FAILED_v1.8.9.txt</code></td>
+<td>Created only if installation fails</td>
+</tr>
+<tr>
+<td>Uninstall log</td>
+<td><code>%TEMP%\whisperjav_uninstall_v1.8.9.txt</code></td>
+<td>Uninstallation details</td>
+</tr>
+</tbody>
+</table>
+<h3 id="network-requirements">Network Requirements<a class="headerlink" href="#network-requirements" title="Permanent link">&para;</a></h3>
+<p>During installation, the following domains must be accessible:</p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pypi.org</code></td>
+<td>Python package downloads</td>
+</tr>
+<tr>
+<td><code>files.pythonhosted.org</code></td>
+<td>Python package files</td>
+</tr>
+<tr>
+<td><code>github.com</code></td>
+<td>Git-based package downloads</td>
+</tr>
+<tr>
+<td><code>download.pytorch.org</code></td>
+<td>PyTorch CUDA wheels</td>
+</tr>
+<tr>
+<td><code>huggingface.co</code></td>
+<td>AI model downloads (first run)</td>
+</tr>
+<tr>
+<td><code>aka.ms</code></td>
+<td>VC++ Redistributable (if needed)</td>
+</tr>
+<tr>
+<td><code>go.microsoft.com</code></td>
+<td>WebView2 runtime (if needed)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="support">Support<a class="headerlink" href="#support" title="Permanent link">&para;</a></h2>
+<p>If you encounter issues not covered in this guide:</p>
+<ol>
+<li>Check the installation log at <code>install_log_v1.8.9.txt</code></li>
+<li>Search existing issues at <a href="https://github.com/meizhong986/whisperjav/issues">GitHub Issues</a></li>
+<li>Open a new issue with:</li>
+<li>Your Windows version</li>
+<li>Your GPU model and driver version</li>
+<li>The installation log file</li>
+<li>A description of the problem</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../getting-started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting Started">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Getting Started
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../installation_windows_python/" class="md-footer__link md-footer__link--next" aria-label="Next: Windows (Python)">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Windows (Python)
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
