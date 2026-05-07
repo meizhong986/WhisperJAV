@@ -293,6 +293,16 @@ class QwenPipeline(BasePipeline):
             self.stepdown_enabled = False
             self.segmenter_chunk_threshold = 0.5
             self.segmenter_max_group_duration = 5.0
+        elif generator_backend == "cohere":
+            # D7: Qwen3 ForcedAligner is the default for word-level timestamps
+            # (Cohere has no native timestamps — see HF discussion #19).
+            # User can disable via Customize Parameters → aligner=none, which
+            # also flips timestamp_mode and stepdown atomically (triple-flip).
+            self.timestamp_mode = TimestampMode.ALIGNER_WITH_VAD_FALLBACK
+            self.assembly_cleaner_enabled = False  # D3: passthrough cleaner
+            self.stepdown_enabled = True            # aligner present → stepdown safe
+            self.segmenter_chunk_threshold = 1.0    # Cohere prefers fewer cuts
+            self.segmenter_max_group_duration = 6.0
 
         # Qwen ASR config (stored as dict for deferred construction)
         self._asr_config = {
@@ -429,6 +439,18 @@ class QwenPipeline(BasePipeline):
                 no_repeat_ngram_size=cfg.get("no_repeat_ngram_size", 0),
                 max_new_tokens=aw_max_tokens,
             )
+        elif self.generator_backend == "cohere":
+            # Cohere Transcribe-03-2026 — gated HF repo, AutoModel + trust_remote_code.
+            # Output is text only (no native timestamps); word-level timing comes
+            # from the Qwen3 ForcedAligner downstream (D7 default).
+            generator = TextGeneratorFactory.create(
+                "cohere",
+                model_id=cfg.get("model_id", "CohereLabs/cohere-transcribe-03-2026"),
+                device=cfg["device"],
+                dtype=cfg["dtype"],
+                language=cfg.get("language", "ja"),
+                max_new_tokens=cfg.get("max_new_tokens", 512),
+            )
         else:
             # Default: Qwen3 text-only mode (existing behavior)
             generator = TextGeneratorFactory.create(
@@ -447,6 +469,10 @@ class QwenPipeline(BasePipeline):
         # TextCleaner: auto-selected based on generator backend
         if self.generator_backend == "anime-whisper":
             cleaner = TextCleanerFactory.create("anime-whisper")
+        elif self.generator_backend == "cohere":
+            # D3: passthrough cleaner for Cohere until v1.8.14 benchmark
+            # surfaces JAV-specific artifacts that warrant a dedicated cleaner.
+            cleaner = TextCleanerFactory.create("passthrough")
         elif self.assembly_cleaner_enabled:
             cleaner_config = AssemblyCleanerConfig(enabled=True)
             cleaner = TextCleanerFactory.create(

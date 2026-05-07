@@ -14,6 +14,7 @@ from whisperjav.modules.subtitle_pipeline.protocols import TextGenerator
 _REGISTRY: dict[str, str] = {
     "qwen3": "whisperjav.modules.subtitle_pipeline.generators.qwen3.Qwen3TextGenerator",
     "anime-whisper": "whisperjav.modules.subtitle_pipeline.generators.anime_whisper.AnimeWhisperGenerator",
+    "cohere": "whisperjav.modules.subtitle_pipeline.generators.cohere.CohereTextGenerator",
 }
 
 # Cache for loaded classes
