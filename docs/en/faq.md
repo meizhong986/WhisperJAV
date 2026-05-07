@@ -207,7 +207,7 @@ Cohere Transcribe-03-2026 is available in v1.8.14 as a third generator under the
 
 **First-run download**
 
-Cohere weights are ~2 GB. The first transcription will spend 5–15 minutes downloading before transcription begins (one-time per machine; cached in your HuggingFace cache afterward).
+Cohere weights total ~3.85 GB (`model.safetensors` is ~4.13 GB raw FP16, plus tokenizer and custom code files). The first transcription will spend 10–30 minutes downloading before transcription begins (one-time per machine; cached in your HuggingFace cache afterward). HuggingFace uses Xet (content-addressed) delivery, which streams chunks into a temp area — plan for **at least 5 GB free** on the cache volume to be safe.
 
 **VRAM requirement**
 
@@ -220,6 +220,36 @@ Cohere Transcribe-03-2026 currently emits text only; per-word timing is on the m
 ### Cohere returned an empty transcript / "gated" error
 
 The most common cause is `HF_TOKEN` not being set in the environment that launches WhisperJAV. Re-check the setup steps above and restart the GUI after setting the token (especially on Windows with `setx`, which only affects new shells). If the error persists, confirm at <https://huggingface.co/CohereLabs/cohere-transcribe-03-2026> that you have an *Authorized* status — the model owners gate access manually.
+
+### Common errors during Cohere first-run
+
+WhisperJAV walks the exception chain and tailors the error message — read the `[ERROR]` block in the console for an actionable diagnostic. The most frequent causes:
+
+**Disk ran out of space (`os error 112`, `no space left`, `CAS service error`)**
+
+The Cohere download exhausts the cache volume mid-stream. WhisperJAV pre-flights free space (~5 GB minimum) before download starts in v1.8.14, but if your cache directory is on a near-full system drive you can either free space or redirect the cache to another drive:
+
+- **Windows (persistent)**: `setx HUGGINGFACE_HUB_CACHE D:\hf_cache` — restart the GUI/terminal after this
+- **Windows (current session only)**: `$env:HUGGINGFACE_HUB_CACHE = "D:\hf_cache"`
+- **macOS/Linux**: `export HUGGINGFACE_HUB_CACHE=/path/with/space`
+
+After redirecting, retry — the download starts fresh in the new cache location.
+
+**Interrupted previous download (`Can't load the model... pytorch_model.bin`)**
+
+A failed prior download left a partial directory. Locate `models--CohereLabs--cohere-transcribe-03-2026/` under your HF cache (default `%USERPROFILE%\.cache\huggingface\hub\` on Windows) and delete it, then retry.
+
+**Network / proxy issues**
+
+If you see connection / timeout / SSL / proxy errors, check your network. Corporate networks may need `HTTPS_PROXY` / `HF_ENDPOINT`. China users: HuggingFace is often throttled — see the dedicated note below.
+
+**Auth failed (401)**
+
+Your `HF_TOKEN` is expired, revoked, or malformed. Recreate a *Read* token at <https://huggingface.co/settings/tokens> and re-set `HF_TOKEN`.
+
+**Wrong loader class on very old transformers**
+
+WhisperJAV uses `AutoModelForSpeechSeq2Seq` (the generate-capable wrapper) per Cohere's `auto_map` metadata. If you're on a transformers version that lacks this class, WhisperJAV falls back to `AutoModel` and logs a warning — `generate()` may then fail at inference time. Upgrade `transformers` (the WhisperJAV environment ships 4.57.6 which has it).
 
 ### License and trust_remote_code
 

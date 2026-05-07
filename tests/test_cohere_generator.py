@@ -229,16 +229,207 @@ class TestCohereLoadErrorDiagnostic:
         msg = CohereTextGenerator._format_load_error(RuntimeError("HTTP 403"))
         assert "FAQ" in msg
 
-    def test_unknown_error_produces_generic_message(self):
+    def test_unknown_error_produces_generic_message_with_chain(self):
+        """A truly unrelated error falls through to the generic branch but
+        always includes the chain summary so the user sees the original."""
         from whisperjav.modules.subtitle_pipeline.generators.cohere import (
             CohereTextGenerator,
         )
 
-        msg = CohereTextGenerator._format_load_error(RuntimeError("disk full"))
+        msg = CohereTextGenerator._format_load_error(
+            RuntimeError("kernel panic: something exotic")
+        )
         assert "Failed to load Cohere" in msg
-        assert "disk full" in msg
-        # Should NOT include FAQ link for unrelated errors
-        assert "FAQ" not in msg
+        assert "kernel panic" in msg
+        assert "Full error chain" in msg
+
+    # ── Bug-B fix: exception chain walking ──────────────────────────────
+
+    def test_disk_space_root_cause_through_chain(self):
+        """Reproduces the v1.8.14 user report: real cause (os error 112)
+        is buried in a chained exception, surface message is transformers'
+        misleading 'Can't load the model'.  The classifier must walk the
+        chain and surface the disk-space diagnostic."""
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        try:
+            raise RuntimeError(
+                "Data processing error: CAS service error : IO Error: "
+                "There is not enough space on the disk. (os error 112)"
+            )
+        except RuntimeError as inner:
+            try:
+                raise OSError(
+                    "Can't load the model for 'CohereLabs/cohere-transcribe-03-2026'. "
+                    "make sure 'CohereLabs/cohere-transcribe-03-2026' is the correct "
+                    "path to a directory containing a file named pytorch_model.bin"
+                ) from inner
+            except OSError as outer:
+                msg = CohereTextGenerator._format_load_error(outer)
+
+        assert "disk ran out of space" in msg.lower()
+        assert "HUGGINGFACE_HUB_CACHE" in msg
+        assert "Full error chain" in msg
+        # User can see BOTH the surface message AND the original cause
+        assert "Can't load the model" in msg
+        assert "os error 112" in msg or "not enough space" in msg
+
+    def test_xet_error_classification(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        msg = CohereTextGenerator._format_load_error(
+            RuntimeError("CAS service error : transient failure")
+        )
+        assert "Xet" in msg or "xet" in msg.lower()
+
+    def test_network_error_classification(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        msg = CohereTextGenerator._format_load_error(
+            ConnectionError("Max retries exceeded with url: https://huggingface.co/...")
+        )
+        assert "network" in msg.lower()
+        assert "Full error chain" in msg
+
+    def test_auth_error_classification(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        msg = CohereTextGenerator._format_load_error(
+            RuntimeError("401 Client Error: Unauthorized for url")
+        )
+        assert "authentication" in msg.lower() or "expired" in msg.lower()
+
+    def test_incomplete_download_classification(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        msg = CohereTextGenerator._format_load_error(
+            OSError(
+                "Can't load the model for 'X'. make sure 'X' is the correct "
+                "path to a directory containing a file named pytorch_model.bin"
+            )
+        )
+        assert "missing" in msg.lower() or "interrupted" in msg.lower()
+        assert "models--CohereLabs--cohere-transcribe-03-2026" in msg
+
+
+class TestCohereDiskSpacePreflight:
+    """_check_disk_space catches insufficient space before download starts."""
+
+    def test_resolve_hf_cache_dir_uses_env_var(self, monkeypatch, tmp_path):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        custom = str(tmp_path / "custom_hf_cache")
+        monkeypatch.setenv("HUGGINGFACE_HUB_CACHE", custom)
+        monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+        monkeypatch.delenv("HF_HOME", raising=False)
+        assert CohereTextGenerator._resolve_hf_cache_dir() == custom
+
+    def test_check_disk_space_passes_with_low_threshold(self):
+        """A required-GB low enough to fit any system should not raise."""
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        CohereTextGenerator._check_disk_space(required_gb=0.0001)
+
+    def test_check_disk_space_raises_when_insufficient(self):
+        """A pathologically high requirement should raise the diagnostic."""
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        with pytest.raises(RuntimeError) as exc_info:
+            CohereTextGenerator._check_disk_space(required_gb=1_000_000.0)
+        assert "Insufficient disk space" in str(exc_info.value)
+        assert "HUGGINGFACE_HUB_CACHE" in str(exc_info.value)
+        assert "FAQ" in str(exc_info.value)
+
+
+class TestCohereLocalPathDetection:
+    """_is_local_path correctly distinguishes HF model IDs from local paths."""
+
+    def test_official_hf_id_is_not_local(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        assert not CohereTextGenerator._is_local_path(
+            "CohereLabs/cohere-transcribe-03-2026"
+        )
+
+    def test_simple_org_repo_is_not_local(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        assert not CohereTextGenerator._is_local_path("openai/whisper-large-v2")
+
+    def test_windows_drive_letter_path_is_local(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        assert CohereTextGenerator._is_local_path("D:/models/cohere")
+        assert CohereTextGenerator._is_local_path(r"D:\models\cohere")
+
+    def test_unix_absolute_path_is_local(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        assert CohereTextGenerator._is_local_path("/opt/models/cohere")
+
+    def test_relative_path_is_local(self):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        assert CohereTextGenerator._is_local_path("./models/cohere")
+        assert CohereTextGenerator._is_local_path("../models/cohere")
+
+    def test_existing_directory_is_local(self, tmp_path):
+        from whisperjav.modules.subtitle_pipeline.generators.cohere import (
+            CohereTextGenerator,
+        )
+
+        d = tmp_path / "my_local_model"
+        d.mkdir()
+        # Pass without leading dot/slash but it exists on disk → still local.
+        assert CohereTextGenerator._is_local_path(str(d))
+
+
+class TestCohereLoaderClass:
+    """Bug A fix: load() uses AutoModelForSpeechSeq2Seq, not AutoModel."""
+
+    def test_load_imports_seq2seq_class(self):
+        """The load() source must reference AutoModelForSpeechSeq2Seq.
+
+        We verify by inspecting the source rather than mocking imports —
+        the actual load() requires HF_TOKEN + downloads, so we cannot run
+        it in CI without the gated_model marker.
+        """
+        from whisperjav.modules.subtitle_pipeline.generators import cohere
+        import inspect
+
+        src = inspect.getsource(cohere.CohereTextGenerator.load)
+        # The class name must appear in the source
+        assert "AutoModelForSpeechSeq2Seq" in src, (
+            "load() must use AutoModelForSpeechSeq2Seq (per HF auto_map metadata: "
+            "AutoModel -> CohereAsrModel encoder, AutoModelForSpeechSeq2Seq -> "
+            "CohereAsrForConditionalGeneration generate-capable wrapper)."
+        )
 
 
 class TestCohereGenerateGuards:

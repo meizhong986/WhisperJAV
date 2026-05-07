@@ -47,6 +47,13 @@ from whisperjav.utils.logger import logger
 _MODEL_PAGE_URL = "https://huggingface.co/CohereLabs/cohere-transcribe-03-2026"
 _TOKEN_PAGE_URL = "https://huggingface.co/settings/tokens"
 
+# Disk-space pre-flight threshold.  The Cohere weights are ~3.85 GB
+# (model.safetensors alone is 4.13 GB FP16 raw); we add a 1 GB safety
+# margin to cover Xet temp staging and other transformers cache files.
+# Verified against the HF API tree listing on 2026-05-07.
+_REQUIRED_DOWNLOAD_GB = 5.0
+_MODEL_WEIGHT_GB = 3.85
+
 
 class CohereTextGenerator:
     """
@@ -164,10 +171,104 @@ class CohereTextGenerator:
             )
 
     @staticmethod
-    def _format_load_error(exc: Exception) -> str:
-        """Produce a helpful diagnostic for known load-failure modes."""
-        msg = str(exc).lower()
-        if any(t in msg for t in ("gated", "403", "access to model", "not authorized")):
+    def _walk_chain(exc: BaseException, max_depth: int = 8) -> list[BaseException]:
+        """Walk __cause__ and __context__ to gather the full exception chain.
+
+        transformers wraps low-level errors (disk space, network, Xet) in
+        higher-level OSErrors that drop the original message, so we must
+        inspect the chain to find the real root cause.
+        """
+        chain: list[BaseException] = [exc]
+        seen = {id(exc)}
+        cur: BaseException = exc
+        for _ in range(max_depth):
+            nxt = cur.__cause__ or cur.__context__
+            if nxt is None or id(nxt) in seen:
+                break
+            chain.append(nxt)
+            seen.add(id(nxt))
+            cur = nxt
+        return chain
+
+    @staticmethod
+    def _classify_error(messages: list[str]) -> str:
+        """Pick the most specific known failure mode from chain messages.
+
+        Returns one of: 'disk_space', 'gated', 'auth', 'xet', 'network',
+        'incomplete_download', 'unknown'.  Order is significant — more
+        specific patterns are checked first.
+        """
+        text = " ".join(messages).lower()
+        if any(t in text for t in (
+            "os error 112",          # Windows: There is not enough space on the disk
+            "no space left",         # POSIX
+            "not enough space",
+            "errno 28",              # POSIX ENOSPC numeric
+            "disk full",
+        )):
+            return "disk_space"
+        if any(t in text for t in ("gated", "403", "access to model", "is restricted", "not in the authorized")):
+            return "gated"
+        if any(t in text for t in ("401", "unauthorized", "invalid token", "authentication failed")):
+            return "auth"
+        if "cas service error" in text or "xet_get" in text or "xet-core" in text:
+            return "xet"
+        if any(t in text for t in (
+            "connection",
+            "timeout",
+            "name or service not known",
+            "unreachable",
+            "max retries",
+            "ssl",
+            "proxy",
+        )):
+            return "network"
+        if "can't load the model" in text or (
+            "pytorch_model" in text and "directory" in text
+        ):
+            return "incomplete_download"
+        return "unknown"
+
+    @classmethod
+    def _format_load_error(cls, exc: Exception) -> str:
+        """Produce a helpful diagnostic for known load-failure modes.
+
+        Walks the exception chain so root causes that transformers wraps in
+        a generic "Can't load the model" OSError are surfaced clearly.
+        Always includes the full chain at the end so no information is lost.
+        """
+        chain = cls._walk_chain(exc)
+        messages = [str(e) for e in chain]
+        kind = cls._classify_error(messages)
+
+        # Build the chain summary that always appends to the message.
+        chain_summary_lines = ["", "Full error chain (most recent → original cause):"]
+        for i, m in enumerate(messages):
+            chain_summary_lines.append(f"  [{i}] {m.strip().splitlines()[0][:200]}")
+        chain_summary = "\n".join(chain_summary_lines)
+
+        if kind == "disk_space":
+            return (
+                "Failed to load Cohere-Transcribe — disk ran out of space during download.\n"
+                "\n"
+                f"The Cohere model weights are about {_MODEL_WEIGHT_GB:.2f} GB. The download "
+                "uses HuggingFace's Xet content-addressed delivery, which needs additional\n"
+                "temp space during streaming. We recommend at least "
+                f"{_REQUIRED_DOWNLOAD_GB:.1f} GB free on the cache volume.\n"
+                "\n"
+                "Remediation:\n"
+                "  1. Free disk space on the volume hosting the HF cache, OR\n"
+                "  2. Redirect the HF cache to a drive with more space:\n"
+                "     Windows (persistent): setx HUGGINGFACE_HUB_CACHE D:\\hf_cache\n"
+                "                           — restart the GUI/terminal after setx\n"
+                "     Windows (current session): $env:HUGGINGFACE_HUB_CACHE = \"D:\\hf_cache\"\n"
+                "     macOS/Linux: export HUGGINGFACE_HUB_CACHE=/path/with/space\n"
+                "  3. Retry — the Cohere download will resume into the new cache.\n"
+                "\n"
+                "See FAQ: 'Cohere-Transcribe (preview)' → 'Common errors'."
+                + chain_summary
+            )
+        if kind == "gated":
             return (
                 "Failed to load Cohere-Transcribe — access to the gated repo was denied.\n"
                 "\n"
@@ -182,10 +283,135 @@ class CohereTextGenerator:
                 "     Windows (current session): $env:HF_TOKEN = \"hf_xxxxxxxxxxxx\"\n"
                 "     macOS/Linux: export HF_TOKEN=hf_xxxxxxxxxxxx\n"
                 "\n"
-                "See FAQ: 'Using Cohere-Transcribe (preview, opt-in)'\n"
-                f"\nOriginal error: {exc}"
+                "See FAQ: 'Using Cohere-Transcribe (preview, opt-in)'."
+                + chain_summary
             )
-        return f"Failed to load Cohere-Transcribe: {exc}"
+        if kind == "auth":
+            return (
+                "Failed to load Cohere-Transcribe — authentication failed.\n"
+                "\n"
+                "Your HF_TOKEN may be expired, revoked, or malformed. Recreate a Read\n"
+                f"token at {_TOKEN_PAGE_URL} and re-set HF_TOKEN in the environment.\n"
+                + chain_summary
+            )
+        if kind == "xet":
+            return (
+                "Failed to load Cohere-Transcribe — HuggingFace Xet (CAS) download error.\n"
+                "\n"
+                "Xet is HuggingFace's content-addressed delivery system. Common causes:\n"
+                "  - Disk space exhausted during streaming (most common; check above)\n"
+                "  - Network instability (proxy, VPN, or rate limiting)\n"
+                "  - Cache directory not writable\n"
+                "\n"
+                "Remediation:\n"
+                "  1. Verify free disk space on the HF cache volume\n"
+                f"     ({_REQUIRED_DOWNLOAD_GB:.1f} GB recommended for Cohere)\n"
+                "  2. If on a corporate network, check proxy/SSL settings\n"
+                "  3. Retry with a stable connection.\n"
+                + chain_summary
+            )
+        if kind == "network":
+            return (
+                "Failed to load Cohere-Transcribe — network error during download.\n"
+                "\n"
+                "Common causes: blocked / throttled HuggingFace, proxy / VPN issues,\n"
+                "or transient connectivity drops. China users: see the FAQ for the\n"
+                "'HF mirror' and 'manual local-path' alternatives.\n"
+                + chain_summary
+            )
+        if kind == "incomplete_download":
+            return (
+                "Failed to load Cohere-Transcribe — required model files are missing\n"
+                "from the cache (likely an interrupted previous download).\n"
+                "\n"
+                "Remediation:\n"
+                "  1. Locate the HF cache:\n"
+                "     - Default: %USERPROFILE%\\.cache\\huggingface\\hub\\\n"
+                "       (or wherever HUGGINGFACE_HUB_CACHE / HF_HOME points)\n"
+                "  2. Delete the partial directory:\n"
+                "     models--CohereLabs--cohere-transcribe-03-2026\n"
+                "  3. Verify free disk space, then retry.\n"
+                + chain_summary
+            )
+        # Unknown — return the surface message + full chain so the user
+        # always has the original cause visible without scrolling logs.
+        return f"Failed to load Cohere-Transcribe: {exc}" + chain_summary
+
+    @staticmethod
+    def _is_local_path(model_id: str) -> bool:
+        """Return True if model_id points to a local filesystem directory."""
+        if not model_id:
+            return False
+        if os.path.isdir(model_id):
+            return True
+        # Heuristic: HF model IDs are 'org/name' with no path separators or
+        # drive letters; a string containing those is almost certainly a path.
+        if any(sep in model_id for sep in (os.sep, "/", "\\")) and (
+            model_id.startswith(("./", "../", "~", "/", "\\"))
+            or (len(model_id) >= 2 and model_id[1] == ":")  # Windows drive letter
+        ):
+            return True
+        return False
+
+    @staticmethod
+    def _resolve_hf_cache_dir() -> str:
+        """Resolve the HF cache directory using the documented env-var precedence."""
+        cache_dir = (
+            os.environ.get("HUGGINGFACE_HUB_CACHE")
+            or os.environ.get("HF_HUB_CACHE")
+            or (os.path.join(os.environ["HF_HOME"], "hub") if os.environ.get("HF_HOME") else None)
+            or os.path.expanduser(os.path.join("~", ".cache", "huggingface", "hub"))
+        )
+        return cache_dir
+
+    @classmethod
+    def _check_disk_space(cls, required_gb: float = _REQUIRED_DOWNLOAD_GB) -> None:
+        """Pre-flight: verify enough free disk space at the HF cache volume.
+
+        Raises RuntimeError with an actionable diagnostic if the volume
+        hosting the HF cache has less than required_gb of free space.
+        Walks up the directory tree if the cache dir does not yet exist
+        (first run on a fresh machine).
+        """
+        import shutil
+
+        cache_dir = cls._resolve_hf_cache_dir()
+
+        # Walk up to the nearest existing parent (cache may not exist on first run).
+        check_dir = cache_dir
+        while not os.path.exists(check_dir):
+            parent = os.path.dirname(check_dir)
+            if not parent or parent == check_dir:
+                break
+            check_dir = parent
+
+        try:
+            free_bytes = shutil.disk_usage(check_dir).free
+        except OSError:
+            # Cannot determine free space (rare); skip and let the download
+            # raise its own error with the chain-aware diagnostic.
+            return
+
+        free_gb = free_bytes / (1024 ** 3)
+        if free_gb < required_gb:
+            raise RuntimeError(
+                "Insufficient disk space for Cohere-Transcribe download.\n"
+                f"  HF cache:   {cache_dir}\n"
+                f"  Volume:     {check_dir}\n"
+                f"  Available:  {free_gb:.2f} GB\n"
+                f"  Required:   ~{required_gb:.1f} GB "
+                f"(weights ~{_MODEL_WEIGHT_GB:.2f} GB + Xet temp + safety margin)\n"
+                "\n"
+                "Remediation:\n"
+                "  1. Free space on the cache volume, OR\n"
+                "  2. Redirect the HF cache to a drive with more space:\n"
+                "     Windows (persistent): setx HUGGINGFACE_HUB_CACHE D:\\hf_cache\n"
+                "                           — restart the GUI/terminal after setx\n"
+                "     Windows (current session): $env:HUGGINGFACE_HUB_CACHE = \"D:\\hf_cache\"\n"
+                "     macOS/Linux: export HUGGINGFACE_HUB_CACHE=/path/with/space\n"
+                "\n"
+                "See FAQ: 'Cohere-Transcribe (preview)' → 'Common errors'."
+            )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -193,33 +419,68 @@ class CohereTextGenerator:
 
     def load(self) -> None:
         """
-        Load AutoProcessor and AutoModel for Cohere Transcribe.
+        Load AutoProcessor + AutoModelForSpeechSeq2Seq for Cohere Transcribe.
 
-        Pre-flights HF_TOKEN, then loads via trust_remote_code=True.
-        Raises RuntimeError with a diagnostic message on gated-repo
-        access failure.
+        Class selection: per the model's auto_map metadata,
+            AutoModel                  -> CohereAsrModel (encoder only)
+            AutoModelForSpeechSeq2Seq  -> CohereAsrForConditionalGeneration
+        We need the seq2seq wrapper because generate() requires the decoder.
+        AutoModelForSpeechSeq2Seq follows auto_map under trust_remote_code=True,
+        so the custom modeling_cohere_asr.py is used as documented.
+
+        Pre-flights performed (skipped when model_id is a local path):
+          - HF_TOKEN presence (gating preflight)
+          - Disk space at HF cache (~5 GB, weights ~3.85 GB + Xet temp + margin)
+
+        Raises RuntimeError with a chain-aware diagnostic on any load failure.
         """
         if self._loaded:
             logger.debug("[CohereTextGenerator] Already loaded")
             return
 
-        self._check_hf_access()
+        cfg = self._config
+        local_path = self._is_local_path(cfg["model_id"])
+
+        if not local_path:
+            # Hub-side preflights: only relevant when downloading from HF.
+            self._check_hf_access()
+            try:
+                self._check_disk_space()
+            except RuntimeError:
+                # Re-raise without wrapping — preflight already produced
+                # an actionable diagnostic.
+                raise
 
         # Suppress TF/oneDNN warnings before importing transformers
         os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
         os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
         import torch
-        from transformers import AutoModel, AutoProcessor
+        from transformers import AutoProcessor
 
-        cfg = self._config
+        # AutoModelForSpeechSeq2Seq is the generate-capable wrapper for
+        # ASR seq2seq models; lands in transformers >= 4.20-ish.  Fall back
+        # to AutoModel only if the env is too old (should not happen in WJ).
+        try:
+            from transformers import AutoModelForSpeechSeq2Seq as _AutoModelClass
+            _model_class_name = "AutoModelForSpeechSeq2Seq"
+        except (ImportError, AttributeError):
+            from transformers import AutoModel as _AutoModelClass
+            _model_class_name = "AutoModel (fallback — old transformers)"
+            logger.warning(
+                "[CohereTextGenerator] AutoModelForSpeechSeq2Seq unavailable; "
+                "falling back to AutoModel. generate() may fail at inference time."
+            )
+
         device = self._detect_device(cfg["device"])
         dtype = self._detect_dtype(device, cfg["dtype"])
 
         logger.info("[CohereTextGenerator] Loading model...")
-        logger.info("  Model:  %s", cfg["model_id"])
-        logger.info("  Device: %s", device)
-        logger.info("  Dtype:  %s", dtype)
+        logger.info("  Model:        %s", cfg["model_id"])
+        logger.info("  Local path:   %s", local_path)
+        logger.info("  Device:       %s", device)
+        logger.info("  Dtype:        %s", dtype)
+        logger.info("  Loader class: %s", _model_class_name)
 
         import time
         start = time.time()
@@ -229,7 +490,7 @@ class CohereTextGenerator:
                 cfg["model_id"],
                 trust_remote_code=cfg["trust_remote_code"],
             )
-            self._model = AutoModel.from_pretrained(
+            self._model = _AutoModelClass.from_pretrained(
                 cfg["model_id"],
                 dtype=dtype,
                 trust_remote_code=cfg["trust_remote_code"],
