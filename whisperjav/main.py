@@ -2157,8 +2157,11 @@ def main():
                 }
 
             # Apply ensemble safety caps for known-unstable combinations.
-            # Currently caps: fidelity → balanced + aggressive sensitivity (downgrade
-            # to balanced sensitivity to avoid intermittent catastrophic truncation).
+            # Pattern: conditional_sensitivity_cap. When a known-unstable
+            # (pass1, pass2, sensitivity) tuple is detected, auto-downgrade
+            # pass 2 sensitivity to a stable preset.
+            # Currently caps: fidelity + balanced + aggressive -> balanced sensitivity
+            # (avoids intermittent catastrophic truncation in pass 2).
             # Single source of truth + rationale: whisperjav/ensemble/safety_caps.py
             # Investigation: docs/plans/V1814_T142_NONDETERMINISM_INVESTIGATION.md §15
             from whisperjav.ensemble.safety_caps import apply_ensemble_safety_caps

@@ -51,6 +51,29 @@ Try a different **Scene Detector**:
 
 Or try **ChronosJAV** pipeline, which uses TEN VAD for tighter timing.
 
+### Why does Fidelity pipeline sometimes take much longer than other times?
+
+Fidelity is built on **openai-whisper**, which uses **PyTorch's default cuDNN auto-tuning**. For each run, cuDNN benchmarks several convolution algorithms and picks one for the current GPU state. The benchmark itself is timing-sensitive — different runs can land on kernels with very different performance characteristics, producing wall-clock variance of roughly 4-5× for the same input audio (e.g. 3 minutes vs 15 minutes on the same clip on the same machine).
+
+This is an inherited characteristic of PyTorch + cuDNN, **not a WhisperJAV bug**. **Output quality and entry counts are unaffected** — only timing varies. Among the pipeline modes:
+
+- **Fidelity** (openai-whisper / PyTorch native): timing varies wildly across runs.
+- **Balanced / Fast / Faster** (built on faster-whisper / CTranslate2): timing-stable across runs.
+
+If predictable timing matters more than peak speed, use **Balanced** as Pass 1 instead of Fidelity. A future release may add an option to lock cuDNN kernel selection at the cost of average-case throughput, for users who prefer predictability.
+
+### v1.8.14: Why was my "aggressive" sensitivity downgraded to "balanced" in ensemble mode?
+
+If you run ensemble mode with **Pass 1 = Fidelity + Pass 2 = Balanced + sensitivity = aggressive**, WhisperJAV automatically downgrades the Pass 2 sensitivity to `balanced` and prints a console warning. This is the **conditional_sensitivity_cap** introduced in v1.8.14.
+
+The original combination was empirically observed to produce intermittent catastrophic Pass 2 truncation (output dropping to ~14 entries instead of ~50 on the reference clip) at roughly a 67% rate. The cap removes the unstable fallback code path while preserving full transcription quality — Pass 2 still runs faster-whisper at the `balanced` sensitivity preset (deterministic temperature, slightly tighter no-speech gate). Output entry counts may differ by a few percent vs healthy aggressive runs, but no catastrophic drops.
+
+Workarounds for users who explicitly want aggressive Pass 2 sensitivity:
+- Use **Balanced** as Pass 1 instead of Fidelity (no cap fires; aggressive Pass 2 is stable in this combination).
+- Use **Fast** or **Faster** as Pass 1 (no cap fires).
+
+A deeper architectural fix is planned for v1.9.0+ pending investigation. The cap is a documented workaround, not a root-cause fix.
+
 ---
 
 ## Translation

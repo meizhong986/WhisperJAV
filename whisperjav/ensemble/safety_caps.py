@@ -5,6 +5,12 @@ This module enforces overrides on known-unstable ensemble pipeline combinations
 at the orchestration layer, BEFORE any pass runs. The single source of truth
 for "which combinations are auto-corrected and why" lives in this file.
 
+The current pattern implemented here is the **conditional_sensitivity_cap**:
+when a known-unstable (pass1, pass2, sensitivity) tuple is detected, the
+pass 2 sensitivity is auto-downgraded to a stable preset. The module name
+remains general ('safety_caps') so future cap variants (e.g. reorder-based,
+scene-detector-based, model-based) can slot in without renaming.
+
 WHY THIS EXISTS
 ---------------
 Some pass1 + pass2 + sensitivity combinations have been empirically shown to
@@ -177,9 +183,9 @@ def apply_ensemble_safety_caps(
             new_pass2_config["sensitivity"] = rule.pass2_sensitivity_replacement
 
             msg = (
-                f"\n[Ensemble safety cap '{rule.name}'] "
+                f"\n[Conditional sensitivity cap: {rule.name}] "
                 f"Auto-downgrading pass2 sensitivity: "
-                f"'{old_value}' → '{rule.pass2_sensitivity_replacement}'.\n"
+                f"'{old_value}' -> '{rule.pass2_sensitivity_replacement}'.\n"
                 f"  Reason: {rule.rationale}\n"
                 f"  See: docs/plans/V1814_T142_NONDETERMINISM_INVESTIGATION.md "
                 f"{rule.memo_section}"
