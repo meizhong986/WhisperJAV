@@ -320,19 +320,27 @@ class CohereTextGenerator:
         """
         Transcribe a single audio file to text.
 
-        Day-1 status: STUB.  Returns an empty TranscriptionResult with a
-        log warning.  Full implementation lands on Day 2 once the
-        processor.decode() signature has been verified empirically against
-        the gated weights (audio_chunk_index handling, punctuation kwarg,
-        language passthrough).
+        Implementation pattern verified against repka3's reference PoC
+        (cohere_transcript.py at the same repo cited in the v1.8.14 plan):
+          1. Load 16 kHz mono audio via librosa.
+          2. Run processor with language + punctuation kwargs (these are
+             PROCESSOR kwargs, not decode kwargs — verified 2026-05-07).
+          3. Capture audio_chunk_index from processor output.  This is a
+             chunking index used by processor.decode, NOT a timestamp signal.
+             Cohere has no native timestamps (HF discussion #19).
+          4. Cast the whole BatchEncoding to device + model.dtype.
+          5. model.generate under torch.inference_mode().
+          6. Move outputs back to CPU before decode.
+          7. Build decode_kwargs conditionally — only pass audio_chunk_index
+             and language when audio_chunk_index is not None.
+          8. processor.decode may return a list (of strings) or a single
+             string; handle both forms.
 
         Args:
             audio_path: Path to the audio file (WAV, 16 kHz mono expected).
-            language: Language code passed to processor.decode (overrides
-                config language for this call).
+            language: Language code (overrides config language for this call).
             context: IGNORED.  Cohere does not accept initial-prompt context
-                in the same way Whisper does; if context support becomes
-                relevant, revisit at that time.
+                the way Whisper does; if support becomes relevant, revisit.
 
         Returns:
             TranscriptionResult with transcribed text.
@@ -343,36 +351,80 @@ class CohereTextGenerator:
                 "Call load() first."
             )
 
-        # Day-1 stub — full body lands on Day 2.
-        # Flow when implemented:
-        #   1. audio = self._load_audio(audio_path)
-        #   2. inputs = self._processor(audio, sampling_rate=16000,
-        #                               return_tensors="pt", ...)
-        #   3. audio_chunk_index = inputs.get("audio_chunk_index", None)
-        #   4. inputs.input_features.to(device=self._device, dtype=self._dtype)
-        #   5. with torch.no_grad():
-        #        outputs = self._model.generate(
-        #            **inputs,
-        #            max_new_tokens=self._config["max_new_tokens"],
-        #            do_sample=False, num_beams=1,
-        #        )
-        #   6. text = self._processor.decode(
-        #            outputs, audio_chunk_index=audio_chunk_index,
-        #            language=language or self._config["language"],
-        #            skip_special_tokens=True,
-        #        ).strip()
-        logger.warning(
-            "[CohereTextGenerator] generate() is a Day-1 stub; "
-            "full implementation lands Day 2 (audio_path=%s)",
-            audio_path,
+        if context:
+            logger.debug(
+                "[CohereTextGenerator] context parameter ignored "
+                "(Cohere does not accept initial prompts the way Whisper does)"
+            )
+
+        import torch
+
+        cfg = self._config
+        resolved_language = language or cfg["language"]
+        resolved_punctuation = cfg["punctuation"]
+        resolved_max_new_tokens = cfg["max_new_tokens"]
+
+        # Step 1: Load audio (16 kHz mono float32).
+        audio = self._load_audio(audio_path)
+
+        # Step 2: Run processor with language + punctuation kwargs.
+        # Verified against repka3 PoC (transformers 5.4.0); same kwargs
+        # are accepted by the trust_remote_code path on transformers 4.57.6
+        # because the processor class ships in the model repo.
+        inputs = self._processor(
+            audio,
+            sampling_rate=16000,
+            return_tensors="pt",
+            language=resolved_language,
+            punctuation=resolved_punctuation,
         )
+
+        # Step 3: Capture audio_chunk_index BEFORE the .to() cast — it is
+        # a Python int / tensor metadata, not a tensor we want on GPU.
+        audio_chunk_index = inputs.get("audio_chunk_index")
+
+        # Step 4: Cast the whole BatchEncoding to device + model.dtype.
+        # repka3 uses self.model.dtype here; equivalent to self._dtype which
+        # we resolved at load() time.
+        inputs = inputs.to(self._device, dtype=self._dtype)
+
+        # Step 5: Generate.  Greedy decoding (do_sample=False, num_beams=1)
+        # is set explicitly for determinism even though it is the default
+        # behavior — guards against future generation_config drift.
+        with torch.inference_mode():
+            outputs = self._model.generate(
+                **inputs,
+                max_new_tokens=resolved_max_new_tokens,
+                do_sample=False,
+                num_beams=1,
+            )
+
+        # Step 6: Move outputs to CPU before decode (mirrors repka3 pattern).
+        outputs = outputs.cpu()
+
+        # Step 7: Build decode_kwargs conditionally.
+        decode_kwargs = {"skip_special_tokens": True}
+        if audio_chunk_index is not None:
+            decode_kwargs["audio_chunk_index"] = audio_chunk_index
+            decode_kwargs["language"] = resolved_language
+
+        transcript = self._processor.decode(outputs, **decode_kwargs)
+
+        # Step 8: Decode may return list or string.
+        if isinstance(transcript, list):
+            text = transcript[0] if len(transcript) == 1 else "\n".join(transcript)
+        else:
+            text = transcript
+
+        text = (text or "").strip()
+
         return TranscriptionResult(
-            text="",
-            language=language or self._config["language"],
+            text=text,
+            language=resolved_language,
             metadata={
                 "generator": "cohere",
                 "audio_path": str(audio_path),
-                "stub": True,
+                "audio_chunk_index_present": audio_chunk_index is not None,
             },
         )
 

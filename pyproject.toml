@@ -423,6 +423,9 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+markers = [
+    "gated_model: tests that require gated HuggingFace model weights (HF_TOKEN required; skipped in CI)",
+]
 
 # -----------------------------------------------------------------------------
 # Tool Configuration: Coverage
