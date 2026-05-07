@@ -110,15 +110,31 @@ class ConfigSpec:
     language: str = "japanese"
 
 
-# Built-in configs matching the user's T142/T143 GUI defaults
+# Built-in configs matching the user's T142/T143 GUI defaults plus v1.8.14 safety-cap validation
+#
+# Configs A-D mirror the original investigation's test matrix.
+# Configs E-F are added in v1.8.14 to validate the ensemble safety cap fix
+# (see docs/plans/V1814_T142_NONDETERMINISM_INVESTIGATION.md §15-§17).
+#
+# - A_fid_bal:        the catastrophic baseline (pass2 sensitivity stays "aggressive" by default)
+# - B/C/D:            controls — different pass1, same pass2 = balanced + aggressive
+# - E_fid_bal_BAL:    fidelity → balanced WITH pass2 sensitivity downgraded to "balanced".
+#                     This is what the safety cap will produce. Expected: 0% catastrophic.
+# - F_fid_bal_CON:    fidelity → balanced with pass2 sensitivity = "conservative" (extra-safe).
+#                     Expected: 0% catastrophic.
 DEFAULT_CONFIGS = {
-    "A_fid_bal":    ConfigSpec(name="A_fid_bal",    pass1_pipeline="fidelity", pass2_pipeline="balanced"),
-    "B_bal_bal":    ConfigSpec(name="B_bal_bal",    pass1_pipeline="balanced", pass2_pipeline="balanced"),
-    "C_fast_bal":   ConfigSpec(name="C_fast_bal",   pass1_pipeline="fast",     pass2_pipeline="balanced"),
-    "D_faster_bal": ConfigSpec(name="D_faster_bal", pass1_pipeline="faster",   pass2_pipeline="balanced"),
+    "A_fid_bal":      ConfigSpec(name="A_fid_bal",      pass1_pipeline="fidelity", pass2_pipeline="balanced"),
+    "B_bal_bal":      ConfigSpec(name="B_bal_bal",      pass1_pipeline="balanced", pass2_pipeline="balanced"),
+    "C_fast_bal":     ConfigSpec(name="C_fast_bal",     pass1_pipeline="fast",     pass2_pipeline="balanced"),
+    "D_faster_bal":   ConfigSpec(name="D_faster_bal",   pass1_pipeline="faster",   pass2_pipeline="balanced"),
+    "E_fid_bal_BAL":  ConfigSpec(name="E_fid_bal_BAL",  pass1_pipeline="fidelity", pass2_pipeline="balanced",
+                                 pass2_sensitivity="balanced"),
+    "F_fid_bal_CON":  ConfigSpec(name="F_fid_bal_CON",  pass1_pipeline="fidelity", pass2_pipeline="balanced",
+                                 pass2_sensitivity="conservative"),
 }
 
 PRIMARY_CONFIG_NAME = "A_fid_bal"
+SAFETY_CAP_VALIDATION_CONFIGS = ("E_fid_bal_BAL", "F_fid_bal_CON")
 
 
 # --------------------------------------------------------------------------
@@ -440,6 +456,12 @@ def main() -> int:
     parser.add_argument("--config", type=str, default=None,
                         choices=list(DEFAULT_CONFIGS.keys()),
                         help="Run only the named config. Combine with --runs.")
+    parser.add_argument("--validate-safety-cap", action="store_true",
+                        help="Run the v1.8.14 safety-cap validation set: A_fid_bal "
+                             "(catastrophic baseline) + E_fid_bal_BAL (capped) + F_fid_bal_CON "
+                             "(extra-safe). Use --runs to set iterations per config "
+                             "(default 10 each). Diff between A and E demonstrates the cap "
+                             "is necessary AND sufficient.")
     parser.add_argument("--catastrophic-threshold", type=int,
                         default=CATASTROPHIC_THRESHOLD_DEFAULT,
                         help=f"pass 2 entry count below this = catastrophic (default {CATASTROPHIC_THRESHOLD_DEFAULT})")
@@ -467,7 +489,14 @@ def main() -> int:
         print(f"  {k}: {system_info.get(k)}")
 
     # --- Build the test plan ---
-    if args.config:
+    if args.validate_safety_cap:
+        # v1.8.14 safety-cap validation: A (baseline catastrophic) + E (cap'd) + F (extra-safe)
+        configs_with_runs = [
+            (DEFAULT_CONFIGS["A_fid_bal"],     args.runs),
+            (DEFAULT_CONFIGS["E_fid_bal_BAL"], args.runs),
+            (DEFAULT_CONFIGS["F_fid_bal_CON"], args.runs),
+        ]
+    elif args.config:
         configs_with_runs = [(DEFAULT_CONFIGS[args.config], args.runs)]
     else:
         configs_with_runs = [(DEFAULT_CONFIGS[PRIMARY_CONFIG_NAME], args.runs)]

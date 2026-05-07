@@ -2156,6 +2156,16 @@ def main():
                     'xxl_args': _get_xxl_extra_args_from_config(),
                 }
 
+            # Apply ensemble safety caps for known-unstable combinations.
+            # Currently caps: fidelity → balanced + aggressive sensitivity (downgrade
+            # to balanced sensitivity to avoid intermittent catastrophic truncation).
+            # Single source of truth + rationale: whisperjav/ensemble/safety_caps.py
+            # Investigation: docs/plans/V1814_T142_NONDETERMINISM_INVESTIGATION.md §15
+            from whisperjav.ensemble.safety_caps import apply_ensemble_safety_caps
+            pass1_config, pass2_config = apply_ensemble_safety_caps(
+                pass1_config, pass2_config, logger=logger
+            )
+
             # Create orchestrator
             # "source" sentinel is passed through — orchestrator resolves per-file
             ensemble_output_dir = args.output_dir
