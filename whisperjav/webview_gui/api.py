@@ -2100,6 +2100,125 @@ class WhisperJAVAPI:
             }
         }
 
+    def get_cohere_schema(self) -> Dict[str, Any]:
+        """
+        Get the focused parameter schema for Cohere-Transcribe customize modal.
+
+        v1.8.14 status: defined but not yet wired up to the GUI; the GUI
+        currently routes Cohere through openQwenCustomize() with cohere
+        defaults overrides for diff-scope reasons (D-NEW2 — parallel-flag
+        pattern in v1.8.14, full ChronosJAV refactor in v1.9.0).
+
+        v1.9.0 will introduce a dedicated openCohereCustomize() handler that
+        renders the focused fields below instead of the full Qwen-shaped
+        schema. The fields here intentionally omit Qwen-specific knobs that
+        the cohere generator silently ignores (batch_size, repetition_penalty,
+        max_tokens_per_audio_second, attn_implementation) so users see only
+        the controls that actually affect Cohere transcription.
+
+        Schema fields per v1.8.14 plan §4.6:
+          - model_id: gated official Cohere repo (single option in v1.8.14)
+          - max_new_tokens: D2 default 512
+          - dtype: auto/float16/bfloat16/float32
+          - language: defaults to ja
+          - punctuation: bool, default True
+          - aligner: D7 — qwen3 default with 'none' as VAD-only fallback;
+                     selecting 'none' must trigger the customize-handler
+                     triple-flip (timestamp_mode→vad_only, stepdown→False)
+        """
+        return {
+            "success": True,
+            "schema": {
+                "model": {
+                    "model_id": {
+                        "type": "dropdown",
+                        "label": "ASR Model",
+                        "options": [
+                            {
+                                "value": "CohereLabs/cohere-transcribe-03-2026",
+                                "label": "Cohere-Transcribe-03-2026 (gated, ~4-8GB VRAM, preview)",
+                            },
+                        ],
+                        "default": "CohereLabs/cohere-transcribe-03-2026",
+                        "description": "Gated HF repo — requires HF_TOKEN (see FAQ).",
+                    },
+                    "language": {
+                        "type": "dropdown",
+                        "label": "Language",
+                        "options": [
+                            {"value": "ja", "label": "Japanese"},
+                            {"value": "en", "label": "English"},
+                            {"value": "zh", "label": "Chinese"},
+                        ],
+                        "default": "ja",
+                        "description": "Cohere supports 14 languages; default JA for WhisperJAV.",
+                    },
+                    "punctuation": {
+                        "type": "checkbox",
+                        "label": "Punctuation",
+                        "default": True,
+                        "description": "Request punctuated output from the processor.",
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "group": "hardware",
+                        "options": [
+                            {"value": "auto", "label": "Auto (detect GPU)"},
+                            {"value": "cuda", "label": "CUDA (GPU)"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto",
+                    },
+                    "dtype": {
+                        "type": "dropdown",
+                        "label": "Data Type",
+                        "group": "hardware",
+                        "options": [
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "float16", "label": "Float16 (faster)"},
+                            {"value": "bfloat16", "label": "BFloat16"},
+                            {"value": "float32", "label": "Float32 (slower)"},
+                        ],
+                        "default": "auto",
+                    },
+                },
+                "generation": {
+                    "max_new_tokens": {
+                        "type": "slider",
+                        "label": "Max New Tokens",
+                        "description": "Maximum tokens generated per scene. 512 is a safe ceiling for JAV monologues (Cohere has no Whisper-style 448 cap).",
+                        "min": 128,
+                        "max": 1024,
+                        "step": 64,
+                        "default": 512,
+                    },
+                },
+                "alignment": {
+                    "aligner_backend": {
+                        "type": "dropdown",
+                        "label": "Aligner Backend",
+                        "description": (
+                            "Cohere has no native word-level timestamps (HF discussion #19). "
+                            "Qwen3 ForcedAligner produces them downstream. Selecting 'none' "
+                            "falls back to VAD-derived segment timing only and must flip "
+                            "timestamp_mode and stepdown together (handled at pack time)."
+                        ),
+                        "options": [
+                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (recommended, D7 default)"},
+                            {"value": "none", "label": "None (VAD timestamps only)"},
+                        ],
+                        "default": "qwen3",
+                    },
+                },
+            },
+            "metadata": {
+                "preview": True,
+                "v1_8_14_status": "API defined; GUI routes via openQwenCustomize for v1.8.14 (D-NEW2)",
+                "triple_flip_note": "When aligner_backend='none', api.py params packer must also stamp timestamp_mode='vad_only' and stepdown=False to keep the orchestrator consistent (plan §4.6).",
+            },
+        }
+
     # ========================================================================
     # Two-Pass Ensemble Methods
     # ========================================================================
@@ -2380,7 +2499,10 @@ class WhisperJAVAPI:
         # Pass 1 configuration
         pass1 = config.get('pass1', {})
         p1_pipeline = pass1.get('pipeline', 'balanced')
-        if p1_pipeline == 'anime-whisper':
+        # ChronosJAV variants (anime-whisper, cohere) all route through the
+        # qwen outer-shell pipeline; the specific generator backend is
+        # selected via --pass1-qwen-params generator_backend below.
+        if p1_pipeline in ('anime-whisper', 'cohere'):
             p1_pipeline = 'qwen'
         args += ["--pass1-pipeline", p1_pipeline]
 
@@ -2402,6 +2524,20 @@ class WhisperJAVAPI:
                 qwen1_params.setdefault('timestamp_mode', 'vad_only')
                 qwen1_params.setdefault('assembly_cleaner', 'passthrough')
                 qwen1_params.setdefault('stepdown', False)
+            elif pass1.get('isCohere'):
+                qwen1_params['generator_backend'] = 'cohere'
+                qwen1_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
+                qwen1_params.setdefault('assembly_cleaner', 'passthrough')         # D3
+                # stepdown defaults to True for Cohere (aligner ON by D7)
+                # Triple-flip enforcement (plan §4.6): when the user disables the
+                # aligner via Customize Parameters → aligner_backend='none', three
+                # downstream fields must flip together to keep the orchestrator
+                # consistent: timestamp_mode → vad_only, stepdown → False, and
+                # the aligner choice stays 'none'. We enforce here at pack time
+                # so a manually-edited preset cannot leave the trio in conflict.
+                if qwen1_params.get('aligner_backend') == 'none':
+                    qwen1_params['timestamp_mode'] = 'vad_only'
+                    qwen1_params['stepdown'] = False
             if qwen1_params:
                 args += ["--pass1-qwen-params", json.dumps(qwen1_params)]
         else:
@@ -2460,7 +2596,9 @@ class WhisperJAVAPI:
         pass2 = config.get('pass2', {})
         if pass2.get('enabled', False):
             p2_pipeline = pass2.get('pipeline', 'qwen')
-            if p2_pipeline == 'anime-whisper':
+            # ChronosJAV variants route through the qwen outer-shell pipeline
+            # (mirror of the pass-1 rewrite above).
+            if p2_pipeline in ('anime-whisper', 'cohere'):
                 p2_pipeline = 'qwen'
             args += ["--pass2-pipeline", p2_pipeline]
 
@@ -2490,6 +2628,14 @@ class WhisperJAVAPI:
                     qwen2_params.setdefault('timestamp_mode', 'vad_only')
                     qwen2_params.setdefault('assembly_cleaner', 'passthrough')
                     qwen2_params.setdefault('stepdown', False)
+                elif pass2.get('isCohere'):
+                    qwen2_params['generator_backend'] = 'cohere'
+                    qwen2_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
+                    qwen2_params.setdefault('assembly_cleaner', 'passthrough')         # D3
+                    # Triple-flip enforcement (mirror of pass 1).
+                    if qwen2_params.get('aligner_backend') == 'none':
+                        qwen2_params['timestamp_mode'] = 'vad_only'
+                        qwen2_params['stepdown'] = False
                 if qwen2_params:
                     args += ["--pass2-qwen-params", json.dumps(qwen2_params)]
             else:
@@ -3124,6 +3270,7 @@ class WhisperJAVAPI:
         "is_transformers":   "isTransformers",
         "is_qwen":           "isQwen",
         "is_anime_whisper":  "isAnimeWhisper",
+        "is_cohere":         "isCohere",
         "framer":            "framer",
         "dsp_effects":       "dspEffects",
         "created_at":        "createdAt",

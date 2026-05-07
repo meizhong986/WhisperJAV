@@ -1222,8 +1222,9 @@ const EnsembleManager = {
             params: null,  // null = use defaults, object = full custom config
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,  // Track if using Transformers pipeline
-            isQwen: false,  // Track if using Qwen3-ASR or Anime-Whisper pipeline
+            isQwen: false,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
             isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
+            isCohere: false,  // Track if using Cohere-Transcribe specifically (v1.8.14)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
             enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
@@ -1240,8 +1241,9 @@ const EnsembleManager = {
             params: null,
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,
-            isQwen: true,  // Default pipeline is Qwen3-ASR
+            isQwen: true,  // Default pipeline is Qwen3-ASR (ChronosJAV umbrella)
             isAnimeWhisper: false,
+            isCohere: false,  // v1.8.14: Cohere-Transcribe preview (gated HF model)
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
@@ -1278,6 +1280,12 @@ const EnsembleManager = {
         { value: 'kotoba-tech/kotoba-whisper-v2.0', label: 'Kotoba v2.0    ~2GB' },
         { value: 'kotoba-tech/kotoba-whisper-v2.1', label: 'Kotoba v2.1    ~2GB' }
     ],
+    cohereModels: [
+        // v1.8.14: single official Cohere repo (gated). Finetune variants
+        // can be added in v1.9.0 once a v1.8.14 benchmark cycle establishes
+        // a quality baseline.
+        { value: 'CohereLabs/cohere-transcribe-03-2026', label: 'Cohere-Transcribe-03-2026    ~4-8GB (gated)' }
+    ],
 
     async init() {
         // SYNC: Initialize state from actual HTML form values
@@ -1304,13 +1312,17 @@ const EnsembleManager = {
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
         this.state.serialMode = document.getElementById('ensemble-serial').checked;
 
-        // Update isTransformers, isQwen, and isAnimeWhisper flags based on synced pipeline values
+        // Update isTransformers, isQwen, isAnimeWhisper, isCohere flags based on synced pipeline values.
+        // isQwen is the ChronosJAV umbrella flag (any of qwen / anime-whisper / cohere); the
+        // specific-backend flags discriminate within the umbrella.
         this.state.pass1.isTransformers = this.state.pass1.pipeline === 'transformers';
-        this.state.pass1.isQwen = (this.state.pass1.pipeline === 'qwen' || this.state.pass1.pipeline === 'anime-whisper');
+        this.state.pass1.isQwen = (this.state.pass1.pipeline === 'qwen' || this.state.pass1.pipeline === 'anime-whisper' || this.state.pass1.pipeline === 'cohere');
         this.state.pass1.isAnimeWhisper = this.state.pass1.pipeline === 'anime-whisper';
+        this.state.pass1.isCohere = this.state.pass1.pipeline === 'cohere';
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
-        this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper');
+        this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper' || this.state.pass2.pipeline === 'cohere');
         this.state.pass2.isAnimeWhisper = this.state.pass2.pipeline === 'anime-whisper';
+        this.state.pass2.isCohere = this.state.pass2.pipeline === 'cohere';
         this.state.pass2.isXxl = this.state.pass2.pipeline === 'xxl';
 
         // Load persisted BYOP preferences (XXL exe path, extra args)
@@ -1332,14 +1344,21 @@ const EnsembleManager = {
             // BYOP preferences not available — first run or backend not ready
         }
 
-        // Swap model options for non-legacy passes
+        // Swap model options for non-legacy passes.
+        // Order matters: more specific ChronosJAV backends (anime-whisper, cohere)
+        // must be checked before the isQwen umbrella, because isQwen is true
+        // for all of them.
         if (this.state.pass1.isAnimeWhisper) {
             this.swapModelOptions('pass1', 'anime-whisper');
+        } else if (this.state.pass1.isCohere) {
+            this.swapModelOptions('pass1', 'cohere');
         } else if (this.state.pass1.isQwen) {
             this.swapModelOptions('pass1', 'qwen');
         }
         if (this.state.pass2.isAnimeWhisper) {
             this.swapModelOptions('pass2', 'anime-whisper');
+        } else if (this.state.pass2.isCohere) {
+            this.swapModelOptions('pass2', 'cohere');
         } else if (this.state.pass2.isQwen) {
             this.swapModelOptions('pass2', 'qwen');
         }
@@ -1496,18 +1515,22 @@ const EnsembleManager = {
     handlePipelineChange(passKey, newValue, selectElement) {
         const passState = this.state[passKey];
         const isTransformers = newValue === 'transformers';
-        const isQwen = (newValue === 'qwen' || newValue === 'anime-whisper');
+        // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
+        const isQwen = (newValue === 'qwen' || newValue === 'anime-whisper' || newValue === 'cohere');
         const isAnimeWhisper = newValue === 'anime-whisper';
+        const isCohere = newValue === 'cohere';
         const isXxl = newValue === 'xxl';
         const wasTransformers = passState.isTransformers;
         const wasQwen = passState.isQwen;
         const wasAnimeWhisper = passState.isAnimeWhisper;
+        const wasCohere = passState.isCohere;
 
-        // Determine pipeline category for model swapping
-        const getPipelineType = (isT, isQ, isAW) =>
-            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isQ ? 'qwen' : 'legacy'));
-        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper);
-        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper);
+        // Determine pipeline category for model swapping. Specific ChronosJAV
+        // backends (anime-whisper, cohere) take precedence over the qwen umbrella.
+        const getPipelineType = (isT, isQ, isAW, isC) =>
+            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isQ ? 'qwen' : 'legacy')));
+        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper, wasCohere);
+        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper, isCohere);
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -1519,6 +1542,7 @@ const EnsembleManager = {
                 passState.isTransformers = isTransformers;
                 passState.isQwen = isQwen;
                 passState.isAnimeWhisper = isAnimeWhisper;
+                passState.isCohere = isCohere;
                 passState.isXxl = isXxl;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
@@ -1537,6 +1561,7 @@ const EnsembleManager = {
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
             passState.isAnimeWhisper = isAnimeWhisper;
+            passState.isCohere = isCohere;
             passState.isXxl = isXxl;
             this.updateRowGreyingState(passKey);
             this.updateByopPanel();
@@ -1558,6 +1583,17 @@ const EnsembleManager = {
         // below set whisperseg as the per-pipeline preset; users can manually
         // override via the dropdown (e.g., switch to silero-v3.1 for non-JA audio).
         if (pipelineType === 'anime-whisper') {
+            sceneSelect.value = 'semantic';
+            segmenterSelect.value = 'whisperseg';
+            sensitivitySelect.value = 'balanced';
+            this.state[passKey].sceneDetector = 'semantic';
+            this.state[passKey].speechSegmenter = 'whisperseg';
+            this.state[passKey].sensitivity = 'balanced';
+            this.state[passKey].framer = 'vad-grouped';
+        } else if (pipelineType === 'cohere') {
+            // Cohere prefers long contiguous segments — same defaults as
+            // anime-whisper / qwen (semantic + whisperseg + balanced sensitivity),
+            // but with full-scene framer to give the model larger context.
             sceneSelect.value = 'semantic';
             segmenterSelect.value = 'whisperseg';
             sensitivitySelect.value = 'balanced';
@@ -1596,7 +1632,7 @@ const EnsembleManager = {
     },
 
     // Swap model dropdown options based on pipeline type
-    // pipelineType: 'legacy' | 'transformers' | 'qwen'
+    // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere'
     swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
         let models;
@@ -1607,6 +1643,9 @@ const EnsembleManager = {
                 break;
             case 'anime-whisper':
                 models = this.animeWhisperModels;
+                break;
+            case 'cohere':
+                models = this.cohereModels;
                 break;
             case 'qwen':
                 models = this.qwenModels;
@@ -1699,7 +1738,7 @@ const EnsembleManager = {
             sensitivitySelect.style.display = '';
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = passState.isQwen
-                ? `Segmenter sensitivity preset for ${passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR'}`
+                ? `Segmenter sensitivity preset for ${passState.isAnimeWhisper ? 'Anime-Whisper' : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR')}`
                 : '';
         }
 
@@ -1716,7 +1755,7 @@ const EnsembleManager = {
             // Re-enable segmenter (unless pass2 is disabled)
             // Note: Qwen uses segmenter as post-ASR VAD filter
             segmenterSelect.disabled = isPass2Disabled;
-            segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR'}` : '';
+            segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR')}` : '';
         }
 
         // Parameter guide button: visible only for Qwen pipelines
@@ -3132,7 +3171,9 @@ const EnsembleManager = {
             // Set modal title
             const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
             const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
-            const pipelineName = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
+            const pipelineName = passState.isAnimeWhisper
+                ? 'Anime-Whisper'
+                : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR');
             document.getElementById('customizeModalTitle').textContent =
                 `${passLabel} Settings (${pipelineName})${customStatus}`;
 
@@ -3156,6 +3197,26 @@ const EnsembleManager = {
                 currentValues.max_group_duration = 5;
             }
 
+            // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).
+            // Cohere has no native timestamps -- aligner is ON by default for word
+            // timing. Most Qwen-shaped fields (batch_size, repetition_penalty,
+            // max_tokens_per_audio_second, attn_implementation) are silently
+            // ignored by the cohere generator; we leave them at Qwen defaults
+            // so the modal still renders a full schema. v1.9.0 will route Cohere
+            // to a tailored modal via get_cohere_schema().
+            if (passState.isCohere && !passState.customized) {
+                currentValues.model_id = 'CohereLabs/cohere-transcribe-03-2026';
+                currentValues.context = '';                          // Cohere ignores context
+                currentValues.max_new_tokens = 512;                  // D2
+                currentValues.timestamp_mode = 'aligner_vad_fallback'; // D7: aligner ON
+                currentValues.assembly_cleaner = 'passthrough';      // D3
+                currentValues.stepdown = true;
+                currentValues.chunk_threshold = 1.0;
+                currentValues.max_group_duration = 6;
+                currentValues.aligner_backend = 'qwen3';             // D7 default
+                currentValues.language = 'Japanese';
+            }
+
             // Get scene detector from main dropdown
             currentValues.scene = passState.sceneDetector || 'semantic';
 
@@ -3169,7 +3230,9 @@ const EnsembleManager = {
             document.getElementById('customizeModal').classList.add('active');
 
         } catch (error) {
-            const errPipeline = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
+            const errPipeline = passState.isAnimeWhisper
+                ? 'Anime-Whisper'
+                : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR');
             ErrorHandler.show('Error', `Failed to open ${errPipeline} customize dialog: ` + error);
         }
     },
@@ -3215,7 +3278,7 @@ const EnsembleManager = {
     generateQwenModelTab(tabId, schemaSection, currentValues) {
         const container = document.getElementById(tabId);
 
-        // Model ID dropdown — override options for anime-whisper
+        // Model ID dropdown — override options for anime-whisper / cohere
         const modelDef = schemaSection.model_id;
         const passState = this.state[this.state.currentCustomize];
         let modelOptions = modelDef.options;
@@ -3226,6 +3289,12 @@ const EnsembleManager = {
                 { value: 'efwkjn/whisper-ja-anime-v0.3', label: 'efwkjn/whisper-ja-anime-v0.3 (experimental, community #232)' },
             ];
             modelDefault = 'litagin/anime-whisper';
+        } else if (passState && passState.isCohere) {
+            // v1.8.14 ships a single Cohere variant; finetunes can be added in v1.9.0.
+            modelOptions = [
+                { value: 'CohereLabs/cohere-transcribe-03-2026', label: 'CohereLabs/cohere-transcribe-03-2026 (gated, ~4-8GB VRAM, preview)' },
+            ];
+            modelDefault = 'CohereLabs/cohere-transcribe-03-2026';
         }
         container.appendChild(this.createTransformersDropdown(
             'model_id', modelDef.label,
@@ -3262,6 +3331,12 @@ const EnsembleManager = {
         if (passState && passState.isAnimeWhisper) {
             textarea.disabled = true;
             textarea.placeholder = 'Not supported by Anime-Whisper (causes hallucinations)';
+            textarea.value = '';
+        } else if (passState && passState.isCohere) {
+            // Cohere does not accept initial-prompt context the way Whisper does;
+            // the cohere generator silently ignores the field with a debug log.
+            textarea.disabled = true;
+            textarea.placeholder = 'Not supported by Cohere-Transcribe (no initial-prompt mechanism)';
             textarea.value = '';
         }
         contextControl.appendChild(textarea);
@@ -4617,6 +4692,18 @@ const EnsembleManager = {
             defaults.stepdown = false;
             defaults.chunk_threshold = 0.5;
             defaults.max_group_duration = 5;
+        } else if (passState.isCohere) {
+            // Cohere defaults — mirror the openCustomize override (D2/D3/D7).
+            defaults.model_id = 'CohereLabs/cohere-transcribe-03-2026';
+            defaults.context = '';
+            defaults.max_new_tokens = 512;
+            defaults.timestamp_mode = 'aligner_vad_fallback';
+            defaults.assembly_cleaner = 'passthrough';
+            defaults.stepdown = true;
+            defaults.chunk_threshold = 1.0;
+            defaults.max_group_duration = 6;
+            defaults.aligner_backend = 'qwen3';
+            defaults.language = 'Japanese';
         }
 
         // Reset all controls in all tabs (includes context tab)
@@ -4659,7 +4746,9 @@ const EnsembleManager = {
         this.state[passKey].presetName = null;
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
-        const pipelineName = passState.isAnimeWhisper ? 'Anime-Whisper' : 'Qwen3-ASR';
+        const pipelineName = passState.isAnimeWhisper
+            ? 'Anime-Whisper'
+            : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR');
         ConsoleManager.log(`Reset ${passLabel} ${pipelineName} parameters to defaults`, 'info');
 
         this.updateBadges();
@@ -4708,6 +4797,8 @@ const EnsembleManager = {
                     let pipelineCap = null;
                     if (p.pipeline === 'anime-whisper') {
                         pipelineCap = 'Anime-Whisper';
+                    } else if (p.pipeline === 'cohere') {
+                        pipelineCap = 'Cohere-Transcribe';
                     } else if (p.pipeline) {
                         pipelineCap = p.pipeline.charAt(0).toUpperCase() + p.pipeline.slice(1);
                     }
@@ -4772,6 +4863,7 @@ const EnsembleManager = {
             isTransformers: passState.isTransformers,
             isQwen: passState.isQwen,
             isAnimeWhisper: passState.isAnimeWhisper || false,
+            isCohere: passState.isCohere || false,
             framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
             dspEffects: passState.dspEffects || null,
             enhanceForVad: passState.enhanceForVad || false,
@@ -4786,8 +4878,9 @@ const EnsembleManager = {
         const passState = passKey ? this.state[passKey] : null;
         const pipelineLabel = passState
             ? (passState.isAnimeWhisper ? 'Anime-Whisper'
-                : (passState.isQwen ? 'Qwen' : (passState.isTransformers ? 'Transformers'
-                    : passState.pipeline.charAt(0).toUpperCase() + passState.pipeline.slice(1))))
+                : (passState.isCohere ? 'Cohere-Transcribe'
+                    : (passState.isQwen ? 'Qwen' : (passState.isTransformers ? 'Transformers'
+                        : passState.pipeline.charAt(0).toUpperCase() + passState.pipeline.slice(1)))))
             : 'Unknown';
         const name = prompt(`Save preset for ${pipelineLabel} pipeline.\nPreset name:`);
         if (!name || !name.trim()) return;
@@ -4838,14 +4931,17 @@ const EnsembleManager = {
             const passState = this.state[passKey];
             const prefix = passKey;
 
-            // Detect pipeline type change
-            const getPipelineType = (isT, isQ, isAW) =>
-                isT ? 'transformers' : (isAW ? 'anime-whisper' : (isQ ? 'qwen' : 'legacy'));
-            const oldType = getPipelineType(passState.isTransformers, passState.isQwen, passState.isAnimeWhisper);
+            // Detect pipeline type change.
+            // getPipelineType signature mirrors handlePipelineChange's local helper —
+            // 4-arg form (isT, isQ, isAW, isC) so cohere preset round-trips correctly.
+            const getPipelineType = (isT, isQ, isAW, isC) =>
+                isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isQ ? 'qwen' : 'legacy')));
+            const oldType = getPipelineType(passState.isTransformers, passState.isQwen, passState.isAnimeWhisper, passState.isCohere);
             const presetIsTransformers = !!preset.isTransformers;
             const presetIsQwen = !!preset.isQwen;
             const presetIsAnimeWhisper = !!preset.isAnimeWhisper;
-            const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper);
+            const presetIsCohere = !!preset.isCohere;
+            const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper, presetIsCohere);
 
             // Apply ALL preset fields to state
             if (preset.pipeline) passState.pipeline = preset.pipeline;
@@ -4860,6 +4956,7 @@ const EnsembleManager = {
             passState.isTransformers = presetIsTransformers;
             passState.isQwen = presetIsQwen;
             passState.isAnimeWhisper = presetIsAnimeWhisper;
+            passState.isCohere = presetIsCohere;
             passState.customized = true;
             passState.params = preset.params || null;
             passState.presetName = name;
@@ -4979,6 +5076,7 @@ const EnsembleManager = {
                 isTransformers: this.state.pass1.isTransformers,
                 isQwen: this.state.pass1.isQwen,
                 isAnimeWhisper: this.state.pass1.isAnimeWhisper,
+                isCohere: this.state.pass1.isCohere || false,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
                 enhanceForVad: this.state.pass1.enhanceForVad || false
             },
@@ -4996,6 +5094,7 @@ const EnsembleManager = {
                 isTransformers: this.state.pass2.isTransformers,
                 isQwen: this.state.pass2.isQwen,
                 isAnimeWhisper: this.state.pass2.isAnimeWhisper,
+                isCohere: this.state.pass2.isCohere || false,
                 isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
                 enhanceForVad: this.state.pass2.enhanceForVad || false,

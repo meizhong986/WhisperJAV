@@ -102,6 +102,49 @@ whisperjav-upgrade
 
 ---
 
+## Cohere-Transcribe（预览）
+
+### 使用 Cohere-Transcribe（预览，可选）
+
+Cohere Transcribe-03-2026 在 v1.8.14 中作为 **ChronosJAV** 下拉菜单的第三种生成器提供，与 Qwen3-ASR 和 Anime-Whisper 并列。该模型在 HuggingFace 上受门控，需要一次性设置。Anime-Whisper 仍是日语调优的默认生成器；Cohere 为可选项。
+
+**一次性设置**
+
+1. 访问 <https://huggingface.co/CohereLabs/cohere-transcribe-03-2026> 并点击 *Agree and access repository*（同意并访问仓库）。
+2. 在 <https://huggingface.co/settings/tokens> 创建一个 token（*Read* 权限即可）。
+3. 在环境中设置 `HF_TOKEN`：
+   - **Windows（持久化）：** `setx HF_TOKEN hf_xxxxxxxxxxxx` — 设置后需重启 GUI/终端才能生效。
+   - **Windows（仅当前 PowerShell 会话）：** `$env:HF_TOKEN = "hf_xxxxxxxxxxxx"`
+   - **Linux/macOS：** `export HF_TOKEN=hf_xxxxxxxxxxxx`
+4. 在 GUI Ensemble 下拉菜单中选择 **ChronosJAV → Cohere-Transcribe (preview)**，或通过 CLI 运行：
+   ```bash
+   whisperjav --mode qwen --pass1-qwen-params '{"generator_backend":"cohere"}' video.mp4
+   ```
+
+**首次运行下载**
+
+Cohere 权重约 2 GB。首次转录需先下载 5–15 分钟（每台机器仅一次；之后缓存在 HuggingFace 缓存目录中）。
+
+**显存需求**
+
+FP16 约 4–8 GB。用于词级时间戳的 Qwen3-ForcedAligner 在 Cohere 卸载之后才依次加载，因此峰值显存仅由 Cohere 决定 — 在 8–10 GB 显卡上可舒适运行。
+
+### 为什么 Cohere 不产生原生的词级时间戳？
+
+Cohere Transcribe-03-2026 当前只输出文本；逐词时间戳在模型作者的[路线图](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026/discussions/19)中但尚未实现。WhisperJAV 将 Cohere 与 Qwen3-ForcedAligner-0.6B（与 Qwen3-ASR 流水线使用的同一对齐器）配对，从 Cohere 的输出推导出词级时间戳。您可以通过自定义参数 → *Aligner Backend → None* 禁用对齐器，回退为仅基于 VAD 的段级时间 — 如果您只需要段级字幕并希望省去对齐器加载，可以这样做。
+
+### Cohere 返回了空转录 / "gated" 错误
+
+最常见的原因是启动 WhisperJAV 的环境中没有设置 `HF_TOKEN`。重新检查上述设置步骤，并在设置 token 后重启 GUI（特别是在 Windows 上使用 `setx` 时，它仅对新 shell 生效）。如果错误仍存在，请在 <https://huggingface.co/CohereLabs/cohere-transcribe-03-2026> 确认您的状态为 *Authorized* — 模型作者会手动审核访问。
+
+### 许可证和 trust_remote_code
+
+- Cohere **模型代码**采用 **Apache-2.0** 许可证。
+- 模型**权重**受 Cohere 的门控访问条款约束，您需在 HuggingFace 上接受。WhisperJAV 不再分发 Cohere 权重；它们在首次使用时从 HuggingFace 下载。
+- 加载使用 `trust_remote_code=True`，因为 WhisperJAV 固定的 `transformers` 4.57.6 版本尚未原生暴露 Cohere 模型类 — 该类随模型仓库一起发布。这与 WhisperJAV 中 ZipEnhancer/ModelScope 的处理方式相同。
+
+---
+
 ## 故障排除
 
 ### 处理时出错

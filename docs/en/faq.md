@@ -186,6 +186,49 @@ Tips:
 
 ---
 
+## Cohere-Transcribe (preview)
+
+### Using Cohere-Transcribe (preview, opt-in)
+
+Cohere Transcribe-03-2026 is available in v1.8.14 as a third generator under the **ChronosJAV** dropdown, alongside Qwen3-ASR and Anime-Whisper. The model is gated on HuggingFace, so a one-time setup is required. Anime-Whisper remains the default JA-tuned generator; Cohere is opt-in.
+
+**Setup (one-time)**
+
+1. Visit <https://huggingface.co/CohereLabs/cohere-transcribe-03-2026> and click *Agree and access repository*.
+2. Create a token at <https://huggingface.co/settings/tokens> (a *Read* token is sufficient).
+3. Set `HF_TOKEN` in your environment:
+   - **Windows (persistent):** `setx HF_TOKEN hf_xxxxxxxxxxxx` — restart the GUI/terminal after this for the change to take effect.
+   - **Windows (current PowerShell only):** `$env:HF_TOKEN = "hf_xxxxxxxxxxxx"`
+   - **Linux/macOS:** `export HF_TOKEN=hf_xxxxxxxxxxxx`
+4. Pick **ChronosJAV → Cohere-Transcribe (preview)** in the GUI Ensemble dropdown, or run from CLI:
+   ```bash
+   whisperjav --mode qwen --pass1-qwen-params '{"generator_backend":"cohere"}' video.mp4
+   ```
+
+**First-run download**
+
+Cohere weights are ~2 GB. The first transcription will spend 5–15 minutes downloading before transcription begins (one-time per machine; cached in your HuggingFace cache afterward).
+
+**VRAM requirement**
+
+~4–8 GB at FP16. The Qwen3-ForcedAligner used for word-level timestamps is loaded sequentially after Cohere unloads, so peak VRAM is bounded by Cohere alone — Cohere fits comfortably on 8–10 GB cards.
+
+### Why doesn't Cohere produce native word timestamps?
+
+Cohere Transcribe-03-2026 currently emits text only; per-word timing is on the model authors' [roadmap](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026/discussions/19) but not yet implemented. WhisperJAV pairs Cohere with the Qwen3-ForcedAligner-0.6B (the same aligner used by the Qwen3-ASR pipeline) to derive word-level timestamps from Cohere's output. You can disable the aligner via Customize Parameters → *Aligner Backend → None* to fall back to VAD-derived segment timing only — useful if you only need segment-level subs and want to save the aligner load step.
+
+### Cohere returned an empty transcript / "gated" error
+
+The most common cause is `HF_TOKEN` not being set in the environment that launches WhisperJAV. Re-check the setup steps above and restart the GUI after setting the token (especially on Windows with `setx`, which only affects new shells). If the error persists, confirm at <https://huggingface.co/CohereLabs/cohere-transcribe-03-2026> that you have an *Authorized* status — the model owners gate access manually.
+
+### License and trust_remote_code
+
+- The Cohere model code is **Apache-2.0** licensed.
+- The model **weights** are governed by Cohere's gated-access terms, which you accept on HuggingFace. WhisperJAV does not redistribute Cohere weights; they are downloaded from HuggingFace at first use.
+- Loading uses `trust_remote_code=True` because `transformers` 4.57.6 (WhisperJAV's pinned version) does not yet expose the Cohere model class natively — the class ships in the model repo itself. This is the same precedent used by ZipEnhancer/ModelScope elsewhere in WhisperJAV.
+
+---
+
 ## Troubleshooting
 
 ### Processing fails with an error
