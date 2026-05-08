@@ -102,11 +102,17 @@ whisperjav-upgrade
 
 ---
 
-## Cohere-Transcribe（预览）
+## Cohere-Transcribe（预览 —— 推迟到 v1.9.0）
 
-### 使用 Cohere-Transcribe（预览，可选）
+> **状态更新（v1.8.14）：** Cohere-Transcribe 预览**推迟到 v1.9.0**，下拉菜单中的入口已置灰。该模型需要 `transformers ≥ 5.4.0`，但 WhisperJAV 附带的 Qwen3-ASR fork 在 transformers 5.x 下会失败（`@check_model_inputs()` 装饰器 API 变更）。v1.9.0 将协同执行 transformers 升级、Qwen3-ASR fork 补丁以及 Cohere 交付。
 
-Cohere Transcribe-03-2026 在 v1.8.14 中作为 **ChronosJAV** 下拉菜单的第三种生成器提供，与 Qwen3-ASR 和 Anime-Whisper 并列。该模型在 HuggingFace 上受门控，需要一次性设置。Anime-Whisper 仍是日语调优的默认生成器；Cohere 为可选项。
+> **已升级 transformers 用户的迁移说明：** 如果您最近运行过 `pip install transformers --upgrade`（或以其他方式将 transformers 5.x 安装到了 WhisperJAV 环境中），Qwen3-ASR 将无法加载。请使用 `pip install "transformers>=4.40.0,<5.0"` 恢复稳定，然后通过 `python -c "from qwen_asr import Qwen3ASRModel; print('OK')"` 验证 Qwen3-ASR 是否能正常加载。
+
+下方的设置说明对 v1.9.0 恢复仍然有效 —— 保留作为前向参考。
+
+### 使用 Cohere-Transcribe（预览，可选）—— v1.9.0
+
+Cohere Transcribe-03-2026 在 v1.9.0 中将作为 **ChronosJAV** 下拉菜单的第三种生成器提供，与 Qwen3-ASR 和 Anime-Whisper 并列。该模型在 HuggingFace 上受门控，需要一次性设置。Anime-Whisper 仍是日语调优的默认生成器；Cohere 为可选项。
 
 **一次性设置**
 

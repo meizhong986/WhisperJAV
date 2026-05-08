@@ -186,11 +186,17 @@ Tips:
 
 ---
 
-## Cohere-Transcribe (preview)
+## Cohere-Transcribe (preview — deferred to v1.9.0)
 
-### Using Cohere-Transcribe (preview, opt-in)
+> **Status update (v1.8.14):** The Cohere-Transcribe preview is **deferred to v1.9.0** and the dropdown entry is greyed out. The model requires `transformers ≥ 5.4.0`, but the Qwen3-ASR fork that ships with WhisperJAV breaks on transformers 5.x (`@check_model_inputs()` decorator API change). v1.9.0 will land a coordinated transformers upgrade together with the Qwen3-ASR fork patch and the Cohere ship.
 
-Cohere Transcribe-03-2026 is available in v1.8.14 as a third generator under the **ChronosJAV** dropdown, alongside Qwen3-ASR and Anime-Whisper. The model is gated on HuggingFace, so a one-time setup is required. Anime-Whisper remains the default JA-tuned generator; Cohere is opt-in.
+> **Migration note for users who already upgraded transformers:** If you ran a recent `pip install transformers --upgrade` (or otherwise pulled transformers 5.x into your WhisperJAV env), Qwen3-ASR will fail to load. Restore stability with `pip install "transformers>=4.40.0,<5.0"` and then verify Qwen3-ASR loads via `python -c "from qwen_asr import Qwen3ASRModel; print('OK')"`.
+
+The setup notes below remain valid for v1.9.0 resumption — preserved for forward reference.
+
+### Using Cohere-Transcribe (preview, opt-in) — v1.9.0
+
+Cohere Transcribe-03-2026 will be available in v1.9.0 as a third generator under the **ChronosJAV** dropdown, alongside Qwen3-ASR and Anime-Whisper. The model is gated on HuggingFace, so a one-time setup is required. Anime-Whisper remains the default JA-tuned generator; Cohere is opt-in.
 
 **Setup (one-time)**
 

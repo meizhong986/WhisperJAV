@@ -301,7 +301,8 @@ class TestInstallationConstraints:
 
     @pytest.mark.parametrize("pkg_info", [
         ("huggingface-hub", ">=0.25.0", "huggingface_hub"),
-        ("transformers", ">=4.40.0", "transformers"),
+        # v1.8.14: <5.0 upper bound — Qwen3-ASR fork breaks on transformers 5.x.
+        ("transformers", ">=4.40.0,<5.0", "transformers"),
         ("accelerate", ">=0.26.0", "accelerate"),
     ], ids=lambda x: x[0] if isinstance(x, tuple) else str(x))
     def test_huggingface_package_installed(self, pkg_info):

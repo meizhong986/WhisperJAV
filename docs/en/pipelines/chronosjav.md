@@ -13,10 +13,10 @@ Inspired by the temporal-awareness approach in [ChronusOmni](https://arxiv.org/a
 | **anime-whisper** | ~4 GB | Best quality for anime/JAV dialogue. Fine-tuned Whisper large-v3. |
 | **Kotoba v2.1** | ~2 GB | Lighter weight with punctuation support. Good balance of speed and quality. |
 | **Kotoba v2.0** | ~2 GB | Lighter weight, no punctuation. Fastest of the three. |
-| **Cohere-Transcribe** *(v1.8.14 preview)* | ~4-8 GB | Cohere Labs 2B Conformer ASR. Gated HF model — requires `HF_TOKEN`. Word-level timestamps come from the Qwen3 ForcedAligner downstream. See the [FAQ](../faq.md#cohere-transcribe-preview) for setup. Anime-Whisper remains the default JA-tuned generator. |
+| **Cohere-Transcribe** *(deferred to v1.9.0)* | ~4-8 GB | Cohere Labs 2B Conformer ASR. **Currently disabled in the GUI dropdown** — the model requires transformers ≥ 5.4.0 which conflicts with the bundled Qwen3-ASR fork. v1.9.0 will land a coordinated transformers upgrade and ship Cohere alongside the existing generators. See the [FAQ](../faq.md#cohere-transcribe-preview-deferred-to-v190) for the current status. |
 
 !!! tip
-    Start with **anime-whisper** for best results. Switch to Kotoba if you need faster processing or have limited GPU memory. Try **Cohere-Transcribe** as an opt-in preview if you have an HF account and want to compare alternative generators on JAV content.
+    Start with **anime-whisper** for best results. Switch to Kotoba if you need faster processing or have limited GPU memory. Cohere-Transcribe is targeted for v1.9.0; the dropdown entry is visible but greyed out in v1.8.14 as a forward-reference signpost.
 
 ---
 

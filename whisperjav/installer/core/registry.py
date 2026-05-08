@@ -786,10 +786,16 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="transformers",
-        version=">=4.40.0",
+        version=">=4.40.0,<5.0",
         extra=Extra.HUGGINGFACE,
         order=81,
-        reason="HuggingFace Transformers for ASR pipeline (kotoba-whisper)",
+        reason=(
+            "HuggingFace Transformers for ASR pipeline (kotoba-whisper). "
+            "Upper bound <5.0 added in v1.8.14: transformers 5.x breaks the "
+            "Qwen3-ASR fork (@check_model_inputs() decorator API change at "
+            "modeling_qwen3_asr.py:986). Pin removed in v1.9.0 once Qwen3-ASR "
+            "is patched and Cohere preview ships."
+        ),
     ),
     Package(
         name="accelerate",
