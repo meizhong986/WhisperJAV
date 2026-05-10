@@ -50,11 +50,26 @@ from whisperjav.modules.timing_adjuster import TimingAdjuster
 _HAS_LINGUISTIC_CONTENT = re.compile(
     r'[\u3041-\u3096\u309D-\u309F'  # hiragana (skip U+3040 reserved, U+3097-U+309C marks)
     r'\u30A1-\u30FA\u30FC-\u30FF'   # katakana letters + ー (skip U+30A0 double hyphen, U+30FB middle dot)
-    r'\u4E00-\u9FFF'                # CJK unified ideographs
-    r'\uFF10-\uFF19'                # fullwidth digits
-    r'\uFF21-\uFF3A'                # fullwidth uppercase Latin
-    r'\uFF41-\uFF5A'                # fullwidth lowercase Latin
-    r'A-Za-z0-9]'                   # halfwidth ASCII alnum
+    r'\u4E00-\u9FFF'                  # CJK unified ideographs
+    r'\uFF10-\uFF19'                  # fullwidth digits
+    r'\uFF21-\uFF3A'                  # fullwidth uppercase Latin
+    r'\uFF41-\uFF5A'                  # fullwidth lowercase Latin
+    r'A-Za-z0-9'                        # halfwidth ASCII alnum
+    # v1.8.14 (#324): Hangul (Korean) + other major Whisper-supported scripts.
+    # v1.8.11 Fix 2 narrowed the class to CJK+Latin only, silently dropping
+    # valid Korean/Cyrillic/Arabic/Thai/Hebrew/Devanagari/Greek/diacritic-Latin
+    # output as "symbol_only_residue". Whisper supports 99 languages; cover the
+    # script families a user could realistically transcribe with WhisperJAV.
+    r'\uAC00-\uD7AF'                  # v1.8.14: Hangul syllables (Korean) - primary #324 fix
+    r'\u1100-\u11FF'                  # v1.8.14: Hangul Jamo (Korean)
+    r'\u3130-\u318F'                  # v1.8.14: Hangul compatibility Jamo (Korean)
+    r'\u0400-\u04FF'                  # v1.8.14: Cyrillic (Russian, Ukrainian, etc.)
+    r'\u0370-\u03FF'                  # v1.8.14: Greek
+    r'\u0600-\u06FF'                  # v1.8.14: Arabic
+    r'\u0590-\u05FF'                  # v1.8.14: Hebrew
+    r'\u0E00-\u0E7F'                  # v1.8.14: Thai
+    r'\u0900-\u097F'                  # v1.8.14: Devanagari (Hindi)
+    r'\u00C0-\u024F]'                 # v1.8.14: Latin Extended-A/-B (cafe, naive)
 )
 
 

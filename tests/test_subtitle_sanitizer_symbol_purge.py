@@ -66,6 +66,18 @@ class TestHasLinguisticContentRegex:
         "笑",                  # single kanji
         "ＡＢＣ",              # fullwidth upper
         "１２３",              # fullwidth digits
+        # v1.8.14 (#324) regression coverage: Hangul + other major scripts
+        "안녕하세요",     # Korean (Hangul syllables) - primary #324 fix
+        "ㅏ",                  # Korean compatibility Jamo
+        "안녕",          # Korean partial
+        "Здрав",      # Russian (Cyrillic)
+        "Γειά",          # Greek
+        "مرحبا",     # Arabic
+        "שלום",          # Hebrew
+        "สวัด",  # Thai
+        "नमस्ते",  # Hindi (Devanagari)
+        "café",                # Latin with diacritic
+        "naïve",               # Latin with diaeresis
     ])
     def test_keeps_linguistic_content(self, text):
         assert _HAS_LINGUISTIC_CONTENT.search(text) is not None, (
