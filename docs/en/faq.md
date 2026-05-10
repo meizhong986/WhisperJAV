@@ -104,7 +104,68 @@ Install the missing dependency: `pip install google-api-core`. Fixed since v1.8.
 
 ### The installer is stuck / taking very long
 
-The first install downloads ~3-5 GB of packages. On slow connections this can take 30+ minutes. Check the install log in the installation directory for progress.
+The first install downloads ~3-5 GB of packages. On slow connections this can take 30+ minutes. Check the install log (`install_log_v{VERSION}.txt` in the installation directory) for real-time progress.
+
+**Phase 3 (PyTorch) appears silent for several minutes.** PyTorch is the largest package (~2 GB CUDA-enabled) and downloads as one big stream. The console only updates between download and post-install steps. As long as your network is active and disk usage is increasing under the install directory, the install is making progress. If it stays silent for >20 minutes with no disk activity, your network may be timing out - check `install_log_v{VERSION}.txt` for the underlying error.
+
+### Installer behind a corporate proxy or firewall (HTTP_PROXY / HTTPS_PROXY)
+
+The standalone installer respects standard proxy environment variables. Set them BEFORE launching the installer:
+
+**Windows (current Command Prompt session):**
+```cmd
+set HTTPS_PROXY=http://user:pass@proxy.example.com:8080
+set HTTP_PROXY=http://user:pass@proxy.example.com:8080
+WhisperJAV-1.8.x-Windows-x86_64.exe
+```
+
+**Windows (persistent, all sessions):**
+```cmd
+setx HTTPS_PROXY http://user:pass@proxy.example.com:8080
+setx HTTP_PROXY http://user:pass@proxy.example.com:8080
+```
+(Open a new Command Prompt for the variables to take effect, then run the installer.)
+
+**macOS / Linux:**
+```bash
+export HTTPS_PROXY=http://user:pass@proxy.example.com:8080
+export HTTP_PROXY=http://user:pass@proxy.example.com:8080
+python install.py
+```
+
+`pip`, `uv`, and `git` all read these variables. WhisperJAV does NOT have a separate `--proxy` flag - the env-var approach is the standard pattern across all underlying tools.
+
+### macOS source install fails with `SSL: CERTIFICATE_VERIFY_FAILED`
+
+On macOS, the bundled Python may not trust the system certificate store by default. The pre-flight network check will fail with:
+
+```
+<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate>
+```
+
+**Fix**: run the official Python "Install Certificates" script that ships in your Python install:
+
+```bash
+/Applications/Python\ 3.12/Install\ Certificates.command
+```
+
+(Replace `3.12` with your installed Python minor version.) This installs the `certifi` CA bundle into the Python you are running. Re-run `python install.py` after.
+
+**Note**: avoid alpha or pre-release Python builds (e.g. 3.12.0a3) for production installs. WhisperJAV supports stable Python 3.10-3.12.
+
+### Qwen3-ASR fails with `TypeError: check_model_inputs() missing 1 required positional argument`
+
+The bundled Qwen3-ASR fork is incompatible with `transformers` 5.x (the decorator API changed at `modeling_qwen3_asr.py:986`). WhisperJAV v1.8.14 pins `transformers>=4.40.0,<5.0` in `pyproject.toml` and the installer registry, so fresh installs are protected.
+
+**If you hit this error**, your environment has `transformers >=5.0`. Either:
+
+1. Downgrade transformers in your active env:
+   ```bash
+   <env-pip> install --no-deps "transformers>=4.40.0,<5.0"
+   ```
+   Replace `<env-pip>` with the exact pip path for your install (e.g. `Scripts\pip.exe` for the Windows standalone installer, or your venv pip for source installs).
+
+2. Or wait for v1.9.0, which will ship a Qwen3-ASR fork patched for transformers 5.x. Tracking: <https://github.com/QwenLM/Qwen3-ASR/issues/138>.
 
 ### "CUDA not available" but I have an NVIDIA GPU
 
