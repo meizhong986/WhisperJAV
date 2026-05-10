@@ -10,14 +10,21 @@ Any format FFmpeg can read: MP4, MKV, AVI, MOV, WMV, FLV, WAV, MP3, FLAC, M4A, M
 
 ### How long does transcription take?
 
-Depends on video length, pipeline, and GPU:
+Depends on the mode, GPU tier, and how challenging the audio is. The numbers below are field-observed ranges on a **mid-tier GPU** (RTX 3060 12 GB or Google Colab T4 free tier) for typical JA dialogue content. Higher-end GPUs (RTX 3090/4080/4090) are roughly 1.5-3x faster; CPU-only is significantly slower (often 5-10x the slowest GPU row).
 
-| Video Length | Faster (GPU) | Balanced (GPU) | Ensemble (GPU) | Faster (CPU) |
-|-------------|-------------|----------------|----------------|-------------|
-| 30 min | ~1 min | ~2 min | ~4 min | ~10 min |
-| 2 hours | ~3 min | ~5 min | ~10 min | ~40 min |
+| Mode | 30-min clip | 2-hour movie | Notes |
+|------|-------------|--------------|-------|
+| **Faster** | 2-4 min | 6-10 min | Single-pass turbo-int8-batch8; fastest mode |
+| **Fast** | 3-5 min | 8-15 min | Single-pass turbo-int8 |
+| **Balanced** | 4-7 min | 15-25 min | Single-pass large-v2-int8 (recommended default) |
+| **Fidelity** | 10-15 min | 40-50 min* | Single-pass large-v2-fp16; high quality, high variance |
+| **Ensemble** | 15-25 min | 60-90 min | Two-pass (Pass 1 + Pass 2 sequential, then merged) |
 
-These are rough estimates. Actual times vary with GPU model and audio complexity.
+*Fidelity has high run-to-run timing variance (4-5x range on the same input) due to PyTorch cuDNN auto-tune, see "Why does Fidelity pipeline sometimes take much longer than other times?" below. Quality is unaffected, only wall-clock.
+
+**Audio difficulty multiplier**: very dense whispered content (ASMR-style, soft moaning, breathy speech) can push processing time **1.2-1.5x** the values above, especially on Fidelity and Ensemble modes - the model spends more time on close-call frames. A 2-hour ASMR-heavy clip on Fidelity can exceed 1 hour wall-clock.
+
+**CPU-only**: Faster mode is the only realistic option without a GPU. Expect roughly 30-60 minutes for a 30-minute clip; multi-hour content on CPU is impractical for most users.
 
 ### Can I use WhisperJAV without a GPU?
 
@@ -29,25 +36,30 @@ Yes. Go to **Advanced** → check **"Accept CPU-only mode"**. Use **Faster** mod
 
 ### Which pipeline gives the best subtitles?
 
-For anime/JAV content: **ChronosJAV** with anime-whisper, or **Ensemble** (Balanced + Qwen3-ASR with Smart Merge) for maximum accuracy.
+There is no universal "best" - it depends on content style and how much time you can spend. Common recommendations from field reports:
 
-For general Japanese content: **Balanced** mode is the best single-pass option.
+- **Anime / dramatic JAV dialogue**: **ChronosJAV** with anime-whisper.
+- **General Japanese dialogue, single-pass**: **Balanced** is the typical default.
+- **Highest accuracy at the cost of wall-clock**: **Ensemble** (Pass 1 = Balanced + Pass 2 = Qwen3-ASR with Smart Merge), which combines two model outputs.
+- **Whispered / ASMR-heavy content**: try **Fidelity** with **aggressive** sensitivity; it can recover quiet speech that other modes drop.
+
+In all cases, run a 5-10 minute representative clip first and compare - quality on JAV content varies enough by performer voice profile that no single recommendation lands consistently across content libraries.
 
 ### The subtitles have hallucinated text (random English phrases, URLs, etc.)
 
 This is a known Whisper behavior on silent or very quiet sections. WhisperJAV includes a hallucination sanitizer that removes most of these. Try:
 
-1. Use **Aggressive** sensitivity (captures more speech, leaving less "silence" for hallucinations)
-2. Use **Ensemble** mode (two passes catch different hallucinations)
+1. Try a different **sensitivity** setting - in some content profiles **Aggressive** captures real speech that **Conservative** drops as silence (which Whisper then fills with hallucinations); on other content the reverse is true. Run a representative clip on each setting to find the sweet spot for your library.
+2. Use **Ensemble** mode - two model outputs typically disagree on different hallucinations, so the merge step removes more than either pass alone.
 3. Enable a **Speech Enhancer** (ClearVoice or BS-RoFormer) to clean the audio first
 
 ### The timing is off / subtitles appear too early or late
 
 Try a different **Scene Detector**:
 
-- **Semantic** (default) — best for most content
-- **Auditok** — better for content with clear silence between dialogue
-- **Silero** — more aggressive splitting
+- **Semantic** (default in v1.8.13+) - audio-feature-based; reasonable starting choice for most content.
+- **Auditok** - energy-based; tends to work better on content with clear silence between dialogue lines.
+- **Silero** - VAD-based; produces more frequent splits which can either help or hurt timing depending on content.
 
 Or try **ChronosJAV** pipeline, which uses TEN VAD for tighter timing.
 
@@ -80,11 +92,15 @@ A deeper architectural fix is planned for v1.9.0+ pending investigation. The cap
 
 ### Which translation provider is best?
 
-For cost-effectiveness: **DeepSeek** offers excellent quality at low cost, especially for CJK languages.
+No single answer - each has trade-offs and quality varies by content. Field-reported patterns:
 
-For quality: **Claude** or **GPT-4** produce the most natural translations, but at higher cost.
+- **DeepSeek** (`deepseek-v4-flash` default in v1.8.14): low per-token cost; users frequently report it as a good balance for JA->EN/CN. The thinking variant `deepseek-v4-pro` is available via `--model deepseek-v4-pro`.
+- **Claude** (default `claude-3-5-haiku-20241022`) and **OpenAI GPT** (default `gpt-4o-mini`): higher per-token cost; users often prefer them for nuanced or context-dependent passages.
+- **Gemini** (`gemini-2.0-flash`): mid-tier cost; quality varies more by content style.
+- **Ollama / Local LLM**: runs entirely on your machine - no data leaves your computer. Quality depends on the local model you run; use `qwen2.5:7b-instruct` or `gemma3:12b` for sensible results, avoid thinking models (their chain-of-thought can leak into the SRT output).
+- **OpenRouter**: a router for multiple upstream models. Useful if you want to compare providers without maintaining separate API keys.
 
-For privacy: **Local LLM** runs entirely on your machine with no data leaving your computer.
+If you are not sure where to start, run a 30-line sample SRT through DeepSeek and Ollama side-by-side and pick the output that reads better to you.
 
 ### Translation fails with "API token limit" error
 
@@ -232,16 +248,19 @@ Total disk reclaimed varies — usually 5-15 GB.
 
 ### What if I have only 4 GB VRAM?
 
-Model recommendations for 4 GB VRAM:
+VRAM requirements for each transcription mode (matches the labels in the GUI Mode dropdown):
 
-| Pipeline | Model | VRAM | Notes |
-|----------|-------|------|-------|
-| **fast** | `turbo-int8` | ~3 GB | Recommended starting point |
-| **faster** | `turbo-int8-batch8` | ~5 GB (peak) | May still work via fallback to CPU offload |
-| **balanced** | `large-v2-int8` | ~6 GB | Likely too large; use `fast` instead |
+| Mode | Model | VRAM | Fits in 4 GB? |
+|------|-------|------|---------------|
+| **fast** | `turbo-int8` | ~4 GB | Tight but typically yes; recommended starting point |
+| **faster** | `turbo-int8-batch8` | ~6 GB peak | No |
+| **balanced** | `large-v2-int8` | ~6 GB | No |
+| **fidelity** | `large-v2-fp16` | ~10 GB | No |
+| **transformers** | HF `kotoba-bilingual` | ~6 GB | No |
 
-Tips:
-- Avoid running other GPU-heavy applications simultaneously (Chrome, games, video encoding)
+On a 4 GB GPU, **Fast** is the only mode that reliably fits. There is no automatic CPU-offload fallback - if a mode requests more VRAM than is available, you will get a CUDA out-of-memory error rather than a graceful fallback.
+
+Tips:- Avoid running other GPU-heavy applications simultaneously (Chrome, games, video encoding)
 - Translation with local LLMs needs separate VRAM (3-8 GB depending on model). On a 4 GB GPU, prefer cloud translation providers (DeepSeek, OpenRouter) for the translation step.
 - Speech enhancers (`clearvoice`, `bs-roformer`, `zipenhancer`) each need 1-3 GB extra. Use `none` or `ffmpeg-dsp` (CPU-only) if VRAM is tight.
 
@@ -338,6 +357,6 @@ WhisperJAV uses `AutoModelForSpeechSeq2Seq` (the generate-capable wrapper) per C
 ### The GUI won't start
 
 - **Windows:** Ensure WebView2 is installed (comes with Windows 10 1803+ and Windows 11)
-- **Linux:** Install `libwebkit2gtk-4.0-dev` (Ubuntu) or `webkit2gtk4.0-devel` (Fedora)
+- **Linux:** Install `libwebkit2gtk-4.0-dev` on Ubuntu (or `libwebkit2gtk-4.1-dev` on Ubuntu 24.04+) or `webkit2gtk4.0-devel` on Fedora
 - **macOS:** WebKit is built-in, should work automatically
 - Try launching from command line (`whisperjav-gui`) to see error output
