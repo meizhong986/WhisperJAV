@@ -5,12 +5,22 @@ Provider configurations for translation services.
 PROVIDER_CONFIGS = {
     'deepseek': {
         'pysubtrans_name': 'DeepSeek',
-        'model': 'deepseek-chat',
+        # v1.8.14 (#325): DeepSeek announced new model names 2026-05-06.
+        # 'deepseek-chat' / 'deepseek-reasoner' deprecate 2026-07-24, replaced
+        # by 'deepseek-v4-flash' (non-thinking, was deepseek-chat) and
+        # 'deepseek-v4-pro' (thinking, was deepseek-reasoner).
+        # Source: https://api-docs.deepseek.com/zh-cn/
+        # Users wanting the thinking model can override via: --model deepseek-v4-pro
+        'model': 'deepseek-v4-flash',
         'env_var': 'DEEPSEEK_API_KEY',
         'api_base': 'https://api.deepseek.com'
     },
     'openrouter': {
         'pysubtrans_name': 'OpenRouter',
+        # v1.8.14 (#325): OpenRouter routes to DeepSeek; OpenRouter typically lags
+        # the upstream model catalog. Keep deepseek-chat as the routed default until
+        # OpenRouter publishes deepseek-v4-flash; users can override via
+        # --model deepseek/deepseek-v4-flash once available.
         'model': 'deepseek/deepseek-chat',
         'env_var': 'OPENROUTER_API_KEY',
         'api_base': 'https://openrouter.ai/api/v1'
