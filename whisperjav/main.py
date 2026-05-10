@@ -2001,6 +2001,91 @@ def main():
                 "context": getattr(args, 'context', None),
                 "context_file": getattr(args, 'context_file', None),
             }
+        # v1.8.14 (#312): Add ensemble pass1/pass2 component info when --ensemble.
+        # Without this, dump_params produced near-empty output in ensemble mode
+        # (resolved_config is set to None at line 1717 because EnsembleOrchestrator
+        # owns config resolution). The legacy resolver path doesn't run, so the
+        # v1.8.13 #312 fix above (firewall mirroring) had nothing to populate.
+        # Mirror the pass1_config / pass2_config dicts built below at lines
+        # ~2116-2157 so users see exactly what each pass will receive.
+        if args.ensemble:
+            ensemble_dump = {
+                "merge_strategy": args.merge_strategy,
+                "ensemble_serial": getattr(args, 'ensemble_serial', False),
+                "pass1": {
+                    "pipeline": args.pass1_pipeline,
+                    "sensitivity": args.pass1_sensitivity,
+                    "scene_detector": args.pass1_scene_detector,
+                    "speech_segmenter": args.pass1_speech_segmenter,
+                    "speech_enhancer": args.pass1_speech_enhancer,
+                    "enhance_for_vad": (
+                        getattr(args, 'pass1_enhance_for_vad', False)
+                        or getattr(args, 'enhance_for_vad', False)
+                    ),
+                    "model": args.pass1_model,
+                    "vad_threshold": args.pass1_vad_threshold,
+                    "speech_pad_ms": args.pass1_speech_pad_ms,
+                    "params_provided": bool(
+                        getattr(args, 'pass1_params', None)
+                        or getattr(args, 'pass1_overrides', None)
+                    ),
+                    "hf_params_provided": bool(getattr(args, 'pass1_hf_params', None)),
+                    "qwen_params_provided": bool(getattr(args, 'pass1_qwen_params', None)),
+                    "language": language_code,
+                    "device": args.device,
+                    "compute_type": args.compute_type,
+                },
+                "pass2": None,
+            }
+            if getattr(args, 'pass2_pipeline', None):
+                ensemble_dump["pass2"] = {
+                    "pipeline": args.pass2_pipeline,
+                    "sensitivity": args.pass2_sensitivity,
+                    "scene_detector": args.pass2_scene_detector,
+                    "speech_segmenter": args.pass2_speech_segmenter,
+                    "speech_enhancer": args.pass2_speech_enhancer,
+                    "enhance_for_vad": (
+                        getattr(args, 'pass2_enhance_for_vad', False)
+                        or getattr(args, 'enhance_for_vad', False)
+                    ),
+                    "model": args.pass2_model,
+                    "vad_threshold": args.pass2_vad_threshold,
+                    "speech_pad_ms": args.pass2_speech_pad_ms,
+                    "params_provided": bool(
+                        getattr(args, 'pass2_params', None)
+                        or getattr(args, 'pass2_overrides', None)
+                    ),
+                    "hf_params_provided": bool(getattr(args, 'pass2_hf_params', None)),
+                    "qwen_params_provided": bool(getattr(args, 'pass2_qwen_params', None)),
+                    "language": language_code,
+                    "device": args.device,
+                    "compute_type": args.compute_type,
+                    "xxl_exe": getattr(args, 'xxl_exe', None),
+                }
+            # Apply the same conditional_sensitivity_cap that runs at runtime
+            # so the dump shows what pass 2 will ACTUALLY use, not what was
+            # requested. Single source of truth: whisperjav/ensemble/safety_caps.py
+            try:
+                from whisperjav.ensemble.safety_caps import apply_ensemble_safety_caps
+                # Build minimal config dicts for the cap function
+                p1_for_cap = dict(ensemble_dump["pass1"])
+                p2_for_cap = dict(ensemble_dump["pass2"]) if ensemble_dump["pass2"] else None
+                p1_capped, p2_capped = apply_ensemble_safety_caps(
+                    p1_for_cap, p2_for_cap, logger=logger
+                )
+                # Surface any cap-driven sensitivity change in the dump
+                if (p2_capped and ensemble_dump["pass2"]
+                        and p2_capped.get("sensitivity") != ensemble_dump["pass2"].get("sensitivity")):
+                    ensemble_dump["_safety_cap_applied"] = {
+                        "pass2_sensitivity_requested": ensemble_dump["pass2"]["sensitivity"],
+                        "pass2_sensitivity_effective": p2_capped["sensitivity"],
+                        "rule": "conditional_sensitivity_cap",
+                    }
+                    ensemble_dump["pass2"]["sensitivity"] = p2_capped["sensitivity"]
+            except Exception as cap_err:
+                # Don't let cap surfacing fail the dump; record the error
+                ensemble_dump["_safety_cap_error"] = str(cap_err)
+            dump_data["ensemble_config"] = ensemble_dump
         try:
             with open(args.dump_params, 'w', encoding='utf-8') as f:
                 json.dump(dump_data, f, indent=2, ensure_ascii=False, default=str)
