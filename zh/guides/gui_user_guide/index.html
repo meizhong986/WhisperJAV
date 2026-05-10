@@ -1,0 +1,3422 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/zh/guides/gui_user_guide/">
+      
+      
+        <link rel="prev" href="../../user-guide/">
+      
+      
+        <link rel="next" href="../../user-guide/workflows/">
+      
+      
+        
+          <link rel="alternate" href="../../../guides/gui_user_guide/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>GUI Walkthrough - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-gui" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../" title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              GUI Walkthrough
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../guides/gui_user_guide/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../" title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 启动应用
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 界面概览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 界面概览">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主题
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 添加文件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 添加文件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        添加文件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理文件列表
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 选择输出位置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 基本转录
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 基本转录">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        灵敏度
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        源语言
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        字幕输出
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 高级选项
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 集成模式（双通道）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 集成模式（双通道）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        集成模式的工作原理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通道配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可用处理管线
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自定义参数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第二通道配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#byopxxl-faster-whisper-v189" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BYOP：XXL Faster Whisper (v1.8.9+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ffmpeg-dsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语音增强：FFmpeg DSP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        合并策略
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        串行模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        内联 AI 翻译（集成模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. AI 字幕翻译
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. AI 字幕翻译">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        提供商和模型
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API 密钥和连接测试
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语言和风格
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        高级设置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译进度
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 运行任务
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 运行任务">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开始
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        取消
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        处理运行时
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        完成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 控制台输出
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. 菜单与对话框
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. 菜单与对话框">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        关于对话框
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查更新
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译设置弹窗
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. 键盘快捷键
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. 常见工作流程
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. 常见工作流程">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快速转录（最快）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        高质量转录（集成模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一步完成转录和翻译
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译已有的 SRT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        纯 CPU 模式（无 GPU）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV 升级指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 启动应用
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 界面概览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 界面概览">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主题
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 添加文件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 添加文件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        添加文件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理文件列表
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 选择输出位置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 基本转录
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 基本转录">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        灵敏度
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        源语言
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        字幕输出
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 高级选项
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 集成模式（双通道）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 集成模式（双通道）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        集成模式的工作原理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通道配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可用处理管线
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自定义参数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第二通道配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#byopxxl-faster-whisper-v189" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BYOP：XXL Faster Whisper (v1.8.9+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ffmpeg-dsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语音增强：FFmpeg DSP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        合并策略
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        串行模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        内联 AI 翻译（集成模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. AI 字幕翻译
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. AI 字幕翻译">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        提供商和模型
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API 密钥和连接测试
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语言和风格
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        高级设置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译进度
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 运行任务
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 运行任务">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开始
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        取消
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        处理运行时
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        完成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 控制台输出
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. 菜单与对话框
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. 菜单与对话框">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        关于对话框
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查更新
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译设置弹窗
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. 键盘快捷键
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. 常见工作流程
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. 常见工作流程">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快速转录（最快）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        高质量转录（集成模式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一步完成转录和翻译
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        翻译已有的 SRT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        纯 CPU 模式（无 GPU）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/zh/guides/gui_user_guide.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-gui">WhisperJAV GUI 用户指南<a class="headerlink" href="#whisperjav-gui" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>截图来自 v1.8.9 · Windows 11</p>
+</blockquote>
+<hr />
+<h2 id="_1">目录<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-启动应用">启动应用</a></li>
+<li><a href="#2-界面概览">界面概览</a></li>
+<li><a href="#3-添加文件">添加文件</a></li>
+<li><a href="#4-选择输出位置">选择输出位置</a></li>
+<li><a href="#5-基本转录">基本转录</a></li>
+<li><a href="#6-高级选项">高级选项</a></li>
+<li><a href="#7-集成模式双通道">集成模式（双通道）</a></li>
+<li><a href="#8-ai-字幕翻译">AI 字幕翻译</a></li>
+<li><a href="#9-运行任务">运行任务</a></li>
+<li><a href="#10-控制台输出">控制台输出</a></li>
+<li><a href="#11-菜单与对话框">菜单与对话框</a></li>
+<li><a href="#12-键盘快捷键">键盘快捷键</a></li>
+<li><a href="#13-常见工作流程">常见工作流程</a></li>
+</ol>
+<p><img alt="WhisperJAV GUI 概览" loading="lazy" src="../images/gui-tab1-transcription.png" /></p>
+<hr />
+<h2 id="1">1. 启动应用<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
+<p>安装完成后，可以通过以下方式启动 WhisperJAV：</p>
+<ul>
+<li><strong>桌面快捷方式</strong> — 由安装程序自动创建</li>
+<li><strong>开始菜单</strong> — 搜索 "WhisperJAV"</li>
+<li><strong>命令行</strong> — <code>whisperjav-gui</code></li>
+</ul>
+<p>首次启动时，应用会执行预检查，验证 FFmpeg、CUDA 和 Python 依赖项是否可用。任何问题都会在窗口底部的控制台中报告。</p>
+<hr />
+<h2 id="2">2. 界面概览<a class="headerlink" href="#2" title="Permanent link">&para;</a></h2>
+<p>GUI 从上到下分为五个区域：</p>
+<table>
+<thead>
+<tr>
+<th>区域</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>顶部栏</strong></td>
+<td>主题切换器（4 种主题）和检查更新按钮</td>
+</tr>
+<tr>
+<td><strong>来源</strong></td>
+<td>添加要处理的视频/音频文件</td>
+</tr>
+<tr>
+<td><strong>目标</strong></td>
+<td>设置输出 SRT 文件的保存位置</td>
+</tr>
+<tr>
+<td><strong>选项标签页</strong></td>
+<td>四个配置标签页（参见第 5-8 节）</td>
+</tr>
+<tr>
+<td><strong>运行控制和控制台</strong></td>
+<td>进度条、开始/取消按钮和实时日志输出</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_2">主题<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<p>点击顶部栏中的调色板图标切换主题：</p>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td>蓝色调的浅色主题</td>
+</tr>
+<tr>
+<td>Google</td>
+<td>Material Design 风格</td>
+</tr>
+<tr>
+<td>Carbon</td>
+<td>IBM Carbon 深色主题</td>
+</tr>
+<tr>
+<td>Primer</td>
+<td>GitHub 风格的中性色调</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3">3. 添加文件<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、MKV、AVI、WAV、MP3、FLAC、M4B 等）。</p>
+<h3 id="_3">添加文件<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>拖放</strong> 文件到文件列表区域</li>
+<li><strong>Add File(s)</strong> 按钮 — 打开多选文件对话框</li>
+<li><strong>Add Folder</strong> 按钮 — 添加文件夹中的所有媒体文件（非递归）</li>
+</ul>
+<p>每个文件在列表中显示文件名和时长。</p>
+<h3 id="_4">管理文件列表<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Remove Selected</strong> — 从列表中移除选中的文件</li>
+<li><strong>Clear</strong> — 移除所有文件</li>
+</ul>
+<hr />
+<h2 id="4">4. 选择输出位置<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
+<p>默认情况下，SRT 文件保存在源视频旁边。取消勾选 <strong>"Save next to source video"</strong> 可以选择自定义输出文件夹。</p>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>勾选（默认）</td>
+<td>输出 SRT 保存在每个源视频所在的文件夹中</td>
+</tr>
+<tr>
+<td>取消勾选</td>
+<td>所有 SRT 文件保存到指定的输出目录</td>
+</tr>
+</tbody>
+</table>
+<p>取消勾选后，使用 <strong>Browse</strong> 选择文件夹，或使用 <strong>Open</strong> 在文件资源管理器中查看。</p>
+<hr />
+<h2 id="5">5. 基本转录<a class="headerlink" href="#5" title="Permanent link">&para;</a></h2>
+<p><strong>Transcription Mode</strong> 标签页（标签页 1）控制核心转录处理管线。</p>
+<p><img alt="Transcription Mode 标签页默认设置" loading="lazy" src="../images/gui-tab1-transcription.png" /></p>
+<h3 id="_5">模式<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>选择处理管线。每种模式在速度和精度之间做出不同的权衡。</p>
+<p><img alt="模式下拉菜单展开显示所有处理管线选项" loading="lazy" src="../images/gui-tab1-mode-dropdown.png" /></p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>后端</th>
+<th>场景检测</th>
+<th>语音活动检测</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fidelity</strong></td>
+<td>Whisper</td>
+<td>是</td>
+<td>完整</td>
+<td>最高精度，速度较慢</td>
+</tr>
+<tr>
+<td><strong>Balanced</strong>（默认）</td>
+<td>Whisper</td>
+<td>是</td>
+<td>是</td>
+<td>通用场景</td>
+</tr>
+<tr>
+<td><strong>Fast</strong></td>
+<td>Whisper</td>
+<td>是</td>
+<td>否</td>
+<td>具有场景感知的快速转录</td>
+</tr>
+<tr>
+<td><strong>Faster</strong></td>
+<td>Faster-Whisper</td>
+<td>否</td>
+<td>否</td>
+<td>最快速度，最少处理</td>
+</tr>
+<tr>
+<td><strong>Transformers</strong></td>
+<td>HuggingFace</td>
+<td>是</td>
+<td>是</td>
+<td>替代后端</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">灵敏度<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>控制系统检测和分割语音的激进程度。</p>
+<table>
+<thead>
+<tr>
+<th>灵敏度</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>激进</strong>（默认）</td>
+<td>较低阈值，捕获更多语音（包括安静段落）</td>
+</tr>
+<tr>
+<td><strong>均衡</strong></td>
+<td>居中水平</td>
+</tr>
+<tr>
+<td><strong>保守</strong></td>
+<td>较高阈值，误报更少，可能遗漏安静的语音</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_7">源语言<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>视频中的说话语言。影响 Whisper 的语言提示和后处理规则。</p>
+<ul>
+<li><strong>日语</strong>（默认） — 针对日语优化，包含日语分组、助词检测、相槌处理</li>
+<li><strong>韩语</strong>、<strong>中文</strong>、<strong>英语</strong> — 标准 Whisper 处理</li>
+</ul>
+<h3 id="_8">字幕输出<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>原语言</strong>（默认） — 以原始语言输出字幕</li>
+<li><strong>直接转英语</strong> — Whisper 在转录过程中翻译为英语（质量低于专门的翻译工具）</li>
+</ul>
+<hr />
+<h2 id="6">6. 高级选项<a class="headerlink" href="#6" title="Permanent link">&para;</a></h2>
+<p><strong>Advanced</strong> 标签页（标签页 2）提供用于故障排除和微调的额外控制。</p>
+<p><img alt="Advanced Options 标签页" loading="lazy" src="../images/gui-tab2-advanced.png" /></p>
+<table>
+<thead>
+<tr>
+<th>选项</th>
+<th>默认值</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>模型覆盖</strong></td>
+<td>关闭</td>
+<td>勾选后，强制使用指定的 Whisper 模型大小，而非处理管线默认值</td>
+</tr>
+<tr>
+<td><strong>模型</strong> 下拉</td>
+<td>Large V3</td>
+<td>仅在勾选模型覆盖时可见。选项：Large V2、Large V3、Turbo</td>
+</tr>
+<tr>
+<td><strong>输出格式</strong></td>
+<td>SRT</td>
+<td>输出格式：SRT、VTT 或两者</td>
+</tr>
+<tr>
+<td><strong>异步处理</strong></td>
+<td>关闭</td>
+<td>启用异步处理管线执行</td>
+</tr>
+<tr>
+<td><strong>调试日志</strong></td>
+<td>关闭</td>
+<td>将详细调试日志写入 <code>whisperjav.log</code></td>
+</tr>
+<tr>
+<td><strong>保留临时文件</strong></td>
+<td>关闭</td>
+<td>保留中间音频块和处理产物</td>
+</tr>
+<tr>
+<td><strong>自定义临时目录</strong></td>
+<td>系统默认</td>
+<td>开启"保留临时文件"后，可选择存储位置</td>
+</tr>
+<tr>
+<td><strong>接受纯 CPU 模式</strong></td>
+<td>关闭</td>
+<td>允许在没有 CUDA GPU 的情况下运行（速度慢很多，但可以工作）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7">7. 集成模式（双通道）<a class="headerlink" href="#7" title="Permanent link">&para;</a></h2>
+<p><strong>Ensemble</strong> 标签页（标签页 3）允许运行两个不同的处理管线并合并结果，以获得更高的精度。这是最强大的模式。</p>
+<p><img alt="集成模式标签页概览" loading="lazy" src="../images/gui-tab3-ensemble.png" /></p>
+<h3 id="_9">集成模式的工作原理<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>第一通道</strong> 使用一种处理管线配置处理视频</li>
+<li><strong>第二通道</strong>（可选）使用另一种配置处理同一视频</li>
+<li>两个 SRT 输出通过可配置的策略进行<strong>合并</strong></li>
+</ol>
+<p>这种方式利用了不同后端的优势 — 例如，Whisper 用于时间轴精度，Qwen3-ASR 用于文本质量。</p>
+<h3 id="_10">通道配置<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<p>始终处于活动状态。每个通道具有相同的控制项：</p>
+<table>
+<thead>
+<tr>
+<th>控制项</th>
+<th>选项</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>处理管线</strong></td>
+<td>Balanced、Fast、Faster、Fidelity、Transformers、Qwen3-ASR、ChronosJAV、XXL Faster Whisper</td>
+<td>Balanced</td>
+</tr>
+<tr>
+<td><strong>灵敏度</strong></td>
+<td>激进、均衡、保守</td>
+<td>激进</td>
+</tr>
+<tr>
+<td><strong>场景检测器</strong></td>
+<td>Auditok、Silero、Semantic、None</td>
+<td>Semantic</td>
+</tr>
+<tr>
+<td><strong>语音增强器</strong></td>
+<td>None、FFmpeg DSP、ZipEnhancer、ClearVoice、BS-RoFormer</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>语音分割器</strong></td>
+<td>Silero v6.2、v4.0、v3.1、Whisper VAD、TEN、None</td>
+<td>Silero v6.2</td>
+</tr>
+<tr>
+<td><strong>模型</strong></td>
+<td>取决于处理管线 — Large V2/V3/Turbo (Whisper) 或 1.7B/0.6B (Qwen)</td>
+<td>处理管线默认值</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_11">可用处理管线<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<p>处理管线下拉菜单按后端分组：</p>
+<p><img alt="处理管线下拉菜单显示所有可用后端" loading="lazy" src="../images/gui-tab3-pipeline-dropdown.png" /></p>
+<ul>
+<li><strong>基于 Whisper</strong>：Balanced、Fast、Faster、Fidelity</li>
+<li><strong>HuggingFace</strong>：Transformers</li>
+<li><strong>ChronosJAV</strong>：Qwen3-ASR、Anime-Whisper</li>
+<li><strong>外部 (BYOP)</strong>：XXL Faster Whisper（仅第二通道）</li>
+</ul>
+<h3 id="_12">自定义参数<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<p>点击某个通道上的 <strong>Customize</strong> 按钮打开参数调整弹窗。可以对模型、质量、语音分割器、语音增强器、场景检测和上下文参数进行精细控制。</p>
+<p><img alt="自定义参数弹窗 — 质量标签页" loading="lazy" src="../images/gui-tab3-customize-modal.png" /></p>
+<p>弹窗包含 <strong>Model</strong>、<strong>Quality</strong>、<strong>Segmenter</strong>、<strong>Enhancer</strong> 和 <strong>Scene</strong> 设置标签页。徽标显示 <strong>DEFAULT</strong> 或 <strong>CUSTOM</strong> 表示参数是否已修改。</p>
+<p>使用 <strong>Save Preset</strong> 保存配置以便重用，或使用 <strong>Load Preset</strong> 恢复已保存的配置。预设在会话间持久保存。</p>
+<h3 id="_13">第二通道配置<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<p>勾选 <strong>Pass 2</strong> 复选框启用第二通道。控制项与第一通道相同。</p>
+<p>禁用时，该行变灰且所有控制项不可用。</p>
+<h3 id="byopxxl-faster-whisper-v189">BYOP：XXL Faster Whisper (v1.8.9+)<a class="headerlink" href="#byopxxl-faster-whisper-v189" title="Permanent link">&para;</a></h3>
+<p>选择 <strong>XXL Faster Whisper</strong> 作为第二通道处理管线，以使用 <a href="https://github.com/Purfview/whisper-standalone-win">PurfView 的 Faster Whisper XXL</a> 作为外部子进程。这是"自带处理管线"（BYOP）功能 — 你提供可执行文件，WhisperJAV 负责集成。</p>
+<p><img alt="集成模式中 XXL Faster Whisper 作为第二通道" loading="lazy" src="../images/gui-tab3-ensemble-xxl.png" /></p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Executable</strong></td>
+<td><code>faster-whisper-xxl.exe</code> 的路径。点击 <strong>Browse</strong> 选择。</td>
+</tr>
+<tr>
+<td><strong>Extra Args</strong></td>
+<td>传递给 XXL 的额外参数（例如 <code>--verbose True --standard_asia</code>）。</td>
+</tr>
+</tbody>
+</table>
+<p>WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、模型、语言）。其他一切由 Extra Args 字段控制。XXL 的实时控制台输出会流式传输到 GUI 控制台。</p>
+<p>如果 XXL 在关闭时崩溃（这是已知的 ctranslate2 行为），但 SRT 已经写入，WhisperJAV 会保留有效输出而不是丢弃它。</p>
+<h3 id="ffmpeg-dsp">语音增强：FFmpeg DSP<a class="headerlink" href="#ffmpeg-dsp" title="Permanent link">&para;</a></h3>
+<p>选择 <strong>FFmpeg DSP</strong> 作为语音增强器时，会出现一个包含 8 种音频处理效果的附加面板：</p>
+<table>
+<thead>
+<tr>
+<th>效果</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>响度归一化</td>
+<td>将整体响度归一化到标准水平</td>
+</tr>
+<tr>
+<td>动态归一化</td>
+<td>平衡安静和响亮段落之间的音量差异</td>
+</tr>
+<tr>
+<td>压缩</td>
+<td>减小动态范围</td>
+</tr>
+<tr>
+<td>降噪</td>
+<td>去除背景噪音</td>
+</tr>
+<tr>
+<td>高通滤波器</td>
+<td>去除低频隆隆声</td>
+</tr>
+<tr>
+<td>低通滤波器</td>
+<td>去除高频嘶嘶声</td>
+</tr>
+<tr>
+<td>消齿音</td>
+<td>减少刺耳的齿擦音（s/t 音）</td>
+</tr>
+<tr>
+<td>增益</td>
+<td>提升整体音量</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_14">合并策略<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
+<p>启用第二通道后，选择两个输出的合并方式：</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pass 1 Primary</strong>（默认）</td>
+<td>以第一通道为基础，用第二通道填补空缺</td>
+</tr>
+<tr>
+<td><strong>Smart Merge</strong></td>
+<td>基于质量启发式算法智能选择每个通道的最佳字幕</td>
+</tr>
+<tr>
+<td><strong>Full Merge</strong></td>
+<td>合并两个通道的所有字幕，解决重叠问题</td>
+</tr>
+<tr>
+<td><strong>Longest</strong></td>
+<td>当通道重叠时，选择较长（更详细）的字幕</td>
+</tr>
+<tr>
+<td><strong>Pass 2 Primary</strong></td>
+<td>以第二通道为基础，用第一通道填补空缺</td>
+</tr>
+<tr>
+<td><strong>Pass 1 Overlap (30%)</strong></td>
+<td>以第一通道为基础，需要 30% 的时间重叠才从第二通道合并</td>
+</tr>
+<tr>
+<td><strong>Pass 2 Overlap (30%)</strong></td>
+<td>以第二通道为基础，需要 30% 的时间重叠才从第一通道合并</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_15">串行模式<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<p>勾选 <strong>"Finish each file"</strong> 以在处理多个文件时，先完整处理每个文件（第一通道 → 第二通道 → 合并），再处理下一个。这样可以在结果出来时立即查看，而不必等待整个批次完成。</p>
+<h3 id="ai">内联 AI 翻译（集成模式）<a class="headerlink" href="#ai" title="Permanent link">&para;</a></h3>
+<p>勾选合并策略后面的 <strong>"AI-translate"</strong> 以自动翻译合并后的输出。这会显示一个内联的提供商/模型选择器和设置按钮。</p>
+<hr />
+<h2 id="8-ai">8. AI 字幕翻译<a class="headerlink" href="#8-ai" title="Permanent link">&para;</a></h2>
+<p><strong>AI SRT Translate</strong> 标签页（标签页 4）是一个独立工具，用于使用 AI 语言模型翻译现有的 SRT 文件。</p>
+<p><img alt="AI SRT Translate 标签页 — 完整视图" loading="lazy" src="../images/gui-tab4-translation.png" /></p>
+<h3 id="_16">提供商和模型<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>提供商</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ollama</strong></td>
+<td>通过 Ollama 使用本地大语言模型。免费、隐私、无需 API 密钥。推荐优先于 Local。</td>
+</tr>
+<tr>
+<td><strong>Local</strong></td>
+<td>使用本地大语言模型服务器 (llama-cpp)。免费、隐私。旧版 — 建议改用 Ollama。</td>
+</tr>
+<tr>
+<td><strong>DeepSeek</strong></td>
+<td>云端 API。性价比高，CJK 语言质量好。</td>
+</tr>
+<tr>
+<td><strong>Gemini</strong></td>
+<td>Google 的 API。多语言支持好。</td>
+</tr>
+<tr>
+<td><strong>Claude</strong></td>
+<td>Anthropic 的 API。高质量，成本较高。</td>
+</tr>
+<tr>
+<td><strong>GPT</strong></td>
+<td>OpenAI 的 API。广泛可用。</td>
+</tr>
+<tr>
+<td><strong>OpenRouter</strong></td>
+<td>支持多种模型的元路由器。</td>
+</tr>
+<tr>
+<td><strong>GLM</strong></td>
+<td>智谱 AI。适合中文相关任务。</td>
+</tr>
+<tr>
+<td><strong>Groq</strong></td>
+<td>快速推理云提供商。</td>
+</tr>
+<tr>
+<td><strong>Custom</strong></td>
+<td>任何 OpenAI 兼容的端点。</td>
+</tr>
+</tbody>
+</table>
+<p>每个提供商会填充一个 <strong>模型</strong> 下拉菜单，列出可用模型。使用 <strong>Custom model override</strong> 指定不在列表中的模型 ID。</p>
+<h3 id="api">API 密钥和连接测试<a class="headerlink" href="#api" title="Permanent link">&para;</a></h3>
+<p>对于云提供商，输入你的 API 密钥并点击 <strong>Test Connection</strong> 验证是否有效。状态图标显示结果。</p>
+<ul>
+<li>绿色勾号：连接成功</li>
+<li>红色叉号：连接失败（检查密钥和端点）</li>
+</ul>
+<p>Local 提供商不需要 API 密钥 — 它会自动启动 llama-cpp 服务器。</p>
+<h3 id="_17">语言和风格<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>选项</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>源语言</strong></td>
+<td>日语、韩语、中文</td>
+<td>日语</td>
+</tr>
+<tr>
+<td><strong>目标语言</strong></td>
+<td>英语、中文、印尼语、葡萄牙语、西班牙语</td>
+<td>英语</td>
+</tr>
+<tr>
+<td><strong>风格</strong></td>
+<td>Standard、Adult-Explicit</td>
+<td>Standard</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Standard</strong> 风格生成干净、自然的翻译。<strong>Adult-Explicit</strong> 使用针对 JAV 对白的专门指令和相应词汇。</p>
+<h3 id="_18">高级设置<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<p>点击可折叠的 <strong>Advanced Settings</strong> 部分展开更多选项：</p>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>默认值</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>影片标题</strong></td>
+<td>（空）</td>
+<td>为 AI 提供上下文以改善翻译</td>
+</tr>
+<tr>
+<td><strong>演员姓名</strong></td>
+<td>（空）</td>
+<td>帮助 AI 正确处理角色名称</td>
+</tr>
+<tr>
+<td><strong>剧情摘要</strong></td>
+<td>（空）</td>
+<td>为 AI 翻译器提供额外上下文</td>
+</tr>
+<tr>
+<td><strong>场景阈值</strong></td>
+<td>60 秒</td>
+<td>翻译器将字幕分组为场景进行批处理的时间间隔</td>
+</tr>
+<tr>
+<td><strong>最大批量大小</strong></td>
+<td>30</td>
+<td>每次翻译批处理的最大字幕数</td>
+</tr>
+<tr>
+<td><strong>最大重试次数</strong></td>
+<td>3</td>
+<td>API 调用失败的重试次数</td>
+</tr>
+<tr>
+<td><strong>速率限制</strong></td>
+<td>（提供商默认值）</td>
+<td>每分钟请求数限制</td>
+</tr>
+<tr>
+<td><strong>自定义端点</strong></td>
+<td>（空）</td>
+<td>覆盖默认 API 端点 URL</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_19">翻译进度<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
+<p>翻译有自己的进度条和开始/取消按钮，位于标签页 4 的底部。标签页 4 处于活动状态时，主运行控制区域会隐藏。</p>
+<hr />
+<h2 id="9">9. 运行任务<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<h3 id="_20">开始<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h3>
+<ol>
+<li>添加一个或多个文件（第 3 节）</li>
+<li>在相应标签页上配置选项</li>
+<li>点击 <strong>Start</strong></li>
+</ol>
+<p>进度条显示整体完成百分比。状态标签描述当前阶段（例如"正在提取音频..."、"正在转录场景 3/12..."）。</p>
+<h3 id="_21">取消<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
+<p>点击 <strong>Cancel</strong> 停止当前任务。进程终止，已有的部分输出会被保留。</p>
+<h3 id="_22">处理运行时<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
+<ul>
+<li>所有文件选择和配置控制项被<strong>禁用</strong></li>
+<li><strong>Cancel</strong> 按钮变为可用</li>
+<li>进度条和控制台显示实时进度</li>
+</ul>
+<h3 id="_23">完成<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
+<p>完成后，状态显示"Completed"，SRT 文件路径打印在控制台中。输出的 SRT 可以直接在任何媒体播放器中使用。</p>
+<hr />
+<h2 id="10">10. 控制台输出<a class="headerlink" href="#10" title="Permanent link">&para;</a></h2>
+<p>底部的控制台显示来自处理管线的实时日志消息。</p>
+<table>
+<thead>
+<tr>
+<th>颜色</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>绿色</td>
+<td>成功消息（文件已保存、处理完成）</td>
+</tr>
+<tr>
+<td>黄色</td>
+<td>警告（已激活后备方案、参数已调整）</td>
+</tr>
+<tr>
+<td>红色</td>
+<td>错误（文件未找到、CUDA 故障）</td>
+</tr>
+<tr>
+<td>白色/灰色</td>
+<td>信息消息（进度、阶段切换）</td>
+</tr>
+</tbody>
+</table>
+<p>点击 <strong>Clear</strong> 清空控制台输出。</p>
+<hr />
+<h2 id="11">11. 菜单与对话框<a class="headerlink" href="#11" title="Permanent link">&para;</a></h2>
+<h3 id="_24">关于对话框<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
+<p>按 <strong>F1</strong> 或通过顶部栏访问。显示版本信息、功能列表和键盘快捷键。</p>
+<h3 id="_25">检查更新<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV 在启动时自动检查更新（延迟 3 秒后）。有新版本可用时，顶部栏会出现一个显示版本号的微妙提示。点击可查看更新日志。</p>
+<p>对于关键更新，窗口顶部会出现一个完整的横幅。</p>
+<p>也可以手动检查：点击顶部栏中的调色板图标，然后选择 <strong>Check for Updates</strong>。</p>
+<h3 id="_26">翻译设置弹窗<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
+<p>可从 Ensemble 标签页 AI 翻译行中的 <strong>Translation Settings</strong> 按钮访问。以紧凑的弹窗形式提供与标签页 4 相同的配置。</p>
+<p><img alt="翻译设置弹窗" loading="lazy" src="../images/gui-translation-settings-modal.png" /></p>
+<hr />
+<h2 id="12">12. 键盘快捷键<a class="headerlink" href="#12" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>快捷键</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ctrl+O</strong></td>
+<td>打开文件对话框（添加文件）</td>
+</tr>
+<tr>
+<td><strong>Ctrl+R</strong></td>
+<td>开始处理</td>
+</tr>
+<tr>
+<td><strong>Escape</strong></td>
+<td>取消当前任务 / 关闭对话框</td>
+</tr>
+<tr>
+<td><strong>F1</strong></td>
+<td>打开关于对话框</td>
+</tr>
+<tr>
+<td><strong>方向键</strong></td>
+<td>浏览文件列表</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="13">13. 常见工作流程<a class="headerlink" href="#13" title="Permanent link">&para;</a></h2>
+<h3 id="_27">快速转录（最快）<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
+<ol>
+<li>将视频文件拖放到应用中</li>
+<li>保持默认设置（Balanced 模式、激进灵敏度、日语）</li>
+<li>点击 <strong>Start</strong></li>
+<li>SRT 文件出现在视频文件旁边</li>
+</ol>
+<h3 id="_28">高质量转录（集成模式）<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h3>
+<ol>
+<li>添加文件</li>
+<li>进入 <strong>Ensemble</strong> 标签页</li>
+<li>第一通道：Balanced 处理管线、Semantic 场景检测（默认）</li>
+<li>启用第二通道：选择 <strong>Qwen3-ASR</strong> 处理管线</li>
+<li>合并策略：<strong>Smart Merge</strong></li>
+<li>点击 <strong>Start</strong></li>
+<li>两个通道依次运行，然后合并结果</li>
+</ol>
+<h3 id="_29">一步完成转录和翻译<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h3>
+<ol>
+<li>添加文件</li>
+<li>进入 <strong>Ensemble</strong> 标签页</li>
+<li>按需配置通道</li>
+<li>勾选 <strong>"AI-translate"</strong></li>
+<li>选择提供商，如需要则输入 API 密钥</li>
+<li>点击 <strong>Start</strong></li>
+<li>转录完成后自动获取翻译好的 SRT</li>
+</ol>
+<h3 id="srt">翻译已有的 SRT<a class="headerlink" href="#srt" title="Permanent link">&para;</a></h3>
+<ol>
+<li>进入 <strong>AI SRT Translate</strong> 标签页（标签页 4）</li>
+<li>添加你的 SRT 文件</li>
+<li>选择提供商和模型</li>
+<li>输入 API 密钥并测试连接</li>
+<li>设置目标语言</li>
+<li>点击 <strong>Start</strong></li>
+</ol>
+<h3 id="cpu-gpu">纯 CPU 模式（无 GPU）<a class="headerlink" href="#cpu-gpu" title="Permanent link">&para;</a></h3>
+<ol>
+<li>进入 <strong>Advanced</strong> 标签页</li>
+<li>勾选 <strong>"Accept CPU-only mode"</strong></li>
+<li>使用 <strong>Faster</strong> 模式以获得无 GPU 时的最佳速度</li>
+<li>处理速度会明显变慢，但功能正常</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../../user-guide/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 用户指南">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                用户指南
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../user-guide/workflows/" class="md-footer__link md-footer__link--next" aria-label="下一页: Common Workflows">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                Common Workflows
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
