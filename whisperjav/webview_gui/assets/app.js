@@ -5634,7 +5634,9 @@ const UpdateManager = {
 
     async init() {
         // Bind event handlers
-        document.getElementById('updateNowBtn')?.addEventListener('click', () => this.startUpdate());
+        // v1.8.14: critical-update "Update Now" no longer triggers in-GUI pip install.
+        // Users are sent to the GitHub releases page for installer + upgrade instructions.
+        document.getElementById('updateNowBtn')?.addEventListener('click', () => this.openReleasePage());
         document.getElementById('updateDismissBtn')?.addEventListener('click', () => this.dismiss());
         document.getElementById('updateReleaseNotesBtn')?.addEventListener('click', () => this.openReleaseNotes());
 
@@ -5748,6 +5750,20 @@ const UpdateManager = {
     openReleaseNotes() {
         // Show the changelog modal instead of opening browser
         ChangelogManager.show();
+    },
+
+    async openReleasePage() {
+        // v1.8.14: replaces the legacy in-GUI pip-install update path.
+        // Opens the GitHub releases page where users follow the documented
+        // installer/upgrade instructions for their platform.
+        const url = this.releaseUrl || 'https://github.com/meizhong986/WhisperJAV/releases';
+        try {
+            await pywebview.api.open_url(url);
+        } catch (err) {
+            // Fallback: open in new window if pywebview API unavailable
+            window.open(url, '_blank');
+        }
+        this.hideBanner();
     },
 
     async startUpdate() {
@@ -5926,14 +5942,11 @@ const UpdateCheckManager = {
                 stableReleaseNotes.style.display = 'none';
             }
 
-            // Show action button (Download for major, Update for others)
-            if (level === 'major') {
-                stableActions.innerHTML = '<button id="updateToStable" class="btn btn-primary btn-sm">Download from GitHub</button>';
-                document.getElementById('updateToStable').addEventListener('click', () => this.openDownloadPage());
-            } else {
-                stableActions.innerHTML = '<button id="updateToStable" class="btn btn-primary btn-sm">Update to Stable</button>';
-                document.getElementById('updateToStable').addEventListener('click', () => this.startUpdate('stable'));
-            }
+            // v1.8.14: in-GUI pip-install path retired. All update paths
+            // (major, minor, patch) now send users to the GitHub releases page
+            // for installer + upgrade instructions. Single button for all levels.
+            stableActions.innerHTML = '<button id="updateToStable" class="btn btn-primary btn-sm">Open Release Page</button>';
+            document.getElementById('updateToStable').addEventListener('click', () => this.openDownloadPage());
             stableActions.style.display = 'block';
         } else {
             // Up to date with stable
@@ -5974,9 +5987,11 @@ const UpdateCheckManager = {
                 devCommitsList.style.display = 'none';
             }
 
-            // Show action button
-            devActions.innerHTML = '<button id="updateToDev" class="btn btn-secondary btn-sm">Update to Latest Dev</button>';
-            document.getElementById('updateToDev').addEventListener('click', () => this.startUpdate('dev'));
+            // v1.8.14: in-GUI pip-install path retired. Dev users are sent to
+            // the same GitHub releases page; instructions for getting dev builds
+            // are documented in the repo / release notes.
+            devActions.innerHTML = '<button id="updateToDev" class="btn btn-secondary btn-sm">Open Release Page</button>';
+            document.getElementById('updateToDev').addEventListener('click', () => this.openDownloadPage());
             devActions.style.display = 'block';
         } else {
             // Up to date with dev
