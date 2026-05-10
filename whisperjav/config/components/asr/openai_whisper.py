@@ -193,7 +193,7 @@ class OpenAIWhisperASR(ASRComponent):
             task="transcribe",
             language="ja",
             beam_size=2,
-            best_of=1,                            # v1.8.10-hf3: 1→2; v1.8.12: 2→1, engine-split retune
+            best_of=2,                            # v1.8.10-hf3: 1→2; v1.8.12: 2→1; v1.8.14: 1→2, engine-symmetric quality retune
             patience=1.0,                         # v1.8.10-hf3: 1.5→1.2; v1.8.12: 1.2→1.0, engine-split retune
             length_penalty=None,
             prefix=None,
@@ -204,7 +204,7 @@ class OpenAIWhisperASR(ASRComponent):
             # Transcriber options
             temperature=[0.0],
             compression_ratio_threshold=2.2,
-            logprob_threshold=-0.70,              # v1.8.12: -0.80→-0.70, engine-split retune
+            logprob_threshold=-1.00,              # v1.8.12: -0.80→-0.70; v1.8.14: -0.70→-1.00, gate relaxation
             logprob_margin=0.0,
             no_speech_threshold=0.54,             # v1.8.10-hf3: 0.60→0.46; v1.8.12: 0.46→0.54, engine-split retune
             drop_nonverbal_vocals=False,
@@ -227,8 +227,8 @@ class OpenAIWhisperASR(ASRComponent):
             task="transcribe",
             language="ja",
             beam_size=2,
-            best_of=1,                            # v1.8.10-hf3: 1→2; v1.8.12: 2→1, engine-split retune
-            patience=1.5,                         # v1.8.10-hf3: 2.0→1.6; v1.8.12: 1.6→1.5, engine-split retune
+            best_of=2,                            # v1.8.10-hf3: 1→2; v1.8.12: 2→1; v1.8.14: 1→2, engine-symmetric quality retune
+            patience=1.2,                         # v1.8.10-hf3: 2.0→1.6; v1.8.12: 1.6→1.5; v1.8.14: 1.5→1.2, engine-symmetric quality retune
             length_penalty=None,
             prefix=None,
             suppress_tokens=None,
@@ -238,7 +238,7 @@ class OpenAIWhisperASR(ASRComponent):
             # Transcriber options
             temperature=[0.0],
             compression_ratio_threshold=2.4,
-            logprob_threshold=-0.85,              # v1.8.12: -1.00→-0.85, engine-split retune
+            logprob_threshold=-1.00,              # v1.8.12: -1.00→-0.85; v1.8.14: -0.85→-1.00, gate relaxation
             logprob_margin=0.0,
             no_speech_threshold=0.71,             # v1.8.10-hf3: 0.70→0.65; v1.8.12: 0.65→0.71, engine-split retune
             drop_nonverbal_vocals=False,
@@ -262,7 +262,7 @@ class OpenAIWhisperASR(ASRComponent):
             language="ja",
             beam_size=3,                          # v1.8.10-hf3: 4→2; v1.8.12: 2→3, engine-split retune
             best_of=2,                            # v1.8.10-hf3: 3→2; v1.8.12: 2→1; v1.8.12.post1: 1→2, mirror faster_whisper aggressive fix
-            patience=2.0,                         # v1.8.10-hf3: 2.5→2.0, retuned per forensic analysis
+            patience=1.5,                         # v1.8.10-hf3: 2.5→2.0; v1.8.14: 2.0→1.5, speed/quality tune
             length_penalty=None,
             prefix=None,
             suppress_blank=True,
@@ -272,7 +272,7 @@ class OpenAIWhisperASR(ASRComponent):
             # Transcriber options
             temperature=[0.0, 0.17],              # v1.8.10-hf3: [0.0]→[0.0, 0.17], light fallback for aggressive
             compression_ratio_threshold=2.6,
-            logprob_threshold=-1.30,              # v1.8.10-hf3: -1.30→-1.00; v1.8.12: -1.00→-1.30, engine-split retune (whisper-only)
+            logprob_threshold=-1.55,              # v1.8.10-hf3: -1.30→-1.00; v1.8.12: -1.00→-1.30; v1.8.14: -1.30→-1.55, gate relaxation (whisper-only)
             logprob_margin=0.0,
             no_speech_threshold=0.84,             # v1.8.10-hf3: 0.90→0.77; v1.8.12: 0.77→0.84, engine-split retune
             drop_nonverbal_vocals=False,
