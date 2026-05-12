@@ -4,7 +4,7 @@
   "_legacy_sections_removed_in": "v1.8.9",
   "_legacy_sections_backup": "asr_config.pre_v189_cleanup.json",
   "ui_preferences": {
-    "console_verbosity": "summary",
+    "console_verbosity": "normal",
     "progress_batch_size": 10,
     "show_scene_details": false,
     "max_console_lines": 1000,

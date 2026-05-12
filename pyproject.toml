@@ -137,6 +137,9 @@ cli = [
 
     # Scene detection clustering
     "scikit-learn>=1.4.0",
+
+    # whisper.cpp backend (Metal GPU on Mac)
+    "pywhispercpp>=1.3.0",
 ]
 
 # GUI dependencies (platform-aware)
