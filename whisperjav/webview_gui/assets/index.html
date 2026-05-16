@@ -214,6 +214,7 @@
                                             <option value="kotoba-faster-whisper">kotoba&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(kotoba-v2-fp16&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
                                             -->
                                             <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-bilingual&nbsp;6GB VRAM)</option>
+                                            <option value="crispasr">crispasr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(external provider — set exe path)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>
                                     </div>
@@ -274,6 +275,37 @@
                                         <strong>Transformers Mode:</strong> Uses HuggingFace pipeline with chunked long-form algorithm.
                                         Sensitivity presets do not apply. Use Ensemble tab's "Customize Parameters" button for fine-tuning.
                                     </p>
+                                </div>
+                            </div>
+
+                            <!-- Row 4: CrispASR settings (shown when crispasr mode selected).
+                                 Self-contained external provider — NOT the BYOP panel. -->
+                            <div class="byop-settings-panel" id="crispasrModeRow" style="display: none;">
+                                <div class="byop-settings-header">
+                                    <span class="byop-title">CrispASR (external provider)</span>
+                                    <span class="byop-hint">Self-contained engine — WhisperJAV scene/segmenter/enhancer settings do not apply</span>
+                                </div>
+                                <div class="byop-settings-row">
+                                    <label class="byop-label" for="crispasr-mode-backend">Backend</label>
+                                    <select id="crispasr-mode-backend" class="form-select compact">
+                                        <option value="parakeet" selected>parakeet (native word ts)</option>
+                                        <option value="whispercpp">whispercpp (whisper.cpp large-v2)</option>
+                                        <option value="cohere">cohere (native word ts)</option>
+                                    </select>
+                                </div>
+                                <div class="byop-settings-row">
+                                    <label class="byop-label" for="crispasr-mode-exe-path">Executable</label>
+                                    <input type="text" id="crispasr-mode-exe-path" class="form-input byop-path-input"
+                                           placeholder="Path to the crispasr executable" readonly
+                                           title="Click Browse to select the crispasr executable">
+                                    <button type="button" class="btn btn-secondary btn-compact" id="crispasr-mode-browse-btn"
+                                            title="Browse for the crispasr executable">Browse</button>
+                                </div>
+                                <div class="byop-settings-row">
+                                    <label class="byop-label" for="crispasr-mode-extra-args">Extra Args</label>
+                                    <input type="text" id="crispasr-mode-extra-args" class="form-input byop-args-input"
+                                           placeholder="e.g. --vad --split-on-punct"
+                                           title="Additional command-line arguments passed verbatim to crispasr">
                                 </div>
                             </div>
 
@@ -399,6 +431,9 @@
                                                 <option value="qwen">Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (preview — coming in v1.9.0)</option>
+                                            </optgroup>
+                                            <optgroup label="External (CrispASR)">
+                                                <option value="crispasr">CrispASR</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -559,6 +594,9 @@
                                             <optgroup label="External (BYOP)">
                                                 <option value="xxl">XXL Faster Whisper</option>
                                             </optgroup>
+                                            <optgroup label="External (CrispASR)">
+                                                <option value="crispasr">CrispASR</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -710,6 +748,30 @@
                                                value="--model large-v3 --verbose True --standard_asia"
                                                placeholder="e.g. --model large-v3 --verbose --standard_asia"
                                                title="Additional command-line arguments passed directly to XXL">
+                                    </div>
+                                </div>
+
+                                <!-- CrispASR Settings Row (shown when CrispASR selected as Pass 1 or Pass 2).
+                                     Separate from the BYOP panel — CrispASR is not BYOP/XXL coupled.
+                                     Backend is chosen via the per-pass Model column. -->
+                                <div class="byop-settings-panel" id="crispasr-settings-panel" style="display: none;">
+                                    <div class="byop-settings-header">
+                                        <span class="byop-title">CrispASR (external provider)</span>
+                                        <span class="byop-hint">Backend is selected in the Model column. Exe path is shared across passes.</span>
+                                    </div>
+                                    <div class="byop-settings-row">
+                                        <label class="byop-label" for="crispasr-exe-path">Executable</label>
+                                        <input type="text" id="crispasr-exe-path" class="form-input byop-path-input"
+                                               placeholder="Path to the crispasr executable" readonly
+                                               title="Click Browse to select the crispasr executable">
+                                        <button type="button" class="btn btn-secondary btn-compact" id="crispasr-browse-btn"
+                                                title="Browse for the crispasr executable">Browse</button>
+                                    </div>
+                                    <div class="byop-settings-row">
+                                        <label class="byop-label" for="crispasr-extra-args">Extra Args</label>
+                                        <input type="text" id="crispasr-extra-args" class="form-input byop-args-input"
+                                               placeholder="e.g. --vad --split-on-punct"
+                                               title="Additional command-line arguments passed verbatim to crispasr">
                                     </div>
                                 </div>
 

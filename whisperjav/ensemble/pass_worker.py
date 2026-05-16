@@ -24,6 +24,7 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
 )
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -37,6 +38,7 @@ PIPELINE_CLASSES = {
     "kotoba-faster-whisper": KotobaFasterWhisperPipeline,
     "transformers": TransformersPipeline,
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
+    "crispasr": CrispASRPipeline,  # Standalone external-provider pipeline (docs/plans/crispasr_v190/08)
 }
 
 DEFAULT_HF_PARAMS = {
@@ -1295,6 +1297,49 @@ def _build_pipeline(
         except Exception as e:
             logger.error(
                 "[Worker %s] Pass %s: FAILED to create QwenPipeline - %s: %s",
+                os.getpid(), pass_number, type(e).__name__, e
+            )
+            raise
+
+    # CrispASR — simple standalone external-provider pipeline
+    # (docs/plans/crispasr_v190/08).  Constructs directly from pass_config
+    # like transformers/qwen.  It deliberately does NOT fall through to
+    # resolve_legacy_pipeline(): crispasr is not a LEGACY_PIPELINES entry
+    # (legacy.py:172 would raise), and per legacy.py's own docstring,
+    # dedicated-CLI-arg pipelines construct their config separately.
+    if pipeline_name == "crispasr":
+        crispasr_kwargs = {
+            "output_dir": output_dir,
+            "temp_dir": str(pass_temp_dir),
+            "keep_temp_files": keep_temp_files,
+            "save_metadata_json": pass_config.get("save_metadata_json", False),
+            "progress_display": None,
+            "subs_language": subs_language,
+            "crispasr_exe": pass_config.get("crispasr_exe"),
+            "crispasr_args": pass_config.get("crispasr_args") or "",
+            "crispasr_language": pass_config.get("language") or "ja",
+        }
+        # Only forward the backend when set so the pipeline default applies
+        # (passing None would override the default with None).
+        _crispasr_backend = pass_config.get("crispasr_backend")
+        if _crispasr_backend:
+            crispasr_kwargs["crispasr_backend"] = _crispasr_backend
+        logger.debug(
+            "[Worker %s] Pass %s: Creating CrispASRPipeline with backend=%s, exe=%s",
+            os.getpid(), pass_number,
+            _crispasr_backend or "(default)",
+            crispasr_kwargs["crispasr_exe"],
+        )
+        try:
+            pipeline = CrispASRPipeline(**crispasr_kwargs)
+            logger.debug(
+                "[Worker %s] Pass %s: CrispASRPipeline created successfully",
+                os.getpid(), pass_number
+            )
+            return pipeline
+        except Exception as e:
+            logger.error(
+                "[Worker %s] Pass %s: FAILED to create CrispASRPipeline - %s: %s",
                 os.getpid(), pass_number, type(e).__name__, e
             )
             raise

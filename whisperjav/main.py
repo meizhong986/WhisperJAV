@@ -162,8 +162,8 @@ def parse_arguments():
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen"], default="balanced",
-                       help="Processing mode (default: balanced)")
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen", "crispasr"], default="balanced",
+                       help="Processing mode (default: balanced). 'crispasr' = CrispASR external provider (requires --crispasr-exe)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
     parser.add_argument("--language", choices=["japanese", "korean", "chinese", "english"],
@@ -192,8 +192,8 @@ def parse_arguments():
                                help="Enable two-pass ensemble mode")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
-                               help="Pipeline for pass 1 (default: balanced)")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "crispasr"],
+                               help="Pipeline for pass 1 (default: balanced). 'crispasr' requires --crispasr-exe")
     twopass_group.add_argument("--pass1-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 1 (default: balanced)")
@@ -222,8 +222,8 @@ def parse_arguments():
                                help="Speech padding in ms for pass 1")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl"],
-                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe)")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl", "crispasr"],
+                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe); 'crispasr' requires --crispasr-exe")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: balanced)")
@@ -261,6 +261,24 @@ def parse_arguments():
     byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
     byop_group.add_argument("--xxl-exe", default=None,
                             help="Path to faster-whisper-xxl executable (required for --pass2-pipeline xxl)")
+
+    # CrispASR — standalone external-provider pipeline (NOT BYOP/XXL coupled).
+    # docs/plans/crispasr_v190/08_crispasr_simple_pipeline_design.md
+    crispasr_group = parser.add_argument_group(
+        "CrispASR Mode Options (--mode crispasr / --passN-pipeline crispasr)"
+    )
+    crispasr_group.add_argument("--crispasr-exe", default=None,
+                                help="Path to the crispasr external executable "
+                                     "(required for --mode crispasr or --passN-pipeline crispasr)")
+    crispasr_group.add_argument("--crispasr-backend", default="parakeet",
+                                choices=["whispercpp", "parakeet", "cohere"],
+                                help="CrispASR ASR backend (default: parakeet). "
+                                     "'whispercpp' = crispasr's whisper backend (defaults to large-v2). "
+                                     "All curated backends emit native word timestamps; no aligner needed.")
+    crispasr_group.add_argument("--crispasr-args", default="",
+                                help="Extra arguments passed verbatim to crispasr "
+                                     "(shlex-split, appended to argv). Single escape valve "
+                                     "for advanced CrispASR-internal control.")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -1225,6 +1243,24 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode
+    elif args.mode == "crispasr":
+        # CrispASR standalone external-provider pipeline (docs/plans/crispasr_v190/08).
+        # Constructed directly from --crispasr-* args, like transformers/qwen.
+        from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
+        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+        pipeline = CrispASRPipeline(
+            output_dir=initial_output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp,
+            save_metadata_json=getattr(args, 'debug', False),
+            progress_display=progress,
+            crispasr_exe=getattr(args, 'crispasr_exe', None),
+            crispasr_backend=getattr(args, 'crispasr_backend', 'parakeet'),
+            crispasr_args=getattr(args, 'crispasr_args', ''),
+            crispasr_language=getattr(args, 'language', 'japanese'),
+            subs_language=args.subs_language,
+        )
+        effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
         effective_mode = args.mode
@@ -1763,6 +1799,13 @@ def main():
             resolved_config = None
             logger.debug("Qwen mode: skipping legacy config resolution (uses --qwen-* args)")
 
+        elif args.mode == "crispasr":
+            # CrispASR mode: uses dedicated --crispasr-* arguments, not legacy
+            # config. resolve_legacy_pipeline() would raise (crispasr is not a
+            # LEGACY_PIPELINES entry) — skip it, like transformers/qwen.
+            resolved_config = None
+            logger.debug("CrispASR mode: skipping legacy config resolution (uses --crispasr-* args)")
+
         else:
             # Legacy mode: use pipeline resolver
             resolved_config = resolve_legacy_pipeline(
@@ -2031,6 +2074,8 @@ def main():
                     ),
                     "hf_params_provided": bool(getattr(args, 'pass1_hf_params', None)),
                     "qwen_params_provided": bool(getattr(args, 'pass1_qwen_params', None)),
+                    "crispasr_exe": getattr(args, 'crispasr_exe', None),
+                    "crispasr_backend": getattr(args, 'crispasr_backend', None),
                     "language": language_code,
                     "device": args.device,
                     "compute_type": args.compute_type,
@@ -2061,6 +2106,8 @@ def main():
                     "device": args.device,
                     "compute_type": args.compute_type,
                     "xxl_exe": getattr(args, 'xxl_exe', None),
+                    "crispasr_exe": getattr(args, 'crispasr_exe', None),
+                    "crispasr_backend": getattr(args, 'crispasr_backend', None),
                 }
             # Apply the same conditional_sensitivity_cap that runs at runtime
             # so the dump shows what pass 2 will ACTUALLY use, not what was
@@ -2211,6 +2258,11 @@ def main():
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params,  # For transformers pipeline
                 'qwen_params': pass1_qwen_params,  # For qwen pipeline
+                # CrispASR fields (only used when pipeline='crispasr'); shared
+                # across both passes, mirroring the --xxl-exe precedent.
+                'crispasr_exe': getattr(args, 'crispasr_exe', None),
+                'crispasr_backend': getattr(args, 'crispasr_backend', None),
+                'crispasr_args': getattr(args, 'crispasr_args', ''),
                 'language': language_code,  # Source language code (e.g., 'en', 'ja')
                 'device': args.device,  # Hardware override (None = auto-detect)
                 'compute_type': args.compute_type,  # Compute type override (None = auto)
@@ -2231,6 +2283,11 @@ def main():
                     'params': pass2_params,
                     'hf_params': pass2_hf_params,  # For transformers pipeline
                     'qwen_params': pass2_qwen_params,  # For qwen pipeline
+                    # CrispASR fields (only used when pipeline='crispasr'); shared
+                    # across both passes, mirroring the --xxl-exe precedent.
+                    'crispasr_exe': getattr(args, 'crispasr_exe', None),
+                    'crispasr_backend': getattr(args, 'crispasr_backend', None),
+                    'crispasr_args': getattr(args, 'crispasr_args', ''),
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)

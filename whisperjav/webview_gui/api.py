@@ -143,6 +143,10 @@ class WhisperJAVAPI:
         if mode == 'transformers':
             return self._build_transformers_args(args, options)
 
+        # Handle CrispASR mode separately (external provider, --crispasr-* args)
+        if mode == 'crispasr':
+            return self._build_crispasr_args(args, options)
+
         # Source audio language (for transcription)
         source_language = options.get('source_language', 'japanese')
         args += ["--language", source_language]
@@ -283,6 +287,58 @@ class WhisperJAVAPI:
             args += ["--debug"]
 
         # Output format (srt/vtt/both)
+        output_format = options.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
+
+        if options.get('accept_cpu_mode', False):
+            args += ["--accept-cpu-mode"]
+
+        return args
+
+    def _build_crispasr_args(self, args: List[str], options: Dict[str, Any]) -> List[str]:
+        """
+        Build CLI arguments for CrispASR mode (single --mode crispasr).
+
+        CrispASR is a self-contained external provider invoked via dedicated
+        --crispasr-* arguments. It does not use sensitivity / scene / segmenter
+        presets (those are for the in-process pipelines).
+        """
+        # Source / subtitle language
+        source_language = options.get('source_language', 'japanese')
+        args += ["--language", source_language]
+
+        subs_language = options.get('subs_language', 'native')
+        args += ["--subs-language", subs_language]
+
+        # Output directory
+        output_dir = options.get('output_dir', self.default_output)
+        args += ["--output-dir", output_dir]
+
+        # CrispASR-specific args
+        crispasr_exe = (options.get('crispasr_exe') or '').strip()
+        if crispasr_exe:
+            args += ["--crispasr-exe", crispasr_exe]
+
+        crispasr_backend = (options.get('crispasr_backend') or '').strip()
+        if crispasr_backend:
+            args += ["--crispasr-backend", crispasr_backend]
+
+        crispasr_args = (options.get('crispasr_args') or '').strip()
+        if crispasr_args:
+            args += ["--crispasr-args", crispasr_args]
+
+        # Common arguments
+        temp_dir = options.get('temp_dir', '').strip()
+        if temp_dir:
+            args += ["--temp-dir", temp_dir]
+
+        if options.get('keep_temp', False):
+            args += ["--keep-temp"]
+
+        if options.get('debug', False):
+            args += ["--debug"]
+
         output_format = options.get('output_format', 'srt')
         if output_format and output_format != 'srt':
             args += ["--output-format", output_format]
@@ -720,6 +776,57 @@ class WhisperJAVAPI:
             byop = ui_prefs.get('byop', {})
             byop.update(prefs)
             ui_prefs['byop'] = byop
+            mgr.update_ui_preferences(ui_prefs)
+            mgr.save_config()
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def select_crispasr_exe(self) -> Dict[str, Any]:
+        """Open a file dialog to select the CrispASR executable."""
+        windows = webview.windows
+        if not windows:
+            return {"success": False, "message": "No active window"}
+
+        window = windows[0]
+        file_types = [
+            'Executable Files (*.exe)',
+            'All Files (*.*)'
+        ]
+
+        result = window.create_file_dialog(
+            FileDialog.OPEN,
+            allow_multiple=False,
+            file_types=file_types
+        )
+
+        if result and len(result) > 0:
+            return {"success": True, "path": result[0]}
+        return {"success": False, "message": "No file selected"}
+
+    def get_crispasr_preferences(self) -> Dict[str, Any]:
+        """Return persisted CrispASR preferences from asr_config.json.
+
+        Stored under a dedicated `crispasr` key (NOT `byop` — CrispASR is
+        not BYOP/XXL coupled).
+        """
+        try:
+            from whisperjav.config.manager import ConfigManager
+            mgr = ConfigManager()
+            prefs = mgr.get_ui_preferences()
+            return prefs.get('crispasr', {})
+        except Exception:
+            return {}
+
+    def save_crispasr_preferences(self, prefs: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist CrispASR preferences (crispasr_exe_path, crispasr_extra_args)."""
+        try:
+            from whisperjav.config.manager import ConfigManager
+            mgr = ConfigManager()
+            ui_prefs = mgr.get_ui_preferences()
+            crispasr = ui_prefs.get('crispasr', {})
+            crispasr.update(prefs)
+            ui_prefs['crispasr'] = crispasr
             mgr.update_ui_preferences(ui_prefs)
             mgr.save_config()
             return {"success": True}
@@ -2506,7 +2613,13 @@ class WhisperJAVAPI:
             p1_pipeline = 'qwen'
         args += ["--pass1-pipeline", p1_pipeline]
 
-        if pass1.get('isTransformers'):
+        crispasr_p1 = pass1.get('isCrispasr') or p1_pipeline == 'crispasr'
+        if crispasr_p1:
+            # CrispASR pass: self-contained external provider. No sensitivity /
+            # params / scene / segmenter / enhancer / model. The shared
+            # --crispasr-* flags are emitted once after both passes.
+            pass
+        elif pass1.get('isTransformers'):
             # Transformers pass: no sensitivity, handle HF params
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-hf-params", json.dumps(pass1['params'])]
@@ -2546,51 +2659,54 @@ class WhisperJAVAPI:
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-params", json.dumps(pass1['params'])]
 
-        # Pass 1: Scene Detector
-        # Note: All pipelines use --pass1-scene-detector. For Qwen, pass_worker.py
-        # translates this to qwen_scene parameter.
-        scene1 = pass1.get('sceneDetector')
-        if scene1 and scene1 != 'none':
-            args += ["--pass1-scene-detector", scene1]
+        # Pass 1: Scene/Segmenter/Enhancer/Model — skipped for CrispASR
+        # (external provider; same pattern as the BYOP XXL skip in pass 2).
+        if not crispasr_p1:
+            # Pass 1: Scene Detector
+            # Note: All pipelines use --pass1-scene-detector. For Qwen, pass_worker.py
+            # translates this to qwen_scene parameter.
+            scene1 = pass1.get('sceneDetector')
+            if scene1 and scene1 != 'none':
+                args += ["--pass1-scene-detector", scene1]
 
-        # Pass 1: Speech Segmenter
-        # - Transformers: Skip (uses HF internal chunking)
-        # - Qwen/Legacy: Use --pass1-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
-        segmenter1 = pass1.get('speechSegmenter')
-        if pass1.get('isTransformers'):
-            # Transformers: Skip segmenter entirely (HF internal chunking)
-            pass
-        else:
-            # Both Qwen and Legacy use --pass1-speech-segmenter
-            # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
-            # For Legacy: used as pre-ASR speech segmentation
-            if segmenter1:  # Pass any value including "none" to disable
-                args += ["--pass1-speech-segmenter", segmenter1]
-
-        # Pass 1: Speech Enhancer
-        # Note: All pipelines use --pass1-speech-enhancer. For Qwen, pass_worker.py
-        # translates this to qwen_enhancer parameter.
-        enhancer1 = pass1.get('speechEnhancer')
-        if enhancer1 and enhancer1 != 'none':
-            # Handle FFmpeg DSP with selected effects
-            if enhancer1 == 'ffmpeg-dsp':
-                dsp_effects = pass1.get('dspEffects', ['loudnorm'])
-                effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
-                args += ["--pass1-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+            # Pass 1: Speech Segmenter
+            # - Transformers: Skip (uses HF internal chunking)
+            # - Qwen/Legacy: Use --pass1-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
+            segmenter1 = pass1.get('speechSegmenter')
+            if pass1.get('isTransformers'):
+                # Transformers: Skip segmenter entirely (HF internal chunking)
+                pass
             else:
-                args += ["--pass1-speech-enhancer", enhancer1]
+                # Both Qwen and Legacy use --pass1-speech-segmenter
+                # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
+                # For Legacy: used as pre-ASR speech segmentation
+                if segmenter1:  # Pass any value including "none" to disable
+                    args += ["--pass1-speech-segmenter", segmenter1]
 
-        # Pass 1: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
-        # Only effective for Qwen pipeline; pass_worker.py silently ignores for others.
-        if pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', ''):
-            args += ["--pass1-enhance-for-vad"]
+            # Pass 1: Speech Enhancer
+            # Note: All pipelines use --pass1-speech-enhancer. For Qwen, pass_worker.py
+            # translates this to qwen_enhancer parameter.
+            enhancer1 = pass1.get('speechEnhancer')
+            if enhancer1 and enhancer1 != 'none':
+                # Handle FFmpeg DSP with selected effects
+                if enhancer1 == 'ffmpeg-dsp':
+                    dsp_effects = pass1.get('dspEffects', ['loudnorm'])
+                    effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
+                    args += ["--pass1-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+                else:
+                    args += ["--pass1-speech-enhancer", enhancer1]
 
-        # Pass 1: Model
-        # Note: All pipelines use --pass1-model. For Qwen, pass_worker.py
-        # translates this to qwen_model_id parameter.
-        model1 = pass1.get('model')
-        if model1:
-            args += ["--pass1-model", model1]
+            # Pass 1: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
+            # Only effective for Qwen pipeline; pass_worker.py silently ignores for others.
+            if pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', ''):
+                args += ["--pass1-enhance-for-vad"]
+
+            # Pass 1: Model
+            # Note: All pipelines use --pass1-model. For Qwen, pass_worker.py
+            # translates this to qwen_model_id parameter.
+            model1 = pass1.get('model')
+            if model1:
+                args += ["--pass1-model", model1]
 
         # Pass 2 configuration
         pass2 = config.get('pass2', {})
@@ -2610,6 +2726,11 @@ class WhisperJAVAPI:
                 if xxl_exe:
                     args += ["--xxl-exe", xxl_exe]
                 # Skip all pipeline-specific args — XXL handles everything internally
+            elif pass2.get('isCrispasr') or p2_pipeline == 'crispasr':
+                # CrispASR pass: self-contained external provider. The shared
+                # --crispasr-* flags are emitted once after both passes.
+                # No sensitivity / params here.
+                pass
             elif pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
                 if pass2.get('customized') and pass2.get('params'):
@@ -2644,8 +2765,10 @@ class WhisperJAVAPI:
                 if pass2.get('customized') and pass2.get('params'):
                     args += ["--pass2-params", json.dumps(pass2['params'])]
 
-            # Pass 2: Scene/Segmenter/Enhancer/Model — skip for BYOP XXL (external tool)
-            if not (pass2.get('isXxl') or p2_pipeline == 'xxl'):
+            # Pass 2: Scene/Segmenter/Enhancer/Model — skip for BYOP XXL and
+            # CrispASR (both external/self-contained providers)
+            if not (pass2.get('isXxl') or p2_pipeline == 'xxl'
+                    or pass2.get('isCrispasr') or p2_pipeline == 'crispasr'):
                 # Pass 2: Scene Detector
                 # Note: All pipelines use --pass2-scene-detector. For Qwen, pass_worker.py
                 # translates this to qwen_scene parameter.
@@ -2690,6 +2813,27 @@ class WhisperJAVAPI:
                 model2 = pass2.get('model')
                 if model2:
                     args += ["--pass2-model", model2]
+
+        # CrispASR shared flags — emitted once for whichever pass(es) use it.
+        # The CLI uses single --crispasr-* flags (like --xxl-exe), so when both
+        # passes are CrispASR with different backends, pass 1's backend wins.
+        p1_is_crispasr = pass1.get('isCrispasr') or p1_pipeline == 'crispasr'
+        p2_is_crispasr = pass2.get('enabled', False) and (
+            pass2.get('isCrispasr') or pass2.get('pipeline') == 'crispasr'
+        )
+        if p1_is_crispasr or p2_is_crispasr:
+            crispasr_exe = (config.get('crispasrExe') or '').strip()
+            if crispasr_exe:
+                args += ["--crispasr-exe", crispasr_exe]
+            crispasr_backend = (
+                pass1.get('crispasrBackend') if p1_is_crispasr
+                else pass2.get('crispasrBackend')
+            )
+            if crispasr_backend:
+                args += ["--crispasr-backend", str(crispasr_backend)]
+            crispasr_args = (config.get('crispasrArgs') or '').strip()
+            if crispasr_args:
+                args += ["--crispasr-args", crispasr_args]
 
         # Merge strategy (default: pass1_primary - Pass 1 as base, fill gaps from Pass 2)
         merge_strategy = config.get('merge_strategy', 'pass1_primary')

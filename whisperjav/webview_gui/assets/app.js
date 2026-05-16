@@ -139,7 +139,7 @@ const TabManager = {
 // Mode-Specific UI Manager (Transformers sensitivity handling)
 // ============================================================
 const ModeManager = {
-    noSensitivityModes: ['transformers'],
+    noSensitivityModes: ['transformers', 'crispasr'],
 
     init() {
         const modeSelect = document.getElementById('mode');
@@ -152,6 +152,11 @@ const ModeManager = {
         const sensitivitySelect = document.getElementById('sensitivity');
         const sensitivityLabel = sensitivitySelect.previousElementSibling;
         const transformersInfoRow = document.getElementById('transformersInfoRow');
+        const crispasrModeRow = document.getElementById('crispasrModeRow');
+
+        // CrispASR has its own settings panel (exe/backend/args); the
+        // transformers info row is text-only. Show exactly the relevant one.
+        if (crispasrModeRow) crispasrModeRow.style.display = (mode === 'crispasr') ? 'block' : 'none';
 
         if (this.noSensitivityModes.includes(mode)) {
             // Disable sensitivity and show N/A
@@ -168,8 +173,8 @@ const ModeManager = {
             }
             sensitivitySelect.value = 'n/a';
 
-            // Show info row
-            if (transformersInfoRow) transformersInfoRow.style.display = 'block';
+            // Show info row (transformers text only; crispasr uses its own panel above)
+            if (transformersInfoRow) transformersInfoRow.style.display = (mode === 'transformers') ? 'block' : 'none';
             sensitivityLabel.textContent = 'Sensitivity (not used for this mode):';
         } else {
             // Re-enable sensitivity
@@ -744,6 +749,17 @@ const FormManager = {
             return essentialOptions;
         }
 
+        // CrispASR mode: external provider — exe path + backend + extra args.
+        // No sensitivity / scene / segmenter (engine is self-contained).
+        if (mode === 'crispasr') {
+            return {
+                ...baseOptions,
+                crispasr_exe: (document.getElementById('crispasr-mode-exe-path')?.value || '').trim(),
+                crispasr_backend: document.getElementById('crispasr-mode-backend')?.value || 'parakeet',
+                crispasr_args: (document.getElementById('crispasr-mode-extra-args')?.value || '').trim(),
+            };
+        }
+
         // Legacy mode handling (all other modes)
         const modelOverrideEnabled = document.getElementById('modelOverrideEnabled').checked;
         const asyncProcessingEnabled = document.getElementById('asyncProcessing').checked;
@@ -1225,6 +1241,7 @@ const EnsembleManager = {
             isQwen: false,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
             isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             isCohere: false,  // Track if using Cohere-Transcribe specifically (v1.8.14)
+            isCrispasr: false,  // Track if using CrispASR external provider (v1.9.0)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
             enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
@@ -1244,6 +1261,7 @@ const EnsembleManager = {
             isQwen: true,  // Default pipeline is Qwen3-ASR (ChronosJAV umbrella)
             isAnimeWhisper: false,
             isCohere: false,  // v1.8.14: Cohere-Transcribe preview (gated HF model)
+            isCrispasr: false,  // Track if using CrispASR external provider (v1.9.0)
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
@@ -1253,7 +1271,11 @@ const EnsembleManager = {
         },
         mergeStrategy: 'pass1_primary',
         serialMode: false,
-        currentCustomize: null  // 'pass1' or 'pass2'
+        currentCustomize: null,  // 'pass1' or 'pass2'
+        // CrispASR exe/args are shared across passes (single --crispasr-* CLI
+        // flags, like --xxl-exe). Backend is per-pass via the Model column.
+        crispasrExePath: '',
+        crispasrExtraArgs: ''
     },
 
     // Model options for different pipeline types
@@ -1285,6 +1307,17 @@ const EnsembleManager = {
         // can be added in v1.9.0 once a v1.8.14 benchmark cycle establishes
         // a quality baseline.
         { value: 'CohereLabs/cohere-transcribe-03-2026', label: 'Cohere-Transcribe-03-2026    ~4-8GB (gated)' }
+    ],
+    // CrispASR curated backend set (CL1, revised 2026-05-16). The per-pass
+    // "Model" column doubles as the CrispASR backend selector
+    // (--crispasr-backend). v1.9.0 first release: parakeet (default),
+    // whispercpp (alias of crispasr's whisper backend, large-v2), cohere.
+    // All emit native word timestamps; none needs a forced aligner.
+    // canary + kyutai-stt deferred (CL1(d)/(e)).
+    crispasrModels: [
+        { value: 'parakeet', label: 'parakeet (native word ts)' },
+        { value: 'whispercpp', label: 'whispercpp (whisper.cpp large-v2)' },
+        { value: 'cohere', label: 'cohere (native word ts)' }
     ],
 
     async init() {
@@ -1319,10 +1352,12 @@ const EnsembleManager = {
         this.state.pass1.isQwen = (this.state.pass1.pipeline === 'qwen' || this.state.pass1.pipeline === 'anime-whisper' || this.state.pass1.pipeline === 'cohere');
         this.state.pass1.isAnimeWhisper = this.state.pass1.pipeline === 'anime-whisper';
         this.state.pass1.isCohere = this.state.pass1.pipeline === 'cohere';
+        this.state.pass1.isCrispasr = this.state.pass1.pipeline === 'crispasr';
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper' || this.state.pass2.pipeline === 'cohere');
         this.state.pass2.isAnimeWhisper = this.state.pass2.pipeline === 'anime-whisper';
         this.state.pass2.isCohere = this.state.pass2.pipeline === 'cohere';
+        this.state.pass2.isCrispasr = this.state.pass2.pipeline === 'crispasr';
         this.state.pass2.isXxl = this.state.pass2.pipeline === 'xxl';
 
         // Load persisted BYOP preferences (XXL exe path, extra args)
@@ -1344,6 +1379,30 @@ const EnsembleManager = {
             // BYOP preferences not available — first run or backend not ready
         }
 
+        // Load persisted CrispASR preferences (exe path, extra args).
+        // Separate from BYOP — CrispASR is not BYOP/XXL coupled.
+        try {
+            const crispPrefs = await pywebview.api.get_crispasr_preferences();
+            if (crispPrefs) {
+                if (crispPrefs.crispasr_exe_path) {
+                    this.state.crispasrExePath = crispPrefs.crispasr_exe_path;
+                    ['crispasr-exe-path', 'crispasr-mode-exe-path'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = crispPrefs.crispasr_exe_path;
+                    });
+                }
+                if (crispPrefs.crispasr_extra_args) {
+                    this.state.crispasrExtraArgs = crispPrefs.crispasr_extra_args;
+                    ['crispasr-extra-args', 'crispasr-mode-extra-args'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = crispPrefs.crispasr_extra_args;
+                    });
+                }
+            }
+        } catch (e) {
+            // CrispASR preferences not available — first run or backend not ready
+        }
+
         // Swap model options for non-legacy passes.
         // Order matters: more specific ChronosJAV backends (anime-whisper, cohere)
         // must be checked before the isQwen umbrella, because isQwen is true
@@ -1352,6 +1411,8 @@ const EnsembleManager = {
             this.swapModelOptions('pass1', 'anime-whisper');
         } else if (this.state.pass1.isCohere) {
             this.swapModelOptions('pass1', 'cohere');
+        } else if (this.state.pass1.isCrispasr) {
+            this.swapModelOptions('pass1', 'crispasr');
         } else if (this.state.pass1.isQwen) {
             this.swapModelOptions('pass1', 'qwen');
         }
@@ -1359,6 +1420,8 @@ const EnsembleManager = {
             this.swapModelOptions('pass2', 'anime-whisper');
         } else if (this.state.pass2.isCohere) {
             this.swapModelOptions('pass2', 'cohere');
+        } else if (this.state.pass2.isCrispasr) {
+            this.swapModelOptions('pass2', 'crispasr');
         } else if (this.state.pass2.isQwen) {
             this.swapModelOptions('pass2', 'qwen');
         }
@@ -1453,6 +1516,38 @@ const EnsembleManager = {
             pywebview.api.save_byop_preferences({ xxl_extra_args: this.state.pass2.xxlExtraArgs });
         });
 
+        // CrispASR: shared exe path + extra args (not BYOP). Both the
+        // single-mode panel and the ensemble panel mirror the same state.
+        const syncCrispasrExe = (path) => {
+            this.state.crispasrExePath = path;
+            ['crispasr-exe-path', 'crispasr-mode-exe-path'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = path;
+            });
+            pywebview.api.save_crispasr_preferences({ crispasr_exe_path: path });
+        };
+        const syncCrispasrArgs = (val) => {
+            this.state.crispasrExtraArgs = val.trim();
+            ['crispasr-extra-args', 'crispasr-mode-extra-args'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.value !== this.state.crispasrExtraArgs) el.value = this.state.crispasrExtraArgs;
+            });
+            pywebview.api.save_crispasr_preferences({ crispasr_extra_args: this.state.crispasrExtraArgs });
+        };
+        ['crispasr-browse-btn', 'crispasr-mode-browse-btn'].forEach(id => {
+            document.getElementById(id)?.addEventListener('click', async () => {
+                try {
+                    const result = await pywebview.api.select_crispasr_exe();
+                    if (result.success && result.path) syncCrispasrExe(result.path);
+                } catch (e) {
+                    ConsoleManager.log(`Failed to browse for CrispASR: ${e.message}`, 'error');
+                }
+            });
+        });
+        ['crispasr-extra-args', 'crispasr-mode-extra-args'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', (e) => syncCrispasrArgs(e.target.value));
+        });
+
         // DSP effects checkbox handlers
         this.initDspCheckboxes();
         document.getElementById('pass2-model').addEventListener('change', (e) => {
@@ -1510,6 +1605,7 @@ const EnsembleManager = {
         this.updateBadges();
         this.updateRowGreyingState('pass1');
         this.updateRowGreyingState('pass2');
+        this.updateCrispasrPanel();
     },
 
     handlePipelineChange(passKey, newValue, selectElement) {
@@ -1520,17 +1616,20 @@ const EnsembleManager = {
         const isAnimeWhisper = newValue === 'anime-whisper';
         const isCohere = newValue === 'cohere';
         const isXxl = newValue === 'xxl';
+        const isCrispasr = newValue === 'crispasr';
         const wasTransformers = passState.isTransformers;
         const wasQwen = passState.isQwen;
         const wasAnimeWhisper = passState.isAnimeWhisper;
         const wasCohere = passState.isCohere;
+        const wasCrispasr = passState.isCrispasr;
 
         // Determine pipeline category for model swapping. Specific ChronosJAV
         // backends (anime-whisper, cohere) take precedence over the qwen umbrella.
-        const getPipelineType = (isT, isQ, isAW, isC) =>
-            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isQ ? 'qwen' : 'legacy')));
-        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper, wasCohere);
-        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper, isCohere);
+        // CrispASR is its own category (the Model column = backend selector).
+        const getPipelineType = (isT, isQ, isAW, isC, isCR) =>
+            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isCR ? 'crispasr' : (isQ ? 'qwen' : 'legacy'))));
+        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper, wasCohere, wasCrispasr);
+        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper, isCohere, isCrispasr);
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -1543,10 +1642,12 @@ const EnsembleManager = {
                 passState.isQwen = isQwen;
                 passState.isAnimeWhisper = isAnimeWhisper;
                 passState.isCohere = isCohere;
+                passState.isCrispasr = isCrispasr;
                 passState.isXxl = isXxl;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
                 this.updateByopPanel();
+                this.updateCrispasrPanel();
                 if (oldType !== newType) {
                     this.swapModelOptions(passKey, newType);
                 }
@@ -1562,9 +1663,11 @@ const EnsembleManager = {
             passState.isQwen = isQwen;
             passState.isAnimeWhisper = isAnimeWhisper;
             passState.isCohere = isCohere;
+            passState.isCrispasr = isCrispasr;
             passState.isXxl = isXxl;
             this.updateRowGreyingState(passKey);
             this.updateByopPanel();
+            this.updateCrispasrPanel();
             if (oldType !== newType) {
                 this.swapModelOptions(passKey, newType);
             }
@@ -1575,6 +1678,11 @@ const EnsembleManager = {
 
     // Set scene detector, segmenter, and sensitivity to appropriate defaults for the pipeline type
     applyPipelinePresets(passKey, pipelineType) {
+        // CrispASR is a self-contained external provider: WhisperJAV's
+        // scene/segmenter/sensitivity controls are inert (greyed by
+        // updateRowGreyingState), so there is nothing to preset here.
+        if (pipelineType === 'crispasr') return;
+
         const sceneSelect = document.getElementById(`${passKey}-scene`);
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
@@ -1632,7 +1740,7 @@ const EnsembleManager = {
     },
 
     // Swap model dropdown options based on pipeline type
-    // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere'
+    // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere' | 'crispasr'
     swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
         let models;
@@ -1649,6 +1757,9 @@ const EnsembleManager = {
                 break;
             case 'qwen':
                 models = this.qwenModels;
+                break;
+            case 'crispasr':
+                models = this.crispasrModels;
                 break;
             default:
                 models = this.legacyModels;
@@ -1704,6 +1815,37 @@ const EnsembleManager = {
             const guideBtn = document.getElementById(`guide-${passKey}`);
             if (guideBtn) guideBtn.style.display = 'none';
             this.updateDspPanel(passKey);
+            return;
+        }
+
+        // CrispASR (external provider): disable WhisperJAV scene/segmenter/
+        // sensitivity/enhancer/customize — the engine is self-contained. The
+        // Model column STAYS ENABLED because it is the CrispASR backend
+        // selector (--crispasr-backend), unlike XXL which disables it.
+        if (passState.isCrispasr) {
+            const crispTitle = 'Not applicable — CrispASR is a self-contained external provider';
+            sensitivitySelect.disabled = true;
+            sensitivitySelect.title = crispTitle;
+            segmenterSelect.disabled = true;
+            segmenterSelect.title = crispTitle;
+
+            const sceneSelect = document.getElementById(`${passKey}-scene`);
+            const enhancerSelect = document.getElementById(`${passKey}-enhancer`);
+            const modelSelect = document.getElementById(`${passKey}-model`);
+            const customizeBtn = document.getElementById(`customize-${passKey}`);
+            if (sceneSelect) { sceneSelect.disabled = true; sceneSelect.title = crispTitle; }
+            if (enhancerSelect) { enhancerSelect.disabled = true; enhancerSelect.title = crispTitle; }
+            // Model column = CrispASR backend selector → keep enabled.
+            if (modelSelect) {
+                modelSelect.disabled = (passKey === 'pass2' && !this.state.pass2.enabled);
+                modelSelect.title = 'CrispASR backend';
+            }
+            if (customizeBtn) { customizeBtn.disabled = true; customizeBtn.title = crispTitle; }
+
+            const guideBtn = document.getElementById(`guide-${passKey}`);
+            if (guideBtn) guideBtn.style.display = 'none';
+            this.updateDspPanel(passKey);
+            this.updateCrispasrPanel();
             return;
         }
 
@@ -1813,9 +1955,10 @@ const EnsembleManager = {
             mergeRow.classList.add('disabled');
         }
 
-        // Update DSP and BYOP panel visibility for Pass 2
+        // Update DSP and BYOP/CrispASR panel visibility for Pass 2
         this.updateDspPanel('pass2');
         this.updateByopPanel();
+        this.updateCrispasrPanel();
     },
 
     // DSP Effects Panel Management
@@ -1864,6 +2007,30 @@ const EnsembleManager = {
             }
             if (argsInput && !argsInput.value && this.state.pass2.xxlExtraArgs) {
                 argsInput.value = this.state.pass2.xxlExtraArgs;
+            }
+        }
+    },
+
+    // CrispASR Settings Panel Management (ensemble tab). Separate from the
+    // BYOP panel — shown when EITHER pass uses CrispASR (it can be pass 1
+    // or pass 2, unlike XXL which is pass-2 only).
+    updateCrispasrPanel() {
+        const panel = document.getElementById('crispasr-settings-panel');
+        if (!panel) return;
+
+        const showCrisp =
+            this.state.pass1.isCrispasr ||
+            (this.state.pass2.enabled && this.state.pass2.isCrispasr);
+        panel.style.display = showCrisp ? 'block' : 'none';
+
+        if (showCrisp) {
+            const pathInput = document.getElementById('crispasr-exe-path');
+            const argsInput = document.getElementById('crispasr-extra-args');
+            if (pathInput && !pathInput.value && this.state.crispasrExePath) {
+                pathInput.value = this.state.crispasrExePath;
+            }
+            if (argsInput && !argsInput.value && this.state.crispasrExtraArgs) {
+                argsInput.value = this.state.crispasrExtraArgs;
             }
         }
     },
@@ -5057,8 +5224,10 @@ const EnsembleManager = {
         // Helpers for pipeline-specific null handling:
         // - Sensitivity: null only for Transformers (Qwen now uses sensitivity presets)
         // - Segmenter: null for Transformers only (Qwen uses segmenter as post-ASR VAD filter)
-        const disableSensitivity = (passState) => passState.isTransformers;
-        const disableSegmenter = (passState) => passState.isTransformers;  // NOT Qwen!
+        // CrispASR is a self-contained external provider — like Transformers,
+        // WhisperJAV sensitivity/segmenter do not apply (sent as null).
+        const disableSensitivity = (passState) => passState.isTransformers || passState.isCrispasr;
+        const disableSegmenter = (passState) => passState.isTransformers || passState.isCrispasr;  // NOT Qwen!
 
         const config = {
             inputs: AppState.selectedFiles,
@@ -5077,6 +5246,8 @@ const EnsembleManager = {
                 isQwen: this.state.pass1.isQwen,
                 isAnimeWhisper: this.state.pass1.isAnimeWhisper,
                 isCohere: this.state.pass1.isCohere || false,
+                isCrispasr: this.state.pass1.isCrispasr || false,
+                crispasrBackend: this.state.pass1.isCrispasr ? this.state.pass1.model : null,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
                 enhanceForVad: this.state.pass1.enhanceForVad || false
             },
@@ -5095,6 +5266,8 @@ const EnsembleManager = {
                 isQwen: this.state.pass2.isQwen,
                 isAnimeWhisper: this.state.pass2.isAnimeWhisper,
                 isCohere: this.state.pass2.isCohere || false,
+                isCrispasr: this.state.pass2.isCrispasr || false,
+                crispasrBackend: this.state.pass2.isCrispasr ? this.state.pass2.model : null,
                 isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
                 enhanceForVad: this.state.pass2.enhanceForVad || false,
@@ -5102,6 +5275,10 @@ const EnsembleManager = {
                 xxlExe: this.state.pass2.isXxl ? this.state.pass2.xxlExePath : null,
                 xxlArgs: this.state.pass2.isXxl ? this.state.pass2.xxlExtraArgs : null
             },
+            // CrispASR exe/args are shared across passes (single --crispasr-*
+            // CLI flags). Per-pass backend rides crispasrBackend above.
+            crispasrExe: (this.state.pass1.isCrispasr || this.state.pass2.isCrispasr) ? (this.state.crispasrExePath || null) : null,
+            crispasrArgs: (this.state.pass1.isCrispasr || this.state.pass2.isCrispasr) ? (this.state.crispasrExtraArgs || null) : null,
             merge_strategy: this.state.mergeStrategy,
             serial_mode: this.state.serialMode,
             source_language: document.getElementById('source-language').value,
@@ -5147,6 +5324,14 @@ const EnsembleManager = {
                 pywebview.api.save_byop_preferences({
                     xxl_exe_path: this.state.pass2.xxlExePath,
                     xxl_extra_args: this.state.pass2.xxlExtraArgs || ''
+                });
+            }
+
+            // Persist CrispASR preferences (separate from BYOP)
+            if ((this.state.pass1.isCrispasr || this.state.pass2.isCrispasr) && this.state.crispasrExePath) {
+                pywebview.api.save_crispasr_preferences({
+                    crispasr_exe_path: this.state.crispasrExePath,
+                    crispasr_extra_args: this.state.crispasrExtraArgs || ''
                 });
             }
 
