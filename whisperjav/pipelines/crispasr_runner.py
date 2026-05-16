@@ -23,6 +23,7 @@ Durable record:  memory/feedback_crispasr_simple_standalone_pipeline.md
 """
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -155,13 +156,21 @@ def run_crispasr(
 
     start_time = time.monotonic()
 
-    # Stream stdout to the parent (visible in the GUI console) while
-    # capturing stderr separately for diagnostics on failure.
+    # CAPTURE stdout (not stream).  CrispASR reliably prints the full
+    # transcription to stdout in a fixed, documented format
+    # (``[HH:MM:SS.fff --> HH:MM:SS.fff]  text``, docs/plans/crispasr_v190
+    # 02b §1.6); the ``-osrt``/``-of`` file-output flags are version-fragile
+    # and were observed (2026-05-16 acceptance test T1) to produce NO file
+    # while the transcription still succeeded and went to stdout.  Susurrus —
+    # the reference Python consumer — likewise parses stdout for exactly this
+    # reason (02a §3 / 02b §4).  We therefore synthesise the SRT from stdout,
+    # keeping engine-written-file detection as a first-choice fallback for
+    # builds that DO honour ``-osrt``.
     # errors="replace" prevents UnicodeDecodeError when the external process
     # emits non-UTF-8 bytes (e.g. Windows system codepage for CJK filenames).
     result = subprocess.run(
         cmd,
-        stdout=sys.stdout,
+        stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
@@ -171,51 +180,113 @@ def run_crispasr(
     )
 
     elapsed = time.monotonic() - start_time
+    stdout_text = result.stdout or ""
+    stderr_text = result.stderr or ""
 
-    # Check for the SRT BEFORE checking the exit code.  CrispASR is built on
-    # the ggml / whisper.cpp stack which can crash in its C++ destructor on
-    # process shutdown (the same class of issue WhisperJAV's own Nuclear Exit
-    # solves) — the transcription completes and the SRT is written first.
+    # Echo the engine's stdout through so it still appears in the
+    # WhisperJAV/GUI console (we captured it instead of streaming).
+    if stdout_text:
+        print(stdout_text, end="" if stdout_text.endswith("\n") else "\n")
+
+    # Acquire the SRT BEFORE judging the exit code.  CrispASR is built on the
+    # ggml / whisper.cpp stack which can crash in its C++ destructor on
+    # process shutdown (the class of issue WhisperJAV's Nuclear Exit solves);
+    # the transcription completes first.
+    # 1) A file the engine wrote (if this build honours -osrt/-of).
     srt_path = _find_srt(output_dir, input_file, outbase)
+    # 2) Otherwise synthesise it from the captured stdout (the robust path).
+    if srt_path is None:
+        srt_path = _srt_from_stdout(stdout_text, outbase)
+
     if srt_path is not None:
         if result.returncode != 0:
             print(
                 f"[CrispASR] Warning: process exited non-zero "
-                f"(code {result.returncode}) but SRT was produced "
+                f"(code {result.returncode}) but a transcript was produced "
                 f"successfully ({elapsed:.1f}s)",
                 file=sys.stderr,
             )
         return srt_path
 
-    stderr_tail = (result.stderr or "(no stderr)")[-2000:]
+    tail = (stderr_text or stdout_text or "(no output)")[-2000:]
     if result.returncode != 0:
         raise RuntimeError(
-            f"CrispASR failed (exit {result.returncode}, {elapsed:.1f}s):\n{stderr_tail}"
+            f"CrispASR failed (exit {result.returncode}, {elapsed:.1f}s):\n{tail}"
         )
     raise RuntimeError(
-        f"CrispASR completed ({elapsed:.1f}s) but no SRT found in "
-        f"{output_dir}\n{stderr_tail}"
+        f"CrispASR completed ({elapsed:.1f}s) but produced no SRT file and "
+        f"no parseable transcript on stdout (output dir: {output_dir})\n{tail}"
     )
 
 
 def _find_srt(output_dir: str, input_file: str, outbase: str) -> Optional[Path]:
-    """Locate the SRT produced by crispasr.  Returns Path if non-empty, else None."""
+    """Locate an SRT the engine wrote.  Returns Path if non-empty, else None."""
+    in_parent = Path(input_file).parent
+    in_stem = Path(input_file).stem
+
     # 1. The exact -of target.
     expected = Path(outbase + ".srt")
     if expected.is_file() and expected.stat().st_size > 0:
         return expected
 
-    # 2. <input_stem>.srt in output_dir (defensive — naming may vary by version).
-    expected2 = Path(output_dir) / f"{Path(input_file).stem}.srt"
-    if expected2.is_file() and expected2.stat().st_size > 0:
-        return expected2
+    # 2. <input_stem>.srt in output_dir or next to the input (whisper.cpp
+    #    style — some builds write the SRT beside the input file).
+    for cand in (
+        Path(output_dir) / f"{in_stem}.srt",
+        in_parent / f"{in_stem}.srt",
+    ):
+        if cand.is_file() and cand.stat().st_size > 0:
+            return cand
 
-    # 3. Newest non-empty .srt anywhere in output_dir.
+    # 3. Newest non-empty .srt in output_dir or the input's directory.
     srts = sorted(
-        Path(output_dir).glob("*.srt"), key=os.path.getmtime, reverse=True
+        list(Path(output_dir).glob("*.srt")) + list(in_parent.glob("*.srt")),
+        key=os.path.getmtime,
+        reverse=True,
     )
     for s in srts:
         if s.stat().st_size > 0:
             return s
 
     return None
+
+
+# CrispASR stdout line: ``[H:MM:SS.fff --> H:MM:SS.fff]  text``
+# (period before ms, two spaces after ``]``; 02b §1.6 + Susurrus 02b §4).
+_TS_LINE_RE = re.compile(
+    r"^\s*\[\s*(\d+):(\d{2}):(\d{2})[.,](\d{1,3})\s*-->\s*"
+    r"(\d+):(\d{2}):(\d{2})[.,](\d{1,3})\s*\]\s*(.*)$"
+)
+
+
+def _fmt_ts(h: str, m: str, s: str, ms: str) -> str:
+    """`H, MM, SS, fff` strings -> SRT `HH:MM:SS,mmm`."""
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int(ms):03d}"
+
+
+def _srt_from_stdout(stdout_text: str, outbase: str) -> Optional[Path]:
+    """Parse the engine's stdout transcript lines and write an SRT.
+
+    Returns the written Path, or None if no parseable lines were found.
+    """
+    blocks = []
+    for line in stdout_text.splitlines():
+        mobj = _TS_LINE_RE.match(line)
+        if not mobj:
+            continue
+        text = (mobj.group(9) or "").strip()
+        if not text:
+            continue
+        start = _fmt_ts(*mobj.group(1, 2, 3, 4))
+        end = _fmt_ts(*mobj.group(5, 6, 7, 8))
+        blocks.append((start, end, text))
+
+    if not blocks:
+        return None
+
+    srt_path = Path(outbase + ".srt")
+    srt_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(srt_path, "w", encoding="utf-8") as fh:
+        for idx, (start, end, text) in enumerate(blocks, 1):
+            fh.write(f"{idx}\n{start} --> {end}\n{text}\n\n")
+    return srt_path
