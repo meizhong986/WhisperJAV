@@ -24,6 +24,7 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
 )
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+from whisperjav.pipelines.sensevoice_pipeline import SenseVoicePipeline
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -37,6 +38,7 @@ PIPELINE_CLASSES = {
     "kotoba-faster-whisper": KotobaFasterWhisperPipeline,
     "transformers": TransformersPipeline,
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
+    "sensevoice": SenseVoicePipeline,  # FunASR SenseVoice (issue #350)
 }
 
 DEFAULT_HF_PARAMS = {
@@ -366,6 +368,74 @@ def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     for key, hf_key in override_mapping.items():
         if key in overrides:
             params[hf_key] = overrides[key]
+
+    return params
+
+
+# Default SenseVoice parameters (issue #350)
+DEFAULT_SV_PARAMS = {
+    "sv_model_id": "iic/SenseVoiceSmall",
+    "sv_device": "auto",
+    "sv_language": "ja",
+    "sv_use_itn": True,
+    "sv_vad_model": "fsmn-vad",
+    "sv_scene": "auditok",
+    "sv_task": "transcribe",
+    # Post-processing (relaxed for SenseVoice — Whisper-tuned filters over-remove
+    # its per-scene short lines). (#350)
+    "sv_remove_hallucinations": False,
+    "sv_remove_repetitions": True,
+    "sv_remove_cps_outliers": False,
+    "sv_diarize": False,
+}
+
+
+def prepare_sensevoice_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return sv_* parameters for the SenseVoice pipeline with overrides applied."""
+    params = DEFAULT_SV_PARAMS.copy()
+
+    # The customize modal sends its values via the generic "params" dict; the
+    # CLI/legacy paths may use "sensevoice_params"/"sv_params". Merge all.
+    sv_params = {
+        **(pass_config.get("params") or {}),
+        **(pass_config.get("sensevoice_params") or {}),
+        **(pass_config.get("sv_params") or {}),
+    }
+    mapping = {
+        "model_id": "sv_model_id",
+        "device": "sv_device",
+        "language": "sv_language",
+        "use_itn": "sv_use_itn",
+        "ban_emo_unk": "sv_ban_emo_unk",
+        "vad_model": "sv_vad_model",
+        "merge_vad": "sv_merge_vad",
+        "merge_length_s": "sv_merge_length_s",
+        "vad_max_segment_ms": "sv_vad_max_segment_ms",
+        "batch_size_s": "sv_batch_size_s",
+        "bsrf_overlap": "sv_bsrf_overlap",
+        "scene": "sv_scene",
+        "task": "sv_task",
+        "remove_hallucinations": "sv_remove_hallucinations",
+        "remove_repetitions": "sv_remove_repetitions",
+        "remove_cps_outliers": "sv_remove_cps_outliers",
+        "diarize": "sv_diarize",
+        "spk_num": "sv_spk_num",
+    }
+    for key, value in sv_params.items():
+        if key in mapping:
+            params[mapping[key]] = value
+        elif key.startswith("sv_"):
+            params[key] = value
+
+    overrides = pass_config.get("overrides") or {}
+    override_mapping = {
+        "language": "sv_language",
+        "device": "sv_device",
+        "task": "sv_task",
+    }
+    for key, sv_key in override_mapping.items():
+        if key in overrides:
+            params[sv_key] = overrides[key]
 
     return params
 
@@ -1296,6 +1366,75 @@ def _build_pipeline(
             logger.error(
                 "[Worker %s] Pass %s: FAILED to create QwenPipeline - %s: %s",
                 os.getpid(), pass_number, type(e).__name__, e
+            )
+            raise
+
+    # SenseVoice pipeline (FunASR, issue #350) — uses sv_* kwargs, not legacy config
+    if pipeline_name == "sensevoice":
+        sv_defaults = prepare_sensevoice_params(pass_config)
+        sv_defaults["sv_task"] = asr_task
+        # Apply GUI-specified overrides. The ensemble Model dropdown defaults to
+        # Whisper model ids (large-v2/turbo) for "legacy" pipelines; only honour
+        # a model override that is actually a FunASR/SenseVoice model id, so a
+        # stale Whisper id doesn't get forwarded to SenseVoice.
+        _model = pass_config.get("model")
+        if _model and ("sensevoice" in _model.lower() or "/" in _model):
+            sv_defaults["sv_model_id"] = _model
+            logger.debug("Pass %s: Override sv_model_id = %s", pass_number, _model)
+        elif _model:
+            logger.debug(
+                "Pass %s: Ignoring non-SenseVoice model override '%s'; using %s",
+                pass_number, _model, sv_defaults["sv_model_id"],
+            )
+        if pass_config.get("scene_detector") and pass_config["scene_detector"] != "none":
+            sv_defaults["sv_scene"] = pass_config["scene_detector"]
+            logger.debug("Pass %s: Override sv_scene = %s", pass_number, pass_config["scene_detector"])
+        elif pass_config.get("scene_detector") == "none":
+            sv_defaults["sv_scene"] = "none"
+        if pass_config.get("language"):
+            sv_defaults["sv_language"] = pass_config["language"]
+            logger.debug("Pass %s: Override sv_language = %s", pass_number, pass_config["language"])
+        # The Speech Segmenter dropdown is repurposed for SenseVoice to toggle
+        # its internal FunASR VAD (fsmn-vad). "none" disables it; anything else
+        # (or unset) keeps fsmn-vad on.
+        _seg = pass_config.get("speech_segmenter")
+        if _seg == "none":
+            sv_defaults["sv_vad_model"] = None
+            logger.debug("Pass %s: SenseVoice internal VAD disabled (segmenter=none)", pass_number)
+        elif _seg:
+            sv_defaults["sv_vad_model"] = "fsmn-vad"
+        # Speech enhancer (e.g. bs-roformer:vocals) — cleans audio before ASR.
+        if pass_config.get("speech_enhancer"):
+            _enh_backend, _enh_model = _parse_speech_enhancer(pass_config["speech_enhancer"])
+            sv_defaults["sv_speech_enhancer"] = _enh_backend
+            if _enh_model:
+                sv_defaults["sv_speech_enhancer_model"] = _enh_model
+            logger.debug("Pass %s: SenseVoice enhancer = %s (model=%s)", pass_number, _enh_backend, _enh_model)
+        logger.debug(
+            "[Worker %s] Pass %s: Creating SenseVoicePipeline with sv_model_id=%s, sv_language=%s, sv_scene=%s, sv_vad_model=%s",
+            os.getpid(), pass_number,
+            sv_defaults.get("sv_model_id"), sv_defaults.get("sv_language"),
+            sv_defaults.get("sv_scene"), sv_defaults.get("sv_vad_model"),
+        )
+        try:
+            pipeline = SenseVoicePipeline(
+                output_dir=output_dir,
+                temp_dir=str(pass_temp_dir),
+                keep_temp_files=keep_temp_files,
+                progress_display=None,
+                subs_language=subs_language,
+                parameter_tracer=tracer,
+                **sv_defaults,
+            )
+            logger.debug(
+                "[Worker %s] Pass %s: SenseVoicePipeline created successfully",
+                os.getpid(), pass_number,
+            )
+            return pipeline
+        except Exception as e:
+            logger.error(
+                "[Worker %s] Pass %s: FAILED to create SenseVoicePipeline - %s: %s",
+                os.getpid(), pass_number, type(e).__name__, e,
             )
             raise
 

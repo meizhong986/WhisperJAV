@@ -112,9 +112,17 @@ class SRTPostProcessor:
         # Korean and Chinese use the same sanitizer - Japanese-specific patterns
         # simply won't match Hangul/Han characters and pass through unchanged
         if language in ('ja', 'ko', 'zh'):
+            # remove_hallucinations gates all three phrase-matching modes
+            # (exact/regex/fuzzy); remove_cps_outliers gates the abnormal-CPS
+            # drop. Non-autoregressive backends (SenseVoice) pass these False to
+            # avoid Whisper-tuned filters dropping their per-scene short lines.
+            _hall = kwargs.get('remove_hallucinations', True)
             config = SanitizationConfig(
-                enable_exact_matching=kwargs.get('remove_hallucinations', True),
+                enable_exact_matching=_hall,
+                enable_regex_matching=_hall,
+                enable_fuzzy_matching=_hall,
                 enable_repetition_cleaning=kwargs.get('remove_repetitions', True),
+                enable_cps_filter=kwargs.get('remove_cps_outliers', True),
                 repetition_threshold=kwargs.get('repetition_threshold', 2),
                 min_subtitle_duration=kwargs.get('min_subtitle_duration', 0.5),
                 max_subtitle_duration=kwargs.get('max_subtitle_duration', 7.0),

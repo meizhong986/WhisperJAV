@@ -162,7 +162,7 @@ def parse_arguments():
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen"], default="balanced",
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen", "sensevoice"], default="balanced",
                        help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
@@ -192,7 +192,7 @@ def parse_arguments():
                                help="Enable two-pass ensemble mode")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "sensevoice"],
                                help="Pipeline for pass 1 (default: balanced)")
     twopass_group.add_argument("--pass1-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -222,7 +222,7 @@ def parse_arguments():
                                help="Speech padding in ms for pass 1")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl"],
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "sensevoice", "xxl"],
                                help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe)")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
@@ -370,6 +370,20 @@ def parse_arguments():
                              choices=["true", "false"],
                              metavar="BOOL",
                              help="Enable/disable conditioning on previous text (default: mode-dependent)")
+    tuning_group.add_argument("--batched-pipeline",
+                             type=str, default=None,
+                             choices=["true", "false"],
+                             metavar="BOOL",
+                             help=(
+                                 "Use faster-whisper BatchedInferencePipeline to batch the "
+                                 "encoder across VAD groups in the balanced pipeline "
+                                 "(5-20x transcription speedup, on by default). "
+                                 "Set to false to use the legacy sequential per-segment path."
+                             ))
+    tuning_group.add_argument("--batch-size",
+                             type=int, default=None,
+                             metavar="INT",
+                             help="Number of VAD groups decoded in parallel when --batched-pipeline is on (default: 8)")
 
     # Async processing
     async_group = parser.add_argument_group("Processing Options")
@@ -502,6 +516,74 @@ def parse_arguments():
     hf_group.add_argument("--hf-dtype", type=str, default="auto",
                          choices=["auto", "float16", "bfloat16", "float32"],
                          help="Data type (default: auto)")
+
+    # ── SenseVoice Mode (--mode sensevoice) ─────────────────────────────
+    sv_group = parser.add_argument_group("SenseVoice Mode Options (--mode sensevoice)")
+    sv_group.add_argument("--sv-model-id", type=str, default="iic/SenseVoiceSmall",
+                         help="FunASR/ModelScope model id (default: iic/SenseVoiceSmall)")
+    sv_group.add_argument("--sv-language", type=str, default="ja",
+                         choices=["ja", "en", "zh", "yue", "ko", "auto"],
+                         help="Source language (default: ja). 'auto' = detect.")
+    sv_group.add_argument("--sv-scene", type=str, default="auditok",
+                         choices=["none", "auditok", "silero", "semantic"],
+                         help="Scene detection method providing subtitle granularity (default: auditok)")
+    sv_group.add_argument("--sv-device", type=str, default="auto",
+                         choices=["auto", "cuda", "cpu"],
+                         help="Device to use (default: auto)")
+    sv_group.add_argument("--sv-no-itn", action="store_true",
+                         help="Disable inverse text normalization (punctuation/number formatting)")
+    sv_group.add_argument("--sv-no-vad", action="store_true",
+                         help="Disable SenseVoice's internal FunASR VAD chunking")
+    sv_group.add_argument("--sv-speech-enhancer", type=str, default="none",
+                         metavar="BACKEND",
+                         help=(
+                             "Speech enhancer applied BEFORE SenseVoice transcribes "
+                             "(none/clearvoice/bs-roformer/zipenhancer/ffmpeg-dsp). "
+                             "bs-roformer isolates vocals from music/background — helps "
+                             "noisy scenes. Format: 'bs-roformer' or 'bs-roformer:vocals'. Default: none"
+                         ))
+    sv_group.add_argument("--sv-speech-enhancer-model", type=str, default=None,
+                         metavar="MODEL",
+                         help="Speech enhancer model variant (e.g. 'vocals' for bs-roformer)")
+    sv_group.add_argument("--sv-bsrf-overlap", type=int, default=None,
+                         metavar="INT",
+                         help=(
+                             "BS-RoFormer chunk overlap (speed/quality knob). Default 2 "
+                             "(per model config). Lower (e.g. 1) ~halves separation time at "
+                             "a small quality cost; higher is slower/cleaner. Only applies "
+                             "when --sv-speech-enhancer is bs-roformer."
+                         ))
+    # Post-processing controls. The shared sanitizer is Whisper-tuned and over-
+    # removes SenseVoice lines; these default OFF (relaxed) for SenseVoice and
+    # can be turned back on. (#350)
+    sv_group.add_argument("--sv-remove-hallucinations", action="store_true",
+                         help=("Apply the Whisper hallucination blacklist (exact/regex/fuzzy) "
+                               "to SenseVoice output. OFF by default — SenseVoice's short "
+                               "utterances collide with Whisper-tuned phrases and get dropped."))
+    sv_group.add_argument("--sv-no-remove-repetitions", action="store_true",
+                         help="Disable repetition cleaning for SenseVoice (on by default).")
+    sv_group.add_argument("--sv-remove-cps-outliers", action="store_true",
+                         help=("Apply the abnormal-CPS (too-fast/too-slow) line drop to "
+                               "SenseVoice. OFF by default — SenseVoice spans a whole "
+                               "utterance across the scene, so genuine short lines look "
+                               "'too slow' and would be removed."))
+    sv_group.add_argument("--sv-diarize", action="store_true",
+                         help=("Enable speaker diarization (FunASR cam++). Adds "
+                               "per-sentence [spkN] labels. Runs SenseVoice on the "
+                               "full audio (scene detection is auto-disabled) so "
+                               "speaker ids stay consistent; downloads the cam++ "
+                               "model (~ModelScope) on first use."))
+    sv_group.add_argument("--sv-spk-num", type=int, default=None, metavar="N",
+                         help=("Force a fixed speaker count for diarization "
+                               "(0/unset = cam++ auto-estimate, which often "
+                               "collapses to 1 on breathy/monologue audio; set 2+ "
+                               "when you know the scene's speaker count)."))
+    sv_group.add_argument("--sv-params", default=None, metavar="JSON",
+                         help=("JSON dict of SenseVoice customize-modal params "
+                               "(use_itn, ban_emo_unk, merge_vad, merge_length_s, "
+                               "vad_max_segment_ms, batch_size_s, diarize, "
+                               "bsrf_overlap). Used by the GUI single-pass path; "
+                               "merges over the individual --sv-* flags."))
 
     # ── Qwen3-ASR: Model ────────────────────────────────────────────────
     qwen_model_group = parser.add_argument_group("Qwen3-ASR: Model")
@@ -1225,6 +1307,74 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode
+    elif args.mode == "sensevoice":
+        # SenseVoice (FunASR) pipeline (issue #350)
+        from whisperjav.pipelines.sensevoice_pipeline import SenseVoicePipeline
+        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+
+        sv_kwargs = dict(
+            output_dir=initial_output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp,
+            save_metadata_json=getattr(args, 'debug', False),
+            progress_display=progress,
+            sv_model_id=getattr(args, 'sv_model_id', 'iic/SenseVoiceSmall'),
+            sv_device=getattr(args, 'sv_device', 'auto'),
+            sv_language=getattr(args, 'sv_language', 'ja'),
+            sv_use_itn=not getattr(args, 'sv_no_itn', False),
+            sv_vad_model=None if getattr(args, 'sv_no_vad', False) else 'fsmn-vad',
+            sv_scene=getattr(args, 'sv_scene', 'auditok'),
+            sv_task='translate' if args.subs_language == 'direct-to-english' else 'transcribe',
+            sv_speech_enhancer=(getattr(args, 'sv_speech_enhancer', 'none') or 'none').split(':', 1)[0],
+            sv_speech_enhancer_model=(
+                # Prefer 'backend:model' inline form; fall back to the explicit flag.
+                (getattr(args, 'sv_speech_enhancer', '') or '').split(':', 1)[1]
+                if ':' in (getattr(args, 'sv_speech_enhancer', '') or '')
+                else getattr(args, 'sv_speech_enhancer_model', None)
+            ),
+            sv_bsrf_overlap=getattr(args, 'sv_bsrf_overlap', None),
+            sv_remove_hallucinations=getattr(args, 'sv_remove_hallucinations', False),
+            sv_remove_repetitions=not getattr(args, 'sv_no_remove_repetitions', False),
+            sv_remove_cps_outliers=getattr(args, 'sv_remove_cps_outliers', False),
+            sv_diarize=getattr(args, 'sv_diarize', False),
+            sv_spk_num=getattr(args, 'sv_spk_num', None),
+            subs_language=args.subs_language,
+        )
+
+        # --sv-params: JSON dict of customize-modal params (GUI single-pass path).
+        # Maps each modal key to its sv_* constructor kwarg and overlays the
+        # individual --sv-* flags above. Mirrors the ensemble --passN-params path.
+        sv_params_raw = getattr(args, 'sv_params', None)
+        if sv_params_raw:
+            import json as _json
+            try:
+                _sv_params = _json.loads(sv_params_raw)
+            except Exception as e:
+                logger.error(f"Invalid JSON in --sv-params: {e}")
+                _sv_params = {}
+            _modal_to_kw = {
+                "model_id": "sv_model_id",
+                "device": "sv_device",
+                "scene": "sv_scene",
+                "use_itn": "sv_use_itn",
+                "ban_emo_unk": "sv_ban_emo_unk",
+                "merge_vad": "sv_merge_vad",
+                "merge_length_s": "sv_merge_length_s",
+                "vad_max_segment_ms": "sv_vad_max_segment_ms",
+                "batch_size_s": "sv_batch_size_s",
+                "bsrf_overlap": "sv_bsrf_overlap",
+                "diarize": "sv_diarize",
+                "spk_num": "sv_spk_num",
+                "remove_hallucinations": "sv_remove_hallucinations",
+                "remove_repetitions": "sv_remove_repetitions",
+                "remove_cps_outliers": "sv_remove_cps_outliers",
+            }
+            for _k, _v in _sv_params.items():
+                if _k in _modal_to_kw:
+                    sv_kwargs[_modal_to_kw[_k]] = _v
+
+        pipeline = SenseVoicePipeline(**sv_kwargs)
+        effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
         effective_mode = args.mode
@@ -1763,6 +1913,11 @@ def main():
             resolved_config = None
             logger.debug("Qwen mode: skipping legacy config resolution (uses --qwen-* args)")
 
+        elif args.mode == "sensevoice":
+            # SenseVoice mode: uses dedicated --sv-* arguments, not legacy config
+            resolved_config = None
+            logger.debug("SenseVoice mode: skipping legacy config resolution (uses --sv-* args)")
+
         else:
             # Legacy mode: use pipeline resolver
             resolved_config = resolve_legacy_pipeline(
@@ -1942,6 +2097,24 @@ def main():
                 resolved_config["params"]["decoder"] = {}
             resolved_config["params"]["decoder"]["condition_on_previous_text"] = condition_bool
             logger.info(f"Condition on previous text set via CLI: {condition_bool}")
+
+        # Batched transcription pipeline (issue #357) — balanced pipeline only.
+        # Routed into provider params, where FasterWhisperProASR reads it.
+        batched_pipeline = getattr(args, 'batched_pipeline', None)
+        if batched_pipeline is not None:
+            batched_bool = batched_pipeline.lower() == "true"
+            if "provider" not in resolved_config["params"]:
+                resolved_config["params"]["provider"] = {}
+            resolved_config["params"]["provider"]["use_batched_pipeline"] = batched_bool
+            logger.info(f"Batched inference pipeline set via CLI: {batched_bool}")
+
+        batch_size = getattr(args, 'batch_size', None)
+        if batch_size is not None:
+            batch_size = max(1, batch_size)
+            if "provider" not in resolved_config["params"]:
+                resolved_config["params"]["provider"] = {}
+            resolved_config["params"]["provider"]["batch_size"] = batch_size
+            logger.info(f"Batched pipeline batch size set via CLI: {batch_size}")
 
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
