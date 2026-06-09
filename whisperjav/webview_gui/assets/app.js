@@ -304,6 +304,9 @@ const SenseVoiceManager = {
     params: null,
     customized: false,
     defaults: {
+        model_id: 'iic/SenseVoiceSmall',
+        device: 'auto',
+        scene: 'auditok',
         use_itn: true,
         ban_emo_unk: false,
         merge_vad: true,
@@ -3060,9 +3063,15 @@ const EnsembleManager = {
     },
 
     generateSenseVoiceForm(schema, currentValues) {
-        // Use two existing tab slots: 'quality' -> Decoding, 'segmenter' -> VAD.
-        // Hide all the other tabs (model/enhancer/scene/context).
-        const tabMap = { quality: 'Decoding', segmenter: 'VAD' };
+        // Mirror the Transformers modal layout: Model / Quality / Chunking /
+        // Enhancer / Scene in the five standard tab slots; context stays hidden.
+        const tabMap = {
+            model: 'Model',
+            quality: 'Quality',
+            segmenter: 'Chunking',
+            enhancer: 'Enhancer',
+            scene: 'Scene'
+        };
         ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'].forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (panel) panel.innerHTML = '';
@@ -3072,6 +3081,22 @@ const EnsembleManager = {
                 else { btn.style.display = 'none'; }
             }
         });
+
+        // Model tab: model id + device. NOTE: in ensemble the main-tab Model
+        // dropdown overrides model_id (pass_worker applies it after modal
+        // params); device has no main-tab equivalent so it always applies.
+        const modelTab = document.getElementById('tab-model');
+        const secM = schema.model || {};
+        if (secM.model_id) {
+            modelTab.appendChild(this.createTransformersDropdown('model_id', secM.model_id.label,
+                secM.model_id.options, currentValues.model_id || secM.model_id.default,
+                'FunASR/ModelScope model id. The Model dropdown on the main Ensemble row takes precedence when set.'));
+        }
+        if (secM.device) {
+            modelTab.appendChild(this.createTransformersDropdown('device', secM.device.label,
+                secM.device.options, currentValues.device || secM.device.default,
+                'Compute device (auto will detect GPU availability)'));
+        }
 
         const decoding = document.getElementById('tab-quality');
         const sec1 = schema.decoding || {};
@@ -3126,12 +3151,18 @@ const EnsembleManager = {
             bs.min, bs.max, bs.step, currentValues.batch_size_s ?? bs.default,
             'FunASR batch_size_s: total audio-seconds decoded per dynamic batch. Higher = faster throughput but more VRAM. Independent of subtitle timing.'));
 
-        // BS-RoFormer overlap (only meaningful when the BS-RoFormer enhancer is
-        // selected for this pass). Gated behind an enable checkbox so that when
-        // no speech enhancement is used we don't emit a floating bsrf_overlap
-        // into --passN-params. The gating checkbox is consumed locally and is
-        // NOT collected as a param (see applyCustomization's data-gating-toggle
+        // Enhancer tab: enhancer selection itself lives on the main Ensemble
+        // row (like Transformers); the modal only exposes the BS-RoFormer
+        // overlap knob. Gated behind an enable checkbox so that when no speech
+        // enhancement is used we don't emit a floating bsrf_overlap into
+        // --passN-params. The gating checkbox is consumed locally and is NOT
+        // collected as a param (see applyCustomization's data-gating-toggle
         // handling); the slider is skipped entirely when the box is unchecked.
+        const enhTab = document.getElementById('tab-enhancer');
+        const enhNote = document.createElement('p');
+        enhNote.className = 'tab-empty';
+        enhNote.innerHTML = 'Speech enhancement is selected in the main Ensemble tab.<br>This tab only tunes the BS-RoFormer enhancer when it is selected there.';
+        enhTab.appendChild(enhNote);
         const enhSec = schema.enhancer || {};
         if (enhSec.bsrf_overlap) {
             const ov = enhSec.bsrf_overlap;
@@ -3140,12 +3171,12 @@ const EnsembleManager = {
             const gate = this.createParamGateToggle('enable_bsrf_overlap',
                 'Override BS-RoFormer overlap', overlapEnabled,
                 'Only applies when this pass uses the BS-RoFormer speech enhancer. Leave off to use its default overlap (2).');
-            vad.appendChild(gate);
-            vad.appendChild(this.createTransformersSlider('bsrf_overlap', ov.label,
+            enhTab.appendChild(gate);
+            enhTab.appendChild(this.createTransformersSlider('bsrf_overlap', ov.label,
                 ov.min, ov.max, ov.step, currentValues.bsrf_overlap ?? ov.default,
                 'BS-RoFormer chunk overlap — lower = faster separation, slight quality cost (only used when Speech Enhancer = BS-RoFormer)'));
             // Tie the slider control to the gate so the collector skips it when off.
-            const ovCtrl = vad.querySelector('.param-control[data-param="bsrf_overlap"]');
+            const ovCtrl = enhTab.querySelector('.param-control[data-param="bsrf_overlap"]');
             if (ovCtrl) {
                 ovCtrl.dataset.gatedBy = 'enable_bsrf_overlap';
                 ovCtrl.style.opacity = overlapEnabled ? '1' : '0.5';
@@ -3163,13 +3194,25 @@ const EnsembleManager = {
             }
         }
 
+        // Scene tab. NOTE: in ensemble the main-tab Scene Detector dropdown
+        // overrides this when set (pass_worker applies it after modal params)
+        // — same precedence as the Transformers modal's Scene tab.
+        const sceneTab = document.getElementById('tab-scene');
+        const secSc = schema.scene || {};
+        if (secSc.scene) {
+            sceneTab.appendChild(this.createTransformersDropdown('scene', secSc.scene.label,
+                secSc.scene.options, currentValues.scene || secSc.scene.default,
+                'Split audio into scenes before transcription — this sets subtitle granularity for SenseVoice. The Scene Detector dropdown on the main Ensemble row takes precedence when set.'));
+        }
+
         // Mark integer sliders so applyCustomization parses them as ints.
-        ['merge_length_s', 'vad_max_segment_ms', 'batch_size_s', 'bsrf_overlap'].forEach(p => {
-            const ctrl = document.querySelector(`#tab-segmenter .param-control[data-param="${p}"]`);
+        [['tab-segmenter', 'merge_length_s'], ['tab-segmenter', 'vad_max_segment_ms'],
+         ['tab-segmenter', 'batch_size_s'], ['tab-enhancer', 'bsrf_overlap']].forEach(([tabId, p]) => {
+            const ctrl = document.querySelector(`#${tabId} .param-control[data-param="${p}"]`);
             if (ctrl) ctrl.dataset.originalType = 'int';
         });
 
-        this.switchModalTab('quality');
+        this.switchModalTab('model');
     },
 
     // Generic checkbox control (no Transformers-specific helper exists).

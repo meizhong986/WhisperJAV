@@ -1353,6 +1353,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 logger.error(f"Invalid JSON in --sv-params: {e}")
                 _sv_params = {}
             _modal_to_kw = {
+                "model_id": "sv_model_id",
+                "device": "sv_device",
+                "scene": "sv_scene",
                 "use_itn": "sv_use_itn",
                 "ban_emo_unk": "sv_ban_emo_unk",
                 "merge_vad": "sv_merge_vad",

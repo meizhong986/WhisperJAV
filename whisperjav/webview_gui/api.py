@@ -1921,10 +1921,50 @@ class WhisperJAVAPI:
             (60s) for long audio. Segments longer than this are truncated.
           - batch_size_s: dynamic batch size (throughput vs VRAM)
         Defaults mirror modules/sensevoice_asr.py.
+
+        Tab layout mirrors the Transformers modal (Model / Quality / Chunking /
+        Enhancer / Scene). NOTE: in ensemble, the main-tab Model and Scene
+        Detector dropdowns take precedence over the modal's model_id/scene
+        (pass_worker applies pass_config overrides after modal params) — the
+        modal descriptions say so.
         """
         return {
             "success": True,
             "schema": {
+                "model": {
+                    "model_id": {
+                        "type": "dropdown",
+                        "label": "ASR Model",
+                        "options": [
+                            {"value": "iic/SenseVoiceSmall",
+                             "label": "SenseVoice Small (~1GB VRAM)"},
+                        ],
+                        "default": "iic/SenseVoiceSmall",
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "options": [
+                            {"value": "auto", "label": "Auto (detect GPU)"},
+                            {"value": "cuda", "label": "CUDA (GPU)"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto",
+                    },
+                },
+                "scene": {
+                    "scene": {
+                        "type": "dropdown",
+                        "label": "Scene Detection Method",
+                        "options": [
+                            {"value": "auditok", "label": "Auditok (energy-based)"},
+                            {"value": "silero", "label": "Silero (VAD-based)"},
+                            {"value": "semantic", "label": "Semantic"},
+                            {"value": "none", "label": "None (process whole file)"},
+                        ],
+                        "default": "auditok",
+                    },
+                },
                 "decoding": {
                     "use_itn": {
                         "type": "checkbox",
