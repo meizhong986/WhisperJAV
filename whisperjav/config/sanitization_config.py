@@ -20,6 +20,11 @@ class SanitizationConfig:
     enable_fuzzy_matching: bool = True
     enable_repetition_cleaning: bool = True
     enable_cross_subtitle: bool = True
+    # Abnormal-CPS removal (too-fast / too-slow-short-text drop). On by default
+    # to preserve Whisper behavior. Non-autoregressive backends like SenseVoice
+    # span a whole utterance across the scene duration, so genuine short lines
+    # read as "too slow" and get dropped — those backends turn this off.
+    enable_cps_filter: bool = True
     
     # Customizable thresholds
     repetition_threshold: Optional[int] = None
