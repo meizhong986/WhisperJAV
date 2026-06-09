@@ -188,9 +188,24 @@ body {
 
 .app-main {
     flex: 1;
+    min-height: 0;  /* allow children to shrink/grow inside the flex column */
     overflow-y: auto;
     padding: 8px 12px;  /* AGGRESSIVE: Reduced from 10px 14px */
     background: var(--content-area-bg);
+    /* Flex column so the console section can grow to fill leftover vertical
+       space instead of stopping at a fixed height (grey gap below console). */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Upper sections keep their natural height; only the console grows. Without
+   this, making .app-main a flex column would let the content sections be
+   squished when the window is short. */
+.app-main > .source-section,
+.app-main > .destination-section,
+.app-main > .tabs-section,
+.app-main > .run-section {
+    flex-shrink: 0;
 }
 
 .app-footer {
@@ -865,6 +880,7 @@ body {
    ============================================================ */
 .console-section {
     flex: 1;
+    min-height: 0;  /* let the flex child (console) own the scroll, not overflow the column */
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
@@ -872,6 +888,7 @@ body {
 
 .console-section .section-content {
     flex: 1;
+    min-height: 0;  /* same: required for .console-output overflow-y to work when tall */
     display: flex;
     padding: 0;
 }
@@ -887,8 +904,11 @@ body {
     white-space: pre-wrap;
     word-wrap: break-word;
     line-height: 1.45;  /* AGGRESSIVE: Slightly reduced from 1.5 */
-    min-height: 280px;  /* AGGRESSIVE: INCREASED from 250px (more console space!) */
-    max-height: 400px;  /* Fixed height for dedicated scrollbar and auto-scroll */
+    min-height: 200px;  /* Floor for short windows (then .app-main scrolls) */
+    /* No max-height: flex:1 (via .console-section/.section-content) lets the
+       console fill all leftover vertical space down to the footer, so there's
+       no grey gap below it on tall windows. Its own overflow-y keeps the log
+       scrollable + auto-scrolling. */
     scroll-behavior: smooth;  /* Smooth auto-scroll animation */
 }
 

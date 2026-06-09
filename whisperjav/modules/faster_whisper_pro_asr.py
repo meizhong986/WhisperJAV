@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union, Optional, Any
 import gc
 import torch
-from faster_whisper import WhisperModel
+from faster_whisper import WhisperModel, BatchedInferencePipeline
 import soundfile as sf
 import numpy as np
 import srt
@@ -165,6 +165,9 @@ class FasterWhisperProASR:
         self.whisper_params.pop("logprob_margin", None)
         self.whisper_params.pop("drop_nonverbal_vocals", None)
         self.whisper_params.pop("post_model_filter_enabled", None)
+        # Batched-pipeline controls are consumed here, not by transcribe()
+        self.whisper_params.pop("use_batched_pipeline", None)
+        self.whisper_params.pop("batch_size", None)
 
         # Ensure task is set correctly
         self.whisper_params['task'] = task
@@ -172,6 +175,28 @@ class FasterWhisperProASR:
 
         # Store task for metadata
         self.task = task
+
+        # --- Batched transcription (issue #357) ---
+        # Use faster-whisper's BatchedInferencePipeline to batch the encoder
+        # across all VAD groups in a single call (5-20x speedup vs the sequential
+        # per-group loop). External speech segmentation, timestamp offsets, and
+        # the downstream segment filtering are all preserved: the VAD groups are
+        # passed as clip_timestamps so the pipeline batches over *our* segments
+        # rather than running its own internal VAD.
+        # Can be disabled via provider config (use_batched_pipeline: false) to
+        # fall back to the legacy sequential path.
+        _raw_batched = provider_params.get("use_batched_pipeline")
+        if _raw_batched is None:
+            self.use_batched_pipeline = True
+        else:
+            self.use_batched_pipeline = bool(_raw_batched)
+        # Max number of VAD groups decoded in parallel per forward pass.
+        try:
+            self.batch_size = int(provider_params.get("batch_size", 8))
+        except (TypeError, ValueError):
+            self.batch_size = 8
+        # Populated in _initialize_models() after the WhisperModel loads.
+        self.batched_pipeline = None
 
         # Log task for debugging translation issues
         logger.info(f"FasterWhisperProASR initialized with task='{task}'")
@@ -256,6 +281,7 @@ class FasterWhisperProASR:
                 f"(backend: ctranslate2, direct API - no stable-ts wrapper)"
             )
             logger.debug(f"Model type: {type(self.whisper_model)}")
+            self._initialize_batched_pipeline()
         except Exception as e:
             # VRAM exhaustion fallback - try int8 if float16/other fails on CUDA
             if self.device == "cuda" and self.compute_type != "int8":
@@ -288,6 +314,7 @@ class FasterWhisperProASR:
                         )
                         self.compute_type = "int8"  # Update for logging/metadata
                         logger.info("Faster-Whisper model loaded successfully with int8 fallback")
+                        self._initialize_batched_pipeline()
                         return
                     except Exception as fallback_e:
                         logger.error(f"int8 fallback also failed: {fallback_e}")
@@ -297,6 +324,31 @@ class FasterWhisperProASR:
             logger.error(f"Model name that failed: {self.model_name}")
             logger.error(f"Device: {self.device}, Compute type: {self.compute_type}")
             raise
+
+    def _initialize_batched_pipeline(self):
+        """Wrap the loaded WhisperModel in a BatchedInferencePipeline (issue #357).
+
+        Non-fatal: if construction fails for any reason, batching is disabled
+        and the ASR falls back to the sequential per-VAD-group path.
+        """
+        if not self.use_batched_pipeline:
+            logger.debug("Batched pipeline disabled via config (use_batched_pipeline=false)")
+            self.batched_pipeline = None
+            return
+        try:
+            self.batched_pipeline = BatchedInferencePipeline(model=self.whisper_model)
+            logger.info(
+                "BatchedInferencePipeline initialized (batch_size=%d) - "
+                "VAD groups will be transcribed in batches",
+                self.batch_size,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to initialize BatchedInferencePipeline (%s). "
+                "Falling back to sequential per-segment transcription.",
+                e,
+            )
+            self.batched_pipeline = None
 
     def _log_sensitivity_parameters(self):
         """Log the sensitivity-related parameters for debugging."""
@@ -543,6 +595,33 @@ class FasterWhisperProASR:
                 audio_duration,
             )
             all_segments = self._transcribe_full_audio(audio_data, sample_rate)
+        elif self.batched_pipeline is not None:
+            # Batched path (issue #357): transcribe all VAD groups in one call.
+            try:
+                logger.info(
+                    "Transcribing %d VAD groups via BatchedInferencePipeline "
+                    "(batch_size=%d)",
+                    len(vad_segments),
+                    self.batch_size,
+                )
+                all_segments = self._transcribe_vad_groups_batched(
+                    audio_data, sample_rate, vad_segments
+                )
+            except Exception as e:
+                # Any failure in the batched path: fall back to the proven
+                # sequential loop rather than failing the whole file.
+                logger.warning(
+                    "Batched transcription failed (%s: %s). Falling back to "
+                    "sequential per-group transcription.",
+                    type(e).__name__,
+                    e,
+                )
+                get_tracer().trace_error(e, context="batched_vad_groups")
+                all_segments = []
+                for i, vad_group in enumerate(vad_segments, 1):
+                    logger.debug(f"Processing segment group {i}/{len(vad_segments)}")
+                    segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
+                    all_segments.extend(segments)
         else:
             all_segments = []
             for i, vad_group in enumerate(vad_segments, 1):
@@ -740,6 +819,216 @@ class FasterWhisperProASR:
             crash_tracer.trace_error(e, context="full_audio")
             logger.error(f"Full audio transcription failed: {type(e).__name__}: {e}")
             raise
+
+    def _filter_segment(self, seg: Dict, time_offset: float = 0.0) -> Optional[Dict]:
+        """Apply suppression + logprob/nonverbal filtering to one raw segment.
+
+        Shared by the sequential (_transcribe_vad_group) and batched
+        (_transcribe_vad_groups_batched) paths so both produce identical output.
+
+        Args:
+            seg: raw segment dict with 'start', 'end', 'text', 'avg_logprob'.
+                 'start'/'end' are relative to the audio chunk that produced it.
+            time_offset: seconds to add to start/end to make them absolute.
+
+        Returns:
+            The adjusted+kept segment dict, or None if it was filtered out.
+        """
+        text = seg["text"].strip() if isinstance(seg.get("text"), str) else seg.get("text", "").strip()
+        if not text:
+            return None
+
+        # Apply high suppression list filtering
+        if any(suppress in text for suppress in self.suppress_high):
+            logger.debug(f"Filtered segment due to suppression word: {text[:30]}...")
+            return None
+
+        # Apply logprob filtering with suppression penalties
+        avg_logprob = seg.get("avg_logprob", 0.0)
+        for suppress_word in self.suppress_low:
+            if suppress_word in text:
+                avg_logprob -= 0.15
+
+        segment_duration = max(0.0, float(seg["end"] - seg["start"]))
+        should_filter, reason, effective_threshold = self._segment_filter.should_filter(
+            avg_logprob=avg_logprob,
+            duration=segment_duration,
+            text=text,
+        )
+
+        if should_filter:
+            if reason == "logprob":
+                logger.debug(
+                    "Filtered segment with logprob %.3f (threshold %.3f): %s",
+                    avg_logprob,
+                    effective_threshold if effective_threshold is not None else -1.0,
+                    f"{text[:50]}...",
+                )
+                self._filter_statistics['logprob_filtered'] += 1
+            else:
+                logger.debug(f"Filtered nonverbal segment: {text[:50]}...")
+                self._filter_statistics['nonverbal_filtered'] += 1
+            return None
+
+        return {
+            "start": seg["start"] + time_offset,
+            "end": seg["end"] + time_offset,
+            "text": text,
+            "avg_logprob": avg_logprob,
+        }
+
+    def _transcribe_vad_groups_batched(self, audio_data: np.ndarray, sample_rate: int,
+                                       vad_segments: List[List[Dict]]) -> List[Dict]:
+        """Transcribe all VAD groups in a single batched call (issue #357).
+
+        Each VAD group is passed to BatchedInferencePipeline as a clip_timestamp,
+        so the pipeline batches the encoder across all groups instead of running
+        one sequential transcribe() per group. clip_timestamps suppresses the
+        pipeline's internal VAD, so our external speech segmentation is preserved.
+
+        Timestamps yielded by the pipeline are already absolute to the full audio
+        (the pipeline applies each clip's offset internally), so no per-group
+        offset is added here.
+
+        Returns the same filtered, absolute-timestamped segment list as the
+        sequential path. Raises on failure so the caller can fall back.
+        """
+        # Build clip_timestamps (seconds) from the VAD groups, in order.
+        clip_timestamps = []
+        for vad_group in vad_segments:
+            if not vad_group:
+                continue
+            clip_timestamps.append({
+                "start": float(vad_group[0]["start_sec"]),
+                "end": float(vad_group[-1]["end_sec"]),
+            })
+
+        if not clip_timestamps:
+            return []
+
+        # Prepare params and translate to the batched pipeline's API surface.
+        whisper_params = self._prepare_whisper_params()
+        batched_params = self._prepare_batched_params(whisper_params)
+
+        logger.debug("=" * 60)
+        logger.debug("DIAGNOSTIC: Batched VAD-group transcription")
+        logger.debug(f"  Model: {self.model_name}")
+        logger.debug(f"  VAD groups (clips): {len(clip_timestamps)}")
+        logger.debug(f"  batch_size: {self.batch_size}")
+        logger.debug(f"  Batched params keys: {list(batched_params.keys())}")
+        logger.debug("=" * 60)
+
+        self.tracer.emit_transcribe_params(
+            params=batched_params,
+            audio_info={
+                "duration_sec": len(audio_data) / sample_rate if sample_rate else 0.0,
+                "sample_rate": sample_rate,
+                "num_clips": len(clip_timestamps),
+            },
+            context="batched_vad_groups",
+        )
+
+        crash_tracer = get_tracer()
+        crash_tracer.trace_transcribe_start(
+            audio_info={
+                "shape": audio_data.shape,
+                "dtype": str(audio_data.dtype),
+                "duration_sec": len(audio_data) / sample_rate if sample_rate else 0.0,
+                "sample_rate": sample_rate,
+                "num_clips": len(clip_timestamps),
+                "context": "batched_vad_groups",
+            },
+            params=batched_params,
+        )
+
+        segments_generator, transcription_info = self.batched_pipeline.transcribe(
+            audio_data,
+            clip_timestamps=clip_timestamps,
+            batch_size=self.batch_size,
+            **batched_params,
+        )
+        crash_tracer.trace_transcribe_generator_created(transcription_info)
+
+        actual_task = batched_params.get('task', 'transcribe')
+
+        raw_segments = []
+        _full_segments_for_json = []
+        from dataclasses import asdict
+        for segment in segments_generator:
+            # Pipeline yields absolute start/end already (clip offsets applied).
+            raw_segments.append({
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text,
+                "avg_logprob": segment.avg_logprob,
+            })
+            try:
+                _full_segments_for_json.append(asdict(segment))
+            except Exception:
+                pass
+
+        crash_tracer.trace_transcribe_complete(len(raw_segments))
+        logger.debug(f"Batched transcription produced {len(raw_segments)} raw segments")
+
+        # Capture full results for diagnostic JSON (single batched entry).
+        if hasattr(self, '_last_full_results'):
+            self._last_full_results.append({
+                "group_start_sec": clip_timestamps[0]["start"],
+                "group_end_sec": clip_timestamps[-1]["end"],
+                "batched": True,
+                "segments": _full_segments_for_json,
+            })
+
+        # Translation-output sanity check (mirrors sequential path).
+        if actual_task == 'translate' and raw_segments:
+            sample_text = ' '.join(seg['text'] for seg in raw_segments[:5])
+            japanese_char_count = sum(1 for c in sample_text if '぀' <= c <= 'ゟ' or
+                                                                 '゠' <= c <= 'ヿ' or
+                                                                 '一' <= c <= '鿿')
+            total_chars = len(sample_text.replace(' ', ''))
+            if total_chars > 0 and japanese_char_count / total_chars > 0.3:
+                logger.warning(
+                    "Translation mode was requested but batched output appears to be in Japanese "
+                    f"({japanese_char_count}/{total_chars} chars are Japanese)."
+                )
+
+        # Filtering. Timestamps are already absolute -> time_offset=0.0.
+        segments = []
+        for seg in raw_segments:
+            kept = self._filter_segment(seg, time_offset=0.0)
+            if kept is not None:
+                segments.append(kept)
+
+        return segments
+
+    def _prepare_batched_params(self, whisper_params: Dict) -> Dict:
+        """Strip params that BatchedInferencePipeline.transcribe() does not accept.
+
+        The batched pipeline ignores several decoding controls (it hardcodes
+        condition_on_previous_text=False, uses only temperature[0], runs its own
+        feature extraction, and ignores vad_* when clip_timestamps is given).
+        Passing unknown kwargs would raise TypeError, so drop anything not in the
+        batched signature.
+        """
+        # Accepted kwargs for BatchedInferencePipeline.transcribe (excluding
+        # audio, clip_timestamps and batch_size which we pass explicitly).
+        allowed = {
+            'language', 'task', 'log_progress', 'beam_size', 'best_of', 'patience',
+            'length_penalty', 'repetition_penalty', 'no_repeat_ngram_size',
+            'temperature', 'compression_ratio_threshold', 'log_prob_threshold',
+            'no_speech_threshold', 'condition_on_previous_text',
+            'prompt_reset_on_temperature', 'initial_prompt', 'prefix',
+            'suppress_blank', 'suppress_tokens', 'without_timestamps',
+            'max_initial_timestamp', 'word_timestamps', 'prepend_punctuations',
+            'append_punctuations', 'multilingual', 'max_new_tokens', 'chunk_length',
+            'hallucination_silence_threshold', 'hotwords',
+            'language_detection_threshold', 'language_detection_segments',
+        }
+        batched = {k: v for k, v in whisper_params.items() if k in allowed}
+        dropped = [k for k in whisper_params if k not in allowed]
+        if dropped:
+            logger.debug(f"Batched pipeline: dropped unsupported params: {dropped}")
+        return batched
 
     def _transcribe_vad_group(self, audio_data: np.ndarray, sample_rate: int,
                              vad_group: List[Dict]) -> List[Dict]:
@@ -980,54 +1269,13 @@ class FasterWhisperProASR:
         if not result or not result.get("segments"):
             return []
 
-        # Adjust timestamps and apply suppression (preserved from original)
+        # Adjust timestamps and apply suppression (shared with the batched path).
+        # Sequential timestamps are relative to the group -> offset by start_sec.
         segments = []
         for seg in result["segments"]:
-            text = seg["text"].strip() if isinstance(seg["text"], str) else seg.get("text", "").strip()
-            if not text:
-                continue
-
-            # Apply high suppression list filtering
-            if any(suppress in text for suppress in self.suppress_high):
-                logger.debug(f"Filtered segment due to suppression word: {text[:30]}...")
-                continue
-
-            # Apply logprob filtering with suppression penalties
-            avg_logprob = seg.get("avg_logprob", 0.0)
-
-            # Apply text-based suppression penalties
-            for suppress_word in self.suppress_low:
-                if suppress_word in text:
-                    avg_logprob -= 0.15
-
-            segment_duration = max(0.0, float(seg["end"] - seg["start"]))
-            should_filter, reason, effective_threshold = self._segment_filter.should_filter(
-                avg_logprob=avg_logprob,
-                duration=segment_duration,
-                text=text,
-            )
-
-            if should_filter:
-                if reason == "logprob":
-                    logger.debug(
-                        "Filtered segment with logprob %.3f (threshold %.3f): %s",
-                        avg_logprob,
-                        effective_threshold if effective_threshold is not None else -1.0,
-                        f"{text[:50]}...",
-                    )
-                    self._filter_statistics['logprob_filtered'] += 1
-                else:
-                    logger.debug(f"Filtered nonverbal segment: {text[:50]}...")
-                    self._filter_statistics['nonverbal_filtered'] += 1
-                continue
-
-            adjusted_seg = {
-                "start": seg["start"] + start_sec,
-                "end": seg["end"] + start_sec,
-                "text": text,
-                "avg_logprob": avg_logprob
-            }
-            segments.append(adjusted_seg)
+            kept = self._filter_segment(seg, time_offset=start_sec)
+            if kept is not None:
+                segments.append(kept)
 
         return segments
 
@@ -1081,6 +1329,15 @@ class FasterWhisperProASR:
         import gc
 
         logger.debug(f"Cleaning up {self.__class__.__name__} resources...")
+
+        # Release the batched pipeline (holds a reference to whisper_model)
+        try:
+            if getattr(self, 'batched_pipeline', None) is not None:
+                del self.batched_pipeline
+                self.batched_pipeline = None
+                logger.debug("Batched pipeline released")
+        except Exception as e:
+            logger.warning(f"Error releasing batched pipeline: {e}")
 
         # Delete Whisper model
         try:

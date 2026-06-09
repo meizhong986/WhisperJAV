@@ -214,6 +214,7 @@
                                             <option value="kotoba-faster-whisper">kotoba&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(kotoba-v2-fp16&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
                                             -->
                                             <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-bilingual&nbsp;6GB VRAM)</option>
+                                            <option value="sensevoice">sensevoice&nbsp;&nbsp;&nbsp;(FunASR Small&nbsp;&nbsp;&nbsp;&nbsp;~1GB VRAM)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>
                                     </div>
@@ -356,6 +357,54 @@
                                     </label>
                                 </div>
                             </div>
+
+                            <!-- Row 4: Batched transcription (balanced pipeline speedup, issue #357) -->
+                            <div class="form-row" id="adv-row-4">
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Batch the encoder across VAD groups using faster-whisper BatchedInferencePipeline. 5-20x faster transcription on GPU for the balanced pipeline. No effect on other modes.">
+                                        <input type="checkbox" id="batchedPipeline" checked>
+                                        <span>Batched transcription (balanced — faster)</span>
+                                    </label>
+                                </div>
+                                <div class="form-group tight-pair" id="batchSizeGroup">
+                                    <label for="batchSize" class="form-label" style="white-space: nowrap;">Batch size:</label>
+                                    <input
+                                        type="number"
+                                        id="batchSize"
+                                        class="form-input"
+                                        min="1"
+                                        max="32"
+                                        step="1"
+                                        value="8"
+                                        style="width: 5rem;"
+                                        title="Number of VAD groups decoded in parallel. Higher = faster but more VRAM. Default: 8."
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Row 5: SenseVoice diarization (single-pass; only applies to --mode sensevoice) -->
+                            <div class="form-row" id="adv-row-sv-diarize" style="display: none;">
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Speaker diarization (FunASR cam++): adds per-sentence [spkN] labels. Runs SenseVoice on the full audio (scene detection is auto-disabled) so speaker ids stay consistent. Downloads the cam++ model on first use.">
+                                        <input type="checkbox" id="svDiarize">
+                                        <span>Speaker diarization ([spkN] labels) — SenseVoice only</span>
+                                    </label>
+                                </div>
+                                <div class="form-group tight-pair" id="svSpkNumGroup">
+                                    <label for="svSpkNum" class="form-label" style="white-space: nowrap;">Speakers:</label>
+                                    <input
+                                        type="number"
+                                        id="svSpkNum"
+                                        class="form-input"
+                                        min="0"
+                                        max="10"
+                                        step="1"
+                                        value="0"
+                                        style="width: 5rem;"
+                                        title="Force a fixed speaker count. 0 = auto-detect (cam++ often collapses to 1 on breathy/monologue audio). Set 2+ when you know how many speakers the scene has."
+                                    >
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Tab 3: Two-Pass Ensemble Mode -->
@@ -394,6 +443,9 @@
                                             </optgroup>
                                             <optgroup label="HuggingFace">
                                                 <option value="transformers">Transformers (HF)</option>
+                                            </optgroup>
+                                            <optgroup label="FunASR">
+                                                <option value="sensevoice">SenseVoice (Small)</option>
                                             </optgroup>
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
@@ -436,7 +488,7 @@
                                                 <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
-                                                <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
+                                                <option value="bs-roformer:vocals" title="Band-Split RoFormer vocal isolation — separates speech from music/background (44.1kHz). Requires the bs-roformer-infer package.">Vocals</option>
                                             </optgroup>
                                         </select>
                                         <div class="enhance-for-vad-row" id="pass1-enhance-vad-row" style="display: none;">
@@ -551,6 +603,9 @@
                                             <optgroup label="HuggingFace">
                                                 <option value="transformers">Transformers (HF)</option>
                                             </optgroup>
+                                            <optgroup label="FunASR">
+                                                <option value="sensevoice">SenseVoice (Small)</option>
+                                            </optgroup>
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen" selected>Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
@@ -595,7 +650,7 @@
                                                 <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
-                                                <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
+                                                <option value="bs-roformer:vocals" title="Band-Split RoFormer vocal isolation — separates speech from music/background (44.1kHz). Requires the bs-roformer-infer package.">Vocals</option>
                                             </optgroup>
                                         </select>
                                         <div class="enhance-for-vad-row" id="pass2-enhance-vad-row" style="display: none;">
@@ -987,6 +1042,48 @@
                                         <div class="form-group" style="grid-column: span 2;">
                                             <label for="translatorCustomEndpoint" class="form-label">Custom Endpoint URL:</label>
                                             <input type="text" id="translatorCustomEndpoint" class="form-input" placeholder="https://api.example.com/v1 (for OpenAI-compatible APIs)">
+                                        </div>
+
+                                        <!-- Ollama tuning (shown only when provider = Ollama) -->
+                                        <div class="form-group" id="translatorOllamaTuning" style="grid-column: span 2; display:none;">
+                                            <div class="section-header-inline" style="margin-bottom:6px;">
+                                                <span class="section-title">Ollama Tuning</span>
+                                                <span class="section-note">(leave blank for model defaults)</span>
+                                            </div>
+                                            <div class="translator-advanced-grid">
+                                                <div class="form-group" title="Token budget for the whole prompt+reply per batch. Larger lets more subtitle lines fit per request (batch size is auto-recomputed from this).&#10;ACCURACY: higher avoids context overflow that truncates/garbles output and drops lines.&#10;SPEED: slightly slower per batch, but fewer batches overall.&#10;VRAM: HIGHER COST — KV cache grows with context (8192→16384 adds ~1-2GB on a 12B model). 4070/12GB: 16384 is safe with a Q4 12B model.&#10;Blank = model default (often 8192).">
+                                                    <label for="translatorOllamaNumCtx" class="form-label">Context Window (num_ctx):</label>
+                                                    <input type="number" id="translatorOllamaNumCtx" class="form-input" placeholder="e.g. 16384" min="2048" max="131072" step="1024">
+                                                </div>
+                                                <div class="form-group" title="Hard cap on tokens the model may generate per batch.&#10;ACCURACY: too low truncates the reply mid-batch (lost lines); auto value is sized to the batch.&#10;SPEED: a tighter cap can end runaway/garbled generations sooner.&#10;VRAM: no real effect.&#10;Blank = auto (computed from context + batch size).">
+                                                    <label for="translatorOllamaMaxTokens" class="form-label">Max Output Tokens:</label>
+                                                    <input type="number" id="translatorOllamaMaxTokens" class="form-input" placeholder="auto" min="256" max="32768" step="256">
+                                                </div>
+                                                <div class="form-group" title="Randomness of word choice.&#10;ACCURACY: lower (0.2-0.4) = more literal, consistent, fewer hallucinations — best for subtitles; higher = more creative but more drift/invented lines.&#10;SPEED: no effect.&#10;VRAM: no effect.&#10;Blank = 0.3 (tuned for JA→EN subtitles).">
+                                                    <label for="translatorOllamaTemperature" class="form-label">Temperature:</label>
+                                                    <input type="number" id="translatorOllamaTemperature" class="form-input" placeholder="auto (0.3)" min="0" max="2" step="0.05">
+                                                </div>
+                                                <div class="form-group" title="Nucleus sampling: keep only the most probable tokens summing to this probability.&#10;ACCURACY: lower (0.9-0.92) trims unlikely/garbage tokens, steadier output; 1.0 disables it.&#10;SPEED: no effect.&#10;VRAM: no effect.&#10;Blank = 0.92.">
+                                                    <label for="translatorOllamaTopP" class="form-label">Top P:</label>
+                                                    <input type="number" id="translatorOllamaTopP" class="form-input" placeholder="0.92" min="0" max="1" step="0.01">
+                                                </div>
+                                                <div class="form-group" title="Limit choices to the K most likely tokens each step.&#10;ACCURACY: lower (40-50) curbs hallucination and off-topic words; very low can sound stiff.&#10;SPEED: negligible.&#10;VRAM: no effect.&#10;Blank = 50.">
+                                                    <label for="translatorOllamaTopK" class="form-label">Top K:</label>
+                                                    <input type="number" id="translatorOllamaTopK" class="form-input" placeholder="50" min="1" max="200" step="1">
+                                                </div>
+                                                <div class="form-group" title="Discard tokens below this fraction of the top token's probability.&#10;ACCURACY: a small floor (0.05) removes long-tail noise that causes blank/garbled lines.&#10;SPEED: no effect.&#10;VRAM: no effect.&#10;Blank = 0.05.">
+                                                    <label for="translatorOllamaMinP" class="form-label">Min P:</label>
+                                                    <input type="number" id="translatorOllamaMinP" class="form-input" placeholder="0.05" min="0" max="1" step="0.01">
+                                                </div>
+                                                <div class="form-group" title="Penalty applied to already-used tokens.&#10;ACCURACY: higher (1.1-1.2) stops the model repeating a line or looping on moans/short ASR fragments — a common cause of dropped/duplicate subtitles; too high (over 1.3) can hurt fluency.&#10;SPEED: no effect.&#10;VRAM: no effect.&#10;Blank = 1.1.">
+                                                    <label for="translatorOllamaRepeatPenalty" class="form-label">Repeat Penalty:</label>
+                                                    <input type="number" id="translatorOllamaRepeatPenalty" class="form-input" placeholder="1.1" min="0.5" max="2" step="0.05">
+                                                </div>
+                                                <div class="form-group" title="How long Ollama keeps the model loaded in VRAM between batches.&#10;ACCURACY: none.&#10;SPEED: longer (e.g. 30m, or -1 = forever) avoids a multi-second reload before each file/batch; 0 unloads immediately.&#10;VRAM: keeps it OCCUPIED while idle (use 0 to free VRAM for other apps between runs).&#10;Blank = Ollama default (~5m). Values: 30m, 1h, -1, 0.">
+                                                    <label for="translatorOllamaKeepAlive" class="form-label">Keep Alive:</label>
+                                                    <input type="text" id="translatorOllamaKeepAlive" class="form-input" placeholder="e.g. 30m, -1, 0">
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </details>
@@ -1395,11 +1492,11 @@
                             </div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group">
+                            <div class="form-group" title="Randomness of word choice (applies to cloud providers AND Ollama).&#10;ACCURACY: lower (0.2-0.4) = more literal, consistent, fewer hallucinations — best for subtitles; higher = more creative but more drift/invented lines.&#10;SPEED: no effect.&#10;VRAM: no effect.&#10;For Ollama, 0.3 is the tuned default.">
                                 <label for="translationTemperature" class="form-label">Temperature:</label>
                                 <input type="number" id="translationTemperature" class="form-input" value="0.5" min="0" max="2" step="0.1">
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" title="Nucleus sampling: keep only the most probable tokens summing to this probability (cloud providers AND Ollama).&#10;ACCURACY: lower (0.9-0.92) trims unlikely/garbage tokens, steadier output; 1.0 disables it.&#10;SPEED: no effect.&#10;VRAM: no effect.">
                                 <label for="translationTopP" class="form-label">Top P:</label>
                                 <input type="number" id="translationTopP" class="form-input" value="0.9" min="0" max="1" step="0.1">
                             </div>
@@ -1414,6 +1511,43 @@
                             <div class="form-group full-width">
                                 <label for="translationOllamaUrl" class="form-label">Ollama Server URL:</label>
                                 <input type="text" id="translationOllamaUrl" class="form-input" placeholder="http://localhost:11434 (leave empty for default)">
+                            </div>
+                        </div>
+                        <!-- Ollama tuning (shown only when provider = Ollama) -->
+                        <div class="ollama-settings-row" id="translationOllamaTuning" style="display:none">
+                            <div class="section-header-inline" style="margin-bottom:6px;">
+                                <span class="section-title">Ollama Tuning</span>
+                                <span class="section-note">(leave blank for model defaults)</span>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" title="Token budget for the whole prompt+reply per batch. Larger lets more subtitle lines fit per request (batch size is auto-recomputed from this).&#10;ACCURACY: higher avoids context overflow that truncates/garbles output and drops lines.&#10;SPEED: slightly slower per batch, but fewer batches overall.&#10;VRAM: HIGHER COST — KV cache grows with context (8192→16384 adds ~1-2GB on a 12B model). 4070/12GB: 16384 is safe with a Q4 12B model.&#10;Blank = model default (often 8192).">
+                                    <label for="translationOllamaNumCtx" class="form-label">Context Window (num_ctx):</label>
+                                    <input type="number" id="translationOllamaNumCtx" class="form-input" placeholder="e.g. 16384" min="2048" max="131072" step="1024">
+                                </div>
+                                <div class="form-group" title="Hard cap on tokens the model may generate per batch.&#10;ACCURACY: too low truncates the reply mid-batch (lost lines); auto value is sized to the batch.&#10;SPEED: a tighter cap can end runaway/garbled generations sooner.&#10;VRAM: no real effect.&#10;Blank = auto (computed from context + batch size).">
+                                    <label for="translationOllamaMaxTokens" class="form-label">Max Output Tokens:</label>
+                                    <input type="number" id="translationOllamaMaxTokens" class="form-input" placeholder="auto" min="256" max="32768" step="256">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" title="Limit choices to the K most likely tokens each step.&#10;ACCURACY: lower (40-50) curbs hallucination and off-topic words; very low can sound stiff.&#10;SPEED: negligible.&#10;VRAM: no effect.&#10;Blank = 50.">
+                                    <label for="translationOllamaTopK" class="form-label">Top K:</label>
+                                    <input type="number" id="translationOllamaTopK" class="form-input" placeholder="50" min="1" max="200" step="1">
+                                </div>
+                                <div class="form-group" title="Discard tokens below this fraction of the top token's probability.&#10;ACCURACY: a small floor (0.05) removes long-tail noise that causes blank/garbled lines.&#10;SPEED: no effect.&#10;VRAM: no effect.&#10;Blank = 0.05.">
+                                    <label for="translationOllamaMinP" class="form-label">Min P:</label>
+                                    <input type="number" id="translationOllamaMinP" class="form-input" placeholder="0.05" min="0" max="1" step="0.01">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" title="Penalty applied to already-used tokens.&#10;ACCURACY: higher (1.1-1.2) stops the model repeating a line or looping on moans/short ASR fragments — a common cause of dropped/duplicate subtitles; too high (over 1.3) can hurt fluency.&#10;SPEED: no effect.&#10;VRAM: no effect.&#10;Blank = 1.1.">
+                                    <label for="translationOllamaRepeatPenalty" class="form-label">Repeat Penalty:</label>
+                                    <input type="number" id="translationOllamaRepeatPenalty" class="form-input" placeholder="1.1" min="0.5" max="2" step="0.05">
+                                </div>
+                                <div class="form-group" title="How long Ollama keeps the model loaded in VRAM between batches.&#10;ACCURACY: none.&#10;SPEED: longer (e.g. 30m, or -1 = forever) avoids a multi-second reload before each file/batch; 0 unloads immediately.&#10;VRAM: keeps it OCCUPIED while idle (use 0 to free VRAM for other apps between runs).&#10;Blank = Ollama default (~5m). Values: 30m, 1h, -1, 0.">
+                                    <label for="translationOllamaKeepAlive" class="form-label">Keep Alive:</label>
+                                    <input type="text" id="translationOllamaKeepAlive" class="form-input" placeholder="e.g. 30m, -1, 0">
+                                </div>
                             </div>
                         </div>
                     </div>
