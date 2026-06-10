@@ -128,7 +128,8 @@ def _build_provider_options(
     tone: str = "standard",
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
-    settings_model_params: Optional[dict] = None
+    settings_model_params: Optional[dict] = None,
+    settings_tone: Optional[str] = None
 ) -> dict:
     """
     Build provider options with tone-aware defaults.
@@ -140,6 +141,11 @@ def _build_provider_options(
         temperature: Explicit temperature override
         top_p: Explicit top_p override
         settings_model_params: Model params from settings file
+        settings_tone: Tone the settings file was SAVED with — the settings
+            temperature is tone-coupled and only applies when it matches
+            the effective run tone (the GUI modal persists its Temperature
+            field unconditionally, so a stock 0.5 saved under tone=standard
+            must not pin contextual/pornify to 0.5 forever)
 
     Returns:
         Dict of provider options
@@ -161,9 +167,11 @@ def _build_provider_options(
     result_temp = default_temperature
     result_top_p = default_top_p
 
-    # Apply settings overrides
+    # Apply settings overrides (temperature only when the settings file was
+    # saved for the same tone this run uses — see settings_tone docstring)
     if settings_model_params:
-        if settings_model_params.get('temperature') is not None:
+        if (settings_model_params.get('temperature') is not None
+                and (settings_tone or 'standard') == tone):
             try:
                 result_temp = float(settings_model_params['temperature'])
             except (ValueError, TypeError):
@@ -322,7 +330,8 @@ def translate_with_config(
         tone=tone,
         temperature=temperature,
         top_p=top_p,
-        settings_model_params=settings.get('model_params')
+        settings_model_params=settings.get('model_params'),
+        settings_tone=settings.get('tone')
     )
 
     # Generate output path if not specified
@@ -392,7 +401,16 @@ def translate_with_config(
             if ollama_max_tokens is not None:
                 max_tokens = ollama_max_tokens
 
-            if temperature is None and readiness.get('temperature'):
+            # Curated Ollama temperature replaces only the generic standard-
+            # tone default — contextual's 0.8 and pornify's 1.2 are
+            # intentional tone-tuned values (mirror of cli.py's guard).
+            _settings_temp_applies = (
+                bool((settings.get('model_params') or {}).get('temperature'))
+                and (settings.get('tone') or 'standard') == tone
+            )
+            if (temperature is None and not _settings_temp_applies
+                    and tone not in ('pornify', 'contextual')
+                    and readiness.get('temperature')):
                 provider_options['temperature'] = readiness['temperature']
             provider_options['num_ctx'] = n_ctx
 
