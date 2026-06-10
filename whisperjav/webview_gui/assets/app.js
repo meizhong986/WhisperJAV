@@ -7226,6 +7226,21 @@ const TranslationSettingsModal = {
         // Test connection button
         document.getElementById('translationTestConnection')?.addEventListener('click', () => this.testConnection());
 
+        // Tone change reflects the tone's default temperature in the modal's
+        // Temperature field. That field is always forwarded to the backend,
+        // so without this the tone-aware defaults in translate/service.py
+        // (_build_provider_options) never applied — the stale field value
+        // silently won. User edits after the tone switch still stick.
+        // Keep this map in sync with _build_provider_options.
+        const toneTemperatureDefaults = { standard: 0.5, contextual: 0.8, pornify: 1.2 };
+        document.getElementById('translationTone')?.addEventListener('change', (e) => {
+            const temp = toneTemperatureDefaults[e.target.value];
+            const tempInput = document.getElementById('translationTemperature');
+            if (temp !== undefined && tempInput) {
+                tempInput.value = temp;
+            }
+        });
+
         // Provider change handler for inline dropdown — route through ProviderUIManager
         document.getElementById('ensembleTranslateProvider')?.addEventListener('change', (e) => {
             ProviderUIManager.onProviderChange(e.target.value, 'ensemble');

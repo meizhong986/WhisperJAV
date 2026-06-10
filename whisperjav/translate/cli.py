@@ -242,9 +242,11 @@ def main():
     )
     translation_group.add_argument(
         '--tone',
-        choices=['standard', 'pornify'],
+        choices=['standard', 'contextual', 'pornify'],
         default=None,
-        help=f"Translation tone/style (default: {settings.get('tone', 'standard')})"
+        help=f"Translation tone/style: standard (faithful), contextual (explicit only "
+             f"where the original is explicit), pornify (everything explicit) "
+             f"(default: {settings.get('tone', 'standard')})"
     )
 
     # API configuration

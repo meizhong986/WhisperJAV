@@ -406,9 +406,10 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-tone",
-        choices=["standard", "pornify"],
+        choices=["standard", "contextual", "pornify"],
         default="standard",
-        help="Translation style (default: standard)"
+        help="Translation style: standard, contextual (explicit only where the "
+             "original is explicit), pornify (default: standard)"
     )
     translation_group.add_argument(
         "--translate-api-key",

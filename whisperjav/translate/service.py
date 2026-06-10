@@ -148,6 +148,12 @@ def _build_provider_options(
     if tone == 'pornify':
         default_temperature = 1.2
         default_top_p = 0.9
+    elif tone == 'contextual':
+        # Adult-when-source-is-adult: warmer than standard for natural porn
+        # phrasing in explicit lines, but cool enough not to freelance on
+        # neutral dialogue (the failure mode pornify@1.2 is prone to).
+        default_temperature = 0.8
+        default_top_p = 0.9
     else:
         default_temperature = 0.5
         default_top_p = 0.9
