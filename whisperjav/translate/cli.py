@@ -89,8 +89,10 @@ def build_provider_options(args, settings_model_params: dict, effective_tone: st
 
     Precedence: CLI > settings > defaults (tone-aware).
     Defaults:
-      - standard: temperature=0.5, top_p=0.9
-      - pornify:  temperature=1.2, top_p=0.9
+      - standard:   temperature=0.5, top_p=0.9
+      - contextual: temperature=0.8, top_p=0.9
+      - pornify:    temperature=1.2, top_p=0.9
+    Keep in sync with translate/service.py _build_provider_options.
     """
     def _to_float(val):
         try:
@@ -101,6 +103,9 @@ def build_provider_options(args, settings_model_params: dict, effective_tone: st
     # 1) Start from tone-aware defaults
     if effective_tone == 'pornify':
         temperature = 1.2
+        top_p = 0.9
+    elif effective_tone == 'contextual':
+        temperature = 0.8
         top_p = 0.9
     else:
         temperature = 0.5
