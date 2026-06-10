@@ -1691,14 +1691,16 @@ const EnsembleManager = {
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'cohere') {
-            // Cohere prefers long contiguous segments — same defaults as
-            // anime-whisper / qwen (semantic + whisperseg + balanced sensitivity),
-            // but with full-scene framer to give the model larger context.
+            // Cohere runs VAD-only timing by default (ChronosJAV logic):
+            // the segmenter drives subtitle granularity, so pair it with
+            // FireRedVAD — tight native splits (max_speech 5s, splits at
+            // probability minima) and CPU-side, leaving VRAM to the ~4GB
+            // Cohere model.
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'whisperseg';
+            segmenterSelect.value = 'firered';
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'whisperseg';
+            this.state[passKey].speechSegmenter = 'firered';
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'qwen') {
@@ -3410,8 +3412,9 @@ const EnsembleManager = {
             if (mtCtrl) mtCtrl.dataset.originalType = 'int';
         }
 
-        // Alignment tab. aligner_backend='none' triggers the pack-time
-        // triple-flip in api.py (timestamp_mode→vad_only, stepdown→False).
+        // Alignment tab. Pack-time triple-flip in api.py is bidirectional:
+        // 'qwen3' restores aligner_vad_fallback + stepdown=True; the default
+        // ('none', VAD timing) stamps vad_only + stepdown=False.
         const alignTab = document.getElementById('tab-enhancer');
         const secA = schema.alignment || {};
         if (secA.aligner_backend) {

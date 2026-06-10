@@ -1214,13 +1214,19 @@ def _build_pipeline(
         if pass_config.get("speech_segmenter"):
             qwen_defaults["qwen_segmenter"] = pass_config["speech_segmenter"]
             logger.debug("Pass %s: Override qwen_segmenter = %s", pass_number, pass_config["speech_segmenter"])
-        # anime-whisper: v1.8.13 default flipped TEN -> WhisperSeg (must
-        # override BEFORE sensitivity resolution). Only fires when user did
-        # not pass --pass{N}-speech-segmenter.
+        # Per-generator segmenter defaults (must override BEFORE sensitivity
+        # resolution). Only fires when user did not pass
+        # --pass{N}-speech-segmenter. anime-whisper: v1.8.13 flipped TEN ->
+        # WhisperSeg. cohere: FireRedVAD — under vad_only timing the segmenter
+        # drives subtitle granularity, and FireRedVAD splits tightly on CPU
+        # (no VRAM contention with the ~4GB Cohere model).
         _aw_gen = qwen_defaults.get("qwen_generator_backend", "qwen3")
-        if _aw_gen in ("anime-whisper", "cohere") and not pass_config.get("speech_segmenter"):
+        if _aw_gen == "anime-whisper" and not pass_config.get("speech_segmenter"):
             qwen_defaults["qwen_segmenter"] = "whisperseg"
             logger.debug("Pass %s: %s default qwen_segmenter = whisperseg", pass_number, _aw_gen)
+        elif _aw_gen == "cohere" and not pass_config.get("speech_segmenter"):
+            qwen_defaults["qwen_segmenter"] = "firered"
+            logger.debug("Pass %s: cohere default qwen_segmenter = firered", pass_number)
         # Resolve sensitivity preset into segmenter_config
         # Layering: YAML spec < sensitivity preset < user custom overrides
         qwen_sensitivity = (
@@ -1313,17 +1319,22 @@ def _build_pipeline(
             if "max_group_duration" not in _user_qwen:
                 qwen_pipeline_params["segmenter_max_group_duration"] = 5.0
         elif _gen_backend == "cohere":
-            # Cohere Transcribe defaults (D7: Qwen3 ForcedAligner ON by default).
-            # User can disable aligner via Customize Parameters; the customize
-            # handler must triple-flip aligner+timestamp_mode+stepdown atomically.
+            # Cohere Transcribe defaults: ChronosJAV-style vad_only timing
+            # (ForcedAligner benchmarked ~0% native alignment on JAV audio →
+            # scene-sized blocks; the segmenter — FireRedVAD by default —
+            # drives subtitle granularity), passthrough cleaner (D3), no
+            # stepdown (no aligner = no collapse). The GUI re-enables the
+            # aligner via Customize Parameters → aligner_backend='qwen3'
+            # (api.py packs timestamp_mode+stepdown atomically).
             _user_qwen = pass_config.get("qwen_params") or {}
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "CohereLabs/cohere-transcribe-03-2026"
             if "timestamp_mode" not in _user_qwen:
-                qwen_pipeline_params["timestamp_mode"] = "aligner_vad_fallback"
+                qwen_pipeline_params["timestamp_mode"] = "vad_only"
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False  # D3: passthrough
-            # stepdown defaults to True for Cohere (aligner ON by D7); leave qwen_defaults to drive it
+            if "stepdown" not in _user_qwen:
+                qwen_pipeline_params["stepdown_enabled"] = False
             if "chunk_threshold" not in _user_qwen:
                 qwen_pipeline_params["segmenter_chunk_threshold"] = 1.0
             if "max_group_duration" not in _user_qwen:

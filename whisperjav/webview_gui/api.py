@@ -2332,9 +2332,11 @@ class WhisperJAVAPI:
           - dtype: auto/float16/bfloat16/float32
           - language: defaults to ja
           - punctuation: bool, default True
-          - aligner: D7 — qwen3 default with 'none' as VAD-only fallback;
-                     selecting 'none' must trigger the customize-handler
-                     triple-flip (timestamp_mode→vad_only, stepdown→False)
+          - aligner: 'none' (VAD-only timing) is the default — ChronosJAV
+                     logic with FireRedVAD as the segmenter; the aligner
+                     benchmarked ~0% native alignment on JAV audio. Selecting
+                     'qwen3' triggers the reverse triple-flip at pack time
+                     (timestamp_mode→aligner_vad_fallback, stepdown→True).
         """
         return {
             "success": True,
@@ -2454,18 +2456,18 @@ class WhisperJAVAPI:
                     "vad_threshold": {
                         "type": "slider",
                         "label": "VAD Threshold",
-                        "description": "Speech detection probability threshold for the segmenter selected on the pass row (WhisperSeg, FireRedVAD, Silero, TEN). Overrides sensitivity preset. Lower = more sensitive.",
+                        "description": "Speech detection probability threshold for the segmenter selected on the pass row (FireRedVAD default, WhisperSeg, Silero, TEN). Overrides sensitivity preset. Lower = more sensitive. Under VAD-only timing this segmenter drives subtitle granularity. Default 0.4 = FireRedVAD balanced.",
                         "group": "vad_settings",
                         "min": 0.05, "max": 0.80, "step": 0.05,
-                        "default": 0.35,
+                        "default": 0.4,
                     },
                     "vad_padding": {
                         "type": "slider",
                         "label": "VAD Padding (ms)",
-                        "description": "Padding around detected speech segments (ms), applied by the selected segmenter (FireRedVAD pads both sides). Overrides sensitivity preset.",
+                        "description": "Padding around detected speech segments (ms), applied by the selected segmenter (FireRedVAD pads both sides symmetrically). Overrides sensitivity preset. Default 100 = FireRedVAD balanced.",
                         "group": "vad_settings",
                         "min": 50, "max": 600, "step": 25,
-                        "default": 250,
+                        "default": 100,
                     },
                 },
                 "generation": {
@@ -2485,22 +2487,24 @@ class WhisperJAVAPI:
                         "label": "Aligner Backend",
                         "description": (
                             "Cohere has no native word-level timestamps (HF discussion #19). "
-                            "Qwen3 ForcedAligner produces them downstream. Selecting 'none' "
-                            "falls back to VAD-derived segment timing only and must flip "
+                            "Default is VAD-only timing (ChronosJAV logic): the speech "
+                            "segmenter — FireRedVAD by default — drives subtitle granularity. "
+                            "The Qwen3 ForcedAligner benchmarked ~0% native alignment on JAV "
+                            "audio (scene-sized blocks); selecting it restores "
                             "timestamp_mode and stepdown together (handled at pack time)."
                         ),
                         "options": [
-                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (recommended, D7 default)"},
-                            {"value": "none", "label": "None (VAD timestamps only)"},
+                            {"value": "none", "label": "None — VAD timing (recommended)"},
+                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (+~1.2GB VRAM)"},
                         ],
-                        "default": "qwen3",
+                        "default": "none",
                     },
                 },
             },
             "metadata": {
                 "preview": True,
                 "v1_8_14_status": "API defined; GUI routes via openQwenCustomize for v1.8.14 (D-NEW2)",
-                "triple_flip_note": "When aligner_backend='none', api.py params packer must also stamp timestamp_mode='vad_only' and stepdown=False to keep the orchestrator consistent (plan §4.6).",
+                "triple_flip_note": "Bidirectional at pack time: aligner_backend='qwen3' stamps timestamp_mode='aligner_vad_fallback'+stepdown=True; default/'none' stamps timestamp_mode='vad_only'+stepdown=False to keep the orchestrator consistent (plan §4.6).",
             },
         }
 
@@ -2816,16 +2820,19 @@ class WhisperJAVAPI:
                 qwen1_params.setdefault('stepdown', False)
             elif pass1.get('isCohere'):
                 qwen1_params['generator_backend'] = 'cohere'
-                qwen1_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
-                qwen1_params.setdefault('assembly_cleaner', 'passthrough')         # D3
-                # stepdown defaults to True for Cohere (aligner ON by D7)
-                # Triple-flip enforcement (plan §4.6): when the user disables the
-                # aligner via Customize Parameters → aligner_backend='none', three
-                # downstream fields must flip together to keep the orchestrator
-                # consistent: timestamp_mode → vad_only, stepdown → False, and
-                # the aligner choice stays 'none'. We enforce here at pack time
-                # so a manually-edited preset cannot leave the trio in conflict.
-                if qwen1_params.get('aligner_backend') == 'none':
+                qwen1_params.setdefault('assembly_cleaner', 'passthrough')  # D3
+                # ChronosJAV-style VAD-only timing is the Cohere default (the
+                # ForcedAligner benchmarked ~0% native alignment on JAV audio
+                # and emitted scene-sized blocks). Triple-flip enforcement at
+                # pack time keeps timestamp_mode/stepdown/aligner consistent
+                # in BOTH directions: aligner_backend='qwen3' (explicit
+                # Customize choice) restores the aligner trio; anything else
+                # (default, or explicit 'none') stamps the vad_only trio so a
+                # manually-edited preset cannot leave them in conflict.
+                if qwen1_params.get('aligner_backend') == 'qwen3':
+                    qwen1_params.setdefault('timestamp_mode', 'aligner_vad_fallback')
+                    qwen1_params.setdefault('stepdown', True)
+                else:
                     qwen1_params['timestamp_mode'] = 'vad_only'
                     qwen1_params['stepdown'] = False
             if qwen1_params:
@@ -2929,10 +2936,14 @@ class WhisperJAVAPI:
                     qwen2_params.setdefault('stepdown', False)
                 elif pass2.get('isCohere'):
                     qwen2_params['generator_backend'] = 'cohere'
-                    qwen2_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
-                    qwen2_params.setdefault('assembly_cleaner', 'passthrough')         # D3
-                    # Triple-flip enforcement (mirror of pass 1).
-                    if qwen2_params.get('aligner_backend') == 'none':
+                    qwen2_params.setdefault('assembly_cleaner', 'passthrough')  # D3
+                    # Bidirectional triple-flip enforcement (mirror of pass 1):
+                    # vad_only timing is the default; aligner_backend='qwen3'
+                    # restores the aligner trio.
+                    if qwen2_params.get('aligner_backend') == 'qwen3':
+                        qwen2_params.setdefault('timestamp_mode', 'aligner_vad_fallback')
+                        qwen2_params.setdefault('stepdown', True)
+                    else:
                         qwen2_params['timestamp_mode'] = 'vad_only'
                         qwen2_params['stepdown'] = False
                 if qwen2_params:

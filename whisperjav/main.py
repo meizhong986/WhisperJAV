@@ -1211,6 +1211,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         if _gen_backend_early == "anime-whisper":
             if not any(a.startswith('--qwen-segmenter') for a in sys.argv):
                 _qwen_segmenter = "whisperseg"
+        elif _gen_backend_early == "cohere":
+            # Cohere pairs with FireRedVAD by default (ChronosJAV logic with
+            # a different VAD/model): vad_only timing means the segmenter IS
+            # the subtitle clock, and FireRedVAD's tight native splits
+            # (max_speech 5s, split at probability minima) keep blocks small;
+            # it runs on CPU, leaving VRAM to the ~4GB Cohere model.
+            if not any(a.startswith('--qwen-segmenter') for a in sys.argv):
+                _qwen_segmenter = "firered"
         _user_vad_overrides = {}
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
@@ -1310,13 +1318,20 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
                 qwen_kwargs["segmenter_max_group_duration"] = 5.0
         elif _gen_backend == "cohere":
-            # Cohere Transcribe defaults — mirror pass_worker's cohere branch
-            # (D2/D3/D7): official gated repo, passthrough cleaner, ForcedAligner
-            # stays ON (timestamp_mode default aligner_vad_fallback already).
+            # Cohere Transcribe defaults — mirror pass_worker's cohere branch:
+            # official gated repo, passthrough cleaner (D3), and ChronosJAV-style
+            # vad_only timing (the ForcedAligner benchmarked ~0% native alignment
+            # on JAV audio and emitted scene-sized blocks; FireRedVAD segments
+            # drive subtitle granularity instead). Aligner can be re-enabled
+            # with --qwen-timestamp-mode aligner_vad_fallback.
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "CohereLabs/cohere-transcribe-03-2026"
+            if not any(a.startswith('--qwen-timestamp-mode') for a in sys.argv):
+                qwen_kwargs["timestamp_mode"] = "vad_only"
             if not any(a.startswith('--qwen-assembly-cleaner') for a in sys.argv):
                 qwen_kwargs["assembly_cleaner"] = False
+            if not any(a.startswith('--qwen-stepdown') for a in sys.argv):
+                qwen_kwargs["stepdown_enabled"] = False
             if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
                 qwen_kwargs["segmenter_chunk_threshold"] = 1.0
             if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
