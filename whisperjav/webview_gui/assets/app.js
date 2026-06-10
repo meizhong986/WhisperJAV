@@ -779,7 +779,14 @@ const ConsoleManager = {
         line.textContent = message;
         output.appendChild(line);
 
-        // Auto-scroll to bottom (use requestAnimationFrame to ensure DOM updated)
+        this._autoScroll(output);
+    },
+
+    // Scroll to bottom unless the user unchecked the Auto-scroll toggle.
+    // requestAnimationFrame ensures the DOM has been updated first.
+    _autoScroll(output) {
+        const toggle = document.getElementById('consoleAutoScroll');
+        if (toggle && !toggle.checked) return;
         requestAnimationFrame(() => {
             if (output) {
                 output.scrollTop = output.scrollHeight;
@@ -808,12 +815,7 @@ const ConsoleManager = {
             output.appendChild(lineEl);
         });
 
-        // Auto-scroll to bottom (use requestAnimationFrame to ensure DOM updated)
-        requestAnimationFrame(() => {
-            if (output) {
-                output.scrollTop = output.scrollHeight;
-            }
-        });
+        this._autoScroll(output);
     }
 };
 

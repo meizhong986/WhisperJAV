@@ -1040,9 +1040,15 @@
             <section class="section console-section">
                 <div class="section-header">
                     <h2>Console</h2>
-                    <button type="button" class="btn btn-text btn-sm" id="clearConsoleBtn">
-                        Clear
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <label class="checkbox-label" title="Keep the console scrolled to the newest line">
+                            <input type="checkbox" id="consoleAutoScroll" checked>
+                            <span>Auto-scroll</span>
+                        </label>
+                        <button type="button" class="btn btn-text btn-sm" id="clearConsoleBtn">
+                            Clear
+                        </button>
+                    </div>
                 </div>
                 <div class="section-content">
                     <div class="console-output" id="consoleOutput">
