@@ -2190,6 +2190,13 @@ const EnsembleManager = {
             await this.openTransformersCustomize(passKey);
             return;
         }
+        // Cohere must be checked BEFORE the isQwen umbrella (isCohere ⊂ isQwen):
+        // it gets the focused get_cohere_schema modal instead of the full
+        // Qwen-shaped one (the v1.9.0 dedicated handler per api.py D-NEW2).
+        if (passState.isCohere) {
+            await this.openCohereCustomize(passKey);
+            return;
+        }
         if (passState.isQwen) {
             await this.openQwenCustomize(passKey);
             return;
@@ -3284,6 +3291,136 @@ const EnsembleManager = {
             gate.appendChild(desc);
         }
         return gate;
+    },
+
+    // --- Cohere-Transcribe customize modal (issue #262, v1.9.0 handler) ---
+    // Renders the focused get_cohere_schema fields instead of the full
+    // Qwen-shaped modal, so users only see knobs the cohere generator
+    // actually consumes (it silently ignores batch_size, repetition_penalty,
+    // max_tokens_per_audio_second, attn_implementation, context).
+    cohereDefaults: {
+        model_id: 'CohereLabs/cohere-transcribe-03-2026',
+        language: 'ja',          // ISO code — Cohere's processor takes codes, not full names
+        device: 'auto',
+        dtype: 'auto',
+        max_new_tokens: 512,     // D2
+        aligner_backend: 'qwen3', // D7: ForcedAligner ON by default (no native timestamps)
+        // Audio tab (qwen-shell framing/VAD — same plumbing as Anime-Whisper).
+        // vad_threshold/vad_padding become threshold/speech_pad_ms overrides on
+        // the segmenter selected on the pass row (whisperseg, firered, ...).
+        framer: 'vad-grouped',
+        safe_chunking: true,
+        scene_min_duration: 12,
+        scene_max_duration: 48,
+        chunk_threshold: 1.0,    // Cohere prefers long contiguous frames
+        max_group_duration: 6,
+        vad_threshold: 0.35,
+        vad_padding: 250
+    },
+
+    async openCohereCustomize(passKey) {
+        this.state.currentCustomize = passKey;
+        const passState = this.state[passKey];
+        try {
+            const result = await pywebview.api.get_cohere_schema();
+            if (!result.success) {
+                ErrorHandler.show('Error', 'Failed to load Cohere parameters: ' + (result.error || 'Unknown error'));
+                return;
+            }
+            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+            const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
+            document.getElementById('customizeModalTitle').textContent =
+                `${passLabel} Settings (Cohere-Transcribe)${customStatus}`;
+
+            this._cohereSchema = result.schema;
+            const currentValues = passState.customized && passState.params
+                ? { ...this.cohereDefaults, ...passState.params }
+                : { ...this.cohereDefaults };
+
+            this.generateCohereForm(result.schema, currentValues);
+            await this.refreshPresetList();
+            document.getElementById('customizeModal').classList.add('active');
+        } catch (error) {
+            ErrorHandler.show('Error', 'Failed to open Cohere customize dialog: ' + error);
+        }
+    },
+
+    generateCohereForm(schema, currentValues) {
+        // Four focused tabs in the standard slots: Model / Audio / Generation /
+        // Alignment — matching the Anime-Whisper (qwen-shell) layout. The Audio
+        // tab reuses generateQwenAudioTab: framing, scene bounds, VAD grouping
+        // and the VAD threshold/padding sliders all ride the same qwen-shell
+        // plumbing (prepare_qwen_params), and the VAD sliders override the
+        // segmenter selected on the pass row (whisperseg, firered, silero...).
+        // Scene/context stay hidden — scene detector and enhancer are chosen
+        // on the main Ensemble row.
+        const tabMap = { model: 'Model', quality: 'Audio', segmenter: 'Generation', enhancer: 'Alignment' };
+        ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'].forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (panel) panel.innerHTML = '';
+            const btn = document.querySelector(`[data-tab="${tab}"]`);
+            if (btn) {
+                if (tabMap[tab]) { btn.style.display = ''; btn.textContent = tabMap[tab]; }
+                else { btn.style.display = 'none'; }
+            }
+        });
+
+        // Model tab: model id (gated), language, device, dtype.
+        const modelTab = document.getElementById('tab-model');
+        const secM = schema.model || {};
+        if (secM.model_id) {
+            modelTab.appendChild(this.createTransformersDropdown('model_id', secM.model_id.label,
+                secM.model_id.options, currentValues.model_id || secM.model_id.default,
+                'Gated HuggingFace repo — accept the conditions on the model page and set HF_TOKEN before first use.'));
+        }
+        if (secM.language) {
+            modelTab.appendChild(this.createTransformersDropdown('language', secM.language.label,
+                secM.language.options, currentValues.language || secM.language.default,
+                secM.language.description || 'Cohere supports 14 languages; default JA.'));
+        }
+        if (secM.device) {
+            modelTab.appendChild(this.createTransformersDropdown('device', secM.device.label,
+                secM.device.options, currentValues.device || secM.device.default,
+                'Compute device (auto will detect GPU availability)'));
+        }
+        if (secM.dtype) {
+            modelTab.appendChild(this.createTransformersDropdown('dtype', secM.dtype.label,
+                secM.dtype.options, currentValues.dtype || secM.dtype.default,
+                'Model precision (auto selects based on hardware; ~4-8GB VRAM at FP16)'));
+        }
+        // NOTE: schema.model.punctuation is intentionally NOT rendered — the
+        // qwen-shell plumbing does not forward it to the generator yet, so a
+        // checkbox here would be a silent no-op. The generator's default (on)
+        // always applies. Render it once the plumbing exists.
+
+        // Audio tab — identical widget set to the Anime-Whisper/Qwen modal.
+        if (schema.audio) {
+            this.generateQwenAudioTab('tab-quality', schema.audio, currentValues);
+        }
+
+        // Generation tab.
+        const genTab = document.getElementById('tab-segmenter');
+        const secG = schema.generation || {};
+        if (secG.max_new_tokens) {
+            const mt = secG.max_new_tokens;
+            genTab.appendChild(this.createTransformersSlider('max_new_tokens', mt.label,
+                mt.min, mt.max, mt.step, currentValues.max_new_tokens ?? mt.default,
+                mt.description || 'Maximum tokens generated per scene.'));
+            const mtCtrl = genTab.querySelector('.param-control[data-param="max_new_tokens"]');
+            if (mtCtrl) mtCtrl.dataset.originalType = 'int';
+        }
+
+        // Alignment tab. aligner_backend='none' triggers the pack-time
+        // triple-flip in api.py (timestamp_mode→vad_only, stepdown→False).
+        const alignTab = document.getElementById('tab-enhancer');
+        const secA = schema.alignment || {};
+        if (secA.aligner_backend) {
+            alignTab.appendChild(this.createTransformersDropdown('aligner_backend', secA.aligner_backend.label,
+                secA.aligner_backend.options, currentValues.aligner_backend || secA.aligner_backend.default,
+                secA.aligner_backend.description));
+        }
+
+        this.switchModalTab('model');
     },
 
     async openTransformersCustomize(passKey) {
@@ -4955,9 +5092,37 @@ const EnsembleManager = {
             return;
         }
 
+        // Cohere: re-render the dedicated focused form with its defaults.
+        // Must be checked BEFORE the isQwen umbrella (isCohere ⊂ isQwen).
+        if (passState.isCohere) {
+            passState.params = null;
+            passState.customized = false;
+            passState.presetName = null;
+            if (this._cohereSchema) {
+                this.generateCohereForm(this._cohereSchema, { ...this.cohereDefaults });
+            }
+            ConsoleManager.log(`Reset ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'} Cohere parameters to defaults`, 'info');
+            this.updateBadges();
+            return;
+        }
+
         // Handle Qwen separately
         if (passState.isQwen) {
             this.resetQwenToDefaults(passKey);
+            return;
+        }
+
+        // SenseVoice: re-render its form with defaults (previously fell
+        // through to the legacy _currentDefaults path, which errors).
+        if (passState.isSenseVoice) {
+            passState.params = null;
+            passState.customized = false;
+            passState.presetName = null;
+            if (this._sensevoiceSchema) {
+                this.generateSenseVoiceForm(this._sensevoiceSchema, { ...SenseVoiceManager.defaults });
+            }
+            ConsoleManager.log(`Reset ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'} SenseVoice parameters to defaults`, 'info');
+            this.updateBadges();
             return;
         }
 

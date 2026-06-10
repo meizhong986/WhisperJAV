@@ -1130,6 +1130,7 @@ class WhisperJAVAPI:
             "nemo-lite": "nemo-speech-segmentation.yaml",
             "silero-v6.2": "silero-v6-speech-segmentation.yaml",
             "whisperseg": "whisperseg-speech-segmentation.yaml",
+            "firered": "firered-speech-segmentation.yaml",
         }
 
         # Handle "none" backend
@@ -2383,13 +2384,88 @@ class WhisperJAVAPI:
                         "type": "dropdown",
                         "label": "Data Type",
                         "group": "hardware",
+                        # float16 intentionally absent: the Cohere modeling
+                        # code's -1e9 attention mask overflows fp16 and kills
+                        # every forward pass (verified 2026-06-10); the
+                        # generator coerces fp16 -> bf16 anyway.
                         "options": [
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "float16", "label": "Float16 (faster)"},
+                            {"value": "auto", "label": "Auto (BFloat16 on GPU)"},
                             {"value": "bfloat16", "label": "BFloat16"},
-                            {"value": "float32", "label": "Float32 (slower)"},
+                            {"value": "float32", "label": "Float32 (slower, 2x VRAM)"},
                         ],
                         "default": "auto",
+                    },
+                },
+                # Audio: qwen-shell framing/scene/VAD knobs — Cohere rides the
+                # same outer shell as Anime-Whisper, so these all apply. Field
+                # set mirrors get_qwen_schema()["audio"] (generateQwenAudioTab
+                # renders this section unguarded — keep all 8 keys present).
+                # vad_threshold/vad_padding become segmenter overrides
+                # (threshold / speech_pad_ms) for whichever speech segmenter
+                # the Ensemble row selects (whisperseg, firered, silero, ten).
+                "audio": {
+                    "framer": {
+                        "type": "dropdown",
+                        "label": "Temporal Framing",
+                        "description": "How audio is split into frames for text generation. Cohere prefers long contiguous segments — keep VAD Grouped.",
+                        "options": [
+                            {"value": "vad-grouped", "label": "VAD Grouped (default)"},
+                            {"value": "full-scene", "label": "Full Scene"},
+                            {"value": "srt-source", "label": "SRT Source"},
+                        ],
+                        "default": "vad-grouped",
+                    },
+                    "safe_chunking": {
+                        "type": "checkbox",
+                        "label": "Safe Chunking",
+                        "description": "Enforce scene boundaries for ForcedAligner 180s limit",
+                        "default": True,
+                    },
+                    "scene_min_duration": {
+                        "type": "slider",
+                        "label": "Min Duration",
+                        "description": "Minimum scene length (default: 12s)",
+                        "group": "scene_bounds",
+                        "min": 5, "max": 60, "step": 1,
+                        "default": 12,
+                    },
+                    "scene_max_duration": {
+                        "type": "slider",
+                        "label": "Max Duration",
+                        "description": "Maximum scene length (default: 48s)",
+                        "group": "scene_bounds",
+                        "min": 20, "max": 300, "step": 5,
+                        "default": 48,
+                    },
+                    "chunk_threshold": {
+                        "type": "slider",
+                        "label": "Frame Gap Threshold",
+                        "description": "Silence gap (seconds) that splits speech into separate frames. Cohere default 1.0 (longer frames = more context).",
+                        "min": 0.3, "max": 5.0, "step": 0.1,
+                        "default": 1.0,
+                    },
+                    "max_group_duration": {
+                        "type": "slider",
+                        "label": "Max Group Duration",
+                        "description": "Maximum duration for VAD segment grouping (Cohere default 6s)",
+                        "min": 3, "max": 60, "step": 1,
+                        "default": 6,
+                    },
+                    "vad_threshold": {
+                        "type": "slider",
+                        "label": "VAD Threshold",
+                        "description": "Speech detection probability threshold for the segmenter selected on the pass row (WhisperSeg, FireRedVAD, Silero, TEN). Overrides sensitivity preset. Lower = more sensitive.",
+                        "group": "vad_settings",
+                        "min": 0.05, "max": 0.80, "step": 0.05,
+                        "default": 0.35,
+                    },
+                    "vad_padding": {
+                        "type": "slider",
+                        "label": "VAD Padding (ms)",
+                        "description": "Padding around detected speech segments (ms), applied by the selected segmenter (FireRedVAD pads both sides). Overrides sensitivity preset.",
+                        "group": "vad_settings",
+                        "min": 50, "max": 600, "step": 25,
+                        "default": 250,
                     },
                 },
                 "generation": {

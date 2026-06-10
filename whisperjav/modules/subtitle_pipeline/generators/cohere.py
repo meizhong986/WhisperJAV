@@ -54,6 +54,32 @@ _TOKEN_PAGE_URL = "https://huggingface.co/settings/tokens"
 _REQUIRED_DOWNLOAD_GB = 5.0
 _MODEL_WEIGHT_GB = 3.85
 
+# The Cohere processor takes ISO language CODES ("ja", "en" — per the model
+# card examples), but upstream callers may hand us Qwen-style full names
+# ("Japanese") because the qwen outer shell defaults qwen_language="Japanese".
+# Normalize full names for the model's 14 supported languages; unknown values
+# pass through unchanged (the processor raises its own error for those).
+_LANGUAGE_NAME_TO_CODE = {
+    "english": "en", "french": "fr", "german": "de", "italian": "it",
+    "spanish": "es", "portuguese": "pt", "greek": "el", "dutch": "nl",
+    "polish": "pl", "chinese": "zh", "mandarin": "zh", "japanese": "ja",
+    "korean": "ko", "vietnamese": "vi", "arabic": "ar",
+}
+
+
+def _normalize_language(language: Optional[str]) -> Optional[str]:
+    """Map full language names to the ISO codes the Cohere processor expects."""
+    if not language:
+        return language
+    code = _LANGUAGE_NAME_TO_CODE.get(language.strip().lower())
+    if code and code != language:
+        logger.debug(
+            "[CohereTextGenerator] Normalized language %r -> %r "
+            "(Cohere processor takes ISO codes)", language, code
+        )
+        return code
+    return language
+
 
 class CohereTextGenerator:
     """
@@ -126,17 +152,58 @@ class CohereTextGenerator:
 
     @staticmethod
     def _detect_dtype(device: str, dtype: str):
-        """Resolve 'auto' dtype based on device capability."""
+        """Resolve 'auto' dtype based on device capability.
+
+        float16 is NOT usable with this model: the repo's remote modeling
+        code masks attention scores via masked_fill(mask, -1e9), and -1e9
+        overflows fp16 (max +/-65504) — every forward pass dies with
+        "value cannot be converted to type c10::Half without overflow"
+        (verified on a real run, 2026-06-10). bfloat16 has fp32-like range
+        at the same memory cost, so it is the CUDA default; explicit
+        float16 requests are coerced with a warning.
+        """
         import torch
+        if dtype == "float16":
+            logger.warning(
+                "[CohereTextGenerator] float16 requested but the Cohere "
+                "modeling code overflows fp16 (-1e9 attention mask); "
+                "using bfloat16 instead."
+            )
+            dtype = "bfloat16"
         if dtype != "auto":
             return getattr(torch, dtype, torch.float32)
         if "cuda" in device:
-            return torch.float16
+            try:
+                if torch.cuda.is_bf16_supported():
+                    return torch.bfloat16
+            except Exception:
+                pass
+            # Pre-Ampere GPU without bf16: fp32 is the only safe choice
+            # (doubles VRAM to ~8GB, but fp16 cannot produce output at all).
+            return torch.float32
         return torch.float32
 
     # ------------------------------------------------------------------
     # HF gating pre-flight
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _cached_snapshot(model_id: str) -> Optional[str]:
+        """
+        Return the local HF cache snapshot path if the model is fully
+        downloaded, else None.
+
+        Gating only matters for the DOWNLOAD — once the snapshot is on disk,
+        the model loads fine with no token at all (local_files_only=True).
+        snapshot_download(local_files_only=True) succeeds only when every
+        file of the latest cached revision is present, so a partially
+        downloaded model correctly falls through to the token preflight.
+        """
+        try:
+            from huggingface_hub import snapshot_download
+            return snapshot_download(model_id, local_files_only=True)
+        except Exception:
+            return None
 
     @staticmethod
     def _check_hf_access() -> None:
@@ -152,6 +219,15 @@ class CohereTextGenerator:
         That case is handled in _format_load_error.
         """
         token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        if not token:
+            # Also accept a token stored by `huggingface-cli login` /
+            # `huggingface_hub.login()` (~/.cache/huggingface/token) —
+            # from_pretrained honors it, so the preflight should too.
+            try:
+                from huggingface_hub import get_token as _hf_get_token
+                token = _hf_get_token()
+            except Exception:
+                token = None
         if not token:
             raise RuntimeError(
                 "Cohere-Transcribe requires HF_TOKEN to be set in the environment.\n"
@@ -441,7 +517,21 @@ class CohereTextGenerator:
         cfg = self._config
         local_path = self._is_local_path(cfg["model_id"])
 
+        # Gating preflights only matter when a DOWNLOAD is needed. If the
+        # full snapshot is already in the local HF cache, load offline —
+        # no token required, and local_files_only=True below prevents
+        # transformers' Hub revision check from raising 401/GatedRepoError
+        # for token-less (e.g. stale-environment GUI) processes.
+        cached_snapshot = None
         if not local_path:
+            cached_snapshot = self._cached_snapshot(cfg["model_id"])
+            if cached_snapshot:
+                logger.info(
+                    "[CohereTextGenerator] Model found in local HF cache — "
+                    "loading offline (no HF token needed): %s", cached_snapshot
+                )
+
+        if not local_path and not cached_snapshot:
             # Hub-side preflights: only relevant when downloading from HF.
             self._check_hf_access()
             try:
@@ -485,15 +575,21 @@ class CohereTextGenerator:
         import time
         start = time.time()
 
+        # Offline load when the snapshot is cached: skips Hub revision
+        # checks entirely, so no token is needed and no network round-trip.
+        _offline = {"local_files_only": True} if cached_snapshot else {}
+
         try:
             self._processor = AutoProcessor.from_pretrained(
                 cfg["model_id"],
                 trust_remote_code=cfg["trust_remote_code"],
+                **_offline,
             )
             self._model = _AutoModelClass.from_pretrained(
                 cfg["model_id"],
                 dtype=dtype,
                 trust_remote_code=cfg["trust_remote_code"],
+                **_offline,
             ).to(device)
             self._model.eval()
         except Exception as exc:
@@ -621,7 +717,7 @@ class CohereTextGenerator:
         import torch
 
         cfg = self._config
-        resolved_language = language or cfg["language"]
+        resolved_language = _normalize_language(language or cfg["language"])
         resolved_punctuation = cfg["punctuation"]
         resolved_max_new_tokens = cfg["max_new_tokens"]
 
@@ -649,12 +745,32 @@ class CohereTextGenerator:
         # we resolved at load() time.
         inputs = inputs.to(self._device, dtype=self._dtype)
 
+        # transformers 4.57.x compat: the model's remote generate() wrapper
+        # forwards decoder_attention_mask=None when no decoder_input_ids are
+        # given (the processor emits only input_features+length).
+        # transformers >= 5.4 tolerates the None; 4.57's
+        # _update_model_kwargs_for_generation crashes on it ("'NoneType'
+        # object has no attribute 'new_ones'", verified 2026-06-10).
+        # Passing explicit decoder_input_ids (the decoder start token, same
+        # as 5.4 auto-creates) makes the wrapper build a real ones-mask.
+        extra_gen_kwargs = {}
+        gen_cfg = getattr(self._model, "generation_config", None)
+        start_id = getattr(gen_cfg, "decoder_start_token_id", None) if gen_cfg else None
+        if start_id is None:
+            start_id = getattr(self._model.config, "decoder_start_token_id", None)
+        if start_id is not None:
+            extra_gen_kwargs["decoder_input_ids"] = torch.full(
+                (inputs["input_features"].shape[0], 1), start_id,
+                dtype=torch.long, device=self._device,
+            )
+
         # Step 5: Generate.  Greedy decoding (do_sample=False, num_beams=1)
         # is set explicitly for determinism even though it is the default
         # behavior — guards against future generation_config drift.
         with torch.inference_mode():
             outputs = self._model.generate(
                 **inputs,
+                **extra_gen_kwargs,
                 max_new_tokens=resolved_max_new_tokens,
                 do_sample=False,
                 num_beams=1,
@@ -669,7 +785,25 @@ class CohereTextGenerator:
             decode_kwargs["audio_chunk_index"] = audio_chunk_index
             decode_kwargs["language"] = resolved_language
 
-        transcript = self._processor.decode(outputs, **decode_kwargs)
+        # The current model-repo revision's processor.decode is a PLAIN proxy
+        # to tokenizer.decode (verified in the cached remote source,
+        # 2026-06-10): it takes a single 1-D id sequence and has no
+        # audio_chunk_index reassembly. model.generate returns a 2-D
+        # (batch, seq) tensor, so feeding it whole dies with
+        # "int() argument must be ... not 'list'". Try the documented call
+        # first (forward-compat with revisions that do implement chunk
+        # reassembly), then fall back to batch_decode on the 2-D output.
+        try:
+            transcript = self._processor.decode(outputs, **decode_kwargs)
+        except (TypeError, ValueError):
+            logger.debug(
+                "[CohereTextGenerator] processor.decode rejected batched "
+                "output (plain tokenizer proxy in this repo revision); "
+                "falling back to batch_decode."
+            )
+            transcript = self._processor.batch_decode(
+                outputs, skip_special_tokens=True
+            )
 
         # Step 8: Decode may return list or string.
         if isinstance(transcript, list):

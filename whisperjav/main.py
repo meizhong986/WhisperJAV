@@ -338,7 +338,7 @@ def parse_arguments():
                                  "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                  "nemo", "nemo-lite",
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
-                                 "ten", "whisperseg", "none"
+                                 "ten", "whisperseg", "firered", "none"
                              ],
                              default=None,  # None = use whisperseg (v1.8.13 default for balanced/fidelity)
                              metavar="BACKEND",
@@ -352,6 +352,8 @@ def parse_arguments():
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), "
+                                 "firered (FireRedVAD — multilingual DFSMN VAD, ~2MB, CPU-fast, "
+                                 "requires pip install fireredvad), "
                                  "none (disable segmentation)"
                              ))
     tuning_group.add_argument("--initial-prompt",
@@ -588,9 +590,11 @@ def parse_arguments():
     # ── Qwen3-ASR: Model ────────────────────────────────────────────────
     qwen_model_group = parser.add_argument_group("Qwen3-ASR: Model")
     qwen_model_group.add_argument("--qwen-generator", type=str, default="qwen3",
-                           choices=["qwen3", "anime-whisper"],
+                           choices=["qwen3", "anime-whisper", "cohere"],
                            help="Text generator backend (default: qwen3). "
-                                "anime-whisper uses litagin/anime-whisper for anime/VN dialogue")
+                                "anime-whisper uses litagin/anime-whisper for anime/VN dialogue. "
+                                "cohere uses CohereLabs/cohere-transcribe-03-2026 "
+                                "(gated HF repo — requires access grant + HF_TOKEN)")
     qwen_model_group.add_argument("--qwen-model-id", type=str,
                            default="Qwen/Qwen3-ASR-1.7B",
                            help="Qwen3-ASR model ID (default: Qwen/Qwen3-ASR-1.7B)")
@@ -635,12 +639,13 @@ def parse_arguments():
                                 "for ASR transcription (Qwen/Decoupled pipelines only)")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
-                                    "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg"],
+                                    "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg", "firered"],
                            help="Speech segmentation backend for VAD-based chunking: "
                                 "whisperseg (default since v1.8.13, JA-ASMR ONNX), "
                                 "silero-v6.2 (force-splits long chunks), "
                                 "ten, silero/silero-v4.0/v3.1, "
-                                "nemo/nemo-lite, whisper-vad, none")
+                                "nemo/nemo-lite, whisper-vad, "
+                                "firered (FireRedVAD multilingual DFSMN), none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
@@ -1304,6 +1309,18 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 qwen_kwargs["segmenter_chunk_threshold"] = 0.5
             if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
                 qwen_kwargs["segmenter_max_group_duration"] = 5.0
+        elif _gen_backend == "cohere":
+            # Cohere Transcribe defaults — mirror pass_worker's cohere branch
+            # (D2/D3/D7): official gated repo, passthrough cleaner, ForcedAligner
+            # stays ON (timestamp_mode default aligner_vad_fallback already).
+            if not any(a.startswith('--qwen-model-id') for a in sys.argv):
+                qwen_kwargs["model_id"] = "CohereLabs/cohere-transcribe-03-2026"
+            if not any(a.startswith('--qwen-assembly-cleaner') for a in sys.argv):
+                qwen_kwargs["assembly_cleaner"] = False
+            if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
+                qwen_kwargs["segmenter_chunk_threshold"] = 1.0
+            if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
+                qwen_kwargs["segmenter_max_group_duration"] = 6.0
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode

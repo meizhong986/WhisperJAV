@@ -450,7 +450,7 @@
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
-                                                <option value="cohere" disabled>Cohere-Transcribe (preview — coming in v1.9.0)</option>
+                                                <option value="cohere" title="Gated HuggingFace model: request access at huggingface.co/CohereLabs/cohere-transcribe-03-2026 and set HF_TOKEN before first use">Cohere-Transcribe (preview — gated HF)</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -511,6 +511,7 @@
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
+                                            <option value="firered" title="FireRedVAD — multilingual DFSMN VAD (Xiaohongshu), 97.57% F1 on FLEURS-VAD-102. Tiny model (~2MB), fast on CPU. Requires pip install fireredvad; weights auto-download from HuggingFace.">FireRedVAD</option>
                                             <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Default since v1.8.13 — F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR, default)</option>
                                             <option value="none">None</option>
                                         </select>
@@ -609,7 +610,7 @@
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen" selected>Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
-                                                <option value="cohere" disabled>Cohere-Transcribe (preview — coming in v1.9.0)</option>
+                                                <option value="cohere" title="Gated HuggingFace model: request access at huggingface.co/CohereLabs/cohere-transcribe-03-2026 and set HF_TOKEN before first use">Cohere-Transcribe (preview — gated HF)</option>
                                             </optgroup>
                                             <optgroup label="External (BYOP)">
                                                 <option value="xxl">XXL Faster Whisper</option>
@@ -673,6 +674,7 @@
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
+                                            <option value="firered" title="FireRedVAD — multilingual DFSMN VAD (Xiaohongshu), 97.57% F1 on FLEURS-VAD-102. Tiny model (~2MB), fast on CPU. Requires pip install fireredvad; weights auto-download from HuggingFace.">FireRedVAD</option>
                                             <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Default since v1.8.13 — F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR, default)</option>
                                             <option value="none">None</option>
                                         </select>
