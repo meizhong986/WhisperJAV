@@ -187,23 +187,84 @@ class CohereTextGenerator:
     # HF gating pre-flight
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _cached_snapshot(model_id: str) -> Optional[str]:
-        """
-        Return the local HF cache snapshot path if the model is fully
-        downloaded, else None.
+    # Files a usable Cohere-Transcribe snapshot must contain. Used to verify
+    # a cached revision is COMPLETE — snapshot_download(local_files_only=True)
+    # cannot do that offline (it has no file list without the Hub API) and
+    # happily returns a partial snapshot when upstream pushed a new commit
+    # and only some of its files got cached (seen in the wild: a refs/main
+    # snapshot holding only processor_config.json next to a complete older
+    # revision → offline load crashed despite the model being downloaded).
+    _CORE_SNAPSHOT_FILES = (
+        "config.json",
+        "model.safetensors",
+        "preprocessor_config.json",
+        "processor_config.json",
+        "tokenizer_config.json",
+        "configuration_cohere_asr.py",
+        "modeling_cohere_asr.py",
+        "processing_cohere_asr.py",
+        "tokenization_cohere_asr.py",
+    )
 
-        Gating only matters for the DOWNLOAD — once the snapshot is on disk,
-        the model loads fine with no token at all (local_files_only=True).
-        snapshot_download(local_files_only=True) succeeds only when every
-        file of the latest cached revision is present, so a partially
-        downloaded model correctly falls through to the token preflight.
+    @classmethod
+    def _snapshot_complete(cls, snapshot_dir) -> bool:
+        """True if the snapshot dir holds every core file with a real blob
+        behind it (stat() follows the HF cache symlinks; a dangling link
+        from an evicted/partial blob fails the check)."""
+        from pathlib import Path
+        snap = Path(snapshot_dir)
+        try:
+            return all((snap / name).stat().st_size > 0
+                       for name in cls._CORE_SNAPSHOT_FILES)
+        except OSError:
+            return False
+
+    @classmethod
+    def _cached_snapshot(cls, model_id: str) -> Optional[str]:
         """
+        Return a local HF cache snapshot path holding a COMPLETE copy of the
+        model, else None.
+
+        Gating only matters for the DOWNLOAD — once a snapshot is on disk,
+        the model loads fine with no token at all. Strategy:
+          1. Ask snapshot_download(local_files_only=True) for the cached
+             ref'd revision and verify it is complete.
+          2. If the ref points at a partial revision (upstream pushed a new
+             commit; only some files were fetched), scan ALL cached
+             revisions of the repo and return the newest complete one.
+        The caller loads directly FROM the returned path, which pins the
+        known-good revision and never touches the Hub.
+        """
+        from pathlib import Path
+        path = None
         try:
             from huggingface_hub import snapshot_download
-            return snapshot_download(model_id, local_files_only=True)
+            path = snapshot_download(model_id, local_files_only=True)
+        except Exception:
+            path = None
+        if path and cls._snapshot_complete(path):
+            return path
+        try:
+            from huggingface_hub.constants import HF_HUB_CACHE
+            snaps_dir = (Path(HF_HUB_CACHE)
+                         / ("models--" + model_id.replace("/", "--"))
+                         / "snapshots")
+            if not snaps_dir.is_dir():
+                return None
+            candidates = sorted(
+                (d for d in snaps_dir.iterdir() if d.is_dir()),
+                key=lambda d: d.stat().st_mtime, reverse=True,
+            )
+            for snap in candidates:
+                if cls._snapshot_complete(snap):
+                    logger.debug(
+                        "[CohereTextGenerator] refs/main snapshot is partial; "
+                        "using complete cached revision %s", snap.name
+                    )
+                    return str(snap)
         except Exception:
             return None
+        return None
 
     @staticmethod
     def _check_hf_access() -> None:
@@ -575,18 +636,22 @@ class CohereTextGenerator:
         import time
         start = time.time()
 
-        # Offline load when the snapshot is cached: skips Hub revision
-        # checks entirely, so no token is needed and no network round-trip.
+        # Offline load when a complete snapshot is cached: load FROM the
+        # snapshot directory itself. That pins the verified revision and
+        # skips Hub resolution entirely (no token, no network) — passing
+        # the repo id with local_files_only=True would re-resolve refs/main,
+        # which can point at a partial newer revision (see _cached_snapshot).
+        _load_target = cached_snapshot or cfg["model_id"]
         _offline = {"local_files_only": True} if cached_snapshot else {}
 
         try:
             self._processor = AutoProcessor.from_pretrained(
-                cfg["model_id"],
+                _load_target,
                 trust_remote_code=cfg["trust_remote_code"],
                 **_offline,
             )
             self._model = _AutoModelClass.from_pretrained(
-                cfg["model_id"],
+                _load_target,
                 dtype=dtype,
                 trust_remote_code=cfg["trust_remote_code"],
                 **_offline,
