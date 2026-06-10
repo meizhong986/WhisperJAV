@@ -902,21 +902,25 @@ class SubtitleSanitizer:
 
 
 
-            # Hallucination Removal
+            # Hallucination Removal (gated — non-autoregressive backends like
+            # SenseVoice disable this; their short utterances collide with the
+            # Whisper-tuned blacklist).
 
-            modified_text, hall_mods = self.hallucination_remover.remove_hallucinations(modified_text, self.config.primary_language)
+            if self.config.enable_exact_matching or self.config.enable_regex_matching or self.config.enable_fuzzy_matching:
 
-            if hall_mods:
+                modified_text, hall_mods = self.hallucination_remover.remove_hallucinations(modified_text, self.config.primary_language)
 
-                all_mods.extend(hall_mods)
+                if hall_mods:
 
-                final_reason = "hallucination"
+                    all_mods.extend(hall_mods)
+
+                    final_reason = "hallucination"
 
 
 
             # Repetition Cleaning
 
-            if modified_text.strip(): # Only process if there's text left
+            if self.config.enable_repetition_cleaning and modified_text.strip(): # Only process if there's text left
 
                 modified_text, rep_mods = self.repetition_cleaner.clean_repetitions(modified_text)
 
@@ -971,9 +975,20 @@ class SubtitleSanitizer:
 
 
 
-        # Now, run the High CPS removal on the already cleaned text
+        # Now, run the High CPS removal on the already cleaned text.
+        # Skippable: SenseVoice and other non-autoregressive backends span a
+        # whole utterance across the scene duration, so genuine short lines read
+        # as "abnormally slow" and would be dropped here. (#350)
 
-        final_subs = self._remove_abnormally_fast_subs(cleaned_subs)
+        if getattr(self.config, 'enable_cps_filter', True):
+
+            final_subs = self._remove_abnormally_fast_subs(cleaned_subs)
+
+        else:
+
+            logger.debug("CPS filter disabled (enable_cps_filter=False) — keeping all cleaned subs")
+
+            final_subs = cleaned_subs
 
         logger.debug(f"Content Cleaning complete. Subtitles remaining: {len(final_subs)}")
 

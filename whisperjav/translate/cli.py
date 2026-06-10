@@ -359,6 +359,35 @@ def main():
              "Note: batch size and max-tokens are auto-recomputed from this override."
     )
     ollama_group.add_argument(
+        '--ollama-temperature', type=float, default=None,
+        help="Sampling temperature for Ollama (0.0-2.0). Lower = more faithful/"
+             "deterministic, higher = more creative. Overrides the curated default."
+    )
+    ollama_group.add_argument(
+        '--ollama-top-p', type=float, default=None,
+        help="top_p nucleus sampling for Ollama (0.0-1.0). Baked into an optimized "
+             "model variant (PySubtrans only forwards temperature to the API)."
+    )
+    ollama_group.add_argument(
+        '--ollama-top-k', type=int, default=None,
+        help="top_k sampling for Ollama. Baked into an optimized model variant."
+    )
+    ollama_group.add_argument(
+        '--ollama-min-p', type=float, default=None,
+        help="min_p sampling floor for Ollama (0.0-1.0). Baked into an optimized variant."
+    )
+    ollama_group.add_argument(
+        '--ollama-repeat-penalty', type=float, default=None,
+        help="repeat_penalty for Ollama (e.g. 1.1). Higher discourages repetition. "
+             "Baked into an optimized model variant."
+    )
+    ollama_group.add_argument(
+        '--ollama-keep-alive', default=None,
+        help="How long Ollama keeps the model loaded in VRAM between batches "
+             "(e.g. '5m', '30m', '-1' for forever, '0' to unload immediately). "
+             "Keeping it loaded avoids reload stalls between batches."
+    )
+    ollama_group.add_argument(
         '--yes', '-y',
         action='store_true',
         help="Auto-confirm prompts (model downloads, server starts)"
@@ -584,12 +613,26 @@ def main():
         interactive = sys.stdin.isatty() and not getattr(args, 'yes', False)
         auto_pull = getattr(args, 'yes', False)
 
+        # Custom sampling params → baked into an optimized model variant.
+        # PySubtrans forwards ONLY temperature to the API per-request, so
+        # top_p/top_k/min_p/repeat_penalty must be applied server-side via the
+        # variant. None values are ignored (curated default kept).
+        _ollama_sampling = {
+            'temperature': getattr(args, 'ollama_temperature', None),
+            'top_p': getattr(args, 'ollama_top_p', None),
+            'top_k': getattr(args, 'ollama_top_k', None),
+            'min_p': getattr(args, 'ollama_min_p', None),
+            'repeat_penalty': getattr(args, 'ollama_repeat_penalty', None),
+        }
+
         try:
             readiness = mgr.ensure_ready(
                 model=model,
                 auto_start=True,
                 auto_pull=auto_pull,
                 interactive=interactive,
+                sampling=_ollama_sampling,
+                num_ctx_override=getattr(args, 'ollama_num_ctx', None),
             )
         except OllamaNotInstalledError as e:
             print(f"\n{e}", file=sys.stderr)
@@ -601,16 +644,16 @@ def main():
             print(f"\nERROR: {e}", file=sys.stderr)
             sys.exit(1)
 
-        # Dynamic config from model metadata
+        # Dynamic config from model metadata. ensure_ready() has already
+        # applied any --ollama-num-ctx override (num_ctx_override) to both
+        # readiness['num_ctx'] AND the baked model variant, so this value is
+        # the effective context window for batch_size capping / max_tokens.
         model = readiness['model']
         ollama_n_ctx = readiness['num_ctx']
-        # User --ollama-num-ctx override is applied BEFORE batch_size capping
-        # and max_tokens computation, so both downstream values honor the override.
         _user_n_ctx = getattr(args, 'ollama_num_ctx', None)
         if _user_n_ctx is not None:
-            print(f"[OLLAMA] num_ctx overridden by --ollama-num-ctx: "
-                  f"{ollama_n_ctx} -> {_user_n_ctx}", file=sys.stderr)
-            ollama_n_ctx = _user_n_ctx
+            print(f"[OLLAMA] num_ctx overridden by --ollama-num-ctx: {ollama_n_ctx} "
+                  f"(baked into model variant)", file=sys.stderr)
         _user_batch = merged.get('max_batch_size', readiness['batch_size'])
         ollama_batch_size = cap_batch_size_for_context(_user_batch, ollama_n_ctx)
         ollama_max_tokens = compute_max_output_tokens(ollama_batch_size, ollama_n_ctx)
@@ -634,6 +677,20 @@ def main():
         if not _user_set_temp_cli and not _user_set_temp_settings:
             if effective_tone != 'pornify':
                 provider_options['temperature'] = readiness.get('temperature', 0.3)
+
+        # --ollama-temperature is the highest-priority temperature override.
+        # It must go on the request path (provider_options) because PySubtrans
+        # sends temperature per-request, which overrides any Modelfile PARAMETER.
+        _ollama_temp = getattr(args, 'ollama_temperature', None)
+        if _ollama_temp is not None:
+            provider_options['temperature'] = max(0.0, min(2.0, _ollama_temp))
+
+        # keep_alive controls how long Ollama holds the model in VRAM between
+        # batches. PySubtrans forwards extra provider_options into the request
+        # body, and Ollama's OpenAI-compatible endpoint accepts keep_alive.
+        _keep_alive = getattr(args, 'ollama_keep_alive', None)
+        if _keep_alive is not None:
+            provider_options['keep_alive'] = _keep_alive
 
         provider_config = dict(provider_config)
         provider_config['max_tokens'] = ollama_max_tokens
@@ -660,9 +717,28 @@ def main():
                   f"{ollama_batch_size} to fit {ollama_n_ctx}-token context", file=sys.stderr)
         print(f"[OLLAMA] model={model}, num_ctx={ollama_n_ctx}, batch_size={ollama_batch_size}, "
               f"max_tokens={ollama_max_tokens}", file=sys.stderr)
-        print(f"[OLLAMA] Final provider_options: temperature={provider_options.get('temperature')}, "
-              f"top_p={provider_options.get('top_p')}",
+        # Echo the EFFECTIVE tuning so the console shows what actually reaches
+        # Ollama. NOTE: only temperature/max_tokens travel in the per-request
+        # body (visible with --debug as "Request Body"); num_ctx + top_k/top_p/
+        # min_p/repeat_penalty are applied server-side via the baked model
+        # variant (see "Created optimized variant" above / `ollama show <model>`).
+        # keep_alive rides in the request body too.
+        _applied = {
+            'temperature': provider_options.get('temperature'),
+            'top_p (request)': provider_options.get('top_p'),
+            'num_ctx (variant)': ollama_n_ctx,
+            'keep_alive (request)': provider_options.get('keep_alive', 'default'),
+        }
+        for _k in ('ollama_top_k', 'ollama_min_p', 'ollama_repeat_penalty'):
+            _v = getattr(args, _k, None)
+            if _v is not None:
+                _applied[_k.replace('ollama_', '') + ' (variant)'] = _v
+        print(f"[OLLAMA] Effective tuning: "
+              + ", ".join(f"{k}={v}" for k, v in _applied.items()),
               file=sys.stderr)
+        print(f"[OLLAMA] (num_ctx + top_k/top_p/min_p/repeat_penalty are baked into "
+              f"the '{model}' variant, not the per-request body — verify with "
+              f"`ollama show {model}`)", file=sys.stderr)
 
     # Batch translation loop
     success_count = 0

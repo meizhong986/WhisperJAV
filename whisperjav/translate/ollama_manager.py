@@ -427,33 +427,45 @@ class OllamaManager:
 
     # ── Optimized Model Variants ─────────────────────────────────────
 
-    def _ensure_optimized_variant(self, model: str) -> str:
+    def _ensure_optimized_variant(self, model: str, sampling: Optional[dict] = None) -> str:
         """Create or reuse an optimized model variant with tuned sampling params.
 
         PySubtrans CustomClient only passes ``temperature`` to the Ollama API.
         Other sampling parameters (top_k, top_p, min_p, repeat_penalty) are
         silently ignored. This method works around that limitation by creating
-        a lightweight Ollama model variant with our recommended defaults baked
-        into the Modelfile as PARAMETER directives.
+        a lightweight Ollama model variant with the requested sampling params
+        baked in as PARAMETER directives.
 
         The variant is a thin metadata layer — no model weight duplication.
         Ollama reuses the same GGUF blobs.
 
         Args:
             model: Original model name (e.g., "huihui_ai/hy-mt1.5-abliterated:latest")
+            sampling: Sampling parameter dict to bake in. Falls back to
+                OLLAMA_SAMPLING_DEFAULTS when not provided. Only non-None values
+                are applied, so callers can pass a partial dict (e.g. just
+                {'repeat_penalty': 1.2}) to override individual params.
 
         Returns:
             Variant model name on success, original model name on failure.
         """
         import hashlib
 
-        if not OLLAMA_SAMPLING_DEFAULTS:
-            return model  # No defaults to apply
+        # Merge requested sampling over the curated defaults, dropping None values
+        # (None = "not set by the user", leave the default in place).
+        params = dict(OLLAMA_SAMPLING_DEFAULTS)
+        if sampling:
+            for k, v in sampling.items():
+                if v is not None:
+                    params[k] = v
+
+        if not params:
+            return model  # No params to apply
 
         # Deterministic variant name: hash of (model + params) ensures:
         #   - Same model + same params → same variant (reuse)
-        #   - Params change in code update → new variant created
-        _key = f"{model}:{json.dumps(OLLAMA_SAMPLING_DEFAULTS, sort_keys=True)}"
+        #   - Params change → new variant created
+        _key = f"{model}:{json.dumps(params, sort_keys=True)}"
         _hash = hashlib.sha256(_key.encode()).hexdigest()[:10]
         variant = f"whisperjav-{_hash}"
 
@@ -462,28 +474,43 @@ class OllamaManager:
             print(f"[OLLAMA] Using optimized variant: {variant}", file=sys.stderr)
             return variant
 
-        # Build Modelfile with optimized sampling parameters
-        lines = [f'FROM {model}']
-        for param, value in OLLAMA_SAMPLING_DEFAULTS.items():
-            lines.append(f'PARAMETER {param} {value}')
-        modelfile = '\n'.join(lines)
+        _params_str = ', '.join(f'{k}={v}' for k, v in params.items())
 
-        # Create variant via /api/create (stream=false → single JSON response)
-        try:
-            self._http_post('/api/create', {
-                'model': variant,
-                'modelfile': modelfile,
-                'stream': False,
-            }, timeout=30)
-            print(f"[OLLAMA] Created optimized variant: {variant}", file=sys.stderr)
-            _params_str = ', '.join(f'{k}={v}' for k, v in OLLAMA_SAMPLING_DEFAULTS.items())
-            print(f"[OLLAMA]   Sampling defaults: {_params_str}", file=sys.stderr)
-            return variant
-        except Exception as e:
-            print(f"[OLLAMA] Could not create optimized variant: {e}", file=sys.stderr)
-            print(f"[OLLAMA]   Continuing with original model (only temperature will be tuned)",
-                  file=sys.stderr)
-            return model
+        # Create variant via /api/create (stream=false → single JSON response).
+        # Modern Ollama (>= 0.x with structured create) rejects the legacy
+        # 'modelfile' string field with HTTP 400 and instead wants structured
+        # 'from' + 'parameters' fields. Try the structured payload first, then
+        # fall back to the legacy 'modelfile' string for older servers.
+        structured_payload = {
+            'model': variant,
+            'from': model,
+            'parameters': params,
+            'stream': False,
+        }
+        lines = [f'FROM {model}']
+        for param, value in params.items():
+            lines.append(f'PARAMETER {param} {value}')
+        legacy_payload = {
+            'model': variant,
+            'modelfile': '\n'.join(lines),
+            'stream': False,
+        }
+
+        last_err = None
+        for payload in (structured_payload, legacy_payload):
+            try:
+                self._http_post('/api/create', payload, timeout=30)
+                print(f"[OLLAMA] Created optimized variant: {variant}", file=sys.stderr)
+                print(f"[OLLAMA]   Sampling params: {_params_str}", file=sys.stderr)
+                return variant
+            except Exception as e:
+                last_err = e
+                continue
+
+        print(f"[OLLAMA] Could not create optimized variant: {last_err}", file=sys.stderr)
+        print(f"[OLLAMA]   Continuing with original model (only temperature will be tuned)",
+              file=sys.stderr)
+        return model
 
     # ── Hardware-Aware Recommendation ─────────────────────────────────
 
@@ -529,8 +556,22 @@ class OllamaManager:
         auto_start: bool = True,
         auto_pull: bool = False,
         interactive: bool = True,
+        sampling: Optional[dict] = None,
+        num_ctx_override: Optional[int] = None,
     ) -> dict:
         """Full orchestration: detect server, start if needed, check model, pull if needed.
+
+        Args:
+            sampling: Optional dict of sampling params (top_k, top_p, min_p,
+                repeat_penalty, temperature) to bake into the optimized model
+                variant, overriding OLLAMA_SAMPLING_DEFAULTS. None values are
+                ignored (the curated default is kept).
+            num_ctx_override: Optional context-window override. When set, it
+                replaces the curated num_ctx in the returned dict AND is baked
+                into the optimized variant as a ``num_ctx`` PARAMETER — the only
+                reliable way to change the context window, since Ollama's
+                OpenAI-compatible /v1/chat/completions endpoint ignores a
+                top-level num_ctx field in the request body.
 
         Returns:
             dict with keys: model, num_ctx, batch_size, temperature, server_started, base_url
@@ -628,6 +669,12 @@ class OllamaManager:
         # Use curated config if available, otherwise use dynamic values
         cfg = OLLAMA_MODEL_CONFIGS.get(model, {})
         num_ctx = cfg.get('num_ctx', min(actual_ctx, 8192))
+        # Honor an explicit context-window override (e.g. from --ollama-num-ctx /
+        # the GUI). It must be resolved BEFORE building the variant so the variant
+        # bakes in the right num_ctx — Ollama's OpenAI endpoint ignores a
+        # top-level num_ctx in the request body, so the variant is the only path.
+        if num_ctx_override is not None:
+            num_ctx = int(num_ctx_override)
         batch_size = cfg.get('batch_size', 11)
         # Default 0.3: best-fit compromise across 10 tested local models for
         # JAV subtitle translation (range 0.2–0.4, median 0.3). Keeps strong
@@ -650,9 +697,13 @@ class OllamaManager:
 
         # Step 6c: Create optimized variant with tuned sampling parameters.
         # PySubtrans only passes temperature to the API — top_k, top_p, min_p,
-        # repeat_penalty are silently dropped. By baking them into a Modelfile
-        # variant, Ollama applies them server-side as defaults.
-        effective_model = self._ensure_optimized_variant(model)
+        # repeat_penalty, AND num_ctx are silently dropped on Ollama's OpenAI
+        # endpoint. By baking them into a model variant, Ollama applies them
+        # server-side as defaults. We always bake num_ctx so the resolved
+        # context window (curated or overridden) actually takes effect.
+        _variant_params = dict(sampling) if sampling else {}
+        _variant_params['num_ctx'] = num_ctx
+        effective_model = self._ensure_optimized_variant(model, sampling=_variant_params)
 
         # Step 7: Return readiness info
         return {
