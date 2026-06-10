@@ -185,6 +185,12 @@ const ModeManager = {
             if (transformersInfoRow) transformersInfoRow.style.display = 'none';
             sensitivityLabel.textContent = 'Sensitivity (accuracy vs false-positives):';
         }
+
+        // Show the single-pass SenseVoice diarization toggle only in sensevoice mode.
+        const svDiarizeRow = document.getElementById('adv-row-sv-diarize');
+        if (svDiarizeRow) {
+            svDiarizeRow.style.display = (mode === 'sensevoice') ? '' : 'none';
+        }
     },
 
     isTransformersMode() {
@@ -287,6 +293,43 @@ const QwenManager = {
         this.customized = true;
     },
 
+    resetToDefaults() {
+        this.params = null;
+        this.customized = false;
+    }
+};
+
+// SenseVoice (FunASR) parameter defaults — mirror modules/sensevoice_asr.py.
+const SenseVoiceManager = {
+    params: null,
+    customized: false,
+    defaults: {
+        model_id: 'iic/SenseVoiceSmall',
+        device: 'auto',
+        scene: 'auditok',
+        use_itn: true,
+        ban_emo_unk: false,
+        merge_vad: true,
+        merge_length_s: 15,
+        vad_max_segment_ms: 60000,
+        batch_size_s: 60,
+        // Post-processing (relaxed for SenseVoice — see api.get_sensevoice_schema)
+        remove_hallucinations: false,
+        remove_repetitions: true,
+        remove_cps_outliers: false,
+        // Speaker diarization (funasr cam++); spk_num 0 = auto-detect count
+        diarize: false,
+        spk_num: 0,
+    },
+    getParams() {
+        return this.customized && this.params
+            ? { ...this.defaults, ...this.params }
+            : { ...this.defaults };
+    },
+    setParams(params) {
+        this.params = params;
+        this.customized = true;
+    },
     resetToDefaults() {
         this.params = null;
         this.customized = false;
@@ -668,6 +711,17 @@ const FormManager = {
             modelSelect.disabled = !modelOverrideCheckbox.checked;
         });
 
+        // Batched transcription toggle (issue #357): grey out batch size when off
+        const batchedCheckbox = document.getElementById('batchedPipeline');
+        const batchSizeInput = document.getElementById('batchSize');
+        if (batchedCheckbox && batchSizeInput) {
+            const syncBatchSize = () => {
+                batchSizeInput.disabled = !batchedCheckbox.checked;
+            };
+            batchedCheckbox.addEventListener('change', syncBatchSize);
+            syncBatchSize();  // initialize on load
+        }
+
         // Validate on form changes
         document.querySelectorAll('input, select').forEach(input => {
             input.addEventListener('change', () => this.validateForm());
@@ -748,7 +802,14 @@ const FormManager = {
         const modelOverrideEnabled = document.getElementById('modelOverrideEnabled').checked;
         const asyncProcessingEnabled = document.getElementById('asyncProcessing').checked;
 
-        return {
+        // Batched transcription (issue #357) — only meaningful for the balanced
+        // pipeline; harmless for other modes (ignored downstream).
+        const batchedEl = document.getElementById('batchedPipeline');
+        const batchedPipeline = batchedEl ? batchedEl.checked : true;
+        const batchSizeEl = document.getElementById('batchSize');
+        const batchSize = batchSizeEl ? parseInt(batchSizeEl.value, 10) || 8 : 8;
+
+        const legacyOptions = {
             ...baseOptions,
             sensitivity: document.getElementById('sensitivity').value,
 
@@ -760,7 +821,27 @@ const FormManager = {
             // Async processing (conditional)
             async_processing: asyncProcessingEnabled,
 
+            // Batched transcription speedup
+            batched_pipeline: batchedPipeline,
+            batch_size: batchSize,
+
         };
+
+        // Single-pass SenseVoice: forward the Advanced-Options diarization toggle
+        // as sv_params (api._build_sensevoice_args → --sv-params → main.py).
+        // Previously single-pass SenseVoice dropped all customize params.
+        if (mode === 'sensevoice') {
+            const svDiarizeEl = document.getElementById('svDiarize');
+            if (svDiarizeEl && svDiarizeEl.checked) {
+                const svParams = { diarize: true };
+                const spkNumEl = document.getElementById('svSpkNum');
+                const spkNum = spkNumEl ? parseInt(spkNumEl.value, 10) : 0;
+                if (spkNum && spkNum > 0) svParams.spk_num = spkNum;
+                legacyOptions.sv_params = svParams;
+            }
+        }
+
+        return legacyOptions;
     }
 };
 
@@ -1225,6 +1306,7 @@ const EnsembleManager = {
             isQwen: false,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
             isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             isCohere: false,  // Track if using Cohere-Transcribe specifically (v1.8.14)
+            isSenseVoice: false,  // Track if using SenseVoice (FunASR, issue #350)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
             enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
@@ -1244,6 +1326,7 @@ const EnsembleManager = {
             isQwen: true,  // Default pipeline is Qwen3-ASR (ChronosJAV umbrella)
             isAnimeWhisper: false,
             isCohere: false,  // v1.8.14: Cohere-Transcribe preview (gated HF model)
+            isSenseVoice: false,  // Track if using SenseVoice (FunASR, issue #350)
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
@@ -1273,6 +1356,9 @@ const EnsembleManager = {
     qwenModels: [
         { value: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR-1.7B    8GB' },
         { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' }
+    ],
+    sensevoiceModels: [
+        { value: 'iic/SenseVoiceSmall', label: 'SenseVoice Small    ~1GB' }
     ],
     animeWhisperModels: [
         { value: 'litagin/anime-whisper', label: 'anime-whisper    ~4GB' },
@@ -1319,10 +1405,12 @@ const EnsembleManager = {
         this.state.pass1.isQwen = (this.state.pass1.pipeline === 'qwen' || this.state.pass1.pipeline === 'anime-whisper' || this.state.pass1.pipeline === 'cohere');
         this.state.pass1.isAnimeWhisper = this.state.pass1.pipeline === 'anime-whisper';
         this.state.pass1.isCohere = this.state.pass1.pipeline === 'cohere';
+        this.state.pass1.isSenseVoice = this.state.pass1.pipeline === 'sensevoice';
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper' || this.state.pass2.pipeline === 'cohere');
         this.state.pass2.isAnimeWhisper = this.state.pass2.pipeline === 'anime-whisper';
         this.state.pass2.isCohere = this.state.pass2.pipeline === 'cohere';
+        this.state.pass2.isSenseVoice = this.state.pass2.pipeline === 'sensevoice';
         this.state.pass2.isXxl = this.state.pass2.pipeline === 'xxl';
 
         // Load persisted BYOP preferences (XXL exe path, extra args)
@@ -1354,6 +1442,10 @@ const EnsembleManager = {
             this.swapModelOptions('pass1', 'cohere');
         } else if (this.state.pass1.isQwen) {
             this.swapModelOptions('pass1', 'qwen');
+        } else if (this.state.pass1.isTransformers) {
+            this.swapModelOptions('pass1', 'transformers');
+        } else if (this.state.pass1.isSenseVoice) {
+            this.swapModelOptions('pass1', 'sensevoice');
         }
         if (this.state.pass2.isAnimeWhisper) {
             this.swapModelOptions('pass2', 'anime-whisper');
@@ -1361,6 +1453,10 @@ const EnsembleManager = {
             this.swapModelOptions('pass2', 'cohere');
         } else if (this.state.pass2.isQwen) {
             this.swapModelOptions('pass2', 'qwen');
+        } else if (this.state.pass2.isTransformers) {
+            this.swapModelOptions('pass2', 'transformers');
+        } else if (this.state.pass2.isSenseVoice) {
+            this.swapModelOptions('pass2', 'sensevoice');
         }
 
         // Pass 2 enable/disable
@@ -1519,18 +1615,20 @@ const EnsembleManager = {
         const isQwen = (newValue === 'qwen' || newValue === 'anime-whisper' || newValue === 'cohere');
         const isAnimeWhisper = newValue === 'anime-whisper';
         const isCohere = newValue === 'cohere';
+        const isSenseVoice = newValue === 'sensevoice';
         const isXxl = newValue === 'xxl';
         const wasTransformers = passState.isTransformers;
         const wasQwen = passState.isQwen;
         const wasAnimeWhisper = passState.isAnimeWhisper;
         const wasCohere = passState.isCohere;
+        const wasSenseVoice = passState.isSenseVoice;
 
         // Determine pipeline category for model swapping. Specific ChronosJAV
         // backends (anime-whisper, cohere) take precedence over the qwen umbrella.
-        const getPipelineType = (isT, isQ, isAW, isC) =>
-            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isQ ? 'qwen' : 'legacy')));
-        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper, wasCohere);
-        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper, isCohere);
+        const getPipelineType = (isT, isQ, isAW, isC, isSV) =>
+            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isSV ? 'sensevoice' : (isQ ? 'qwen' : 'legacy'))));
+        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper, wasCohere, wasSenseVoice);
+        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper, isCohere, isSenseVoice);
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -1543,6 +1641,7 @@ const EnsembleManager = {
                 passState.isQwen = isQwen;
                 passState.isAnimeWhisper = isAnimeWhisper;
                 passState.isCohere = isCohere;
+                passState.isSenseVoice = isSenseVoice;
                 passState.isXxl = isXxl;
                 this.updateBadges();
                 this.updateRowGreyingState(passKey);
@@ -1562,6 +1661,7 @@ const EnsembleManager = {
             passState.isQwen = isQwen;
             passState.isAnimeWhisper = isAnimeWhisper;
             passState.isCohere = isCohere;
+            passState.isSenseVoice = isSenseVoice;
             passState.isXxl = isXxl;
             this.updateRowGreyingState(passKey);
             this.updateByopPanel();
@@ -1591,14 +1691,16 @@ const EnsembleManager = {
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'cohere') {
-            // Cohere prefers long contiguous segments — same defaults as
-            // anime-whisper / qwen (semantic + whisperseg + balanced sensitivity),
-            // but with full-scene framer to give the model larger context.
+            // Cohere runs VAD-only timing by default (ChronosJAV logic):
+            // the segmenter drives subtitle granularity, so pair it with
+            // FireRedVAD — tight native splits (max_speech 5s, splits at
+            // probability minima) and CPU-side, leaving VRAM to the ~4GB
+            // Cohere model.
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'whisperseg';
+            segmenterSelect.value = 'firered';
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'whisperseg';
+            this.state[passKey].speechSegmenter = 'firered';
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'qwen') {
@@ -1609,6 +1711,19 @@ const EnsembleManager = {
             this.state[passKey].speechSegmenter = 'whisperseg';
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
+        } else if (pipelineType === 'sensevoice') {
+            // SenseVoice: scene detection drives subtitle granularity; the
+            // segmenter dropdown is repurposed as an fsmn-vad on/off toggle and
+            // defaults to fsmn-vad (enabled). Sensitivity is unused.
+            sceneSelect.value = 'auditok';
+            this.state[passKey].sceneDetector = 'auditok';
+            // Default the internal VAD to ON (fsmn-vad). The actual dropdown
+            // options are swapped in by updateRowGreyingState's SenseVoice branch.
+            this.state[passKey].speechSegmenter = 'fsmn-vad';
+            if (sensitivitySelect.querySelector('option[value="none"]')) {
+                sensitivitySelect.value = 'none';
+            }
+            this.state[passKey].sensitivity = 'none';
         } else {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
             const pipeline = this.state[passKey].pipeline;
@@ -1649,6 +1764,9 @@ const EnsembleManager = {
                 break;
             case 'qwen':
                 models = this.qwenModels;
+                break;
+            case 'sensevoice':
+                models = this.sensevoiceModels;
                 break;
             default:
                 models = this.legacyModels;
@@ -1717,16 +1835,20 @@ const EnsembleManager = {
         if (modelSelect) { modelSelect.disabled = isPass2Disabled; modelSelect.title = ''; }
         if (customizeBtn) { customizeBtn.disabled = isPass2Disabled; customizeBtn.title = ''; }
 
-        // Sensitivity: Disabled only for Transformers (Qwen now uses sensitivity presets)
-        const disableSensitivity = passState.isTransformers;
+        // Sensitivity: Disabled for Transformers and SenseVoice (no sensitivity presets)
+        const disableSensitivity = passState.isTransformers || passState.isSenseVoice;
 
-        // Segmenter: Only disabled for Transformers (uses HF internal chunking)
+        // Segmenter: Disabled for Transformers (HF internal chunking).
+        // SenseVoice repurposes it as an fsmn-vad on/off toggle (handled below),
+        // so it is NOT in the blanket-disable set.
         // Qwen DOES use segmenter as a post-ASR VAD filter (--qwen-segmenter)
         const disableSegmenter = passState.isTransformers;
 
         if (disableSensitivity) {
             sensitivitySelect.disabled = true;
-            sensitivitySelect.title = 'Sensitivity not applicable for Transformers mode';
+            sensitivitySelect.title = passState.isSenseVoice
+                ? 'Sensitivity not applicable for SenseVoice mode'
+                : 'Sensitivity not applicable for Transformers mode';
 
             // Set sensitivity to 'none' for visual clarity (if option exists)
             if (sensitivitySelect.querySelector('option[value="none"]')) {
@@ -1743,17 +1865,30 @@ const EnsembleManager = {
         }
 
         if (disableSegmenter) {
+            // Transformers: restore the standard Whisper segmenter options (in
+            // case we're switching back from SenseVoice) then disable.
+            this.restoreWhisperSegmenterOptions(segmenterSelect);
             segmenterSelect.disabled = true;
             segmenterSelect.title = 'Transformers uses HF internal chunking';
-
-            // Set segmenter to 'none' for visual clarity (if option exists)
             if (segmenterSelect.querySelector('option[value="none"]')) {
                 segmenterSelect.value = 'none';
                 passState.speechSegmenter = 'none';
             }
+        } else if (passState.isSenseVoice) {
+            // SenseVoice: repurpose the dropdown as an fsmn-vad on/off toggle.
+            this.setSenseVoiceSegmenterOptions(segmenterSelect);
+            segmenterSelect.disabled = isPass2Disabled;
+            segmenterSelect.title = 'SenseVoice internal VAD: fsmn-vad (default) or None to disable chunking';
+            // Default to fsmn-vad unless the user already chose none.
+            if (passState.speechSegmenter !== 'none') {
+                segmenterSelect.value = 'fsmn-vad';
+                passState.speechSegmenter = 'fsmn-vad';
+            } else {
+                segmenterSelect.value = 'none';
+            }
         } else {
-            // Re-enable segmenter (unless pass2 is disabled)
-            // Note: Qwen uses segmenter as post-ASR VAD filter
+            // Whisper/Qwen: restore standard segmenter options, then enable.
+            this.restoreWhisperSegmenterOptions(segmenterSelect);
             segmenterSelect.disabled = isPass2Disabled;
             segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR')}` : '';
         }
@@ -1761,6 +1896,32 @@ const EnsembleManager = {
         // Parameter guide button: visible only for Qwen pipelines
         const guideBtn = document.getElementById(`guide-${passKey}`);
         if (guideBtn) guideBtn.style.display = passState.isQwen ? '' : 'none';
+    },
+
+    // Replace the segmenter dropdown's options with the SenseVoice VAD toggle
+    // (fsmn-vad / none). The original Whisper options are stashed once so they
+    // can be restored when switching to a Whisper/Qwen pipeline.
+    setSenseVoiceSegmenterOptions(segmenterSelect) {
+        if (!segmenterSelect) return;
+        if (segmenterSelect.dataset.svActive === '1') return;  // already swapped
+        if (!segmenterSelect.dataset.whisperOptions) {
+            segmenterSelect.dataset.whisperOptions = segmenterSelect.innerHTML;
+        }
+        segmenterSelect.innerHTML =
+            '<option value="fsmn-vad" title="FunASR fsmn-vad — chunks long audio internally (default)">fsmn-vad (default)</option>' +
+            '<option value="none" title="Disable SenseVoice internal VAD — each scene is decoded as one un-chunked clip">None (disable VAD)</option>';
+        segmenterSelect.dataset.svActive = '1';
+    },
+
+    // Restore the original Whisper/Qwen segmenter options if they were swapped
+    // out for the SenseVoice VAD toggle.
+    restoreWhisperSegmenterOptions(segmenterSelect) {
+        if (!segmenterSelect) return;
+        if (segmenterSelect.dataset.svActive !== '1') return;  // not swapped
+        if (segmenterSelect.dataset.whisperOptions) {
+            segmenterSelect.innerHTML = segmenterSelect.dataset.whisperOptions;
+        }
+        segmenterSelect.dataset.svActive = '0';
     },
 
     handleSensitivityChange(passKey, newValue, selectElement) {
@@ -2031,8 +2192,19 @@ const EnsembleManager = {
             await this.openTransformersCustomize(passKey);
             return;
         }
+        // Cohere must be checked BEFORE the isQwen umbrella (isCohere ⊂ isQwen):
+        // it gets the focused get_cohere_schema modal instead of the full
+        // Qwen-shaped one (the v1.9.0 dedicated handler per api.py D-NEW2).
+        if (passState.isCohere) {
+            await this.openCohereCustomize(passKey);
+            return;
+        }
         if (passState.isQwen) {
             await this.openQwenCustomize(passKey);
+            return;
+        }
+        if (passState.isSenseVoice) {
+            await this.openSenseVoiceCustomize(passKey);
             return;
         }
 
@@ -2870,6 +3042,389 @@ const EnsembleManager = {
     },
 
     // ========== Transformers Pipeline Customization ==========
+
+    // --- SenseVoice customize modal (issue #350) ---
+    async openSenseVoiceCustomize(passKey) {
+        this.state.currentCustomize = passKey;
+        const passState = this.state[passKey];
+        try {
+            const result = await pywebview.api.get_sensevoice_schema();
+            if (!result.success) {
+                ErrorHandler.show('Error', 'Failed to load SenseVoice parameters: ' + (result.error || 'Unknown error'));
+                return;
+            }
+            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+            const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
+            document.getElementById('customizeModalTitle').textContent =
+                `${passLabel} Settings (SenseVoice / FunASR)${customStatus}`;
+
+            this._sensevoiceSchema = result.schema;
+            const currentValues = passState.customized && passState.params
+                ? { ...SenseVoiceManager.defaults, ...passState.params }
+                : { ...SenseVoiceManager.defaults };
+
+            this.generateSenseVoiceForm(result.schema, currentValues);
+            await this.refreshPresetList();
+            document.getElementById('customizeModal').classList.add('active');
+        } catch (error) {
+            ErrorHandler.show('Error', 'Failed to open SenseVoice customize dialog: ' + error);
+        }
+    },
+
+    generateSenseVoiceForm(schema, currentValues) {
+        // Mirror the Transformers modal layout: Model / Quality / Chunking /
+        // Enhancer / Scene in the five standard tab slots; context stays hidden.
+        const tabMap = {
+            model: 'Model',
+            quality: 'Quality',
+            segmenter: 'Chunking',
+            enhancer: 'Enhancer',
+            scene: 'Scene'
+        };
+        ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'].forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (panel) panel.innerHTML = '';
+            const btn = document.querySelector(`[data-tab="${tab}"]`);
+            if (btn) {
+                if (tabMap[tab]) { btn.style.display = ''; btn.textContent = tabMap[tab]; }
+                else { btn.style.display = 'none'; }
+            }
+        });
+
+        // Model tab: model id + device. NOTE: in ensemble the main-tab Model
+        // dropdown overrides model_id (pass_worker applies it after modal
+        // params); device has no main-tab equivalent so it always applies.
+        const modelTab = document.getElementById('tab-model');
+        const secM = schema.model || {};
+        if (secM.model_id) {
+            modelTab.appendChild(this.createTransformersDropdown('model_id', secM.model_id.label,
+                secM.model_id.options, currentValues.model_id || secM.model_id.default,
+                'FunASR/ModelScope model id. The Model dropdown on the main Ensemble row takes precedence when set.'));
+        }
+        if (secM.device) {
+            modelTab.appendChild(this.createTransformersDropdown('device', secM.device.label,
+                secM.device.options, currentValues.device || secM.device.default,
+                'Compute device (auto will detect GPU availability)'));
+        }
+
+        const decoding = document.getElementById('tab-quality');
+        const sec1 = schema.decoding || {};
+        decoding.appendChild(this.createParamCheckbox('use_itn', sec1.use_itn.label,
+            currentValues.use_itn, 'Restore punctuation and number formatting (recommended on)'));
+        decoding.appendChild(this.createParamCheckbox('ban_emo_unk', sec1.ban_emo_unk.label,
+            currentValues.ban_emo_unk, 'Suppress the unknown-emotion token in output'));
+        if (sec1.diarize) {
+            decoding.appendChild(this.createParamCheckbox('diarize', sec1.diarize.label,
+                currentValues.diarize,
+                'Speaker diarization (FunASR cam++): per-sentence [spkN] labels. Runs SenseVoice on the full audio (scene detection auto-disabled) so speaker ids stay consistent; downloads the cam++ model on first use.'));
+            if (sec1.spk_num) {
+                const sn = sec1.spk_num;
+                decoding.appendChild(this.createTransformersSlider('spk_num', sn.label,
+                    sn.min, sn.max, sn.step, currentValues.spk_num ?? sn.default,
+                    'Force a fixed speaker count. 0 = auto-detect (cam++ often collapses to 1 on breathy/monologue audio). Set 2+ when you know the scene’s speaker count.'));
+                const snCtrl = decoding.querySelector('.param-control[data-param="spk_num"]');
+                if (snCtrl) snCtrl.dataset.originalType = 'int';
+            }
+        }
+
+        // Post-processing filters. The shared sanitizer is Whisper-tuned and
+        // over-removes SenseVoice lines; these default OFF/relaxed. (#350)
+        const sec3 = schema.postproc || {};
+        if (sec3.remove_hallucinations) {
+            decoding.appendChild(this.createParamCheckbox('remove_hallucinations',
+                sec3.remove_hallucinations.label, currentValues.remove_hallucinations,
+                'Apply the Whisper hallucination blacklist. OFF by default — SenseVoice’s short utterances collide with Whisper-tuned phrases and get dropped.'));
+            decoding.appendChild(this.createParamCheckbox('remove_repetitions',
+                sec3.remove_repetitions.label, currentValues.remove_repetitions,
+                'Collapse repeated phrases within a line.'));
+            decoding.appendChild(this.createParamCheckbox('remove_cps_outliers',
+                sec3.remove_cps_outliers.label, currentValues.remove_cps_outliers,
+                'Drop lines that are abnormally fast/slow. OFF by default — SenseVoice spans an utterance across the whole scene, so genuine short lines look “too slow” and would be removed.'));
+        }
+
+        const vad = document.getElementById('tab-segmenter');
+        const sec2 = schema.vad || {};
+        vad.appendChild(this.createParamCheckbox('merge_vad', sec2.merge_vad.label,
+            currentValues.merge_vad,
+            'FunASR merge_vad: glue adjacent short fsmn-vad segments together (up to the merge target length) before decoding. Fewer, longer chunks = better context, slightly fewer subtitle lines.'));
+        const ml = sec2.merge_length_s;
+        vad.appendChild(this.createTransformersSlider('merge_length_s', ml.label,
+            ml.min, ml.max, ml.step, currentValues.merge_length_s ?? ml.default,
+            'FunASR merge_length_s: target length (seconds) when merging short VAD segments. Only applies when "Merge short VAD segments" is on.'));
+        const ms = sec2.vad_max_segment_ms;
+        vad.appendChild(this.createTransformersSlider('vad_max_segment_ms', ms.label,
+            ms.min, ms.max, ms.step, currentValues.vad_max_segment_ms ?? ms.default,
+            'FunASR vad_kwargs.max_single_segment_time: longest single VAD chunk (ms). The tutorial recommends 60000 (60s) for long audio. Segments longer than this are TRUNCATED, so keep it at/above your longest expected utterance.'));
+        const bs = sec2.batch_size_s;
+        vad.appendChild(this.createTransformersSlider('batch_size_s', bs.label,
+            bs.min, bs.max, bs.step, currentValues.batch_size_s ?? bs.default,
+            'FunASR batch_size_s: total audio-seconds decoded per dynamic batch. Higher = faster throughput but more VRAM. Independent of subtitle timing.'));
+
+        // Enhancer tab: enhancer selection itself lives on the main Ensemble
+        // row (like Transformers); the modal only exposes the BS-RoFormer
+        // overlap knob. Gated behind an enable checkbox so that when no speech
+        // enhancement is used we don't emit a floating bsrf_overlap into
+        // --passN-params. The gating checkbox is consumed locally and is NOT
+        // collected as a param (see applyCustomization's data-gating-toggle
+        // handling); the slider is skipped entirely when the box is unchecked.
+        const enhTab = document.getElementById('tab-enhancer');
+        const enhNote = document.createElement('p');
+        enhNote.className = 'tab-empty';
+        enhNote.innerHTML = 'Speech enhancement is selected in the main Ensemble tab.<br>This tab only tunes the BS-RoFormer enhancer when it is selected there.';
+        enhTab.appendChild(enhNote);
+        const enhSec = schema.enhancer || {};
+        if (enhSec.bsrf_overlap) {
+            const ov = enhSec.bsrf_overlap;
+            // Override is "on" only if a non-default value was previously saved.
+            const overlapEnabled = currentValues.bsrf_overlap != null;
+            const gate = this.createParamGateToggle('enable_bsrf_overlap',
+                'Override BS-RoFormer overlap', overlapEnabled,
+                'Only applies when this pass uses the BS-RoFormer speech enhancer. Leave off to use its default overlap (2).');
+            enhTab.appendChild(gate);
+            enhTab.appendChild(this.createTransformersSlider('bsrf_overlap', ov.label,
+                ov.min, ov.max, ov.step, currentValues.bsrf_overlap ?? ov.default,
+                'BS-RoFormer chunk overlap — lower = faster separation, slight quality cost (only used when Speech Enhancer = BS-RoFormer)'));
+            // Tie the slider control to the gate so the collector skips it when off.
+            const ovCtrl = enhTab.querySelector('.param-control[data-param="bsrf_overlap"]');
+            if (ovCtrl) {
+                ovCtrl.dataset.gatedBy = 'enable_bsrf_overlap';
+                ovCtrl.style.opacity = overlapEnabled ? '1' : '0.5';
+            }
+            // Wire the gate checkbox to enable/disable the slider live.
+            const gateCb = gate.querySelector('.gate-checkbox');
+            if (gateCb && ovCtrl) {
+                const sync = () => {
+                    const on = gateCb.checked;
+                    ovCtrl.style.opacity = on ? '1' : '0.5';
+                    ovCtrl.querySelectorAll('input').forEach(el => { el.disabled = !on; });
+                };
+                gateCb.addEventListener('change', sync);
+                sync();
+            }
+        }
+
+        // Scene tab. NOTE: in ensemble the main-tab Scene Detector dropdown
+        // overrides this when set (pass_worker applies it after modal params)
+        // — same precedence as the Transformers modal's Scene tab.
+        const sceneTab = document.getElementById('tab-scene');
+        const secSc = schema.scene || {};
+        if (secSc.scene) {
+            sceneTab.appendChild(this.createTransformersDropdown('scene', secSc.scene.label,
+                secSc.scene.options, currentValues.scene || secSc.scene.default,
+                'Split audio into scenes before transcription — this sets subtitle granularity for SenseVoice. The Scene Detector dropdown on the main Ensemble row takes precedence when set.'));
+        }
+
+        // Mark integer sliders so applyCustomization parses them as ints.
+        [['tab-segmenter', 'merge_length_s'], ['tab-segmenter', 'vad_max_segment_ms'],
+         ['tab-segmenter', 'batch_size_s'], ['tab-enhancer', 'bsrf_overlap']].forEach(([tabId, p]) => {
+            const ctrl = document.querySelector(`#${tabId} .param-control[data-param="${p}"]`);
+            if (ctrl) ctrl.dataset.originalType = 'int';
+        });
+
+        this.switchModalTab('model');
+    },
+
+    // Generic checkbox control (no Transformers-specific helper exists).
+    createParamCheckbox(paramName, label, currentValue, description) {
+        const control = document.createElement('div');
+        control.className = 'param-control';
+        control.dataset.param = paramName;
+        control.dataset.originalType = 'bool';
+
+        const wrap = document.createElement('label');
+        wrap.style.display = 'flex';
+        wrap.style.alignItems = 'center';
+        wrap.style.gap = '0.5rem';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'param-checkbox';
+        cb.id = `sv-${paramName}`;
+        cb.checked = !!currentValue;
+
+        const span = document.createElement('span');
+        span.textContent = label;
+
+        wrap.appendChild(cb);
+        wrap.appendChild(span);
+        control.appendChild(wrap);
+
+        if (description) {
+            const desc = document.createElement('p');
+            desc.className = 'param-description';
+            desc.textContent = description;
+            control.appendChild(desc);
+        }
+        return control;
+    },
+
+    // Gate toggle: an enable checkbox that controls whether a sibling param is
+    // collected. Uses classes 'param-gate'/'gate-checkbox' (NOT param-control/
+    // param-checkbox) so the generic applyCustomization collector never harvests
+    // it as a parameter — it only consults gateCb.checked to decide whether to
+    // skip controls marked data-gated-by="<paramName>".
+    createParamGateToggle(paramName, label, currentValue, description) {
+        const gate = document.createElement('div');
+        gate.className = 'param-gate';
+        gate.dataset.gate = paramName;
+
+        const wrap = document.createElement('label');
+        wrap.style.display = 'flex';
+        wrap.style.alignItems = 'center';
+        wrap.style.gap = '0.5rem';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'gate-checkbox';
+        cb.id = `gate-${paramName}`;
+        cb.checked = !!currentValue;
+
+        const span = document.createElement('span');
+        span.textContent = label;
+
+        wrap.appendChild(cb);
+        wrap.appendChild(span);
+        gate.appendChild(wrap);
+
+        if (description) {
+            const desc = document.createElement('p');
+            desc.className = 'param-description';
+            desc.textContent = description;
+            gate.appendChild(desc);
+        }
+        return gate;
+    },
+
+    // --- Cohere-Transcribe customize modal (issue #262, v1.9.0 handler) ---
+    // Renders the focused get_cohere_schema fields instead of the full
+    // Qwen-shaped modal, so users only see knobs the cohere generator
+    // actually consumes (it silently ignores batch_size, repetition_penalty,
+    // max_tokens_per_audio_second, attn_implementation, context).
+    cohereDefaults: {
+        model_id: 'CohereLabs/cohere-transcribe-03-2026',
+        language: 'ja',          // ISO code — Cohere's processor takes codes, not full names
+        device: 'auto',
+        dtype: 'auto',
+        max_new_tokens: 512,     // D2
+        aligner_backend: 'qwen3', // D7: ForcedAligner ON by default (no native timestamps)
+        // Audio tab (qwen-shell framing/VAD — same plumbing as Anime-Whisper).
+        // vad_threshold/vad_padding become threshold/speech_pad_ms overrides on
+        // the segmenter selected on the pass row (whisperseg, firered, ...).
+        framer: 'vad-grouped',
+        safe_chunking: true,
+        scene_min_duration: 12,
+        scene_max_duration: 48,
+        chunk_threshold: 1.0,    // Cohere prefers long contiguous frames
+        max_group_duration: 6,
+        vad_threshold: 0.35,
+        vad_padding: 250
+    },
+
+    async openCohereCustomize(passKey) {
+        this.state.currentCustomize = passKey;
+        const passState = this.state[passKey];
+        try {
+            const result = await pywebview.api.get_cohere_schema();
+            if (!result.success) {
+                ErrorHandler.show('Error', 'Failed to load Cohere parameters: ' + (result.error || 'Unknown error'));
+                return;
+            }
+            const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+            const customStatus = passState.customized ? ' [Custom]' : ' [Default]';
+            document.getElementById('customizeModalTitle').textContent =
+                `${passLabel} Settings (Cohere-Transcribe)${customStatus}`;
+
+            this._cohereSchema = result.schema;
+            const currentValues = passState.customized && passState.params
+                ? { ...this.cohereDefaults, ...passState.params }
+                : { ...this.cohereDefaults };
+
+            this.generateCohereForm(result.schema, currentValues);
+            await this.refreshPresetList();
+            document.getElementById('customizeModal').classList.add('active');
+        } catch (error) {
+            ErrorHandler.show('Error', 'Failed to open Cohere customize dialog: ' + error);
+        }
+    },
+
+    generateCohereForm(schema, currentValues) {
+        // Four focused tabs in the standard slots: Model / Audio / Generation /
+        // Alignment — matching the Anime-Whisper (qwen-shell) layout. The Audio
+        // tab reuses generateQwenAudioTab: framing, scene bounds, VAD grouping
+        // and the VAD threshold/padding sliders all ride the same qwen-shell
+        // plumbing (prepare_qwen_params), and the VAD sliders override the
+        // segmenter selected on the pass row (whisperseg, firered, silero...).
+        // Scene/context stay hidden — scene detector and enhancer are chosen
+        // on the main Ensemble row.
+        const tabMap = { model: 'Model', quality: 'Audio', segmenter: 'Generation', enhancer: 'Alignment' };
+        ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'].forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (panel) panel.innerHTML = '';
+            const btn = document.querySelector(`[data-tab="${tab}"]`);
+            if (btn) {
+                if (tabMap[tab]) { btn.style.display = ''; btn.textContent = tabMap[tab]; }
+                else { btn.style.display = 'none'; }
+            }
+        });
+
+        // Model tab: model id (gated), language, device, dtype.
+        const modelTab = document.getElementById('tab-model');
+        const secM = schema.model || {};
+        if (secM.model_id) {
+            modelTab.appendChild(this.createTransformersDropdown('model_id', secM.model_id.label,
+                secM.model_id.options, currentValues.model_id || secM.model_id.default,
+                'Gated HuggingFace repo — accept the conditions on the model page and set HF_TOKEN before first use.'));
+        }
+        if (secM.language) {
+            modelTab.appendChild(this.createTransformersDropdown('language', secM.language.label,
+                secM.language.options, currentValues.language || secM.language.default,
+                secM.language.description || 'Cohere supports 14 languages; default JA.'));
+        }
+        if (secM.device) {
+            modelTab.appendChild(this.createTransformersDropdown('device', secM.device.label,
+                secM.device.options, currentValues.device || secM.device.default,
+                'Compute device (auto will detect GPU availability)'));
+        }
+        if (secM.dtype) {
+            modelTab.appendChild(this.createTransformersDropdown('dtype', secM.dtype.label,
+                secM.dtype.options, currentValues.dtype || secM.dtype.default,
+                'Model precision (auto selects based on hardware; ~4-8GB VRAM at FP16)'));
+        }
+        // NOTE: schema.model.punctuation is intentionally NOT rendered — the
+        // qwen-shell plumbing does not forward it to the generator yet, so a
+        // checkbox here would be a silent no-op. The generator's default (on)
+        // always applies. Render it once the plumbing exists.
+
+        // Audio tab — identical widget set to the Anime-Whisper/Qwen modal.
+        if (schema.audio) {
+            this.generateQwenAudioTab('tab-quality', schema.audio, currentValues);
+        }
+
+        // Generation tab.
+        const genTab = document.getElementById('tab-segmenter');
+        const secG = schema.generation || {};
+        if (secG.max_new_tokens) {
+            const mt = secG.max_new_tokens;
+            genTab.appendChild(this.createTransformersSlider('max_new_tokens', mt.label,
+                mt.min, mt.max, mt.step, currentValues.max_new_tokens ?? mt.default,
+                mt.description || 'Maximum tokens generated per scene.'));
+            const mtCtrl = genTab.querySelector('.param-control[data-param="max_new_tokens"]');
+            if (mtCtrl) mtCtrl.dataset.originalType = 'int';
+        }
+
+        // Alignment tab. Pack-time triple-flip in api.py is bidirectional:
+        // 'qwen3' restores aligner_vad_fallback + stepdown=True; the default
+        // ('none', VAD timing) stamps vad_only + stepdown=False.
+        const alignTab = document.getElementById('tab-enhancer');
+        const secA = schema.alignment || {};
+        if (secA.aligner_backend) {
+            alignTab.appendChild(this.createTransformersDropdown('aligner_backend', secA.aligner_backend.label,
+                secA.aligner_backend.options, currentValues.aligner_backend || secA.aligner_backend.default,
+                secA.aligner_backend.description));
+        }
+
+        this.switchModalTab('model');
+    },
 
     async openTransformersCustomize(passKey) {
         this.state.currentCustomize = passKey;
@@ -4222,6 +4777,17 @@ const EnsembleManager = {
                 const originalType = control.dataset.originalType;
                 let value;
 
+                // Gated controls (e.g. bsrf_overlap) are only collected when
+                // their gating checkbox is checked. When off, skip entirely so
+                // the param never reaches --passN-params — avoids emitting a
+                // floating value (like overlap) that has no effect unless the
+                // BS-RoFormer enhancer is selected.
+                const gatedBy = control.dataset.gatedBy;
+                if (gatedBy) {
+                    const gateCb = panel.querySelector(`.param-gate[data-gate="${gatedBy}"] .gate-checkbox`);
+                    if (gateCb && !gateCb.checked) return;
+                }
+
                 // Find the input element
                 const checkbox = control.querySelector('.param-checkbox');
                 const slider = control.querySelector('.param-slider');
@@ -4529,9 +5095,37 @@ const EnsembleManager = {
             return;
         }
 
+        // Cohere: re-render the dedicated focused form with its defaults.
+        // Must be checked BEFORE the isQwen umbrella (isCohere ⊂ isQwen).
+        if (passState.isCohere) {
+            passState.params = null;
+            passState.customized = false;
+            passState.presetName = null;
+            if (this._cohereSchema) {
+                this.generateCohereForm(this._cohereSchema, { ...this.cohereDefaults });
+            }
+            ConsoleManager.log(`Reset ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'} Cohere parameters to defaults`, 'info');
+            this.updateBadges();
+            return;
+        }
+
         // Handle Qwen separately
         if (passState.isQwen) {
             this.resetQwenToDefaults(passKey);
+            return;
+        }
+
+        // SenseVoice: re-render its form with defaults (previously fell
+        // through to the legacy _currentDefaults path, which errors).
+        if (passState.isSenseVoice) {
+            passState.params = null;
+            passState.customized = false;
+            passState.presetName = null;
+            if (this._sensevoiceSchema) {
+                this.generateSenseVoiceForm(this._sensevoiceSchema, { ...SenseVoiceManager.defaults });
+            }
+            ConsoleManager.log(`Reset ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'} SenseVoice parameters to defaults`, 'info');
+            this.updateBadges();
             return;
         }
 
@@ -4835,6 +5429,13 @@ const EnsembleManager = {
             panel.querySelectorAll('.param-control').forEach(control => {
                 const paramName = control.dataset.param;
                 if (!paramName) return;
+                // Skip gated controls (e.g. bsrf_overlap) when their gate is off,
+                // so presets don't bake in a floating overlap value.
+                const gatedBy = control.dataset.gatedBy;
+                if (gatedBy) {
+                    const gateCb = panel.querySelector(`.param-gate[data-gate="${gatedBy}"] .gate-checkbox`);
+                    if (gateCb && !gateCb.checked) return;
+                }
                 const checkbox = control.querySelector('.param-checkbox');
                 const slider = control.querySelector('.param-slider');
                 const number = control.querySelector('.param-number');
@@ -4864,6 +5465,7 @@ const EnsembleManager = {
             isQwen: passState.isQwen,
             isAnimeWhisper: passState.isAnimeWhisper || false,
             isCohere: passState.isCohere || false,
+            isSenseVoice: passState.isSenseVoice || false,
             framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
             dspEffects: passState.dspEffects || null,
             enhanceForVad: passState.enhanceForVad || false,
@@ -4934,14 +5536,15 @@ const EnsembleManager = {
             // Detect pipeline type change.
             // getPipelineType signature mirrors handlePipelineChange's local helper —
             // 4-arg form (isT, isQ, isAW, isC) so cohere preset round-trips correctly.
-            const getPipelineType = (isT, isQ, isAW, isC) =>
-                isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isQ ? 'qwen' : 'legacy')));
-            const oldType = getPipelineType(passState.isTransformers, passState.isQwen, passState.isAnimeWhisper, passState.isCohere);
+            const getPipelineType = (isT, isQ, isAW, isC, isSV) =>
+                isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (isSV ? 'sensevoice' : (isQ ? 'qwen' : 'legacy'))));
+            const oldType = getPipelineType(passState.isTransformers, passState.isQwen, passState.isAnimeWhisper, passState.isCohere, passState.isSenseVoice);
             const presetIsTransformers = !!preset.isTransformers;
             const presetIsQwen = !!preset.isQwen;
             const presetIsAnimeWhisper = !!preset.isAnimeWhisper;
             const presetIsCohere = !!preset.isCohere;
-            const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper, presetIsCohere);
+            const presetIsSenseVoice = !!preset.isSenseVoice;
+            const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper, presetIsCohere, presetIsSenseVoice);
 
             // Apply ALL preset fields to state
             if (preset.pipeline) passState.pipeline = preset.pipeline;
@@ -4957,6 +5560,7 @@ const EnsembleManager = {
             passState.isQwen = presetIsQwen;
             passState.isAnimeWhisper = presetIsAnimeWhisper;
             passState.isCohere = presetIsCohere;
+            passState.isSenseVoice = presetIsSenseVoice;
             passState.customized = true;
             passState.params = preset.params || null;
             passState.presetName = name;
@@ -5057,8 +5661,8 @@ const EnsembleManager = {
         // Helpers for pipeline-specific null handling:
         // - Sensitivity: null only for Transformers (Qwen now uses sensitivity presets)
         // - Segmenter: null for Transformers only (Qwen uses segmenter as post-ASR VAD filter)
-        const disableSensitivity = (passState) => passState.isTransformers;
-        const disableSegmenter = (passState) => passState.isTransformers;  // NOT Qwen!
+        const disableSensitivity = (passState) => passState.isTransformers || passState.isSenseVoice;
+        const disableSegmenter = (passState) => passState.isTransformers || passState.isSenseVoice;  // NOT Qwen!
 
         const config = {
             inputs: AppState.selectedFiles,
@@ -5077,6 +5681,7 @@ const EnsembleManager = {
                 isQwen: this.state.pass1.isQwen,
                 isAnimeWhisper: this.state.pass1.isAnimeWhisper,
                 isCohere: this.state.pass1.isCohere || false,
+                isSenseVoice: this.state.pass1.isSenseVoice || false,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
                 enhanceForVad: this.state.pass1.enhanceForVad || false
             },
@@ -5095,6 +5700,7 @@ const EnsembleManager = {
                 isQwen: this.state.pass2.isQwen,
                 isAnimeWhisper: this.state.pass2.isAnimeWhisper,
                 isCohere: this.state.pass2.isCohere || false,
+                isSenseVoice: this.state.pass2.isSenseVoice || false,
                 isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
                 enhanceForVad: this.state.pass2.enhanceForVad || false,
@@ -6478,6 +7084,13 @@ const ProviderUIManager = {
             if (modelOverrideEl) modelOverrideEl.style.display = '';
             this.updateModelDropdown(provider, tabContext);
         }
+
+        // Ollama tuning knobs live in the SRT translator tab's Advanced
+        // Settings. Show them only for the Ollama provider on that tab.
+        if (tabContext === 'srt') {
+            const tuning = document.getElementById('translatorOllamaTuning');
+            if (tuning) tuning.style.display = (provider === 'ollama') ? '' : 'none';
+        }
     },
 
     // Track previous dropdown value for revert on cancel
@@ -6755,12 +7368,13 @@ const TranslatorManager = {
     // ---- Translation options & execution ----
 
     collectOptions() {
-        return {
+        const provider = document.getElementById('translatorProvider')?.value || 'deepseek';
+        const options = {
             // Uses shared file list from SOURCE section (AppState.selectedFiles)
             inputs: AppState.selectedFiles,
             // Shared Destination section — same as transcription/ensemble tabs
             output_dir: document.getElementById('outputDir')?.value || '',
-            provider: document.getElementById('translatorProvider')?.value || 'deepseek',
+            provider: provider,
             model: document.getElementById('translatorCustomModel')?.value ||
                    document.getElementById('translatorModel')?.value || null,
             source_language: document.getElementById('translatorSourceLang')?.value || 'japanese',
@@ -6780,6 +7394,36 @@ const TranslatorManager = {
             // Debug checkbox lives in Transcription Adv. Options but is global
             debug: document.getElementById('debugLogging')?.checked || false
         };
+
+        // Ollama tuning knobs — only forward for the Ollama provider, and only
+        // when the user actually filled a field in (blank = curated default).
+        if (provider === 'ollama') {
+            const readNum = (id) => {
+                const el = document.getElementById(id);
+                if (!el || el.value === '' || el.value == null) return null;
+                const n = Number(el.value);
+                return Number.isFinite(n) ? n : null;
+            };
+            const numCtx       = readNum('translatorOllamaNumCtx');
+            const maxTokens    = readNum('translatorOllamaMaxTokens');
+            const temperature  = readNum('translatorOllamaTemperature');
+            const topP         = readNum('translatorOllamaTopP');
+            const topK         = readNum('translatorOllamaTopK');
+            const minP         = readNum('translatorOllamaMinP');
+            const repeatPen    = readNum('translatorOllamaRepeatPenalty');
+            const keepAlive    = document.getElementById('translatorOllamaKeepAlive')?.value?.trim() || null;
+
+            if (numCtx != null)      options.ollama_num_ctx = numCtx;
+            if (maxTokens != null)   options.ollama_max_tokens = maxTokens;
+            if (temperature != null) options.ollama_temperature = temperature;
+            if (topP != null)        options.ollama_top_p = topP;
+            if (topK != null)        options.ollama_top_k = topK;
+            if (minP != null)        options.ollama_min_p = minP;
+            if (repeatPen != null)   options.ollama_repeat_penalty = repeatPen;
+            if (keepAlive)           options.ollama_keep_alive = keepAlive;
+        }
+
+        return options;
     },
 
     async startTranslation() {
@@ -7052,7 +7696,13 @@ const TranslateIntegrationManager = {
                 maxBatchSize: fullSettings.maxBatchSize,
                 temperature: fullSettings.temperature,
                 topP: fullSettings.topP,
-                customEndpoint: fullSettings.customEndpoint
+                customEndpoint: fullSettings.customEndpoint,
+                ollamaNumCtx: fullSettings.ollamaNumCtx,
+                ollamaMaxTokens: fullSettings.ollamaMaxTokens,
+                ollamaTopK: fullSettings.ollamaTopK,
+                ollamaMinP: fullSettings.ollamaMinP,
+                ollamaRepeatPenalty: fullSettings.ollamaRepeatPenalty,
+                ollamaKeepAlive: fullSettings.ollamaKeepAlive
             };
         } else {
             // Transcription Mode settings
@@ -7084,7 +7734,7 @@ const TranslateIntegrationManager = {
 
         try {
             // Start translation via API - use correct key names matching api.py
-            const result = await pywebview.api.start_translation({
+            const payload = {
                 inputs: outputFiles,              // API expects 'inputs' not 'input_files'
                 provider: settings.provider,
                 target: settings.target,          // API expects 'target' not 'target_language'
@@ -7094,8 +7744,47 @@ const TranslateIntegrationManager = {
                 movie_title: settings.movieTitle || '',
                 actress: settings.actress || '',
                 movie_plot: settings.plot || '',
-                endpoint: settings.customEndpoint || ''
-            });
+                endpoint: settings.customEndpoint || '',
+                // Forward the global Debug checkbox so the ensemble translate
+                // subprocess gets --debug → PySubtrans logs the request body
+                // ("Request Body:\n{...}") sent to Ollama. Without this the
+                // ensemble path was always non-debug. (Transcription Adv.
+                // Options hosts the checkbox but it's global.)
+                debug: document.getElementById('debugLogging')?.checked || false
+            };
+            // Processing knobs from the ensemble translation modal (previously
+            // dropped — only provider/model/context reached the CLI).
+            if (settings.sceneThreshold) payload.scene_threshold = settings.sceneThreshold;
+            if (settings.maxBatchSize) payload.max_batch_size = settings.maxBatchSize;
+
+            // Ollama tuning — only for the ollama provider, only non-blank
+            // values (blank = curated default). Mirrors the SRT tab.
+            if (settings.provider === 'ollama') {
+                const num = (v) => {
+                    if (v === '' || v == null) return null;
+                    const n = Number(v);
+                    return Number.isFinite(n) ? n : null;
+                };
+                const numCtx = num(settings.ollamaNumCtx);
+                const maxTok = num(settings.ollamaMaxTokens);
+                const topK   = num(settings.ollamaTopK);
+                const minP   = num(settings.ollamaMinP);
+                const repPen = num(settings.ollamaRepeatPenalty);
+                const temp   = num(settings.temperature);
+                const topP   = num(settings.topP);
+                const keep   = (settings.ollamaKeepAlive || '').trim();
+
+                if (numCtx != null) payload.ollama_num_ctx = numCtx;
+                if (maxTok != null) payload.ollama_max_tokens = maxTok;
+                if (topK != null)   payload.ollama_top_k = topK;
+                if (minP != null)   payload.ollama_min_p = minP;
+                if (repPen != null) payload.ollama_repeat_penalty = repPen;
+                if (temp != null)   payload.ollama_temperature = temp;
+                if (topP != null)   payload.ollama_top_p = topP;
+                if (keep)           payload.ollama_keep_alive = keep;
+            }
+
+            const result = await pywebview.api.start_translation(payload);
 
             if (result.success) {
                 ConsoleManager.log('Translation started', 'success');
@@ -7203,7 +7892,15 @@ const TranslationSettingsModal = {
         temperature: 0.5,
         topP: 0.9,
         customEndpoint: '',
-        ollamaUrl: ''
+        ollamaUrl: '',
+        // Ollama tuning (blank/null = use curated default). temperature/topP
+        // above are reused for Ollama too.
+        ollamaNumCtx: '',
+        ollamaMaxTokens: '',
+        ollamaTopK: '',
+        ollamaMinP: '',
+        ollamaRepeatPenalty: '',
+        ollamaKeepAlive: ''
     },
 
     init() {
@@ -7230,7 +7927,7 @@ const TranslationSettingsModal = {
         document.getElementById('ensembleTranslateProvider')?.addEventListener('change', (e) => {
             ProviderUIManager.onProviderChange(e.target.value, 'ensemble');
             this.updateModelOptions(e.target.value);
-            // Show/hide Ollama URL field in settings modal
+            // Show/hide Ollama URL field + tuning section in settings modal
             document.querySelectorAll('.ollama-settings-row').forEach(el => {
                 el.style.display = (e.target.value === 'ollama') ? 'block' : 'none';
             });
@@ -7283,6 +7980,13 @@ const TranslationSettingsModal = {
         this.settings.topP = parseFloat(document.getElementById('translationTopP')?.value) || 0.9;
         this.settings.customEndpoint = document.getElementById('translationCustomEndpoint')?.value || '';
         this.settings.ollamaUrl = document.getElementById('translationOllamaUrl')?.value || '';
+        // Ollama tuning — keep raw string ('' = use curated default)
+        this.settings.ollamaNumCtx = document.getElementById('translationOllamaNumCtx')?.value || '';
+        this.settings.ollamaMaxTokens = document.getElementById('translationOllamaMaxTokens')?.value || '';
+        this.settings.ollamaTopK = document.getElementById('translationOllamaTopK')?.value || '';
+        this.settings.ollamaMinP = document.getElementById('translationOllamaMinP')?.value || '';
+        this.settings.ollamaRepeatPenalty = document.getElementById('translationOllamaRepeatPenalty')?.value || '';
+        this.settings.ollamaKeepAlive = document.getElementById('translationOllamaKeepAlive')?.value?.trim() || '';
 
         // Persist to localStorage (fast cache / fallback)
         try {
@@ -7347,6 +8051,14 @@ const TranslationSettingsModal = {
         document.getElementById('translationCustomEndpoint').value = this.settings.customEndpoint;
         const ollamaUrlEl = document.getElementById('translationOllamaUrl');
         if (ollamaUrlEl) ollamaUrlEl.value = this.settings.ollamaUrl || '';
+        // Ollama tuning fields (may not exist on older markup — guard each)
+        const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v ?? ''); };
+        setVal('translationOllamaNumCtx', this.settings.ollamaNumCtx);
+        setVal('translationOllamaMaxTokens', this.settings.ollamaMaxTokens);
+        setVal('translationOllamaTopK', this.settings.ollamaTopK);
+        setVal('translationOllamaMinP', this.settings.ollamaMinP);
+        setVal('translationOllamaRepeatPenalty', this.settings.ollamaRepeatPenalty);
+        setVal('translationOllamaKeepAlive', this.settings.ollamaKeepAlive);
     },
 
     updateMultiFileWarning() {
@@ -7461,7 +8173,13 @@ const TranslationSettingsModal = {
             temperature: this.settings.temperature,
             topP: this.settings.topP,
             customEndpoint: this.settings.customEndpoint,
-            ollamaUrl: this.settings.ollamaUrl
+            ollamaUrl: this.settings.ollamaUrl,
+            ollamaNumCtx: this.settings.ollamaNumCtx,
+            ollamaMaxTokens: this.settings.ollamaMaxTokens,
+            ollamaTopK: this.settings.ollamaTopK,
+            ollamaMinP: this.settings.ollamaMinP,
+            ollamaRepeatPenalty: this.settings.ollamaRepeatPenalty,
+            ollamaKeepAlive: this.settings.ollamaKeepAlive
         };
     }
 };

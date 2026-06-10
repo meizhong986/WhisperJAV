@@ -16,6 +16,7 @@ at 44.1kHz. For speech-only content, ClearVoice may be more appropriate.
 
 from typing import Union, List, Dict, Any, Optional
 from pathlib import Path
+import sys
 import time
 import tempfile
 import numpy as np
@@ -49,6 +50,33 @@ DEFAULT_MODEL = "vocals"
 DEFAULT_SAMPLE_RATE = 44100
 
 
+class _FilteredStdout:
+    """stdout proxy used during demix_track().
+
+    Keeps useful progress (the one-shot "Estimated total processing time..."
+    line) but drops the per-chunk carriage-return redraw spam
+    ("Estimated time remaining...") that otherwise stacks up in piped logs.
+    """
+
+    _DROP = "Estimated time remaining"
+
+    def __init__(self):
+        self._real = sys.__stdout__
+
+    def write(self, s):
+        try:
+            if s and self._DROP not in s:
+                self._real.write(s)
+        except Exception:
+            pass
+
+    def flush(self):
+        try:
+            self._real.flush()
+        except Exception:
+            pass
+
+
 class BSRoformerSpeechEnhancer:
     """
     BS-RoFormer vocal isolation backend.
@@ -69,20 +97,43 @@ class BSRoformerSpeechEnhancer:
         self,
         model: str = DEFAULT_MODEL,
         device: str = "auto",
+        ckpt_path: Optional[str] = None,
+        config_path: Optional[str] = None,
+        variant: str = "revive2",
+        num_overlap: Optional[int] = None,
         **kwargs
     ):
         """
         Initialize BS-RoFormer enhancer.
 
         Args:
-            model: Model/stem to extract ("vocals" or "other")
-            device: Device to use ("cuda", "cpu", "auto")
-            **kwargs: Additional parameters (ignored)
+            model: Stem to extract ("vocals" or "other").
+            device: Device to use ("cuda", "cpu", "auto").
+            ckpt_path: Optional explicit path to a .ckpt (overrides download).
+            config_path: Optional explicit path to the model config .yaml.
+            variant: Which pcunwa BS-Roformer-Revive model to auto-download when
+                ckpt_path is not given — "revive2" (best Bleedless, recommended for
+                ASR), "revive3e" (max Fullness), or "revive" (v1). Bleedless wins
+                for transcription: cleanest vocal stem = best ASR input.
+            **kwargs: Additional parameters (ignored).
         """
         self._model_name = model if model in _MODEL_INFO else DEFAULT_MODEL
         self._device = device
+        self._ckpt_path = ckpt_path
+        self._config_path = config_path
+        self._variant = (variant or "revive2").lower()
+        # num_overlap: chunk overlap during separation. Higher = better quality
+        # but slower (config default is 2). Lower (e.g. 1) ~halves separation time
+        # at a small quality cost. None = use the model config's value.
+        try:
+            self._num_overlap = int(num_overlap) if num_overlap is not None else None
+        except (TypeError, ValueError):
+            self._num_overlap = None
         self._separator = None
         self._initialized = False
+        self._config = None
+        self._device_torch = None
+        self._target_instrument = None
 
         if model not in _MODEL_INFO:
             logger.warning(
@@ -92,9 +143,73 @@ class BSRoformerSpeechEnhancer:
 
         logger.debug(f"BSRoformerSpeechEnhancer configured: model={self._model_name}")
 
+    # Public BS-Roformer-Revive mirror (the package's own registry URLs are dead).
+    # Revive 2 = best Bleedless (cleanest stem → best ASR input, our default).
+    _HF_BASE = "https://huggingface.co/pcunwa/BS-Roformer-Revive/resolve/main/"
+    _VARIANT_CKPT = {
+        "revive": "bs_roformer_revive.ckpt",
+        "revive2": "bs_roformer_revive2.ckpt",
+        "revive3e": "bs_roformer_revive3e.ckpt",
+    }
+    _CONFIG_FILE = "config.yaml"
+
+    def _resolve_assets(self):
+        """Return (ckpt_path, config_path) as Paths, or (None, None) on failure.
+
+        Resolution order: explicit user paths -> cache -> download from HF.
+        """
+        from pathlib import Path
+        # 1) explicit paths
+        if self._ckpt_path and self._config_path:
+            cp, gp = Path(self._ckpt_path), Path(self._config_path)
+            if cp.exists() and gp.exists():
+                logger.info(f"BS-RoFormer: using explicit checkpoint {cp.name}")
+                return cp, gp
+            logger.warning("BS-RoFormer explicit ckpt/config path missing; falling back to download")
+
+        variant = self._variant if self._variant in self._VARIANT_CKPT else "revive2"
+        ckpt_name = self._VARIANT_CKPT[variant]
+        cache_dir = Path.home() / ".cache" / "whisperjav" / "bs_roformer" / variant
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        ckpt_path = cache_dir / ckpt_name
+        cfg_path = cache_dir / self._CONFIG_FILE
+
+        # 2) cache
+        if ckpt_path.exists() and cfg_path.exists():
+            return ckpt_path, cfg_path
+
+        # 3) download
+        import urllib.request
+        try:
+            if not cfg_path.exists():
+                logger.info(f"Downloading BS-RoFormer config -> {cfg_path}")
+                urllib.request.urlretrieve(self._HF_BASE + self._CONFIG_FILE, str(cfg_path))
+            if not ckpt_path.exists():
+                logger.info(f"Downloading BS-RoFormer weights ({variant}, ~639MB) -> {ckpt_path} (first run only)")
+                urllib.request.urlretrieve(self._HF_BASE + ckpt_name, str(ckpt_path))
+        except Exception as e:
+            logger.error(f"BS-RoFormer download failed: {e}")
+            # Clean partial files so a retry re-downloads cleanly.
+            for p in (ckpt_path, cfg_path):
+                try:
+                    if p.exists() and p.stat().st_size == 0:
+                        p.unlink()
+                except Exception:
+                    pass
+            return None, None
+
+        if ckpt_path.exists() and cfg_path.exists():
+            return ckpt_path, cfg_path
+        return None, None
+
     def _ensure_initialized(self) -> bool:
         """
         Lazy initialization of BS-RoFormer model.
+
+        Uses the real bs-roformer-infer (>=0.1.0) API: download the model
+        checkpoint+config from the registry, build the net via
+        get_model_from_config, load weights, and move to device. Separation
+        itself is done later via demix_track() (see _process_audio).
 
         Returns:
             True if initialized successfully, False otherwise
@@ -103,37 +218,70 @@ class BSRoformerSpeechEnhancer:
             return True
 
         try:
-            # Import bs-roformer
-            from bs_roformer import BSRoformer
+            import torch
+            import yaml
+            from ml_collections import ConfigDict
+            from bs_roformer.utils import get_model_from_config
+            from bs_roformer.inference import SafeLoaderWithTuple
+        except ImportError as e:
+            logger.error(f"bs-roformer not installed or incompatible: {e}")
+            logger.error("Install with: pip install bs-roformer-infer")
+            return False
 
-            logger.info(f"Loading BS-RoFormer model for stem: {self._model_name}")
+        try:
+            # Resolve ckpt + config. The bs-roformer-infer registry URLs are all
+            # dead upstream (gated/401 or 404), so we self-host the download from
+            # the public pcunwa/BS-Roformer-Revive HF repo. Order:
+            #   1) explicit ckpt_path/config_path (user-supplied)
+            #   2) cached file from a previous run
+            #   3) download the selected Revive variant from HF
+            ckpt_path, cfg_path = self._resolve_assets()
+            if ckpt_path is None or cfg_path is None:
+                logger.error("BS-RoFormer model assets unavailable (download failed)")
+                return False
+            logger.info(f"Loading BS-RoFormer model (variant={self._variant}, stem={self._model_name})")
 
-            # Resolve best available device (cuda > mps > cpu)
+            # Load config + build model.
+            with open(cfg_path) as f:
+                self._config = ConfigDict(yaml.load(f, Loader=SafeLoaderWithTuple))
+
+            # Override chunk overlap if requested (speed/quality knob).
+            if self._num_overlap is not None:
+                ov = max(1, self._num_overlap)
+                try:
+                    if hasattr(self._config, "inference"):
+                        self._config.inference.num_overlap = ov
+                    logger.info(f"BS-RoFormer: num_overlap overridden to {ov} (config default was 2)")
+                except Exception as e:
+                    logger.warning(f"Could not set num_overlap={ov}: {e}")
+
+            model = get_model_from_config("bs_roformer", self._config)
+            if model is None:
+                logger.error("get_model_from_config returned None for bs_roformer")
+                return False
+            state = torch.load(str(ckpt_path), map_location=torch.device("cpu"))
+            model.load_state_dict(state)
+
+            # Resolve device (cuda > cpu; bs-roformer is heavy, MPS unsupported here).
             device = resolve_torch_device(self._device)
+            if device == "mps":
+                logger.info("BS-RoFormer: MPS not supported, using CPU")
+                device = "cpu"
+            self._device_torch = torch.device(device)
+            model = model.to(self._device_torch)
+            model.eval()
+            self._separator = model
 
-            # Try initializing with the selected device
-            try:
-                self._separator = BSRoformer(device=device)
-            except Exception as dev_err:
-                # If MPS failed (model may not support all ops), fall back to CPU
-                if device == "mps":
-                    logger.info(
-                        f"BS-RoFormer does not support MPS ({dev_err}), "
-                        "falling back to CPU"
-                    )
-                    device = "cpu"
-                    self._separator = BSRoformer(device=device)
-                else:
-                    raise
+            # Which instrument to keep (vocals for speech isolation).
+            self._target_instrument = (
+                getattr(self._config.training, "target_instrument", None)
+                or self._model_name
+            )
 
             self._initialized = True
             logger.info(f"BS-RoFormer loaded successfully on {device}")
             return True
 
-        except ImportError as e:
-            logger.error(f"bs-roformer not installed: {e}")
-            logger.error("Install with: pip install bs-roformer-infer")
-            return False
         except Exception as e:
             logger.error(f"Failed to initialize BS-RoFormer: {e}")
             return False
@@ -247,46 +395,50 @@ class BSRoformerSpeechEnhancer:
         Returns:
             Separated audio array (vocals or other stem)
         """
+        import torch
+        from bs_roformer.utils import demix_track
+
         stem = _MODEL_INFO[self._model_name]["stem"]
 
-        # BS-RoFormer expects stereo input, convert mono to stereo
+        # BS-RoFormer expects stereo (channels, samples). Build it.
         if audio.ndim == 1:
             audio_stereo = np.stack([audio, audio], axis=0)  # (2, samples)
         else:
             audio_stereo = audio
+            # Normalize to (channels, samples)
+            if audio_stereo.shape[0] > audio_stereo.shape[1]:
+                audio_stereo = audio_stereo.T
+            if audio_stereo.shape[0] == 1:
+                audio_stereo = np.repeat(audio_stereo, 2, axis=0)
 
-        # Ensure shape is (channels, samples)
-        if audio_stereo.shape[0] > audio_stereo.shape[1]:
-            audio_stereo = audio_stereo.T
+        mixture = torch.tensor(audio_stereo, dtype=torch.float32)
 
-        # Process through separator
-        # API: separator.separate(audio, sr) -> dict of stems
-        result = self._separator.separate(audio_stereo, sr=sample_rate)
+        # demix_track returns ({instrument: ndarray(channels, samples)}, _).
+        # The package writes progress to stdout: a useful one-shot ETA line
+        # ("Estimated total processing time...") plus a per-chunk redraw spam
+        # ("Estimated time remaining...", carriage-return based) that stacks up
+        # in a piped log. Filter: keep the useful ETA, drop the \r redraw spam.
+        import contextlib
+        with contextlib.redirect_stdout(_FilteredStdout()):
+            res, _ = demix_track(self._config, self._separator, mixture, self._device_torch)
 
-        # Extract the desired stem
-        if isinstance(result, dict):
-            if stem in result:
-                separated = result[stem]
-            elif "vocals" in result and stem == "vocals":
-                separated = result["vocals"]
-            else:
-                # Take first available
-                separated = list(result.values())[0]
+        if stem in res:
+            separated = res[stem]
+        elif self._target_instrument in res:
+            separated = res[self._target_instrument]
         else:
-            separated = result
+            separated = list(res.values())[0]
 
-        # Convert to mono if stereo
+        # demix_track output is (channels, samples) -> collapse to mono.
         if isinstance(separated, np.ndarray):
             if separated.ndim > 1:
-                # Average channels for mono
-                if separated.shape[0] <= 2:  # (channels, samples)
+                if separated.shape[0] <= 2:      # (channels, samples)
                     separated = np.mean(separated, axis=0)
-                else:  # (samples, channels)
+                else:                             # (samples, channels)
                     separated = np.mean(separated, axis=1)
-
             return separated.astype(np.float32)
 
-        raise RuntimeError(f"Unexpected result type from BS-RoFormer: {type(result)}")
+        raise RuntimeError(f"Unexpected result type from BS-RoFormer: {type(separated)}")
 
     def get_preferred_sample_rate(self) -> int:
         """Return 44100Hz (standard for music/BS-RoFormer)."""

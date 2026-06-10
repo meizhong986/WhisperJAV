@@ -294,13 +294,18 @@ class QwenPipeline(BasePipeline):
             self.segmenter_chunk_threshold = 0.5
             self.segmenter_max_group_duration = 5.0
         elif generator_backend == "cohere":
-            # D7: Qwen3 ForcedAligner is the default for word-level timestamps
-            # (Cohere has no native timestamps — see HF discussion #19).
-            # User can disable via Customize Parameters → aligner=none, which
-            # also flips timestamp_mode and stepdown atomically (triple-flip).
-            self.timestamp_mode = TimestampMode.ALIGNER_WITH_VAD_FALLBACK
+            # ChronosJAV-style VAD-only timing is the system-wide Cohere
+            # default (main.py + pass_worker.py default chain): the Qwen3
+            # ForcedAligner benchmarked ~0% native alignment on JAV audio
+            # and produced scene-sized subtitle blocks, so the segmenter
+            # (FireRedVAD by default) drives subtitle granularity instead.
+            # timestamp_mode/stepdown are intentionally NOT stamped here
+            # (mirrors the v1.8.13 segmenter-override removal above) — the
+            # earlier hard-stamp of ALIGNER_WITH_VAD_FALLBACK silently
+            # clobbered the GUI aligner='none' triple-flip. Explicit caller
+            # choices (--qwen-timestamp-mode, GUI aligner_backend='qwen3')
+            # are honored via the constructor args.
             self.assembly_cleaner_enabled = False  # D3: passthrough cleaner
-            self.stepdown_enabled = True            # aligner present → stepdown safe
             self.segmenter_chunk_threshold = 1.0    # Cohere prefers fewer cuts
             self.segmenter_max_group_duration = 6.0
 

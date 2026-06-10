@@ -54,6 +54,32 @@ _TOKEN_PAGE_URL = "https://huggingface.co/settings/tokens"
 _REQUIRED_DOWNLOAD_GB = 5.0
 _MODEL_WEIGHT_GB = 3.85
 
+# The Cohere processor takes ISO language CODES ("ja", "en" — per the model
+# card examples), but upstream callers may hand us Qwen-style full names
+# ("Japanese") because the qwen outer shell defaults qwen_language="Japanese".
+# Normalize full names for the model's 14 supported languages; unknown values
+# pass through unchanged (the processor raises its own error for those).
+_LANGUAGE_NAME_TO_CODE = {
+    "english": "en", "french": "fr", "german": "de", "italian": "it",
+    "spanish": "es", "portuguese": "pt", "greek": "el", "dutch": "nl",
+    "polish": "pl", "chinese": "zh", "mandarin": "zh", "japanese": "ja",
+    "korean": "ko", "vietnamese": "vi", "arabic": "ar",
+}
+
+
+def _normalize_language(language: Optional[str]) -> Optional[str]:
+    """Map full language names to the ISO codes the Cohere processor expects."""
+    if not language:
+        return language
+    code = _LANGUAGE_NAME_TO_CODE.get(language.strip().lower())
+    if code and code != language:
+        logger.debug(
+            "[CohereTextGenerator] Normalized language %r -> %r "
+            "(Cohere processor takes ISO codes)", language, code
+        )
+        return code
+    return language
+
 
 class CohereTextGenerator:
     """
@@ -126,17 +152,119 @@ class CohereTextGenerator:
 
     @staticmethod
     def _detect_dtype(device: str, dtype: str):
-        """Resolve 'auto' dtype based on device capability."""
+        """Resolve 'auto' dtype based on device capability.
+
+        float16 is NOT usable with this model: the repo's remote modeling
+        code masks attention scores via masked_fill(mask, -1e9), and -1e9
+        overflows fp16 (max +/-65504) — every forward pass dies with
+        "value cannot be converted to type c10::Half without overflow"
+        (verified on a real run, 2026-06-10). bfloat16 has fp32-like range
+        at the same memory cost, so it is the CUDA default; explicit
+        float16 requests are coerced with a warning.
+        """
         import torch
+        if dtype == "float16":
+            logger.warning(
+                "[CohereTextGenerator] float16 requested but the Cohere "
+                "modeling code overflows fp16 (-1e9 attention mask); "
+                "using bfloat16 instead."
+            )
+            dtype = "bfloat16"
         if dtype != "auto":
             return getattr(torch, dtype, torch.float32)
         if "cuda" in device:
-            return torch.float16
+            try:
+                if torch.cuda.is_bf16_supported():
+                    return torch.bfloat16
+            except Exception:
+                pass
+            # Pre-Ampere GPU without bf16: fp32 is the only safe choice
+            # (doubles VRAM to ~8GB, but fp16 cannot produce output at all).
+            return torch.float32
         return torch.float32
 
     # ------------------------------------------------------------------
     # HF gating pre-flight
     # ------------------------------------------------------------------
+
+    # Files a usable Cohere-Transcribe snapshot must contain. Used to verify
+    # a cached revision is COMPLETE — snapshot_download(local_files_only=True)
+    # cannot do that offline (it has no file list without the Hub API) and
+    # happily returns a partial snapshot when upstream pushed a new commit
+    # and only some of its files got cached (seen in the wild: a refs/main
+    # snapshot holding only processor_config.json next to a complete older
+    # revision → offline load crashed despite the model being downloaded).
+    _CORE_SNAPSHOT_FILES = (
+        "config.json",
+        "model.safetensors",
+        "preprocessor_config.json",
+        "processor_config.json",
+        "tokenizer_config.json",
+        "configuration_cohere_asr.py",
+        "modeling_cohere_asr.py",
+        "processing_cohere_asr.py",
+        "tokenization_cohere_asr.py",
+    )
+
+    @classmethod
+    def _snapshot_complete(cls, snapshot_dir) -> bool:
+        """True if the snapshot dir holds every core file with a real blob
+        behind it (stat() follows the HF cache symlinks; a dangling link
+        from an evicted/partial blob fails the check)."""
+        from pathlib import Path
+        snap = Path(snapshot_dir)
+        try:
+            return all((snap / name).stat().st_size > 0
+                       for name in cls._CORE_SNAPSHOT_FILES)
+        except OSError:
+            return False
+
+    @classmethod
+    def _cached_snapshot(cls, model_id: str) -> Optional[str]:
+        """
+        Return a local HF cache snapshot path holding a COMPLETE copy of the
+        model, else None.
+
+        Gating only matters for the DOWNLOAD — once a snapshot is on disk,
+        the model loads fine with no token at all. Strategy:
+          1. Ask snapshot_download(local_files_only=True) for the cached
+             ref'd revision and verify it is complete.
+          2. If the ref points at a partial revision (upstream pushed a new
+             commit; only some files were fetched), scan ALL cached
+             revisions of the repo and return the newest complete one.
+        The caller loads directly FROM the returned path, which pins the
+        known-good revision and never touches the Hub.
+        """
+        from pathlib import Path
+        path = None
+        try:
+            from huggingface_hub import snapshot_download
+            path = snapshot_download(model_id, local_files_only=True)
+        except Exception:
+            path = None
+        if path and cls._snapshot_complete(path):
+            return path
+        try:
+            from huggingface_hub.constants import HF_HUB_CACHE
+            snaps_dir = (Path(HF_HUB_CACHE)
+                         / ("models--" + model_id.replace("/", "--"))
+                         / "snapshots")
+            if not snaps_dir.is_dir():
+                return None
+            candidates = sorted(
+                (d for d in snaps_dir.iterdir() if d.is_dir()),
+                key=lambda d: d.stat().st_mtime, reverse=True,
+            )
+            for snap in candidates:
+                if cls._snapshot_complete(snap):
+                    logger.debug(
+                        "[CohereTextGenerator] refs/main snapshot is partial; "
+                        "using complete cached revision %s", snap.name
+                    )
+                    return str(snap)
+        except Exception:
+            return None
+        return None
 
     @staticmethod
     def _check_hf_access() -> None:
@@ -152,6 +280,15 @@ class CohereTextGenerator:
         That case is handled in _format_load_error.
         """
         token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        if not token:
+            # Also accept a token stored by `huggingface-cli login` /
+            # `huggingface_hub.login()` (~/.cache/huggingface/token) —
+            # from_pretrained honors it, so the preflight should too.
+            try:
+                from huggingface_hub import get_token as _hf_get_token
+                token = _hf_get_token()
+            except Exception:
+                token = None
         if not token:
             raise RuntimeError(
                 "Cohere-Transcribe requires HF_TOKEN to be set in the environment.\n"
@@ -441,7 +578,21 @@ class CohereTextGenerator:
         cfg = self._config
         local_path = self._is_local_path(cfg["model_id"])
 
+        # Gating preflights only matter when a DOWNLOAD is needed. If the
+        # full snapshot is already in the local HF cache, load offline —
+        # no token required, and local_files_only=True below prevents
+        # transformers' Hub revision check from raising 401/GatedRepoError
+        # for token-less (e.g. stale-environment GUI) processes.
+        cached_snapshot = None
         if not local_path:
+            cached_snapshot = self._cached_snapshot(cfg["model_id"])
+            if cached_snapshot:
+                logger.info(
+                    "[CohereTextGenerator] Model found in local HF cache — "
+                    "loading offline (no HF token needed): %s", cached_snapshot
+                )
+
+        if not local_path and not cached_snapshot:
             # Hub-side preflights: only relevant when downloading from HF.
             self._check_hf_access()
             try:
@@ -485,15 +636,25 @@ class CohereTextGenerator:
         import time
         start = time.time()
 
+        # Offline load when a complete snapshot is cached: load FROM the
+        # snapshot directory itself. That pins the verified revision and
+        # skips Hub resolution entirely (no token, no network) — passing
+        # the repo id with local_files_only=True would re-resolve refs/main,
+        # which can point at a partial newer revision (see _cached_snapshot).
+        _load_target = cached_snapshot or cfg["model_id"]
+        _offline = {"local_files_only": True} if cached_snapshot else {}
+
         try:
             self._processor = AutoProcessor.from_pretrained(
-                cfg["model_id"],
+                _load_target,
                 trust_remote_code=cfg["trust_remote_code"],
+                **_offline,
             )
             self._model = _AutoModelClass.from_pretrained(
-                cfg["model_id"],
+                _load_target,
                 dtype=dtype,
                 trust_remote_code=cfg["trust_remote_code"],
+                **_offline,
             ).to(device)
             self._model.eval()
         except Exception as exc:
@@ -621,47 +782,139 @@ class CohereTextGenerator:
         import torch
 
         cfg = self._config
-        resolved_language = language or cfg["language"]
+        resolved_language = _normalize_language(language or cfg["language"])
         resolved_punctuation = cfg["punctuation"]
         resolved_max_new_tokens = cfg["max_new_tokens"]
 
         # Step 1: Load audio (16 kHz mono float32).
         audio = self._load_audio(audio_path)
 
-        # Step 2: Run processor with language + punctuation kwargs.
-        # Verified against repka3 PoC (transformers 5.4.0); same kwargs
-        # are accepted by the trust_remote_code path on transformers 4.57.6
-        # because the processor class ships in the model repo.
+        # Step 2: Build the decoder prompt that FORCES language/punctuation.
+        # CRITICAL (root cause of non-Japanese output, found 2026-06-10):
+        # the processor IGNORES language=/punctuation= kwargs entirely
+        # (processing_cohere_asr.py never reads them — they vanish into
+        # **kwargs), and the model performs NO language detection (its own
+        # transcribe() docstring). The ONLY language mechanism is the decoder
+        # prompt prefix "<|startofcontext|><|startoftranscript|>...<|ja|><|ja|>..."
+        # built by model.build_prompt() and fed as decoder_input_ids — mirror
+        # the model's own transcribe()/_transcribe_waveforms_batched() flow.
+        try:
+            self._model._validate_transcribe_language(resolved_language)
+        except AttributeError:
+            pass  # older/newer revision without the helper — build_prompt below
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Cohere-Transcribe does not support language "
+                f"'{resolved_language}': {exc}"
+            ) from exc
+
+        if hasattr(self._model, "build_prompt"):
+            prompt_text = self._model.build_prompt(
+                language=resolved_language, punctuation=resolved_punctuation
+            )
+        else:
+            # Fallback mirrors build_prompt() from the cached repo revision.
+            pnc_token = "<|pnc|>" if resolved_punctuation else "<|nopnc|>"
+            prompt_text = (
+                "<|startofcontext|><|startoftranscript|><|emo:undefined|>"
+                f"<|{resolved_language}|><|{resolved_language}|>"
+                f"{pnc_token}<|noitn|><|notimestamp|><|nodiarize|>"
+            )
+
+        # Step 3: Run processor with audio AND the prompt text (lists, exactly
+        # like the model's own batched transcribe path). With text= present
+        # the processor tokenizes the prompt into input_ids.
         inputs = self._processor(
-            audio,
+            audio=[audio],
+            text=[prompt_text],
             sampling_rate=16000,
             return_tensors="pt",
-            language=resolved_language,
-            punctuation=resolved_punctuation,
         )
 
-        # Step 3: Capture audio_chunk_index BEFORE the .to() cast — it is
-        # a Python int / tensor metadata, not a tensor we want on GPU.
+        # Capture audio_chunk_index BEFORE device casts — it is metadata,
+        # not a tensor we want on GPU.
         audio_chunk_index = inputs.get("audio_chunk_index")
 
-        # Step 4: Cast the whole BatchEncoding to device + model.dtype.
-        # repka3 uses self.model.dtype here; equivalent to self._dtype which
-        # we resolved at load() time.
-        inputs = inputs.to(self._device, dtype=self._dtype)
+        # Step 4: Cast per-key: floating tensors get the model dtype,
+        # integer tensors (input_ids etc.) must stay long — a blanket
+        # .to(device, dtype) would corrupt the prompt ids.
+        cast_inputs = {}
+        for key, value in inputs.items():
+            if hasattr(value, "is_floating_point") and value.is_floating_point():
+                cast_inputs[key] = value.to(self._device, dtype=self._dtype)
+            elif hasattr(value, "to"):
+                cast_inputs[key] = value.to(self._device)
+            else:
+                cast_inputs[key] = value
+        inputs = cast_inputs
 
-        # Step 5: Generate.  Greedy decoding (do_sample=False, num_beams=1)
+        # Step 5: Rename input_ids -> decoder_input_ids and build the decoder
+        # attention mask (same as the model's transcribe path). Providing a
+        # real mask also fixes the transformers 4.57 crash ('NoneType' has no
+        # attribute 'new_ones') that the old bare-start-token workaround
+        # papered over.
+        if "input_ids" in inputs and "decoder_input_ids" not in inputs:
+            inputs["decoder_input_ids"] = inputs.pop("input_ids")
+
+        extra_gen_kwargs = {}
+        prompt_len = 0
+        if "decoder_input_ids" in inputs:
+            dec_ids = inputs["decoder_input_ids"]
+            pad_id = getattr(self._processor.tokenizer, "pad_token_id", None)
+            if "decoder_attention_mask" not in inputs:
+                if pad_id is None:
+                    inputs["decoder_attention_mask"] = torch.ones_like(dec_ids)
+                else:
+                    inputs["decoder_attention_mask"] = dec_ids.ne(pad_id).long()
+            prompt_len = int(inputs["decoder_attention_mask"][0].sum().item())
+            extra_gen_kwargs["decoder_start_token_id"] = int(dec_ids[0, 0].item())
+        else:
+            # Defensive fallback (processor revision without text= support):
+            # bare decoder start token keeps generation alive on 4.57, but
+            # language is NOT forced — warn loudly.
+            logger.warning(
+                "[CohereTextGenerator] Processor did not return prompt ids — "
+                "language forcing unavailable; output language may drift."
+            )
+            gen_cfg = getattr(self._model, "generation_config", None)
+            start_id = getattr(gen_cfg, "decoder_start_token_id", None) if gen_cfg else None
+            if start_id is None:
+                start_id = getattr(self._model.config, "decoder_start_token_id", None)
+            if start_id is not None:
+                extra_gen_kwargs["decoder_input_ids"] = torch.full(
+                    (inputs["input_features"].shape[0], 1), start_id,
+                    dtype=torch.long, device=self._device,
+                )
+
+        # Step 6: Generate.  Greedy decoding (do_sample=False, num_beams=1)
         # is set explicitly for determinism even though it is the default
         # behavior — guards against future generation_config drift.
         with torch.inference_mode():
             outputs = self._model.generate(
                 **inputs,
+                **extra_gen_kwargs,
                 max_new_tokens=resolved_max_new_tokens,
                 do_sample=False,
                 num_beams=1,
+                use_cache=True,
             )
 
-        # Step 6: Move outputs to CPU before decode (mirrors repka3 pattern).
+        # Move outputs to CPU before decode (mirrors repka3 pattern).
         outputs = outputs.cpu()
+
+        # Step 6b: Trim the echoed prompt prefix from the generated ids
+        # (generate() returns prompt + continuation). The prompt tokens are
+        # specials so skip_special_tokens would drop most of them anyway,
+        # but trimming deterministically matches the model's own flow.
+        if (
+            prompt_len
+            and outputs.shape[1] >= prompt_len
+            and torch.equal(
+                outputs[0, :prompt_len],
+                inputs["decoder_input_ids"][0, :prompt_len].cpu(),
+            )
+        ):
+            outputs = outputs[:, prompt_len:]
 
         # Step 7: Build decode_kwargs conditionally.
         decode_kwargs = {"skip_special_tokens": True}
@@ -669,7 +922,25 @@ class CohereTextGenerator:
             decode_kwargs["audio_chunk_index"] = audio_chunk_index
             decode_kwargs["language"] = resolved_language
 
-        transcript = self._processor.decode(outputs, **decode_kwargs)
+        # The current model-repo revision's processor.decode is a PLAIN proxy
+        # to tokenizer.decode (verified in the cached remote source,
+        # 2026-06-10): it takes a single 1-D id sequence and has no
+        # audio_chunk_index reassembly. model.generate returns a 2-D
+        # (batch, seq) tensor, so feeding it whole dies with
+        # "int() argument must be ... not 'list'". Try the documented call
+        # first (forward-compat with revisions that do implement chunk
+        # reassembly), then fall back to batch_decode on the 2-D output.
+        try:
+            transcript = self._processor.decode(outputs, **decode_kwargs)
+        except (TypeError, ValueError):
+            logger.debug(
+                "[CohereTextGenerator] processor.decode rejected batched "
+                "output (plain tokenizer proxy in this repo revision); "
+                "falling back to batch_decode."
+            )
+            transcript = self._processor.batch_decode(
+                outputs, skip_special_tokens=True
+            )
 
         # Step 8: Decode may return list or string.
         if isinstance(transcript, list):

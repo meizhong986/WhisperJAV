@@ -143,6 +143,10 @@ class WhisperJAVAPI:
         if mode == 'transformers':
             return self._build_transformers_args(args, options)
 
+        # Handle SenseVoice mode separately (uses --sv-* arguments)
+        if mode == 'sensevoice':
+            return self._build_sensevoice_args(args, options)
+
         # Source audio language (for transcription)
         source_language = options.get('source_language', 'japanese')
         args += ["--language", source_language]
@@ -195,6 +199,17 @@ class WhisperJAVAPI:
         speech_segmenter = options.get('speech_segmenter', '').strip()
         if speech_segmenter:
             args += ["--speech-segmenter", speech_segmenter]
+
+        # Batched inference pipeline (issue #357) — balanced pipeline speedup.
+        # Only emit when explicitly set; otherwise the config default (on) applies.
+        batched_pipeline = options.get('batched_pipeline', None)
+        if batched_pipeline is not None:
+            args += ["--batched-pipeline", "true" if batched_pipeline else "false"]
+            # Only forward batch size when batching is enabled.
+            if batched_pipeline:
+                batch_size = options.get('batch_size', None)
+                if batch_size:
+                    args += ["--batch-size", str(int(batch_size))]
 
         # Model override
         model_override = options.get('model_override', '').strip()
@@ -283,6 +298,68 @@ class WhisperJAVAPI:
             args += ["--debug"]
 
         # Output format (srt/vtt/both)
+        output_format = options.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
+
+        if options.get('accept_cpu_mode', False):
+            args += ["--accept-cpu-mode"]
+
+        return args
+
+    def _build_sensevoice_args(self, args: List[str], options: Dict[str, Any]) -> List[str]:
+        """Build CLI arguments for SenseVoice mode (uses --sv-* arguments).
+
+        SenseVoice does not use the legacy sensitivity/speech-segmenter knobs.
+        Source language is mapped from the GUI's full-name value to a SenseVoice
+        language code.
+        """
+        # Map GUI source-language (full names) to SenseVoice language codes.
+        lang_map = {
+            'japanese': 'ja', 'english': 'en', 'chinese': 'zh',
+            'cantonese': 'yue', 'korean': 'ko', 'auto': 'auto',
+        }
+        source_language = options.get('source_language', 'japanese')
+        args += ["--sv-language", lang_map.get(source_language, 'ja')]
+
+        # Subtitle output language (native / direct-to-english). SenseVoice can't
+        # translate, but the flag is forwarded for consistent output naming.
+        subs_language = options.get('subs_language', 'native')
+        args += ["--subs-language", subs_language]
+
+        output_dir = options.get('output_dir', self.default_output)
+        args += ["--output-dir", output_dir]
+
+        # Scene detection method (subtitle granularity). Default auditok.
+        sv_scene = options.get('sv_scene', '').strip()
+        if sv_scene:
+            args += ["--sv-scene", sv_scene]
+
+        # Optional model id override
+        sv_model_id = options.get('sv_model_id', '').strip()
+        if sv_model_id:
+            args += ["--sv-model-id", sv_model_id]
+
+        # Customize-modal params (use_itn, diarize, merge_vad, ...) forwarded as a
+        # single JSON blob — main.py merges it over the individual --sv-* flags.
+        # This is what makes the single-pass SenseVoice customize modal actually
+        # take effect (previously dropped). Only sent when the user customized.
+        sv_params = options.get('sv_params')
+        if sv_params:
+            import json as _json
+            args += ["--sv-params", _json.dumps(sv_params)]
+
+        # Common options
+        temp_dir = options.get('temp_dir', '').strip()
+        if temp_dir:
+            args += ["--temp-dir", temp_dir]
+
+        if options.get('keep_temp', False):
+            args += ["--keep-temp"]
+
+        if options.get('debug', False):
+            args += ["--debug"]
+
         output_format = options.get('output_format', 'srt')
         if output_format and output_format != 'srt':
             args += ["--output-format", output_format]
@@ -1053,6 +1130,7 @@ class WhisperJAVAPI:
             "nemo-lite": "nemo-speech-segmentation.yaml",
             "silero-v6.2": "silero-v6-speech-segmentation.yaml",
             "whisperseg": "whisperseg-speech-segmentation.yaml",
+            "firered": "firered-speech-segmentation.yaml",
         }
 
         # Handle "none" backend
@@ -1830,6 +1908,138 @@ class WhisperJAVAPI:
             }
         }
 
+    def get_sensevoice_schema(self) -> Dict[str, Any]:
+        """
+        Get parameter schema for the SenseVoice (FunASR) customize modal.
+
+        SenseVoice is non-autoregressive — it has no Whisper-style decoder
+        params (beam/temperature/logprob). What it does expose:
+          - use_itn: inverse text normalization (punctuation/numbers)
+          - ban_emo_unk: suppress the <|EMO_UNKNOWN|> emotion token
+          - merge_vad / merge_length_s: merge short fsmn-vad segments
+          - vad_max_segment_ms: max single VAD chunk = FunASR
+            vad_kwargs.max_single_segment_time; tutorial recommends 60000ms
+            (60s) for long audio. Segments longer than this are truncated.
+          - batch_size_s: dynamic batch size (throughput vs VRAM)
+        Defaults mirror modules/sensevoice_asr.py.
+
+        Tab layout mirrors the Transformers modal (Model / Quality / Chunking /
+        Enhancer / Scene). NOTE: in ensemble, the main-tab Model and Scene
+        Detector dropdowns take precedence over the modal's model_id/scene
+        (pass_worker applies pass_config overrides after modal params) — the
+        modal descriptions say so.
+        """
+        return {
+            "success": True,
+            "schema": {
+                "model": {
+                    "model_id": {
+                        "type": "dropdown",
+                        "label": "ASR Model",
+                        "options": [
+                            {"value": "iic/SenseVoiceSmall",
+                             "label": "SenseVoice Small (~1GB VRAM)"},
+                        ],
+                        "default": "iic/SenseVoiceSmall",
+                    },
+                    "device": {
+                        "type": "dropdown",
+                        "label": "Device",
+                        "options": [
+                            {"value": "auto", "label": "Auto (detect GPU)"},
+                            {"value": "cuda", "label": "CUDA (GPU)"},
+                            {"value": "cpu", "label": "CPU"},
+                        ],
+                        "default": "auto",
+                    },
+                },
+                "scene": {
+                    "scene": {
+                        "type": "dropdown",
+                        "label": "Scene Detection Method",
+                        "options": [
+                            {"value": "auditok", "label": "Auditok (energy-based)"},
+                            {"value": "silero", "label": "Silero (VAD-based)"},
+                            {"value": "semantic", "label": "Semantic"},
+                            {"value": "none", "label": "None (process whole file)"},
+                        ],
+                        "default": "auditok",
+                    },
+                },
+                "decoding": {
+                    "use_itn": {
+                        "type": "checkbox",
+                        "label": "Inverse Text Normalization (punctuation/numbers)",
+                        "default": True,
+                    },
+                    "ban_emo_unk": {
+                        "type": "checkbox",
+                        "label": "Ban unknown-emotion token",
+                        "default": False,
+                    },
+                    "diarize": {
+                        "type": "checkbox",
+                        "label": "Speaker diarization ([spkN] labels)",
+                        "default": False,
+                    },
+                    "spk_num": {
+                        "type": "slider",
+                        "label": "Force speaker count (0 = auto)",
+                        "min": 0, "max": 10, "step": 1, "default": 0,
+                    },
+                },
+                "vad": {
+                    "merge_vad": {
+                        "type": "checkbox",
+                        "label": "Merge short VAD segments",
+                        "default": True,
+                    },
+                    "merge_length_s": {
+                        "type": "slider",
+                        "label": "Merge target length (s)",
+                        "min": 1, "max": 30, "step": 1, "default": 15,
+                    },
+                    "vad_max_segment_ms": {
+                        "type": "slider",
+                        "label": "Max VAD segment (ms)",
+                        "min": 5000, "max": 60000, "step": 1000, "default": 60000,
+                    },
+                    "batch_size_s": {
+                        "type": "slider",
+                        "label": "Batch size (audio-seconds)",
+                        "min": 10, "max": 300, "step": 10, "default": 60,
+                    },
+                },
+                "enhancer": {
+                    "bsrf_overlap": {
+                        "type": "slider",
+                        "label": "BS-RoFormer overlap (speed vs quality)",
+                        "min": 1, "max": 4, "step": 1, "default": 2,
+                    },
+                },
+                # Post-processing filters. The shared sanitizer is tuned for
+                # Whisper and over-removes SenseVoice output; defaults are relaxed
+                # (hallucination + CPS off, repetition on). (#350)
+                "postproc": {
+                    "remove_hallucinations": {
+                        "type": "checkbox",
+                        "label": "Remove hallucinations (Whisper blacklist)",
+                        "default": False,
+                    },
+                    "remove_repetitions": {
+                        "type": "checkbox",
+                        "label": "Clean repetitions",
+                        "default": True,
+                    },
+                    "remove_cps_outliers": {
+                        "type": "checkbox",
+                        "label": "Drop abnormal-speed lines (CPS filter)",
+                        "default": False,
+                    },
+                },
+            },
+        }
+
     def get_qwen_schema(self) -> Dict[str, Any]:
         """
         Get parameter schema for Qwen3-ASR pipeline customize modal.
@@ -2122,9 +2332,11 @@ class WhisperJAVAPI:
           - dtype: auto/float16/bfloat16/float32
           - language: defaults to ja
           - punctuation: bool, default True
-          - aligner: D7 — qwen3 default with 'none' as VAD-only fallback;
-                     selecting 'none' must trigger the customize-handler
-                     triple-flip (timestamp_mode→vad_only, stepdown→False)
+          - aligner: 'none' (VAD-only timing) is the default — ChronosJAV
+                     logic with FireRedVAD as the segmenter; the aligner
+                     benchmarked ~0% native alignment on JAV audio. Selecting
+                     'qwen3' triggers the reverse triple-flip at pack time
+                     (timestamp_mode→aligner_vad_fallback, stepdown→True).
         """
         return {
             "success": True,
@@ -2174,13 +2386,88 @@ class WhisperJAVAPI:
                         "type": "dropdown",
                         "label": "Data Type",
                         "group": "hardware",
+                        # float16 intentionally absent: the Cohere modeling
+                        # code's -1e9 attention mask overflows fp16 and kills
+                        # every forward pass (verified 2026-06-10); the
+                        # generator coerces fp16 -> bf16 anyway.
                         "options": [
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "float16", "label": "Float16 (faster)"},
+                            {"value": "auto", "label": "Auto (BFloat16 on GPU)"},
                             {"value": "bfloat16", "label": "BFloat16"},
-                            {"value": "float32", "label": "Float32 (slower)"},
+                            {"value": "float32", "label": "Float32 (slower, 2x VRAM)"},
                         ],
                         "default": "auto",
+                    },
+                },
+                # Audio: qwen-shell framing/scene/VAD knobs — Cohere rides the
+                # same outer shell as Anime-Whisper, so these all apply. Field
+                # set mirrors get_qwen_schema()["audio"] (generateQwenAudioTab
+                # renders this section unguarded — keep all 8 keys present).
+                # vad_threshold/vad_padding become segmenter overrides
+                # (threshold / speech_pad_ms) for whichever speech segmenter
+                # the Ensemble row selects (whisperseg, firered, silero, ten).
+                "audio": {
+                    "framer": {
+                        "type": "dropdown",
+                        "label": "Temporal Framing",
+                        "description": "How audio is split into frames for text generation. Cohere prefers long contiguous segments — keep VAD Grouped.",
+                        "options": [
+                            {"value": "vad-grouped", "label": "VAD Grouped (default)"},
+                            {"value": "full-scene", "label": "Full Scene"},
+                            {"value": "srt-source", "label": "SRT Source"},
+                        ],
+                        "default": "vad-grouped",
+                    },
+                    "safe_chunking": {
+                        "type": "checkbox",
+                        "label": "Safe Chunking",
+                        "description": "Enforce scene boundaries for ForcedAligner 180s limit",
+                        "default": True,
+                    },
+                    "scene_min_duration": {
+                        "type": "slider",
+                        "label": "Min Duration",
+                        "description": "Minimum scene length (default: 12s)",
+                        "group": "scene_bounds",
+                        "min": 5, "max": 60, "step": 1,
+                        "default": 12,
+                    },
+                    "scene_max_duration": {
+                        "type": "slider",
+                        "label": "Max Duration",
+                        "description": "Maximum scene length (default: 48s)",
+                        "group": "scene_bounds",
+                        "min": 20, "max": 300, "step": 5,
+                        "default": 48,
+                    },
+                    "chunk_threshold": {
+                        "type": "slider",
+                        "label": "Frame Gap Threshold",
+                        "description": "Silence gap (seconds) that splits speech into separate frames. Cohere default 1.0 (longer frames = more context).",
+                        "min": 0.3, "max": 5.0, "step": 0.1,
+                        "default": 1.0,
+                    },
+                    "max_group_duration": {
+                        "type": "slider",
+                        "label": "Max Group Duration",
+                        "description": "Maximum duration for VAD segment grouping (Cohere default 6s)",
+                        "min": 3, "max": 60, "step": 1,
+                        "default": 6,
+                    },
+                    "vad_threshold": {
+                        "type": "slider",
+                        "label": "VAD Threshold",
+                        "description": "Speech detection probability threshold for the segmenter selected on the pass row (FireRedVAD default, WhisperSeg, Silero, TEN). Overrides sensitivity preset. Lower = more sensitive. Under VAD-only timing this segmenter drives subtitle granularity. Default 0.4 = FireRedVAD balanced.",
+                        "group": "vad_settings",
+                        "min": 0.05, "max": 0.80, "step": 0.05,
+                        "default": 0.4,
+                    },
+                    "vad_padding": {
+                        "type": "slider",
+                        "label": "VAD Padding (ms)",
+                        "description": "Padding around detected speech segments (ms), applied by the selected segmenter (FireRedVAD pads both sides symmetrically). Overrides sensitivity preset. Default 100 = FireRedVAD balanced.",
+                        "group": "vad_settings",
+                        "min": 50, "max": 600, "step": 25,
+                        "default": 100,
                     },
                 },
                 "generation": {
@@ -2200,22 +2487,24 @@ class WhisperJAVAPI:
                         "label": "Aligner Backend",
                         "description": (
                             "Cohere has no native word-level timestamps (HF discussion #19). "
-                            "Qwen3 ForcedAligner produces them downstream. Selecting 'none' "
-                            "falls back to VAD-derived segment timing only and must flip "
+                            "Default is VAD-only timing (ChronosJAV logic): the speech "
+                            "segmenter — FireRedVAD by default — drives subtitle granularity. "
+                            "The Qwen3 ForcedAligner benchmarked ~0% native alignment on JAV "
+                            "audio (scene-sized blocks); selecting it restores "
                             "timestamp_mode and stepdown together (handled at pack time)."
                         ),
                         "options": [
-                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (recommended, D7 default)"},
-                            {"value": "none", "label": "None (VAD timestamps only)"},
+                            {"value": "none", "label": "None — VAD timing (recommended)"},
+                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (+~1.2GB VRAM)"},
                         ],
-                        "default": "qwen3",
+                        "default": "none",
                     },
                 },
             },
             "metadata": {
                 "preview": True,
                 "v1_8_14_status": "API defined; GUI routes via openQwenCustomize for v1.8.14 (D-NEW2)",
-                "triple_flip_note": "When aligner_backend='none', api.py params packer must also stamp timestamp_mode='vad_only' and stepdown=False to keep the orchestrator consistent (plan §4.6).",
+                "triple_flip_note": "Bidirectional at pack time: aligner_backend='qwen3' stamps timestamp_mode='aligner_vad_fallback'+stepdown=True; default/'none' stamps timestamp_mode='vad_only'+stepdown=False to keep the orchestrator consistent (plan §4.6).",
             },
         }
 
@@ -2511,6 +2800,11 @@ class WhisperJAVAPI:
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-hf-params", json.dumps(pass1['params'])]
             # else: minimal args - backend uses model defaults
+        elif pass1.get('isSenseVoice'):
+            # SenseVoice pass: no sensitivity. Forward customize-modal params
+            # (use_itn, merge_vad, merge_length_s, etc.) via --pass1-params.
+            if pass1.get('customized') and pass1.get('params'):
+                args += ["--pass1-params", json.dumps(pass1['params'])]
         elif pass1.get('isQwen'):
             # Qwen pass: sensitivity resolves segmenter config via YAML presets
             if pass1.get('sensitivity'):
@@ -2526,16 +2820,19 @@ class WhisperJAVAPI:
                 qwen1_params.setdefault('stepdown', False)
             elif pass1.get('isCohere'):
                 qwen1_params['generator_backend'] = 'cohere'
-                qwen1_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
-                qwen1_params.setdefault('assembly_cleaner', 'passthrough')         # D3
-                # stepdown defaults to True for Cohere (aligner ON by D7)
-                # Triple-flip enforcement (plan §4.6): when the user disables the
-                # aligner via Customize Parameters → aligner_backend='none', three
-                # downstream fields must flip together to keep the orchestrator
-                # consistent: timestamp_mode → vad_only, stepdown → False, and
-                # the aligner choice stays 'none'. We enforce here at pack time
-                # so a manually-edited preset cannot leave the trio in conflict.
-                if qwen1_params.get('aligner_backend') == 'none':
+                qwen1_params.setdefault('assembly_cleaner', 'passthrough')  # D3
+                # ChronosJAV-style VAD-only timing is the Cohere default (the
+                # ForcedAligner benchmarked ~0% native alignment on JAV audio
+                # and emitted scene-sized blocks). Triple-flip enforcement at
+                # pack time keeps timestamp_mode/stepdown/aligner consistent
+                # in BOTH directions: aligner_backend='qwen3' (explicit
+                # Customize choice) restores the aligner trio; anything else
+                # (default, or explicit 'none') stamps the vad_only trio so a
+                # manually-edited preset cannot leave them in conflict.
+                if qwen1_params.get('aligner_backend') == 'qwen3':
+                    qwen1_params.setdefault('timestamp_mode', 'aligner_vad_fallback')
+                    qwen1_params.setdefault('stepdown', True)
+                else:
                     qwen1_params['timestamp_mode'] = 'vad_only'
                     qwen1_params['stepdown'] = False
             if qwen1_params:
@@ -2558,8 +2855,13 @@ class WhisperJAVAPI:
         # - Qwen/Legacy: Use --pass1-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
         segmenter1 = pass1.get('speechSegmenter')
         if pass1.get('isTransformers'):
-            # Transformers: Skip segmenter entirely (HF internal chunking)
+            # Transformers: HF internal chunking — no external segmenter.
             pass
+        elif pass1.get('isSenseVoice'):
+            # SenseVoice: the segmenter dropdown toggles its internal fsmn-vad.
+            # Pass it through so the worker can disable VAD when "none".
+            if segmenter1:
+                args += ["--pass1-speech-segmenter", segmenter1]
         else:
             # Both Qwen and Legacy use --pass1-speech-segmenter
             # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
@@ -2615,6 +2917,10 @@ class WhisperJAVAPI:
                 if pass2.get('customized') and pass2.get('params'):
                     args += ["--pass2-hf-params", json.dumps(pass2['params'])]
                 # else: minimal args - backend uses model defaults
+            elif pass2.get('isSenseVoice'):
+                # SenseVoice pass: no sensitivity. Forward customize-modal params.
+                if pass2.get('customized') and pass2.get('params'):
+                    args += ["--pass2-params", json.dumps(pass2['params'])]
             elif pass2.get('isQwen'):
                 # Qwen pass: sensitivity resolves segmenter config via YAML presets
                 if pass2.get('sensitivity'):
@@ -2630,10 +2936,14 @@ class WhisperJAVAPI:
                     qwen2_params.setdefault('stepdown', False)
                 elif pass2.get('isCohere'):
                     qwen2_params['generator_backend'] = 'cohere'
-                    qwen2_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
-                    qwen2_params.setdefault('assembly_cleaner', 'passthrough')         # D3
-                    # Triple-flip enforcement (mirror of pass 1).
-                    if qwen2_params.get('aligner_backend') == 'none':
+                    qwen2_params.setdefault('assembly_cleaner', 'passthrough')  # D3
+                    # Bidirectional triple-flip enforcement (mirror of pass 1):
+                    # vad_only timing is the default; aligner_backend='qwen3'
+                    # restores the aligner trio.
+                    if qwen2_params.get('aligner_backend') == 'qwen3':
+                        qwen2_params.setdefault('timestamp_mode', 'aligner_vad_fallback')
+                        qwen2_params.setdefault('stepdown', True)
+                    else:
                         qwen2_params['timestamp_mode'] = 'vad_only'
                         qwen2_params['stepdown'] = False
                 if qwen2_params:
@@ -2658,8 +2968,12 @@ class WhisperJAVAPI:
                 # - Qwen/Legacy: Use --pass2-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
                 segmenter2 = pass2.get('speechSegmenter')
                 if pass2.get('isTransformers'):
-                    # Transformers: Skip segmenter entirely (HF internal chunking)
+                    # Transformers: HF internal chunking — no external segmenter.
                     pass
+                elif pass2.get('isSenseVoice'):
+                    # SenseVoice: segmenter dropdown toggles its internal fsmn-vad.
+                    if segmenter2:
+                        args += ["--pass2-speech-segmenter", segmenter2]
                 else:
                     # Both Qwen and Legacy use --pass2-speech-segmenter
                     # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
@@ -3112,6 +3426,17 @@ class WhisperJAVAPI:
                 'ollamaUrl': backend.get('ollama_url', '') or '',
                 'provider': backend.get('provider', ''),
             }
+            # Ollama tuning knobs (None/missing → '' so the GUI shows a blank =
+            # "use curated default").
+            ot = backend.get('ollama_tuning') or {}
+            gui_settings.update({
+                'ollamaNumCtx': ot.get('num_ctx') if ot.get('num_ctx') is not None else '',
+                'ollamaMaxTokens': ot.get('max_tokens') if ot.get('max_tokens') is not None else '',
+                'ollamaTopK': ot.get('top_k') if ot.get('top_k') is not None else '',
+                'ollamaMinP': ot.get('min_p') if ot.get('min_p') is not None else '',
+                'ollamaRepeatPenalty': ot.get('repeat_penalty') if ot.get('repeat_penalty') is not None else '',
+                'ollamaKeepAlive': ot.get('keep_alive') if ot.get('keep_alive') is not None else '',
+            })
             return {"success": True, "settings": gui_settings}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -3159,6 +3484,24 @@ class WhisperJAVAPI:
                 existing['ollama_url'] = settings['ollamaUrl'] or None
             if 'provider' in settings:
                 existing['provider'] = settings['provider']
+
+            # Ollama tuning knobs (stored under a nested dict; '' / None means
+            # "use the curated default"). Kept separate from model_params so they
+            # only ever apply to the Ollama provider path.
+            _ot_map = {
+                'ollamaNumCtx': 'num_ctx',
+                'ollamaMaxTokens': 'max_tokens',
+                'ollamaTopK': 'top_k',
+                'ollamaMinP': 'min_p',
+                'ollamaRepeatPenalty': 'repeat_penalty',
+                'ollamaKeepAlive': 'keep_alive',
+            }
+            if any(k in settings for k in _ot_map):
+                ot = existing.setdefault('ollama_tuning', {})
+                for js_key, be_key in _ot_map.items():
+                    if js_key in settings:
+                        val = settings[js_key]
+                        ot[be_key] = val if (val not in ('', None)) else None
 
             # Nested model_params
             mp = existing.setdefault('model_params', {})
@@ -3659,6 +4002,25 @@ class WhisperJAVAPI:
                 args.extend(["--max-batch-size", str(options['max_batch_size'])])
             if options.get('max_retries'):
                 args.extend(["--max-retries", str(options['max_retries'])])
+            # Ollama tuning knobs (only meaningful for the ollama provider).
+            # Empty/None means "use the curated default" → don't pass the flag.
+            if provider == 'ollama':
+                if options.get('ollama_num_ctx'):
+                    args.extend(["--ollama-num-ctx", str(options['ollama_num_ctx'])])
+                if options.get('ollama_max_tokens'):
+                    args.extend(["--ollama-max-tokens", str(options['ollama_max_tokens'])])
+                if options.get('ollama_temperature') not in (None, ''):
+                    args.extend(["--ollama-temperature", str(options['ollama_temperature'])])
+                if options.get('ollama_top_p') not in (None, ''):
+                    args.extend(["--ollama-top-p", str(options['ollama_top_p'])])
+                if options.get('ollama_top_k') not in (None, ''):
+                    args.extend(["--ollama-top-k", str(options['ollama_top_k'])])
+                if options.get('ollama_min_p') not in (None, ''):
+                    args.extend(["--ollama-min-p", str(options['ollama_min_p'])])
+                if options.get('ollama_repeat_penalty') not in (None, ''):
+                    args.extend(["--ollama-repeat-penalty", str(options['ollama_repeat_penalty'])])
+                if options.get('ollama_keep_alive') not in (None, ''):
+                    args.extend(["--ollama-keep-alive", str(options['ollama_keep_alive'])])
             # Output directory — honor the shared Destination section.
             # 'source' is a sentinel meaning "save next to input file" (default).
             _out_dir = options.get('output_dir', '')
