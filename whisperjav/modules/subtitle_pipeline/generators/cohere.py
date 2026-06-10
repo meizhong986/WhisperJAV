@@ -724,47 +724,104 @@ class CohereTextGenerator:
         # Step 1: Load audio (16 kHz mono float32).
         audio = self._load_audio(audio_path)
 
-        # Step 2: Run processor with language + punctuation kwargs.
-        # Verified against repka3 PoC (transformers 5.4.0); same kwargs
-        # are accepted by the trust_remote_code path on transformers 4.57.6
-        # because the processor class ships in the model repo.
-        inputs = self._processor(
-            audio,
-            sampling_rate=16000,
-            return_tensors="pt",
-            language=resolved_language,
-            punctuation=resolved_punctuation,
-        )
+        # Step 2: Build the decoder prompt that FORCES language/punctuation.
+        # CRITICAL (root cause of non-Japanese output, found 2026-06-10):
+        # the processor IGNORES language=/punctuation= kwargs entirely
+        # (processing_cohere_asr.py never reads them — they vanish into
+        # **kwargs), and the model performs NO language detection (its own
+        # transcribe() docstring). The ONLY language mechanism is the decoder
+        # prompt prefix "<|startofcontext|><|startoftranscript|>...<|ja|><|ja|>..."
+        # built by model.build_prompt() and fed as decoder_input_ids — mirror
+        # the model's own transcribe()/_transcribe_waveforms_batched() flow.
+        try:
+            self._model._validate_transcribe_language(resolved_language)
+        except AttributeError:
+            pass  # older/newer revision without the helper — build_prompt below
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Cohere-Transcribe does not support language "
+                f"'{resolved_language}': {exc}"
+            ) from exc
 
-        # Step 3: Capture audio_chunk_index BEFORE the .to() cast — it is
-        # a Python int / tensor metadata, not a tensor we want on GPU.
-        audio_chunk_index = inputs.get("audio_chunk_index")
-
-        # Step 4: Cast the whole BatchEncoding to device + model.dtype.
-        # repka3 uses self.model.dtype here; equivalent to self._dtype which
-        # we resolved at load() time.
-        inputs = inputs.to(self._device, dtype=self._dtype)
-
-        # transformers 4.57.x compat: the model's remote generate() wrapper
-        # forwards decoder_attention_mask=None when no decoder_input_ids are
-        # given (the processor emits only input_features+length).
-        # transformers >= 5.4 tolerates the None; 4.57's
-        # _update_model_kwargs_for_generation crashes on it ("'NoneType'
-        # object has no attribute 'new_ones'", verified 2026-06-10).
-        # Passing explicit decoder_input_ids (the decoder start token, same
-        # as 5.4 auto-creates) makes the wrapper build a real ones-mask.
-        extra_gen_kwargs = {}
-        gen_cfg = getattr(self._model, "generation_config", None)
-        start_id = getattr(gen_cfg, "decoder_start_token_id", None) if gen_cfg else None
-        if start_id is None:
-            start_id = getattr(self._model.config, "decoder_start_token_id", None)
-        if start_id is not None:
-            extra_gen_kwargs["decoder_input_ids"] = torch.full(
-                (inputs["input_features"].shape[0], 1), start_id,
-                dtype=torch.long, device=self._device,
+        if hasattr(self._model, "build_prompt"):
+            prompt_text = self._model.build_prompt(
+                language=resolved_language, punctuation=resolved_punctuation
+            )
+        else:
+            # Fallback mirrors build_prompt() from the cached repo revision.
+            pnc_token = "<|pnc|>" if resolved_punctuation else "<|nopnc|>"
+            prompt_text = (
+                "<|startofcontext|><|startoftranscript|><|emo:undefined|>"
+                f"<|{resolved_language}|><|{resolved_language}|>"
+                f"{pnc_token}<|noitn|><|notimestamp|><|nodiarize|>"
             )
 
-        # Step 5: Generate.  Greedy decoding (do_sample=False, num_beams=1)
+        # Step 3: Run processor with audio AND the prompt text (lists, exactly
+        # like the model's own batched transcribe path). With text= present
+        # the processor tokenizes the prompt into input_ids.
+        inputs = self._processor(
+            audio=[audio],
+            text=[prompt_text],
+            sampling_rate=16000,
+            return_tensors="pt",
+        )
+
+        # Capture audio_chunk_index BEFORE device casts — it is metadata,
+        # not a tensor we want on GPU.
+        audio_chunk_index = inputs.get("audio_chunk_index")
+
+        # Step 4: Cast per-key: floating tensors get the model dtype,
+        # integer tensors (input_ids etc.) must stay long — a blanket
+        # .to(device, dtype) would corrupt the prompt ids.
+        cast_inputs = {}
+        for key, value in inputs.items():
+            if hasattr(value, "is_floating_point") and value.is_floating_point():
+                cast_inputs[key] = value.to(self._device, dtype=self._dtype)
+            elif hasattr(value, "to"):
+                cast_inputs[key] = value.to(self._device)
+            else:
+                cast_inputs[key] = value
+        inputs = cast_inputs
+
+        # Step 5: Rename input_ids -> decoder_input_ids and build the decoder
+        # attention mask (same as the model's transcribe path). Providing a
+        # real mask also fixes the transformers 4.57 crash ('NoneType' has no
+        # attribute 'new_ones') that the old bare-start-token workaround
+        # papered over.
+        if "input_ids" in inputs and "decoder_input_ids" not in inputs:
+            inputs["decoder_input_ids"] = inputs.pop("input_ids")
+
+        extra_gen_kwargs = {}
+        prompt_len = 0
+        if "decoder_input_ids" in inputs:
+            dec_ids = inputs["decoder_input_ids"]
+            pad_id = getattr(self._processor.tokenizer, "pad_token_id", None)
+            if "decoder_attention_mask" not in inputs:
+                if pad_id is None:
+                    inputs["decoder_attention_mask"] = torch.ones_like(dec_ids)
+                else:
+                    inputs["decoder_attention_mask"] = dec_ids.ne(pad_id).long()
+            prompt_len = int(inputs["decoder_attention_mask"][0].sum().item())
+            extra_gen_kwargs["decoder_start_token_id"] = int(dec_ids[0, 0].item())
+        else:
+            # Defensive fallback (processor revision without text= support):
+            # bare decoder start token keeps generation alive on 4.57, but
+            # language is NOT forced — warn loudly.
+            logger.warning(
+                "[CohereTextGenerator] Processor did not return prompt ids — "
+                "language forcing unavailable; output language may drift."
+            )
+            gen_cfg = getattr(self._model, "generation_config", None)
+            start_id = getattr(gen_cfg, "decoder_start_token_id", None) if gen_cfg else None
+            if start_id is None:
+                start_id = getattr(self._model.config, "decoder_start_token_id", None)
+            if start_id is not None:
+                extra_gen_kwargs["decoder_input_ids"] = torch.full(
+                    (inputs["input_features"].shape[0], 1), start_id,
+                    dtype=torch.long, device=self._device,
+                )
+
+        # Step 6: Generate.  Greedy decoding (do_sample=False, num_beams=1)
         # is set explicitly for determinism even though it is the default
         # behavior — guards against future generation_config drift.
         with torch.inference_mode():
@@ -774,10 +831,25 @@ class CohereTextGenerator:
                 max_new_tokens=resolved_max_new_tokens,
                 do_sample=False,
                 num_beams=1,
+                use_cache=True,
             )
 
-        # Step 6: Move outputs to CPU before decode (mirrors repka3 pattern).
+        # Move outputs to CPU before decode (mirrors repka3 pattern).
         outputs = outputs.cpu()
+
+        # Step 6b: Trim the echoed prompt prefix from the generated ids
+        # (generate() returns prompt + continuation). The prompt tokens are
+        # specials so skip_special_tokens would drop most of them anyway,
+        # but trimming deterministically matches the model's own flow.
+        if (
+            prompt_len
+            and outputs.shape[1] >= prompt_len
+            and torch.equal(
+                outputs[0, :prompt_len],
+                inputs["decoder_input_ids"][0, :prompt_len].cpu(),
+            )
+        ):
+            outputs = outputs[:, prompt_len:]
 
         # Step 7: Build decode_kwargs conditionally.
         decode_kwargs = {"skip_special_tokens": True}
