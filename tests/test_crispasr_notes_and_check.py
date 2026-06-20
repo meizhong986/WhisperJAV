@@ -226,7 +226,7 @@ MAIN_PROBE = textwrap.dedent("""
     media.write_bytes(b"x")
     out = root / "out"
     out.mkdir()
-    srt = out / "a.ja.merged.whisperjav.srt"
+    srt = out / "a.merged.whisperjav.ja.srt"
     srt.write_text("\\n".join(
         f"{i + 1}\\n00:{i:02d}:00,000 --> 00:{i:02d}:09,000\\nline {i + 1}\\n" for i in range(60)),
         encoding="utf-8")
@@ -286,7 +286,7 @@ class TestMainPrintsThemAndChangesNothing:
         _root, stdout = run
         lines = stdout.splitlines()
         row = next(i for i, line in enumerate(lines)
-                   if line.startswith("done") and "a.mp4 -> a.ja.merged.whisperjav.srt" in line)
+                   if line.startswith("done") and "a.mp4 -> a.merged.whisperjav.ja.srt" in line)
         assert lines[row + 1] == SUMMARY_NOTE_LINE.format(note=CPU_NOTE)
         assert lines[row + 2] == SUMMARY_NOTE_LINE.format(note=WARN_NOTE)
 
@@ -371,7 +371,7 @@ WORKER_OK_PROBE = textwrap.dedent("""
 
     def process(self, media_info):
         name = media_info["basename"]
-        final = self.output_dir / (name + ".ja.whisperjav.srt")
+        final = self.output_dir / (name + ".whisperjav.ja.srt")
         final.write_text("1\\n00:00:01,000 --> 00:00:02,000\\nline one\\n\\n"
                          "2\\n00:00:03,000 --> 00:00:04,000\\nline two\\n", encoding="utf-8")
         return {"output_files": {"final_srt": str(final)},
@@ -417,7 +417,7 @@ class TestTheWorkerCarriesACrispASRFilesNotes:
             assert (r["status"], r["error"], r["subtitles"], r["processing_time"]) == ("completed", None, 2, 1.5)
             assert r["srt_path"] == str(root / "out" / f"{name}.ja.pass1.srt")
             assert Path(r["srt_path"]).is_file()
-            assert not (root / "out" / f"{name}.ja.whisperjav.srt").exists()  # moved, not copied
+            assert not (root / "out" / f"{name}.whisperjav.ja.srt").exists()  # moved, not copied
 
     def test_the_notes_survive_the_process_and_stay_apart_from_the_degradations(self, worker):
         _root, data = worker

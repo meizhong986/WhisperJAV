@@ -78,8 +78,8 @@ def _write_srt(path: Path, lines):
 
 
 def test_find_hyp_requires_exactly_one(tmp_path):
-    _write_srt(tmp_path / "clip.ja.whisperjav.srt", [(1, 2, "a")])
-    assert find_hyp(tmp_path, "clip").name == "clip.ja.whisperjav.srt"
+    _write_srt(tmp_path / "clip.whisperjav.ja.srt", [(1, 2, "a")])
+    assert find_hyp(tmp_path, "clip").name == "clip.whisperjav.ja.srt"
     _write_srt(tmp_path / "clip.ja.pass1.srt", [(1, 2, "a")])
     with pytest.raises(SystemExit):
         find_hyp(tmp_path, "clip")
@@ -90,8 +90,8 @@ def test_cli_end_to_end(tmp_path, capsys):
     for d in (ref_dir, base_dir, cand_dir):
         d.mkdir()
     _write_srt(ref_dir / "clip.ja.srt", [(r["start"], r["end"], r["text"]) for r in REF])
-    _write_srt(base_dir / "clip.ja.whisperjav.srt", [(1.5, 3.5, "こんにちは"), (5.5, 7.5, "元気ですか")])
-    _write_srt(cand_dir / "clip.ja.whisperjav.srt", [(1.1, 3.1, "こんにちは"), (5.1, 7.1, "元気ですか")])
+    _write_srt(base_dir / "clip.whisperjav.ja.srt", [(1.5, 3.5, "こんにちは"), (5.5, 7.5, "元気ですか")])
+    _write_srt(cand_dir / "clip.whisperjav.ja.srt", [(1.1, 3.1, "こんにちは"), (5.1, 7.1, "元気ですか")])
     out = tmp_path / "t.json"
     assert main(["--ref-dir", str(ref_dir), "--base", str(base_dir), "--cand", str(cand_dir), "-o", str(out)]) == 0
     import json

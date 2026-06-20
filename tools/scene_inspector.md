@@ -29,7 +29,7 @@ the semantic threshold flag).
 ```bash
 python tools/scene_inspector.py MOVIE.mp4
 python tools/scene_inspector.py MOVIE.mp4 --backend semantic --scene-threshold 10
-python tools/scene_inspector.py MOVIE.mp4 --backend auditok,semantic --speech-ratio --srt MOVIE.ja.whisperjav.srt
+python tools/scene_inspector.py MOVIE.mp4 --backend auditok,semantic --speech-ratio --srt MOVIE.whisperjav.ja.srt
 python tools/scene_inspector.py MOVIE.mp4 --sensitivity aggressive --no-screenshots
 python tools/scene_inspector.py --list-params auditok
 python tools/scene_inspector.py MOVIE.mp4 --pipeline moss-crispasr --no-screenshots --markers
@@ -93,7 +93,7 @@ any product file.
 
 ## What was verified (2026-09-05, WJ env, RTX 3060)
 
-- `293sec-S01E04-scene4.mkv`, `--backend auditok,semantic --speech-ratio --srt …ja.whisperjav.srt`: auditok 19 scenes / semantic 7; 57 + 21 frames; two contact sheets (one opened and checked); two chapter files, one muxed with ffmpeg and read back by ffprobe; speech 65.6 % / 66.6 % of the media; 7 auditok scenes without cues, 1 cue in a gap; `compare.md` with boundary agreement auditok→semantic 0.161, semantic→auditok 0.429.
+- `293sec-S01E04-scene4.mkv`, `--backend auditok,semantic --speech-ratio --srt …whisperjav.ja.srt`: auditok 19 scenes / semantic 7; 57 + 21 frames; two contact sheets (one opened and checked); two chapter files, one muxed with ffmpeg and read back by ffprobe; speech 65.6 % / 66.6 % of the media; 7 auditok scenes without cues, 1 cue in a gap; `compare.md` with boundary agreement auditok→semantic 0.161, semantic→auditok 0.429.
 - `--sensitivity conservative|aggressive` (auditok, audio clip): only the preset keys change (thresholds 40/45 and 28/32, silences 3.0/2.5 and 2.0/1.2); max scene stays 28 s.
 - `--backend semantic --scene-threshold 10`: 6 scenes; effective `clustering_threshold: 10.0`; with `--backend auditok` the flag warns.
 - Audio-only `015sec_test…wav` with `--speech-ratio ten` and `--srt`: 1 scene, screenshots skipped with `skipped_reason: "no video stream"`, speech 68.8 %.

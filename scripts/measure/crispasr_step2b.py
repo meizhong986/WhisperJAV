@@ -32,7 +32,7 @@ Usage (from the repository root, with WJ110's python):
 
 Output, in <batch>/<model>_<slice form>/ (both films of a configuration share it; every file name starts with the
 film's name):
-    <film>.ja.whisperjav.srt          the pipeline's own SRT, with its default settings
+    <film>.whisperjav.ja.srt          the pipeline's own SRT, with its default settings
     lines-<l>_post-<p>/<film>.lines-<l>_post-<p>.srt
                                       one folder per variant, so `python -m subeval score --test-dir <folder>`
                                       finds exactly one SRT per film in a variant folder or in the configuration
@@ -158,7 +158,7 @@ def variants_for(pipeline: str) -> List[Tuple[str, str, str, Tuple[str, ...]]]:
 def planned_files(cfg: Config) -> Dict:
     folder, film = cfg.folder, cfg.basename
     return {
-        "pipeline_srt": folder / f"{film}.ja.whisperjav.srt",  # the pipeline's own name for it
+        "pipeline_srt": folder / f"{film}.whisperjav.ja.srt",  # the pipeline's own name for it
         "variants": {name: folder / name / f"{film}.{name}.srt" for name, _, _, _ in variants_for(cfg.pipeline)},
         "run_json": folder / f"{film}.run.json",
         "run_log": folder / f"{film}.run.log",

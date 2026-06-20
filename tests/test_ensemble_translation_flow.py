@@ -62,8 +62,8 @@ class TestComputeExpectedOutputs:
         result = mock_api._compute_expected_outputs(config, is_ensemble=True)
 
         assert len(result) == 2
-        assert result[0] == str(Path(output_dir) / "video1.ja.merged.whisperjav.srt")
-        assert result[1] == str(Path(output_dir) / "video2.ja.merged.whisperjav.srt")
+        assert result[0] == str(Path(output_dir) / "video1.merged.whisperjav.ja.srt")
+        assert result[1] == str(Path(output_dir) / "video2.merged.whisperjav.ja.srt")
 
     def test_ensemble_mode_via_mode_key(self, mock_api, tmp_path):
         """Test ensemble mode detected via mode='ensemble' key."""
@@ -78,7 +78,7 @@ class TestComputeExpectedOutputs:
         result = mock_api._compute_expected_outputs(options)
 
         assert len(result) == 1
-        assert result[0] == str(Path(output_dir) / "test.ja.merged.whisperjav.srt")
+        assert result[0] == str(Path(output_dir) / "test.merged.whisperjav.ja.srt")
 
     def test_non_ensemble_mode(self, mock_api, tmp_path):
         """Test non-ensemble mode produces simple .srt filename."""
@@ -107,7 +107,7 @@ class TestComputeExpectedOutputs:
         result = mock_api._compute_expected_outputs(config, is_ensemble=True)
 
         assert len(result) == 1
-        assert "audio.en.merged.whisperjav.srt" in result[0]
+        assert "audio.merged.whisperjav.en.srt" in result[0]
 
     def test_default_output_dir(self, mock_api):
         """Test using default output directory when not specified."""
@@ -120,7 +120,7 @@ class TestComputeExpectedOutputs:
 
         assert len(result) == 1
         assert mock_api.default_output in result[0]
-        assert "video.ja.merged.whisperjav.srt" in result[0]
+        assert "video.merged.whisperjav.ja.srt" in result[0]
 
     def test_windows_paths(self, mock_api, tmp_path):
         """Test with Windows-style paths."""
@@ -134,7 +134,7 @@ class TestComputeExpectedOutputs:
         result = mock_api._compute_expected_outputs(config, is_ensemble=True)
 
         assert len(result) == 1
-        assert "movie.ja.merged.whisperjav.srt" in result[0]
+        assert "movie.merged.whisperjav.ja.srt" in result[0]
 
     def test_complex_filename(self, mock_api, tmp_path):
         """Test with complex filename containing dots and special chars."""
@@ -149,7 +149,7 @@ class TestComputeExpectedOutputs:
 
         assert len(result) == 1
         # Should preserve the full stem
-        assert "MIAA-432.20sec_piano.ja.merged.whisperjav.srt" in result[0]
+        assert "MIAA-432.20sec_piano.merged.whisperjav.ja.srt" in result[0]
 
 
 # =============================================================================
@@ -181,7 +181,7 @@ class TestEnsembleTwopassOutputTracking:
 
         assert result['success'] == True
         assert len(mock_api._expected_output_files) == 1
-        assert "video.ja.merged.whisperjav.srt" in mock_api._expected_output_files[0]
+        assert "video.merged.whisperjav.ja.srt" in mock_api._expected_output_files[0]
 
     def test_multiple_files_tracked(self, mock_api, tmp_path):
         """Test multiple input files are all tracked."""
@@ -208,9 +208,9 @@ class TestEnsembleTwopassOutputTracking:
 
         assert len(mock_api._expected_output_files) == 3
         expected_names = [
-            "video1.ja.merged.whisperjav.srt",
-            "video2.ja.merged.whisperjav.srt",
-            "video3.ja.merged.whisperjav.srt"
+            "video1.merged.whisperjav.ja.srt",
+            "video2.merged.whisperjav.ja.srt",
+            "video3.merged.whisperjav.ja.srt"
         ]
         for name in expected_names:
             assert any(name in f for f in mock_api._expected_output_files)
@@ -253,7 +253,7 @@ class TestProcessStatusOutputFiles:
         assert status['status'] == 'completed'
         assert 'output_files' in status
         assert len(status['output_files']) == 1
-        assert "video.ja.merged.whisperjav.srt" in status['output_files'][0]
+        assert "video.merged.whisperjav.ja.srt" in status['output_files'][0]
 
     def test_output_files_not_returned_when_running(self, mock_api, tmp_path):
         """Test output_files is not returned while process is running."""
@@ -313,7 +313,7 @@ class TestTranslationApiContract:
     def test_start_translation_accepts_inputs_key(self, mock_api):
         """Test that start_translation accepts 'inputs' key (not 'input_files')."""
         options = {
-            'inputs': ['/path/to/video.ja.merged.whisperjav.srt'],
+            'inputs': ['/path/to/video.merged.whisperjav.ja.srt'],
             'provider': 'deepseek',
             'target': 'english'
         }
@@ -416,8 +416,8 @@ class TestFullEnsembleTranslationFlow:
             assert len(output_files) == 2
 
             # Verify filename patterns
-            assert any('MIAA-432.20sec_piano.ja.merged.whisperjav.srt' in f for f in output_files)
-            assert any('SONE-966-15_sec_test.ja.merged.whisperjav.srt' in f for f in output_files)
+            assert any('MIAA-432.20sec_piano.merged.whisperjav.ja.srt' in f for f in output_files)
+            assert any('SONE-966-15_sec_test.merged.whisperjav.ja.srt' in f for f in output_files)
 
         # Step 4: Start translation with the output files
         # Reset mock for translation subprocess

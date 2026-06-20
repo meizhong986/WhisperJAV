@@ -850,7 +850,7 @@ class TransformersPipeline(BasePipeline):
             self.progress.set_current_step("Post-processing subtitles", 5, 5)
             logger.info("Step 5/5: Post-processing subtitles...")
 
-            final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+            final_srt_path = self.build_output_srt_path(media_basename)
             processed_srt_path, stats = self.postprocessor.process(stitched_srt_path, final_srt_path)
 
             # Ensure final SRT is in output directory

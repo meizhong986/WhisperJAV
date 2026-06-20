@@ -109,7 +109,7 @@ class TestEnsembleMode:
         """
         Test basic ensemble mode produces merged SRT.
 
-        Expected output: {basename}.ja.merged.whisperjav.srt
+        Expected output: {basename}.merged.whisperjav.ja.srt
         """
         output_dir = persistent_output_dir / "test_ensemble_basic"
         output_dir.mkdir(exist_ok=True)
@@ -132,7 +132,7 @@ class TestEnsembleMode:
         assert result.returncode == 0, f"CLI failed with: {result.stderr}"
 
         # Check output file exists
-        expected_srt = output_dir / "short_15_sec_test-966-00_01_45-00_01_59.ja.merged.whisperjav.srt"
+        expected_srt = output_dir / "short_15_sec_test-966-00_01_45-00_01_59.merged.whisperjav.ja.srt"
         assert expected_srt.exists(), f"Expected SRT not found: {expected_srt}"
 
         # Verify SRT has content
@@ -198,7 +198,7 @@ class TestTranslationStandalone:
         assert result.returncode == 0, f"Translation CLI failed: {result.stderr}"
 
         # Check for output file (naming varies)
-        output_files = list(output_dir.glob("*.english.srt")) + list(output_dir.glob("*_translated.srt"))
+        output_files = list(output_dir.glob("*.en.srt")) + list(output_dir.glob("*_translated.srt"))
         assert len(output_files) > 0, f"No translated SRT found in {output_dir}"
 
 
@@ -217,8 +217,8 @@ class TestFullPipeline:
         Test full pipeline: Ensemble transcription + Translation.
 
         Expected outputs:
-        1. {basename}.ja.merged.whisperjav.srt (transcription)
-        2. {basename}.ja.merged.whisperjav.english.srt (translation)
+        1. {basename}.merged.whisperjav.ja.srt (transcription)
+        2. {basename}.merged.whisperjav.en.srt (translation)
         """
         output_dir = persistent_output_dir / "test_full_pipeline"
         output_dir.mkdir(exist_ok=True)
@@ -247,13 +247,13 @@ class TestFullPipeline:
 
         # Check transcription output
         base_name = "short_15_sec_test-966-00_01_45-00_01_59"
-        transcription_srt = output_dir / f"{base_name}.ja.merged.whisperjav.srt"
+        transcription_srt = output_dir / f"{base_name}.merged.whisperjav.ja.srt"
         assert transcription_srt.exists(), f"Transcription SRT not found: {transcription_srt}"
 
         # Check translation output (naming may vary)
         translation_candidates = [
-            output_dir / f"{base_name}.ja.merged.whisperjav.english.srt",
-            output_dir / f"{base_name}.english.srt",
+            output_dir / f"{base_name}.merged.whisperjav.en.srt",
+            output_dir / f"{base_name}.en.srt",
         ]
 
         translation_srt = None

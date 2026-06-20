@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
-from .output_naming import strip_language_suffix
+from .output_naming import generate_output_path
 from .settings import load_settings, DEFAULT_SETTINGS
 from .instructions import get_instruction_content
 from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
@@ -342,13 +342,7 @@ def translate_with_config(
     if output_path:
         resolved_output_path = Path(output_path)
     else:
-        stem = input_file.stem
-        # Remove existing language suffix if present.
-        # Shared with translate/cli.py via output_naming, so the two naming paths cannot
-        # drift apart again. Both were hand-kept lists before: this one was missing
-        # portuguese and french, cli.py's knew only japanese/english/ja/en/jp.
-        stem = strip_language_suffix(stem)
-        resolved_output_path = input_file.parent / f"{stem}.{target_lang}.srt"
+        resolved_output_path = Path(generate_output_path(input_file, target_lang))
 
     # Log configuration
     logger.info(f"Translation: {input_file.name} -> {target_lang}")

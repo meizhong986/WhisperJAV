@@ -57,7 +57,7 @@ class AcceptanceCase:
     name: str
     cli_args: List[str]
     audio_file: Path
-    expected_srt_suffix: str  # e.g. ".ja.whisperjav.srt" or ".ja.merged.whisperjav.srt"
+    expected_srt_suffix: str  # e.g. ".whisperjav.ja.srt" or ".merged.whisperjav.ja.srt"
     timeout: int = 120
     slow: bool = False
 
@@ -67,28 +67,28 @@ ACCEPTANCE_CASES: List[AcceptanceCase] = [
         name="faster_smoke_5s",
         cli_args=["--mode", "faster"],
         audio_file=TEST_AUDIO_5S,
-        expected_srt_suffix=".ja.whisperjav.srt",
+        expected_srt_suffix=".whisperjav.ja.srt",
         timeout=120,
     ),
     AcceptanceCase(
         name="faster_20s",
         cli_args=["--mode", "faster"],
         audio_file=TEST_AUDIO_20S,
-        expected_srt_suffix=".ja.whisperjav.srt",
+        expected_srt_suffix=".whisperjav.ja.srt",
         timeout=120,
     ),
     AcceptanceCase(
         name="fast_20s",
         cli_args=["--mode", "fast"],
         audio_file=TEST_AUDIO_20S,
-        expected_srt_suffix=".ja.whisperjav.srt",
+        expected_srt_suffix=".whisperjav.ja.srt",
         timeout=180,
     ),
     AcceptanceCase(
         name="balanced_20s",
         cli_args=["--mode", "balanced"],
         audio_file=TEST_AUDIO_20S,
-        expected_srt_suffix=".ja.whisperjav.srt",
+        expected_srt_suffix=".whisperjav.ja.srt",
         timeout=300,
         slow=True,
     ),
@@ -100,7 +100,7 @@ ACCEPTANCE_CASES: List[AcceptanceCase] = [
             "--pass2-pipeline", "faster",
         ],
         audio_file=TEST_AUDIO_20S,
-        expected_srt_suffix=".ja.merged.whisperjav.srt",
+        expected_srt_suffix=".merged.whisperjav.ja.srt",
         timeout=300,
         slow=True,
     ),

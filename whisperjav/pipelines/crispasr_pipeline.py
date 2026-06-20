@@ -28,7 +28,7 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
      three filters (nonverbal, nonlinguistic, scene overlap; W129 6), and fidelity's artifacts file; MOSS-CrispASR
      the duplicate merge, the three filters and its interjection rules (W505 2 b-d; before it the three filters
      only, W421 i3). Cohere-CrispASR's text is cleaned before the aligner (ChronosJAV's text cleaner);
-     <name>.ja.whisperjav.srt.
+     <name>.whisperjav.ja.srt.
 
 Times: Parakeet's token times (W93 c5, W116); Cohere's from the aligner's character times, or the VAD group
 edges where there are none (design note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md, section 6).
@@ -344,7 +344,7 @@ class CrispASRPipeline(BasePipeline):
         stats, count = self._postprocess(stitched, count_raw, basename)
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        final_srt = self.output_dir / f"{basename}.{self.lang_code}.whisperjav.srt"
+        final_srt = self.build_output_srt_path(basename)
         if count > 0:
             shutil.copy2(stitched, final_srt)
         else:
