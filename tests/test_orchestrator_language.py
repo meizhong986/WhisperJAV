@@ -66,7 +66,7 @@ def test_process_batch_handles_none_overrides(tmp_path, monkeypatch):
         merge_strategy="pass1_primary",
     )
 
-    assert results[0]["summary"]["final_output"].endswith("sample.ja.merged.whisperjav.srt")
+    assert results[0]["summary"]["final_output"].endswith("sample.merged.whisperjav.ja.srt")
     final_path = Path(results[0]["summary"]["final_output"])
     assert final_path.exists()
 
@@ -120,7 +120,7 @@ def test_process_batch_reports_merge_failure_and_summary(tmp_path, monkeypatch):
 
     # Merge failed → fallback to pass1 SRT as final output
     assert results[0]["summary"]["final_output"].endswith("sample.ja.pass1.srt")
-    merged_path = out_dir / "sample.ja.merged.whisperjav.srt"
+    merged_path = out_dir / "sample.merged.whisperjav.ja.srt"
     assert not merged_path.exists()
 
     # Summary JSON is written to temp_dir, not output_dir

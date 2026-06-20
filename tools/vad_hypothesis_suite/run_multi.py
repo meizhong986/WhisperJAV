@@ -27,7 +27,7 @@ _CONFIG_BY_NAME = {name: (hyp, args, note) for name, hyp, args, note in C.CONFIG
 
 
 def _find_srt(d):
-    hits = glob.glob(os.path.join(d, "*.whisperjav.srt"))
+    hits = glob.glob(os.path.join(d, "*.whisperjav*.srt"))
     return hits[0] if hits else None
 
 

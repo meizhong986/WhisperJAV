@@ -207,7 +207,7 @@ class FasterPipeline(BasePipeline):
                 self.progress_reporter.report_step("Post-processing subtitles", 3, 3)
             self.progress.set_current_step("Post-processing subtitles", 3, 3)
 
-            final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+            final_srt_path = self.build_output_srt_path(media_basename)
            
             # The postprocessor returns the path to the new sanitized file in the temp directory
             processed_srt, stats = self.postprocessor.process(raw_srt_path, final_srt_path)

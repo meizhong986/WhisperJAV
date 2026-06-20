@@ -120,7 +120,7 @@ class TestSkipExistingWithSourceMode:
         video_file.touch()
 
         # Simulate existing output
-        existing_srt = video_dir / "test_video.ja.whisperjav.srt"
+        existing_srt = video_dir / "test_video.whisperjav.ja.srt"
         existing_srt.touch()
 
         output_to_source = True
@@ -133,7 +133,7 @@ class TestSkipExistingWithSourceMode:
         else:
             expected_dir = Path('./output')
 
-        expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+        expected_output = expected_dir / f"{media_basename}.whisperjav.{output_lang_code}.srt"
         assert expected_output.exists()
 
     def test_skip_existing_normal_mode(self, tmp_path):
@@ -141,7 +141,7 @@ class TestSkipExistingWithSourceMode:
         output_dir = tmp_path / "output"
         output_dir.mkdir()
 
-        existing_srt = output_dir / "test_video.ja.whisperjav.srt"
+        existing_srt = output_dir / "test_video.whisperjav.ja.srt"
         existing_srt.touch()
 
         output_to_source = False
@@ -153,7 +153,7 @@ class TestSkipExistingWithSourceMode:
         else:
             expected_dir = output_dir
 
-        expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+        expected_output = expected_dir / f"{media_basename}.whisperjav.{output_lang_code}.srt"
         assert expected_output.exists()
 
     def test_skip_existing_source_mode_no_srt(self, tmp_path):
@@ -173,7 +173,7 @@ class TestSkipExistingWithSourceMode:
         else:
             expected_dir = Path('./output')
 
-        expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
+        expected_output = expected_dir / f"{media_basename}.whisperjav.{output_lang_code}.srt"
         assert not expected_output.exists()
 
 

@@ -395,7 +395,7 @@ class TestEnsemblePath:
         import whisperjav.ensemble.orchestrator as O
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.merged.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.merged.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubOrchestrator.plan = {"a": ("completed", srt, None)}
         code = _run_main(monkeypatch, _ensemble_argv([a], out_dir, tmp_path),
                          [_media(a, 3600.0)], [(O, "EnsembleOrchestrator", _StubOrchestrator)])
@@ -436,7 +436,7 @@ class TestEnsemblePath:
         import whisperjav.ensemble.orchestrator as O
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = out_dir / "a.ja.merged.whisperjav.srt"; srt.write_text("", encoding="utf-8")
+        srt = out_dir / "a.merged.whisperjav.ja.srt"; srt.write_text("", encoding="utf-8")
         _StubOrchestrator.plan = {"a": ("completed", srt, None)}
         argv = _ensemble_argv([a], out_dir, tmp_path)
         assert _run_main(monkeypatch, argv, [_media(a, 3600.0)],
@@ -450,7 +450,7 @@ class TestEnsemblePath:
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
         b = media_dir / "b.mp4"; b.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "b.ja.merged.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "b.merged.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubOrchestrator.plan = {"a": ("failed", None, "boom"), "b": ("completed", srt, None)}
         code = _run_main(monkeypatch, _ensemble_argv([a, b], out_dir, tmp_path),
                          [_media(a, 3600.0), _media(b, 3600.0)],
@@ -464,7 +464,7 @@ class TestEnsemblePath:
         import whisperjav.ensemble.orchestrator as O
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.merged.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.merged.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubOrchestrator.plan = {"a": ("completed", srt, None)}
         _run_main(monkeypatch, _ensemble_argv([a], out_dir, tmp_path),
                   [_media(a, 3600.0)], [(O, "EnsembleOrchestrator", _StubOrchestrator)])
@@ -490,7 +490,7 @@ class TestEnsemblePath:
         import whisperjav.ensemble.orchestrator as O
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        _fake_srt(out_dir, "a.ja.merged.whisperjav.srt", [(1, 2, "x")])
+        _fake_srt(out_dir, "a.merged.whisperjav.ja.srt", [(1, 2, "x")])
         _StubOrchestrator.plan = {}
         code = _run_main(monkeypatch, _ensemble_argv([a], out_dir, tmp_path, ["--skip-existing"]),
                          [_media(a, 3600.0)], [(O, "EnsembleOrchestrator", _StubOrchestrator)])
@@ -530,7 +530,7 @@ class TestSyncPath:
         import whisperjav.main as M
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubPipeline.plan = {"a": lambda: _metadata(srt)}
         code = _run_main(monkeypatch, _sync_argv([a], out_dir, tmp_path),
                          [_media(a, 3600.0)], [(M, "FasterPipeline", _StubPipeline)])
@@ -560,7 +560,7 @@ class TestSyncPath:
         import whisperjav.main as M
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = out_dir / "a.ja.whisperjav.srt"; srt.write_text("", encoding="utf-8")
+        srt = out_dir / "a.whisperjav.ja.srt"; srt.write_text("", encoding="utf-8")
         _StubPipeline.plan = {"a": lambda: _metadata(srt)}
         argv = _sync_argv([a], out_dir, tmp_path)
         assert _run_main(monkeypatch, argv, [_media(a, 3600.0)], [(M, "FasterPipeline", _StubPipeline)]) == 0
@@ -572,7 +572,7 @@ class TestSyncPath:
         import whisperjav.main as M
 
         a = media_dir / "gqn.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "gqn.ja.whisperjav.srt", [(10, 12, "a"), (370, 376.9, "b")])
+        srt = _fake_srt(out_dir, "gqn.whisperjav.ja.srt", [(10, 12, "a"), (370, 376.9, "b")])
         _StubPipeline.plan = {"gqn": lambda: _metadata(srt, streak=8)}
         code = _run_main(monkeypatch, _sync_argv([a], out_dir, tmp_path),
                          [_media(a, 8766.0)], [(M, "FasterPipeline", _StubPipeline)])
@@ -588,7 +588,7 @@ class TestSyncPath:
         from whisperjav.utils.run_outcome import default_manifest_path
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(media_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(media_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubPipeline.plan = {"a": lambda: _metadata(srt)}
         argv = [str(media_dir), "--mode", "faster", "--output-dir", "source",
                 "--temp-dir", str(tmp_path / "tmp"), "--accept-cpu-mode", "--no-signature", "--no-progress"]
@@ -602,7 +602,7 @@ class TestSyncPath:
         import whisperjav.main as M
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x")])
+        _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x")])
         _StubPipeline.plan = {}
         code = _run_main(monkeypatch, _sync_argv([a], out_dir, tmp_path, ["--skip-existing"]),
                          [_media(a, 3600.0)], [(M, "FasterPipeline", _StubPipeline)])
@@ -615,7 +615,7 @@ class TestSyncPath:
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
         b = media_dir / "b.mp4"; b.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
 
         def _interrupt():
             raise KeyboardInterrupt
@@ -632,7 +632,7 @@ class TestSyncPath:
         import whisperjav.main as M
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubPipeline.plan = {"a": lambda: _metadata(srt)}
         code = _run_main(monkeypatch, _sync_argv([a], out_dir, tmp_path, ["--output-format", "vtt"]),
                          [_media(a, 3600.0)], [(M, "FasterPipeline", _StubPipeline)])
@@ -647,7 +647,7 @@ class TestSyncPath:
         import whisperjav.main as M
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubPipeline.plan = {"a": lambda: _metadata(srt)}
 
         def _boom(*a_, **k_):
@@ -736,7 +736,7 @@ class TestAsyncPath:
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
         b = media_dir / "b.mp4"; b.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubAsyncManager.plan = {
             "a": ("completed", _metadata(srt), None),
             "b": ("failed", None, RuntimeError("worker died")),
@@ -752,7 +752,7 @@ class TestAsyncPath:
         import whisperjav.main as M
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
         _StubAsyncManager.plan = {"a": ("completed", _metadata(srt), None)}
         code = _run_main(monkeypatch, _sync_argv([a], out_dir, tmp_path, ["--async-processing"]),
                          [_media(a, 3600.0)], [(M, "AsyncPipelineManager", _StubAsyncManager)])
@@ -800,7 +800,7 @@ class TestAsyncPath:
             def process(self, media_info):
                 name = media_info["basename"]
                 seen[name] = self.output_dir
-                srt = _fake_srt(self.output_dir, f"{name}.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+                srt = _fake_srt(self.output_dir, f"{name}.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
                 return _metadata(srt)
 
             def cleanup(self):
@@ -822,7 +822,7 @@ class TestAsyncPath:
         import whisperjav.pipelines.faster_pipeline as FP
 
         a = media_dir / "a.mp4"; a.write_bytes(b"x")
-        srt = _fake_srt(out_dir, "a.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        srt = _fake_srt(out_dir, "a.whisperjav.ja.srt", [(1, 2, "x"), (3500, 3590, "y")])
 
         class _SlowPipeline:
             def __init__(self, **kw):

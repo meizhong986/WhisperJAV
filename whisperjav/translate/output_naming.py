@@ -15,6 +15,8 @@ running cli.py's argument parser or loading a provider.
 from pathlib import Path
 from typing import Union
 
+from whisperjav.utils.output_naming import translated_srt_path
+
 from .providers import SUPPORTED_TARGETS
 
 # Suffixes WhisperJAV itself writes onto a subtitle stem: every supported target, plus the
@@ -39,7 +41,10 @@ def strip_language_suffix(stem: str) -> str:
 
 
 def generate_output_path(input_path: Union[str, Path], target_lang: str) -> str:
-    """Where a translation of `input_path` into `target_lang` should be written."""
-    input_path = Path(input_path)
-    stem = strip_language_suffix(input_path.stem)
-    return str(input_path.parent / f"{stem}.{target_lang}.srt")
+    """Where a translation of `input_path` into `target_lang` should be written.
+
+    Uses the shared naming scheme in `whisperjav.utils.output_naming`, which writes the
+    target's short ISO code. So `video.whisperjav.ja.srt` translated to English becomes
+    `video.whisperjav.en.srt`.
+    """
+    return str(translated_srt_path(input_path, target_lang))

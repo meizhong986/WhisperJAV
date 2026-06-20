@@ -80,7 +80,7 @@ ensemble_failure_rate_results/
     │   ├── temp/          # whisperjav --keep-temp output (scene WAVs, intermediate SRTs)
     │   ├── *.pass1.srt    # pass 1 output
     │   ├── *.pass2.srt    # pass 2 output (the one we're measuring)
-    │   └── *.merged.whisperjav.srt
+    │   └── *.merged.whisperjav.*.srt
     └── ...
 ```
 

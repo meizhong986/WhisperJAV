@@ -29,7 +29,7 @@ DEFAULT_OUT = os.path.join(
 
 
 def _find_srt(out_dir: str) -> str | None:
-    hits = glob.glob(os.path.join(out_dir, "*.whisperjav.srt"))
+    hits = glob.glob(os.path.join(out_dir, "*.whisperjav*.srt"))
     return hits[0] if hits else None
 
 
