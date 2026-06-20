@@ -4,6 +4,7 @@ Instructions management - fetch from Gist, cache, and fallback.
 
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Optional, Tuple
@@ -11,6 +12,29 @@ from typing import Optional, Tuple
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+def adapt_instructions_to_source_language(content: str, source_lang: str) -> str:
+    """Rewrite default instruction text when the source language is not Japanese.
+
+    The bundled/Gist instruction templates are written for Japanese: they say
+    things like "specializing in Japanese translations", "translate the Japanese
+    movie subtitles", and "Japanese Adult Videos". When the user picks a
+    different source language (e.g. Korean), those hardcoded references both
+    mislead the model and make the temp instructions file show the wrong
+    language. Replace the standalone word "Japanese" with the selected source
+    language. No-op for Japanese or empty input.
+
+    Note: this only rewrites the literal word "Japanese" (whole-word, any case);
+    embedded example sentences written in actual Japanese script are left
+    untouched, as are acronyms like "JAV".
+    """
+    if not content or not source_lang:
+        return content
+    if source_lang.strip().lower() == "japanese":
+        return content
+    display = source_lang.strip().capitalize()
+    return re.sub(r"\bJapanese\b", display, content, flags=re.IGNORECASE)
 
 # Default instruction file URLs (Gist raw URLs)
 DEFAULT_INSTRUCTION_URLS = {

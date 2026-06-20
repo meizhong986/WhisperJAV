@@ -17,6 +17,7 @@ DEFAULT_SETTINGS = {
     '_comment': 'WhisperJAV-Translate user settings',
     'provider': 'deepseek',
     'model': None,
+    'source': 'japanese',
     'target_language': 'english',
     'tone': 'standard',
     'scene_threshold': 60.0,
