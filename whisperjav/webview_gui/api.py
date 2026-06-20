@@ -648,6 +648,7 @@ class WhisperJAVAPI:
             self.exit_code = None
             self._process_started_at = time.time()
             self._run_summary = None
+            self._reset_transcribe_progress_state()
 
             # Start log streaming thread
             self._stream_thread = threading.Thread(
@@ -744,6 +745,15 @@ class WhisperJAVAPI:
                 "message": f"Failed to cancel process: {e}"
             }
 
+    def _reset_transcribe_progress_state(self):
+        """Clear the per-file transcription progress fields parsed from stdout markers."""
+        self._transcribe_current_file = None
+        self._transcribe_files_current = 0
+        self._transcribe_files_total = 0
+        self._transcribe_pass_number = None
+        self._transcribe_pass_total = None
+        self._transcribe_scene_progress = None
+
     def get_process_status(self) -> Dict[str, Any]:
         """
         Get current process status.
@@ -772,11 +782,23 @@ class WhisperJAVAPI:
                 self.status = "error"
                 self.log_queue.put(f"\n{self._finish_line()}\n")
 
+        _tc = getattr(self, '_transcribe_files_current', 0)
+        _tt = getattr(self, '_transcribe_files_total', 0)
+        _scene_pct = getattr(self, '_transcribe_scene_progress', None)
+        _file_pct = int(100 * max(_tc - 1, 0) / _tt) if _tt > 0 else 0
         result = {
             "status": self.status,
             "exit_code": self.exit_code,
             "has_logs": not self.log_queue.empty(),
             "run_summary": self._run_summary if self.status in ("completed", "error") else None,
+            "current_file": getattr(self, '_transcribe_current_file', None),
+            "files_current": _tc,
+            "files_total": _tt,
+            "pass_number": getattr(self, '_transcribe_pass_number', None),
+            "pass_total": getattr(self, '_transcribe_pass_total', None),
+            # Prefer the fine-grained scene-blended percentage; fall back to the
+            # per-file (lag-by-one) percentage when no scene marker has arrived.
+            "progress": _scene_pct if _scene_pct is not None else _file_pct,
         }
         # A run that ended without a run summary: the reason it printed, for the dialog (22.9.2).
         if self.status == "error" and self._run_summary is None:
@@ -883,11 +905,24 @@ class WhisperJAVAPI:
         This runs in a separate thread to avoid blocking the main thread.
         """
         self._output_tail = collections.deque(maxlen=80)
+        from whisperjav.utils.progress_markers import parse_progress_marker, parse_transcribe_marker
         try:
             if self.process and self.process.stdout:
                 for line in self.process.stdout:
+                    # Overall-progress markers drive the bar and are kept out of the log.
+                    pct = parse_progress_marker(line)
+                    if pct is not None:
+                        self._transcribe_scene_progress = pct
+                        continue
                     self.log_queue.put(line)
                     self._output_tail.append(line)
+                    parsed = parse_transcribe_marker(line)
+                    if parsed:
+                        self._transcribe_current_file = parsed["name"]
+                        self._transcribe_files_current = parsed["current"]
+                        self._transcribe_files_total = parsed["total"]
+                        self._transcribe_pass_number = parsed["pass_number"]
+                        self._transcribe_pass_total = parsed["pass_total"]
         except Exception as e:
             self.log_queue.put(f"\n[ERROR] Log streaming error: {e}\n")
         finally:
@@ -2004,6 +2039,7 @@ class WhisperJAVAPI:
             self.exit_code = None
             self._process_started_at = time.time()
             self._run_summary = None
+            self._reset_transcribe_progress_state()
 
             # Start log streaming thread
             self._stream_thread = threading.Thread(
@@ -3174,6 +3210,7 @@ class WhisperJAVAPI:
             self.exit_code = None
             self._process_started_at = time.time()
             self._run_summary = None
+            self._reset_transcribe_progress_state()
 
             # Start log streaming thread
             self._stream_thread = threading.Thread(
@@ -4045,6 +4082,7 @@ class WhisperJAVAPI:
             self._translate_log_queue: queue.Queue = queue.Queue()
             self._translate_thread: Optional[threading.Thread] = None
             self._translate_files_total = 0
+            self._translate_files_current = 0
             self._translate_files_completed = 0
             self._translate_current_file = None
 
@@ -4712,6 +4750,7 @@ class WhisperJAVAPI:
 
         # Reset progress tracking
         self._translate_files_total = 0
+        self._translate_files_current = 0
         self._translate_files_completed = 0
         self._translate_current_file = None
 
@@ -4842,6 +4881,7 @@ class WhisperJAVAPI:
                     # Parse progress: "Translating [1/3]: file_a.srt"
                     m = re.search(r'Translating \[(\d+)/(\d+)\]:\s+(.+)', line)
                     if m:
+                        self._translate_files_current = int(m.group(1))
                         self._translate_files_total = int(m.group(2))
                         self._translate_current_file = m.group(3).strip()
                     # Parse completion: "Complete: file_a.english.srt"
@@ -4927,6 +4967,7 @@ class WhisperJAVAPI:
             "status": self._translate_status,
             "progress": progress,
             "current_file": getattr(self, '_translate_current_file', None),
+            "files_current": getattr(self, '_translate_files_current', 0),
             "files_completed": files_completed,
             "files_total": files_total,
             "has_logs": not self._translate_log_queue.empty(),
