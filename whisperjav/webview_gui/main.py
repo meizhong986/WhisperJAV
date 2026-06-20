@@ -160,27 +160,21 @@ def on_drop_event(e):
 
 def bind_dom_events(window):
     """
-    Bind drag-drop events to window DOM after creation.
+    Bind the drop handler that passes native file paths to JavaScript.
 
-    Registers handlers for dragenter, dragover, and drop events
-    to enable native file path access via pywebviewFullPath.
+    Must run after the document has loaded. Dragenter and dragover are handled
+    in JavaScript (`FileListManager.initializeDragDrop`).
 
     Args:
         window: PyWebView window instance
     """
     try:
-        # Prevent default for drag events (required for drop to work)
-        # preventDefault=True, stopPropagation=True
-        window.dom.document.events.dragenter += DOMEventHandler(lambda e: None, True, True)
-        window.dom.document.events.dragover += DOMEventHandler(lambda e: None, True, True)
-
-        # Handle actual file drops
+        # prevent_default=True keeps the browser from opening the dropped file.
         window.dom.document.events.drop += DOMEventHandler(on_drop_event, True, True)
-
-        print("DOM drag-drop events bound successfully")
+        print("DOM drop handler bound successfully")
     except Exception as ex:
-        print(f"Warning: Could not bind DOM events: {ex}")
-        print("Drag-drop may not work correctly. Please use Add Files button.")
+        print(f"Warning: Could not bind DOM drop handler: {ex}")
+        print("Drag-drop may not work correctly. Please use Add File(s).")
 
 
 def get_asset_path(relative_path: str) -> Path:
@@ -533,14 +527,24 @@ def main():
         # NOT via browser localStorage — so private_mode loses nothing valuable.
         # Theme selection resets to default each session (acceptable tradeoff).
 
+        # Bind drag-drop on window.events.loaded, once the DOM exists.
+        # webview.start(func=...) can run too early and the bind fails silently.
+        _dom_bound = {'done': False}
+
+        def _bind_dom_once(*_args):
+            if _dom_bound['done']:
+                return
+            _dom_bound['done'] = True
+            bind_dom_events(window)
+
+        window.events.loaded += _bind_dom_once
+
         # If icon kwarg couldn't be used (older pywebview), set icon after start on Windows
         if platform.system() == 'Windows' and icon_path and not icon_used:
-            def _after_start():
-                _set_windows_icon('WhisperJAV GUI', icon_path)
-                bind_dom_events(window)
-            webview.start(debug=debug_mode, private_mode=True, func=_after_start)
+            webview.start(debug=debug_mode, private_mode=True,
+                          func=lambda: _set_windows_icon('WhisperJAV GUI', icon_path))
         else:
-            webview.start(debug=debug_mode, private_mode=True, func=lambda: bind_dom_events(window))
+            webview.start(debug=debug_mode, private_mode=True)
 
     except FileNotFoundError as e:
         print("\nERROR: Asset file not found!")

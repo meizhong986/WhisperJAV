@@ -900,7 +900,8 @@ window.WJ_I18N_ZH = {
   "Force CPU (disable GPU inference)": "强制使用 CPU（停用 GPU 推理）",
   "Bypass CUDAExecutionProvider even when available. Useful when the GPU is needed for ASR or when ONNX CUDA is unstable on the current driver.": "即使 CUDAExecutionProvider 可用也不用它。适用于 GPU 需要留给 ASR、或当前驱动下 ONNX CUDA 不稳定的情况。",
   "Whisper JA Anime v0.3 (efwkjn, experimental)": "Whisper JA Anime v0.3（efwkjn，实验性）",
-  "Delete preset \"{raw_name}\"?": "删除预设“{raw_name}”？"
+  "Delete preset \"{raw_name}\"?": "删除预设“{raw_name}”？",
+  "Drag & drop files here, or click \"Add File(s)\" / \"Add Folder\"": "将文件拖放到此处，或点击“添加文件”/“添加文件夹”"
  },
  "keep": [
   "(2.5 GB)",

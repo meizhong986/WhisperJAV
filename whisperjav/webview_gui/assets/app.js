@@ -682,44 +682,67 @@ const FileListManager = {
     initializeDragDrop() {
         const fileList = document.getElementById('fileList');
 
-        fileList.addEventListener('dragover', (e) => {
+        // WebView2 fires 'drop' only after a preventDefault()-ed 'dragover'.
+        // Binding on document makes the whole window a drop target.
+        const showDragFeedback = () => { if (fileList) fileList.classList.add('drag-over'); };
+        const clearDragFeedback = () => { if (fileList) fileList.classList.remove('drag-over'); };
+
+        document.addEventListener('dragenter', (e) => {
             e.preventDefault();
-            e.stopPropagation();
-            fileList.classList.add('drag-over');
+            showDragFeedback();
         });
 
-        fileList.addEventListener('dragenter', (e) => {
+        document.addEventListener('dragover', (e) => {
             e.preventDefault();
-            e.stopPropagation();
-            fileList.classList.add('drag-over');
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            showDragFeedback();
         });
 
-        fileList.addEventListener('dragleave', () => {
-            fileList.classList.remove('drag-over');
+        document.addEventListener('dragleave', (e) => {
+            // Clear only when the cursor leaves the window, so moving between children doesn't flicker.
+            if (!e.relatedTarget) clearDragFeedback();
         });
 
-        fileList.addEventListener('drop', (e) => {
+        document.addEventListener('drop', (e) => {
+            // No stopPropagation(): the Python drop handler in main.py must still run.
             e.preventDefault();
-            e.stopPropagation();
-            fileList.classList.remove('drag-over');
-
-            // Note: Actual file path extraction is handled by Python DOM event handler
-            // in main.py using pywebviewFullPath, which bypasses browser security restrictions.
-            // This handler just prevents default browser behavior and provides visual feedback.
-            // Python will call FileListManager.addDroppedFiles(paths) with the full paths.
+            clearDragFeedback();
         });
     },
 
-    // Method called by Python DOM event handler with full file paths
+    // Drop filters: the AI SRT Translate tab (tab4) takes .srt, the other tabs take media.
+    SRT_EXTENSIONS: ['.srt'],
+    MEDIA_EXTENSIONS: [
+        '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.ts', '.m4v', '.mpg', '.mpeg',
+        '.mp3', '.wav', '.flac', '.m4a', '.m4b', '.aac', '.ogg', '.opus', '.wma'
+    ],
+
+    // Called by the Python drop handler in main.py with full file paths.
     addDroppedFiles(paths) {
         if (!Array.isArray(paths) || paths.length === 0) {
             return;
         }
 
+        // Match the Add File(s) / Add Folder buttons. A path with no extension counts as a folder.
+        const isSrtMode = AppState.activeTab === 'tab4';
+        const hasExt = (p, exts) => exts.some(ext => p.toLowerCase().endsWith(ext));
+        const looksLikeFolder = (p) => {
+            const last = p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
+            return !last.includes('.');
+        };
+        const isCompatible = (p) => isSrtMode
+            ? hasExt(p, this.SRT_EXTENSIONS)
+            : (hasExt(p, this.MEDIA_EXTENSIONS) || looksLikeFolder(p));
+
         let addedCount = 0;
         let duplicates = 0;
+        const rejected = [];
 
         paths.forEach(path => {
+            if (!isCompatible(path)) {
+                rejected.push(path);
+                return;
+            }
             if (!AppState.selectedFiles.includes(path)) {
                 AppState.selectedFiles.push(path);
                 addedCount++;
@@ -735,6 +758,16 @@ const FileListManager = {
 
         if (duplicates > 0) {
             ConsoleManager.log(`ℹ Skipped ${duplicates} duplicate(s)`, 'info');
+        }
+
+        if (rejected.length > 0) {
+            const accepts = isSrtMode
+                ? '.srt subtitle files'
+                : 'video/audio files (or folders)';
+            ConsoleManager.log(
+                `⚠ Ignored ${rejected.length} incompatible item(s) — the ${isSrtMode ? 'AI SRT Translate' : 'current'} tab accepts ${accepts}.`,
+                'warning'
+            );
         }
     },
 
