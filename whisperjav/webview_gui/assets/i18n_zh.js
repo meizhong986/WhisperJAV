@@ -927,7 +927,8 @@ window.WJ_I18N_ZH = {
   "Delete preset \"{raw_name}\"?": "删除预设“{raw_name}”？",
   "Pass {n}/{total}": "第 {n}/{total} 轮",
   "Transcribing{pass}: {raw_file}{raw_count}": "正在转写{pass}：{raw_file}{raw_count}",
-  "Translating: {raw_file}{raw_count}": "正在翻译：{raw_file}{raw_count}"
+  "Translating: {raw_file}{raw_count}": "正在翻译：{raw_file}{raw_count}",
+  "Drag & drop files here, or click \"Add File(s)\" / \"Add Folder\"": "将文件拖放到此处，或点击“添加文件”/“添加文件夹”"
  },
  "keep": [
   "DSP",
