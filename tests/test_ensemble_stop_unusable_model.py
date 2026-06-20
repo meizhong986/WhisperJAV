@@ -24,7 +24,7 @@ def _orchestrator(tmp_path, serial, unusable_pass, calls):
                                 serial_file_processing=serial)
     orch.temp_dir.mkdir(parents=True, exist_ok=True)
 
-    def run_pass(pass_number, media_files, pass_config, language_code):
+    def run_pass(pass_number, media_files, pass_config, language_code, **_progress):
         calls.append((pass_number, [m["basename"] for m in media_files]))
         if pass_number == unusable_pass:
             return {m["basename"]: {"status": "failed", "error": MESSAGE} for m in media_files}
@@ -132,11 +132,12 @@ def test_an_ordinary_failure_does_not_stop_the_run(tmp_path):
     calls = []
     orch = _orchestrator(tmp_path, True, None, calls)
 
-    def run_pass(pass_number, media_files, pass_config, language_code, _orig=orch._run_pass_in_subprocess):
+    def run_pass(pass_number, media_files, pass_config, language_code, _orig=orch._run_pass_in_subprocess,
+                 **progress):
         if pass_number == 1 and media_files[0]["basename"] == "a":
             calls.append((1, ["a"]))
             return {"a": {"status": "failed", "error": "Traceback ... RuntimeError: boom"}}
-        return _orig(pass_number, media_files, pass_config, language_code)
+        return _orig(pass_number, media_files, pass_config, language_code, **progress)
 
     orch._run_pass_in_subprocess = run_pass
     results = orch.process_batch(_media(tmp_path), P1, P2, "pass1_primary")
