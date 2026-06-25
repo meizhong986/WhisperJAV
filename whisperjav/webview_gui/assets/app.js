@@ -256,10 +256,11 @@ const QwenManager = {
         safe_chunking: true,
         scene_min_duration: 12,
         scene_max_duration: 48,
-        chunk_threshold: 1.0,
-        max_group_duration: 6,
+        chunk_threshold_ms: 400,
+        max_group_duration: 4,
         vad_threshold: 0.35,
-        vad_padding: 250,
+        vad_start_pad: 100,
+        vad_end_pad: 200,
         // Scene detection (from main dropdown)
         scene: 'semantic',
         input_mode: 'assembly',
@@ -3360,8 +3361,8 @@ const EnsembleManager = {
                 currentValues.timestamp_mode = 'vad_only';
                 currentValues.assembly_cleaner = 'passthrough';
                 currentValues.stepdown = false;
-                currentValues.chunk_threshold = 0.5;
-                currentValues.max_group_duration = 5;
+                currentValues.chunk_threshold_ms = 400;
+                currentValues.max_group_duration = 4;
             }
 
             // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).
@@ -3378,7 +3379,7 @@ const EnsembleManager = {
                 currentValues.timestamp_mode = 'aligner_vad_fallback'; // D7: aligner ON
                 currentValues.assembly_cleaner = 'passthrough';      // D3
                 currentValues.stepdown = true;
-                currentValues.chunk_threshold = 1.0;
+                currentValues.chunk_threshold_ms = 1000;
                 currentValues.max_group_duration = 6;
                 currentValues.aligner_backend = 'qwen3';             // D7 default
                 currentValues.language = 'Japanese';
@@ -3662,13 +3663,14 @@ const EnsembleManager = {
         vadHeader.textContent = 'VAD Grouping';
         container.appendChild(vadHeader);
 
-        // Frame Gap Threshold slider (O2: chunk_threshold_s)
-        const chunkDef = schemaSection.chunk_threshold;
+        // Frame Gap Threshold slider — GUI in ms (chunk_threshold_ms); converted to
+        // chunk_threshold (seconds) at pack time in api.py.
+        const chunkDef = schemaSection.chunk_threshold_ms;
         if (chunkDef) {
             container.appendChild(this.createTransformersSlider(
-                'chunk_threshold', chunkDef.label,
+                'chunk_threshold_ms', chunkDef.label,
                 chunkDef.min, chunkDef.max, chunkDef.step,
-                currentValues.chunk_threshold ?? chunkDef.default,
+                currentValues.chunk_threshold_ms ?? chunkDef.default,
                 chunkDef.description
             ));
         }
@@ -3700,13 +3702,24 @@ const EnsembleManager = {
             thrDef.description
         ));
 
-        const padDef = schemaSection.vad_padding;
-        vadContainer.appendChild(this.createTransformersSlider(
-            'vad_padding', padDef.label,
-            padDef.min, padDef.max, padDef.step,
-            currentValues.vad_padding ?? padDef.default,
-            padDef.description
-        ));
+        const startPadDef = schemaSection.vad_start_pad;
+        if (startPadDef) {
+            vadContainer.appendChild(this.createTransformersSlider(
+                'vad_start_pad', startPadDef.label,
+                startPadDef.min, startPadDef.max, startPadDef.step,
+                currentValues.vad_start_pad ?? startPadDef.default,
+                startPadDef.description
+            ));
+        }
+        const endPadDef = schemaSection.vad_end_pad;
+        if (endPadDef) {
+            vadContainer.appendChild(this.createTransformersSlider(
+                'vad_end_pad', endPadDef.label,
+                endPadDef.min, endPadDef.max, endPadDef.step,
+                currentValues.vad_end_pad ?? endPadDef.default,
+                endPadDef.description
+            ));
+        }
 
         vadDetails.appendChild(vadContainer);
         container.appendChild(vadDetails);
@@ -4857,8 +4870,8 @@ const EnsembleManager = {
             defaults.timestamp_mode = 'vad_only';
             defaults.assembly_cleaner = 'passthrough';
             defaults.stepdown = false;
-            defaults.chunk_threshold = 0.5;
-            defaults.max_group_duration = 5;
+            defaults.chunk_threshold_ms = 400;
+            defaults.max_group_duration = 4;
         } else if (passState.isCohere) {
             // Cohere defaults — mirror the openCustomize override (D2/D3/D7).
             defaults.model_id = 'CohereLabs/cohere-transcribe-03-2026';
@@ -4867,7 +4880,7 @@ const EnsembleManager = {
             defaults.timestamp_mode = 'aligner_vad_fallback';
             defaults.assembly_cleaner = 'passthrough';
             defaults.stepdown = true;
-            defaults.chunk_threshold = 1.0;
+            defaults.chunk_threshold_ms = 1000;
             defaults.max_group_duration = 6;
             defaults.aligner_backend = 'qwen3';
             defaults.language = 'Japanese';

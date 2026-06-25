@@ -116,8 +116,10 @@ class QwenPipeline(BasePipeline):
         # Speech segmentation / VAD (Phase 4)
         # v1.8.13: default flipped silero-v6.2 -> whisperseg (system-wide default flip).
         speech_segmenter: str = "whisperseg",
-        segmenter_max_group_duration: float = 6.0,  # Max group size in seconds (CLI: --qwen-max-group-duration)
-        segmenter_chunk_threshold: float = 1.0,  # Silence gap threshold for VAD frame grouping
+        segmenter_max_group_duration: float = 4.0,  # v1.9.0 JAV retune (was 6.0). CLI: --qwen-max-group-duration
+        segmenter_chunk_threshold: float = 0.4,  # v1.9.0 JAV retune: group only if gap < 0.4s/400ms (was 1.0)
+        segmenter_start_pad_ms: int = 100,  # v1.9.0 asymmetric pad before speech onset
+        segmenter_end_pad_ms: int = 200,    # v1.9.0 asymmetric pad after speech offset (end-of-speech is critical)
         segmenter_config: Optional[Dict[str, Any]] = None,  # GUI/CLI custom segmenter params
 
         # Qwen ASR (Phase 5)
@@ -229,6 +231,8 @@ class QwenPipeline(BasePipeline):
         self.segmenter_backend = speech_segmenter
         self.segmenter_max_group_duration = segmenter_max_group_duration
         self.segmenter_chunk_threshold = segmenter_chunk_threshold
+        self.segmenter_start_pad_ms = segmenter_start_pad_ms
+        self.segmenter_end_pad_ms = segmenter_end_pad_ms
         self.segmenter_config = segmenter_config or {}
 
         # Adaptive Step-Down config
@@ -756,6 +760,13 @@ class QwenPipeline(BasePipeline):
             # Prior to this, only max_group_duration_s was injected and the
             # chunk_threshold from segmenter_config (YAML) silently won.
             segmenter_kwargs["chunk_threshold_s"] = self.segmenter_chunk_threshold
+            # v1.9.0: asymmetric padding — the pipeline owns the qwen/anime defaults
+            # (start 100 / end 200 ms). Same scalar-injection pattern as group/chunk:
+            # GUI/CLI overrides populate these scalars, segmenter_config carries only
+            # threshold/min-duration. Backends that lack start/end_pad_ms strip them
+            # via the factory's _sanitize_params; whisperseg consumes them.
+            segmenter_kwargs["start_pad_ms"] = self.segmenter_start_pad_ms
+            segmenter_kwargs["end_pad_ms"] = self.segmenter_end_pad_ms
             segmenter = SpeechSegmenterFactory.create(
                 self.segmenter_backend,
                 **segmenter_kwargs,

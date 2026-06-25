@@ -2051,19 +2051,19 @@ class WhisperJAVAPI:
                         "min": 20, "max": 300, "step": 5,
                         "default": 48,
                     },
-                    "chunk_threshold": {
+                    "chunk_threshold_ms": {
                         "type": "slider",
-                        "label": "Frame Gap Threshold",
-                        "description": "Silence gap (seconds) that splits speech into separate frames. Lower = more smaller frames, higher = fewer larger frames.",
-                        "min": 0.3, "max": 5.0, "step": 0.1,
-                        "default": 1.0,
+                        "label": "Frame Gap Threshold (ms)",
+                        "description": "Max silence gap (ms) between two segments that can still be grouped together. Gaps larger than this start a new group. JAV default: 400ms.",
+                        "min": 100, "max": 2000, "step": 50,
+                        "default": 400,
                     },
                     "max_group_duration": {
                         "type": "slider",
-                        "label": "Max Group Duration",
-                        "description": "Maximum duration for VAD segment grouping",
-                        "min": 3, "max": 60, "step": 1,
-                        "default": 6,
+                        "label": "Max Group Duration (s)",
+                        "description": "Maximum duration (seconds) for a grouped VAD segment sent to ASR. JAV default: 4.0s.",
+                        "min": 1.0, "max": 14.0, "step": 0.5,
+                        "default": 4.0,
                     },
                     "vad_threshold": {
                         "type": "slider",
@@ -2073,13 +2073,21 @@ class WhisperJAVAPI:
                         "min": 0.05, "max": 0.80, "step": 0.05,
                         "default": 0.35,
                     },
-                    "vad_padding": {
+                    "vad_start_pad": {
                         "type": "slider",
-                        "label": "VAD Padding (ms)",
-                        "description": "Padding around detected speech segments (ms). Overrides sensitivity preset.",
+                        "label": "VAD Start Pad (ms)",
+                        "description": "Padding added before each speech segment (ms). JAV default: 100ms — shorter than the end pad.",
                         "group": "vad_settings",
-                        "min": 50, "max": 600, "step": 25,
-                        "default": 250,
+                        "min": 0, "max": 600, "step": 50,
+                        "default": 100,
+                    },
+                    "vad_end_pad": {
+                        "type": "slider",
+                        "label": "VAD End Pad (ms)",
+                        "description": "Padding added after each speech segment (ms). Capturing end-of-speech is most critical for JAV ASR accuracy. JAV default: 200ms.",
+                        "group": "vad_settings",
+                        "min": 0, "max": 800, "step": 50,
+                        "default": 200,
                     },
                 },
                 # ── Tab 3: Generation ─────────────────────────────────
@@ -2630,6 +2638,10 @@ class WhisperJAVAPI:
                 args += ["--pass1-sensitivity", pass1['sensitivity']]
             # Always inject framer from state (even when not customized)
             qwen1_params = dict(pass1.get('params') or {}) if pass1.get('customized') else {}
+            # v1.9.0: GUI stores Frame Gap in ms (chunk_threshold_ms); the CLI/pipeline
+            # contract is seconds (chunk_threshold). Convert at pack time.
+            if 'chunk_threshold_ms' in qwen1_params:
+                qwen1_params['chunk_threshold'] = float(qwen1_params.pop('chunk_threshold_ms')) / 1000.0
             if pass1.get('framer'):
                 qwen1_params['framer'] = pass1['framer']
             if pass1.get('isAnimeWhisper'):
@@ -2742,6 +2754,9 @@ class WhisperJAVAPI:
                     args += ["--pass2-sensitivity", pass2['sensitivity']]
                 # Always inject framer from state (even when not customized)
                 qwen2_params = dict(pass2.get('params') or {}) if pass2.get('customized') else {}
+                # v1.9.0: GUI stores Frame Gap in ms; convert to seconds at pack time.
+                if 'chunk_threshold_ms' in qwen2_params:
+                    qwen2_params['chunk_threshold'] = float(qwen2_params.pop('chunk_threshold_ms')) / 1000.0
                 if pass2.get('framer'):
                     qwen2_params['framer'] = pass2['framer']
                 if pass2.get('isAnimeWhisper'):

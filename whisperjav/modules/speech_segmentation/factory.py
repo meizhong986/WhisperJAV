@@ -150,7 +150,9 @@ _PARAM_SCHEMAS = {
         "threshold":               (float, 0.35, False),
         "min_speech_duration_ms":  (int,   100,  False),
         "min_silence_duration_ms": (int,   100,  False),
-        "speech_pad_ms":           (int,   300,  False),
+        "speech_pad_ms":           (int,   300,  False),  # Symmetric fallback for start/end pad
+        "start_pad_ms":            (int,   100,  True),   # v1.9.0: asymmetric pad (qwen/anime default)
+        "end_pad_ms":              (int,   200,  True),   # v1.9.0: asymmetric pad (qwen/anime default)
         "max_speech_duration_s":   (float, 5.0,  True),   # v1.8.12: None→5.0 (YAML balanced, explicit)
         "chunk_threshold_s":       (float, 1.0,  True),
         "max_group_duration_s":    (float, 6.0,  True),   # v1.8.12: None→6.0 (YAML balanced)

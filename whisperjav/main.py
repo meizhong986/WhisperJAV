@@ -578,9 +578,9 @@ def parse_arguments():
                                 "ten, silero/silero-v4.0/v3.1, "
                                 "nemo/nemo-lite, whisper-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
-                           help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
+                           help="Max duration (seconds) for VAD segment grouping (pipeline default: 4.0)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
-                           help="Silence gap threshold (seconds) for VAD frame grouping (pipeline default: 1.0)")
+                           help="Silence gap (seconds) above which segments are NOT grouped (pipeline default: 0.4 / 400ms)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default). "
@@ -600,7 +600,12 @@ def parse_arguments():
     qwen_audio_group.add_argument("--qwen-vad-threshold", type=float, default=None,
                            help="VAD speech detection threshold (overrides sensitivity preset)")
     qwen_audio_group.add_argument("--qwen-vad-padding", type=int, default=None,
-                           help="VAD speech padding in ms (overrides sensitivity preset)")
+                           help="Legacy symmetric VAD padding in ms (applies to both start and end). "
+                                "Prefer --qwen-vad-start-pad / --qwen-vad-end-pad.")
+    qwen_audio_group.add_argument("--qwen-vad-start-pad", type=int, default=None,
+                           help="VAD padding before speech onset, ms (pipeline default: 100)")
+    qwen_audio_group.add_argument("--qwen-vad-end-pad", type=int, default=None,
+                           help="VAD padding after speech offset, ms (pipeline default: 200; end-of-speech is most critical)")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
     qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
@@ -1146,9 +1151,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
             _user_vad_overrides["threshold"] = _vad_thr
-        _vad_pad = getattr(args, 'qwen_vad_padding', None)
-        if _vad_pad is not None:
-            _user_vad_overrides["speech_pad_ms"] = _vad_pad
+        # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
+        # below, NOT into segmenter_config — the pipeline injects start/end pad at
+        # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
         _resolved_segmenter_config = resolve_qwen_sensitivity(
             _qwen_segmenter, _qwen_sensitivity, _user_vad_overrides or None
         )
@@ -1218,6 +1223,18 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _chunk_thr = getattr(args, 'qwen_chunk_threshold', None)
         if _chunk_thr is not None:
             qwen_kwargs["segmenter_chunk_threshold"] = _chunk_thr
+        # v1.9.0: asymmetric VAD padding (pipeline owns default 100/200). Legacy
+        # --qwen-vad-padding maps symmetrically; explicit start/end win per-side.
+        _vad_pad_legacy = getattr(args, 'qwen_vad_padding', None)
+        if _vad_pad_legacy is not None:
+            qwen_kwargs["segmenter_start_pad_ms"] = max(0, int(_vad_pad_legacy))
+            qwen_kwargs["segmenter_end_pad_ms"] = max(0, int(_vad_pad_legacy))
+        _vad_start_pad = getattr(args, 'qwen_vad_start_pad', None)
+        if _vad_start_pad is not None:
+            qwen_kwargs["segmenter_start_pad_ms"] = max(0, int(_vad_start_pad))
+        _vad_end_pad = getattr(args, 'qwen_vad_end_pad', None)
+        if _vad_end_pad is not None:
+            qwen_kwargs["segmenter_end_pad_ms"] = max(0, int(_vad_end_pad))
         _sd_init = getattr(args, 'qwen_stepdown_initial_group', None)
         if _sd_init is not None:
             qwen_kwargs["stepdown_initial_group"] = _sd_init
@@ -1237,9 +1254,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             if not any(a.startswith('--qwen-stepdown') for a in sys.argv):
                 qwen_kwargs["stepdown_enabled"] = False
             if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
-                qwen_kwargs["segmenter_chunk_threshold"] = 0.5
+                qwen_kwargs["segmenter_chunk_threshold"] = 0.4  # v1.9.0 JAV retune (was 0.5)
             if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
-                qwen_kwargs["segmenter_max_group_duration"] = 5.0
+                qwen_kwargs["segmenter_max_group_duration"] = 4.0  # v1.9.0 JAV retune (was 5.0)
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode

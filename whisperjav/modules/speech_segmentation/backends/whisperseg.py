@@ -83,6 +83,8 @@ class WhisperSegSpeechSegmenter:
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
         speech_pad_ms: int = 300,
+        start_pad_ms: Optional[int] = None,  # Asymmetric: pad before speech onset.
+        end_pad_ms: Optional[int] = None,    # Asymmetric: pad after speech offset.
         max_speech_duration_s: Optional[float] = None,
         chunk_threshold_s: Optional[float] = 1.0,
         max_group_duration_s: Optional[float] = None,
@@ -102,8 +104,14 @@ class WhisperSegSpeechSegmenter:
                 default and is not user-tunable.
             min_speech_duration_ms: Minimum speech segment duration.
             min_silence_duration_ms: Minimum silence duration to end a segment.
-            speech_pad_ms: Post-hoc padding applied around each segment
-                (overlap-prevented).
+            speech_pad_ms: Symmetric post-hoc padding around each segment
+                (overlap-prevented). Used as the fallback when start_pad_ms /
+                end_pad_ms are not supplied.
+            start_pad_ms: Asymmetric padding before speech onset. None → inherit
+                speech_pad_ms.
+            end_pad_ms: Asymmetric padding after speech offset. None → inherit
+                speech_pad_ms. (JAV: capturing end-of-speech is most critical, so
+                the qwen/anime pipeline defaults end_pad > start_pad.)
             max_speech_duration_s: Force-split segments exceeding this duration.
                 None = inherits max_group_duration_s.
             chunk_threshold_s: Gap threshold for post-VAD segment grouping (seconds).
@@ -120,6 +128,10 @@ class WhisperSegSpeechSegmenter:
         self.min_speech_duration_ms = int(min_speech_duration_ms)
         self.min_silence_duration_ms = int(min_silence_duration_ms)
         self.speech_pad_ms = int(speech_pad_ms)
+        # Asymmetric padding (v1.9.0): start/end fall back to symmetric
+        # speech_pad_ms when unset, preserving behavior for existing callers.
+        self.start_pad_ms = int(start_pad_ms) if start_pad_ms is not None else int(speech_pad_ms)
+        self.end_pad_ms = int(end_pad_ms) if end_pad_ms is not None else int(speech_pad_ms)
         self.force_cpu = bool(force_cpu)
         self.num_threads = int(num_threads)
         self.model_path = model_path
@@ -447,7 +459,8 @@ class WhisperSegSpeechSegmenter:
         # Duration conversions (ms → frames)
         min_speech_frames = max(1, int(self.min_speech_duration_ms / frame_ms))
         min_silence_frames = max(1, int(self.min_silence_duration_ms / frame_ms))
-        speech_pad_frames = max(0, int(self.speech_pad_ms / frame_ms))
+        start_pad_frames = max(0, int(self.start_pad_ms / frame_ms))
+        end_pad_frames = max(0, int(self.end_pad_ms / frame_ms))
         if self.max_speech_duration_s and self.max_speech_duration_s > 0:
             max_speech_frames = int(self.max_speech_duration_s * 1000.0 / frame_ms)
         else:
@@ -524,24 +537,24 @@ class WhisperSegSpeechSegmenter:
                     current["max_prob"] = float(np.max(current_probs))
                 speeches.append(current)
 
-        # Post-hoc padding with overlap prevention
+        # Post-hoc padding with overlap prevention (asymmetric: start vs end)
         for idx, seg in enumerate(speeches):
             if idx == 0:
-                seg["start"] = max(0, seg["start"] - speech_pad_frames)
+                seg["start"] = max(0, seg["start"] - start_pad_frames)
             else:
                 seg["start"] = max(
                     speeches[idx - 1]["end"],
-                    seg["start"] - speech_pad_frames,
+                    seg["start"] - start_pad_frames,
                 )
             if idx < len(speeches) - 1:
                 seg["end"] = min(
                     speeches[idx + 1]["start"],
-                    seg["end"] + speech_pad_frames,
+                    seg["end"] + end_pad_frames,
                 )
             else:
                 seg["end"] = min(
                     len(speech_probs),
-                    seg["end"] + speech_pad_frames,
+                    seg["end"] + end_pad_frames,
                 )
 
         # Frame indices → SpeechSegment (both seconds and samples populated)
@@ -688,6 +701,8 @@ class WhisperSegSpeechSegmenter:
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "speech_pad_ms": self.speech_pad_ms,
+            "start_pad_ms": self.start_pad_ms,
+            "end_pad_ms": self.end_pad_ms,
             "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,
