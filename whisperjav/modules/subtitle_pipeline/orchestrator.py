@@ -355,8 +355,20 @@ class DecoupledSubtitlePipeline:
         )
 
         scene_frames: list[list[TemporalFrame]] = []
-        frame_audio_paths: list[list[Path]] = []
+        frame_audio_paths: list[list] = []  # Path entries, or np.ndarray in pathless mode
         frame_speech_regions: list[Optional[list[list[tuple[float, float]]]]] = []
+
+        # v1.9.0 pathless mode: when the generator can consume in-memory arrays
+        # AND there is no aligner (e.g. anime-whisper, which is vad_only), skip the
+        # per-VAD-group temp WAV write entirely and pass numpy slices downstream.
+        # Fail-safe: if either condition is unmet, fall back to the WAV path.
+        pathless = getattr(self.generator, "accepts_array", False) and (
+            self.aligner is None or getattr(self.aligner, "accepts_array", False)
+        )
+        if pathless:
+            logger.info(
+                "[DecoupledPipeline] Step 1: pathless mode — in-memory frame audio, no temp WAVs"
+            )
 
         for scene_idx, audio_path in enumerate(scene_audio_paths):
             # Dual-track: framer runs on enhanced audio, slicing on original
@@ -377,27 +389,47 @@ class DecoupledSubtitlePipeline:
             regions = framing_result.metadata.get("speech_regions")
             frame_speech_regions.append(regions)
 
-            # Load ASR audio (only needed if dual-track and we have frames to slice)
-            if dual_track and not (len(frames) == 1 and frames[0].start == 0.0):
-                asr_audio, sr = self._load_audio(audio_path)
-            else:
-                asr_audio = framing_audio  # same source, no extra load
-
-            # Slice audio per frame → temp WAV (always from ASR audio)
-            frame_paths = []
-            for frame_idx, frame in enumerate(frames):
-                if len(frames) == 1 and frame.start == 0.0:
-                    # Full-scene frame — use original ASR audio path (no slicing needed)
-                    frame_paths.append(audio_path)
+            if pathless:
+                # In-memory slicing — NO temp WAV. ASR always reads the ORIGINAL
+                # audio (load it explicitly under dual-track, since framing_audio
+                # is the enhanced track in that mode).
+                if dual_track:
+                    asr_audio, sr = self._load_audio(audio_path)
                 else:
-                    # Slice and write temp WAV from ASR audio
-                    start_sample = int(frame.start * sr)
-                    end_sample = int(frame.end * sr)
-                    frame_audio = asr_audio[start_sample:end_sample]
-                    temp_path = self._write_temp_wav(frame_audio, sr, scene_idx, frame_idx)
-                    frame_paths.append(temp_path)
+                    asr_audio = framing_audio
+                frame_entries: list = []
+                for frame in frames:
+                    if len(frames) == 1 and frame.start == 0.0:
+                        frame_entries.append(asr_audio)  # full-scene frame
+                    else:
+                        start_sample = int(frame.start * sr)
+                        end_sample = int(frame.end * sr)
+                        # .copy() so the parent scene array can be freed after the
+                        # scene loop — bounds peak RAM to the speech regions only.
+                        frame_entries.append(asr_audio[start_sample:end_sample].copy())
+                frame_audio_paths.append(frame_entries)
+            else:
+                # Load ASR audio (only needed if dual-track and we have frames to slice)
+                if dual_track and not (len(frames) == 1 and frames[0].start == 0.0):
+                    asr_audio, sr = self._load_audio(audio_path)
+                else:
+                    asr_audio = framing_audio  # same source, no extra load
 
-            frame_audio_paths.append(frame_paths)
+                # Slice audio per frame → temp WAV (always from ASR audio)
+                frame_paths = []
+                for frame_idx, frame in enumerate(frames):
+                    if len(frames) == 1 and frame.start == 0.0:
+                        # Full-scene frame — use original ASR audio path (no slicing needed)
+                        frame_paths.append(audio_path)
+                    else:
+                        # Slice and write temp WAV from ASR audio
+                        start_sample = int(frame.start * sr)
+                        end_sample = int(frame.end * sr)
+                        frame_audio = asr_audio[start_sample:end_sample]
+                        temp_path = self._write_temp_wav(frame_audio, sr, scene_idx, frame_idx)
+                        frame_paths.append(temp_path)
+
+                frame_audio_paths.append(frame_paths)
 
             logger.debug(
                 "[DecoupledPipeline] Scene %d: %d frames (%.1fs)",
