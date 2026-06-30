@@ -356,7 +356,7 @@ def parse_arguments():
                                  "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                  "nemo", "nemo-lite",
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
-                                 "ten", "whisperseg", "none"
+                                 "ten", "whisperseg", "faster-whisper", "none"
                              ],
                              default=None,  # None = use whisperseg (v1.8.13 default for balanced/fidelity)
                              metavar="BACKEND",
@@ -370,6 +370,9 @@ def parse_arguments():
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), "
+                                 "faster-whisper (v1.9.0 balanced default — faster-whisper's "
+                                 "built-in VAD via vad_filter; one transcribe call per scene, "
+                                 "no external per-group overhead), "
                                  "none (disable segmentation)"
                              ))
     tuning_group.add_argument("--initial-prompt",
@@ -383,6 +386,19 @@ def parse_arguments():
                              type=int, default=None,
                              metavar="INT",
                              help="Padding around detected speech in milliseconds (default: backend-specific)")
+    tuning_group.add_argument("--max-group-duration",
+                             type=float, default=None,
+                             metavar="SECONDS",
+                             help="Max duration (s) of a VAD segment GROUP before a new transcribe() call "
+                                  "(external segmenters: silero/nemo/etc). Larger = fewer calls = faster "
+                                  "(each <=30s call is one encoder pass), but longer subtitles. "
+                                  "Overrides the sensitivity preset. No effect with --speech-segmenter faster-whisper.")
+    tuning_group.add_argument("--chunk-threshold",
+                             type=float, default=None,
+                             metavar="SECONDS",
+                             help="Gap (s) above which adjacent speech segments are split into separate groups "
+                                  "(external segmenters). Larger = fewer groups (merges across longer silences). "
+                                  "Overrides the sensitivity preset.")
     tuning_group.add_argument("--condition-on-previous-text",
                              type=str, default=None,
                              choices=["true", "false"],
@@ -1922,7 +1938,17 @@ def main():
 
     speech_segmenter = getattr(args, 'speech_segmenter', None)
     if speech_segmenter is None and resolved_config is not None:
-        if _path_safe_for_whisperseg_default(args):
+        if getattr(args, 'mode', None) == "balanced":
+            # v1.9.0 T1: balanced defaults to faster-whisper's native VAD
+            # (vad_filter=True, one transcribe call per scene). This is the
+            # throughput fix — it bypasses the external per-group segmenter
+            # whose N-calls-per-scene padding was the 2-3x slowdown. Native
+            # VAD does NOT hit the v1.9.0 non-Silero routing bug because it
+            # uses faster-whisper's internal VAD, not the external grouping
+            # path. Revert with --speech-segmenter silero-v3.1.
+            speech_segmenter = "faster-whisper"
+            logger.debug("No --speech-segmenter passed; --mode balanced uses v1.9.0 default: faster-whisper (native VAD)")
+        elif _path_safe_for_whisperseg_default(args):
             speech_segmenter = "whisperseg"
             logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
         else:
@@ -1938,6 +1964,7 @@ def main():
     if speech_segmenter is not None and resolved_config is not None:
         if (not _path_safe_for_whisperseg_default(args)
                 and speech_segmenter != "none"
+                and speech_segmenter != "faster-whisper"
                 and not speech_segmenter.startswith("silero")):
             logger.warning(
                 "Speech segmenter '%s' is not supported in --mode %s due to a known "
@@ -1956,6 +1983,45 @@ def main():
         resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
         logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
+
+        # v1.9.0 T1: native faster-whisper VAD uses its OWN VadOptions preset.
+        # The resolver's params["vad"] holds silero-scaled values (the legacy
+        # preset selector is still silero-v3.1); faster-whisper's bundled Silero
+        # uses a different probability scale, so overlay the sensitivity-matched
+        # faster_whisper_vad preset here. Only for the native backend — reverting
+        # to silero-v3.1 leaves the resolver's silero preset untouched (true
+        # revert). An explicit --vad-threshold below still overrides this.
+        if speech_segmenter == "faster-whisper":
+            try:
+                from whisperjav.config.components.base import get_vad_registry
+                _fw_vad = get_vad_registry().get("faster_whisper_vad")
+                _preset = _fw_vad.get_preset(getattr(args, 'sensitivity', 'balanced')) if _fw_vad else None
+                if _preset is not None:
+                    resolved_config["params"]["vad"] = _preset.model_dump()
+                    logger.debug(
+                        "Native faster-whisper VAD preset applied (sensitivity=%s): %s",
+                        getattr(args, 'sensitivity', 'balanced'),
+                        resolved_config["params"]["vad"],
+                    )
+                else:
+                    logger.warning("faster_whisper_vad preset not found; native VAD will use library defaults")
+            except Exception as e:
+                logger.warning("Could not apply native faster-whisper VAD preset: %s", e)
+
+        elif getattr(args, 'mode', None) == "balanced" and speech_segmenter != "none":
+            # v1.9.0: balanced is fast-by-default (native faster-whisper VAD).
+            # When a user explicitly opts INTO an external segmenter on balanced,
+            # default it to the "Test D" fine-grained grouping — the best subtitle
+            # quality from the slow-but-granular path (owner A/B 2026-06-30:
+            # max_group=9s + chunk_threshold=0.1s ranked best). This overwrites the
+            # resolver's silero preset grouping (6.0s / 2.5s). Explicit
+            # --max-group-duration / --chunk-threshold below still override these.
+            resolved_config["params"].setdefault("vad", {})
+            resolved_config["params"]["vad"]["max_group_duration_s"] = 9.0
+            resolved_config["params"]["vad"]["chunk_threshold_s"] = 0.1
+            resolved_config["params"]["speech_segmenter"]["max_group_duration_s"] = 9.0
+            resolved_config["params"]["speech_segmenter"]["chunk_threshold_s"] = 0.1
+            logger.info("Balanced + external segmenter: Test-D grouping defaults applied (max_group=9.0s, chunk_threshold=0.1s)")
 
     # Apply CLI quality knobs (--initial-prompt, --vad-threshold, --condition-on-previous-text)
     if resolved_config is not None:
@@ -1995,6 +2061,32 @@ def main():
             resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
             logger.info(f"Speech pad set via CLI: {speech_pad_ms}ms")
 
+        # Group-sizing knobs for external segmenters (silero/nemo/etc). These
+        # control the encoder-pass count: each <=30s GROUP is one transcribe()
+        # call. Routed into both params["vad"] and speech_segmenter config so the
+        # segmenter's _group_segments() picks them up via merged_segmenter_config.
+        max_group_duration = getattr(args, 'max_group_duration', None)
+        if max_group_duration is not None:
+            max_group_duration = max(1.0, float(max_group_duration))
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["max_group_duration_s"] = max_group_duration
+            if "speech_segmenter" not in resolved_config["params"]:
+                resolved_config["params"]["speech_segmenter"] = {}
+            resolved_config["params"]["speech_segmenter"]["max_group_duration_s"] = max_group_duration
+            logger.info(f"Max group duration set via CLI: {max_group_duration}s")
+
+        chunk_threshold = getattr(args, 'chunk_threshold', None)
+        if chunk_threshold is not None:
+            chunk_threshold = max(0.0, float(chunk_threshold))
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["chunk_threshold_s"] = chunk_threshold
+            if "speech_segmenter" not in resolved_config["params"]:
+                resolved_config["params"]["speech_segmenter"] = {}
+            resolved_config["params"]["speech_segmenter"]["chunk_threshold_s"] = chunk_threshold
+            logger.info(f"Chunk threshold set via CLI: {chunk_threshold}s")
+
         condition_on_prev = getattr(args, 'condition_on_previous_text', None)
         if condition_on_prev is not None:
             condition_bool = condition_on_prev.lower() == "true"
@@ -2021,7 +2113,9 @@ def main():
             params = dump_resolved.get("params") or {}
             ss = params.get("speech_segmenter") or {}
             backend = ss.get("backend") or "silero-v3.1"  # firewall default
-            if backend and not backend.startswith("silero"):
+            # faster-whisper native VAD keeps its vad_params (they ARE its
+            # VadOptions); only the external non-silero segmenters get cleared.
+            if backend and not backend.startswith("silero") and backend != "faster-whisper":
                 cleared_vad = params.pop("vad", None)
                 params["_dump_note"] = (
                     f"Resolver-produced silero vad_params cleared for non-silero "
