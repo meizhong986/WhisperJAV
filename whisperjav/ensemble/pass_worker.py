@@ -507,7 +507,11 @@ def resolve_qwen_sensitivity(
     Returns:
         Dict of segmenter config params (filtered to SEGMENTER_PARAMS keys)
     """
-    if segmenter_backend == "none" or not segmenter_backend:
+    # "faster-whisper" = native VAD inside faster-whisper (vad_filter). Like
+    # "none", it has no EXTERNAL segmenter config to resolve by sensitivity, so
+    # return empty (the ASR enables vad_filter itself). Avoids a spurious
+    # "Unknown segmenter backend" warning when balanced runs native VAD in a pass.
+    if segmenter_backend in ("none", "faster-whisper") or not segmenter_backend:
         return {}
 
     tool_name = _SEGMENTER_TOOL_NAMES.get(segmenter_backend)

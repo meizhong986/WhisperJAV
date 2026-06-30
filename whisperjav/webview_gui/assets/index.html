@@ -483,6 +483,7 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass1-segmenter" class="form-select compact">
+                                            <option value="faster-whisper" selected title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene. Balanced default since v1.9.0. Pick an external segmenter instead to get the best-quality fine-grained grouping.">Faster-Whisper Native VAD (fast, default)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
@@ -494,7 +495,7 @@
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
-                                            <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Default since v1.8.13 — F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR, default)</option>
+                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -645,6 +646,7 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
+                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>

@@ -1233,7 +1233,7 @@ const EnsembleManager = {
             sensitivity: 'aggressive',
             sceneDetector: 'auditok',
             speechEnhancer: 'none',
-            speechSegmenter: 'whisperseg',  // v1.8.13: WhisperSeg system-wide default
+            speechSegmenter: 'faster-whisper',  // v1.9.0: balanced default = native faster-whisper VAD
             model: 'large-v2',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1721,11 +1721,20 @@ const EnsembleManager = {
         } else {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
             const pipeline = this.state[passKey].pipeline;
-            if (pipeline === 'balanced' || pipeline === 'fidelity') {
-                // v1.8.13: whisperseg + auditok for balanced; whisperseg + semantic for fidelity
-                sceneSelect.value = (pipeline === 'balanced') ? 'auditok' : 'semantic';
+            if (pipeline === 'balanced') {
+                // v1.9.0: balanced defaults to faster-whisper native VAD (fastest;
+                // one transcribe call per scene). Picking an external segmenter
+                // instead auto-applies the best-quality fine-grained grouping
+                // (handled in main.py). Scene detection stays auditok.
+                sceneSelect.value = 'auditok';
+                segmenterSelect.value = 'faster-whisper';
+                this.state[passKey].sceneDetector = 'auditok';
+                this.state[passKey].speechSegmenter = 'faster-whisper';
+            } else if (pipeline === 'fidelity') {
+                // v1.8.13: whisperseg + semantic for fidelity (unchanged)
+                sceneSelect.value = 'semantic';
                 segmenterSelect.value = 'whisperseg';
-                this.state[passKey].sceneDetector = (pipeline === 'balanced') ? 'auditok' : 'semantic';
+                this.state[passKey].sceneDetector = 'semantic';
                 this.state[passKey].speechSegmenter = 'whisperseg';
             } else {
                 // faster, fast — runtime has vad=none per LEGACY_PIPELINES, but
