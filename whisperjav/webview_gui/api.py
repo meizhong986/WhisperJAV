@@ -2338,7 +2338,7 @@ class WhisperJAVAPI:
     # Two-Pass Ensemble Methods
     # ========================================================================
 
-    def get_pipeline_defaults(self, pipeline: str, sensitivity: str) -> Dict[str, Any]:
+    def get_pipeline_defaults(self, pipeline: str, sensitivity: str, segmenter: str = None) -> Dict[str, Any]:
         """
         Get resolved parameters for a pipeline+sensitivity combination.
 
@@ -2382,6 +2382,21 @@ class WhisperJAVAPI:
                 sensitivity=sensitivity,
                 task='transcribe'
             )
+
+            # v1.9.0: reflect the runtime balanced VAD defaults in the Customize
+            # panel — native faster_whisper_vad preset (e.g. threshold 0.40), or the
+            # Test-D fine-grained grouping for an external segmenter on balanced —
+            # instead of the raw silero preset. Legacy (non-V3) configs only. Uses
+            # the SAME shared helper main.py / pass_worker apply at run time, so the
+            # panel shows what will actually run.
+            if segmenter and 'asr' not in config.get('params', {}):
+                from whisperjav.config.legacy import apply_balanced_vad_defaults
+                config.setdefault('params', {}).setdefault('speech_segmenter', {})['backend'] = segmenter
+                apply_balanced_vad_defaults(
+                    config,
+                    sensitivity=sensitivity,
+                    is_balanced=(pipeline == 'balanced'),
+                )
 
             # Determine scene detection method (default: auditok)
             scene_detection_method = 'auditok'

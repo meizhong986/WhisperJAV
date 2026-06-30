@@ -74,7 +74,7 @@ from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
-from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
+from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.__version__ import __version__, __version_display__
 
 
@@ -1984,44 +1984,17 @@ def main():
         logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
 
-        # v1.9.0 T1: native faster-whisper VAD uses its OWN VadOptions preset.
-        # The resolver's params["vad"] holds silero-scaled values (the legacy
-        # preset selector is still silero-v3.1); faster-whisper's bundled Silero
-        # uses a different probability scale, so overlay the sensitivity-matched
-        # faster_whisper_vad preset here. Only for the native backend — reverting
-        # to silero-v3.1 leaves the resolver's silero preset untouched (true
-        # revert). An explicit --vad-threshold below still overrides this.
-        if speech_segmenter == "faster-whisper":
-            try:
-                from whisperjav.config.components.base import get_vad_registry
-                _fw_vad = get_vad_registry().get("faster_whisper_vad")
-                _preset = _fw_vad.get_preset(getattr(args, 'sensitivity', 'balanced')) if _fw_vad else None
-                if _preset is not None:
-                    resolved_config["params"]["vad"] = _preset.model_dump()
-                    logger.debug(
-                        "Native faster-whisper VAD preset applied (sensitivity=%s): %s",
-                        getattr(args, 'sensitivity', 'balanced'),
-                        resolved_config["params"]["vad"],
-                    )
-                else:
-                    logger.warning("faster_whisper_vad preset not found; native VAD will use library defaults")
-            except Exception as e:
-                logger.warning("Could not apply native faster-whisper VAD preset: %s", e)
-
-        elif getattr(args, 'mode', None) == "balanced" and speech_segmenter != "none":
-            # v1.9.0: balanced is fast-by-default (native faster-whisper VAD).
-            # When a user explicitly opts INTO an external segmenter on balanced,
-            # default it to the "Test D" fine-grained grouping — the best subtitle
-            # quality from the slow-but-granular path (owner A/B 2026-06-30:
-            # max_group=9s + chunk_threshold=0.1s ranked best). This overwrites the
-            # resolver's silero preset grouping (6.0s / 2.5s). Explicit
-            # --max-group-duration / --chunk-threshold below still override these.
-            resolved_config["params"].setdefault("vad", {})
-            resolved_config["params"]["vad"]["max_group_duration_s"] = 9.0
-            resolved_config["params"]["vad"]["chunk_threshold_s"] = 0.1
-            resolved_config["params"]["speech_segmenter"]["max_group_duration_s"] = 9.0
-            resolved_config["params"]["speech_segmenter"]["chunk_threshold_s"] = 0.1
-            logger.info("Balanced + external segmenter: Test-D grouping defaults applied (max_group=9.0s, chunk_threshold=0.1s)")
+        # v1.9.0: apply the SHARED balanced VAD defaults — native faster_whisper_vad
+        # preset (scale-correct for faster-whisper's bundled Silero), or the Test-D
+        # fine-grained grouping for an external segmenter on balanced. Shared with
+        # the ensemble path (pass_worker._apply_gui_overrides) so the two cannot
+        # drift. Explicit CLI overrides below (--vad-threshold / --speech-pad-ms /
+        # --max-group-duration / --chunk-threshold) run after and win.
+        apply_balanced_vad_defaults(
+            resolved_config,
+            sensitivity=getattr(args, 'sensitivity', 'balanced'),
+            is_balanced=(getattr(args, 'mode', None) == "balanced"),
+        )
 
     # Apply CLI quality knobs (--initial-prompt, --vad-threshold, --condition-on-previous-text)
     if resolved_config is not None:

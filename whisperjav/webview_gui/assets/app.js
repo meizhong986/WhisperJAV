@@ -2219,8 +2219,10 @@ const EnsembleManager = {
         const sensitivity = passState.sensitivity;
 
         try {
-            // Get resolved pipeline parameters
-            const result = await pywebview.api.get_pipeline_defaults(pipeline, sensitivity);
+            // Get resolved pipeline parameters. v1.9.0: pass the pass's segmenter so
+            // the panel reflects the actual balanced VAD defaults (native
+            // faster_whisper_vad preset, or Test-D grouping for an external segmenter).
+            const result = await pywebview.api.get_pipeline_defaults(pipeline, sensitivity, passState.speechSegmenter || '');
 
             if (!result.success) {
                 ErrorHandler.show('Error', 'Failed to load pipeline parameters: ' + result.error);

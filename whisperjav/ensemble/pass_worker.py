@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from whisperjav.config.legacy import resolve_legacy_pipeline
+from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
@@ -1704,6 +1704,18 @@ def _apply_gui_overrides(
                 "Pass %s: Override speech_segmenter = %s, resolved %d sensitivity params (%s)",
                 pass_number, segmenter_backend, len(segmenter_params), sensitivity,
             )
+
+    # v1.9.0: apply the SHARED balanced VAD defaults so the ensemble path matches
+    # the single-pass path — native faster_whisper_vad preset (scale-correct 0.40,
+    # not the silero 0.28 scale), or Test-D fine-grained grouping for an external
+    # segmenter on the balanced pipeline. Runs AFTER the segmenter backend is set
+    # above and BEFORE the explicit vad_threshold / speech_pad_ms overrides below
+    # (and apply_custom_params later), all of which still win.
+    apply_balanced_vad_defaults(
+        resolved_config,
+        sensitivity=pass_config.get("sensitivity", "balanced"),
+        is_balanced=(pass_config.get("pipeline") == "balanced"),
+    )
 
     # Override speech enhancer if specified
     speech_enhancer = pass_config.get("speech_enhancer")
