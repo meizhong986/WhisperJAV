@@ -16,7 +16,6 @@ Each file:  <sanitized-name>.json
 
 import json
 import logging
-import os
 import re
 import time
 from pathlib import Path
@@ -162,17 +161,9 @@ def save_preset(name: str, data: Dict) -> bool:
             else:
                 data["created_at"] = now
 
-        # Atomic write
-        tmp_path = path.with_suffix(".json.tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-
-        # Windows: rename fails if target exists
-        if path.exists():
-            path.unlink()
-        tmp_path.rename(path)
+        # Atomic write with junction-safe fallback (#309)
+        from .gui_settings import atomic_write_json
+        atomic_write_json(path, data, logger_=logger)
 
         logger.debug("Preset saved: %s → %s", name, path)
         return True
