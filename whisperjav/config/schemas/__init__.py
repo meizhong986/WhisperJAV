@@ -22,7 +22,7 @@ from .model import MODELS, VAD_ENGINES, ModelConfig, VADEngineConfig
 from .pipeline import ResolvedConfig, ResolvedParams, WorkflowConfig
 from .transcriber import TranscriberOptions
 from .ui import UIPreferences
-from .vad import FasterWhisperVADOptions, SileroVADOptions, StableTSVADOptions
+from .vad import FasterWhisperVADOptions, SegmenterGroupingOptions, SileroVADOptions, StableTSVADOptions
 from .presets import (
     DECODER_PRESETS,
     FASTER_WHISPER_ENGINE_PRESETS,
@@ -53,6 +53,7 @@ __all__ = [
     "DecoderOptions",
     # VAD schemas
     "SileroVADOptions",
+    "SegmenterGroupingOptions",
     "FasterWhisperVADOptions",
     "StableTSVADOptions",
     # Engine schemas

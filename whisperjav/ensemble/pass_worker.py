@@ -81,43 +81,14 @@ DECODER_PARAMS = {
     "max_initial_timestamp",
 }
 
-# Segmenter params - routed to speech segmentation backends, not passed to Whisper ASR
-# Covers all backends: Silero, TEN, Whisper VAD, and shared grouping params
-SEGMENTER_PARAMS = {
-    # Core VAD (Silero, shared)
-    "threshold",
-    "min_speech_duration_ms",
-    "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
-    "min_silence_duration_ms",
-    "speech_pad_ms",
-    # Grouping (shared across backends)
-    "chunk_threshold_s",
-    "max_group_duration_s",
-    # TEN-specific
-    "hop_size",
-    "start_pad_ms",
-    "end_pad_ms",
-    # Whisper VAD-specific
-    "cache_results",
-}
-
-# Backend name → YAML tool name mapping for ConfigManager.get_tool_config()
-# Used by resolve_qwen_sensitivity() to resolve sensitivity presets
-_SEGMENTER_TOOL_NAMES = {
-    "silero-v6.2": "silero-v6-speech-segmentation",
-    "silero": "silero-speech-segmentation",
-    "silero-v4.0": "silero-speech-segmentation",
-    "silero-v3.1": "silero-speech-segmentation",
-    "ten": "ten-speech-segmentation",
-    "nemo": "nemo-speech-segmentation",
-    "nemo-lite": "nemo-speech-segmentation",
-    "whisper-vad": "whisper-vad-speech-segmentation",
-    "whisper-vad-tiny": "whisper-vad-speech-segmentation",
-    "whisper-vad-base": "whisper-vad-speech-segmentation",
-    "whisper-vad-small": "whisper-vad-speech-segmentation",
-    "whisper-vad-medium": "whisper-vad-speech-segmentation",
-    "whisperseg": "whisperseg-speech-segmentation",
-}
+# Segmenter params - routed to speech segmentation backends, not passed to Whisper ASR.
+# v1.9.0: canonical definitions live in config/segmenter_resolution.py (shared
+# with the legacy resolver's unified segmenter routing); imported here to keep
+# the ensemble path and the resolver in sync.
+from whisperjav.config.segmenter_resolution import (
+    SEGMENTER_PARAM_KEYS as SEGMENTER_PARAMS,
+    SEGMENTER_TOOL_NAMES as _SEGMENTER_TOOL_NAMES,  # noqa: F401 (re-export)
+)
 
 # Provider params - common transcriber options shared by all backends
 PROVIDER_PARAMS_COMMON = {
@@ -502,35 +473,14 @@ def resolve_qwen_sensitivity(
 
     Returns:
         Dict of segmenter config params (filtered to SEGMENTER_PARAMS keys)
+
+    .. note:: v1.9.0 - thin alias for the shared implementation in
+       config/segmenter_resolution.py (also used by the legacy resolver's
+       unified segmenter routing).
     """
-    if segmenter_backend == "none" or not segmenter_backend:
-        return {}
+    from whisperjav.config.segmenter_resolution import resolve_segmenter_config
 
-    tool_name = _SEGMENTER_TOOL_NAMES.get(segmenter_backend)
-    if not tool_name:
-        logger.warning(
-            "Unknown segmenter backend '%s' for sensitivity resolution; "
-            "passing user overrides only",
-            segmenter_backend,
-        )
-        return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
-
-    try:
-        from whisperjav.config.v4 import ConfigManager
-
-        cm = ConfigManager()
-        resolved = cm.get_tool_config(tool_name, sensitivity, user_overrides)
-
-        # Filter to SEGMENTER_PARAMS only — ConfigManager returns full tool config
-        # including metadata keys we don't want to pass to the backend
-        return {k: v for k, v in resolved.items() if k in SEGMENTER_PARAMS}
-    except Exception as e:
-        logger.warning(
-            "ConfigManager failed for '%s' sensitivity '%s': %s. "
-            "Falling back to user overrides only.",
-            tool_name, sensitivity, e,
-        )
-        return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
+    return resolve_segmenter_config(segmenter_backend, sensitivity, user_overrides)
 
 
 def _write_dropbox_and_exit(result_file: str, result: Dict[str, Any], tracer, exit_code: int) -> None:
