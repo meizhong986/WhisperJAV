@@ -40,6 +40,28 @@ class SileroVADOptions(BaseConfig):
     )
 
 
+class SegmenterGroupingOptions(BaseConfig):
+    """
+    Backend-agnostic segment grouping parameters (v1.9.0 split).
+
+    These apply to ALL speech-segmenter backends (Silero, WhisperSeg, TEN,
+    NeMo, Whisper-VAD) and live in the canonical params["speech_segmenter"]
+    location, NOT in params["vad"] (which is Silero-specific).
+    See docs/architecture/SEGMENTER_ROUTING_UNIFICATION_v1.9.md.
+    """
+
+    chunk_threshold_s: float = Field(
+        ge=0.0, le=30.0,
+        description="Gap threshold for segment grouping (seconds). Segments "
+                    "with gaps larger than this are split into separate groups."
+    )
+    max_group_duration_s: float = Field(
+        ge=1.0, le=60.0,
+        description="Maximum duration for a segment group (seconds). Groups "
+                    "are split if adding a segment would exceed this limit."
+    )
+
+
 class FasterWhisperVADOptions(BaseConfig):
     """
     Faster-Whisper integrated VAD parameters.

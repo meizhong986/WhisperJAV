@@ -1604,6 +1604,44 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
             cleanup_temp_directory(args.temp_dir)
 
 
+def _select_speech_segmenter(args):
+    """
+    Select the runtime speech-segmenter backend BEFORE config resolution.
+
+    v1.9.0 unified segmenter routing: the chosen backend is passed into
+    resolve_legacy_pipeline(), which routes segmenter params to the canonical
+    location (params['speech_segmenter']) and resolves the backend's own YAML
+    sensitivity preset for non-Silero backends. Explicit non-Silero choices
+    are now honored in simple balanced/fidelity modes (#323) - the routing
+    bug that forced a silero-v3.1 downgrade is fixed.
+
+    Default policy (unchanged from v1.8.13 pending GT acceptance):
+    - ensemble / decoupled / qwen paths: whisperseg
+    - simple balanced/fidelity: silero-v3.1 (flip to whisperseg after the
+      F4/F6 acceptance runs pass with the fixed routing - one-line change)
+
+    Returns None for modes that don't use a speech segmenter.
+    """
+    mode = getattr(args, 'mode', None)
+
+    # --no-vad disables speech segmentation for balanced/fidelity
+    if getattr(args, 'no_vad', False) and mode in ("balanced", "fidelity"):
+        return "none"
+
+    explicit = getattr(args, 'speech_segmenter', None)
+    if explicit is not None:
+        return explicit
+
+    if getattr(args, 'ensemble', False) or getattr(args, 'pipeline', None) == 'decoupled' \
+            or mode == 'qwen':
+        return "whisperseg"
+
+    if mode in ("balanced", "fidelity"):
+        return "silero-v3.1"
+
+    return None
+
+
 def main():
     """Enhanced main entry point with all V3 improvements."""
     # Apply HuggingFace Hub network resilience patch (#204)
@@ -1764,13 +1802,20 @@ def main():
             logger.debug("Qwen mode: skipping legacy config resolution (uses --qwen-* args)")
 
         else:
-            # Legacy mode: use pipeline resolver
+            # Legacy mode: use pipeline resolver.
+            # v1.9.0 unified segmenter routing: the segmenter backend is
+            # selected BEFORE resolution and passed into the resolver, which
+            # places segmenter params in their canonical location
+            # (params['speech_segmenter']). Non-Silero backends get their own
+            # YAML sensitivity preset - no constructor firewall needed.
+            effective_segmenter = _select_speech_segmenter(args)
             resolved_config = resolve_legacy_pipeline(
                 pipeline_name=args.mode,
                 sensitivity=args.sensitivity,
                 task=task,
                 device=args.device,
                 compute_type=args.compute_type,
+                speech_segmenter=effective_segmenter,
             )
 
         if args.scene_detection_method:
@@ -1837,64 +1882,28 @@ def main():
             resolved_config["params"]["speech_segmenter"]["backend"] = "none"
             logger.info("Speech segmentation disabled via --no-vad flag (backend set to 'none')")
 
-    # Apply --speech-segmenter (explicit override, or v1.8.13 default).
+    # v1.9.0 UNIFIED SEGMENTER ROUTING (see
+    # docs/architecture/SEGMENTER_ROUTING_UNIFICATION_v1.9.md):
+    # Segmenter selection happens in _select_speech_segmenter() BEFORE config
+    # resolution, and resolve_legacy_pipeline() routes segmenter params to the
+    # canonical location (params['speech_segmenter']) - for non-Silero backends
+    # it resolves the backend's own YAML sensitivity preset and empties
+    # params['vad'] at the source. The v1.8.13 CONSTRUCTOR FIREWALL and the
+    # downgrade guard that force-reverted explicit non-Silero choices to
+    # silero-v3.1 in simple modes are gone: --mode balanced/fidelity with
+    # --speech-segmenter whisperseg/ten/nemo/whisper-vad now routes correctly
+    # without --ensemble (#323).
     #
-    # v1.8.13 ships a SCOPED default flip. Whisperseg becomes the default only on
-    # paths that correctly route segmenter grouping params (chunk_threshold_s,
-    # max_group_duration_s, etc.) to non-Silero backends. Simple --mode balanced
-    # and --mode fidelity go through FasterWhisperProASR / WhisperProASR whose
-    # CONSTRUCTOR FIREWALL strips those params for non-Silero backends, causing
-    # whisperseg to fall back to its 29s default max_group_duration_s and trigger
-    # a Whisper repetition pathology on JAV moaning content (catastrophic empty
-    # output — see F4/F6 acceptance tests). Fix is tracked for v1.9.0 (split
-    # SileroVADOptions, introduce SegmenterGroupingOptions, eliminate firewall).
-    # Until then, simple modes default to silero-v3.1 (the v1.8.12 default,
-    # known-good baseline). Users who want whisperseg in v1.8.13 use --ensemble.
-    def _path_safe_for_whisperseg_default(_args):
-        """Paths with explicit segmenter-param routing for non-Silero backends."""
-        if getattr(_args, 'ensemble', False):
-            return True  # pass_worker.py:1404-1418 routes correctly
-        if getattr(_args, 'pipeline', None) == 'decoupled':
-            return True  # DecoupledPipeline kwargs path
-        if getattr(_args, 'mode', None) == 'qwen':
-            return True  # QwenPipeline explicit forwarding (v1.8.12 fix)
-        return False
-
-    speech_segmenter = getattr(args, 'speech_segmenter', None)
-    if speech_segmenter is None and resolved_config is not None:
-        if _path_safe_for_whisperseg_default(args):
-            speech_segmenter = "whisperseg"
-            logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
-        else:
-            speech_segmenter = "silero-v3.1"
-            logger.debug(
-                "No --speech-segmenter passed; --mode %s uses silero-v3.1 "
-                "(v1.8.12 default — non-Silero routing for simple modes is a v1.9.0 fix). "
-                "Use --ensemble to enable whisperseg.",
-                getattr(args, 'mode', None)
-            )
-
-    # Guard: explicit non-Silero choice on a path with the routing bug → downgrade with warning.
-    if speech_segmenter is not None and resolved_config is not None:
-        if (not _path_safe_for_whisperseg_default(args)
-                and speech_segmenter != "none"
-                and not speech_segmenter.startswith("silero")):
-            logger.warning(
-                "Speech segmenter '%s' is not supported in --mode %s due to a known "
-                "v1.9.0 routing bug (catastrophic empty output on JAV moaning content). "
-                "Falling back to silero-v3.1. Use --ensemble for full WhisperSeg / TEN / "
-                "NeMo / whisper-vad support.",
-                speech_segmenter, getattr(args, 'mode', None)
-            )
-            speech_segmenter = "silero-v3.1"
-
-    if speech_segmenter is not None and resolved_config is not None:
-        if "params" not in resolved_config:
-            resolved_config["params"] = {}
-        if "speech_segmenter" not in resolved_config["params"]:
-            resolved_config["params"]["speech_segmenter"] = {}
-        resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
-        logger.info(f"Speech segmenter set to: {speech_segmenter}")
+    # NOTE: the SCOPED whisperseg default is retained for now - simple
+    # balanced/fidelity modes still default to silero-v3.1 until whisperseg
+    # passes the F4/F6 GT acceptance runs with the fixed routing. Flipping the
+    # default is a one-line change in _select_speech_segmenter().
+    if resolved_config is not None and not args.ensemble \
+            and args.mode not in ("transformers", "qwen"):
+        backend = (resolved_config.get("params", {})
+                   .get("speech_segmenter", {}).get("backend"))
+        if backend:
+            logger.info(f"Speech segmenter set to: {backend}")
         # Note: Speech Segmenter factory handles "none" backend internally
 
     # Apply CLI quality knobs (--initial-prompt, --vad-threshold, --condition-on-previous-text)
@@ -1948,30 +1957,13 @@ def main():
         import json
         import copy
 
-        # v1.8.13 (#312): Mirror the WhisperProASR firewall
-        # (whisper_pro_asr.py:71-77) in the dump output. The legacy resolver
-        # always emits silero VAD presets because LEGACY_PIPELINES hardcodes
-        # vad="silero". At runtime, those silero params get cleared by the
-        # firewall when a non-silero segmenter is selected — so the dump
-        # was historically misleading (showed silero values for ten/whisperseg/
-        # silero-v6.2 backends). Apply the same firewall here so users see
-        # the runtime-effective config.
+        # v1.9.0 (#312 follow-up): resolved_config is runtime-accurate at the
+        # source now. The unified segmenter routing empties params["vad"] and
+        # resolves the backend's own YAML preset into params["speech_segmenter"]
+        # AT RESOLUTION TIME, so the v1.8.13 firewall-mirroring workaround that
+        # lived here is no longer needed - what the dump shows is exactly what
+        # the ASR constructors receive.
         dump_resolved = copy.deepcopy(resolved_config) if resolved_config else None
-        if dump_resolved is not None and isinstance(dump_resolved, dict):
-            params = dump_resolved.get("params") or {}
-            ss = params.get("speech_segmenter") or {}
-            backend = ss.get("backend") or "silero-v3.1"  # firewall default
-            if backend and not backend.startswith("silero"):
-                cleared_vad = params.pop("vad", None)
-                params["_dump_note"] = (
-                    f"Resolver-produced silero vad_params cleared for non-silero "
-                    f"backend '{backend}' to mirror the runtime firewall "
-                    f"(whisper_pro_asr.py). Actual runtime VAD settings come from "
-                    f"the {backend} YAML preset at sensitivity='{args.sensitivity}'."
-                )
-                if cleared_vad:
-                    params["_dump_cleared_vad"] = cleared_vad
-                dump_resolved["params"] = params
 
         dump_data = {
             "mode": args.mode,

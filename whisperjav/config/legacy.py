@@ -49,6 +49,7 @@ for backward compatibility.
 from typing import Any, Dict, List, Optional
 
 from .resolver_v3 import resolve_config_v3
+from .segmenter_resolution import apply_segmenter_routing
 
 
 def _filter_none_values(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -147,6 +148,7 @@ def resolve_legacy_pipeline(
     overrides: Optional[Dict[str, Any]] = None,
     device: Optional[str] = None,
     compute_type: Optional[str] = None,
+    speech_segmenter: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Resolve configuration from legacy pipeline name.
@@ -197,7 +199,15 @@ def resolve_legacy_pipeline(
         return config
 
     # Map to old output structure for backward compatibility
-    return _map_to_legacy_structure(config, pipeline_def)
+    legacy_config = _map_to_legacy_structure(config, pipeline_def)
+
+    # v1.9.0 unified segmenter routing: place grouping params in the canonical
+    # location (params['speech_segmenter']) and, for non-Silero backends,
+    # resolve the backend's own sensitivity preset instead of shipping
+    # Silero-resolved values that the constructors then had to firewall away.
+    apply_segmenter_routing(legacy_config["params"], speech_segmenter, sensitivity)
+
+    return legacy_config
 
 
 def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any]) -> Dict[str, Any]:
