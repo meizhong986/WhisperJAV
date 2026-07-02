@@ -44,10 +44,14 @@ jobs:
         run: pip install pydantic pyyaml pysrt numpy pytest
 
       - name: Accuracy-gate scorer tests
-        run: python -m pytest tests/bench -q
+        # Ships in the accuracy-gate PR; guard until merged
+        run: |
+          if [ -d tests/bench ]; then python -m pytest tests/bench -q; else echo "tests/bench not present - skipping"; fi
 
       - name: Segmenter routing tests
-        run: python -m pytest tests/config/test_segmenter_routing.py -q
+        # Ships in the unified-routing PR; guard until merged
+        run: |
+          if [ -f tests/config/test_segmenter_routing.py ]; then python -m pytest tests/config/test_segmenter_routing.py -q; else echo "not present - skipping"; fi
 
       # Greened in v1.9.0 (26 stale expectations retuned to current intended
       # values, with provenance comments). BLOCKING: a failure here means a
@@ -57,6 +61,7 @@ jobs:
         run: python -m pytest tests/config -q
 
       - name: Gate smoke test (synthetic corpus)
+        if: ${{ hashFiles('whisperjav/bench/regression_cli.py') != '' }}
         run: |
           python - <<'PY'
           import json, subprocess, sys
