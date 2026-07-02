@@ -326,6 +326,7 @@ whisperjav-gui = "whisperjav.webview_gui.main:main"
 whisperjav-translate = "whisperjav.translate.cli:main"
 whisperjav-upgrade = "whisperjav.upgrade:main"
 whisperjav-bench = "whisperjav.bench.cli:main"
+whisperjav-accuracy-gate = "whisperjav.bench.regression_cli:main"
 
 # -----------------------------------------------------------------------------
 # Project URLs
