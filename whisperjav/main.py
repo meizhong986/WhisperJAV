@@ -677,6 +677,14 @@ def parse_arguments():
     qwen_output_group.add_argument("--no-qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_false",
                            help=argparse.SUPPRESS)
+    qwen_output_group.add_argument("--qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
+                           action="store_true", default=True,
+                           help="Drop lone nonverbal single-token subtitle lines "
+                                "(あ。 は。 え。 ん。 つ。 ふ。 ふっ。 切。) in Phase 8 (default: enabled). "
+                                "Applies to all Qwen backends (qwen3 / cohere / anime-whisper).")
+    qwen_output_group.add_argument("--no-qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
+                           action="store_false",
+                           help="Keep nonverbal single-token subtitle lines (disable the Phase-8 filter)")
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(
@@ -1201,6 +1209,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "segmenter_config": _resolved_segmenter_config or None,
             # Adaptive Step-Down
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
+            # v1.9.0: Phase-8 nonverbal single-token line filter (default on)
+            "drop_nonverbal_lines": getattr(args, 'qwen_drop_nonverbal_lines', True),
             # Generator backend selection (v1.8.6+)
             "generator_backend": getattr(args, 'qwen_generator', 'qwen3'),
             # Qwen ASR

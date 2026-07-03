@@ -150,6 +150,12 @@ class QwenPipeline(BasePipeline):
         # Assembly text cleaner (Step 4 of assembly mode)
         assembly_cleaner: bool = True,  # Enable/disable pre-alignment text cleaning
 
+        # v1.9.0: Phase-8 nonverbal single-token line filter (all Qwen backends).
+        # Drops lone ASR-artifact lines ("あ。", "は。", "え。", "切。" ...) that the
+        # sensitive VAD/decoding captures. Whole-line exact match — safe. CLI:
+        # --qwen-drop-nonverbal-lines / --no-qwen-drop-nonverbal-lines.
+        drop_nonverbal_lines: bool = True,
+
         # Adaptive Step-Down
         stepdown_enabled: bool = True,
         stepdown_initial_group: float = 6.0,
@@ -271,6 +277,9 @@ class QwenPipeline(BasePipeline):
 
         # Assembly text cleaner toggle (for --qwen-assembly-cleaner on|off)
         self.assembly_cleaner_enabled = assembly_cleaner
+
+        # v1.9.0: Phase-8 nonverbal single-token line filter toggle.
+        self.drop_nonverbal_lines = drop_nonverbal_lines
 
         # Generator backend selection (v1.8.6+)
         self.generator_backend = generator_backend
@@ -1006,9 +1015,33 @@ class QwenPipeline(BasePipeline):
                 anime_filter_stats["dropped_ellipsis"],
                 anime_filter_stats["dropped_empty"],
             )
-        else:
+
+        # v1.9.0: nonverbal single-token line filter — ALL Qwen backends
+        # (qwen3 / cohere / anime-whisper). Drops lone ASR-artifact lines
+        # ("あ。", "は。", "え。", "切。" ...) produced by the sensitive VAD/
+        # decoding. Runs IN PLACE on stitched_srt_path (after the anime filter,
+        # if any) BEFORE the copy to final. Owner-curated, whole-line exact
+        # match (see NonverbalLineFilter for the token set + validation).
+        nonverbal_filter_stats = None
+        if self.drop_nonverbal_lines and num_subtitles > 0:
+            from whisperjav.modules.subtitle_pipeline.cleaners.nonverbal_line_filter import (
+                NonverbalLineFilter,
+            )
+            nonverbal_filter_stats = NonverbalLineFilter().filter_srt_file(stitched_srt_path)
+            num_subtitles = nonverbal_filter_stats["final_count"]
             logger.info(
-                "[QwenPipeline PID %s] Phase 8: Skipped (legacy sanitizer disabled for Qwen)",
+                "[QwenPipeline PID %s] Phase 8: nonverbal line filter - %d -> %d entries "
+                "(-%d nonverbal, -%d empty)",
+                os.getpid(),
+                nonverbal_filter_stats["original_count"],
+                nonverbal_filter_stats["final_count"],
+                nonverbal_filter_stats["dropped_nonverbal"],
+                nonverbal_filter_stats["dropped_empty"],
+            )
+        elif anime_filter_stats is None:
+            logger.info(
+                "[QwenPipeline PID %s] Phase 8: no SRT filter applied "
+                "(nonverbal filter disabled, legacy sanitizer N/A for Qwen)",
                 os.getpid(),
             )
 
@@ -1022,6 +1055,10 @@ class QwenPipeline(BasePipeline):
                 # quality_metrics block below can report them.
                 stats["anime_ellipsis_dropped"] = anime_filter_stats["dropped_ellipsis"]
                 stats["anime_empty_dropped"] = anime_filter_stats["dropped_empty"]
+            if nonverbal_filter_stats:
+                # v1.9.0: surface nonverbal-filter counters (feeds nonverbal_filtered).
+                stats["nonverbal_dropped"] = nonverbal_filter_stats["dropped_nonverbal"]
+                stats["nonverbal_empty_dropped"] = nonverbal_filter_stats["dropped_empty"]
             processed_path = final_srt_path
             logger.info(
                 "[QwenPipeline PID %s] Phase 8: %d subtitles in final output",
@@ -1053,7 +1090,7 @@ class QwenPipeline(BasePipeline):
             "empty_removed": stats.get("empty_removed", 0),
             "cps_filtered": stats.get("cps_filtered", 0),
             "logprob_filtered": 0,       # N/A for Qwen pipeline
-            "nonverbal_filtered": 0,     # N/A for Qwen pipeline
+            "nonverbal_filtered": stats.get("nonverbal_dropped", 0),  # v1.9.0 nonverbal line filter
         }
 
         # ==============================================================
