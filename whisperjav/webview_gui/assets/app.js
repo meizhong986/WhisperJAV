@@ -256,11 +256,11 @@ const QwenManager = {
         safe_chunking: true,
         scene_min_duration: 12,
         scene_max_duration: 48,
-        chunk_threshold_ms: 400,
-        max_group_duration: 4,
-        vad_threshold: 0.35,
+        chunk_threshold_ms: 300,
+        max_group_duration: 3,
+        vad_threshold: 0.25,
         vad_start_pad: 100,
-        vad_end_pad: 200,
+        vad_end_pad: 100,
         // Scene detection (from main dropdown)
         scene: 'semantic',
         input_mode: 'assembly',
@@ -3372,8 +3372,8 @@ const EnsembleManager = {
                 currentValues.timestamp_mode = 'vad_only';
                 currentValues.assembly_cleaner = 'passthrough';
                 currentValues.stepdown = false;
-                currentValues.chunk_threshold_ms = 400;
-                currentValues.max_group_duration = 4;
+                currentValues.chunk_threshold_ms = 300;
+                currentValues.max_group_duration = 3;
             }
 
             // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).
@@ -4881,8 +4881,8 @@ const EnsembleManager = {
             defaults.timestamp_mode = 'vad_only';
             defaults.assembly_cleaner = 'passthrough';
             defaults.stepdown = false;
-            defaults.chunk_threshold_ms = 400;
-            defaults.max_group_duration = 4;
+            defaults.chunk_threshold_ms = 300;
+            defaults.max_group_duration = 3;
         } else if (passState.isCohere) {
             // Cohere defaults — mirror the openCustomize override (D2/D3/D7).
             defaults.model_id = 'CohereLabs/cohere-transcribe-03-2026';

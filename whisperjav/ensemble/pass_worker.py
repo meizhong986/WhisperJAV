@@ -1187,6 +1187,16 @@ def _build_pipeline(
         if _cli_vad_thr is not None:
             user_segmenter_overrides["threshold"] = max(0.0, min(1.0, float(_cli_vad_thr)))
             logger.debug("Pass %s: CLI vad_threshold override = %s", pass_number, _cli_vad_thr)
+        # v1.9.0 JAV retune: anime-whisper + qwen3 default the VAD threshold to
+        # 0.25 (they otherwise inherit whisperseg's 'balanced' 0.35). DEFAULT
+        # only — the GUI slider / CLI override above wins when the user set one.
+        # Cohere excluded (keeps its sensitivity-resolved threshold). Layered as
+        # a user-override so it sits above the sensitivity preset; note this makes
+        # the sensitivity threshold-gradient inert for anime/qwen3, which matches
+        # the existing design (the sensitivity dropdown is disabled for these
+        # backends in the GUI — the explicit slider is the control surface).
+        if "threshold" not in user_segmenter_overrides and _aw_gen in ("anime-whisper", "qwen3"):
+            user_segmenter_overrides["threshold"] = 0.25
         # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
         # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")
@@ -1244,9 +1254,9 @@ def _build_pipeline(
             if "stepdown" not in _user_qwen:
                 qwen_pipeline_params["stepdown_enabled"] = False
             if "chunk_threshold" not in _user_qwen:
-                qwen_pipeline_params["segmenter_chunk_threshold"] = 0.4  # v1.9.0 JAV retune (was 0.5)
+                qwen_pipeline_params["segmenter_chunk_threshold"] = 0.3  # v1.9.0 JAV retune (300ms, owner Option B)
             if "max_group_duration" not in _user_qwen:
-                qwen_pipeline_params["segmenter_max_group_duration"] = 4.0  # v1.9.0 JAV retune (was 5.0)
+                qwen_pipeline_params["segmenter_max_group_duration"] = 3.0  # v1.9.0 JAV retune (3.0s, owner Option B)
         elif _gen_backend == "cohere":
             # Cohere Transcribe defaults (D7: Qwen3 ForcedAligner ON by default).
             # User can disable aligner via Customize Parameters; the customize

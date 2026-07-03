@@ -1167,6 +1167,11 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
             _user_vad_overrides["threshold"] = _vad_thr
+        # v1.9.0 JAV retune: anime-whisper + qwen3 default the VAD threshold to
+        # 0.25 (they otherwise inherit whisperseg's 'balanced' 0.35). Default
+        # only — an explicit --qwen-vad-threshold above wins. Cohere excluded.
+        if "threshold" not in _user_vad_overrides and _gen_backend_early in ("anime-whisper", "qwen3"):
+            _user_vad_overrides["threshold"] = 0.25
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
         # below, NOT into segmenter_config — the pipeline injects start/end pad at
         # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
@@ -1270,9 +1275,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             if not any(a.startswith('--qwen-stepdown') for a in sys.argv):
                 qwen_kwargs["stepdown_enabled"] = False
             if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
-                qwen_kwargs["segmenter_chunk_threshold"] = 0.4  # v1.9.0 JAV retune (was 0.5)
+                qwen_kwargs["segmenter_chunk_threshold"] = 0.3  # v1.9.0 JAV retune (300ms, owner Option B)
             if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
-                qwen_kwargs["segmenter_max_group_duration"] = 4.0  # v1.9.0 JAV retune (was 5.0)
+                qwen_kwargs["segmenter_max_group_duration"] = 3.0  # v1.9.0 JAV retune (3.0s, owner Option B)
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode

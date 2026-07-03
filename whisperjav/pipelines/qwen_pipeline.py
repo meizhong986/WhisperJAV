@@ -116,10 +116,10 @@ class QwenPipeline(BasePipeline):
         # Speech segmentation / VAD (Phase 4)
         # v1.8.13: default flipped silero-v6.2 -> whisperseg (system-wide default flip).
         speech_segmenter: str = "whisperseg",
-        segmenter_max_group_duration: float = 4.0,  # v1.9.0 JAV retune (was 6.0). CLI: --qwen-max-group-duration
-        segmenter_chunk_threshold: float = 0.4,  # v1.9.0 JAV retune: group only if gap < 0.4s/400ms (was 1.0)
+        segmenter_max_group_duration: float = 3.0,  # v1.9.0 JAV retune (300/3.0 grouping, owner Option B). CLI: --qwen-max-group-duration
+        segmenter_chunk_threshold: float = 0.3,  # v1.9.0 JAV retune: group only if gap < 0.3s/300ms
         segmenter_start_pad_ms: int = 100,  # v1.9.0 asymmetric pad before speech onset
-        segmenter_end_pad_ms: int = 200,    # v1.9.0 asymmetric pad after speech offset (end-of-speech is critical)
+        segmenter_end_pad_ms: int = 100,    # v1.9.0 JAV retune: symmetric 100/100 (owner-validated end pad)
         segmenter_config: Optional[Dict[str, Any]] = None,  # GUI/CLI custom segmenter params
 
         # Qwen ASR (Phase 5)
@@ -288,15 +288,24 @@ class QwenPipeline(BasePipeline):
         # that anime-whisper takes whisperseg by default when the user
         # doesn't pass an explicit segmenter, so removing this override
         # preserves the default behavior while honoring explicit choices.
-        # The other anime-whisper presets (timestamp_mode, cleaner,
-        # stepdown, chunk/max_group) remain because they are tightly
-        # coupled to the anime-whisper generator's expectations.
+        # The other anime-whisper presets (timestamp_mode, cleaner, stepdown)
+        # remain because they are tightly coupled to the anime-whisper
+        # generator's expectations.
+        #
+        # v1.9.0: the chunk_threshold/max_group override that used to live here
+        # (0.5/5.0) was REMOVED. It unconditionally clobbered the constructor
+        # kwarg AFTER lines 232-233 assigned it, silently defeating the GUI
+        # "Frame Gap"/"Max Group" sliders, the --qwen-chunk-threshold/
+        # --qwen-max-group-duration CLI flags, and the ensemble anime-branch
+        # default — anime-whisper always grouped at 0.5/5.0 regardless of input.
+        # Those two values now flow purely from the constructor kwargs (default
+        # 0.3/3.0, lines 119-120), so upstream config finally takes effect.
+        # Cohere keeps its override below (its standalone path has no CLI branch
+        # to supply the value, and the owner scoped this retune to qwen3+anime).
         if generator_backend == "anime-whisper":
             self.timestamp_mode = TimestampMode.VAD_ONLY
             self.assembly_cleaner_enabled = False
             self.stepdown_enabled = False
-            self.segmenter_chunk_threshold = 0.5
-            self.segmenter_max_group_duration = 5.0
         elif generator_backend == "cohere":
             # D7: Qwen3 ForcedAligner is the default for word-level timestamps
             # (Cohere has no native timestamps — see HF discussion #19).
@@ -755,10 +764,12 @@ class QwenPipeline(BasePipeline):
             from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
             segmenter_kwargs = dict(self.segmenter_config or {})
             segmenter_kwargs["max_group_duration_s"] = self.segmenter_max_group_duration
-            # v1.8.12: forward chunk_threshold_s so anime-mode override (0.5) and
-            # any pipeline-constructor override actually reach the factory.
-            # Prior to this, only max_group_duration_s was injected and the
-            # chunk_threshold from segmenter_config (YAML) silently won.
+            # v1.8.12: forward chunk_threshold_s so the constructor value (GUI
+            # slider / CLI flag / ensemble default / default 0.3) reaches the
+            # factory. Injected AFTER copying segmenter_config so the scalar wins
+            # over any chunk_threshold_s that rode in via the YAML/sensitivity.
+            # (v1.9.0: the old anime 0.5 clobber that fed this was removed — see
+            # the __init__ note near the generator_backend branch.)
             segmenter_kwargs["chunk_threshold_s"] = self.segmenter_chunk_threshold
             # v1.9.0: asymmetric padding — the pipeline owns the qwen/anime defaults
             # (start 100 / end 200 ms). Same scalar-injection pattern as group/chunk:

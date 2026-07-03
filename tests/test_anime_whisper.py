@@ -323,3 +323,42 @@ class TestBackwardCompatibility:
         source = inspect.getsource(main_module.parse_arguments)
         assert "--qwen-generator" in source
         assert "anime-whisper" in source
+
+
+# ─── VAD grouping defaults / clobber regression (v1.9.0) ─────────────────────
+
+class TestAnimeSegmenterGrouping:
+    """Regression guard for the v1.9.0 anime-whisper VAD grouping fix.
+
+    Before v1.9.0, QwenPipeline.__init__ unconditionally reset
+    segmenter_chunk_threshold=0.5 / segmenter_max_group_duration=5.0 for
+    anime-whisper AFTER assigning the constructor kwargs — silently defeating
+    the GUI sliders, the CLI flags and the ensemble default. These tests lock
+    in (a) the new defaults and (b) that an explicit caller value survives.
+    """
+
+    def test_anime_default_grouping_is_option_b(self, tmp_path):
+        """Constructor defaults for anime-whisper are 0.3s / 3.0s, end-pad 100ms."""
+        from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+        pipeline = QwenPipeline(
+            output_dir=str(tmp_path / "out"),
+            temp_dir=str(tmp_path / "tmp"),
+            generator_backend="anime-whisper",
+        )
+        assert pipeline.segmenter_chunk_threshold == 0.3
+        assert pipeline.segmenter_max_group_duration == 3.0
+        assert pipeline.segmenter_start_pad_ms == 100
+        assert pipeline.segmenter_end_pad_ms == 100
+
+    def test_anime_does_not_clobber_explicit_grouping(self, tmp_path):
+        """An explicit grouping kwarg must survive (no anime 0.5/5.0 clobber)."""
+        from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+        pipeline = QwenPipeline(
+            output_dir=str(tmp_path / "out"),
+            temp_dir=str(tmp_path / "tmp"),
+            generator_backend="anime-whisper",
+            segmenter_chunk_threshold=0.35,
+            segmenter_max_group_duration=3.5,
+        )
+        assert pipeline.segmenter_chunk_threshold == 0.35
+        assert pipeline.segmenter_max_group_duration == 3.5
