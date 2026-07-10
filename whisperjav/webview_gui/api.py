@@ -1937,13 +1937,37 @@ class WhisperJAVAPI:
             }
         }
 
-    def get_qwen_schema(self) -> Dict[str, Any]:
+    def get_qwen_schema(self, sensitivity: str = "balanced",
+                        generator_backend: str = "qwen3") -> Dict[str, Any]:
         """
-        Get parameter schema for Qwen3-ASR pipeline customize modal.
+        Get parameter schema for the Qwen / ChronosJAV customize modal.
 
-        Returns the schema used by the frontend to generate the customize
-        modal UI for Qwen3-ASR pipeline parameters.  Organized into 5
-        pipeline-stage sections: model, audio, generation, alignment, output.
+        For the **anime-whisper** backend, the 5 WhisperSeg VAD fields (Frame
+        Gap, Max Group, VAD Threshold, Start/End Pad) are defaulted from the
+        owner's per-sensitivity table (single source of truth) so the Customize
+        dialog shows exactly what will run at the pass's selected sensitivity.
+        Balanced is the fallback for an unknown sensitivity. qwen3 / cohere are
+        unaffected (they keep the static schema defaults).
+        """
+        result = self._get_qwen_schema_base()
+        if generator_backend == "anime-whisper" and result.get("success"):
+            from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+            aw = anime_whisperseg_defaults(sensitivity)
+            audio = result["schema"]["audio"]
+            audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
+            audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
+            audio["vad_threshold"]["default"] = aw["threshold"]
+            audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
+            audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
+        return result
+
+    def _get_qwen_schema_base(self) -> Dict[str, Any]:
+        """
+        Build the static Qwen customize-modal schema (backend-agnostic).
+
+        Organized into 5 pipeline-stage sections: model, audio, generation,
+        alignment, output. Anime-whisper per-sensitivity overrides are applied
+        by the public get_qwen_schema() wrapper.
         """
         return {
             "success": True,

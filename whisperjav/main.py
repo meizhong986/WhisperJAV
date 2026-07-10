@@ -1160,6 +1160,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         from whisperjav.ensemble.pass_worker import resolve_qwen_sensitivity, SEGMENTER_PARAMS
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
@@ -1175,11 +1176,17 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
             _user_vad_overrides["threshold"] = _vad_thr
-        # v1.9.0 JAV retune: anime-whisper + qwen3 default the VAD threshold to
-        # 0.25 (they otherwise inherit whisperseg's 'balanced' 0.35). Default
-        # only — an explicit --qwen-vad-threshold above wins. Cohere excluded.
-        if "threshold" not in _user_vad_overrides and _gen_backend_early in ("anime-whisper", "qwen3"):
-            _user_vad_overrides["threshold"] = 0.25
+        # v1.9.0 JAV retune: default the VAD threshold when the user gave none.
+        #   anime-whisper -> per-sensitivity value from the owner table
+        #                    (conservative 0.35 / balanced 0.30 / aggressive 0.25)
+        #   qwen3         -> flat 0.25 (unchanged; the per-sensitivity gradient is
+        #                    scoped to anime-whisper only). Cohere excluded.
+        # An explicit --qwen-vad-threshold above always wins.
+        if "threshold" not in _user_vad_overrides:
+            if _gen_backend_early == "anime-whisper":
+                _user_vad_overrides["threshold"] = anime_whisperseg_defaults(_qwen_sensitivity)["threshold"]
+            elif _gen_backend_early == "qwen3":
+                _user_vad_overrides["threshold"] = 0.25
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
         # below, NOT into segmenter_config — the pipeline injects start/end pad at
         # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
@@ -1276,6 +1283,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # unless the user explicitly set them via CLI flags
         _gen_backend = qwen_kwargs.get("generator_backend", "qwen3")
         if _gen_backend == "anime-whisper":
+            # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
+            # source of truth). Balanced is the fallback for unknown sensitivity.
+            _aw_vad = anime_whisperseg_defaults(_qwen_sensitivity)
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "litagin/anime-whisper"
             if not any(a.startswith('--qwen-timestamp-mode') for a in sys.argv):
@@ -1285,9 +1295,15 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             if not any(a.startswith('--qwen-stepdown') for a in sys.argv):
                 qwen_kwargs["stepdown_enabled"] = False
             if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
-                qwen_kwargs["segmenter_chunk_threshold"] = 0.3  # v1.9.0 JAV retune (300ms, owner Option B)
+                qwen_kwargs["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
             if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
-                qwen_kwargs["segmenter_max_group_duration"] = 3.0  # v1.9.0 JAV retune (3.0s, owner Option B)
+                qwen_kwargs["segmenter_max_group_duration"] = _aw_vad["max_group_duration_s"]
+            # Per-sensitivity padding. The explicit pad flags (applied above) win;
+            # --qwen-vad-padding sets both sides symmetrically, so it gates both.
+            if not any(a.startswith(('--qwen-vad-start-pad', '--qwen-vad-padding')) for a in sys.argv):
+                qwen_kwargs["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
+            if not any(a.startswith(('--qwen-vad-end-pad', '--qwen-vad-padding')) for a in sys.argv):
+                qwen_kwargs["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode

@@ -362,3 +362,106 @@ class TestAnimeSegmenterGrouping:
         )
         assert pipeline.segmenter_chunk_threshold == 0.35
         assert pipeline.segmenter_max_group_duration == 3.5
+
+
+# ─── Per-sensitivity WhisperSeg VAD defaults (v1.9.0, owner table) ───────────
+
+class TestAnimeWhisperSegDefaults:
+    """Lock the owner-specified per-sensitivity WhisperSeg VAD defaults for the
+    anime-whisper backend (single source of truth in
+    whisperjav/config/anime_whisper_vad.py). These are read by main.py
+    (standalone), pass_worker.py (ensemble) and webview_gui/api.py (Customize
+    dialog), so any drift here is a cross-area contract break.
+    """
+
+    # (sensitivity, chunk_threshold_s, max_group_duration_s, threshold, start_pad_ms, end_pad_ms)
+    EXPECTED = [
+        ("conservative", 0.3,  3.0, 0.35, 100, 100),
+        ("balanced",     0.25, 2.5, 0.30, 50,  50),
+        ("aggressive",   0.2,  2.0, 0.25, 0,   0),
+    ]
+
+    @pytest.mark.parametrize("sens,chunk,mg,thr,sp,ep", EXPECTED)
+    def test_row_values(self, sens, chunk, mg, thr, sp, ep):
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        d = anime_whisperseg_defaults(sens)
+        assert d["chunk_threshold_s"] == chunk
+        assert d["max_group_duration_s"] == mg
+        assert d["threshold"] == thr
+        assert d["start_pad_ms"] == sp
+        assert d["end_pad_ms"] == ep
+
+    def test_unknown_sensitivity_falls_back_to_balanced(self):
+        """Owner rule: any unknown/None sensitivity uses the BALANCED row."""
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        balanced = anime_whisperseg_defaults("balanced")
+        assert anime_whisperseg_defaults("nonsense") == balanced
+        assert anime_whisperseg_defaults("") == balanced
+        assert anime_whisperseg_defaults(None) == balanced
+
+    def test_case_insensitive(self):
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        assert anime_whisperseg_defaults("AGGRESSIVE") == anime_whisperseg_defaults("aggressive")
+
+    def test_returns_mutable_copy(self):
+        """Callers mutate the result (int() casts, etc.); must not alias the table."""
+        from whisperjav.config.anime_whisper_vad import (
+            anime_whisperseg_defaults,
+            ANIME_WHISPER_WHISPERSEG_DEFAULTS,
+        )
+        d = anime_whisperseg_defaults("balanced")
+        d["threshold"] = 0.99
+        assert ANIME_WHISPER_WHISPERSEG_DEFAULTS["balanced"]["threshold"] == 0.30
+
+
+class TestAnimeFramerBindsAllVadParams:
+    """The vad-grouped framer's own segmenter is the BINDING VAD for anime
+    (VAD_ONLY). These tests prove all 5 owner params reach that framer segmenter:
+    grouping (max_group / chunk_threshold) via explicit framer kwargs, and pads
+    via the anime-scoped segmenter_config forward in _build_subtitle_pipeline.
+    (Threshold rides in segmenter_config and is covered by the resolver tests.)
+    """
+
+    def _anime_pipeline(self, tmp_path, **kw):
+        from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+        return QwenPipeline(
+            output_dir=str(tmp_path / "out"),
+            temp_dir=str(tmp_path / "tmp"),
+            generator_backend="anime-whisper",
+            **kw,
+        )
+
+    def test_framer_receives_grouping_and_pads(self, tmp_path):
+        pipeline = self._anime_pipeline(
+            tmp_path,
+            segmenter_chunk_threshold=0.25,
+            segmenter_max_group_duration=2.5,
+            segmenter_start_pad_ms=50,
+            segmenter_end_pad_ms=50,
+        )
+        framer = pipeline._subtitle_pipeline.framer
+        assert framer._max_group == 2.5
+        assert framer._chunk_threshold == 0.25
+        assert framer._segmenter_config["start_pad_ms"] == 50
+        assert framer._segmenter_config["end_pad_ms"] == 50
+
+    def test_framer_pads_default_to_conservative_ctor(self, tmp_path):
+        """Default anime ctor pads (100/100) must reach the framer segmenter too."""
+        pipeline = self._anime_pipeline(tmp_path)
+        framer = pipeline._subtitle_pipeline.framer
+        assert framer._segmenter_config["start_pad_ms"] == 100
+        assert framer._segmenter_config["end_pad_ms"] == 100
+
+    def test_qwen3_framer_config_not_pad_forwarded(self, tmp_path):
+        """Anime-scoped: qwen3 framer must NOT get the pad-scalar forward."""
+        from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+        pipeline = QwenPipeline(
+            output_dir=str(tmp_path / "out"),
+            temp_dir=str(tmp_path / "tmp"),
+            generator_backend="qwen3",
+            segmenter_start_pad_ms=50,
+            segmenter_end_pad_ms=50,
+        )
+        framer = pipeline._subtitle_pipeline.framer
+        assert "start_pad_ms" not in framer._segmenter_config
+        assert "end_pad_ms" not in framer._segmenter_config

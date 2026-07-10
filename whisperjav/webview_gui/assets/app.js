@@ -3339,8 +3339,13 @@ const EnsembleManager = {
         const passState = this.state[passKey];
 
         try {
-            // Get Qwen parameter schema from API
-            const result = await pywebview.api.get_qwen_schema();
+            // Get Qwen parameter schema from API. Pass sensitivity + backend so
+            // anime-whisper receives its per-sensitivity WhisperSeg VAD defaults
+            // (single source of truth in Python); qwen3 / cohere are unaffected.
+            const qwenBackend = passState.isAnimeWhisper ? 'anime-whisper'
+                : (passState.isCohere ? 'cohere' : 'qwen3');
+            const result = await pywebview.api.get_qwen_schema(
+                passState.sensitivity || 'balanced', qwenBackend);
 
             if (!result.success) {
                 ErrorHandler.show('Error', 'Failed to load Qwen3-ASR parameters: ' + (result.error || 'Unknown error'));
@@ -3364,7 +3369,10 @@ const EnsembleManager = {
                 ? { ...passState.params }
                 : { ...QwenManager.defaults };
 
-            // Override defaults for anime-whisper when not customized
+            // Override defaults for anime-whisper when not customized. The 5
+            // WhisperSeg VAD fields are read from the sensitivity-aware schema
+            // (Python is the single source of truth), so the dialog shows exactly
+            // what will run at this pass's selected sensitivity.
             if (passState.isAnimeWhisper && !passState.customized) {
                 currentValues.model_id = 'litagin/anime-whisper';
                 currentValues.repetition_penalty = 1.0;
@@ -3372,8 +3380,12 @@ const EnsembleManager = {
                 currentValues.timestamp_mode = 'vad_only';
                 currentValues.assembly_cleaner = 'passthrough';
                 currentValues.stepdown = false;
-                currentValues.chunk_threshold_ms = 300;
-                currentValues.max_group_duration = 3;
+                const aud = result.schema.audio;
+                currentValues.chunk_threshold_ms = aud.chunk_threshold_ms.default;
+                currentValues.max_group_duration = aud.max_group_duration.default;
+                currentValues.vad_threshold = aud.vad_threshold.default;
+                currentValues.vad_start_pad = aud.vad_start_pad.default;
+                currentValues.vad_end_pad = aud.vad_end_pad.default;
             }
 
             // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).

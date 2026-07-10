@@ -429,11 +429,24 @@ class QwenPipeline(BasePipeline):
         # TemporalFramer: selected by --qwen-framer (default: full-scene)
         framer_kwargs = {}
         if self.framer_backend == "vad-grouped":
+            _framer_segmenter_config = dict(self.segmenter_config or {})
+            # v1.9.0: anime-whisper is VAD_ONLY — the framer's OWN segmenter (built
+            # inside VadGroupedFramer._ensure_segmenter) produces the binding subtitle
+            # boundaries, and it reads padding from segmenter_config only. The
+            # pipeline's start/end pad SCALARS are injected into the Phase-4 segmenter
+            # (process(), Phase 4) but do NOT reach the framer segmenter — so without
+            # this forward, the per-sensitivity Start/End Pad would silently use the
+            # backend's speech_pad_ms fallback instead of the owner's values. Forward
+            # them here so all 5 anime VAD defaults actually bind. Anime-scoped:
+            # qwen3/cohere keep their existing framer segmenter_config untouched.
+            if self.generator_backend == "anime-whisper":
+                _framer_segmenter_config["start_pad_ms"] = self.segmenter_start_pad_ms
+                _framer_segmenter_config["end_pad_ms"] = self.segmenter_end_pad_ms
             framer_kwargs = {
                 "segmenter_backend": self.segmenter_backend,
                 "max_group_duration_s": self.segmenter_max_group_duration,
                 "chunk_threshold_s": self.segmenter_chunk_threshold,
-                "segmenter_config": self.segmenter_config,
+                "segmenter_config": _framer_segmenter_config,
             }
         elif self.framer_backend == "srt-source":
             if not self.framer_srt_path:

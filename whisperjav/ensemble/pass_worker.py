@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
 from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -1187,16 +1188,20 @@ def _build_pipeline(
         if _cli_vad_thr is not None:
             user_segmenter_overrides["threshold"] = max(0.0, min(1.0, float(_cli_vad_thr)))
             logger.debug("Pass %s: CLI vad_threshold override = %s", pass_number, _cli_vad_thr)
-        # v1.9.0 JAV retune: anime-whisper + qwen3 default the VAD threshold to
-        # 0.25 (they otherwise inherit whisperseg's 'balanced' 0.35). DEFAULT
-        # only — the GUI slider / CLI override above wins when the user set one.
-        # Cohere excluded (keeps its sensitivity-resolved threshold). Layered as
-        # a user-override so it sits above the sensitivity preset; note this makes
-        # the sensitivity threshold-gradient inert for anime/qwen3, which matches
-        # the existing design (the sensitivity dropdown is disabled for these
-        # backends in the GUI — the explicit slider is the control surface).
-        if "threshold" not in user_segmenter_overrides and _aw_gen in ("anime-whisper", "qwen3"):
-            user_segmenter_overrides["threshold"] = 0.25
+        # v1.9.0 JAV retune: default the VAD threshold when the user set none via
+        # slider/CLI. DEFAULT only — the GUI slider / CLI override above wins.
+        #   anime-whisper -> per-sensitivity value from the owner table
+        #                    (conservative 0.35 / balanced 0.30 / aggressive 0.25).
+        #                    The GUI Ensemble tab exposes a per-pass sensitivity
+        #                    selector for anime, so this gradient is live.
+        #   qwen3         -> flat 0.25 (unchanged; gradient scoped to anime only).
+        # Cohere excluded (keeps its sensitivity-resolved threshold). Layered as a
+        # user-override so it sits above the sensitivity preset.
+        if "threshold" not in user_segmenter_overrides:
+            if _aw_gen == "anime-whisper":
+                user_segmenter_overrides["threshold"] = anime_whisperseg_defaults(qwen_sensitivity)["threshold"]
+            elif _aw_gen == "qwen3":
+                user_segmenter_overrides["threshold"] = 0.25
         # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
         # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")
@@ -1245,6 +1250,11 @@ def _build_pipeline(
         _gen_backend = qwen_pipeline_params.get("generator_backend", "qwen3")
         if _gen_backend == "anime-whisper":
             _user_qwen = pass_config.get("qwen_params") or {}
+            # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
+            # source of truth). Balanced is the fallback for unknown sensitivity.
+            # Each still gated on the user NOT having set it explicitly, so GUI
+            # sliders / CLI (applied below via qwen_defaults) win.
+            _aw_vad = anime_whisperseg_defaults(qwen_sensitivity)
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
             if "timestamp_mode" not in _user_qwen:
@@ -1254,9 +1264,13 @@ def _build_pipeline(
             if "stepdown" not in _user_qwen:
                 qwen_pipeline_params["stepdown_enabled"] = False
             if "chunk_threshold" not in _user_qwen:
-                qwen_pipeline_params["segmenter_chunk_threshold"] = 0.3  # v1.9.0 JAV retune (300ms, owner Option B)
+                qwen_pipeline_params["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
             if "max_group_duration" not in _user_qwen:
-                qwen_pipeline_params["segmenter_max_group_duration"] = 3.0  # v1.9.0 JAV retune (3.0s, owner Option B)
+                qwen_pipeline_params["segmenter_max_group_duration"] = _aw_vad["max_group_duration_s"]
+            if "vad_padding" not in _user_qwen and "vad_start_pad" not in _user_qwen:
+                qwen_pipeline_params["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
+            if "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
+                qwen_pipeline_params["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
         elif _gen_backend == "cohere":
             # Cohere Transcribe defaults (D7: Qwen3 ForcedAligner ON by default).
             # User can disable aligner via Customize Parameters; the customize
